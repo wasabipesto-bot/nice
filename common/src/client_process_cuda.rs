@@ -38,7 +38,7 @@ use crate::client_process::{process_range_detailed, process_range_niceonly};
 use crate::gpu_config::{
     MAX_GPU_DIGIT_MASK_BASE, chunk_constants, gpu_supports_base, prefilter_params,
 };
-use crate::gpu_niceonly::{RangeSink, report_field, run_range_pipeline};
+use crate::gpu_niceonly::{RangeSink, lane_shift_for, report_field, run_range_pipeline};
 use crate::{
     CLIENT_VERSION, DataToClient, DataToServer, FieldResults, FieldSize, NiceNumberSimple,
     UniquesDistributionSimple,
@@ -85,6 +85,9 @@ struct NiceonlyPlan {
     residues: CudaSlice<u32>,
     modulus: u32,
     num_residues: u32,
+    /// The kernel was compiled with COUNTERS (`NICE_CUDA_PROBE=counters`)
+    /// and takes the extra counter-buffer argument.
+    counters: bool,
 }
 
 /// GPU context: CUDA device handle plus caches of per-base compiled kernels.
@@ -167,6 +170,7 @@ impl CudaContext {
             residues,
             modulus,
             num_residues,
+            counters: defines.iter().any(|d| d == "COUNTERS"),
         });
         self.niceonly_plans
             .lock()
@@ -215,12 +219,17 @@ fn common_defines(base: u32) -> Result<Vec<String>> {
     let n_bits = 128 - n_max.leading_zeros();
     let n_limbs = n_bits.div_ceil(32).max(1);
     let (chunk_digits, chunk_div) = chunk_constants(base);
-    Ok(vec![
+    let mut defines = vec![
         format!("BASE={base}"),
         format!("N_LIMBS={n_limbs}"),
         format!("CHUNK_DIGITS={chunk_digits}"),
         format!("CHUNK_DIV={chunk_div}u"),
-    ])
+    ];
+    // A/B pin for the symmetric-square specialization (both kernels).
+    if std::env::var("NICE_CUDA_GENERIC_SQUARE").is_ok_and(|v| v == "1") {
+        defines.push("GENERIC_SQUARE".to_string());
+    }
+    Ok(defines)
 }
 
 fn detailed_defines(base: u32) -> Result<Vec<String>> {
@@ -264,6 +273,22 @@ fn niceonly_defines(base: u32) -> Result<(Vec<String>, stride_filter::StrideTabl
         defines.push(format!("POW64_MOD_PRE={}ull", pre.pow64_mod));
     } else {
         debug!("modular prefilter disabled for base {base}");
+    }
+    // Diagnostic probe builds. `counters` tallies the filter cascade;
+    // `stop_pre`/`stop_sq` truncate the check for stage timing (results are
+    // garbage — never run them against a real claim).
+    match std::env::var("NICE_CUDA_PROBE").as_deref() {
+        Ok("counters") => defines.push("COUNTERS".to_string()),
+        Ok("stop_pre") => {
+            warn!("NICE_CUDA_PROBE=stop_pre: niceonly results are invalid (timing probe)");
+            defines.push("EARLY_STOP_PRE".to_string());
+        }
+        Ok("stop_sq") => {
+            warn!("NICE_CUDA_PROBE=stop_sq: niceonly results are invalid (timing probe)");
+            defines.push("EARLY_STOP_SQ".to_string());
+        }
+        Ok(other) if !other.is_empty() => warn!("ignoring unknown NICE_CUDA_PROBE '{other}'"),
+        _ => {}
     }
     Ok((defines, table))
 }
@@ -355,11 +380,23 @@ struct NiceonlyLauncher<'a> {
     field_start_hi: u64,
     d_nice_out: CudaSlice<u64>,
     d_nice_count: CudaSlice<u32>,
+    /// Cascade counters, allocated only for COUNTERS probe builds.
+    d_counters: Option<CudaSlice<u64>>,
+    /// `log2(lanes per range)` pinned via `NICE_CUDA_LANES`, or None for the
+    /// per-dispatch adaptive tiling.
+    lane_shift_pin: Option<u32>,
 }
 
 impl<'a> NiceonlyLauncher<'a> {
     fn new(ctx: &'a CudaContext, plan: &'a NiceonlyPlan, range: &FieldSize) -> Result<Self> {
         let (field_start_lo, field_start_hi) = split_u128(range.start());
+        // NICE_CUDA_LANES pins the tiling for A/B measurement, the same knob
+        // as NICE_CUBECL_LANES / NICE_VULKAN_LANES on the other backends.
+        let lane_shift_pin = std::env::var("NICE_CUDA_LANES")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .filter(|n| n.is_power_of_two() && *n <= 32)
+            .map(u32::trailing_zeros);
         Ok(NiceonlyLauncher {
             ctx,
             plan,
@@ -367,11 +404,26 @@ impl<'a> NiceonlyLauncher<'a> {
             field_start_hi,
             d_nice_out: ctx.stream.alloc_zeros::<u64>(2 * NICE_OUT_CAPACITY)?,
             d_nice_count: ctx.stream.alloc_zeros::<u32>(1)?,
+            d_counters: if plan.counters {
+                Some(ctx.stream.alloc_zeros::<u64>(6)?)
+            } else {
+                None
+            },
+            lane_shift_pin,
         })
     }
 
     /// Synchronize and collect the found nice numbers.
     fn finish(self) -> Result<Vec<NiceNumberSimple>> {
+        if let Some(d_counters) = &self.d_counters {
+            let c = self.ctx.stream.clone_dtoh(d_counters)?;
+            // Deliberately loud: counter runs exist to be read off the log.
+            warn!(
+                "CUDA cascade counters b{}: candidates {}, prefilter-pass {}, sq-pass {}, \
+                 warp-iters {}, warp-iters-any-pre {}, warp-iters-any-sq {}",
+                self.plan.base, c[0], c[1], c[2], c[3], c[4], c[5],
+            );
+        }
         let nice_count = self.ctx.stream.clone_dtoh(&self.d_nice_count)?[0] as usize;
         if nice_count > NICE_OUT_CAPACITY {
             bail!(
@@ -408,8 +460,22 @@ impl RangeSink for NiceonlyLauncher<'_> {
             let d_lens = self.ctx.stream.clone_htod(batch_lens)?;
             let num_ranges = batch_offsets.len() as u32;
 
-            // One warp per range.
-            let total_threads = u64::from(num_ranges) * 32;
+            // Tile the dispatch to this batch's ranges (see `lane_shift_for`):
+            // short ranges get fewer cooperating lanes so their per-range setup
+            // isn't replicated across a mostly idle warp. Batches are
+            // homogeneous enough for the mean length to be a good summary,
+            // because the MSD recursion bounds range length by the floor.
+            let mean_len = batch_lens.iter().map(|&l| u64::from(l)).sum::<u64>()
+                / batch_lens.len().max(1) as u64;
+            let lane_shift = self.lane_shift_pin.unwrap_or_else(|| {
+                lane_shift_for(
+                    num_ranges.into(),
+                    mean_len,
+                    self.plan.modulus,
+                    self.plan.num_residues,
+                )
+            });
+            let total_threads = u64::from(num_ranges) << lane_shift;
             let grid_blocks = total_threads.div_ceil(u64::from(BLOCK_THREADS)) as u32;
             let cfg = LaunchConfig {
                 grid_dim: (grid_blocks, 1, 1),
@@ -427,6 +493,10 @@ impl RangeSink for NiceonlyLauncher<'_> {
             launch_args.arg(&self.d_nice_out);
             launch_args.arg(&mut self.d_nice_count);
             launch_args.arg(&nice_capacity);
+            launch_args.arg(&lane_shift);
+            if let Some(d_counters) = &mut self.d_counters {
+                launch_args.arg(d_counters);
+            }
             unsafe {
                 launch_args.launch(cfg)?;
             }
@@ -763,6 +833,53 @@ mod tests {
             r[i + b.len()] = carry as u32;
         }
         r
+    }
+
+    /// Rust mirror of `square_limbs` in `nice_kernels.cu`.
+    fn mirror_square_limbs(a: &[u32]) -> Vec<u32> {
+        let ra = a.len();
+        let mut r = vec![0u32; 2 * ra];
+        for i in 0..ra {
+            let mut carry = 0u64;
+            for j in i + 1..ra {
+                let cur = u64::from(a[i]) * u64::from(a[j]) + u64::from(r[i + j]) + carry;
+                r[i + j] = cur as u32;
+                carry = cur >> 32;
+            }
+            r[i + ra] = carry as u32;
+        }
+        let mut top = 0u32;
+        for limb in &mut r {
+            let next = *limb >> 31;
+            *limb = (*limb << 1) | top;
+            top = next;
+        }
+        let mut carry = 0u64;
+        for i in 0..ra {
+            let cur = u64::from(a[i]) * u64::from(a[i]) + u64::from(r[2 * i]) + carry;
+            r[2 * i] = cur as u32;
+            let hi = (cur >> 32) + u64::from(r[2 * i + 1]);
+            r[2 * i + 1] = hi as u32;
+            carry = hi >> 32;
+        }
+        r
+    }
+
+    #[test_log::test]
+    fn mirror_square_limbs_matches_mul_limbs() {
+        let mut x: u128 = 0x2545_f491_4f6c_dd1d_8caa_1c8f_913a_7791;
+        for limbs in 1..=4usize {
+            for i in 0..2000u128 {
+                x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(i);
+                let n = x >> (128 - 32 * limbs as u32);
+                let a: Vec<u32> = (0..limbs).map(|k| (n >> (32 * k)) as u32).collect();
+                assert_eq!(
+                    mirror_square_limbs(&a),
+                    mirror_mul_limbs(&a, &a),
+                    "square mismatch at {limbs} limbs, n={n}"
+                );
+            }
+        }
     }
 
     /// Rust mirror of `scan_digits` in `nice_kernels.cu`. Returns the digits in

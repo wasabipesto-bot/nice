@@ -29,7 +29,9 @@
 // is done in u32 limbs with u64 accumulators.
 //
 // Kernel work assignment:
-//   niceonly_ranges_kernel: one warp per MSD-valid range. Candidates are
+//   niceonly_ranges_kernel: `1 << lane_shift` lanes per MSD-valid range,
+//     chosen per dispatch by the host (gpu_niceonly::lane_shift_for, the
+//     same tiling the CubeCL and Vulkan backends use). Candidates are
 //     reconstructed on-GPU from the stride residue table: the g-th valid
 //     candidate at or after range start is B0 + (g/R)*M + residues[g%R],
 //     so the host never transfers per-candidate data.
@@ -178,6 +180,43 @@ __device__ __forceinline__ void mul_limbs(
     }
 }
 
+// r[2*ra limbs] = a[ra limbs]^2. Symmetric schoolbook: each cross product
+// a[i]*a[j] with i < j is computed once and doubled, then the diagonal
+// squares are added — ra*(ra+1)/2 distinct 32x32 products instead of
+// mul_limbs's ra^2 (6 vs 9 at N_LIMBS=3). r must not alias a.
+__device__ __forceinline__ void square_limbs(const u32* a, int ra, u32* r) {
+    for (int i = 0; i < 2 * ra; i++) {
+        r[i] = 0;
+    }
+    // Strict upper triangle.
+    for (int i = 0; i < ra; i++) {
+        u64 carry = 0;
+        for (int j = i + 1; j < ra; j++) {
+            u64 cur = (u64)a[i] * a[j] + r[i + j] + carry;
+            r[i + j] = (u32)cur;
+            carry = cur >> 32;
+        }
+        r[i + ra] = (u32)carry;
+    }
+    // Double it. The top bit shifted out is always zero: twice the cross
+    // part is at most a^2, which fits in 2*ra limbs.
+    u32 top = 0;
+    for (int i = 0; i < 2 * ra; i++) {
+        u32 next = r[i] >> 31;
+        r[i] = (r[i] << 1) | top;
+        top = next;
+    }
+    // Add the diagonal a[i]^2 terms at position 2i.
+    u64 carry = 0;
+    for (int i = 0; i < ra; i++) {
+        u64 cur = (u64)a[i] * a[i] + r[2 * i] + carry;
+        r[2 * i] = (u32)cur;
+        u64 hi = (cur >> 32) + r[2 * i + 1];
+        r[2 * i + 1] = (u32)hi;
+        carry = hi >> 32;
+    }
+}
+
 // Index of the highest nonzero limb, or -1 if the value is zero.
 __device__ __forceinline__ int top_limb(const u32* v, int len) {
     int top = len - 1;
@@ -246,6 +285,14 @@ __device__ __forceinline__ bool scan_digits(u32* v, int top, DigitSet& set) {
     return true;
 }
 
+// The A/B toggle for the symmetric square: the host defines GENERIC_SQUARE
+// (via NICE_CUDA_GENERIC_SQUARE=1) to fall back to plain mul_limbs.
+#ifdef GENERIC_SQUARE
+#define SQUARE_N(n32, sq) mul_limbs(n32, N_LIMBS, n32, N_LIMBS, sq)
+#else
+#define SQUARE_N(n32, sq) square_limbs(n32, N_LIMBS, sq)
+#endif
+
 // Unpacks n = (n_lo, n_hi) into N_LIMBS u32 limbs and computes n^2 and n^3.
 __device__ __forceinline__ void square_and_cube(
     u64 n_lo, u64 n_hi, u32* sq, u32* cu
@@ -256,7 +303,7 @@ __device__ __forceinline__ void square_and_cube(
         u64 word = (i < 2) ? n_lo : n_hi;
         n32[i] = (u32)(word >> ((i & 1) * 32));
     }
-    mul_limbs(n32, N_LIMBS, n32, N_LIMBS, sq);
+    SQUARE_N(n32, sq);
     mul_limbs(sq, SQ_LIMBS, n32, N_LIMBS, cu);
 }
 
@@ -275,7 +322,7 @@ __device__ __forceinline__ bool check_is_nice(u64 n_lo, u64 n_hi) {
         n32[i] = (u32)(word >> ((i & 1) * 32));
     }
     u32 sq[SQ_LIMBS];
-    mul_limbs(n32, N_LIMBS, n32, N_LIMBS, sq);
+    SQUARE_N(n32, sq);
 
     // The scan destroys its input; keep sq intact for the cube multiply.
     u32 sq_scan[SQ_LIMBS];
@@ -290,12 +337,19 @@ __device__ __forceinline__ bool check_is_nice(u64 n_lo, u64 n_hi) {
         return false;
     }
 
+#ifdef EARLY_STOP_SQ
+    // Timing probe (NICE_CUDA_PROBE=stop_sq): drop every candidate after the
+    // square scan so the cube stage compiles out. Results are garbage; the
+    // run only measures the pre-cube share of the kernel.
+    return false;
+#else
     u32 cu[CU_LIMBS];
     mul_limbs(sq, SQ_LIMBS, n32, N_LIMBS, cu);
     if (!scan_digits<true>(cu, top_limb(cu, CU_LIMBS), set)) {
         return false;
     }
     return digitset_count(set) == BASE;
+#endif
 }
 
 // Full unique-digit count, no early exit (detailed mode).
@@ -391,8 +445,60 @@ __device__ __forceinline__ bool candidate_is_nice(u64 n_lo, u64 n_hi) {
         return false;
     }
 #endif
+#ifdef EARLY_STOP_PRE
+    // Timing probe (NICE_CUDA_PROBE=stop_pre): drop everything after the
+    // prefilter so the run measures enumeration + prefilter cost only.
+    return false;
+#else
     return check_is_nice(n_lo, n_hi);
+#endif
 }
+
+#ifdef COUNTERS
+// Instrumented mirror of candidate_is_nice for counter runs
+// (NICE_CUDA_PROBE=counters): reports which stages the candidate survived
+// instead of early-returning through the helpers, so the host can measure
+// the filter cascade's densities. Deliberately duplicates check_is_nice's
+// body; diagnostic builds only.
+__device__ __forceinline__ void candidate_stages(
+    u64 n_lo, u64 n_hi, bool& pre_ok, bool& sq_ok, bool& nice
+) {
+    pre_ok = true;
+    sq_ok = false;
+    nice = false;
+#ifdef PREFILTER
+    pre_ok = prefilter_low_digits(n_lo, n_hi);
+    if (!pre_ok) {
+        return;
+    }
+#endif
+    u32 n32[N_LIMBS];
+#pragma unroll
+    for (int i = 0; i < N_LIMBS; i++) {
+        u64 word = (i < 2) ? n_lo : n_hi;
+        n32[i] = (u32)(word >> ((i & 1) * 32));
+    }
+    u32 sq[SQ_LIMBS];
+    SQUARE_N(n32, sq);
+    u32 sq_scan[SQ_LIMBS];
+#pragma unroll
+    for (int i = 0; i < SQ_LIMBS; i++) {
+        sq_scan[i] = sq[i];
+    }
+    DigitSet set;
+    digitset_clear(set);
+    if (!scan_digits<true>(sq_scan, top_limb(sq_scan, SQ_LIMBS), set)) {
+        return;
+    }
+    sq_ok = true;
+    u32 cu[CU_LIMBS];
+    mul_limbs(sq, SQ_LIMBS, n32, N_LIMBS, cu);
+    if (!scan_digits<true>(cu, top_limb(cu, CU_LIMBS), set)) {
+        return;
+    }
+    nice = digitset_count(set) == BASE;
+}
+#endif // COUNTERS
 
 // First index in residues[0..STRIDE_R) with residues[idx] >= m, or STRIDE_R.
 __device__ __forceinline__ u32 lower_bound_residue(
@@ -411,12 +517,15 @@ __device__ __forceinline__ u32 lower_bound_residue(
     return lo;
 }
 
-// One warp per MSD-valid range. Each range is (field_start + offset,
-// field_start + offset + len). Lanes stride through the range's valid
-// candidates by global residue-sequence index; the g-th candidate at or
-// after the range start is B0 + (g / R) * M + residues[g % R], where
-// B0 = range_start - (range_start mod M) and g starts at the lower bound
-// of (range_start mod M) in the residue table.
+// `lanes = 1 << lane_shift` threads cooperate on each MSD-valid range; the
+// host sizes the tiling per dispatch (see gpu_niceonly::lane_shift_for) so
+// short ranges are not spread across a whole warp's worth of redundant
+// setup. Each range is (field_start + offset, field_start + offset + len).
+// Lanes stride through the range's valid candidates by global
+// residue-sequence index; the g-th candidate at or after the range start is
+// B0 + (g / R) * M + residues[g % R], where B0 = range_start -
+// (range_start mod M) and g starts at the lower bound of
+// (range_start mod M) in the residue table.
 extern "C" __global__ void niceonly_ranges_kernel(
     u64 field_start_lo,
     u64 field_start_hi,
@@ -426,14 +535,23 @@ extern "C" __global__ void niceonly_ranges_kernel(
     const u32* __restrict__ residues,
     u64* __restrict__ nice_out, // (lo, hi) pairs
     u32* __restrict__ nice_count,
-    u32 nice_capacity
+    u32 nice_capacity,
+    u32 lane_shift
+#ifdef COUNTERS
+    // Counter run (NICE_CUDA_PROBE=counters): [0] candidates, [1] prefilter
+    // survivors, [2] square-scan survivors, [3] warp iterations, [4] warp
+    // iterations with any prefilter survivor, [5] with any square survivor.
+    ,
+    u64* __restrict__ counters
+#endif
 ) {
     u32 gtid = blockIdx.x * blockDim.x + threadIdx.x;
-    u32 warp = gtid >> 5;
-    u32 lane = gtid & 31;
-    u32 nwarps = (gridDim.x * blockDim.x) >> 5;
+    u32 lanes = 1u << lane_shift;
+    u32 group = gtid >> lane_shift;
+    u32 lane = gtid & (lanes - 1);
+    u32 ngroups = (gridDim.x * blockDim.x) >> lane_shift;
 
-    for (u32 r = warp; r < num_ranges; r += nwarps) {
+    for (u32 r = group; r < num_ranges; r += ngroups) {
         // range_start = field_start + offset
         u64 rs_lo = field_start_lo + range_offsets[r];
         u64 rs_hi = field_start_hi + (rs_lo < field_start_lo ? 1 : 0);
@@ -449,7 +567,7 @@ extern "C" __global__ void niceonly_ranges_kernel(
         // All lanes compute the same search (cheap, keeps the warp uniform).
         u32 idx0 = lower_bound_residue(residues, m);
 
-        for (u32 g = idx0 + lane;; g += 32) {
+        for (u32 g = idx0 + lane;; g += lanes) {
             u32 cycle = g / STRIDE_R; // const divisor -> multiply-high
             u32 j = g - cycle * STRIDE_R;
             u64 add = (u64)cycle * STRIDE_M + residues[j];
@@ -458,7 +576,35 @@ extern "C" __global__ void niceonly_ranges_kernel(
             if (n_hi > re_hi || (n_hi == re_hi && n_lo >= re_lo)) {
                 break;
             }
-            if (candidate_is_nice(n_lo, n_hi)) {
+#ifdef COUNTERS
+            bool pre_ok;
+            bool sq_ok;
+            bool is_nice;
+            candidate_stages(n_lo, n_hi, pre_ok, sq_ok, is_nice);
+            // Opportunistic warp-aggregated tally: whichever lanes are
+            // co-resident ballot together and the leader commits one
+            // atomicAdd per counter, so totals stay exact without a
+            // per-candidate atomic storm.
+            unsigned mask = __activemask();
+            u32 n_cand = __popc(mask);
+            u32 n_pre = __popc(__ballot_sync(mask, pre_ok));
+            u32 n_sq = __popc(__ballot_sync(mask, sq_ok));
+            if ((threadIdx.x & 31) == (__ffs(mask) - 1)) {
+                atomicAdd(&counters[0], (u64)n_cand);
+                atomicAdd(&counters[1], (u64)n_pre);
+                atomicAdd(&counters[2], (u64)n_sq);
+                atomicAdd(&counters[3], 1ull);
+                if (n_pre != 0) {
+                    atomicAdd(&counters[4], 1ull);
+                }
+                if (n_sq != 0) {
+                    atomicAdd(&counters[5], 1ull);
+                }
+            }
+#else
+            bool is_nice = candidate_is_nice(n_lo, n_hi);
+#endif
+            if (is_nice) {
                 u32 pos = atomicAdd(nice_count, 1);
                 if (pos < nice_capacity) {
                     nice_out[2 * (size_t)pos] = n_lo;
