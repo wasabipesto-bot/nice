@@ -866,6 +866,7 @@ fn niceonly_kernel(
     #[comptime] probe: bool, // report prefilter survivors instead of nice numbers
     #[comptime] cross: bool, // cross-end residue filter (certificate x low mask)
     #[comptime] compact: bool, // plane-compact mask survivors before checking
+    #[comptime] plane_scoped: bool, // compaction queue per plane (needs Plane::Sync)
 ) {
     let cu_limbs = comptime!(3 * limbs);
     let offset_chunks = comptime!(64 / offset_chunk_bits);
@@ -887,7 +888,173 @@ fn niceonly_kernel(
     let mut sv_s = SharedMemory::<u32>::new(comptime!((WORKGROUP_SIZE * (cu_limbs | 1)) as usize));
     let svb = UNIT_POS_X * sv_pad;
 
-    if compact {
+    if comptime!(compact && plane_scoped) {
+        // Plane-scoped compaction: the same cursors and survivor production
+        // as the cube-scoped path below, but each plane owns a private
+        // queue (2*PLANE_DIM slots) in shared memory, takes positions
+        // straight from plane_exclusive_sum, fences the write->drain handoff
+        // with sync_plane, and drains in PLANE_DIM-wide waves. No cube
+        // barrier, no serial walk over plane totals, and a plane whose
+        // ranges are exhausted leaves as soon as its queue is dry instead
+        // of idling through the other planes' iterations. Control flow is
+        // plane-uniform: `qn` comes from plane_sum and `done` from
+        // plane_all. Requires Plane::Sync (spirv/msl/cuda; not wgsl).
+        let mut q_lo = SharedMemory::<u64>::new(comptime!((2 * WORKGROUP_SIZE) as usize));
+        let mut q_hi = SharedMemory::<u64>::new(comptime!((2 * WORKGROUP_SIZE) as usize));
+        let qbase = PLANE_POS * (2u32 * PLANE_DIM);
+        let lane_in_plane = UNIT_POS_X % PLANE_DIM;
+
+        let mut r = ABSOLUTE_POS_X >> lane_shift;
+        let mut have_range = r < num_ranges;
+        let mut need_setup = have_range;
+        let mut rmask = 0u64;
+        let mut re_lo = 0u64;
+        let mut re_hi = 0u64;
+        let mut b0_lo = 0u64;
+        let mut b0_hi = 0u64;
+        let mut g = 0u32;
+        let mut qn = 0u32;
+        loop {
+            if need_setup {
+                need_setup = false;
+                let off_lo = range_offsets[(2u32 * r) as usize];
+                let off_hi = range_offsets[(2u32 * r + 1u32) as usize];
+                let offset = (u64::cast_from(off_hi) << 32u64) | u64::cast_from(off_lo);
+                rmask = 0u64;
+                if cross {
+                    rmask = (u64::cast_from(range_masks[(2u32 * r + 1u32) as usize]) << 32u64)
+                        | u64::cast_from(range_masks[(2u32 * r) as usize]);
+                }
+                let rs_lo = fs_lo + offset;
+                let mut rs_hi = fs_hi;
+                if rs_lo < fs_lo {
+                    rs_hi += 1u64;
+                }
+                re_lo = rs_lo + u64::cast_from(range_lens[r as usize]);
+                re_hi = rs_hi;
+                if re_lo < rs_lo {
+                    re_hi += 1u64;
+                }
+                let mut acc = 0u32;
+                #[unroll]
+                for k in 0..offset_chunks {
+                    let word = if comptime!(k < per_word) {
+                        off_hi
+                    } else {
+                        off_lo
+                    };
+                    let shift =
+                        comptime!(32 - offset_chunk_bits - (k % per_word) * offset_chunk_bits);
+                    acc = ((acc << offset_chunk_bits) | ((word >> shift) & offset_chunk_mask))
+                        % stride_m;
+                }
+                let m = (fs_mod_m + acc) % stride_m;
+                b0_lo = rs_lo - u64::cast_from(m);
+                b0_hi = rs_hi;
+                if rs_lo < u64::cast_from(m) {
+                    b0_hi -= 1u64;
+                }
+                let mut lb_lo = 0u32;
+                let mut lb_hi = stride_r.runtime();
+                while lb_lo < lb_hi {
+                    let mid = (lb_lo + lb_hi) >> 1u32;
+                    if residues[mid as usize] < m {
+                        lb_lo = mid + 1u32;
+                    } else {
+                        lb_hi = mid;
+                    }
+                }
+                g = lb_lo + lane;
+            }
+
+            // One candidate ordinal per lane per iteration. A lane whose
+            // range just ended spends the iteration advancing its cursor
+            // and produces nothing.
+            let mut pf = 0u32;
+            let mut cand_lo = 0u64;
+            let mut cand_hi = 0u64;
+            if have_range {
+                let cycle = g / stride_r;
+                let j = g - cycle * stride_r;
+                let add = u64::cast_from(cycle) * u64::cast_from(stride_m)
+                    + u64::cast_from(residues[j as usize]);
+                let n_lo = b0_lo + add;
+                let mut n_hi = b0_hi;
+                if n_lo < b0_lo {
+                    n_hi += 1u64;
+                }
+                if n_hi > re_hi || (n_hi == re_hi && n_lo >= re_lo) {
+                    r += nwarps;
+                    if r < num_ranges {
+                        need_setup = true;
+                    } else {
+                        have_range = false;
+                    }
+                } else {
+                    let mut masked = false;
+                    if cross {
+                        let lm = (u64::cast_from(low_masks[(2u32 * j + 1u32) as usize]) << 32u64)
+                            | u64::cast_from(low_masks[(2u32 * j) as usize]);
+                        if (lm & rmask) != 0u64 {
+                            masked = true;
+                        }
+                    }
+                    if !masked {
+                        pf = 1u32;
+                        cand_lo = n_lo;
+                        cand_hi = n_hi;
+                    }
+                    g += lanes;
+                }
+            }
+
+            let idx_in_plane = plane_exclusive_sum(pf);
+            let tot = plane_sum(pf);
+            let done = plane_all(!have_range);
+            if pf != 0u32 {
+                let dst = (qbase + qn + idx_in_plane) as usize;
+                q_lo[dst] = cand_lo;
+                q_hi[dst] = cand_hi;
+            }
+            qn += tot;
+            // Queue writes become visible to the drain below.
+            sync_plane();
+
+            let mut take = 0u32;
+            if qn >= PLANE_DIM {
+                take = PLANE_DIM;
+            } else if done {
+                take = qn;
+            }
+            if lane_in_plane < take {
+                let s = (qbase + qn - take + lane_in_plane) as usize;
+                candidate_check(
+                    q_lo[s],
+                    q_hi[s],
+                    &mut sv_s,
+                    svb,
+                    nice_out,
+                    nice_count,
+                    nice_cap,
+                    base,
+                    limbs,
+                    chunk_digits,
+                    chunk_div,
+                    wide_chunk,
+                    pre_limbs,
+                    pre_chunk_digits,
+                    pre_chunk_div,
+                    probe,
+                );
+            }
+            qn -= take;
+            // Drain reads are ordered before the next iteration reuses slots.
+            sync_plane();
+            if done && qn == 0u32 {
+                break;
+            }
+        }
+    } else if compact {
         // Cube-compacted enumeration (cross filter survivors only).
         //
         // Each lane keeps its own (range, ordinal) cursor - identical
@@ -1467,7 +1634,7 @@ pub async fn process_range_detailed_cubecl_async(
 ///
 /// The wide flavor divides limb pairs with 64-bit arithmetic and is the
 /// CUDA-native form. On wgpu it is *legal* wherever the device exposes
-/// `u64` and the shader goes through one of CubeCL's direct compilers
+/// `u64` and the shader goes through one of `CubeCL`'s direct compilers
 /// (`wgpu<spirv>` / `wgpu<msl>`; naga's MSL backend miscompiles its checked
 /// u64 division), but legal is not fast: on an Apple M4 under `wgpu<msl>`
 /// the wide flavor measured 4.6x *slower* than split16 (64-bit integer
@@ -1475,15 +1642,16 @@ pub async fn process_range_detailed_cubecl_async(
 /// `NICE_CUBECL_WIDE=1` opts in for A/B runs on devices where it is legal;
 /// `NICE_CUBECL_WIDE=0` forces split16 anywhere. A forced wide flavor on a
 /// device without u64 fails at shader compile time, loudly.
-fn wide_chunk_for<R: cubecl::prelude::Runtime>(
-    client: &cubecl::prelude::ComputeClient<R>,
-) -> bool {
+fn wide_chunk_for<R: cubecl::prelude::Runtime>(client: &cubecl::prelude::ComputeClient<R>) -> bool {
     let name = R::name(client);
     let cuda = name.contains("cuda");
     let direct = name.contains("spirv") || name.contains("msl");
-    let u64_ok = client.properties().features.supports_type(cubecl::ir::Type::scalar(
-        cubecl::ir::ElemType::UInt(cubecl::ir::UIntKind::U64),
-    ));
+    let u64_ok = client
+        .properties()
+        .features
+        .supports_type(cubecl::ir::Type::scalar(cubecl::ir::ElemType::UInt(
+            cubecl::ir::UIntKind::U64,
+        )));
     let wide = match std::env::var("NICE_CUBECL_WIDE").ok().as_deref() {
         Some("0") => false,
         Some(_) => true,
@@ -1824,6 +1992,10 @@ pub struct NiceonlyPlan {
     /// Plane-compact the filter's survivors before checking them
     /// (`NICE_CUBECL_COMPACT=0` opts out; requires `cross`).
     compact: bool,
+    /// Use the plane-scoped compaction queue instead of the cube-scoped one
+    /// (`NICE_CUBECL_PLANE_COMPACT=1` opts in; requires `compact` and a
+    /// device with plane barriers).
+    plane_compact: bool,
 }
 
 impl NiceonlyPlan {
@@ -1861,6 +2033,18 @@ impl NiceonlyPlan {
             .contains(cubecl::ir::features::Plane::Ops);
         let compact =
             cross && plane_ok && std::env::var("NICE_CUBECL_COMPACT").map_or(true, |v| v != "0");
+        let plane_sync = client
+            .properties()
+            .features
+            .plane
+            .contains(cubecl::ir::features::Plane::Sync);
+        let plane_compact = compact
+            && plane_sync
+            && std::env::var("NICE_CUBECL_PLANE_COMPACT").is_ok_and(|v| v == "1");
+        debug!(
+            "CubeCL niceonly plan base {base}: cross {cross}, compact {compact} \
+             (plane ops {plane_ok}), plane-scoped {plane_compact} (plane sync {plane_sync})"
+        );
         #[allow(clippy::cast_possible_truncation)]
         let mask_words: Vec<u32> = if cross {
             table
@@ -1881,6 +2065,7 @@ impl NiceonlyPlan {
             low_masks,
             cross,
             compact,
+            plane_compact,
         })
     }
 }
@@ -1907,6 +2092,9 @@ struct CubeclNiceonlyRun<'a, R: cubecl::prelude::Runtime> {
     /// Force the compact specialization on or off (device tests).
     #[cfg(test)]
     compact_override: Option<bool>,
+    /// Force the plane-scoped queue on or off (device tests).
+    #[cfg(test)]
+    plane_override: Option<bool>,
 }
 
 impl<'a, R: cubecl::prelude::Runtime> CubeclNiceonlyRun<'a, R> {
@@ -1965,6 +2153,8 @@ impl<'a, R: cubecl::prelude::Runtime> CubeclNiceonlyRun<'a, R> {
             lane_shift_override: None,
             #[cfg(test)]
             compact_override: None,
+            #[cfg(test)]
+            plane_override: None,
         })
     }
 
@@ -2037,6 +2227,15 @@ impl<R: cubecl::prelude::Runtime> CubeclNiceonlyRun<'_, R> {
             return forced;
         }
         self.plan.compact && masks.iter().any(|&m| m != 0)
+    }
+
+    /// Whether a compacted dispatch uses the plane-scoped queue.
+    fn dispatch_plane_scoped(&self, compact: bool) -> bool {
+        #[cfg(test)]
+        if let Some(forced) = self.plane_override {
+            return compact && forced;
+        }
+        compact && self.plan.plane_compact
     }
 }
 
@@ -2152,6 +2351,7 @@ impl<R: cubecl::prelude::Runtime> RangeSink for CubeclNiceonlyRun<'_, R> {
                 self.probe,
                 self.plan.cross,
                 compact,
+                self.dispatch_plane_scoped(compact),
             );
         }
         Ok(())
@@ -2400,11 +2600,27 @@ mod tests {
                 want.len()
             );
 
-            for forced_compact in [true, false] {
+            // The plane-scoped queue needs a real subgroup barrier: llvmpipe
+            // mishandles OpControlBarrier at subgroup scope inside
+            // plane-divergent control flow (2 of 283 survivors; exact with
+            // the barriers removed), so it is only covered on hardware.
+            let plane_sync = client
+                .properties()
+                .features
+                .plane
+                .contains(cubecl::ir::features::Plane::Sync)
+                && !is_software_rasterizer(&ctx.device_name());
+            let variants: &[(bool, bool)] = if plane_sync {
+                &[(true, false), (true, true), (false, false)]
+            } else {
+                &[(true, false), (false, false)]
+            };
+            for &(forced_compact, forced_plane) in variants {
                 let mut run =
                     CubeclNiceonlyRun::new(client, base, start, false).expect("probe run");
                 run.probe = true;
                 run.compact_override = Some(forced_compact);
+                run.plane_override = Some(forced_plane);
                 run.launch(&[0], &[len], &[mask]).expect("dispatch");
                 run.sync().expect("sync");
                 let mut got: Vec<u128> = run
@@ -2416,7 +2632,8 @@ mod tests {
                 got.sort_unstable();
                 assert_eq!(
                     got, want,
-                    "base {base} compact={forced_compact}: cross-filtered survivor set mismatch"
+                    "base {base} compact={forced_compact} plane={forced_plane}: \
+                     cross-filtered survivor set mismatch"
                 );
             }
         }
@@ -2519,6 +2736,15 @@ mod tests {
     ///
     /// 40 batches is deliberately over that cap so the test also covers the
     /// aggregated path, but it is not the interesting size: a real field is
+    /// Whether a wgpu adapter name denotes a software rasterizer (CI runs the
+    /// ignored tests on lavapipe; some paths cannot or should not run there).
+    fn is_software_rasterizer(device: &str) -> bool {
+        let squashed = device.to_lowercase().replace(' ', "");
+        ["llvmpipe", "lavapipe", "swiftshader", "softwarerasterizer"]
+            .iter()
+            .any(|s| squashed.contains(s))
+    }
+
     /// `DETAILED_SEARCH_MAX_FIELD_SIZE` = 20 batches, under the cap and still
     /// over the watchdog at every base past ~46.
     ///
@@ -2529,9 +2755,7 @@ mod tests {
     fn cubecl_detailed_survives_more_batches_than_the_task_cap() {
         let ctx = CubeclContext::new_default().expect("CubeCL init");
         let device = ctx.device_name();
-        let squashed = device.to_lowercase().replace(' ', "");
-        let software = ["llvmpipe", "lavapipe", "swiftshader", "softwarerasterizer"];
-        if software.iter().any(|s| squashed.contains(s)) {
+        if is_software_rasterizer(&device) {
             println!("skipping on software rasterizer: {device}");
             return;
         }
