@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add an affine middle-digit filter to the CPU nice-only path. A cross-end survivor `n = s + b³·t` has its output digits at positions 3-5 of both `n²` and `n³` determined by `s` and `t mod b³` through two affine maps (`⌊s²/b³⌋ + 2st` and `⌊s³/b³⌋ + 3s²t`, mod `b³`), so those six fresh digits are computed with word arithmetic and compile-time divisors and tested against the residue's low digits and the range's high certificate before the full nice check runs. About 97% of cross-end survivors die there (measured 96.6-97.3% on bases 40-60), and the whole-scenario CPU nice-only rate roughly doubles on every check-dominated benchmark window (b40/b50/b52 MSD-weak and residue-dense: 1.8-1.95x on 4 threads and single-threaded); MSD-dominated windows are unchanged.
+
 ## Nice v3.4.5
 
 - Fix NVIDIA niceonly fields failing with `CUDA_ERROR_INVALID_HANDLE` at the end of the field: the per-batch events used to measure device busy time were created with timing disabled, which `cuEventElapsedTime` rejects. Busy-time events are now timing-capable, a timing failure drops `device_busy_secs` instead of failing, and a new GPU test runs a field through the pipeline and checks the busy time comes back.
