@@ -128,16 +128,12 @@ jobs:
                       rust_target: aarch64-pc-windows-msvc
                       packages: "-p nice_common -p nice_client"
 
-                    # Build-only: proves the umbrella still compiles for
-                    # Intel macs, which no longer get a GPU release.
                     - build_name: macOS-x86_64
                       runs_on: macOS-latest
                       rust_target: x86_64-apple-darwin
                       packages: "-p nice_common -p nice_client"
                       gpu_features: "nice_client/gpu"
 
-                    # `gpu` only: cubecl-spirv needs the Vulkan SDK to build
-                    # on macOS and is inert there (wgpu picks Metal).
                     - build_name: macOS-aarch64
                       runs_on: macOS-latest
                       rust_target: aarch64-apple-darwin
