@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Record the build commit alongside the version. `nice_common` now exposes `BUILD_SHA`, set by its build script from `NICE_BUILD_SHA` (CI passes `github.sha`; `api/Dockerfile` takes it as a build-arg) or else `git rev-parse HEAD` on the checkout, falling back to `unknown`. It is stamped into benchmark reports and submission telemetry as `build_sha`, reported by the API's `/status`, and exported from the wasm client so browser benchmark reports carry it too. Two builds of the same package version can now be told apart in the benchmark corpus.
+- Record the build commit SHA alongside the version for benchmarks, telemetry, and api `/status`. 
 
 ## Nice v3.4.5
 
