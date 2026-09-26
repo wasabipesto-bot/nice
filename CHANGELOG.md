@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Release GPU-enabled binaries alongside the CPU ones: `nice_client-gpu-Linux-gnu-x86_64`, `nice_client-gpu-Linux-gnu-arm64`, `nice_client-gpu-Windows-msvc-x86_64` and `nice_client-gpu-macOS-arm64`. Linux and Windows are built with `gpu,cubecl-spirv` like the `-gpu` docker image; macOS with `gpu`. The Linux binaries come out of the same pinned `cross` containers as the CPU ones and CI asserts the same glibc 2.28 floor on them. The CUDA backends still need the CUDA toolkit on the host; without it the client falls back to Vulkan through `cubecl`.
+- Update `--threads 0` (and `NICE_THREADS=0`) to explicitly spawn as many threads as the host has CPU cores instead of falling back to edge case behavior. `RAYON_NUM_THREADS` no longer influences the client. Omitting this option still defaults to 4 threads.
+- Record the build commit SHA alongside the version for benchmarks, telemetry, and api `/status`. 
 
 ## Nice v3.4.5
 
