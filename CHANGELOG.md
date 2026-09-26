@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Breaking:** `--threads 0` (and `NICE_THREADS=0`) now means every logical CPU the process can see, resolved once at startup. Previously the zero was handed straight to rayon, which treated it as "automatic" (`RAYON_NUM_THREADS` if set, else all CPUs) while the startup banner, benchmark reports and telemetry still recorded `0`; the estimator then read that as one thread, so a `--threads 0` benchmark upload was mis-anchored. `RAYON_NUM_THREADS` no longer influences the client's pool size. The default stays at 4.
+- Update `--threads 0` (and `NICE_THREADS=0`) to explicitly spawn as many threads as the host has CPU cores instead of falling back to edge case behavior. `RAYON_NUM_THREADS` no longer influences the client. Omitting this option still defaults to 4 threads.
 - Record the build commit SHA alongside the version for benchmarks, telemetry, and api `/status`. 
 
 ## Nice v3.4.5
