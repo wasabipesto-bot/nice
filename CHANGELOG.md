@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Update `--threads 0` (and `NICE_THREADS=0`) to explicitly spawn as many threads as the host has CPU cores instead of falling back to edge case behavior. `RAYON_NUM_THREADS` no longer influences the client. Omitting this option still defaults to 4 threads.
 - Record the build commit SHA alongside the version for benchmarks, telemetry, and api `/status`. 
 
 ## Nice v3.4.5
