@@ -1409,8 +1409,6 @@ impl<R: Runtime> JoinDevice<R> {
         let nbp = self.nbp as usize;
         let ntl = self.ntlay as usize;
         let nb = self.nb as usize;
-        let nwork = nslots * nb;
-        let nwork_u32 = u32::try_from(nwork)?;
         let max_slots = self.max_slots;
         let tl_len = max_slots * ntl * self.nroots as usize;
         let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vs.to_vec()));
@@ -1502,6 +1500,54 @@ impl<R: Runtime> JoinDevice<R> {
                 self.key_level,
                 self.key_level && self.k == 1,
             );
+        }
+        self.launch_join(nslots, &survivors, &checked)?;
+        unsafe {
+            check_kernel::launch_unchecked::<R>(
+                c,
+                CubeCount::Static(CHECK_CUBES, 1, 1),
+                CubeDim::new_1d(JOIN_WG),
+                ArrayArg::from_raw_parts(self.list.clone(), 2 * self.list_cap as usize),
+                ArrayArg::from_raw_parts(checked.clone(), 1),
+                ArrayArg::from_raw_parts(self.top_p.clone(), 2 * max_slots * ntl),
+                ArrayArg::from_raw_parts(
+                    self.nice_out.clone(),
+                    self.nice_cap as usize * NICEONLY_STRIDE as usize,
+                ),
+                ArrayArg::from_raw_parts(self.nice_count.clone(), 1),
+                self.list_cap,
+                self.nice_cap,
+                self.w_f0,
+                self.b,
+                self.limbs,
+                self.chunk_digits,
+                self.chunk_div,
+                self.wide,
+                0u32,
+                0u32,
+                0u32,
+                probe,
+            );
+        }
+        c.flush().map_err(|e| anyhow!("flush failed: {e:?}"))?;
+        Ok(BatchRec { survivors, checked })
+    }
+
+    /// Launch the join kernel on the slots' tops and buckets, which the
+    /// batch's earlier kernels left on the device: its survivors counted in
+    /// `survivors`, the prefilter's written to the list and counted in
+    /// `checked`.
+    fn launch_join(&self, nslots: usize, survivors: &Handle, checked: &Handle) -> Result<()> {
+        let c = &self.client;
+        let (nbp, ntl, nb, max_slots) = (
+            self.nbp as usize,
+            self.ntlay as usize,
+            self.nb as usize,
+            self.max_slots,
+        );
+        let nwork_u32 = u32::try_from(nslots * nb)?;
+        let tl_len = max_slots * ntl * self.nroots as usize;
+        unsafe {
             join_kernel::launch_unchecked::<R>(
                 c,
                 CubeCount::Static(nwork_u32.min(65_535), 1, 1),
@@ -1534,35 +1580,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k2,
             );
         }
-        unsafe {
-            check_kernel::launch_unchecked::<R>(
-                c,
-                CubeCount::Static(CHECK_CUBES, 1, 1),
-                CubeDim::new_1d(JOIN_WG),
-                ArrayArg::from_raw_parts(self.list.clone(), 2 * self.list_cap as usize),
-                ArrayArg::from_raw_parts(checked.clone(), 1),
-                ArrayArg::from_raw_parts(self.top_p.clone(), 2 * max_slots * ntl),
-                ArrayArg::from_raw_parts(
-                    self.nice_out.clone(),
-                    self.nice_cap as usize * NICEONLY_STRIDE as usize,
-                ),
-                ArrayArg::from_raw_parts(self.nice_count.clone(), 1),
-                self.list_cap,
-                self.nice_cap,
-                self.w_f0,
-                self.b,
-                self.limbs,
-                self.chunk_digits,
-                self.chunk_div,
-                self.wide,
-                0u32,
-                0u32,
-                0u32,
-                probe,
-            );
-        }
-        c.flush().map_err(|e| anyhow!("flush failed: {e:?}"))?;
-        Ok(BatchRec { survivors, checked })
+        Ok(())
     }
 
     /// Whether a batch dropped prefilter survivors past the end of the list
@@ -2426,5 +2444,338 @@ mod tests {
     #[ignore = "requires an NVIDIA device; prints throughput"]
     fn cubecl_cuda_join_throughput_fixed_fields() {
         join_throughput(&CubeclContext::new_cuda(0).expect("CubeCL CUDA init"));
+    }
+
+    /// Phase 1 of a hand-CUDA overlap join, an experiment rather than a test
+    /// of the product: `join_kernel` ported to NVRTC (`cuda/overlap_join.cu`)
+    /// and timed against `CubeCL`'s on the same inputs.
+    #[cfg(all(feature = "cuda", feature = "cubecl-cuda"))]
+    mod hand_cuda {
+        use super::*;
+        use cubecl::cuda::CudaRuntime;
+        use cudarc::driver::{
+            CudaContext as Driver, CudaFunction, CudaSlice, CudaStream, LaunchConfig, PushKernelArg,
+        };
+        use cudarc::nvrtc::{CompileOptions, compile_ptx_with_opts};
+        use std::sync::Arc;
+
+        const SRC: &str = include_str!("cuda/overlap_join.cu");
+
+        /// A build of the hand kernel: the faithful port or `TUNED`, for the
+        /// device's architecture (as `CubeCL` compiles) or NVRTC's default (as
+        /// the hand-CUDA backend compiles today).
+        struct Variant {
+            name: &'static str,
+            tuned: bool,
+            arch: bool,
+        }
+
+        const VARIANTS: [Variant; 3] = [
+            Variant {
+                name: "faithful",
+                tuned: false,
+                arch: true,
+            },
+            Variant {
+                name: "tuned",
+                tuned: true,
+                arch: true,
+            },
+            Variant {
+                name: "faithful-noarch",
+                tuned: false,
+                arch: false,
+            },
+        ];
+
+        fn compile(ctx: &Arc<Driver>, fs: &FieldSetup, v: &Variant) -> CudaFunction {
+            let mut options = vec![
+                format!("--define-macro=BASE={}", fs.b),
+                format!("--define-macro=KEY_LEVEL={}", u32::from(fs.key_level)),
+                format!(
+                    "--define-macro=KEY_AT_ZERO={}",
+                    u32::from(fs.key_level && fs.jp.k == 1)
+                ),
+                format!("--define-macro=EPT={ENTRIES_PER_THREAD}"),
+                format!("--define-macro=F0={}", fs.f0),
+                format!("--define-macro=K2={}", fs.k2),
+            ];
+            if v.tuned {
+                options.push("--define-macro=TUNED".into());
+            }
+            if v.arch {
+                let (major, minor) = ctx.compute_capability().expect("compute capability");
+                options.push(format!("--gpu-architecture=sm_{major}{minor}"));
+            }
+            let ptx = compile_ptx_with_opts(
+                SRC,
+                CompileOptions {
+                    options,
+                    ..Default::default()
+                },
+            )
+            .unwrap_or_else(|e| panic!("NVRTC ({}): {e:?}", v.name));
+            ctx.load_module(ptx)
+                .expect("module")
+                .load_function("join_kernel")
+                .expect("function")
+        }
+
+        /// One batch's join inputs, copied from the `CubeCL` device, in the
+        /// kernel's argument order: `ext_m`, `ext_pk`, `bp_r`, `seg`, `lists`,
+        /// `counts`, `work`, `tl`, `top_m`, `top_r`, `top_x`.
+        struct Inputs {
+            bufs: Vec<CudaSlice<u32>>,
+            nwork: u32,
+            nbp: u32,
+            cap: u32,
+        }
+
+        fn upload(
+            stream: &Arc<CudaStream>,
+            dev: &JoinDevice<CudaRuntime>,
+            nslots: usize,
+        ) -> Inputs {
+            let bufs = [
+                &dev.ext_m,
+                &dev.ext_pk,
+                &dev.bp_r,
+                &dev.seg,
+                &dev.lists,
+                &dev.counts,
+                &dev.work,
+                &dev.tl,
+                &dev.top_m,
+                &dev.top_r,
+                &dev.top_x,
+            ]
+            .into_iter()
+            .map(|h| {
+                stream
+                    .clone_htod(&dev.read_u32(h).expect("read"))
+                    .expect("upload")
+            })
+            .collect();
+            Inputs {
+                bufs,
+                nwork: u32::try_from(nslots * dev.nb as usize).expect("work items"),
+                nbp: dev.nbp,
+                cap: dev.list_cap,
+            }
+        }
+
+        fn launch(
+            stream: &Arc<CudaStream>,
+            f: &CudaFunction,
+            inp: &Inputs,
+            list: &mut CudaSlice<u32>,
+            counters: &mut (CudaSlice<u32>, CudaSlice<u32>),
+        ) {
+            let cfg = LaunchConfig {
+                grid_dim: (inp.nwork.min(65_535), 1, 1),
+                block_dim: (JOIN_WG, 1, 1),
+                shared_mem_bytes: 0,
+            };
+            let b = &inp.bufs;
+            let mut args = stream.launch_builder(f);
+            for buf in &b[..10] {
+                args.arg(buf);
+            }
+            args.arg(list);
+            args.arg(&mut counters.0);
+            args.arg(&b[10]);
+            args.arg(&mut counters.1);
+            args.arg(&inp.nwork);
+            args.arg(&inp.nbp);
+            args.arg(&inp.cap);
+            unsafe { args.launch(cfg) }.expect("launch");
+        }
+
+        /// What a join launch wrote: its survivor count, its prefilter
+        /// survivor count and those survivors as sorted (top, r0) pairs.
+        type Output = (u32, u32, Vec<(u32, u32)>);
+
+        /// Seconds per launch of a hand variant over `reps` launches, each
+        /// with fresh counters (checked, survivors) and writing the same
+        /// list, and the last launch's output.
+        fn time_hand(
+            stream: &Arc<CudaStream>,
+            f: &CudaFunction,
+            inp: &Inputs,
+            reps: u32,
+        ) -> (f64, Output) {
+            let mut list = stream
+                .alloc_zeros::<u32>(2 * inp.cap as usize)
+                .expect("list");
+            let mut counters: Vec<(CudaSlice<u32>, CudaSlice<u32>)> = (0..reps)
+                .map(|_| {
+                    (
+                        stream.alloc_zeros::<u32>(1).expect("checked"),
+                        stream.alloc_zeros::<u32>(1).expect("survivors"),
+                    )
+                })
+                .collect();
+            stream.synchronize().expect("sync");
+            let t = Instant::now();
+            for c in &mut counters {
+                launch(stream, f, inp, &mut list, c);
+            }
+            stream.synchronize().expect("sync");
+            let secs = t.elapsed().as_secs_f64() / f64::from(reps);
+            let (checked_h, survivors_h) = counters.last().expect("reps > 0");
+            let checked = stream.clone_dtoh(checked_h).expect("read")[0];
+            let survivors = stream.clone_dtoh(survivors_h).expect("read")[0];
+            let n = 2 * checked.min(inp.cap) as usize;
+            let words = stream.clone_dtoh(&list.slice(..n)).expect("read");
+            (secs, (survivors, checked, pairs(&words, checked)))
+        }
+
+        /// Seconds per launch of `CubeCL`'s join kernel alone on the batch
+        /// the device holds, over `reps` launches with fresh counters.
+        fn time_cubecl(dev: &JoinDevice<CudaRuntime>, nslots: usize, reps: u32) -> f64 {
+            let c = &dev.client;
+            let counters: Vec<(Handle, Handle)> = (0..reps)
+                .map(|_| {
+                    (
+                        c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1])),
+                        c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1])),
+                    )
+                })
+                .collect();
+            dev.read_u32(&counters[0].0).expect("sync");
+            let t = Instant::now();
+            for (s, k) in &counters {
+                dev.launch_join(nslots, s, k).expect("launch");
+            }
+            dev.read_u32(&counters[counters.len() - 1].1).expect("sync");
+            t.elapsed().as_secs_f64() / f64::from(reps)
+        }
+
+        /// The first `n` (top, r0) pairs of a survivor list, sorted.
+        fn pairs(words: &[u32], n: u32) -> Vec<(u32, u32)> {
+            let mut v: Vec<(u32, u32)> = words[..2 * n as usize]
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|&[t, r0]| (t, r0))
+                .collect();
+            v.sort_unstable();
+            v
+        }
+
+        fn env_or<T: std::str::FromStr>(name: &str, default: T) -> T {
+            std::env::var(name).map_or(default, |v| {
+                v.parse().unwrap_or_else(|_| panic!("{name}: not a number"))
+            })
+        }
+
+        /// Per base (`NICE_TEST_JOIN_BASES`, default 57,60,64), the first field
+        /// of `THROUGHPUT_STARTS`: `NICE_TEST_HAND_JOIN` batches of live
+        /// partitions spread over the field (also the opt-in). Each batch
+        /// runs through the `CubeCL` pipeline; its join inputs are copied to a
+        /// hand-CUDA context, and every kernel (`CubeCL`'s and each hand
+        /// variant) is launched `NICE_TEST_HAND_REPS` times (default 10) in
+        /// `NICE_TEST_HAND_ROUNDS` interleaved rounds (default 3, order
+        /// rotated). Every hand variant must write the survivors `CubeCL`'s
+        /// pipeline wrote. Prints per base the summed per-launch times (the
+        /// median round) and the speedups.
+        #[test]
+        #[ignore = "requires an NVIDIA device; experiment"]
+        #[allow(clippy::too_many_lines, clippy::cast_precision_loss)]
+        fn hand_cuda_join_kernel_against_cubecl() {
+            let Ok(nbatches) = std::env::var("NICE_TEST_HAND_JOIN") else {
+                eprintln!("skipping: set NICE_TEST_HAND_JOIN to a batch count per base");
+                return;
+            };
+            let nbatches: usize = nbatches.parse().expect("NICE_TEST_HAND_JOIN: a count");
+            let reps: u32 = env_or("NICE_TEST_HAND_REPS", 10);
+            let rounds: usize = env_or("NICE_TEST_HAND_ROUNDS", 3);
+            let bases: Vec<u32> = std::env::var("NICE_TEST_JOIN_BASES")
+                .unwrap_or_else(|_| "57,60,64".into())
+                .split(',')
+                .map(|b| b.trim().parse().expect("NICE_TEST_JOIN_BASES: bases"))
+                .collect();
+            let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
+            let name = ctx.device_name();
+            let CubeclContext::Cuda { client, .. } = ctx else {
+                unreachable!("new_cuda is CUDA")
+            };
+            let hand = Driver::new(0).expect("CUDA context");
+            let stream = hand.default_stream();
+            for base in bases {
+                let &(_, start) = THROUGHPUT_STARTS
+                    .iter()
+                    .find(|&&(b, _)| b == base)
+                    .expect("a base with throughput fields (57, 60, 64)");
+                let range = FieldSize::new(start, start + 100_000_000_000_000);
+                let jp = crate::overlap_join::join_params_for(base, &range).expect("a join field");
+                let fs = FieldSetup::new(base, range.start(), range.end(), jp).expect("setup");
+                let (plan, _) = JoinPlan::for_field(&fs, limits_of(&client)).expect("plan");
+                let mut dev = JoinDevice::new(&client, &fs, &plan).expect("device");
+                let funcs: Vec<CudaFunction> =
+                    VARIANTS.iter().map(|v| compile(&hand, &fs, v)).collect();
+                let live = live_partitions(&fs);
+                let slots = plan.slots.min(live.len());
+                // Summed seconds per launch: [round][kernel], kernel 0 = CubeCL.
+                let mut sums = vec![vec![0f64; 1 + VARIANTS.len()]; rounds];
+                let (mut surv_total, mut checked_total) = (0u64, 0u64);
+                for bi in 0..nbatches {
+                    let at = (bi * (live.len() - slots)) / nbatches.max(1);
+                    let vs = &live[at..at + slots];
+                    let rec = dev.launch_batch(vs, false).expect("launch");
+                    let (surv, checked) = dev.read_counts(&rec).expect("counts");
+                    assert!(checked <= dev.list_cap, "b{base} batch {bi}: list overflow");
+                    let want = pairs(&dev.read_u32(&dev.list).expect("list"), checked);
+                    surv_total += u64::from(surv);
+                    checked_total += u64::from(checked);
+                    let inp = upload(&stream, &dev, slots);
+                    for (round, sum) in sums.iter_mut().enumerate() {
+                        for i in 0..=VARIANTS.len() {
+                            let kernel = (i + round + bi) % (1 + VARIANTS.len());
+                            if kernel == 0 {
+                                sum[0] += time_cubecl(&dev, slots, reps);
+                            } else {
+                                let (secs, got) =
+                                    time_hand(&stream, &funcs[kernel - 1], &inp, reps);
+                                assert_eq!(
+                                    got,
+                                    (surv, checked, want.clone()),
+                                    "b{base} batch {bi} ({vs:?}): {} differs from CubeCL",
+                                    VARIANTS[kernel - 1].name
+                                );
+                                sum[kernel] += secs;
+                            }
+                        }
+                    }
+                }
+                // The median round of each kernel.
+                let med = |k: usize| {
+                    let mut v: Vec<f64> = sums.iter().map(|r| r[k]).collect();
+                    v.sort_by(f64::total_cmp);
+                    v[v.len() / 2]
+                };
+                let cub = med(0);
+                let variants: Vec<String> = VARIANTS
+                    .iter()
+                    .enumerate()
+                    .map(|(k, v)| {
+                        let t = med(k + 1);
+                        format!(
+                            "{} {:.3} ms ({:.2}x)",
+                            v.name,
+                            t * 1e3 / nbatches as f64,
+                            cub / t
+                        )
+                    })
+                    .collect();
+                eprintln!(
+                    "HAND JOIN device={name} b{base} {jp:?}: {nbatches} batches of {slots} \
+                     ({surv_total} survivors, {checked_total} checked); per batch: CubeCL {:.3} \
+                     ms, {}",
+                    cub * 1e3 / nbatches as f64,
+                    variants.join(", ")
+                );
+            }
+        }
     }
 }
