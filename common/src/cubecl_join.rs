@@ -410,23 +410,30 @@ mod kernels {
                             bit <<= 1u32;
                             jt += 1u32;
                         }
+                        // Each lane walks its set bits, one per round while
+                        // any lane of the plane has one left: an exit that
+                        // diverged per lane would let the lanes drift apart on
+                        // CUDA (sm_70+), and the AND loop after this one ran
+                        // with the plane partly idle (2x on the whole kernel).
                         #[unroll]
                         for j in 0..ept {
                             let mut x = pm[j as usize] & vv[j as usize];
                             let r0 = rr[j as usize];
-                            while x != 0u32 {
-                                let jt2 = jc + x.trailing_zeros();
-                                x &= x - 1u32;
-                                if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
-                                    let at = s_cnt[0].fetch_add(1u32);
-                                    if at < SURV_SH_CAP {
-                                        s_t[at as usize] = t_id[jt2 as usize];
-                                        s_r[at as usize] = r0;
-                                    } else {
-                                        let g = surv_count[0].fetch_add(1u32);
-                                        if g < surv_cap {
-                                            surv[(2u32 * g) as usize] = t_id[jt2 as usize];
-                                            surv[(2u32 * g + 1u32) as usize] = r0;
+                            while plane_any(x != 0u32) {
+                                if x != 0u32 {
+                                    let jt2 = jc + x.trailing_zeros();
+                                    x &= x - 1u32;
+                                    if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
+                                        let at = s_cnt[0].fetch_add(1u32);
+                                        if at < SURV_SH_CAP {
+                                            s_t[at as usize] = t_id[jt2 as usize];
+                                            s_r[at as usize] = r0;
+                                        } else {
+                                            let g = surv_count[0].fetch_add(1u32);
+                                            if g < surv_cap {
+                                                surv[(2u32 * g) as usize] = t_id[jt2 as usize];
+                                                surv[(2u32 * g + 1u32) as usize] = r0;
+                                            }
                                         }
                                     }
                                 }
@@ -2461,64 +2468,137 @@ mod tests {
 
         const SRC: &str = include_str!("cuda/overlap_join.cu");
 
-        /// A build of the hand kernel: the faithful port or `TUNED`, for the
-        /// device's architecture (as `CubeCL` compiles) or NVRTC's default (as
-        /// the hand-CUDA backend compiles today).
-        struct Variant {
-            name: &'static str,
-            tuned: bool,
-            arch: bool,
+        /// How NVRTC compiles a build: for the device's exact architecture
+        /// (`sm_XY`, as `CubeCL` compiles; `compute_XY` measured the same) or
+        /// NVRTC's default (`compute_52`, as the hand-CUDA backend compiles
+        /// today). The driver JIT-compiles the PTX at load.
+        #[derive(Clone, Copy)]
+        enum Arch {
+            Sm,
+            Default,
         }
 
-        const VARIANTS: [Variant; 3] = [
+        /// A build of the hand kernel: from source with extra defines (`TUNED`,
+        /// a `WALK_*` shape of the set-bit walk), or a cubin ptxas compiled
+        /// ahead of time from that PTX (`NICE_TEST_HAND_CUBINS`:
+        /// `b{base}_{tag}_sm{XY}.cubin`), which bypasses the driver's JIT.
+        enum Build {
+            Src {
+                defines: &'static [&'static str],
+                arch: Arch,
+            },
+            Cubin(&'static str),
+        }
+
+        struct Variant {
+            name: &'static str,
+            build: Build,
+        }
+
+        /// The builds to time, `NICE_TEST_HAND_VARIANTS` (comma-separated
+        /// names; default all).
+        const VARIANTS: [Variant; 6] = [
             Variant {
-                name: "faithful",
-                tuned: false,
-                arch: true,
+                name: "sm",
+                build: Build::Src {
+                    defines: &[],
+                    arch: Arch::Sm,
+                },
             },
             Variant {
-                name: "tuned",
-                tuned: true,
-                arch: true,
+                name: "default",
+                build: Build::Src {
+                    defines: &[],
+                    arch: Arch::Default,
+                },
             },
             Variant {
-                name: "faithful-noarch",
-                tuned: false,
-                arch: false,
+                name: "syncwarp-sm",
+                build: Build::Src {
+                    defines: &["WALK_SYNCWARP"],
+                    arch: Arch::Sm,
+                },
+            },
+            Variant {
+                name: "syncwarp-default",
+                build: Build::Src {
+                    defines: &["WALK_SYNCWARP"],
+                    arch: Arch::Default,
+                },
+            },
+            Variant {
+                name: "any-sm",
+                build: Build::Src {
+                    defines: &["WALK_ANY"],
+                    arch: Arch::Sm,
+                },
+            },
+            Variant {
+                name: "cubin-default",
+                build: Build::Cubin("default"),
             },
         ];
 
-        fn compile(ctx: &Arc<Driver>, fs: &FieldSetup, v: &Variant) -> CudaFunction {
-            let mut options = vec![
-                format!("--define-macro=BASE={}", fs.b),
-                format!("--define-macro=KEY_LEVEL={}", u32::from(fs.key_level)),
-                format!(
-                    "--define-macro=KEY_AT_ZERO={}",
-                    u32::from(fs.key_level && fs.jp.k == 1)
-                ),
-                format!("--define-macro=EPT={ENTRIES_PER_THREAD}"),
-                format!("--define-macro=F0={}", fs.f0),
-                format!("--define-macro=K2={}", fs.k2),
-            ];
-            if v.tuned {
-                options.push("--define-macro=TUNED".into());
+        fn compile(ctx: &Arc<Driver>, fs: &FieldSetup, v: &Variant) -> Option<CudaFunction> {
+            use cudarc::driver::sys::CUfunction_attribute_enum as A;
+            let (major, minor) = ctx.compute_capability().expect("compute capability");
+            if let Ok(names) = std::env::var("NICE_TEST_HAND_VARIANTS")
+                && !names.split(',').any(|n| n.trim() == v.name)
+            {
+                return None;
             }
-            if v.arch {
-                let (major, minor) = ctx.compute_capability().expect("compute capability");
-                options.push(format!("--gpu-architecture=sm_{major}{minor}"));
-            }
-            let ptx = compile_ptx_with_opts(
-                SRC,
-                CompileOptions {
-                    options,
-                    ..Default::default()
-                },
-            )
-            .unwrap_or_else(|e| panic!("NVRTC ({}): {e:?}", v.name));
-            ctx.load_module(ptx)
+            let ptx = match v.build {
+                Build::Src { defines, arch } => {
+                    let mut options = vec![
+                        format!("--define-macro=BASE={}", fs.b),
+                        format!("--define-macro=KEY_LEVEL={}", u32::from(fs.key_level)),
+                        format!(
+                            "--define-macro=KEY_AT_ZERO={}",
+                            u32::from(fs.key_level && fs.jp.k == 1)
+                        ),
+                        format!("--define-macro=EPT={ENTRIES_PER_THREAD}"),
+                        format!("--define-macro=F0={}", fs.f0),
+                        format!("--define-macro=K2={}", fs.k2),
+                    ];
+                    options.extend(defines.iter().map(|d| format!("--define-macro={d}")));
+                    match arch {
+                        Arch::Sm => options.push(format!("--gpu-architecture=sm_{major}{minor}")),
+                        Arch::Default => {}
+                    }
+                    compile_ptx_with_opts(
+                        SRC,
+                        CompileOptions {
+                            options,
+                            ..Default::default()
+                        },
+                    )
+                    .unwrap_or_else(|e| panic!("NVRTC ({}): {e:?}", v.name))
+                }
+                Build::Cubin(tag) => {
+                    let dir = std::env::var("NICE_TEST_HAND_CUBINS").ok()?;
+                    let path = format!("{dir}/b{}_{tag}_sm{major}{minor}.cubin", fs.b);
+                    let Ok(bytes) = std::fs::read(&path) else {
+                        eprintln!("  {}: no {path}", v.name);
+                        return None;
+                    };
+                    cudarc::nvrtc::Ptx::from_binary(bytes)
+                }
+            };
+            let f = ctx
+                .load_module(ptx)
                 .expect("module")
                 .load_function("join_kernel")
-                .expect("function")
+                .expect("function");
+            let attr = |a| f.get_attribute(a).unwrap_or(-1);
+            eprintln!(
+                "  {}: {} registers, {} local bytes, PTX {} binary {}",
+                v.name,
+                attr(A::CU_FUNC_ATTRIBUTE_NUM_REGS),
+                attr(A::CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES),
+                attr(A::CU_FUNC_ATTRIBUTE_PTX_VERSION),
+                attr(A::CU_FUNC_ATTRIBUTE_BINARY_VERSION)
+            );
+            Some(f)
         }
 
         /// One batch's join inputs, copied from the `CubeCL` device, in the
@@ -2712,7 +2792,8 @@ mod tests {
                 let fs = FieldSetup::new(base, range.start(), range.end(), jp).expect("setup");
                 let (plan, _) = JoinPlan::for_field(&fs, limits_of(&client)).expect("plan");
                 let mut dev = JoinDevice::new(&client, &fs, &plan).expect("device");
-                let funcs: Vec<CudaFunction> =
+                eprintln!("b{base}:");
+                let funcs: Vec<Option<CudaFunction>> =
                     VARIANTS.iter().map(|v| compile(&hand, &fs, v)).collect();
                 let live = live_partitions(&fs);
                 let slots = plan.slots.min(live.len());
@@ -2734,9 +2815,8 @@ mod tests {
                             let kernel = (i + round + bi) % (1 + VARIANTS.len());
                             if kernel == 0 {
                                 sum[0] += time_cubecl(&dev, slots, reps);
-                            } else {
-                                let (secs, got) =
-                                    time_hand(&stream, &funcs[kernel - 1], &inp, reps);
+                            } else if let Some(f) = &funcs[kernel - 1] {
+                                let (secs, got) = time_hand(&stream, f, &inp, reps);
                                 assert_eq!(
                                     got,
                                     (surv, checked, want.clone()),
@@ -2758,6 +2838,7 @@ mod tests {
                 let variants: Vec<String> = VARIANTS
                     .iter()
                     .enumerate()
+                    .filter(|&(k, _)| funcs[k].is_some())
                     .map(|(k, v)| {
                         let t = med(k + 1);
                         format!(

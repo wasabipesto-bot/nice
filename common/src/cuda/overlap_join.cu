@@ -324,6 +324,64 @@ extern "C" __global__ void __launch_bounds__(JOIN_WG)
                     for (int j = 0; j < EPT; j++) {
                         u32 x = pm[j] & vv[j];
                         u32 r0 = rr[j];
+#ifdef WALK_KEEP
+                        // The pairs inside their top's interval, found with no
+                        // atomic in the loop (ptxas puts a YIELD in a loop with
+                        // atomics for sm_70+ targets), then staged with one
+                        // atomic for all of them.
+                        u32 keep = 0;
+                        while (x != 0) {
+                            u32 b = __ffs(x) - 1;
+                            x &= x - 1;
+                            if (r0 >= t_rlo[jc + b] && r0 < t_rhi[jc + b]) {
+                                keep |= 1u << b;
+                            }
+                        }
+                        if (keep != 0) {
+                            u32 n = __popc(keep);
+                            u32 at = atomicAdd(&s_cnt, n);
+                            if (at + n <= SURV_SH_CAP) {
+                                while (keep != 0) {
+                                    u32 b = __ffs(keep) - 1;
+                                    keep &= keep - 1;
+                                    s_t[at] = t_id[jc + b];
+                                    s_r[at] = r0;
+                                    at++;
+                                }
+                            } else {
+                                // The stage is full: what fits there, the rest
+                                // straight to the output, untested.
+                                while (keep != 0) {
+                                    u32 b = __ffs(keep) - 1;
+                                    keep &= keep - 1;
+                                    if (at < SURV_SH_CAP) {
+                                        s_t[at] = t_id[jc + b];
+                                        s_r[at] = r0;
+                                    } else {
+                                        u32 g = atomicAdd(surv_count, 1u);
+                                        if (g < surv_cap) {
+                                            surv[2 * g] = t_id[jc + b];
+                                            surv[2 * g + 1] = r0;
+                                        }
+                                    }
+                                    at++;
+                                }
+                            }
+                        }
+#elif defined(WALK_INLINE2)
+                        // The first two set bits inline (no loop, so no YIELD for
+                        // sm_70+ targets); the loop only for chunks with more.
+#pragma unroll
+                        for (int k = 0; k < 2; k++) {
+                            if (x != 0) {
+                                u32 jt2 = jc + (__ffs(x) - 1);
+                                x &= x - 1;
+                                if (r0 >= t_rlo[jt2] && r0 < t_rhi[jt2]) {
+                                    stage(t_id[jt2], r0, &s_cnt, s_t, s_r, surv, surv_count,
+                                          surv_cap);
+                                }
+                            }
+                        }
                         while (x != 0) {
                             u32 jt2 = jc + (__ffs(x) - 1);
                             x &= x - 1;
@@ -331,6 +389,42 @@ extern "C" __global__ void __launch_bounds__(JOIN_WG)
                                 stage(t_id[jt2], r0, &s_cnt, s_t, s_r, surv, surv_count, surv_cap);
                             }
                         }
+#elif defined(WALK_SYNCWARP)
+                        while (__any_sync(0xffffffffu, x != 0)) {
+                            if (x != 0) {
+                                u32 jt2 = jc + (__ffs(x) - 1);
+                                x &= x - 1;
+                                if (r0 >= t_rlo[jt2] && r0 < t_rhi[jt2]) {
+                                    stage(t_id[jt2], r0, &s_cnt, s_t, s_r, surv, surv_count,
+                                          surv_cap);
+                                }
+                            }
+                            __syncwarp();
+                        }
+#elif defined(WALK_ANY)
+                        // A warp-uniform exit: while any lane has a bit left,
+                        // each lane takes at most one. ptxas puts a YIELD in a
+                        // loop whose exit diverges (sm_70+ targets), not in
+                        // this one.
+                        while (__any_sync(0xffffffffu, x != 0)) {
+                            if (x != 0) {
+                                u32 jt2 = jc + (__ffs(x) - 1);
+                                x &= x - 1;
+                                if (r0 >= t_rlo[jt2] && r0 < t_rhi[jt2]) {
+                                    stage(t_id[jt2], r0, &s_cnt, s_t, s_r, surv, surv_count,
+                                          surv_cap);
+                                }
+                            }
+                        }
+#else
+                        while (x != 0) {
+                            u32 jt2 = jc + (__ffs(x) - 1);
+                            x &= x - 1;
+                            if (r0 >= t_rlo[jt2] && r0 < t_rhi[jt2]) {
+                                stage(t_id[jt2], r0, &s_cnt, s_t, s_r, surv, surv_count, surv_cap);
+                            }
+                        }
+#endif
                     }
                 }
                 __syncthreads();
