@@ -322,11 +322,17 @@ fn niceonly_defines(base: u32) -> Result<(Vec<String>, stride_filter::StrideTabl
 /// Compile the embedded CUDA source with the given `-D` defines via NVRTC.
 fn compile_kernel_ptx(defines: &[String]) -> Result<Ptx> {
     let kernel_src = include_str!("cuda/nice_kernels.cu");
+    let mut options: Vec<String> = defines
+        .iter()
+        .map(|d| format!("--define-macro={d}"))
+        .collect();
+    // Experiment: `NICE_CUDA_ARCH=sm_86` (or `compute_86`, ...) compiles for
+    // that target instead of NVRTC's default (compute_52, pre-Volta).
+    if let Ok(arch) = std::env::var("NICE_CUDA_ARCH") {
+        options.push(format!("--gpu-architecture={arch}"));
+    }
     let opts = CompileOptions {
-        options: defines
-            .iter()
-            .map(|d| format!("--define-macro={d}"))
-            .collect(),
+        options,
         ..Default::default()
     };
     compile_ptx_with_opts(kernel_src, opts)
