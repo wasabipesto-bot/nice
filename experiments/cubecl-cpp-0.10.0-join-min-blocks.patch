@@ -1,0 +1,37 @@
+diff -ru a/src/cuda/dialect.rs b/src/cuda/dialect.rs
+--- a/src/cuda/dialect.rs	2026-10-04 16:00:39.934525092 +0000
++++ b/src/cuda/dialect.rs	2026-10-04 16:00:39.942525294 +0000
+@@ -337,13 +337,28 @@
+         buffers: &[KernelArg<Self>],
+         flags: &Flags<Self>,
+     ) -> std::fmt::Result {
+-        write!(
+-            f,
+-            "
++        // Experiment (nice overlap join): NICE_CUDA_JOIN_MIN_BLOCKS=N adds a
++        // minimum-blocks-per-SM bound to the join kernel's launch bounds.
++        let min_blocks = (kernel_name == "join_kernel")
++            .then(|| std::env::var("NICE_CUDA_JOIN_MIN_BLOCKS").ok())
++            .flatten()
++            .and_then(|v| v.parse::<u32>().ok());
++        match min_blocks {
++            Some(m) => write!(
++                f,
++                "
++
++extern \"C\" __global__ void __launch_bounds__({}, {m})",
++                flags.cube_dim.num_elems()
++            )?,
++            None => write!(
++                f,
++                "
+ 
+ extern \"C\" __global__ void __launch_bounds__({})",
+-            flags.cube_dim.num_elems()
+-        )?;
++                flags.cube_dim.num_elems()
++            )?,
++        }
+         if let Some(cluster_dim) = flags.cluster_dim {
+             write!(
+                 f,

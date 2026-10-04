@@ -69,6 +69,24 @@ pub const SURV_FLUSH: u32 = 512;
 pub const DEAD_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 /// Bottom entries each thread holds in registers in [`join_kernel`].
 const ENTRIES_PER_THREAD: u32 = 4;
+
+/// Experiment: `NICE_JOIN_WALK_SYNC=1` ends each round of the set-bit walk
+/// with `sync_plane` (runtimes with plane barriers only; not WGSL).
+fn walk_sync() -> bool {
+    static SYNC: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *SYNC.get_or_init(|| std::env::var("NICE_JOIN_WALK_SYNC").is_ok_and(|v| v == "1"))
+}
+
+/// [`ENTRIES_PER_THREAD`], or the experiment's `NICE_JOIN_EPT` override.
+fn entries_per_thread() -> u32 {
+    static EPT: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *EPT.get_or_init(|| {
+        std::env::var("NICE_JOIN_EPT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(ENTRIES_PER_THREAD)
+    })
+}
 /// Cubes for the prefilter and check kernels (grid-stride loops).
 const CHECK_CUBES: u32 = 1024;
 /// How deep the halving of an overflowing partition's top layer may go: a
@@ -293,6 +311,7 @@ mod kernels {
         #[comptime] ept: u32,
         #[comptime] f0: u32,
         #[comptime] k2: u32,
+        #[comptime] walk_sync: bool,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -436,6 +455,9 @@ mod kernels {
                                             }
                                         }
                                     }
+                                }
+                                if walk_sync {
+                                    sync_plane();
                                 }
                             }
                         }
@@ -1582,9 +1604,10 @@ impl<R: Runtime> JoinDevice<R> {
                 self.b,
                 self.key_level,
                 self.key_level && self.k == 1,
-                ENTRIES_PER_THREAD,
+                entries_per_thread(),
                 self.f0,
                 self.k2,
+                walk_sync(),
             );
         }
         Ok(())
@@ -2488,7 +2511,33 @@ mod tests {
                 arch: Arch,
             },
             Cubin(&'static str),
+            /// `CubeCL`'s own generated join kernel, as captured with
+            /// `CUBECL_DEBUG_LOG` and edited (`NICE_TEST_HAND_CUBECL_SRC`:
+            /// `b{base}_{tag}.cu` and its dynamic shared memory in bytes in
+            /// `b{base}_{tag}.smem`), compiled as `CubeCL` compiles it.
+            CubeclSrc(&'static str),
         }
+
+        /// A loaded build: launched like the hand kernel, or, for `CubeCL`'s
+        /// source, with its dynamic shared memory and the scalars in the
+        /// `info_st` struct `CubeCL` passes by value.
+        struct Compiled {
+            f: CudaFunction,
+            cubecl_smem: Option<u32>,
+        }
+
+        /// `CubeCL`'s `info_st` for the join kernel: `nwork`, `nbp` and
+        /// `surv_cap` in `scalars_uint32[0..3]`; the kernel reads no
+        /// `static_meta`.
+        #[repr(C)]
+        #[derive(Clone, Copy)]
+        struct InfoSt {
+            scalars: [u32; 4],
+            meta: [u32; 28],
+        }
+
+        // SAFETY: plain old data with the generated struct's C layout.
+        unsafe impl cudarc::driver::DeviceRepr for InfoSt {}
 
         struct Variant {
             name: &'static str,
@@ -2497,7 +2546,39 @@ mod tests {
 
         /// The builds to time, `NICE_TEST_HAND_VARIANTS` (comma-separated
         /// names; default all).
-        const VARIANTS: [Variant; 6] = [
+        const VARIANTS: [Variant; 14] = [
+            Variant {
+                name: "cubecl-ws-lb0",
+                build: Build::CubeclSrc("wslb0"),
+            },
+            Variant {
+                name: "cubecl-ws-lb4",
+                build: Build::CubeclSrc("wslb4"),
+            },
+            Variant {
+                name: "cubecl-ws-lb5",
+                build: Build::CubeclSrc("wslb5"),
+            },
+            Variant {
+                name: "cubecl-ws-lb6",
+                build: Build::CubeclSrc("wslb6"),
+            },
+            Variant {
+                name: "cubecl-lb0",
+                build: Build::CubeclSrc("lb0"),
+            },
+            Variant {
+                name: "cubecl-lb4",
+                build: Build::CubeclSrc("lb4"),
+            },
+            Variant {
+                name: "cubecl-lb5",
+                build: Build::CubeclSrc("lb5"),
+            },
+            Variant {
+                name: "cubecl-lb6",
+                build: Build::CubeclSrc("lb6"),
+            },
             Variant {
                 name: "sm",
                 build: Build::Src {
@@ -2539,8 +2620,7 @@ mod tests {
             },
         ];
 
-        fn compile(ctx: &Arc<Driver>, fs: &FieldSetup, v: &Variant) -> Option<CudaFunction> {
-            use cudarc::driver::sys::CUfunction_attribute_enum as A;
+        fn compile(ctx: &Arc<Driver>, fs: &FieldSetup, v: &Variant) -> Option<Compiled> {
             let (major, minor) = ctx.compute_capability().expect("compute capability");
             if let Ok(names) = std::env::var("NICE_TEST_HAND_VARIANTS")
                 && !names.split(',').any(|n| n.trim() == v.name)
@@ -2556,7 +2636,7 @@ mod tests {
                             "--define-macro=KEY_AT_ZERO={}",
                             u32::from(fs.key_level && fs.jp.k == 1)
                         ),
-                        format!("--define-macro=EPT={ENTRIES_PER_THREAD}"),
+                        format!("--define-macro=EPT={}", entries_per_thread()),
                         format!("--define-macro=F0={}", fs.f0),
                         format!("--define-macro=K2={}", fs.k2),
                     ];
@@ -2574,6 +2654,43 @@ mod tests {
                     )
                     .unwrap_or_else(|e| panic!("NVRTC ({}): {e:?}", v.name))
                 }
+                Build::CubeclSrc(tag) => {
+                    let dir = std::env::var("NICE_TEST_HAND_CUBECL_SRC").ok()?;
+                    let path = format!("{dir}/b{}_{tag}.cu", fs.b);
+                    let Ok(src) = std::fs::read_to_string(&path) else {
+                        eprintln!("  {}: no {path}", v.name);
+                        return None;
+                    };
+                    let smem: u32 = std::fs::read_to_string(format!("{dir}/b{}_{tag}.smem", fs.b))
+                        .expect("smem file")
+                        .trim()
+                        .parse()
+                        .expect("smem bytes");
+                    let cuda =
+                        std::env::var("CUDA_PATH").unwrap_or_else(|_| "/usr/local/cuda".into());
+                    let ptx = compile_ptx_with_opts(
+                        src,
+                        CompileOptions {
+                            options: vec![
+                                format!("--gpu-architecture=sm_{major}{minor}"),
+                                format!("--include-path={cuda}/include"),
+                                "-lineinfo".into(),
+                            ],
+                            ..Default::default()
+                        },
+                    )
+                    .unwrap_or_else(|e| panic!("NVRTC ({}): {e:?}", v.name));
+                    let f = ctx
+                        .load_module(ptx)
+                        .expect("module")
+                        .load_function("join_kernel")
+                        .expect("function");
+                    report(v, &f);
+                    return Some(Compiled {
+                        f,
+                        cubecl_smem: Some(smem),
+                    });
+                }
                 Build::Cubin(tag) => {
                     let dir = std::env::var("NICE_TEST_HAND_CUBINS").ok()?;
                     let path = format!("{dir}/b{}_{tag}_sm{major}{minor}.cubin", fs.b);
@@ -2589,6 +2706,16 @@ mod tests {
                 .expect("module")
                 .load_function("join_kernel")
                 .expect("function");
+            report(v, &f);
+            Some(Compiled {
+                f,
+                cubecl_smem: None,
+            })
+        }
+
+        /// A loaded build's registers, spill and binary versions.
+        fn report(v: &Variant, f: &CudaFunction) {
+            use cudarc::driver::sys::CUfunction_attribute_enum as A;
             let attr = |a| f.get_attribute(a).unwrap_or(-1);
             eprintln!(
                 "  {}: {} registers, {} local bytes, PTX {} binary {}",
@@ -2598,7 +2725,6 @@ mod tests {
                 attr(A::CU_FUNC_ATTRIBUTE_PTX_VERSION),
                 attr(A::CU_FUNC_ATTRIBUTE_BINARY_VERSION)
             );
-            Some(f)
         }
 
         /// One batch's join inputs, copied from the `CubeCL` device, in the
@@ -2646,7 +2772,7 @@ mod tests {
 
         fn launch(
             stream: &Arc<CudaStream>,
-            f: &CudaFunction,
+            k: &Compiled,
             inp: &Inputs,
             list: &mut CudaSlice<u32>,
             counters: &mut (CudaSlice<u32>, CudaSlice<u32>),
@@ -2654,10 +2780,14 @@ mod tests {
             let cfg = LaunchConfig {
                 grid_dim: (inp.nwork.min(65_535), 1, 1),
                 block_dim: (JOIN_WG, 1, 1),
-                shared_mem_bytes: 0,
+                shared_mem_bytes: k.cubecl_smem.unwrap_or(0),
             };
             let b = &inp.bufs;
-            let mut args = stream.launch_builder(f);
+            let info = InfoSt {
+                scalars: [inp.nwork, inp.nbp, inp.cap, 0],
+                meta: [0; 28],
+            };
+            let mut args = stream.launch_builder(&k.f);
             for buf in &b[..10] {
                 args.arg(buf);
             }
@@ -2665,9 +2795,13 @@ mod tests {
             args.arg(&mut counters.0);
             args.arg(&b[10]);
             args.arg(&mut counters.1);
-            args.arg(&inp.nwork);
-            args.arg(&inp.nbp);
-            args.arg(&inp.cap);
+            if k.cubecl_smem.is_some() {
+                args.arg(&info);
+            } else {
+                args.arg(&inp.nwork);
+                args.arg(&inp.nbp);
+                args.arg(&inp.cap);
+            }
             unsafe { args.launch(cfg) }.expect("launch");
         }
 
@@ -2680,7 +2814,7 @@ mod tests {
         /// list, and the last launch's output.
         fn time_hand(
             stream: &Arc<CudaStream>,
-            f: &CudaFunction,
+            f: &Compiled,
             inp: &Inputs,
             reps: u32,
         ) -> (f64, Output) {
@@ -2793,7 +2927,7 @@ mod tests {
                 let (plan, _) = JoinPlan::for_field(&fs, limits_of(&client)).expect("plan");
                 let mut dev = JoinDevice::new(&client, &fs, &plan).expect("device");
                 eprintln!("b{base}:");
-                let funcs: Vec<Option<CudaFunction>> =
+                let funcs: Vec<Option<Compiled>> =
                     VARIANTS.iter().map(|v| compile(&hand, &fs, v)).collect();
                 let live = live_partitions(&fs);
                 let slots = plan.slots.min(live.len());
