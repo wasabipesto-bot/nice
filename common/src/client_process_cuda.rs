@@ -1550,6 +1550,21 @@ mod tests {
     // the nvidia/cuda docker image). Skipped gracefully when NVRTC is absent.
     // ------------------------------------------------------------------
 
+    /// Experiment: the production niceonly PTX per base, for ptxas/SASS
+    /// analysis without a GPU (`NICE_DUMP_PTX_BASES`, written to /tmp).
+    #[test]
+    #[ignore = "experiment: dumps PTX"]
+    fn dump_niceonly_ptx() {
+        let bases = std::env::var("NICE_DUMP_PTX_BASES").unwrap_or_else(|_| "40,50,52".into());
+        for b in bases.split(',') {
+            let base: u32 = b.trim().parse().expect("a base");
+            let (defines, _) = niceonly_defines(base).expect("defines");
+            eprintln!("b{base}: {}", defines.join(" "));
+            let ptx = compile_kernel_ptx(&defines).expect("NVRTC");
+            std::fs::write(format!("/tmp/hand_b{base}.ptx"), ptx.to_src()).expect("write");
+        }
+    }
+
     #[test_log::test]
     fn nvrtc_compiles_kernels_for_all_supported_bases() {
         // Probe with a trivial program first: if THIS fails, the library is
