@@ -1129,14 +1129,23 @@ mod tests {
         }
     }
 
-    /// `wide-join`: production-size fields at bases 65, 68 and 69: 1e16
-    /// fields on the grid `range_start + i·1e16` of about the median top-layer
-    /// density of a 60-field survey (`jwide list`), and one dense one.
+    /// `wide-join`: production-size fields at bases 65, 68 and 69: the 1e16
+    /// field on the grid `range_start + i·1e16` nearest the mean top-layer
+    /// density of a 60-field survey (`jwide list`; densities 0.190, 0.156
+    /// and 0.109 against means of 0.199, 0.177 and 0.116).
     #[cfg(feature = "wide-join")]
     const WIDE_FIELDS: &[(u32, u128, u128)] = &[
-        (65, 0, 10_000_000_000_000_000),
-        (68, 0, 10_000_000_000_000_000),
-        (69, 0, 10_000_000_000_000_000),
+        (65, 301_987_214_755_747_944_887_348, 10_000_000_000_000_000),
+        (
+            68,
+            4_272_401_290_550_843_048_084_693,
+            10_000_000_000_000_000,
+        ),
+        (
+            69,
+            6_818_125_921_585_159_609_396_207,
+            10_000_000_000_000_000,
+        ),
     ];
 
     /// `wide-join`, opt-in (`NICE_TEST_WIDE_JOIN_REF=n`; minutes on many
