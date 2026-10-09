@@ -1374,6 +1374,111 @@ mod tests {
     use super::*;
     use crate::base_range::get_base_range_u128;
 
+    /// Experiment branch: the certificate (and its closure) on real tops.
+    /// For production-shaped fields at b58-64, random partition-extended tops
+    /// (the CPU join's `tops`: p = p0 * b^p + v over the field's top layer,
+    /// each covering b^f0 numbers) that the certificate keeps are checked by
+    /// brute force: every locally viable n in the top must have every
+    /// certified digit; and a rejected top must hold no locally viable n.
+    /// `NICE_TEST_CERT_TOPS` tops per field (default 40).
+    #[test]
+    #[ignore = "experiment: brute force over real tops, minutes"]
+    fn cert_is_sound_on_real_tops() {
+        use malachite::base::num::arithmetic::traits::Pow;
+        use malachite::base::num::conversion::traits::Digits;
+        use malachite::natural::Natural;
+        let per: usize = std::env::var("NICE_TEST_CERT_TOPS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(40);
+        let fields: [(u32, u128, u128); 4] = [
+            (58, 183_859_216_587_923_470_200, 1_000_000_000_000_000),
+            (60, 795_599_612_114_824_200_908, 10_000_000_000_000_000),
+            (62, 12_255_736_762_397_899_821_056, 10_000_000_000_000_000),
+            (64, 72_806_461_862_957_161_709_568, 10_000_000_000_000_000),
+        ];
+        let dig = |x: &Natural, b: &Natural| -> Vec<u64> {
+            x.to_digits_asc(b).iter().map(|d| u64::try_from(d).unwrap()).collect()
+        };
+        let handles: Vec<_> = fields
+            .into_iter()
+            .map(|(b, s0, size)| {
+                std::thread::spawn(move || {
+                    let range = FieldSize::new(s0, s0 + size);
+                    let jp = join_params_for(b, &range).expect("a join field");
+                    let fs = FieldSetup::new(b, s0, s0 + size, jp).unwrap();
+                    let cap = jp.k;
+                    let mut rng = Rng(u64::from(b) * 0x9E37_79B9);
+                    let bn = Natural::from(b);
+                    let (mut kept, mut rejected, mut viable, mut bits, mut tries) = (0u64, 0u64, 0u64, 0u64, 0u64);
+                    while kept + rejected < per as u64 && tries < 100_000 {
+                        tries += 1;
+                        let (p0, _) = fs.tlay[rng.below(fs.tlay.len() as u128) as usize];
+                        let v = rng.below(fs.nparts);
+                        let p = p0 * fs.nparts + v;
+                        if p < fs.plo || p > fs.phi {
+                            continue;
+                        }
+                        let lo = p * fs.w;
+                        let a = lo.max(fs.s);
+                        let e = (lo + fs.w - 1).min(fs.e - 1);
+                        let got = fs.base.cert(a, e, cap);
+                        let lows: Vec<usize> = [2u64, 3]
+                            .iter()
+                            .map(|&k| {
+                                let x = Natural::from(a).pow(k);
+                                let y = Natural::from(e).pow(k);
+                                let (dx, dy) = (dig(&x, &bn), dig(&y, &bn));
+                                let c0 = (cap as usize).max(dig(&(&y - &x), &bn).len());
+                                let mut l = c0;
+                                for i in (c0..dx.len()).rev() {
+                                    if dx[i] != dy[i] {
+                                        l = i;
+                                        break;
+                                    }
+                                }
+                                l
+                            })
+                            .collect();
+                        for n in a..=e {
+                            let nn = Natural::from(n);
+                            let mut seen = 0u64;
+                            let mut ok = true;
+                            for (k, &l) in [2u64, 3].iter().zip(&lows) {
+                                for &x in dig(&nn.clone().pow(*k), &bn).iter().skip(l) {
+                                    if seen & (1 << x) != 0 {
+                                        ok = false;
+                                    }
+                                    seen |= 1 << x;
+                                }
+                            }
+                            if !ok {
+                                continue;
+                            }
+                            viable += 1;
+                            let m = got.unwrap_or_else(|| {
+                                panic!("b{b} top {p} [{a}, {e}] rejected but n = {n} is locally viable")
+                            });
+                            assert_eq!(m & !seen, 0, "b{b} top {p}: certified {m:#x} not all among n = {n}'s {seen:#x}");
+                        }
+                        match got {
+                            None => rejected += 1,
+                            Some(m) => {
+                                kept += 1;
+                                bits += u64::from(m.count_ones());
+                            }
+                        }
+                    }
+                    (b, kept, rejected, viable, bits)
+                })
+            })
+            .collect();
+        for h in handles {
+            let (b, kept, rejected, viable, bits) = h.join().unwrap();
+            eprintln!("cert on real tops b{b}: {kept} kept ({bits} certified digits), {rejected} rejected, {viable} locally viable numbers, closure {}", cert_closure());
+        }
+    }
+
     /// Experiment branch: the certificate (with or without the interval
     /// closure, per `NICE_EXP_CERT_CLOSURE`) against brute force. For each
     /// power, the certificate reasons about the positions from the first one
