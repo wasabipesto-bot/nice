@@ -52,6 +52,42 @@ pub fn slices_for(base: u32, range: &FieldSize) -> Option<(JoinParams, Vec<Field
     Some((jp, join_slices(range, block, CPU_SLICE_PREFIXES)))
 }
 
+/// Experiment branch: with the `join-prof` feature, the time a thread spent
+/// in each phase of its partitions, as seconds: tops and their sort,
+/// extending the bottoms, listing a key's bottoms, and the scan with its
+/// survivors. Without it the macro is the bare expression.
+#[cfg(feature = "join-prof")]
+pub mod prof {
+    use std::cell::Cell;
+    thread_local! {
+        static PHASES: Cell<[f64; 4]> = const { Cell::new([0.0; 4]) };
+    }
+    pub(crate) fn add(i: usize, secs: f64) {
+        PHASES.with(|p| {
+            let mut a = p.get();
+            a[i] += secs;
+            p.set(a);
+        });
+    }
+    /// This thread's phase times since the last call.
+    #[must_use]
+    pub fn take() -> [f64; 4] {
+        PHASES.with(|p| p.replace([0.0; 4]))
+    }
+}
+
+/// Time `$e` into phase `$i` of [`prof`] (feature `join-prof`).
+macro_rules! prof {
+    ($i:expr, $e:expr) => {{
+        #[cfg(feature = "join-prof")]
+        let t0 = std::time::Instant::now();
+        let r = $e;
+        #[cfg(feature = "join-prof")]
+        prof::add($i, t0.elapsed().as_secs_f64());
+        r
+    }};
+}
+
 /// The mask of a bottom whose fixed digits repeat: it joins no top.
 const DEAD: Mask = Mask::MAX;
 
@@ -389,35 +425,40 @@ impl CpuJoin {
             if lo == hi {
                 continue;
             }
-            self.tops(v, &self.fs.tlay[lo..hi], &mut sc.tops);
+            prof!(0, self.tops(v, &self.fs.tlay[lo..hi], &mut sc.tops));
             if sc.tops.is_empty() {
                 continue;
             }
             if !extended {
-                self.extend(v, &mut sc.ext);
+                prof!(1, self.extend(v, &mut sc.ext));
                 extended = true;
             }
-            sc.tops.sort_unstable_by_key(|t| t.pc);
+            prof!(0, sc.tops.sort_unstable_by_key(|t| t.pc));
             // The last bottom digit: the key itself, or the partition's last.
             let d = if self.fs.key_level {
                 key
             } else {
                 self.partition_digit(v, self.fs.jp.p - 1)
             };
-            self.list(d, &mut sc.ext, &mut sc.masks, &mut sc.info, &mut sc.offs);
-            for top in &sc.tops {
-                for &root in roots {
-                    let c = ((root + m1 - top.pc) % m1) as usize;
-                    let (lo, hi) = (sc.offs[c] as usize, sc.offs[c + 1] as usize);
-                    let pass = Pass {
-                        top,
-                        d,
-                        ext: &sc.ext,
-                        info: &sc.info[lo..hi],
-                    };
-                    self.scan(&pass, &sc.masks[lo..hi], &mut out, &mut record);
+            prof!(
+                2,
+                self.list(d, &mut sc.ext, &mut sc.masks, &mut sc.info, &mut sc.offs)
+            );
+            prof!(3, {
+                for top in &sc.tops {
+                    for &root in roots {
+                        let c = ((root + m1 - top.pc) % m1) as usize;
+                        let (lo, hi) = (sc.offs[c] as usize, sc.offs[c + 1] as usize);
+                        let pass = Pass {
+                            top,
+                            d,
+                            ext: &sc.ext,
+                            info: &sc.info[lo..hi],
+                        };
+                        self.scan(&pass, &sc.masks[lo..hi], &mut out, &mut record);
+                    }
                 }
-            }
+            });
         }
         out
     }

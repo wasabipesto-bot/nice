@@ -133,6 +133,8 @@ fn join(a: &[String]) -> Result<()> {
         // Every sampled partition's time over its slice's mean, for the
         // spread (and so the sampling error) of the estimate.
         let mut rel = Vec::new();
+        // Seconds in each phase of the CPU join (feature `join-prof`).
+        let mut phases = [0.0f64; 4];
         for slice in &slices {
             let ts = Instant::now();
             let join = CpuJoin::new(b, slice, jp)?;
@@ -147,13 +149,17 @@ fn join(a: &[String]) -> Result<()> {
                     static SCRATCH: std::cell::RefCell<Scratch> =
                         std::cell::RefCell::new(Scratch::default());
                 }
-                SCRATCH.with(|sc| join.run_partition(picks[i], &mut sc.borrow_mut()))
+                let r = SCRATCH.with(|sc| join.run_partition(picks[i], &mut sc.borrow_mut()));
+                (r, phases_taken())
             });
             let secs: f64 = items.iter().map(|(_, s)| s).sum();
             let per_part = secs / k as f64;
-            for (r, s) in items {
+            for ((r, ph), s) in items {
                 out.add(r);
                 rel.push(s / per_part);
+                for (t, x) in phases.iter_mut().zip(ph) {
+                    *t += x;
+                }
             }
             let slice_est = su + per_part * parts as f64;
             per_slice.push(
@@ -176,11 +182,21 @@ fn join(a: &[String]) -> Result<()> {
                 "core_secs_per_partition": sampled_secs / sampled as f64,
                 "wall_core_secs_per_partition": wall_secs / sampled as f64,
                 "field_core_secs_est": est, "core_secs_per_number": est / width as f64,
-                "partition_cv": cv(&rel), "survivors": out.survivors, "checked": out.checked,
+                "partition_cv": cv(&rel), "phase_secs": phases.map(|x| x / sampled as f64),
+                "survivors": out.survivors, "checked": out.checked,
                 "hits": out.hits.len(), "per_slice": per_slice})
         );
     }
     Ok(())
+}
+
+/// The CPU join's phase times on this thread since the last call (tops,
+/// extend, list, scan), with the `join-prof` feature; zeros without it.
+fn phases_taken() -> [f64; 4] {
+    #[cfg(feature = "join-prof")]
+    return nice_common::cpu_join::prof::take();
+    #[cfg(not(feature = "join-prof"))]
+    [0.0; 4]
 }
 
 /// The coefficient of variation of `x`.
