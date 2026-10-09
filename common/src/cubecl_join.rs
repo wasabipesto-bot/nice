@@ -44,7 +44,7 @@ use crate::gpu_config::{chunk_constants, chunk_constants_u16, n_limbs};
 use crate::gpu_niceonly::{NiceonlyStats, fields_in_flight};
 use crate::gpu_route::{FieldTicket, Route};
 use crate::join_plan::{
-    BATCHES_IN_FLIGHT, Footprint, JoinCeiling, JoinField, JoinLimits, JoinPlan, NICE_RECORD_BYTES,
+    Footprint, JoinCeiling, JoinField, JoinLimits, JoinPlan, NICE_RECORD_BYTES,
 };
 use crate::overlap_join::{FieldSetup, JoinTelemetry};
 use crate::progress::FieldProgress;
@@ -73,6 +73,13 @@ pub const SURV_FLUSH: u32 = 512;
 pub const DEAD_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 /// Bottom entries each thread holds in registers in [`join_kernel`].
 const ENTRIES_PER_THREAD: u32 = 4;
+/// [`ENTRIES_PER_THREAD`], or `NICE_EXP_EPT` (experiment branch only).
+fn ept() -> u32 {
+    static V: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *V.get_or_init(|| {
+        std::env::var("NICE_EXP_EPT").ok().and_then(|v| v.parse().ok()).unwrap_or(ENTRIES_PER_THREAD)
+    })
+}
 /// Cubes for the prefilter and check kernels (grid-stride loops).
 const CHECK_CUBES: u32 = 1024;
 /// How deep the halving of an overflowing partition's top layer may go: a
@@ -1642,7 +1649,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.b,
                 self.key_level,
                 self.key_level && self.k == 1,
-                ENTRIES_PER_THREAD,
+                ept(),
                 self.f0,
                 self.k2,
                 self.walk_sync,
@@ -2133,7 +2140,7 @@ fn run_pass<R: Runtime>(
     };
     let mut recs = Vec::new();
     for batch in parts.chunks(slots) {
-        while inflight.len() >= BATCHES_IN_FLIGHT {
+        while inflight.len() >= crate::join_plan::exp::batches_in_flight() {
             let tw = Instant::now();
             if let Some((f, upto)) = inflight.pop_front() {
                 cubecl::future::block_on(f).map_err(|e| anyhow!("launch fence failed: {e:?}"))?;

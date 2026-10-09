@@ -141,10 +141,18 @@ impl JoinParams {
         if !(JOIN_MIN_BASE..=JOIN_MAX_BASE).contains(&base) || l < 7 {
             return None;
         }
+        // Experiment branch: NICE_EXP_TKP="dt,k,p" sets t = l - dt.
+        let (dt, k, p) = std::env::var("NICE_EXP_TKP")
+            .ok()
+            .and_then(|v| {
+                let x: Vec<u32> = v.split(',').filter_map(|s| s.trim().parse().ok()).collect();
+                (x.len() == 3).then(|| (x[0], x[1], x[2]))
+            })
+            .unwrap_or((3, 6, 2));
         let jp = JoinParams {
-            t: l - 3,
-            k: 6,
-            p: 2,
+            t: l.checked_sub(dt)?,
+            k,
+            p,
         };
         jp.supported(base, l).then_some(jp)
     }

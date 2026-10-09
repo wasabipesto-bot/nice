@@ -68,6 +68,45 @@ const SURV_PER_PREFIX: usize = 2;
 /// are certified.
 const SLICE_SLOTS: usize = 2;
 
+/// Experiment-only overrides of the sizing constants (branch `exp/join-sizing`,
+/// never shipped). Each reads its env var once; unset means the constant.
+pub(crate) mod exp {
+    use std::sync::OnceLock;
+    fn var<T: std::str::FromStr>(name: &str) -> Option<T> {
+        std::env::var(name).ok()?.parse().ok()
+    }
+    pub(crate) fn slots() -> usize {
+        static V: OnceLock<usize> = OnceLock::new();
+        *V.get_or_init(|| var("NICE_EXP_SLOTS").unwrap_or(super::SLOTS))
+    }
+    pub(crate) fn batches_in_flight() -> usize {
+        static V: OnceLock<usize> = OnceLock::new();
+        *V.get_or_init(|| var("NICE_EXP_BATCHES").unwrap_or(super::BATCHES_IN_FLIGHT))
+    }
+    pub(crate) fn surv_cap() -> u32 {
+        static V: OnceLock<u32> = OnceLock::new();
+        *V.get_or_init(|| var::<u32>("NICE_EXP_SURV_CAP_LOG2").map_or(super::SURV_CAP, |l| 1u32 << l))
+    }
+    pub(crate) fn join_memory() -> usize {
+        static V: OnceLock<usize> = OnceLock::new();
+        *V.get_or_init(|| var::<usize>("NICE_EXP_JOIN_MEMORY_MIB").map_or(super::JOIN_MEMORY, |m| m << 20))
+    }
+    /// The survivors-per-prefix bound in quarters (default 8 = 2.0).
+    pub(crate) fn spp_q() -> usize {
+        static V: OnceLock<usize> = OnceLock::new();
+        *V.get_or_init(|| var("NICE_EXP_SPP_Q").unwrap_or(super::SURV_PER_PREFIX * 4))
+    }
+    pub(crate) fn slice_slots() -> usize {
+        static V: OnceLock<usize> = OnceLock::new();
+        *V.get_or_init(|| var("NICE_EXP_SLICE_SLOTS").unwrap_or(super::SLICE_SLOTS))
+    }
+    /// The share of the budget the survivor list may take, as 1/N (default 4).
+    pub(crate) fn list_div() -> usize {
+        static V: OnceLock<usize> = OnceLock::new();
+        *V.get_or_init(|| var("NICE_EXP_LIST_DIV").unwrap_or(4))
+    }
+}
+
 /// What a device allows the join: its largest buffer, and a budget for all
 /// of one field's buffers together.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -89,7 +128,7 @@ impl JoinLimits {
         let max_binding = usize::try_from(max_buffer).unwrap_or(usize::MAX).max(1);
         Self {
             max_binding,
-            budget: JOIN_MEMORY.min(max_binding.saturating_mul(2)),
+            budget: exp::join_memory().min(max_binding.saturating_mul(2)),
         }
     }
 }
@@ -191,7 +230,7 @@ impl Footprint {
             tl: ntl * nroots * 4,
             work: fs.nb * 16,
             cursor: fs.nb * 4,
-            scratch: fs.nb * 4 * BATCHES_IN_FLIGHT,
+            scratch: fs.nb * 4 * exp::batches_in_flight(),
             fixed: tables.iter().sum(),
             largest_fixed: tables.into_iter().max().unwrap_or(0),
         }
@@ -268,7 +307,7 @@ impl JoinPlan {
         let room = lim.budget.checked_sub(fp.fixed + list)?;
         // The batch's expected prefilter survivors fill at most half its list.
         let by_survivors =
-            (list_cap as usize / 2 / (SURV_PER_PREFIX * fs.tlay.len().max(1))).max(1);
+            (list_cap as usize * 4 / 2 / (exp::spp_q() * fs.tlay.len().max(1))).max(1);
         let slots = slots
             .min(lim.max_binding / fp.largest_per_slot().max(1))
             .min(room / fp.per_slot().max(1))
@@ -287,7 +326,7 @@ impl JoinPlan {
     /// `None` if the device cannot hold one partition with a re-run list of
     /// [`MIN_RETRY_CAP`].
     pub(crate) fn for_field(fs: &FieldSetup, lim: JoinLimits) -> Option<(Self, Self)> {
-        let main = Self::new(fs, lim, SLOTS, SURV_CAP, 1, lim.budget / 4)?;
+        let main = Self::new(fs, lim, exp::slots(), exp::surv_cap(), 1, lim.budget / exp::list_div())?;
         let fp = Footprint::of(fs, NICE_CAP);
         let spare = lim.budget.saturating_sub(fp.fixed + fp.per_slot());
         let retry = Self::new(fs, lim, 1, SURV_CAP_RETRY, MIN_RETRY_CAP, spare)?;
@@ -311,15 +350,15 @@ pub(crate) fn max_slice_prefixes(fs: &FieldSetup, lim: JoinLimits) -> usize {
     let per_fixed = two.fixed - one.fixed;
     let per_slot = two.per_slot() - one.per_slot();
     let per_largest = two.top.max(two.tl) - one.top.max(one.tl);
-    let list_cap = (SURV_CAP as usize)
+    let list_cap = (exp::surv_cap() as usize)
         .min(lim.max_binding / 8)
-        .min(lim.budget / 4 / 8);
-    let s = SLICE_SLOTS;
+        .min(lim.budget / exp::list_div() / 8);
+    let s = exp::slice_slots();
     let base_bytes = one.fixed - per_fixed + list_cap * 8 + s * (one.per_slot() - per_slot);
     let by_budget = lim.budget.saturating_sub(base_bytes) / (per_fixed + s * per_slot).max(1);
     let by_binding =
         (lim.max_binding / s / per_largest.max(1)).min(lim.max_binding / per_fixed.max(1));
-    let by_survivors = list_cap / 2 / (s * SURV_PER_PREFIX);
+    let by_survivors = list_cap * 4 / 2 / (s * exp::spp_q());
     by_budget.min(by_binding).min(by_survivors)
 }
 
