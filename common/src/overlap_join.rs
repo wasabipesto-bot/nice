@@ -1375,11 +1375,13 @@ mod tests {
     use crate::base_range::get_base_range_u128;
 
     /// Experiment branch: the certificate (with or without the interval
-    /// closure, per `NICE_EXP_CERT_CLOSURE`) against brute force. For random
-    /// intervals [a, e] inside bases 58-64, every n whose output digits at
-    /// positions >= cap are pairwise distinct (a necessary condition for
-    /// niceness) must be kept, and every certified digit must be one of n's
-    /// digits there. `NICE_TEST_CERT_TRIALS` intervals (default 400).
+    /// closure, per `NICE_EXP_CERT_CLOSURE`) against brute force. For each
+    /// power, the certificate reasons about the positions from the first one
+    /// where [a², e²] (resp. cubes) differ up to the top. Call n locally
+    /// viable if its digits at those positions, over both powers, are
+    /// pairwise distinct (necessary for niceness). Every locally viable n
+    /// must be kept, and the certified digits must be among its digits
+    /// there. `NICE_TEST_CERT_TRIALS` intervals (default 400).
     #[test]
     #[ignore = "experiment: brute force, minutes"]
     fn cert_is_sound_against_brute_force() {
@@ -1390,46 +1392,72 @@ mod tests {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(400);
-        let cap = 6u32;
+        let cap = 6usize;
         let mut rng = Rng(0x5EED_C10_5E);
-        let (mut rejected, mut kept, mut viable_total, mut nums) = (0u64, 0u64, 0u64, 0u64);
+        let (mut rejected, mut kept, mut viable_total, mut nums, mut bits) = (0u64, 0u64, 0u64, 0u64, 0u64);
+        let dig = |x: &Natural, b: &Natural| -> Vec<u64> {
+            x.to_digits_asc(b).iter().map(|d| u64::try_from(d).unwrap()).collect()
+        };
         for t in 0..trials {
             let b = [58u32, 60, 62, 64][t % 4];
             let r = get_base_range_u128(b).unwrap().unwrap();
-            // Interval widths up to b^3 (a top's block), some much narrower.
             let w = 1 + rng.below(u128::from(b).pow(1 + (t as u32 % 3)));
             let a = r.start() + rng.below(r.size() - w);
             let e = a + w - 1;
             let Some(base) = Base::try_new(b, a, e) else { continue };
-            let got = base.cert(a, e, cap);
+            let got = base.cert(a, e, cap as u32);
             let bn = Natural::from(b);
+            // The positions each power's certificate looks at: from its
+            // first differing position (or the cap) up to the top.
+            let lows: Vec<usize> = [2u64, 3]
+                .iter()
+                .map(|&k| {
+                    let x = Natural::from(a).pow(k);
+                    let y = Natural::from(e).pow(k);
+                    let (dx, dy) = (dig(&x, &bn), dig(&y, &bn));
+                    let c0 = cap.max(dig(&(&y - &x), &bn).len());
+                    let mut lo = c0;
+                    for i in (c0..dx.len()).rev() {
+                        if dx[i] != dy[i] {
+                            lo = i;
+                            break;
+                        }
+                    }
+                    lo
+                })
+                .collect();
             for n in a..=e {
                 nums += 1;
                 let nn = Natural::from(n);
-                let d2: Vec<Natural> = nn.clone().pow(2).to_digits_asc(&bn);
-                let d3: Vec<Natural> = nn.pow(3).to_digits_asc(&bn);
                 let mut seen = 0u64;
                 let mut ok = true;
-                for d in d2.iter().skip(cap as usize).chain(d3.iter().skip(cap as usize)) {
-                    let d = u64::try_from(d).unwrap();
-                    if seen & (1 << d) != 0 {
-                        ok = false;
-                        break;
+                for (k, &lo) in [2u64, 3].iter().zip(&lows) {
+                    let d = dig(&nn.clone().pow(*k), &bn);
+                    for &x in d.iter().skip(lo) {
+                        if seen & (1 << x) != 0 {
+                            ok = false;
+                        }
+                        seen |= 1 << x;
                     }
-                    seen |= 1 << d;
                 }
                 if !ok {
                     continue;
                 }
                 viable_total += 1;
                 let m = got.unwrap_or_else(|| {
-                    panic!("b{b} [{a}, {e}] rejected but n = {n} has distinct digits at >= {cap}")
+                    panic!("b{b} [{a}, {e}] rejected but n = {n} is locally viable")
                 });
-                assert_eq!(m & !seen, 0, "b{b} [{a}, {e}]: certified digits {m:#x} not all in n = {n}'s {seen:#x}");
+                assert_eq!(m & !seen, 0, "b{b} [{a}, {e}]: certified {m:#x} not all among n = {n}'s {seen:#x}");
             }
-            if got.is_none() { rejected += 1 } else { kept += 1 }
+            match got {
+                None => rejected += 1,
+                Some(m) => {
+                    kept += 1;
+                    bits += u64::from(m.count_ones());
+                }
+            }
         }
-        eprintln!("cert soundness: {trials} intervals, {nums} numbers, {viable_total} viable, {rejected} rejected, {kept} kept, closure {}", cert_closure());
+        eprintln!("cert soundness: {trials} intervals, {nums} numbers, {viable_total} locally viable, {rejected} rejected, {kept} kept, {bits} certified digits in kept, closure {}", cert_closure());
     }
 
     /// Base-b digits of x, least significant first.
