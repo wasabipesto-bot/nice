@@ -130,6 +130,9 @@ fn join(a: &[String]) -> Result<()> {
         let (mut sampled, mut partitions) = (0usize, 0usize);
         let mut out = PartitionResult::default();
         let mut per_slice = Vec::new();
+        // Every sampled partition's time over its slice's mean, for the
+        // spread (and so the sampling error) of the estimate.
+        let mut rel = Vec::new();
         for slice in &slices {
             let ts = Instant::now();
             let join = CpuJoin::new(b, slice, jp)?;
@@ -147,10 +150,11 @@ fn join(a: &[String]) -> Result<()> {
                 SCRATCH.with(|sc| join.run_partition(picks[i], &mut sc.borrow_mut()))
             });
             let secs: f64 = items.iter().map(|(_, s)| s).sum();
-            for (r, _) in items {
-                out.add(r);
-            }
             let per_part = secs / k as f64;
+            for (r, s) in items {
+                out.add(r);
+                rel.push(s / per_part);
+            }
             let slice_est = su + per_part * parts as f64;
             per_slice.push(
                 json!({"start": slice.start().to_string(), "size": slice.size().to_string(),
@@ -172,11 +176,20 @@ fn join(a: &[String]) -> Result<()> {
                 "core_secs_per_partition": sampled_secs / sampled as f64,
                 "wall_core_secs_per_partition": wall_secs / sampled as f64,
                 "field_core_secs_est": est, "core_secs_per_number": est / width as f64,
-                "survivors": out.survivors, "checked": out.checked, "hits": out.hits.len(),
-                "per_slice": per_slice})
+                "partition_cv": cv(&rel), "survivors": out.survivors, "checked": out.checked,
+                "hits": out.hits.len(), "per_slice": per_slice})
         );
     }
     Ok(())
+}
+
+/// The coefficient of variation of `x`.
+#[allow(clippy::cast_precision_loss)]
+fn cv(x: &[f64]) -> f64 {
+    let n = x.len() as f64;
+    let mean = x.iter().sum::<f64>() / n;
+    let var = x.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (n - 1.0).max(1.0);
+    var.sqrt() / mean
 }
 
 /// A splitmix64 stream.
@@ -234,6 +247,7 @@ fn stride(a: &[String]) -> Result<()> {
                 "core_secs_per_chunk": mean, "se_core_secs_per_chunk": (var / n).sqrt(),
                 "wall_core_secs_per_chunk": wall * threads.max(1) as f64 / n,
                 "min": q(0.0), "p50": q(0.5), "p90": q(0.9), "p99": q(0.99), "max": q(1.0),
+                "live_share": secs.iter().filter(|&&s| s > 1e-3).count() as f64 / n,
                 "core_secs_per_number": mean / CHUNK as f64,
                 "field_core_secs_est": mean * (width as f64 / CHUNK as f64),
                 "hits": hits})
