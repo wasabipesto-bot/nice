@@ -505,6 +505,21 @@ impl Div64 {
         r >> sh
     }
 
+    /// Experiment branch: x / d and x mod d for one word, by the
+    /// reciprocal (no hardware divide).
+    #[inline]
+    #[must_use]
+    pub fn divrem_u64(&self, x: u64) -> (u64, u64) {
+        let sh = self.shift;
+        let (u1, u0) = if sh == 0 {
+            (0, x)
+        } else {
+            (x >> (64 - sh), x << sh)
+        };
+        let (q, r) = self.div2by1(u1, u0);
+        (q, r >> sh)
+    }
+
     #[inline]
     #[must_use]
     pub fn divrem_u128(&self, x: u128) -> (u128, u64) {
@@ -541,6 +556,13 @@ const DIGIT_BUF: usize = 48;
 pub(crate) fn cert_closure() -> bool {
     static V: OnceLock<bool> = OnceLock::new();
     *V.get_or_init(|| std::env::var("NICE_EXP_CERT_CLOSURE").is_ok_and(|v| v == "1"))
+}
+
+/// Experiment branch: `NICE_EXP_DIGITS_FAST=1` makes [`Base::cert_fast`]
+/// split digits by b's reciprocal instead of the hardware divider.
+pub(crate) fn digits_fast_on() -> bool {
+    static V: OnceLock<bool> = OnceLock::new();
+    *V.get_or_init(|| std::env::var("NICE_EXP_DIGITS_FAST").is_ok_and(|v| v == "1"))
 }
 
 /// Experiment branch: `NICE_EXP_CERT_FAST=1` takes [`Base::cert_fast`].
@@ -709,6 +731,44 @@ impl Base {
         }
     }
 
+    /// Experiment branch: [`Self::digits_w`] with each digit split off by
+    /// b's precomputed reciprocal (`Div64`), not the hardware divider.
+    // Digits are below b <= 64, so `as u8` is exact; x fits u64 by then.
+    #[allow(clippy::cast_possible_truncation)]
+    #[inline]
+    fn digits_w_fast(&self, mut x: W4, len: u32, out: &mut [u8; DIGIT_BUF]) {
+        let db = self.dpow[1];
+        let mut n = 0usize;
+        while x.0[2] != 0 || x.0[3] != 0 {
+            let mut r = self.dpow[self.chd as usize].divrem_w4(&mut x);
+            for _ in 0..self.chd {
+                let (q, d) = db.divrem_u64(r);
+                out[n] = d as u8;
+                r = q;
+                n += 1;
+            }
+        }
+        let mut q = x.to_u128();
+        while q >> 64 != 0 {
+            let (hi, r0) = self.dpow[self.chd as usize].divrem_u128(q);
+            let mut r = r0;
+            for _ in 0..self.chd {
+                let (qq, d) = db.divrem_u64(r);
+                out[n] = d as u8;
+                r = qq;
+                n += 1;
+            }
+            q = hi;
+        }
+        let mut r = q as u64;
+        while n < len as usize {
+            let (qq, d) = db.divrem_u64(r);
+            out[n] = d as u8;
+            r = qq;
+            n += 1;
+        }
+    }
+
     /// Certificate of `[a, e]`: the mask of the output digits of n² and n³
     /// at positions `>= cap` that are the same for every n in the interval,
     /// or `None` if two of them coincide.
@@ -756,7 +816,11 @@ impl Base {
             let len = (sp - c0) as usize;
             let qx = self.shift_down(x, c0);
             let qy = self.shift_down(y, c0);
-            self.digits_w(qx, sp - c0, &mut dx);
+            if digits_fast_on() {
+                self.digits_w_fast(qx, sp - c0, &mut dx);
+            } else {
+                self.digits_w(qx, sp - c0, &mut dx);
+            }
             let mut from = 0usize;
             if qy != qx {
                 while dx[from] == top {
@@ -1539,9 +1603,52 @@ mod tests {
             }
         }
         eprintln!(
-            "cert_fast == cert_ref on {n} intervals ({some} certified), closure {}",
-            cert_closure()
+            "cert_fast == cert_ref on {n} intervals ({some} certified), closure {}, digits_fast {}",
+            cert_closure(),
+            digits_fast_on()
         );
+        // digits_w_fast against digits_w on random values, and the
+        // one-word reciprocal division at its edges.
+        let mut rng = Rng(0xD161_7500);
+        for b in [10u32, 40, 57, 58, 60, 62, 63, 64] {
+            let base = Base::try_new(b, 1 << 40, (1 << 40) + 1).expect("a base");
+            for _ in 0..200_000 {
+                let top = rng.next() >> (rng.next() % 64);
+                let w = W4([rng.next(), rng.next(), rng.next(), top]);
+                let len = base.ndig_w(&w);
+                if len as usize >= DIGIT_BUF || len == 0 {
+                    continue;
+                }
+                let (mut x, mut y) = ([0u8; DIGIT_BUF], [0u8; DIGIT_BUF]);
+                base.digits_w(w, len, &mut x);
+                base.digits_w_fast(w, len, &mut y);
+                assert_eq!(x, y, "b{b} {w:?}");
+            }
+            let db = base.dpow[1];
+            for r in [
+                0u64,
+                1,
+                u64::from(b) - 1,
+                u64::from(b),
+                u64::MAX,
+                u64::MAX - 1,
+                1 << 63,
+            ] {
+                assert_eq!(
+                    db.divrem_u64(r),
+                    (r / u64::from(b), r % u64::from(b)),
+                    "b{b} {r}"
+                );
+            }
+            for _ in 0..1_000_000 {
+                let r = rng.next() >> (rng.next() % 64);
+                assert_eq!(
+                    db.divrem_u64(r),
+                    (r / u64::from(b), r % u64::from(b)),
+                    "b{b} {r}"
+                );
+            }
+        }
     }
 
     #[test]
