@@ -29,7 +29,9 @@
 //!   (mod b − 1)` must be a root of `n² + n³ ≡ b(b−1)/2`, so each top probes
 //!   one bucket per root.
 //! - Each matched pair costs one 64-bit AND of the two masks, which cover
-//!   disjoint output positions. Pairs that pass are fully checked.
+//!   disjoint output positions. Pairs that pass are fully checked. (The
+//!   `wide-join` experiment makes the masks [`Mask`] = `u128`, for bases up
+//!   to 69, on the CPU only.)
 //!
 //! # Soundness
 //!
@@ -50,7 +52,22 @@ use std::time::Instant;
 /// fast or faster and long finished anyway.
 pub const JOIN_MIN_BASE: u32 = 40;
 /// Largest base: certificates are `u64` digit masks.
+#[cfg(not(feature = "wide-join"))]
 pub const JOIN_MAX_BASE: u32 = 64;
+/// Largest base with the `wide-join` experiment: certificates are `u128`
+/// digit masks, and the host's 256-bit `W4` arithmetic holds `n³` for every
+/// `n` of bases up to 69 (base 70's upper range passes 2^85).
+#[cfg(feature = "wide-join")]
+pub const JOIN_MAX_BASE: u32 = 69;
+
+/// A set of digits, bit `d` for digit `d`: the certificates' and the
+/// bottom list's masks, and the CPU join's. `u64` holds bases up to 64.
+#[cfg(not(feature = "wide-join"))]
+pub type Mask = u64;
+/// A set of digits, bit `d` for digit `d` (`wide-join`: bases up to 69).
+#[cfg(feature = "wide-join")]
+pub type Mask = u128;
+
 /// Smallest field the join is used for. The join pays a per-field cost that
 /// does not shrink with the field (the bottom list is rebuilt for every
 /// partition value), so on small fields — every benchmark window, for
@@ -534,7 +551,8 @@ pub struct Base {
 }
 
 /// Digits the certificate's buffers hold (`Base::cert`): the cube of any
-/// field the join takes has at most 39, at bases 40-64.
+/// field the join takes has at most 39, at bases 40-64 (41 at base 69,
+/// with `wide-join`).
 const DIGIT_BUF: usize = 48;
 
 /// Experiment branch: `NICE_EXP_CERT_CLOSURE=1` strengthens [`Base::cert`].
@@ -670,7 +688,7 @@ impl Base {
 
     /// Digits of x (least significant first), exactly `len` of them
     /// (x < b^len).
-    // Digits are below b <= 64, so `as u8` is exact; x fits u64 by then.
+    // Digits are below b <= 69, so `as u8` is exact; x fits u64 by then.
     #[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
     #[inline]
     fn digits_w(&self, mut x: W4, len: u32, out: &mut [u8; DIGIT_BUF]) {
@@ -712,19 +730,22 @@ impl Base {
     /// The scan starts at `ndig(e^j − a^j)`: the two cannot agree on every
     /// position `>= i` unless `e^j − a^j < b^i`.
     #[must_use]
-    pub fn cert(&self, a: u128, e: u128, cap: u32) -> Option<u64> {
+    pub fn cert(&self, a: u128, e: u128, cap: u32) -> Option<Mask> {
         let a2 = W4::mul_u128_u128(a, a);
         let e2 = W4::mul_u128_u128(e, e);
         let a3 = a2.mul_u128(a);
         let e3 = e2.mul_u128(e);
-        let mut mask = 0u64;
+        let mut mask: Mask = 0;
         let mut dx = [0u8; DIGIT_BUF];
         let mut dy = [0u8; DIGIT_BUF];
         // Experiment branch: the first differing position's digit lies in
         // [dx, dy] (the truncated power is monotone over [a, e] and the
         // digits above it are fixed), one interval domain per power.
-        let mut doms = [0u64; 2];
-        for (pi, (x, y, sp)) in [(a2, e2, self.s2), (a3, e3, self.s3)].into_iter().enumerate() {
+        let mut doms: [Mask; 2] = [0; 2];
+        for (pi, (x, y, sp)) in [(a2, e2, self.s2), (a3, e3, self.s3)]
+            .into_iter()
+            .enumerate()
+        {
             let c0 = cap.max(self.ndig_w(&y.sub(&x)));
             if c0 >= sp {
                 continue;
@@ -739,11 +760,15 @@ impl Base {
                     if cert_closure() && dx[i] < dy[i] {
                         let (lo, hi) = (u32::from(dx[i]), u32::from(dy[i]));
                         let w = hi - lo + 1;
-                        doms[pi] = if w >= 64 { u64::MAX << lo } else { ((1u64 << w) - 1) << lo };
+                        doms[pi] = if w >= Mask::BITS {
+                            Mask::MAX << lo
+                        } else {
+                            ((1 << w) - 1) << lo
+                        };
                     }
                     break;
                 }
-                let bit = 1u64 << dx[i];
+                let bit: Mask = 1 << dx[i];
                 if mask & bit != 0 {
                     return None;
                 }
@@ -771,7 +796,10 @@ impl Base {
                         changed = true;
                     }
                 }
-                if doms[0] != 0 && doms[1] != 0 && !forced[0] && !forced[1]
+                if doms[0] != 0
+                    && doms[1] != 0
+                    && !forced[0]
+                    && !forced[1]
                     && ((doms[0] | doms[1]) & !mask).count_ones() < 2
                 {
                     return None;
@@ -803,9 +831,9 @@ impl Base {
     /// fail (a sub-interval's common digits include its parent's).
     #[must_use]
     #[allow(clippy::many_single_char_names)] // b, w, p, a, e as in the docs
-    pub fn top_layer(&self, s: u128, e_incl: u128, depth: u32, cap: u32) -> Vec<(u128, u64)> {
+    pub fn top_layer(&self, s: u128, e_incl: u128, depth: u32, cap: u32) -> Vec<(u128, Mask)> {
         let b = u128::from(self.b);
-        let mut level: Vec<(u128, u64)> = vec![(0, 0)];
+        let mut level: Vec<(u128, Mask)> = vec![(0, 0)];
         for j in 1..=depth {
             let w = self.pow[(self.l - j) as usize];
             let (plo, phi) = (s / w, e_incl / w);
@@ -842,13 +870,13 @@ impl Base {
     pub fn bot_dfs(
         &self,
         r: u128,
-        mask: u64,
+        mask: Mask,
         j: u32,
         k: u32,
         f0: u32,
         pp: u32,
         v: u128,
-        out: &mut Vec<(u64, u64)>,
+        out: &mut Vec<(u64, Mask)>,
     ) {
         if j == k {
             out.push((r as u64, mask));
@@ -881,7 +909,7 @@ impl Base {
             if g2 == g3 {
                 continue;
             }
-            let (m2, m3) = (1u64 << g2, 1u64 << g3);
+            let (m2, m3): (Mask, Mask) = (1 << g2, 1 << g3);
             if mask & (m2 | m3) != 0 {
                 continue;
             }
@@ -911,12 +939,12 @@ pub struct FieldSetup {
     pub plo: u128,
     pub phi: u128,
     /// Top layer at depth `t − p`.
-    pub tlay: Vec<(u128, u64)>,
+    pub tlay: Vec<(u128, Mask)>,
     /// `bpre`: residues mod `b^f0` whose `2·f0` low output digits are
     /// distinct, sorted by digit-sum class mod `b − 1`; `seg[c]..seg[c + 1]`
     /// is class `c`.
     pub bp_r: Vec<u32>,
-    pub bp_m: Vec<u64>,
+    pub bp_m: Vec<Mask>,
     pub seg: Vec<u32>,
     /// The prefilter tests the output digits below `k2` (1 or 2 more than
     /// the bottom list's `k`).
@@ -951,7 +979,7 @@ impl FieldSetup {
         let o = t + k - l;
         let w = base.powu(f0);
         let (tlay, full_floor) = Self::top_side(&base, jp, w, s, e);
-        let mut bpre: Vec<(u64, u64)> = Vec::new();
+        let mut bpre: Vec<(u64, Mask)> = Vec::new();
         base.bot_dfs(0, 0, 0, f0, f0, 0, 0, &mut bpre);
         ensure!(!bpre.is_empty(), "empty bottom list");
         let m1 = b - 1;
@@ -1010,7 +1038,13 @@ impl FieldSetup {
 
     /// The field's top side over `[s, e)`: its top layer at depth `t − p`,
     /// and the certificate floor of its full-width blocks.
-    fn top_side(base: &Base, jp: JoinParams, w: u128, s: u128, e: u128) -> (Vec<(u128, u64)>, u32) {
+    fn top_side(
+        base: &Base,
+        jp: JoinParams,
+        w: u128,
+        s: u128,
+        e: u128,
+    ) -> (Vec<(u128, Mask)>, u32) {
         let tlay = base.top_layer(s, e - 1, jp.t - jp.p, jp.k);
         let first_full = s.div_ceil(w);
         let full_floor = if first_full * w + w - 1 < e {
@@ -1130,7 +1164,7 @@ pub fn join_range(
     let (plo, phi) = (s / w_t, e_incl / w_t);
     let bkt = |r: u64| ((r / kdiv) as usize) * m1 + ((r % lowmod) % m1 as u64) as usize;
     for &v in parts {
-        let tops: Vec<(u128, u64)> = tlay
+        let tops: Vec<(u128, Mask)> = tlay
             .iter()
             .filter_map(|&(p0, _)| {
                 let p = p0 * pdiv + v;
@@ -1157,7 +1191,7 @@ pub fn join_range(
             off[x + 1] += off[x];
         }
         let mut cur = off.clone();
-        let mut sorted = vec![(0u64, 0u64); bl.len()];
+        let mut sorted: Vec<(u64, Mask)> = vec![(0, 0); bl.len()];
         for &(r, m) in &bl {
             let kx = bkt(r);
             sorted[cur[kx] as usize] = (r % lowmod, m);
@@ -1272,6 +1306,61 @@ pub(crate) mod test_fields {
         ),
     ];
 
+    /// `wide-join`: windows at bases 65, 68 and 69, `(b, s, e, t, k, p)` as
+    /// in [`WINDOWS`]. Each starts inside a top block (`b^(L − t)` numbers)
+    /// whose certificate passes, at a random offset, so the join has
+    /// survivors there. The shapes, as `L − t, k, p`: the production
+    /// parameters `3, 6, 2` (two widths), `2, 4, 2` (no key digit),
+    /// `2, 3, 1` (the general `advance`) and `1, 2, 1` (the general
+    /// prefilter). Deterministic: a fixed seed.
+    #[cfg(feature = "wide-join")]
+    pub(crate) fn wide_windows() -> Vec<(u32, u128, u128, u32, u32, u32)> {
+        use super::{Base, ndigits};
+        use crate::base_range::get_base_range_u128;
+        let mut x = 0x0065_0068_0069_5EEDu64;
+        let mut below = |n: u128| {
+            let mut next = || {
+                x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
+                let mut z = x;
+                z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+                z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+                z ^ (z >> 31)
+            };
+            ((u128::from(next()) << 64) | u128::from(next())) % n
+        };
+        let mut out = Vec::new();
+        for b in [65u32, 68, 69] {
+            let r = get_base_range_u128(b)
+                .expect("a u128 range")
+                .expect("a live base");
+            let l = ndigits(r.end() - 1, b);
+            for (dt, k, pp, width) in [
+                (3u32, 6u32, 2u32, 300_000u128),
+                (3, 6, 2, 2_000_000),
+                (2, 4, 2, 100_000),
+                (2, 3, 1, 100_000),
+                (1, 2, 1, 30_000),
+            ] {
+                let w = u128::from(b).pow(dt);
+                let mut found = 0;
+                while found < 2 {
+                    let p = (r.start() + below(r.size() - 4 * width)) / w;
+                    let (a, e) = (p * w, p * w + w - 1);
+                    let Some(base) = Base::try_new(b, a, e) else {
+                        continue; // below the band, where the lengths differ
+                    };
+                    if base.cert(a, e, k).is_none() {
+                        continue;
+                    }
+                    let s = (a + below(w / 2)).max(r.start());
+                    out.push((b, s, s + width, l - dt, k, pp));
+                    found += 1;
+                }
+            }
+        }
+        out
+    }
+
     /// Partition values that hold at least one top prefix of the field.
     pub(crate) fn live_partitions(fs: &FieldSetup) -> Vec<u32> {
         let mut v: Vec<u32> = (fs.plo..=fs.phi)
@@ -1296,7 +1385,7 @@ pub(crate) mod test_fields {
         let p = n / fs.w;
         let a = (p * fs.w).max(fs.s);
         let ee = (p * fs.w + fs.w - 1).min(fs.e - 1);
-        let mut seen = 0u64;
+        let mut seen: Mask = 0;
         let floor = if a == p * fs.w && ee == p * fs.w + fs.w - 1 {
             fs.full_floor
         } else {
@@ -1311,7 +1400,7 @@ pub(crate) mod test_fields {
         let (mut x2, mut x3) = (sq, cu);
         for _ in 0..fs.k2 {
             for d in [x2 % b, x3 % b] {
-                let bit = 1u64 << d;
+                let bit: Mask = 1 << d;
                 if seen & bit != 0 {
                     return false;
                 }
@@ -1394,9 +1483,13 @@ mod tests {
             .unwrap_or(400);
         let cap = 6usize;
         let mut rng = Rng(0x5EED_C10_5E);
-        let (mut rejected, mut kept, mut viable_total, mut nums, mut bits) = (0u64, 0u64, 0u64, 0u64, 0u64);
+        let (mut rejected, mut kept, mut viable_total, mut nums, mut bits) =
+            (0u64, 0u64, 0u64, 0u64, 0u64);
         let dig = |x: &Natural, b: &Natural| -> Vec<u64> {
-            x.to_digits_asc(b).iter().map(|d| u64::try_from(d).unwrap()).collect()
+            x.to_digits_asc(b)
+                .iter()
+                .map(|d| u64::try_from(d).unwrap())
+                .collect()
         };
         for t in 0..trials {
             let b = [58u32, 60, 62, 64][t % 4];
@@ -1404,7 +1497,9 @@ mod tests {
             let w = 1 + rng.below(u128::from(b).pow(1 + (t as u32 % 3)));
             let a = r.start() + rng.below(r.size() - w);
             let e = a + w - 1;
-            let Some(base) = Base::try_new(b, a, e) else { continue };
+            let Some(base) = Base::try_new(b, a, e) else {
+                continue;
+            };
             let got = base.cert(a, e, cap as u32);
             let bn = Natural::from(b);
             // The positions each power's certificate looks at: from its
@@ -1429,7 +1524,7 @@ mod tests {
             for n in a..=e {
                 nums += 1;
                 let nn = Natural::from(n);
-                let mut seen = 0u64;
+                let mut seen: Mask = 0;
                 let mut ok = true;
                 for (k, &lo) in [2u64, 3].iter().zip(&lows) {
                     let d = dig(&nn.clone().pow(*k), &bn);
@@ -1447,7 +1542,11 @@ mod tests {
                 let m = got.unwrap_or_else(|| {
                     panic!("b{b} [{a}, {e}] rejected but n = {n} is locally viable")
                 });
-                assert_eq!(m & !seen, 0, "b{b} [{a}, {e}]: certified {m:#x} not all among n = {n}'s {seen:#x}");
+                assert_eq!(
+                    m & !seen,
+                    0,
+                    "b{b} [{a}, {e}]: certified {m:#x} not all among n = {n}'s {seen:#x}"
+                );
             }
             match got {
                 None => rejected += 1,
@@ -1457,7 +1556,10 @@ mod tests {
                 }
             }
         }
-        eprintln!("cert soundness: {trials} intervals, {nums} numbers, {viable_total} locally viable, {rejected} rejected, {kept} kept, {bits} certified digits in kept, closure {}", cert_closure());
+        eprintln!(
+            "cert soundness: {trials} intervals, {nums} numbers, {viable_total} locally viable, {rejected} rejected, {kept} kept, {bits} certified digits in kept, closure {}",
+            cert_closure()
+        );
     }
 
     /// Base-b digits of x, least significant first.
@@ -1490,12 +1592,12 @@ mod tests {
 
     /// The digit values of n² and n³ at positions `>= cap`, and whether one
     /// of them repeats.
-    fn top_digits(base: &Base, n: u128, cap: u32) -> (u64, bool) {
+    fn top_digits(base: &Base, n: u128, cap: u32) -> (Mask, bool) {
         let b = u128::from(base.b);
-        let (mut seen, mut repeat) = (0u64, false);
+        let (mut seen, mut repeat): (Mask, bool) = (0, false);
         for (x, len) in [(n * n, base.s2), (n * n * n, base.s3)] {
             for d in digits(x, b, len as usize).into_iter().skip(cap as usize) {
-                let bit = 1u64 << d;
+                let bit: Mask = 1 << d;
                 repeat |= seen & bit != 0;
                 seen |= bit;
             }
@@ -1584,7 +1686,7 @@ mod tests {
                         bb,
                         k as usize,
                     ));
-                    let (mut mask, mut distinct) = (0u64, true);
+                    let (mut mask, mut distinct): (Mask, bool) = (0, true);
                     for d in low {
                         distinct &= mask & (1 << d) == 0;
                         mask |= 1 << d;
@@ -1619,7 +1721,7 @@ mod tests {
                 };
                 for depth in 1..base.l.min(5) {
                     let cap = u32::try_from(rng.below(u128::from(base.s2))).unwrap();
-                    let layer: std::collections::HashMap<u128, u64> =
+                    let layer: std::collections::HashMap<u128, Mask> =
                         base.top_layer(s, e, depth, cap).into_iter().collect();
                     let w = u128::from(b).pow(base.l - depth);
                     for n in s..=e {
@@ -1658,10 +1760,10 @@ mod tests {
             let r = n % bk;
             let d2 = digits((r * r) % bk, bb, jp.k as usize);
             let d3 = digits(((r * r) % bk * r) % bk, bb, jp.k as usize);
-            let mut bm = 0u64;
+            let mut bm: Mask = 0;
             let mut ok = true;
             for &d in d2.iter().chain(d3.iter()) {
-                let bit = 1u64 << d;
+                let bit: Mask = 1 << d;
                 if bm & bit != 0 {
                     ok = false;
                     break;
@@ -1754,6 +1856,207 @@ mod tests {
             assert_eq!(st.matches, bm, "b{b} [{s}, {e}) {jp:?}: matches differ");
             assert_eq!(st.survivors, u64::try_from(rec.len()).unwrap());
         }
+    }
+
+    /// `wide-join`: the reference join against brute force on windows at
+    /// bases 65, 68 and 69 (`test_fields::wide_windows`), which must yield
+    /// survivors at every base for the comparison to mean anything.
+    #[cfg(feature = "wide-join")]
+    #[test]
+    fn wide_reference_join_equals_brute_force() {
+        let mut per_base = std::collections::BTreeMap::<u32, (u64, u64)>::new();
+        for (b, s, e, t, k, p) in test_fields::wide_windows() {
+            let base = Base::try_new(b, s, e - 1).expect("window inside one length class");
+            let jp = JoinParams { t, k, p };
+            let mut rec = Vec::new();
+            let st = join_range(&base, s, e, jp, None, Some(&mut rec));
+            rec.sort_unstable();
+            let (bm, bs) = brute(&base, s, e, jp);
+            assert_eq!(rec, bs, "b{b} [{s}, {e}) {jp:?}: survivors differ");
+            assert_eq!(st.matches, bm, "b{b} [{s}, {e}) {jp:?}: matches differ");
+            assert!(
+                st.hits.is_empty(),
+                "b{b} [{s}, {e}): a nice number? {:?}",
+                st.hits
+            );
+            let tally = per_base.entry(b).or_default();
+            tally.0 += st.matches;
+            tally.1 += st.survivors;
+        }
+        eprintln!("wide windows, base: (matches, survivors) = {per_base:?}");
+        for (b, (_, survivors)) in &per_base {
+            assert!(*survivors > 20, "b{b}: only {survivors} survivors");
+        }
+    }
+
+    /// One interval of [`wide_cert_is_sound_against_brute_force`]:
+    /// `(locally viable n, kept, certified digits)`, panicking if a locally
+    /// viable n is rejected or lacks a certified digit.
+    #[cfg(feature = "wide-join")]
+    fn cert_brute_force_interval(b: u32, a: u128, e: u128, cap: u32) -> (u64, bool, u32) {
+        use malachite::base::num::arithmetic::traits::Pow;
+        use malachite::base::num::conversion::traits::Digits;
+        use malachite::natural::Natural;
+        let base = Base::try_new(b, a, e).expect("one digit length");
+        let got = base.cert(a, e, cap);
+        let bn = Natural::from(b);
+        let dig = |x: &Natural| -> Vec<u64> {
+            x.to_digits_asc(&bn)
+                .iter()
+                .map(|d| u64::try_from(d).unwrap())
+                .collect()
+        };
+        // The positions each power's certificate looks at: from its first
+        // differing position (or the cap) up to the top.
+        let lows: Vec<usize> = [2u64, 3]
+            .iter()
+            .map(|&j| {
+                let x = Natural::from(a).pow(j);
+                let y = Natural::from(e).pow(j);
+                let (dx, dy) = (dig(&x), dig(&y));
+                let c0 = (cap as usize).max(dig(&(&y - &x)).len());
+                (c0..dx.len()).rev().find(|&i| dx[i] != dy[i]).unwrap_or(c0)
+            })
+            .collect();
+        let mut viable = 0u64;
+        for n in a..=e {
+            let nn = Natural::from(n);
+            let mut seen: Mask = 0;
+            let mut ok = true;
+            for (j, &lo) in [2u64, 3].iter().zip(&lows) {
+                for &x in dig(&(&nn).pow(*j)).iter().skip(lo) {
+                    ok &= seen & (1 << x) == 0;
+                    seen |= 1 << x;
+                }
+            }
+            if !ok {
+                continue;
+            }
+            viable += 1;
+            let m = got.unwrap_or_else(|| {
+                panic!("b{b} [{a}, {e}] rejected but n = {n} is locally viable")
+            });
+            assert_eq!(
+                m & !seen,
+                0,
+                "b{b} [{a}, {e}]: certified {m:#x} not all among n = {n}'s {seen:#x}"
+            );
+        }
+        (viable, got.is_some(), got.map_or(0, Mask::count_ones))
+    }
+
+    /// `wide-join`: the certificate against brute force at bases 65, 68 and
+    /// 69, as [`cert_is_sound_against_brute_force`] (with or without the
+    /// closure, per `NICE_EXP_CERT_CLOSURE`): every n of an interval whose
+    /// digits are pairwise distinct at the positions the certificate
+    /// reasons about must be kept, with the certified digits among its own.
+    /// Per base, `NICE_TEST_CERT_TRIALS` (default 40) random intervals of
+    /// widths up to b³, most of them rejected, and as many certified blocks
+    /// of b³ numbers from top layers, so the kept side is tested too. On
+    /// every core.
+    #[cfg(feature = "wide-join")]
+    #[test]
+    #[ignore = "experiment: brute force, minutes"]
+    fn wide_cert_is_sound_against_brute_force() {
+        let trials: usize = std::env::var("NICE_TEST_CERT_TRIALS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(40);
+        let cap = 6;
+        let mut rng = Rng(0x0065_0068_0069_C0DE);
+        let mut intervals = Vec::new();
+        for b in [65u32, 68, 69] {
+            let r = get_base_range_u128(b).unwrap().unwrap();
+            let l = ndigits(r.end() - 1, b);
+            let w3 = u128::from(b).pow(3);
+            for t in 0..trials {
+                let w = 1 + rng.below(u128::from(b).pow(1 + (t as u32 % 3)));
+                let a = r.start() + rng.below(r.size() - w);
+                intervals.push((b, a, a + w - 1, false));
+            }
+            let mut blocks = 0;
+            while blocks < trials {
+                let span = 400 * w3;
+                let s = (r.start() + rng.below(r.size() - 2 * span)).div_ceil(w3) * w3;
+                let base = Base::try_new(b, s, s + span - 1).expect("one digit length");
+                for &(p, _) in base.top_layer(s, s + span - 1, l - 3, cap).iter().take(2) {
+                    intervals.push((b, p * w3, p * w3 + w3 - 1, true));
+                    blocks += 1;
+                }
+            }
+        }
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let threads = std::thread::available_parallelism().map_or(4, usize::from);
+        // Per base and kind: intervals, kept, numbers, locally viable, certified digits.
+        let mut tally = std::collections::BTreeMap::<(u32, bool), [u64; 5]>::new();
+        std::thread::scope(|sc| {
+            let workers: Vec<_> = (0..threads)
+                .map(|_| {
+                    sc.spawn(|| {
+                        let mut mine = Vec::new();
+                        while let Some(&(b, a, e, block)) =
+                            intervals.get(next.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+                        {
+                            let (viable, kept, bits) = cert_brute_force_interval(b, a, e, cap);
+                            let numbers = u64::try_from(e - a + 1).unwrap();
+                            mine.push((
+                                (b, block),
+                                [1, u64::from(kept), numbers, viable, u64::from(bits)],
+                            ));
+                        }
+                        mine
+                    })
+                })
+                .collect();
+            for w in workers {
+                for (key, row) in w.join().expect("a brute-force worker panicked") {
+                    let t = tally.entry(key).or_default();
+                    for (x, y) in t.iter_mut().zip(row) {
+                        *x += y;
+                    }
+                }
+            }
+        });
+        eprintln!(
+            "wide cert soundness, closure {}: (base, certified block) -> \
+             [intervals, kept, numbers, locally viable, certified digits in kept]",
+            cert_closure()
+        );
+        for (key, row) in &tally {
+            eprintln!("  {key:?} -> {row:?}");
+        }
+        for b in [65u32, 68, 69] {
+            let blocks = tally[&(b, true)];
+            assert!(
+                blocks[1] == blocks[0] && blocks[3] > 1_000,
+                "b{b}: certified blocks {blocks:?}: the kept side is barely tested"
+            );
+        }
+    }
+
+    /// `wide-join`: production-size fields at bases 65, 68 and 69 take the
+    /// join with the production parameters, and set up, up to the top of
+    /// base 69's band; base 70 does not take it.
+    #[cfg(feature = "wide-join")]
+    #[test]
+    fn wide_bases_take_the_join() {
+        for b in [65u32, 68, 69] {
+            let r = get_base_range_u128(b).unwrap().unwrap();
+            for start in [r.start(), r.end() - JOIN_MIN_FIELD_SIZE] {
+                let f = FieldSize::new(start, start + JOIN_MIN_FIELD_SIZE);
+                let verdict = join_verdict_routed(b, &f, RouteOverride::Auto);
+                let jp = verdict.unwrap_or_else(|e| panic!("b{b} {f:?}: {e:?}"));
+                assert_eq!((jp.k, jp.p, ndigits(start, b) - jp.t), (6, 2, 3), "b{b}");
+                let fs = FieldSetup::new(b, f.start(), f.end(), jp).expect("setup");
+                assert_eq!(fs.k2, 8, "b{b}: the prefilter's depth");
+            }
+        }
+        let r = get_base_range_u128(70).unwrap().unwrap();
+        let f = FieldSize::new(r.start(), r.start() + JOIN_MIN_FIELD_SIZE);
+        assert_eq!(
+            join_verdict_routed(70, &f, RouteOverride::Auto),
+            Err(StrideReason::Base)
+        );
     }
 
     #[test]

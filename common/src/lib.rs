@@ -2,6 +2,17 @@
 
 #![warn(clippy::all, clippy::pedantic)]
 
+// Experiment branch (`exp/join-wide`): `wide-join` gives the CPU overlap join
+// u128 digit masks and bases up to 69. The GPU join keeps u64 masks, so a
+// base above 64 must never reach it: the experiment builds CPU-only.
+#[cfg(all(
+    feature = "wide-join",
+    any(feature = "cuda", feature = "vulkan", feature = "cubecl")
+))]
+compile_error!(
+    "`wide-join` is a CPU-only experiment: build it without the GPU features (cuda, vulkan, cubecl)"
+);
+
 pub mod affine_filter;
 pub mod base_range;
 pub mod bench_defs;

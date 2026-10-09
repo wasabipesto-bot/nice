@@ -36,6 +36,10 @@ cubecl-metal = ["cubecl", "cubecl/metal"]
 # build time via `hipconfig`, so it is NOT in the gpu umbrella; opt-in for
 # machines with ROCm installed.
 cubecl-hip = ["cubecl", "cubecl/hip"]
+# Experiment (branch exp/join-wide only): the CPU overlap join with u128
+# digit masks, for bases up to 69. CPU-only: the GPU join's masks stay u64,
+# so lib.rs refuses to build it with any GPU backend.
+wide-join = []
 
 [dependencies]
 # Pinned exactly: CubeCL is pre-1.0 and its host API drifts between

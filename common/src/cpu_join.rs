@@ -16,7 +16,8 @@
 //! 3. **Join**, one key digit at a time: the key's bottoms are listed by
 //!    digit-sum class (about a megabyte at base 57, so they stay in cache),
 //!    and each of the key's tops scans the classes its roots name, one
-//!    64-bit AND per bottom.
+//!    64-bit AND per bottom (128-bit with `wide-join`, whose [`Mask`] is
+//!    `u128` for bases up to 69).
 //! 4. **Survivors** go through the middle-digit prefilter, as on the GPU,
 //!    and then the client's own full check.
 //!
@@ -30,7 +31,7 @@
 use crate::FieldSize;
 use crate::client_process::{get_is_nice, get_is_nice_with_known_lsd};
 use crate::overlap_join::{
-    Div64, FieldSetup, JoinParams, join_params_for, join_slices, join_verdict, ndigits,
+    Div64, FieldSetup, JoinParams, Mask, join_params_for, join_slices, join_verdict, ndigits,
     prefix_block,
 };
 use anyhow::Result;
@@ -52,7 +53,7 @@ pub fn slices_for(base: u32, range: &FieldSize) -> Option<(JoinParams, Vec<Field
 }
 
 /// The mask of a bottom whose fixed digits repeat: it joins no top.
-const DEAD: u64 = u64::MAX;
+const DEAD: Mask = Mask::MAX;
 
 /// What one partition through the join found and did.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -79,7 +80,7 @@ impl PartitionResult {
 pub struct Scratch {
     tops: Vec<Top>,
     ext: Ext,
-    masks: Vec<u64>,
+    masks: Vec<Mask>,
     info: Vec<Info>,
     offs: Vec<u32>,
 }
@@ -90,7 +91,7 @@ pub struct Scratch {
 struct Top {
     p: u128,
     /// The certificate: output digits at positions `>= k`.
-    mask: u64,
+    mask: Mask,
     rlo: u32,
     rhi: u32,
     /// `n`'s digits `k..k2` (the next digits of `P`), as a number.
@@ -111,7 +112,7 @@ struct Ext {
     /// The residue's index in the field's bottom list.
     idx: Vec<u32>,
     /// Output digits at positions below `k − 1`.
-    mask: Vec<u64>,
+    mask: Vec<Mask>,
     /// `⌊r²/b^(k−1)⌋` and `⌊r³/b^(k−1)⌋` mod `M` (the values at `d = 0`).
     q2: Vec<u32>,
     q3: Vec<u32>,
@@ -159,7 +160,8 @@ impl Ext {
 }
 
 /// A listed bottom: its row in [`Ext`], and the carries the prefilter
-/// needs, `⌊R²/b^k⌋ | ⌊R³/b^k⌋ << 16` (each mod `b^mid`, below `2^12`).
+/// needs, `⌊R²/b^k⌋ | ⌊R³/b^k⌋ << 16` (each mod `b^mid`, below `2^13`
+/// for bases up to 69).
 #[derive(Clone, Copy)]
 struct Info {
     row: u32,
@@ -167,7 +169,8 @@ struct Info {
 }
 
 /// Exact division by a small divisor through a multiply: for `x < 2^48/d`
-/// ([`Self::divrem`]), or `x < 2^26` and `d <= 64` ([`Self::divrem_small`]).
+/// ([`Self::divrem`]), or `x < 2^32/d` ([`Self::divrem_small`]; the join
+/// divides values below `b^3 < 2^19` by `b <= 69`).
 #[derive(Clone, Copy)]
 struct SmallDiv {
     d: u64,
@@ -201,7 +204,7 @@ impl SmallDiv {
     }
 
     /// `(x / d, x % d)` with one 64-bit multiply, exact below `2^32/d`
-    /// (which `2^26` is for `d <= 64`).
+    /// (above `2^25.8` for `d <= 69`).
     #[inline]
     fn divrem_small(self, x: u32) -> (u32, u32) {
         let q = ((u64::from(x) * self.magic32) >> 32) as u32;
@@ -239,7 +242,9 @@ pub struct CpuJoin {
     /// The AND scan may use AVX2 (detected at run time).
     #[cfg(target_arch = "x86_64")]
     avx2: bool,
-    /// AVX-512F scan (experiment branch; `NICE_EXP_NO_AVX512` disables it).
+    /// AVX-512F scan (experiment branch; `NICE_EXP_NO_AVX512` disables it;
+    /// there is none for `u128` masks).
+    #[cfg(not(feature = "wide-join"))]
     avx512: bool,
     /// `fs.tlay` is ordered by key digit (stably): `key_off[d]..key_off[d +
     /// 1]` are the prefixes whose key is `d`.
@@ -301,6 +306,7 @@ impl CpuJoin {
             smid: SmallDiv::new(bmid),
             #[cfg(target_arch = "x86_64")]
             avx2: std::arch::is_x86_feature_detected!("avx2"),
+            #[cfg(not(feature = "wide-join"))]
             avx512: std::arch::is_x86_feature_detected!("avx512f")
                 && std::env::var("NICE_EXP_NO_AVX512").is_err(),
             fs,
@@ -421,7 +427,7 @@ impl CpuJoin {
     // Below 2^32: w = b^f0 is (`JoinParams::supported`), and so are b^mid,
     // b - 1 and the key space. w, p, a, e as in `overlap_join`.
     #[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
-    fn tops(&self, v: u32, layer: &[(u128, u64)], tops: &mut Vec<Top>) {
+    fn tops(&self, v: u32, layer: &[(u128, Mask)], tops: &mut Vec<Top>) {
         tops.clear();
         let fs = &self.fs;
         let (w, v) = (fs.w, u128::from(v));
@@ -458,7 +464,7 @@ impl CpuJoin {
     /// the partition's last digit, which [`Self::list`] adds). Residues
     /// whose digits repeat are dropped here, once for every key.
     // Narrowed: b^f0 and the list's length (at most b^f0) are below 2^32,
-    // r below b^(k-1) < 2^40, and every column below M <= 2^18.
+    // r below b^(k-1) < 2^40, and every column below M = b^3 < 2^19.
     #[allow(clippy::cast_possible_truncation)]
     fn extend(&self, v: u32, ext: &mut Ext) {
         let fs = &self.fs;
@@ -485,7 +491,7 @@ impl CpuJoin {
                     let (g2, g3) = (x2 % b, x3 % b);
                     x2 /= b;
                     x3 /= b;
-                    let bits = (1u64 << g2) | (1u64 << g3);
+                    let bits: Mask = (1 << g2) | (1 << g3);
                     if g2 == g3 || mask & bits != 0 {
                         mask = DEAD;
                         break;
@@ -525,7 +531,7 @@ impl CpuJoin {
     /// Move every residue's `t2`/`t3` to the last bottom digit `d`. For the
     /// production parameters they are affine in `d`: one step is an
     /// addition mod `M` per residue, over plain columns.
-    // M <= 2^18, so it and everything reduced mod M fit u32.
+    // M = b^3 < 2^19, so it and everything reduced mod M fit u32.
     #[allow(clippy::cast_possible_truncation)]
     fn advance(&self, ext: &mut Ext, d: u32) {
         let m = self.big_m as u32;
@@ -564,7 +570,7 @@ impl CpuJoin {
         &self,
         d: u32,
         ext: &mut Ext,
-        masks: &mut Vec<u64>,
+        masks: &mut Vec<Mask>,
         info: &mut Vec<Info>,
         offs: &mut Vec<u32>,
     ) {
@@ -578,7 +584,7 @@ impl CpuJoin {
                 let i = row as usize;
                 let (a2, g2) = self.sb.divrem_small(ext.t2[i]);
                 let (a3, g3) = self.sb.divrem_small(ext.t3[i]);
-                let bits = (1u64 << g2) | (1u64 << g3);
+                let bits: Mask = (1 << g2) | (1 << g3);
                 let mask = ext.mask[i];
                 if g2 == g3 || mask & bits != 0 {
                     continue;
@@ -593,16 +599,17 @@ impl CpuJoin {
         offs.push(masks.len() as u32);
     }
 
-    /// One top against one class of bottoms: a 64-bit AND each, eight at a
-    /// time; the (rare) pairs that pass go to [`Self::survivor`].
+    /// One top against one class of bottoms: an AND of the two masks each
+    /// (64-bit, or 128-bit with `wide-join`), eight at a time; the (rare)
+    /// pairs that pass go to [`Self::survivor`].
     fn scan(
         &self,
         pass: &Pass,
-        masks: &[u64],
+        masks: &[Mask],
         out: &mut PartitionResult,
         record: &mut Option<&mut Vec<u128>>,
     ) {
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(all(target_arch = "x86_64", not(feature = "wide-join")))]
         if self.avx512 {
             // SAFETY: `avx512` is only set where the CPU has AVX-512F.
             unsafe { self.scan_avx512(pass, masks, out, record) };
@@ -619,12 +626,12 @@ impl CpuJoin {
 
     /// [`Self::scan_any`] with AVX2: sixteen ANDs per step, compared with
     /// zero and turned into a bit per bottom.
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(all(target_arch = "x86_64", not(feature = "wide-join")))]
     #[target_feature(enable = "avx2")]
     fn scan_avx2(
         &self,
         pass: &Pass,
-        masks: &[u64],
+        masks: &[Mask],
         out: &mut PartitionResult,
         record: &mut Option<&mut Vec<u128>>,
     ) {
@@ -661,14 +668,75 @@ impl CpuJoin {
         }
     }
 
+    /// [`Self::scan_any`] with AVX2 for `u128` masks (`wide-join`): two
+    /// masks per register, sixteen per step. Each mask's two words are
+    /// ANDed with the top's and OR-ed into one lane, which is compared with
+    /// zero and turned into a bit per bottom.
+    #[cfg(all(target_arch = "x86_64", feature = "wide-join"))]
+    #[target_feature(enable = "avx2")]
+    fn scan_avx2(
+        &self,
+        pass: &Pass,
+        masks: &[Mask],
+        out: &mut PartitionResult,
+        record: &mut Option<&mut Vec<u128>>,
+    ) {
+        use std::arch::x86_64::{
+            __m256i, _mm256_and_si256, _mm256_castsi256_pd, _mm256_cmpeq_epi64, _mm256_loadu_si256,
+            _mm256_movemask_pd, _mm256_or_si256, _mm256_set_epi64x, _mm256_setzero_si256,
+            _mm256_unpackhi_epi64, _mm256_unpacklo_epi64,
+        };
+        let tm = pass.top.mask;
+        // The words of a u128, low first (`as u64` keeps the low word).
+        #[allow(clippy::cast_possible_truncation)]
+        let (lo, hi) = ((tm as u64).cast_signed(), ((tm >> 64) as u64).cast_signed());
+        // Lanes, lowest first: the top's low word, its high word, twice.
+        let t = _mm256_set_epi64x(hi, lo, hi, lo);
+        let zero = _mm256_setzero_si256();
+        let (chunks, rest) = masks.as_chunks::<16>();
+        let mut at = 0;
+        for chunk in chunks {
+            let mut bits = 0u32;
+            for q in 0..4 {
+                // SAFETY: masks 4q..4q + 4 of a 16-mask chunk, two per
+                // unaligned (`loadu`) load of 32 bytes.
+                #[allow(clippy::cast_ptr_alignment)]
+                let (a, c) = unsafe {
+                    let p = chunk.as_ptr().add(4 * q).cast::<__m256i>();
+                    (_mm256_loadu_si256(p), _mm256_loadu_si256(p.add(1)))
+                };
+                let (a, c) = (_mm256_and_si256(a, t), _mm256_and_si256(c, t));
+                // Per 128-bit lane, unpacking pairs the masks' low words and
+                // their high words: masks 4q, 4q + 2, 4q + 1, 4q + 3.
+                let any = _mm256_or_si256(_mm256_unpacklo_epi64(a, c), _mm256_unpackhi_epi64(a, c));
+                let z = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpeq_epi64(any, zero)))
+                    .cast_unsigned();
+                // Back to mask order: swap bits 1 and 2.
+                let z = (z & 0b1001) | ((z & 0b0010) << 1) | ((z & 0b0100) >> 1);
+                bits |= z << (4 * q);
+            }
+            while bits != 0 {
+                let j = at + bits.trailing_zeros() as usize;
+                bits &= bits - 1;
+                self.survivor(pass, masks[j], j, out, record);
+            }
+            at += 16;
+        }
+        for (j, &m) in rest.iter().enumerate() {
+            if m & tm == 0 {
+                self.survivor(pass, m, at + j, out, record);
+            }
+        }
+    }
+
     /// [`Self::scan_any`] with AVX-512F: `vptestnmq` gives the zero-AND
     /// lanes of eight bottoms as a mask directly; 32 per step.
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(all(target_arch = "x86_64", not(feature = "wide-join")))]
     #[target_feature(enable = "avx512f")]
     fn scan_avx512(
         &self,
         pass: &Pass,
-        masks: &[u64],
+        masks: &[Mask],
         out: &mut PartitionResult,
         record: &mut Option<&mut Vec<u128>>,
     ) {
@@ -703,7 +771,7 @@ impl CpuJoin {
     fn scan_any(
         &self,
         pass: &Pass,
-        masks: &[u64],
+        masks: &[Mask],
         out: &mut PartitionResult,
         record: &mut Option<&mut Vec<u128>>,
     ) {
@@ -735,7 +803,7 @@ impl CpuJoin {
     fn survivor(
         &self,
         pass: &Pass,
-        bmask: u64,
+        bmask: Mask,
         j: usize,
         out: &mut PartitionResult,
         record: &mut Option<&mut Vec<u128>>,
@@ -766,10 +834,13 @@ impl CpuJoin {
         }
         // With f0 = 3 (the production parameters) the bottom list's own
         // mask is the low three digits of both powers, which the check skips.
-        let nice = if self.fs.f0 == 3 {
-            get_is_nice_with_known_lsd(n, self.fs.b, 3, self.fs.bp_m[ext.idx[row] as usize])
-        } else {
-            get_is_nice(n, self.fs.b)
+        // The seeded check takes a u64 mask: bases above 64 (`wide-join`)
+        // take the plain check.
+        let nice = match u64::try_from(self.fs.bp_m[ext.idx[row] as usize]) {
+            Ok(seed) if self.fs.f0 == 3 && self.fs.b <= 64 => {
+                get_is_nice_with_known_lsd(n, self.fs.b, 3, seed)
+            }
+            _ => get_is_nice(n, self.fs.b),
         };
         if nice {
             out.hits.push(n);
@@ -783,7 +854,7 @@ impl CpuJoin {
     /// `⌊R³/b^k⌋ + 3R²D` mod `b^mid` when `k >= mid` (the production
     /// parameters), with `2R`, `3R²` (`p2`, `p3`) the bottom's.
     #[inline]
-    fn prefilter(&self, top: &Top, bmask: u64, carries: u32, p2: u32, p3: u32) -> bool {
+    fn prefilter(&self, top: &Top, bmask: Mask, carries: u32, p2: u32, p3: u32) -> bool {
         let dm = u64::from(top.dm);
         let x2 = self
             .smid
@@ -795,7 +866,7 @@ impl CpuJoin {
     /// [`Self::prefilter`] for any parameters: also the terms in `b^k`
     /// (`D²b^k`, `3RD²b^k`, `D³b^(2k)`), which vanish unless `k` is below
     /// the prefilter's depth, and `R mod b^mid` as given.
-    fn prefilter_any(&self, top: &Top, bmask: u64, carries: u32, rho: u64) -> bool {
+    fn prefilter_any(&self, top: &Top, bmask: Mask, carries: u32, rho: u64) -> bool {
         let (m, dm) = (self.bmid, u64::from(top.dm));
         let (a2, a3) = (u64::from(carries & 0xFFFF), u64::from(carries >> 16));
         let (rho2, d2) = (rho * rho % m, dm * dm % m);
@@ -809,12 +880,12 @@ impl CpuJoin {
     /// each, below `b^mid`) against each other, the bottom's digits and
     /// the certificate when it sits above them.
     #[inline]
-    fn prefilter_digits(&self, top: &Top, bmask: u64, mut x2: u32, mut x3: u32) -> bool {
+    fn prefilter_digits(&self, top: &Top, bmask: Mask, mut x2: u32, mut x3: u32) -> bool {
         let mut seen = bmask | if top.seed { top.mask } else { 0 };
         for _ in 0..self.mid {
             let (q2, g2) = self.sb.divrem_small(x2);
             let (q3, g3) = self.sb.divrem_small(x3);
-            let bits = (1u64 << g2) | (1u64 << g3);
+            let bits: Mask = (1 << g2) | (1 << g3);
             if g2 == g3 || seen & bits != 0 {
                 return false;
             }
@@ -845,13 +916,21 @@ mod tests {
     use crate::stride_filter::StrideTable;
     use std::time::Instant;
 
-    /// Dan Stoyell's windows, and base 10's whole band (which holds 69).
+    /// Dan Stoyell's windows, and base 10's whole band (which holds 69);
+    /// with `wide-join`, also windows at bases 65, 68 and 69
+    /// (`test_fields::wide_windows`).
     fn windows() -> Vec<(u32, u128, u128, JoinParams)> {
         let mut v = vec![(10, 47, 100, JoinParams { t: 2, k: 1, p: 0 })];
         v.extend(
             WINDOWS
                 .iter()
                 .map(|&(b, s, e, t, k, p)| (b, s, e, JoinParams { t, k, p })),
+        );
+        #[cfg(feature = "wide-join")]
+        v.extend(
+            crate::overlap_join::test_fields::wide_windows()
+                .into_iter()
+                .map(|(b, s, e, t, k, p)| (b, s, e, JoinParams { t, k, p })),
         );
         v
     }
@@ -865,37 +944,45 @@ mod tests {
         let step = live.len().div_ceil(samples).max(1);
         let mut scratch = Scratch::default();
         for v in live.into_iter().step_by(step) {
-            let mut cpu = Vec::new();
-            let st = join_range(
-                &join.fs.base,
-                s,
-                e,
-                jp,
-                Some(&[u128::from(v)]),
-                Some(&mut cpu),
-            );
-            cpu.retain(|&n| mid_mirror(&join.fs, n));
-            cpu.sort_unstable();
-            let mut got = Vec::new();
-            let res = join.run(v, &mut scratch, Some(&mut got));
-            got.sort_unstable();
-            let mut hits = res.hits.clone();
-            hits.sort_unstable();
-            assert_eq!(
-                res.survivors, st.survivors,
-                "b{b} [{s}, {e}) {jp:?} partition {v}: join survivors"
-            );
-            assert_eq!(
-                got, cpu,
-                "b{b} [{s}, {e}) {jp:?} partition {v}: prefilter survivors"
-            );
-            assert_eq!(
-                res.checked,
-                cpu.len() as u64,
-                "b{b} [{s}, {e}) {jp:?} partition {v}"
-            );
-            assert_eq!(hits, st.hits, "b{b} [{s}, {e}) {jp:?} partition {v}: hits");
+            check_partition(&join, v, &mut scratch);
         }
+    }
+
+    /// Partition `v` of `join`'s field against the reference join (see
+    /// [`check_partitions`]); its join survivors and prefilter survivors.
+    fn check_partition(join: &CpuJoin, v: u32, scratch: &mut Scratch) -> (u64, u64) {
+        let (b, s, e, jp) = (join.fs.b, join.fs.s, join.fs.e, join.fs.jp);
+        let mut cpu = Vec::new();
+        let st = join_range(
+            &join.fs.base,
+            s,
+            e,
+            jp,
+            Some(&[u128::from(v)]),
+            Some(&mut cpu),
+        );
+        cpu.retain(|&n| mid_mirror(&join.fs, n));
+        cpu.sort_unstable();
+        let mut got = Vec::new();
+        let res = join.run(v, scratch, Some(&mut got));
+        got.sort_unstable();
+        let mut hits = res.hits.clone();
+        hits.sort_unstable();
+        assert_eq!(
+            res.survivors, st.survivors,
+            "b{b} [{s}, {e}) {jp:?} partition {v}: join survivors"
+        );
+        assert_eq!(
+            got, cpu,
+            "b{b} [{s}, {e}) {jp:?} partition {v}: prefilter survivors"
+        );
+        assert_eq!(
+            res.checked,
+            cpu.len() as u64,
+            "b{b} [{s}, {e}) {jp:?} partition {v}"
+        );
+        assert_eq!(hits, st.hits, "b{b} [{s}, {e}) {jp:?} partition {v}: hits");
+        (res.survivors, res.checked)
     }
 
     /// The client's CPU stride path over `range` on `threads` threads: its
@@ -1039,6 +1126,74 @@ mod tests {
             let t = Instant::now();
             check_partitions(b, s, s + size, jp, n);
             eprintln!("b{b} {jp:?}: {:.1}s", t.elapsed().as_secs_f64());
+        }
+    }
+
+    /// `wide-join`: production-size fields at bases 65, 68 and 69: 1e16
+    /// fields on the grid `range_start + i·1e16` of about the median top-layer
+    /// density of a 60-field survey (`jwide list`), and one dense one.
+    #[cfg(feature = "wide-join")]
+    const WIDE_FIELDS: &[(u32, u128, u128)] = &[
+        (65, 0, 10_000_000_000_000_000),
+        (68, 0, 10_000_000_000_000_000),
+        (69, 0, 10_000_000_000_000_000),
+    ];
+
+    /// `wide-join`, opt-in (`NICE_TEST_WIDE_JOIN_REF=n`; minutes on many
+    /// cores): `n` partitions of each of [`WIDE_FIELDS`], spread evenly over
+    /// its live partitions and run on every core, each against the
+    /// reference join as [`check_partitions`] compares them.
+    #[cfg(feature = "wide-join")]
+    #[test]
+    #[ignore = "opt-in, minutes"]
+    fn wide_cpu_join_matches_the_reference_on_production_fields() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let Ok(n) = std::env::var("NICE_TEST_WIDE_JOIN_REF") else {
+            eprintln!("skipping: set NICE_TEST_WIDE_JOIN_REF to a partition count per field");
+            return;
+        };
+        let n: usize = n
+            .parse()
+            .expect("NICE_TEST_WIDE_JOIN_REF: a partition count");
+        let threads = std::thread::available_parallelism().map_or(4, usize::from);
+        for &(b, s, size) in WIDE_FIELDS {
+            let range = FieldSize::new(s, s + size);
+            let jp = join_params_for(b, &range).expect("a join field");
+            let t = Instant::now();
+            let join = CpuJoin::new(b, &range, jp).expect("field setup");
+            let live = live_partitions(&join.fs);
+            let picks: Vec<u32> = (0..n.min(live.len()))
+                .map(|i| live[i * live.len() / n.min(live.len())])
+                .collect();
+            let next = AtomicUsize::new(0);
+            let (survivors, checked) = std::thread::scope(|sc| {
+                let workers: Vec<_> = (0..threads)
+                    .map(|_| {
+                        sc.spawn(|| {
+                            let mut scratch = Scratch::default();
+                            let (mut survivors, mut checked) = (0u64, 0u64);
+                            while let Some(&v) = picks.get(next.fetch_add(1, Ordering::Relaxed)) {
+                                let (x, y) = check_partition(&join, v, &mut scratch);
+                                survivors += x;
+                                checked += y;
+                            }
+                            (survivors, checked)
+                        })
+                    })
+                    .collect();
+                workers
+                    .into_iter()
+                    .map(|w| w.join().expect("a partition check panicked"))
+                    .fold((0, 0), |(a, b), (x, y)| (a + x, b + y))
+            });
+            eprintln!(
+                "WIDE REF b{b} [{s}, +{size}) {jp:?}: {} of {} live partitions match the \
+                 reference: {survivors} join survivors, {checked} checked, {:.0}s",
+                picks.len(),
+                live.len(),
+                t.elapsed().as_secs_f64()
+            );
+            assert!(survivors > 0, "b{b}: no survivors, so nothing was compared");
         }
     }
 
