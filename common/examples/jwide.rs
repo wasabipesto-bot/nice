@@ -23,7 +23,7 @@
 use anyhow::{Result, bail};
 use nice_common::FieldSize;
 use nice_common::base_range::get_base_range_u128;
-use nice_common::client_process::process_range_niceonly;
+use nice_common::client_process::{get_is_nice, process_range_niceonly};
 use nice_common::cpu_join::{CpuJoin, PartitionResult, Scratch, slices_for};
 use nice_common::overlap_join::{Base, JoinParams, Mask, join_verdict, ndigits};
 use nice_common::stride_filter::StrideTable;
@@ -278,6 +278,28 @@ fn grid(a: &[String]) -> Result<()> {
     Ok(())
 }
 
+/// `jwide check BASE N SEED`: the client's full nice check (`get_is_nice`)
+/// on N random numbers of BASE's range, one thread: nanoseconds per call.
+#[allow(clippy::cast_precision_loss)]
+fn check(a: &[String]) -> Result<()> {
+    let b: u32 = a[2].parse()?;
+    let n: usize = a[3].parse()?;
+    let mut rng = Rng(a[4].parse()?);
+    let Some(r) = get_base_range_u128(b)? else {
+        bail!("base {b} has no range");
+    };
+    let xs: Vec<u128> = (0..n).map(|_| r.start() + rng.below(r.size())).collect();
+    let t = Instant::now();
+    let nice = xs.iter().filter(|&&x| get_is_nice(x, b)).count();
+    let secs = t.elapsed().as_secs_f64();
+    println!(
+        "{}",
+        json!({"kind": "check", "base": b, "calls": n, "ns_per_call": secs * 1e9 / n as f64,
+            "nice": nice})
+    );
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let a: Vec<String> = std::env::args().collect();
     match a.get(1).map(String::as_str) {
@@ -285,9 +307,11 @@ fn main() -> Result<()> {
         Some("join") => join(&a),
         Some("stride") => stride(&a),
         Some("grid") => grid(&a),
+        Some("check") => check(&a),
         _ => bail!(
             "usage: jwide list THREADS < lines | jwide join BASE WIDTH THREADS SAMPLE S... | \
-             jwide stride BASE WIDTH THREADS CHUNKS SEED S... | jwide grid BASE SIZE N SEED"
+             jwide stride BASE WIDTH THREADS CHUNKS SEED S... | jwide grid BASE SIZE N SEED | \
+             jwide check BASE N SEED"
         ),
     }
 }
