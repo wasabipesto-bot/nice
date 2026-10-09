@@ -239,6 +239,8 @@ pub struct CpuJoin {
     /// The AND scan may use AVX2 (detected at run time).
     #[cfg(target_arch = "x86_64")]
     avx2: bool,
+    /// AVX-512F scan (experiment branch; `NICE_EXP_NO_AVX512` disables it).
+    avx512: bool,
     /// `fs.tlay` is ordered by key digit (stably): `key_off[d]..key_off[d +
     /// 1]` are the prefixes whose key is `d`.
     key_off: Vec<u32>,
@@ -299,6 +301,8 @@ impl CpuJoin {
             smid: SmallDiv::new(bmid),
             #[cfg(target_arch = "x86_64")]
             avx2: std::arch::is_x86_feature_detected!("avx2"),
+            avx512: std::arch::is_x86_feature_detected!("avx512f")
+                && std::env::var("NICE_EXP_NO_AVX512").is_err(),
             fs,
         })
     }
@@ -599,6 +603,12 @@ impl CpuJoin {
         record: &mut Option<&mut Vec<u128>>,
     ) {
         #[cfg(target_arch = "x86_64")]
+        if self.avx512 {
+            // SAFETY: `avx512` is only set where the CPU has AVX-512F.
+            unsafe { self.scan_avx512(pass, masks, out, record) };
+            return;
+        }
+        #[cfg(target_arch = "x86_64")]
         if self.avx2 {
             // SAFETY: `avx2` is only set where the CPU has AVX2.
             unsafe { self.scan_avx2(pass, masks, out, record) };
@@ -642,6 +652,44 @@ impl CpuJoin {
                 self.survivor(pass, masks[j], j, out, record);
             }
             at += 16;
+        }
+        let t = pass.top.mask;
+        for (j, &m) in rest.iter().enumerate() {
+            if m & t == 0 {
+                self.survivor(pass, m, at + j, out, record);
+            }
+        }
+    }
+
+    /// [`Self::scan_any`] with AVX-512F: `vptestnmq` gives the zero-AND
+    /// lanes of eight bottoms as a mask directly; 32 per step.
+    #[cfg(target_arch = "x86_64")]
+    #[target_feature(enable = "avx512f")]
+    fn scan_avx512(
+        &self,
+        pass: &Pass,
+        masks: &[u64],
+        out: &mut PartitionResult,
+        record: &mut Option<&mut Vec<u128>>,
+    ) {
+        use std::arch::x86_64::{_mm512_loadu_si512, _mm512_set1_epi64, _mm512_testn_epi64_mask};
+        let t = _mm512_set1_epi64(pass.top.mask.cast_signed());
+        let (chunks, rest) = masks.as_chunks::<32>();
+        let mut at = 0;
+        for chunk in chunks {
+            let mut bits = 0u32;
+            for q in 0..4 {
+                // SAFETY: eight u64 at q * 8 of a 32-element chunk, unaligned load.
+                #[allow(clippy::cast_ptr_alignment)]
+                let v = unsafe { _mm512_loadu_si512(chunk.as_ptr().add(8 * q).cast()) };
+                bits |= u32::from(_mm512_testn_epi64_mask(v, t)) << (8 * q);
+            }
+            while bits != 0 {
+                let j = at + bits.trailing_zeros() as usize;
+                bits &= bits - 1;
+                self.survivor(pass, masks[j], j, out, record);
+            }
+            at += 32;
         }
         let t = pass.top.mask;
         for (j, &m) in rest.iter().enumerate() {

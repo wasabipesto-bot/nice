@@ -537,6 +537,12 @@ pub struct Base {
 /// field the join takes has at most 39, at bases 40-64.
 const DIGIT_BUF: usize = 48;
 
+/// Experiment branch: `NICE_EXP_CERT_CLOSURE=1` strengthens [`Base::cert`].
+fn cert_closure() -> bool {
+    static V: OnceLock<bool> = OnceLock::new();
+    *V.get_or_init(|| std::env::var("NICE_EXP_CERT_CLOSURE").is_ok_and(|v| v == "1"))
+}
+
 impl Base {
     /// `lo..=hi` must share the digit length of n, n² and n³ (true inside
     /// any field of a nice band), and n³ must have at most [`DIGIT_BUF`]
@@ -714,7 +720,11 @@ impl Base {
         let mut mask = 0u64;
         let mut dx = [0u8; DIGIT_BUF];
         let mut dy = [0u8; DIGIT_BUF];
-        for (x, y, sp) in [(a2, e2, self.s2), (a3, e3, self.s3)] {
+        // Experiment branch: the first differing position's digit lies in
+        // [dx, dy] (the truncated power is monotone over [a, e] and the
+        // digits above it are fixed), one interval domain per power.
+        let mut doms = [0u64; 2];
+        for (pi, (x, y, sp)) in [(a2, e2, self.s2), (a3, e3, self.s3)].into_iter().enumerate() {
             let c0 = cap.max(self.ndig_w(&y.sub(&x)));
             if c0 >= sp {
                 continue;
@@ -726,6 +736,11 @@ impl Base {
             self.digits_w(qy, len, &mut dy);
             for i in (0..len as usize).rev() {
                 if dx[i] != dy[i] {
+                    if cert_closure() && dx[i] < dy[i] {
+                        let (lo, hi) = (u32::from(dx[i]), u32::from(dy[i]));
+                        let w = hi - lo + 1;
+                        doms[pi] = if w >= 64 { u64::MAX << lo } else { ((1u64 << w) - 1) << lo };
+                    }
                     break;
                 }
                 let bit = 1u64 << dx[i];
@@ -733,6 +748,37 @@ impl Base {
                     return None;
                 }
                 mask |= bit;
+            }
+        }
+        if cert_closure() {
+            // Singleton closure and the pair's Hall condition over the two
+            // interval domains: a domain with no free digit rejects, one
+            // with a single free digit forces it.
+            let mut forced = [false; 2];
+            loop {
+                let mut changed = false;
+                for pi in 0..2 {
+                    if doms[pi] == 0 || forced[pi] {
+                        continue;
+                    }
+                    let free = doms[pi] & !mask;
+                    if free == 0 {
+                        return None;
+                    }
+                    if free.count_ones() == 1 {
+                        mask |= free;
+                        forced[pi] = true;
+                        changed = true;
+                    }
+                }
+                if doms[0] != 0 && doms[1] != 0 && !forced[0] && !forced[1]
+                    && ((doms[0] | doms[1]) & !mask).count_ones() < 2
+                {
+                    return None;
+                }
+                if !changed {
+                    break;
+                }
             }
         }
         Some(mask)
