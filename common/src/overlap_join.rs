@@ -1526,7 +1526,8 @@ mod tests {
                 let l = rng.below(30) as u32 + 2;
                 let start = u128::from(b).pow(l / 2).max(2);
                 let a = start + rng.below(start * 3);
-                let e = a + rng.below(1u128 << rng.below(40));
+                let sh = rng.below(40);
+                let e = a + rng.below(1u128 << sh);
                 let Some(base) = Base::try_new(b, a, e) else {
                     continue;
                 };
