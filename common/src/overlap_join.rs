@@ -420,6 +420,21 @@ impl W4 {
         W4(r)
     }
 
+    /// Experiment branch: the sum, which the caller keeps below 2^256.
+    #[inline]
+    #[must_use]
+    pub fn add(&self, o: &W4) -> W4 {
+        let mut r = [0u64; 4];
+        let mut carry = 0u64;
+        for i in 0..4 {
+            let (s1, c1) = self.0[i].overflowing_add(o.0[i]);
+            let (s2, c2) = s1.overflowing_add(carry);
+            r[i] = s2;
+            carry = u64::from(c1 | c2);
+        }
+        W4(r)
+    }
+
     #[inline]
     #[must_use]
     pub fn lt(&self, o: &W4) -> bool {
@@ -565,6 +580,13 @@ pub(crate) fn digits_fast_on() -> bool {
     *V.get_or_init(|| std::env::var("NICE_EXP_DIGITS_FAST").is_ok_and(|v| v == "1"))
 }
 
+/// Experiment branch: `NICE_EXP_CARRY_FAST=1` makes [`Base::cert_fast`]
+/// decide floor(e^j / b^c0) − floor(a^j / b^c0) from a^j's remainder.
+pub(crate) fn carry_fast_on() -> bool {
+    static V: OnceLock<bool> = OnceLock::new();
+    *V.get_or_init(|| std::env::var("NICE_EXP_CARRY_FAST").is_ok_and(|v| v == "1"))
+}
+
 /// Experiment branch: `NICE_EXP_CERT_FAST=1` takes [`Base::cert_fast`].
 pub(crate) fn cert_fast_on() -> bool {
     static V: OnceLock<bool> = OnceLock::new();
@@ -696,6 +718,25 @@ impl Base {
         x
     }
 
+    /// Experiment branch: floor(x / b^c) and x mod b^c, the remainder put
+    /// back together from the chunk remainders.
+    #[inline]
+    fn shift_down_rem(&self, mut x: W4, mut c: u32) -> (W4, W4) {
+        let mut rem = W4::default();
+        let mut at = 0usize;
+        while c >= self.chd {
+            let r = self.dpow[self.chd as usize].divrem_w4(&mut x);
+            rem = rem.add(&self.poww[at].mul_u128(u128::from(r)));
+            at += self.chd as usize;
+            c -= self.chd;
+        }
+        if c > 0 {
+            let r = self.dpow[c as usize].divrem_w4(&mut x);
+            rem = rem.add(&self.poww[at].mul_u128(u128::from(r)));
+        }
+        (x, rem)
+    }
+
     /// Digits of x (least significant first), exactly `len` of them
     /// (x < b^len).
     // Digits are below b <= 64, so `as u8` is exact; x fits u64 by then.
@@ -809,20 +850,29 @@ impl Base {
             .into_iter()
             .enumerate()
         {
-            let c0 = cap.max(self.ndig_w(&y.sub(&x)));
+            let d = y.sub(&x);
+            let c0 = cap.max(self.ndig_w(&d));
             if c0 >= sp {
                 continue;
             }
             let len = (sp - c0) as usize;
-            let qx = self.shift_down(x, c0);
-            let qy = self.shift_down(y, c0);
+            // e^j's shifted value is a^j's or one more: one more exactly
+            // when a^j mod b^c0 plus (e^j − a^j) reaches b^c0 (both terms
+            // are below b^c0 < 2^255, so the sum fits).
+            let (qx, one_more) = if carry_fast_on() {
+                let (qx, rem) = self.shift_down_rem(x, c0);
+                (qx, !rem.add(&d).lt(&self.poww[c0 as usize]))
+            } else {
+                let qx = self.shift_down(x, c0);
+                (qx, self.shift_down(y, c0) != qx)
+            };
             if digits_fast_on() {
                 self.digits_w_fast(qx, sp - c0, &mut dx);
             } else {
                 self.digits_w(qx, sp - c0, &mut dx);
             }
             let mut from = 0usize;
-            if qy != qx {
+            if one_more {
                 while dx[from] == top {
                     from += 1;
                     debug_assert!(from < len, "floor(e^j / b^c0) has more digits than sp - c0");
@@ -1603,10 +1653,40 @@ mod tests {
             }
         }
         eprintln!(
-            "cert_fast == cert_ref on {n} intervals ({some} certified), closure {}, digits_fast {}",
+            "cert_fast == cert_ref on {n} intervals ({some} certified), closure {}, digits_fast {}, carry_fast {}",
             cert_closure(),
-            digits_fast_on()
+            digits_fast_on(),
+            carry_fast_on()
         );
+        // shift_down_rem against shift_down and the remainder's definition.
+        let mut rng = Rng(0x5EED_0C0F);
+        for b in [10u32, 40, 57, 58, 60, 62, 63, 64] {
+            let base = Base::try_new(b, 1 << 40, (1 << 40) + 1).expect("a base");
+            for _ in 0..200_000 {
+                let top = rng.next() >> (1 + rng.next() % 63);
+                let w = W4([rng.next(), rng.next(), rng.next(), top]);
+                let c = (rng.next() % u64::from(base.ndig_w(&w).max(1))) as u32;
+                let (q, r) = base.shift_down_rem(w, c);
+                assert_eq!(q, base.shift_down(w, c), "b{b} {w:?} c {c}");
+                assert!(
+                    r.lt(&base.poww[c as usize]),
+                    "b{b} {w:?} c {c}: remainder too big"
+                );
+                // q * b^c + r == w, checked through the digits.
+                let (mut x, mut y) = ([0u8; DIGIT_BUF], [0u8; DIGIT_BUF]);
+                let len = base.ndig_w(&w);
+                if len as usize >= DIGIT_BUF {
+                    continue;
+                }
+                base.digits_w(w, len, &mut x);
+                base.digits_w(r, c, &mut y);
+                assert_eq!(
+                    x[..c as usize],
+                    y[..c as usize],
+                    "b{b} {w:?} c {c}: low digits"
+                );
+            }
+        }
         // digits_w_fast against digits_w on random values, and the
         // one-word reciprocal division at its edges.
         let mut rng = Rng(0xD161_7500);
