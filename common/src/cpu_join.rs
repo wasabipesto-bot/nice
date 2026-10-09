@@ -117,6 +117,9 @@ pub struct Scratch {
     tops: Vec<Top>,
     ext: Ext,
     masks: Vec<Mask>,
+    /// The masks' low words (`wide-join` experiment, `NICE_EXP_WIDE_SPLIT`).
+    #[cfg(feature = "wide-join")]
+    lo: Vec<u64>,
     info: Vec<Info>,
     offs: Vec<u32>,
 }
@@ -282,6 +285,10 @@ pub struct CpuJoin {
     /// there is none for `u128` masks).
     #[cfg(not(feature = "wide-join"))]
     avx512: bool,
+    /// `wide-join` experiment (`NICE_EXP_WIDE_SPLIT=1`): the two-stage scan
+    /// ([`Self::scan_split`]).
+    #[cfg(feature = "wide-join")]
+    wide_split: bool,
     /// `fs.tlay` is ordered by key digit (stably): `key_off[d]..key_off[d +
     /// 1]` are the prefixes whose key is `d`.
     key_off: Vec<u32>,
@@ -342,6 +349,8 @@ impl CpuJoin {
             smid: SmallDiv::new(bmid),
             #[cfg(target_arch = "x86_64")]
             avx2: std::arch::is_x86_feature_detected!("avx2"),
+            #[cfg(feature = "wide-join")]
+            wide_split: std::env::var("NICE_EXP_WIDE_SPLIT").is_ok_and(|v| v == "1"),
             #[cfg(not(feature = "wide-join"))]
             avx512: std::arch::is_x86_feature_detected!("avx512f")
                 && std::env::var("NICE_EXP_NO_AVX512").is_err(),
@@ -440,10 +449,16 @@ impl CpuJoin {
             } else {
                 self.partition_digit(v, self.fs.jp.p - 1)
             };
-            prof!(
-                2,
-                self.list(d, &mut sc.ext, &mut sc.masks, &mut sc.info, &mut sc.offs)
-            );
+            prof!(2, {
+                self.list(d, &mut sc.ext, &mut sc.masks, &mut sc.info, &mut sc.offs);
+                // `wide-join` experiment: the low words for the split scan.
+                #[cfg(feature = "wide-join")]
+                if self.wide_split {
+                    sc.lo.clear();
+                    #[allow(clippy::cast_possible_truncation)]
+                    sc.lo.extend(sc.masks.iter().map(|&m| m as u64));
+                }
+            });
             prof!(3, {
                 for top in &sc.tops {
                     for &root in roots {
@@ -455,6 +470,17 @@ impl CpuJoin {
                             ext: &sc.ext,
                             info: &sc.info[lo..hi],
                         };
+                        #[cfg(feature = "wide-join")]
+                        if self.wide_split {
+                            self.scan_split(
+                                &pass,
+                                &sc.lo[lo..hi],
+                                &sc.masks[lo..hi],
+                                &mut out,
+                                &mut record,
+                            );
+                            continue;
+                        }
                         self.scan(&pass, &sc.masks[lo..hi], &mut out, &mut record);
                     }
                 }
@@ -764,6 +790,77 @@ impl CpuJoin {
             at += 16;
         }
         for (j, &m) in rest.iter().enumerate() {
+            if m & tm == 0 {
+                self.survivor(pass, m, at + j, out, record);
+            }
+        }
+    }
+
+    /// `wide-join` experiment (`NICE_EXP_WIDE_SPLIT=1`): the scan in two
+    /// stages. The masks' low words (digits below 64) take the u64 AND, eight
+    /// bytes a bottom as with u64 masks, and only the bottoms that pass it
+    /// are tested on the whole mask. The pairs that pass are exactly the
+    /// one-stage scan's.
+    #[cfg(feature = "wide-join")]
+    fn scan_split(
+        &self,
+        pass: &Pass,
+        lo: &[u64],
+        masks: &[Mask],
+        out: &mut PartitionResult,
+        record: &mut Option<&mut Vec<u128>>,
+    ) {
+        #[cfg(target_arch = "x86_64")]
+        if self.avx2 {
+            // SAFETY: `avx2` is only set where the CPU has AVX2.
+            unsafe { self.scan_split_avx2(pass, lo, masks, out, record) };
+            return;
+        }
+        let _ = lo;
+        self.scan_any(pass, masks, out, record);
+    }
+
+    /// [`Self::scan_split`] with AVX2: the u64 scan on the low words, then
+    /// the whole mask of each bottom that passes.
+    #[cfg(all(target_arch = "x86_64", feature = "wide-join"))]
+    #[target_feature(enable = "avx2")]
+    fn scan_split_avx2(
+        &self,
+        pass: &Pass,
+        lo: &[u64],
+        masks: &[Mask],
+        out: &mut PartitionResult,
+        record: &mut Option<&mut Vec<u128>>,
+    ) {
+        use std::arch::x86_64::{
+            __m256i, _mm256_and_si256, _mm256_castsi256_pd, _mm256_cmpeq_epi64, _mm256_loadu_si256,
+            _mm256_movemask_pd, _mm256_set1_epi64x, _mm256_setzero_si256,
+        };
+        let tm = pass.top.mask;
+        #[allow(clippy::cast_possible_truncation)]
+        let t = _mm256_set1_epi64x((tm as u64).cast_signed());
+        let zero = _mm256_setzero_si256();
+        let (chunks, _) = lo.as_chunks::<16>();
+        let mut at = 0;
+        for chunk in chunks {
+            let mut bits = 0u32;
+            for q in 0..4 {
+                // SAFETY: four u64 at q * 4 of a 16-element chunk, unaligned load.
+                #[allow(clippy::cast_ptr_alignment)]
+                let v = unsafe { _mm256_loadu_si256(chunk.as_ptr().add(4 * q).cast::<__m256i>()) };
+                let z = _mm256_cmpeq_epi64(_mm256_and_si256(v, t), zero);
+                bits |= (_mm256_movemask_pd(_mm256_castsi256_pd(z)).cast_unsigned()) << (4 * q);
+            }
+            while bits != 0 {
+                let j = at + bits.trailing_zeros() as usize;
+                bits &= bits - 1;
+                if masks[j] & tm == 0 {
+                    self.survivor(pass, masks[j], j, out, record);
+                }
+            }
+            at += 16;
+        }
+        for (j, &m) in masks[at..].iter().enumerate() {
             if m & tm == 0 {
                 self.survivor(pass, m, at + j, out, record);
             }
