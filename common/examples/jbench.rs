@@ -199,7 +199,7 @@ fn cpu(a: &[String]) -> Result<()> {
                 "run_secs": run, "core_secs_per_partition": per_part,
                 "field_core_secs_est": slices.len() as f64 * (setup + per_part * parts as f64),
                 "survivors": out.survivors, "checked": out.checked, "hits": out.hits.len(),
-                "exp": exp_env()})
+                "stage_ns": out.ns, "exp": exp_env()})
         );
     }
     Ok(())

@@ -63,6 +63,10 @@ pub struct PartitionResult {
     /// ones that passed the prefilter (which the full check read).
     pub survivors: u64,
     pub checked: u64,
+    /// Experiment branch (`NICE_EXP_CPU_PROFILE=1`): nanoseconds in the
+    /// tops, the bottom extension, the list build, the scan (with the
+    /// survivors' prefilter and full checks) and the full checks alone.
+    pub ns: [u64; 5],
 }
 
 impl PartitionResult {
@@ -71,6 +75,26 @@ impl PartitionResult {
         self.hits.extend(other.hits);
         self.survivors += other.survivors;
         self.checked += other.checked;
+        for (a, b) in self.ns.iter_mut().zip(other.ns) {
+            *a += b;
+        }
+    }
+}
+
+/// Experiment branch: `NICE_EXP_CPU_PROFILE=1` times the join's stages.
+pub fn cpu_profile() -> bool {
+    static V: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *V.get_or_init(|| std::env::var("NICE_EXP_CPU_PROFILE").is_ok_and(|v| v == "1"))
+}
+
+#[inline]
+fn lap(on: bool, t: &mut Option<std::time::Instant>, acc: &mut u64) {
+    if on {
+        let now = std::time::Instant::now();
+        if let Some(t0) = *t {
+            *acc += u64::try_from(now.duration_since(t0).as_nanos()).unwrap_or(u64::MAX);
+        }
+        *t = Some(now);
     }
 }
 
@@ -375,6 +399,9 @@ impl CpuJoin {
         // The bottoms are extended at the first key with a top, so a
         // partition without tops does no bottom work at all.
         let mut extended = false;
+        let prof = cpu_profile();
+        let mut t: Option<std::time::Instant> = None;
+        let mut sink = 0u64;
         for key in 0..self.keyspace {
             let (lo, hi) = (
                 self.key_off[key as usize] as usize,
@@ -383,13 +410,16 @@ impl CpuJoin {
             if lo == hi {
                 continue;
             }
+            lap(prof, &mut t, &mut sink);
             self.tops(v, &self.fs.tlay[lo..hi], &mut sc.tops);
+            lap(prof, &mut t, &mut out.ns[0]);
             if sc.tops.is_empty() {
                 continue;
             }
             if !extended {
                 self.extend(v, &mut sc.ext);
                 extended = true;
+                lap(prof, &mut t, &mut out.ns[1]);
             }
             sc.tops.sort_unstable_by_key(|t| t.pc);
             // The last bottom digit: the key itself, or the partition's last.
@@ -399,6 +429,7 @@ impl CpuJoin {
                 self.partition_digit(v, self.fs.jp.p - 1)
             };
             self.list(d, &mut sc.ext, &mut sc.masks, &mut sc.info, &mut sc.offs);
+            lap(prof, &mut t, &mut out.ns[2]);
             for top in &sc.tops {
                 for &root in roots {
                     let c = ((root + m1 - top.pc) % m1) as usize;
@@ -412,6 +443,7 @@ impl CpuJoin {
                     self.scan(&pass, &sc.masks[lo..hi], &mut out, &mut record);
                 }
             }
+            lap(prof, &mut t, &mut out.ns[3]);
         }
         out
     }
@@ -766,11 +798,15 @@ impl CpuJoin {
         }
         // With f0 = 3 (the production parameters) the bottom list's own
         // mask is the low three digits of both powers, which the check skips.
+        let tc = cpu_profile().then(std::time::Instant::now);
         let nice = if self.fs.f0 == 3 {
             get_is_nice_with_known_lsd(n, self.fs.b, 3, self.fs.bp_m[ext.idx[row] as usize])
         } else {
             get_is_nice(n, self.fs.b)
         };
+        if let Some(tc) = tc {
+            out.ns[4] += u64::try_from(tc.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        }
         if nice {
             out.hits.push(n);
         }
