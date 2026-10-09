@@ -100,11 +100,18 @@ fn gpu(a: &[String]) -> Result<()> {
     let t = tickets.pop_front().unwrap();
     g.as_dyn().finish(t)?;
     let warm = tw.elapsed().as_secs_f64();
-    let lookahead = if pipe { fields_in_flight().saturating_sub(1) } else { 0 };
+    let lookahead = if pipe {
+        fields_in_flight().saturating_sub(1)
+    } else {
+        0
+    };
     let t0 = Instant::now();
     let mut queued: VecDeque<(FieldSize, bool, f64)> = VecDeque::new();
     let mut last = 0.0;
-    let mut done = |tickets: &mut VecDeque<FieldTicket>, q: (FieldSize, bool, f64), last: &mut f64| -> Result<()> {
+    let mut done = |tickets: &mut VecDeque<FieldTicket>,
+                    q: (FieldSize, bool, f64),
+                    last: &mut f64|
+     -> Result<()> {
         let tk = tickets.pop_front().unwrap();
         let (res, st) = g.as_dyn().finish(tk)?;
         let now = t0.elapsed().as_secs_f64();
@@ -146,7 +153,10 @@ fn cpu(a: &[String]) -> Result<()> {
     let sample: usize = a[5].parse()?;
     for f in fields(width, &a[6..])? {
         let Some((jp, slices)) = slices_for(b, &f) else {
-            println!("{}", json!({"kind": "field", "base": b, "start": f.start().to_string(), "join": false}));
+            println!(
+                "{}",
+                json!({"kind": "field", "base": b, "start": f.start().to_string(), "join": false})
+            );
             continue;
         };
         let ts = Instant::now();
@@ -200,6 +210,8 @@ fn main() -> Result<()> {
     match a.get(1).map(String::as_str) {
         Some("gpu") => gpu(&a),
         Some("cpu") => cpu(&a),
-        _ => bail!("usage: jbench gpu MODE BASE WIDTH S... | jbench cpu BASE WIDTH THREADS SAMPLE S..."),
+        _ => bail!(
+            "usage: jbench gpu MODE BASE WIDTH S... | jbench cpu BASE WIDTH THREADS SAMPLE S..."
+        ),
     }
 }

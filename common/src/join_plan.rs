@@ -85,11 +85,15 @@ pub(crate) mod exp {
     }
     pub(crate) fn surv_cap() -> u32 {
         static V: OnceLock<u32> = OnceLock::new();
-        *V.get_or_init(|| var::<u32>("NICE_EXP_SURV_CAP_LOG2").map_or(super::SURV_CAP, |l| 1u32 << l))
+        *V.get_or_init(|| {
+            var::<u32>("NICE_EXP_SURV_CAP_LOG2").map_or(super::SURV_CAP, |l| 1u32 << l)
+        })
     }
     pub(crate) fn join_memory() -> usize {
         static V: OnceLock<usize> = OnceLock::new();
-        *V.get_or_init(|| var::<usize>("NICE_EXP_JOIN_MEMORY_MIB").map_or(super::JOIN_MEMORY, |m| m << 20))
+        *V.get_or_init(|| {
+            var::<usize>("NICE_EXP_JOIN_MEMORY_MIB").map_or(super::JOIN_MEMORY, |m| m << 20)
+        })
     }
     /// The survivors-per-prefix bound in quarters (default 8 = 2.0).
     pub(crate) fn spp_q() -> usize {
@@ -326,7 +330,14 @@ impl JoinPlan {
     /// `None` if the device cannot hold one partition with a re-run list of
     /// [`MIN_RETRY_CAP`].
     pub(crate) fn for_field(fs: &FieldSetup, lim: JoinLimits) -> Option<(Self, Self)> {
-        let main = Self::new(fs, lim, exp::slots(), exp::surv_cap(), 1, lim.budget / exp::list_div())?;
+        let main = Self::new(
+            fs,
+            lim,
+            exp::slots(),
+            exp::surv_cap(),
+            1,
+            lim.budget / exp::list_div(),
+        )?;
         let fp = Footprint::of(fs, NICE_CAP);
         let spare = lim.budget.saturating_sub(fp.fixed + fp.per_slot());
         let retry = Self::new(fs, lim, 1, SURV_CAP_RETRY, MIN_RETRY_CAP, spare)?;

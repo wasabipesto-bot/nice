@@ -538,7 +538,7 @@ pub struct Base {
 const DIGIT_BUF: usize = 48;
 
 /// Experiment branch: `NICE_EXP_CERT_CLOSURE=1` strengthens [`Base::cert`].
-fn cert_closure() -> bool {
+pub(crate) fn cert_closure() -> bool {
     static V: OnceLock<bool> = OnceLock::new();
     *V.get_or_init(|| std::env::var("NICE_EXP_CERT_CLOSURE").is_ok_and(|v| v == "1"))
 }
@@ -724,7 +724,10 @@ impl Base {
         // [dx, dy] (the truncated power is monotone over [a, e] and the
         // digits above it are fixed), one interval domain per power.
         let mut doms = [0u64; 2];
-        for (pi, (x, y, sp)) in [(a2, e2, self.s2), (a3, e3, self.s3)].into_iter().enumerate() {
+        for (pi, (x, y, sp)) in [(a2, e2, self.s2), (a3, e3, self.s3)]
+            .into_iter()
+            .enumerate()
+        {
             let c0 = cap.max(self.ndig_w(&y.sub(&x)));
             if c0 >= sp {
                 continue;
@@ -739,7 +742,11 @@ impl Base {
                     if cert_closure() && dx[i] < dy[i] {
                         let (lo, hi) = (u32::from(dx[i]), u32::from(dy[i]));
                         let w = hi - lo + 1;
-                        doms[pi] = if w >= 64 { u64::MAX << lo } else { ((1u64 << w) - 1) << lo };
+                        doms[pi] = if w >= 64 {
+                            u64::MAX << lo
+                        } else {
+                            ((1u64 << w) - 1) << lo
+                        };
                     }
                     break;
                 }
@@ -771,7 +778,10 @@ impl Base {
                         changed = true;
                     }
                 }
-                if doms[0] != 0 && doms[1] != 0 && !forced[0] && !forced[1]
+                if doms[0] != 0
+                    && doms[1] != 0
+                    && !forced[0]
+                    && !forced[1]
                     && ((doms[0] | doms[1]) & !mask).count_ones() < 2
                 {
                     return None;
@@ -1398,7 +1408,10 @@ mod tests {
             (64, 72_806_461_862_957_161_709_568, 10_000_000_000_000_000),
         ];
         let dig = |x: &Natural, b: &Natural| -> Vec<u64> {
-            x.to_digits_asc(b).iter().map(|d| u64::try_from(d).unwrap()).collect()
+            x.to_digits_asc(b)
+                .iter()
+                .map(|d| u64::try_from(d).unwrap())
+                .collect()
         };
         let handles: Vec<_> = fields
             .into_iter()
@@ -1410,7 +1423,8 @@ mod tests {
                     let cap = jp.k;
                     let mut rng = Rng(u64::from(b) * 0x9E37_79B9);
                     let bn = Natural::from(b);
-                    let (mut kept, mut rejected, mut viable, mut bits, mut tries) = (0u64, 0u64, 0u64, 0u64, 0u64);
+                    let (mut kept, mut rejected, mut viable, mut bits, mut tries) =
+                        (0u64, 0u64, 0u64, 0u64, 0u64);
                     while kept + rejected < per as u64 && tries < 100_000 {
                         tries += 1;
                         let (p0, _) = fs.tlay[rng.below(fs.tlay.len() as u128) as usize];
@@ -1457,9 +1471,15 @@ mod tests {
                             }
                             viable += 1;
                             let m = got.unwrap_or_else(|| {
-                                panic!("b{b} top {p} [{a}, {e}] rejected but n = {n} is locally viable")
+                                panic!(
+                                    "b{b} top {p} [{a}, {e}] rejected but n = {n} is locally viable"
+                                )
                             });
-                            assert_eq!(m & !seen, 0, "b{b} top {p}: certified {m:#x} not all among n = {n}'s {seen:#x}");
+                            assert_eq!(
+                                m & !seen,
+                                0,
+                                "b{b} top {p}: certified {m:#x} not all among n = {n}'s {seen:#x}"
+                            );
                         }
                         match got {
                             None => rejected += 1,
@@ -1475,7 +1495,10 @@ mod tests {
             .collect();
         for h in handles {
             let (b, kept, rejected, viable, bits) = h.join().unwrap();
-            eprintln!("cert on real tops b{b}: {kept} kept ({bits} certified digits), {rejected} rejected, {viable} locally viable numbers, closure {}", cert_closure());
+            eprintln!(
+                "cert on real tops b{b}: {kept} kept ({bits} certified digits), {rejected} rejected, {viable} locally viable numbers, closure {}",
+                cert_closure()
+            );
         }
     }
 
@@ -1499,9 +1522,13 @@ mod tests {
             .unwrap_or(400);
         let cap = 6usize;
         let mut rng = Rng(0x5EED_C10_5E);
-        let (mut rejected, mut kept, mut viable_total, mut nums, mut bits) = (0u64, 0u64, 0u64, 0u64, 0u64);
+        let (mut rejected, mut kept, mut viable_total, mut nums, mut bits) =
+            (0u64, 0u64, 0u64, 0u64, 0u64);
         let dig = |x: &Natural, b: &Natural| -> Vec<u64> {
-            x.to_digits_asc(b).iter().map(|d| u64::try_from(d).unwrap()).collect()
+            x.to_digits_asc(b)
+                .iter()
+                .map(|d| u64::try_from(d).unwrap())
+                .collect()
         };
         for t in 0..trials {
             let b = [58u32, 60, 62, 64][t % 4];
@@ -1509,7 +1536,9 @@ mod tests {
             let w = 1 + rng.below(u128::from(b).pow(1 + (t as u32 % 3)));
             let a = r.start() + rng.below(r.size() - w);
             let e = a + w - 1;
-            let Some(base) = Base::try_new(b, a, e) else { continue };
+            let Some(base) = Base::try_new(b, a, e) else {
+                continue;
+            };
             let got = base.cert(a, e, cap as u32);
             let bn = Natural::from(b);
             // The positions each power's certificate looks at: from its
@@ -1552,7 +1581,11 @@ mod tests {
                 let m = got.unwrap_or_else(|| {
                     panic!("b{b} [{a}, {e}] rejected but n = {n} is locally viable")
                 });
-                assert_eq!(m & !seen, 0, "b{b} [{a}, {e}]: certified {m:#x} not all among n = {n}'s {seen:#x}");
+                assert_eq!(
+                    m & !seen,
+                    0,
+                    "b{b} [{a}, {e}]: certified {m:#x} not all among n = {n}'s {seen:#x}"
+                );
             }
             match got {
                 None => rejected += 1,
@@ -1562,7 +1595,10 @@ mod tests {
                 }
             }
         }
-        eprintln!("cert soundness: {trials} intervals, {nums} numbers, {viable_total} locally viable, {rejected} rejected, {kept} kept, {bits} certified digits in kept, closure {}", cert_closure());
+        eprintln!(
+            "cert soundness: {trials} intervals, {nums} numbers, {viable_total} locally viable, {rejected} rejected, {kept} kept, {bits} certified digits in kept, closure {}",
+            cert_closure()
+        );
     }
 
     /// Base-b digits of x, least significant first.

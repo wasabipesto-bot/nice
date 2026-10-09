@@ -77,7 +77,10 @@ const ENTRIES_PER_THREAD: u32 = 4;
 fn ept() -> u32 {
     static V: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
     *V.get_or_init(|| {
-        std::env::var("NICE_EXP_EPT").ok().and_then(|v| v.parse().ok()).unwrap_or(ENTRIES_PER_THREAD)
+        std::env::var("NICE_EXP_EPT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(ENTRIES_PER_THREAD)
     })
 }
 /// Cubes for the prefilter and check kernels (grid-stride loops).
@@ -552,6 +555,8 @@ mod kernels {
     /// is left at the top is exactly the digits `cert` certifies (from the top
     /// down to the first disagreement), with `dup` set if two of them repeat.
     /// Returns the run mask; `c0` and `dup` via the out-arrays.
+    /// Experiment branch: `out_dom` gets the digits of x and y at the topmost
+    /// differing position >= c0 (lo, hi), or (1, 0) if there is none.
     #[cube]
     fn cert_power(
         x: &mut Array<u32>,
@@ -559,6 +564,7 @@ mod kernels {
         pw: &Array<u32>,
         out_c0: &mut Array<u32>,
         out_dup: &mut Array<u32>,
+        out_dom: &mut Array<u32>,
         #[comptime] nl: u32,
         #[comptime] nl3: u32,
         #[comptime] sp: u32,
@@ -619,6 +625,8 @@ mod kernels {
         }
         let mut run = 0u64;
         let mut dup = 0u32;
+        let mut dlo = 1u32;
+        let mut dhi = 0u32;
         let passes = comptime!(sp.div_ceil(chunk_digits));
         #[unroll]
         for pass in 0..passes {
@@ -662,6 +670,8 @@ mod kernels {
                         } else {
                             run = 0u64;
                             dup = 0u32;
+                            dlo = dx;
+                            dhi = dy;
                         }
                     }
                 }
@@ -669,7 +679,25 @@ mod kernels {
         }
         out_c0[0] = c0;
         out_dup[0] = dup;
+        out_dom[0] = dlo;
+        out_dom[1] = dhi;
         run
+    }
+
+    /// Experiment branch: the interval domain [lo, hi] as a digit mask, 0 if
+    /// empty (hi < lo).
+    #[cube]
+    fn dom_mask(lo: u32, hi: u32) -> u64 {
+        let mut m = 0u64;
+        if hi >= lo {
+            let w = hi - lo + 1u32;
+            if w >= 64u32 {
+                m = 0xFFFF_FFFF_FFFF_FFFFu64 << u64::cast_from(lo);
+            } else {
+                m = ((1u64 << u64::cast_from(w)) - 1u64) << u64::cast_from(lo);
+            }
+        }
+        m
     }
 
     /// Stage 0a: certify every top prefix of every slot's partition. Grid: x
@@ -709,6 +737,7 @@ mod kernels {
         #[comptime] chunk_div: u32,
         #[comptime] key_level: bool,
         #[comptime] nb: u32,
+        #[comptime] closure: bool,
     ) {
         let m1 = comptime!(base - 1);
         let nl2 = comptime!(2 * limbs);
@@ -852,12 +881,15 @@ mod kernels {
                 let mut dupa = Array::<u32>::new(1usize);
                 let mut c0b = Array::<u32>::new(1usize);
                 let mut dupb = Array::<u32>::new(1usize);
+                let mut doma = Array::<u32>::new(2usize);
+                let mut domb = Array::<u32>::new(2usize);
                 let msq = cert_power(
                     &mut a2,
                     &mut e2,
                     pw,
                     &mut c0a,
                     &mut dupa,
+                    &mut doma,
                     nl2,
                     nl3,
                     s2,
@@ -872,6 +904,7 @@ mod kernels {
                     pw,
                     &mut c0b,
                     &mut dupb,
+                    &mut domb,
                     nl3,
                     nl3,
                     s3,
@@ -880,8 +913,52 @@ mod kernels {
                     chunk_digits,
                     chunk_div,
                 );
-                if dupa[0] == 0u32 && dupb[0] == 0u32 && (msq & mcu) == 0u64 {
-                    let mask = msq | mcu;
+                let mut mask = msq | mcu;
+                let mut keep = dupa[0] == 0u32 && dupb[0] == 0u32 && (msq & mcu) == 0u64;
+                if comptime!(closure) {
+                    // Experiment branch: `Base::cert`'s interval closure. A
+                    // domain with no free digit rejects, one with a single
+                    // free digit forces it; two unforced domains need 2 free
+                    // digits between them. Forcing the cube's digit can only
+                    // shrink the square's, so one recheck of the square ends it.
+                    let d0 = dom_mask(doma[0], doma[1]);
+                    let d1 = dom_mask(domb[0], domb[1]);
+                    let mut f0 = false;
+                    let mut f1 = false;
+                    if keep && d0 != 0u64 {
+                        let fr = d0 & !mask;
+                        if fr == 0u64 {
+                            keep = false;
+                        } else if (fr & (fr - 1u64)) == 0u64 {
+                            mask |= fr;
+                            f0 = true;
+                        }
+                    }
+                    if keep && d1 != 0u64 {
+                        let fr = d1 & !mask;
+                        if fr == 0u64 {
+                            keep = false;
+                        } else if (fr & (fr - 1u64)) == 0u64 {
+                            mask |= fr;
+                            f1 = true;
+                        }
+                    }
+                    if keep && d0 != 0u64 && d1 != 0u64 && !f0 && !f1 {
+                        let fr = (d0 | d1) & !mask;
+                        if fr == 0u64 || (fr & (fr - 1u64)) == 0u64 {
+                            keep = false;
+                        }
+                    }
+                    if keep && d0 != 0u64 && !f0 && f1 {
+                        let fr = d0 & !mask;
+                        if fr == 0u64 {
+                            keep = false;
+                        } else if (fr & (fr - 1u64)) == 0u64 {
+                            mask |= fr;
+                        }
+                    }
+                }
+                if keep {
                     let mut floor = c0a[0];
                     if c0b[0] < floor {
                         floor = c0b[0];
@@ -1570,6 +1647,7 @@ impl<R: Runtime> JoinDevice<R> {
                 cdiv16,
                 self.key_level,
                 self.nb,
+                crate::overlap_join::cert_closure(),
             );
             top_scan_kernel::launch_unchecked::<R>(
                 c,
