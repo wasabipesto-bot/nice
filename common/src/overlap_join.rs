@@ -1228,7 +1228,7 @@ pub fn join_range(
 /// Fields the tests share: production-size fields that the join takes.
 #[cfg(test)]
 pub(crate) mod test_fields {
-    use super::FieldSetup;
+    use super::{FieldSetup, Mask};
 
     /// A frontier field of base 57.
     pub(crate) const FRONTIER_57: u128 = 28_151_599_893_042_801_193;
