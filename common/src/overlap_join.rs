@@ -1374,6 +1374,64 @@ mod tests {
     use super::*;
     use crate::base_range::get_base_range_u128;
 
+    /// Experiment branch: the certificate (with or without the interval
+    /// closure, per `NICE_EXP_CERT_CLOSURE`) against brute force. For random
+    /// intervals [a, e] inside bases 58-64, every n whose output digits at
+    /// positions >= cap are pairwise distinct (a necessary condition for
+    /// niceness) must be kept, and every certified digit must be one of n's
+    /// digits there. `NICE_TEST_CERT_TRIALS` intervals (default 400).
+    #[test]
+    #[ignore = "experiment: brute force, minutes"]
+    fn cert_is_sound_against_brute_force() {
+        use malachite::base::num::arithmetic::traits::Pow;
+        use malachite::base::num::conversion::traits::Digits;
+        use malachite::natural::Natural;
+        let trials: usize = std::env::var("NICE_TEST_CERT_TRIALS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(400);
+        let cap = 6u32;
+        let mut rng = Rng(0x5EED_C10_5E);
+        let (mut rejected, mut kept, mut viable_total, mut nums) = (0u64, 0u64, 0u64, 0u64);
+        for t in 0..trials {
+            let b = [58u32, 60, 62, 64][t % 4];
+            let r = get_base_range_u128(b).unwrap().unwrap();
+            // Interval widths up to b^3 (a top's block), some much narrower.
+            let w = 1 + rng.below(u128::from(b).pow(1 + (t as u32 % 3)));
+            let a = r.start() + rng.below(r.size() - w);
+            let e = a + w - 1;
+            let Some(base) = Base::try_new(b, a, e) else { continue };
+            let got = base.cert(a, e, cap);
+            let bn = Natural::from(b);
+            for n in a..=e {
+                nums += 1;
+                let nn = Natural::from(n);
+                let d2: Vec<Natural> = nn.clone().pow(2).to_digits_asc(&bn);
+                let d3: Vec<Natural> = nn.pow(3).to_digits_asc(&bn);
+                let mut seen = 0u64;
+                let mut ok = true;
+                for d in d2.iter().skip(cap as usize).chain(d3.iter().skip(cap as usize)) {
+                    let d = u64::try_from(d).unwrap();
+                    if seen & (1 << d) != 0 {
+                        ok = false;
+                        break;
+                    }
+                    seen |= 1 << d;
+                }
+                if !ok {
+                    continue;
+                }
+                viable_total += 1;
+                let m = got.unwrap_or_else(|| {
+                    panic!("b{b} [{a}, {e}] rejected but n = {n} has distinct digits at >= {cap}")
+                });
+                assert_eq!(m & !seen, 0, "b{b} [{a}, {e}]: certified digits {m:#x} not all in n = {n}'s {seen:#x}");
+            }
+            if got.is_none() { rejected += 1 } else { kept += 1 }
+        }
+        eprintln!("cert soundness: {trials} intervals, {nums} numbers, {viable_total} viable, {rejected} rejected, {kept} kept, closure {}", cert_closure());
+    }
+
     /// Base-b digits of x, least significant first.
     fn digits(mut x: u128, b: u128, n: usize) -> Vec<u128> {
         let mut v = Vec::with_capacity(n);
