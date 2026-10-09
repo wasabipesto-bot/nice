@@ -543,6 +543,12 @@ pub(crate) fn cert_closure() -> bool {
     *V.get_or_init(|| std::env::var("NICE_EXP_CERT_CLOSURE").is_ok_and(|v| v == "1"))
 }
 
+/// Experiment branch: `NICE_EXP_CERT_FAST=1` takes [`Base::cert_fast`].
+pub(crate) fn cert_fast_on() -> bool {
+    static V: OnceLock<bool> = OnceLock::new();
+    *V.get_or_init(|| std::env::var("NICE_EXP_CERT_FAST").is_ok_and(|v| v == "1"))
+}
+
 impl Base {
     /// `lo..=hi` must share the digit length of n, n² and n³ (true inside
     /// any field of a nice band), and n³ must have at most [`DIGIT_BUF`]
@@ -713,6 +719,100 @@ impl Base {
     /// position `>= i` unless `e^j − a^j < b^i`.
     #[must_use]
     pub fn cert(&self, a: u128, e: u128, cap: u32) -> Option<u64> {
+        if cert_fast_on() {
+            return self.cert_fast(a, e, cap);
+        }
+        self.cert_ref(a, e, cap)
+    }
+
+    /// Experiment branch: [`Self::cert`] from the digits of `a^j` alone.
+    /// The scan starts at c0 >= ndig(e^j − a^j), so e^j − a^j < b^c0 and
+    /// floor(e^j / b^c0) is floor(a^j / b^c0) or one more. If equal, every
+    /// digit from c0 up is common. If one more, the digits differ exactly
+    /// at the trailing run of (b − 1)s of a^j's and the digit above it,
+    /// which goes from d to d + 1: the common digits are the ones above
+    /// that, and the closure's interval there is [d, d + 1].
+    #[must_use]
+    pub fn cert_fast(&self, a: u128, e: u128, cap: u32) -> Option<u64> {
+        let a2 = W4::mul_u128_u128(a, a);
+        let e2 = W4::mul_u128_u128(e, e);
+        let a3 = a2.mul_u128(a);
+        let e3 = e2.mul_u128(e);
+        let closure = cert_closure();
+        // A digit, below b <= 64.
+        #[allow(clippy::cast_possible_truncation)]
+        let top = (self.b - 1) as u8;
+        let mut mask = 0u64;
+        let mut dx = [0u8; DIGIT_BUF];
+        let mut doms = [0u64; 2];
+        for (pi, (x, y, sp)) in [(a2, e2, self.s2), (a3, e3, self.s3)]
+            .into_iter()
+            .enumerate()
+        {
+            let c0 = cap.max(self.ndig_w(&y.sub(&x)));
+            if c0 >= sp {
+                continue;
+            }
+            let len = (sp - c0) as usize;
+            let qx = self.shift_down(x, c0);
+            let qy = self.shift_down(y, c0);
+            self.digits_w(qx, sp - c0, &mut dx);
+            let mut from = 0usize;
+            if qy != qx {
+                while dx[from] == top {
+                    from += 1;
+                    debug_assert!(from < len, "floor(e^j / b^c0) has more digits than sp - c0");
+                }
+                if closure {
+                    doms[pi] = 0b11u64 << dx[from];
+                }
+                from += 1;
+            }
+            for &d in &dx[from..len] {
+                let bit = 1u64 << d;
+                if mask & bit != 0 {
+                    return None;
+                }
+                mask |= bit;
+            }
+        }
+        if closure {
+            let mut forced = [false; 2];
+            loop {
+                let mut changed = false;
+                for pi in 0..2 {
+                    if doms[pi] == 0 || forced[pi] {
+                        continue;
+                    }
+                    let free = doms[pi] & !mask;
+                    if free == 0 {
+                        return None;
+                    }
+                    if free.count_ones() == 1 {
+                        mask |= free;
+                        forced[pi] = true;
+                        changed = true;
+                    }
+                }
+                if doms[0] != 0
+                    && doms[1] != 0
+                    && !forced[0]
+                    && !forced[1]
+                    && ((doms[0] | doms[1]) & !mask).count_ones() < 2
+                {
+                    return None;
+                }
+                if !changed {
+                    break;
+                }
+            }
+        }
+        Some(mask)
+    }
+
+    /// [`Self::cert`] as v3.4.6 computes it (plus the experiment closure).
+    #[must_use]
+    pub fn cert_ref(&self, a: u128, e: u128, cap: u32) -> Option<u64> {
         let a2 = W4::mul_u128_u128(a, a);
         let e2 = W4::mul_u128_u128(e, e);
         let a3 = a2.mul_u128(a);
@@ -1383,6 +1483,124 @@ pub(crate) mod test_fields {
 mod tests {
     use super::*;
     use crate::base_range::get_base_range_u128;
+
+    #[test]
+    #[ignore = "equivalence of the experiment's cert_fast; a minute of CPU"]
+    fn cert_fast_matches_cert_ref() {
+        // Real tops of production-shaped fields, and arbitrary intervals at
+        // small bases (any width, so c0 = cap often), closure off and on
+        // (the closure is read once per process: run both ways).
+        let fields: [(u32, u128, u128); 4] = [
+            (58, 183_859_216_587_923_470_200, 1_000_000_000_000_000),
+            (60, 795_599_612_114_824_200_908, 10_000_000_000_000_000),
+            (62, 12_255_736_762_397_899_821_056, 10_000_000_000_000_000),
+            (64, 72_806_461_862_957_161_709_568, 10_000_000_000_000_000),
+        ];
+        let per: u64 = std::env::var("NICE_TEST_CERT_FAST")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(200_000);
+        let (mut n, mut some) = (0u64, 0u64);
+        for (b, s0, size) in fields {
+            let range = FieldSize::new(s0, s0 + size);
+            let jp = join_params_for(b, &range).expect("a join field");
+            let fs = FieldSetup::new(b, s0, s0 + size, jp).unwrap();
+            let mut rng = Rng(u64::from(b) * 0x51ED_2701);
+            for _ in 0..per {
+                let (p0, _) = fs.tlay[rng.below(fs.tlay.len() as u128) as usize];
+                let p = p0 * fs.nparts + rng.below(fs.nparts);
+                if p < fs.plo || p > fs.phi {
+                    continue;
+                }
+                let lo = p * fs.w;
+                let (a, e) = (lo.max(fs.s), (lo + fs.w - 1).min(fs.e - 1));
+                let (want, got) = (fs.base.cert_ref(a, e, jp.k), fs.base.cert_fast(a, e, jp.k));
+                assert_eq!(got, want, "b{b} [{a}, {e}] cap {}", jp.k);
+                n += 1;
+                some += u64::from(want.is_some());
+            }
+        }
+        for b in [10u32, 12, 20, 30, 40, 47, 50, 57] {
+            let mut rng = Rng(u64::from(b) * 0x2545_F491);
+            for _ in 0..per / 4 {
+                let l = rng.below(30) as u32 + 2;
+                let start = u128::from(b).pow(l / 2).max(2);
+                let a = start + rng.below(start * 3);
+                let e = a + rng.below(1u128 << rng.below(40));
+                let Some(base) = Base::try_new(b, a, e) else {
+                    continue;
+                };
+                let cap = rng.below(6) as u32;
+                let (want, got) = (base.cert_ref(a, e, cap), base.cert_fast(a, e, cap));
+                assert_eq!(got, want, "b{b} [{a}, {e}] cap {cap}");
+                n += 1;
+                some += u64::from(want.is_some());
+            }
+        }
+        eprintln!(
+            "cert_fast == cert_ref on {n} intervals ({some} certified), closure {}",
+            cert_closure()
+        );
+    }
+
+    #[test]
+    #[ignore = "timing harness"]
+    fn cert_fast_timing() {
+        let fields: [(u32, u128, u128); 4] = [
+            (58, 183_859_216_587_923_470_200, 1_000_000_000_000_000),
+            (60, 795_599_612_114_824_200_908, 10_000_000_000_000_000),
+            (62, 12_255_736_762_397_899_821_056, 10_000_000_000_000_000),
+            (64, 72_806_461_862_957_161_709_568, 10_000_000_000_000_000),
+        ];
+        for (b, s0, size) in fields {
+            let range = FieldSize::new(s0, s0 + size);
+            let jp = join_params_for(b, &range).expect("a join field");
+            let fs = FieldSetup::new(b, s0, s0 + size, jp).unwrap();
+            let mut rng = Rng(u64::from(b) * 0x9E37_79B9);
+            let tops: Vec<(u128, u128)> = (0..400_000)
+                .filter_map(|_| {
+                    let (p0, _) = fs.tlay[rng.below(fs.tlay.len() as u128) as usize];
+                    let p = p0 * fs.nparts + rng.below(fs.nparts);
+                    if p < fs.plo || p > fs.phi {
+                        return None;
+                    }
+                    let lo = p * fs.w;
+                    Some((lo.max(fs.s), (lo + fs.w - 1).min(fs.e - 1)))
+                })
+                .collect();
+            let mut best = [f64::MAX; 2];
+            let mut kept = [0u64; 2];
+            for _ in 0..5 {
+                for (i, f) in [
+                    Base::cert_ref as fn(&Base, u128, u128, u32) -> Option<u64>,
+                    Base::cert_fast,
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    let t = std::time::Instant::now();
+                    let mut k = 0u64;
+                    for &(a, e) in &tops {
+                        k += u64::from(std::hint::black_box(f(&fs.base, a, e, jp.k)).is_some());
+                    }
+                    best[i] = best[i].min(t.elapsed().as_secs_f64());
+                    kept[i] = k;
+                }
+            }
+            assert_eq!(kept[0], kept[1]);
+            #[allow(clippy::cast_precision_loss)]
+            let per = |x: f64| x * 1e9 / tops.len() as f64;
+            eprintln!(
+                "cert timing b{b}: ref {:.0} ns/top, fast {:.0} ns/top (x{:.2}), {} of {} kept, closure {}",
+                per(best[0]),
+                per(best[1]),
+                best[0] / best[1],
+                kept[0],
+                tops.len(),
+                cert_closure()
+            );
+        }
+    }
 
     /// Experiment branch: the certificate (and its closure) on real tops.
     /// For production-shaped fields at b58-64, random partition-extended tops
