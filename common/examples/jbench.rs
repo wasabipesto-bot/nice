@@ -82,8 +82,9 @@ fn gpu(a: &[String]) -> Result<()> {
             join: CubeclContext::new_cuda(0)?,
         }),
         "cubecl" => Gpu::Cubecl(CubeclContext::new_cuda(0)?),
+        "wgpu" => Gpu::Cubecl(CubeclContext::new_default()?),
         "cuda" => Gpu::Cuda(CudaContext::new(0)?),
-        _ => bail!("mode is hybrid, cubecl or cuda"),
+        _ => bail!("mode is hybrid, cubecl, wgpu or cuda"),
     };
     let mut tickets: VecDeque<FieldTicket> = VecDeque::new();
     let begin = |tickets: &mut VecDeque<FieldTicket>, f: &FieldSize| -> Result<bool> {
