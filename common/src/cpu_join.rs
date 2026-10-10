@@ -264,6 +264,7 @@ pub struct CpuJoin {
     #[cfg(target_arch = "x86_64")]
     avx2: bool,
     /// AVX-512F scan (experiment branch; `NICE_EXP_NO_AVX512` disables it).
+    #[cfg(target_arch = "x86_64")]
     avx512: bool,
     /// `fs.tlay` is ordered by key digit (stably): `key_off[d]..key_off[d +
     /// 1]` are the prefixes whose key is `d`.
@@ -325,6 +326,7 @@ impl CpuJoin {
             smid: SmallDiv::new(bmid),
             #[cfg(target_arch = "x86_64")]
             avx2: std::arch::is_x86_feature_detected!("avx2"),
+            #[cfg(target_arch = "x86_64")]
             avx512: std::arch::is_x86_feature_detected!("avx512f")
                 && std::env::var("NICE_EXP_NO_AVX512").is_err(),
             fs,
