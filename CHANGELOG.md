@@ -5,6 +5,7 @@
 - Speed up the overlap join at bases 62 and up by giving each GPU thread six bottom entries instead of four.
 - Speed up the CPU overlap join: an AVX-512 scan where the CPU has it, and a top certificate built from one endpoint's digits instead of both, with half the 256-bit divisions.
 - Strengthen the overlap join's prefix certificate: at the first position where an interval's powers differ, the digit's range of possible values can rule the interval out or fix one more digit. Fewer candidates reach the later stages on the CPU and the GPU.
+- Size the overlap join's working memory to the GPU, up to 4 GiB instead of 1 GiB, so a production field at bases 60-64 runs as one slice instead of five to seven.
 
 ## Nice v3.4.6
 
