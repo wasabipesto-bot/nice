@@ -553,6 +553,39 @@ pub(crate) mod tests {
     /// The densest base-58 region the probes found (2026-10-05), where a 1e15
     /// field overran the join kernel's survivor stage before it flushed per
     /// chunk.
+    /// Experiment branch: print the plan of production-shaped fields for a
+    /// device whose largest buffer is `NICE_EXP_PROBE_BUF_MIB` (the sizing
+    /// knobs in `exp` apply).
+    #[test]
+    #[ignore = "experiment probe"]
+    fn probe_plans() {
+        let mib: u64 = std::env::var("NICE_EXP_PROBE_BUF_MIB").map_or(6144, |v| v.parse().unwrap());
+        let lim = JoinLimits::for_buffer(mib << 20);
+        let fields: [(u32, u128, u128); 7] = [
+            (58, 183_859_216_587_923_470_200, 1_000_000_000_000_000),
+            (58, 130_525_216_587_923_470_200, 1_000_000_000_000_000),
+            (60, 795_599_612_114_824_200_908, 10_000_000_000_000_000),
+            (60, 1_809_849_612_114_824_200_908, 10_000_000_000_000_000),
+            (62, 12_255_736_762_397_899_821_056, 10_000_000_000_000_000),
+            (62, 8_448_266_762_397_899_821_056, 100_000_000_000_000_000),
+            (64, 72_806_461_862_957_161_709_568, 10_000_000_000_000_000),
+        ];
+        for (b, s, w) in fields {
+            let f = plan_join(b, &FieldSize::new(s, s + w), lim).expect("a join field");
+            println!(
+                "PROBE buf {mib} MiB budget {} MiB | b{b} {w:.0e} {}: slices {} slots {} list 2^{:.2} bytes {} MiB | retry slots {} list 2^{:.2}",
+                lim.budget >> 20,
+                s / 10u128.pow(12),
+                f.slices.len(),
+                f.plan.slots,
+                f64::from(f.plan.list_cap).log2(),
+                f.plan.bytes >> 20,
+                f.retry.slots,
+                f64::from(f.retry.list_cap).log2()
+            );
+        }
+    }
+
     pub(crate) const DENSE_58: u128 = 102_121_216_587_923_470_200;
 
     /// A field of 1e14 at base `base`, from the middle of its band.
