@@ -190,6 +190,8 @@ def find_offers(a):
         q += f' gpu_name="{a.gpu}"'
     if a.max_dph:
         q += f" dph_total<{a.max_dph}"
+    if getattr(a, "query", ""):
+        q += " " + a.query
     typ = "bid" if a.bid else "on-demand"
     offers = vast("search", "offers", "-o", "dph_total", q, "--type", typ)
     if a.offer:
@@ -244,7 +246,7 @@ def cmd_list(a):
         return
     for i in live:
         hours = max(0.0, time.time() - float(i.get("start_date") or time.time())) / 3600
-        print(f"{i['id']} {i.get('label')} {i.get('gpu_name')} {i.get('actual_status')} "
+        print(f"{i['id']} {i.get('label')} {i.get('gpu_name')} m{i.get('machine_id')} {i.get('actual_status')} "
               f"age {hours:.2f} h  ${float(i.get('dph_total') or 0):.3f}/h  ~${hours*float(i.get('dph_total') or 0):.2f}  "
               f"ssh -p {i.get('ssh_port')} root@{i.get('ssh_host')}")
 
@@ -339,7 +341,7 @@ def main():
     o.add_argument("--gpu"); o.add_argument("--max-dph", type=float); o.add_argument("--bid", action="store_true")
     o.add_argument("--query", default=""); o.add_argument("-n", type=int, default=15)
     c = s.add_parser("create"); c.set_defaults(f=cmd_create)
-    c.add_argument("offer", nargs="?"); c.add_argument("--gpu"); c.add_argument("--max-dph", type=float); c.add_argument("--name", required=True); c.add_argument("--ttl-hours", type=float, default=DEFAULT_TTL_H)
+    c.add_argument("offer", nargs="?"); c.add_argument("--gpu"); c.add_argument("--query", default=""); c.add_argument("--max-dph", type=float); c.add_argument("--name", required=True); c.add_argument("--ttl-hours", type=float, default=DEFAULT_TTL_H)
     c.add_argument("--image", default=DEFAULT_IMAGE); c.add_argument("--disk", type=int, default=16)
     c.add_argument("--onstart-cmd", default=""); c.add_argument("--bid", type=float); c.add_argument("--purpose", default="")
     s.add_parser("list").set_defaults(f=cmd_list)

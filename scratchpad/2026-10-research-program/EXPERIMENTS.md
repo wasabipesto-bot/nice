@@ -5,6 +5,60 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L1.2 GPU join phase profile by base (2026-10-28, agent; `L1/GPU-RESULTS.md`, branch `rp/gpu-profile` on the fork)
+
+Vast RTX 3080 (instance 58051111, $0.134/h), upstream 85b5b4e + `NICE_EXP_GPU_PROFILE=1`
+(costs 3.9–6.3 % of device time; shares from profiled runs, seconds from unprofiled),
+1e16 fields, 2 per base, CubeCL CUDA.
+
+| base | roots | device s/field | top | bucket | join | check | other |
+|---|---|---|---|---|---|---|---|
+| 58 | 4 | 68.8 | 19.5 % | 3.8 % | 64.8 % | 4.7 % | 7.3 % |
+| 60 | 2 | 45.2 | 23.3 % | 5.1 % | 55.8 % | 5.3 % | 10.5 % |
+| 62 | 2 | 26.1 | 21.9 % | 7.2 % | 57.9 % | 3.6 % | 9.5 % |
+| 64 | 8 | 83.1 | 7.1 % | 3.3 % | 82.6 % | 3.1 % | 3.9 % |
+
+| base | µs/prefix | RX 9070 XT | AND survivors/prefix | prefilter survivors (= full checks) |
+|---|---|---|---|---|
+| 58 | 11.44 | 11.2 | 63.7k | 3.84k |
+| 60 | 8.51 | 6.8–7.3 | 43.8k | 3.10k |
+| 62 | 9.96 | 9.2–9.6 | 34.8k | 2.20k |
+| 64 | 26.84 | 19.5 | 139.8k | 8.77k |
+
+- Everything but the join kernel costs 4–5 µs per prefix at every base; tops per prefix
+  1180–1300 everywhere. The join kernel carries the whole b64 jump (23.0 µs vs 6.1 at b62).
+- Survivors per prefix = tops × roots × bucket occupancy (930–1210 at every base) × AND
+  pass rate. b64/b62 survivors 4.02× = roots 8/2. b58/b60 1.45× (pass rate 1.41 % vs 1.81 %).
+- **Join kernel cost model** (10 fields, four bases, max error 1.9 %): **0.58 ps per
+  lane-pair, lanes padded to whole 1024-entry waves, plus 74 ps per AND survivor.** Wave
+  padding is 1.07–1.10× at b58/b60 and 1.69–1.72× at b62/b64 (buckets of ~1200 spill into
+  a second wave): ~18 % of b64 device time, 12 % of b62's.
+- **Entries per thread (`NICE_EXP_JOIN_EPT`, 2 interleaved rounds, first field):** 5 gives
+  ×1.12 (b62) and ×1.19 (b64) over 4; 6 (= PR #205) gives ×1.08 / ×1.13, matching #205's
+  own 3080 numbers. So 5 beats #205 by 3.4 % / 5.4 % on this card. Needs a third round and
+  other GPUs before it is a claim. The model fitted on EPT 4 predicts 5 and 6 within 0.6–3.4 %.
+- L4: the check kernel is 3.1–5.3 % of device time (3.8–9.8 % of the join's), under the
+  15 % kill criterion.
+- Caveats: no hardware counters (`ncu` blocked on Vast); the b60 window used is denser
+  (44k survivors/prefix vs ~26k on the 9070 XT's fields) so b60's µs/prefix reads high.
+
+**What the prune should buy (director's estimate from the model, to be measured):** per prefix the
+AND term is tops × roots × padded occupancy × 0.58 ps: b58 2.9 µs, b60 1.5, b62 2.8, b64 11.4;
+the survivor term 4.7 / 3.2 / 2.6 / 10.3 µs. Pruning 73–86 % of bottoms (1e14 fields) cuts
+the AND term by 2× at the current wave size (one wave instead of two) and by 3–7× with a
+smaller wave, leaving survivors unchanged: 10–30 % of device time by base.
+
+## L3.0 Detailed mode on the GPU (2026-10-28, agent; `L3/NOTES.md`)
+
+RTX 3080, `auto` = CubeCL CUDA. b40_detailed 1.04e10 n/s, b50_detailed 7.8e9 (references
+2.4e9 / 1.5e9 are for a weaker card). CPU 16 threads: b40 4.4e7, b50 2.86e7, one thread
+1.87e6. GPU = 236–273× this CPU. `nvidia-smi dmon`: SM 98–99 %, memory controller 0 %.
+Kernel: one thread per number; n², n³ in u32 limbs; digits peeled by long division by b⁵
+in shared memory; OR into a mask, popcount, one shared atomic into the histogram. About
+750 (b40) / 1,000 (b50) integer ops per number ≈ the card's integer throughput:
+**compute-bound on the divisions.** The L2 finite-difference scheme (digit arrays updated by
+addition) removes exactly those divisions, so L2 and L3 are one lead with a CPU prototype first.
+
 ## L1.1 CPU join counts by base (2026-10-28, agent; `L1/RESULTS.md`, branch `rp/l1-selectivity` a76984f on the fork)
 
 Item 23's field per base plus a second field, 6 stratified partitions per field, ivory (EPYC

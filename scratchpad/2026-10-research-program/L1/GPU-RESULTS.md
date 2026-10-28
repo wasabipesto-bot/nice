@@ -2,8 +2,12 @@
 
 2026-10-28, 04:56–05:45 UTC. Vast box `ssh2.vast.ai:30942`: an RTX 3080 10 GB (driver 580.126.09,
 power limit 260 W, PCIe 3 x16) on a Xeon E5-2658A v3 host. The rental is 16 cores, but `nproc` shows 48 and
-there is no cgroup CPU quota. Code: upstream main `85b5b4e` plus the instrumentation commit `0c4b880` on
-branch `rp/gpu-profile` (`patches/0001-…patch`; the director pushes it). The `prof_1e16` and
+there is no cgroup CPU quota. Code: upstream main `85b5b4e` plus two commits on branch `rp/gpu-profile`:
+
+- `0c4b880`, the profile and harness knobs (`patches/0001-…`);
+- `38f0342`, the `NICE_EXP_JOIN_EPT` override used in section 6 (`patches/0002-…`).
+
+The director pushes them. The patches applied to `85b5b4e` reproduce the tested file byte for byte (md5 `f22727b5…`). The `prof_1e16` and
 `noprof_1e16` logs record `commit=85b5b4e` because they started before the commit. Their binary was built
 from the same working tree, so the code is identical.
 
@@ -197,10 +201,54 @@ It is also consistent with #205 (EPT 6 = 1536-entry waves, +14 % at b64 on the 9
 
 The survivor term (45 % at b64) is the other lever: fewer AND survivors per pair, or a cheaper walk and stage.
 
-## 6. Interpretation for L1 and neighbours
+## 6. Follow-up: the wave size measured directly (EPT 4/5/6 at b62/b64)
+
+Section 5 made wave padding the measurable lever, so I measured it. #205 (open) switches to EPT 6 from
+b62; EPT 5 was never tried. I added `NICE_EXP_JOIN_EPT` (commit `38f0342`) and ran the first 1e16 field of
+b62 and b64 at EPT 4/5/6, unprofiled, in two interleaved rounds (4, 5, 6, 6, 5, 4). Then I ran one
+profiled pass at EPT 5 and 6 (`raw/ept/`, `work/run_ept.sh`).
+
+Device seconds per field:
+
+| base | EPT 4 (wave 1024) | EPT 5 (1280) | EPT 6 (1536, #205) | EPT 5 vs 4 | EPT 6 vs 4 | EPT 5 vs 6 |
+|---|---|---|---|---|---|---|
+| 62 | 36.27, 36.19 | 32.52, 32.33 | 33.60, 33.42 | **×1.118** | ×1.081 | ×1.034 |
+| 64 | 84.24, 82.86 | 69.95, 70.59 | 74.08, 74.01 | **×1.189** | ×1.128 | ×1.054 |
+
+EPT 6 reproduces #205's 3080 numbers: ×1.08 at b62 and ×1.16 at b64 there, ×1.08 and ×1.13 here. **EPT 5
+beats EPT 6 by 3.4 % at b62 and 5.4 % at b64.** Under EPT 5, padded/pairs falls to 1.07 (b62) and 1.06
+(b64), against 1.29/1.27 at EPT 6 and 1.72/1.69 at EPT 4. The mean probed-bucket occupancy is 1190–1210,
+so a 1280-entry wave holds almost every bucket in one wave.
+
+**The section 5 cost model predicts all four profiled EPT 5/6 join times out of sample.** It was fitted
+on EPT 4 only, and its predictions are within 0.6–3.4 %:
+
+| run | predicted (s) | measured (s) |
+|---|---|---|
+| b62 EPT 5 | 18.2 | 18.8 |
+| b64 EPT 5 | 57.5 | 57.8 |
+| b62 EPT 6 | 19.6 | 19.7 |
+| b64 EPT 6 | 62.0 | 61.4 |
+
+So 0.58 ps per padded lane-pair plus 74 ps per AND survivor is a usable model of the join kernel on this card.
+
+The rule this suggests is **EPT = ceil(mean probed-bucket occupancy / 256)**. That gives 4 at b58/b60
+(occupancy 930–960) and 5 at b62/b64 (1190–1210). It replaces #205's "6 from 62".
+
+Caveats:
+
+- Two rounds on one field per base, on one GPU. PROPOSAL §5 asks for ≥3 rounds before a benchmark claim, and the 4090/A100/9070 XT have not run EPT 5.
+- I did not run EPT 5 at b58/b60. The model predicts it is worse there (more padding), as #205 found for EPT 6.
+- EPT 5/6 stage slightly more survivors past the shared stage. The checked count is +0.4 %: the benign unprefiltered path.
+
+After EPT 5, the b64 join (57.8 s of 73.2 profiled) is about 55 % survivor handling (31.9 s by the model)
+and 41 % AND lanes. The next lever is the survivor term: fewer AND survivors per pair, or a cheaper walk,
+stage and prefilter.
+
+## 7. Interpretation for L1 and neighbours
 
 - **The climb.** The b64 per-prefix climb is the join kernel, and inside it the pair volume set by the 8 roots, partly irreducible. Top, bucket and check cost the same per prefix at every base.
-- **b62.** b62 already pays the padding share (1.7×) that EPT tuning could recover. That is the "whether b62 already pays part of it" answer, and it is the 5–20 % lever on b62/b64.
+- **b62.** b62 already pays the padding share (1.7×) that EPT tuning recovers. That is the "whether b62 already pays part of it" answer. The lever is measured in section 6: EPT 5 gives ×1.12 at b62 and ×1.19 at b64 on this card, which is 3–5 % more than #205's EPT 6.
 - **L4 (post-join filter bundle).** The final check is 3–5.5 % of device time, and 3.8–9.8 % of join time. L4's kill criterion ("final check under 15 % of join time") is met on this card at all four bases.
 - **Top kernel.** The top kernel is 7–23 % of device time: about 2 µs per prefix, which is b² certifications of both endpoints' squares and cubes. At b58/b60/b62 it is the second-largest phase.
 
@@ -219,3 +267,4 @@ The survivor term (45 % at b64) is the other lever: fewer AND survivors per pair
 - `run_join.sh`.
 - `analyze.py`: tables.
 - `fit.py`: the join fit (`uv run --with numpy python3 work/fit.py raw/prof_1e16.log raw/prof_1e16_b60shift.log`).
+- `run_ept.sh`: the EPT sweep. Its logs are in `raw/ept/`.
