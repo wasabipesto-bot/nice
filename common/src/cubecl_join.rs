@@ -73,6 +73,20 @@ pub const SURV_FLUSH: u32 = 512;
 pub const DEAD_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 /// Bottom entries each thread holds in registers in [`join_kernel`].
 const ENTRIES_PER_THREAD: u32 = 4;
+
+/// Experimental: `NICE_EXP_JOIN_EPT=n` (1-8) overrides [`ENTRIES_PER_THREAD`]
+/// for every base, for measuring the wave size against bucket occupancy
+/// (the override of `rp/gpu-profile` 69a83b5, without its profile).
+fn entries_per_thread() -> u32 {
+    static EPT: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *EPT.get_or_init(|| {
+        std::env::var("NICE_EXP_JOIN_EPT")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .filter(|n| (1..=8).contains(n))
+            .unwrap_or(ENTRIES_PER_THREAD)
+    })
+}
 /// Cubes for the prefilter and check kernels (grid-stride loops).
 const CHECK_CUBES: u32 = 1024;
 /// How deep the halving of an overflowing partition's top layer may go: a
@@ -1659,7 +1673,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.b,
                 self.key_level,
                 self.key_level && self.k == 1,
-                ENTRIES_PER_THREAD,
+                entries_per_thread(),
                 self.f0,
                 self.k2,
                 self.walk_sync,
