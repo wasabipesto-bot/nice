@@ -995,6 +995,7 @@ mod tests {
     /// `NICE_TEST_PRUNE_FIELDS=base:start:size,...` checks those fields
     /// instead.
     #[test]
+    #[allow(clippy::cast_precision_loss)]
     fn the_field_prune_drops_exactly_the_bottoms_that_meet_the_certificate() {
         let fields: Vec<(u32, u128, u128)> = std::env::var("NICE_TEST_PRUNE_FIELDS").map_or_else(
             |_| PLAN_FIELDS.to_vec(),
