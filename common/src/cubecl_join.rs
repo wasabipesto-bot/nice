@@ -3173,6 +3173,81 @@ mod kernels {
 // Host side
 // ---------------------------------------------------------------------------
 
+/// Experimental per-phase profile of the join (`NICE_EXP_GPU_PROFILE=1`):
+/// the device is synchronised after each kernel group of every batch, so
+/// each group's seconds are its own, at the cost of the overlap between
+/// batches (a few percent of device time). Off, nothing here runs.
+pub(crate) fn gpu_profile_enabled() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| {
+        std::env::var("NICE_EXP_GPU_PROFILE").is_ok_and(|v| !v.is_empty() && v != "0")
+    })
+}
+
+/// What [`gpu_profile_enabled`] measures for one field, summed over its
+/// slices and batches.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct JoinProfile {
+    /// `JoinDevice::new`: the field's tables uploaded and its scratch
+    /// allocated (once per slice and per re-run layout), synchronised.
+    pub upload_secs: f64,
+    /// Each batch's small input buffers (partition values, zeroed counters).
+    pub inputs_secs: f64,
+    /// `top_kernel` + `top_scan_kernel` + `top_fill_kernel`.
+    pub top_secs: f64,
+    pub bucket_secs: f64,
+    /// `join_kernel` (the AND scan and the inline `mid_pass` prefilter).
+    pub join_secs: f64,
+    pub check_secs: f64,
+    /// Counts and hits read back.
+    pub read_secs: f64,
+    /// The profile's own reads of the per-slot counts (not in any phase).
+    pub probe_secs: f64,
+    /// Top-layer prefixes and `bpre` entries, summed over slices.
+    pub ntlay: u64,
+    pub nbp: u64,
+    /// Certified tops, summed over partitions.
+    pub tops: u64,
+    /// Bottom entries on bucket lists (an entry counts once per key digit
+    /// it is listed under), summed over partitions.
+    pub listed: u64,
+    /// Top × entry pairs the AND scan tested, `Σ (tops in bucket) ×
+    /// (entries in bucket)` over every (partition, bucket), and the same
+    /// with each bucket's entries rounded up to whole waves of
+    /// `ENTRIES_PER_THREAD · JOIN_WG` (the lanes the kernel runs).
+    pub pairs: u64,
+    pub padded_pairs: u64,
+    /// Buckets with at least one top (work items with work).
+    pub live_buckets: u64,
+    pub buckets: u64,
+}
+
+impl JoinProfile {
+    fn add(&mut self, o: &Self) {
+        self.upload_secs += o.upload_secs;
+        self.inputs_secs += o.inputs_secs;
+        self.top_secs += o.top_secs;
+        self.bucket_secs += o.bucket_secs;
+        self.join_secs += o.join_secs;
+        self.check_secs += o.check_secs;
+        self.read_secs += o.read_secs;
+        self.probe_secs += o.probe_secs;
+        self.ntlay += o.ntlay;
+        self.nbp += o.nbp;
+        self.tops += o.tops;
+        self.listed += o.listed;
+        self.pairs += o.pairs;
+        self.padded_pairs += o.padded_pairs;
+        self.live_buckets += o.live_buckets;
+        self.buckets += o.buckets;
+    }
+}
+
+/// Block until the device has run everything queued, for the profile.
+fn profile_sync<R: Runtime>(client: &ComputeClient<R>) -> Result<()> {
+    cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("profile sync failed: {e:?}"))
+}
+
 /// `x` as little-endian `u32` words, the device's limb layout.
 fn u32_words(x: u128) -> [u32; 4] {
     let b = x.to_le_bytes();
@@ -3264,6 +3339,9 @@ pub(crate) struct JoinDevice<R: Runtime> {
     pw_len: usize,
     roots: Handle,
     top_rec: Handle,
+    /// `NICE_EXP_GPU_PROFILE`: on, and what it measured on this layout.
+    profile: bool,
+    prof: std::cell::Cell<JoinProfile>,
 }
 
 /// What a launched batch leaves behind to be read later: its two counts,
@@ -3362,6 +3440,22 @@ impl<R: Runtime> JoinDevice<R> {
     // One buffer per line, as the plan sized them.
     #[allow(clippy::too_many_lines)]
     pub fn new(client: &ComputeClient<R>, fs: &FieldSetup, plan: &JoinPlan) -> Result<Self> {
+        if !gpu_profile_enabled() {
+            return Self::new_inner(client, fs, plan);
+        }
+        profile_sync(client)?;
+        let t = Instant::now();
+        let dev = Self::new_inner(client, fs, plan)?;
+        profile_sync(client)?;
+        let mut p = dev.prof.get();
+        p.upload_secs += t.elapsed().as_secs_f64();
+        dev.prof.set(p);
+        Ok(dev)
+    }
+
+    // One buffer per line, as the plan sized them.
+    #[allow(clippy::too_many_lines)]
+    fn new_inner(client: &ComputeClient<R>, fs: &FieldSetup, plan: &JoinPlan) -> Result<Self> {
         let limbs = n_limbs(fs.b).ok_or_else(|| anyhow!("base {} has no u128 range", fs.b))?;
         ensure!(limbs <= 3, "device tops: n must fit 96 bits");
         let wide = wide_chunk_for(client);
@@ -3515,6 +3609,8 @@ impl<R: Runtime> JoinDevice<R> {
             pw: client.create(cubecl::bytes::Bytes::from_elems(pw)),
             roots: client.create(cubecl::bytes::Bytes::from_elems(roots)),
             top_rec: client.empty(max_slots * fp.top_rec),
+            profile: gpu_profile_enabled(),
+            prof: std::cell::Cell::new(JoinProfile::default()),
         };
         // The FD top stage takes `top_kernel` (only_clipped) beside it on a
         // batch with a clipped block. Compile that now, on this slice's first
@@ -3653,6 +3749,73 @@ impl<R: Runtime> JoinDevice<R> {
         }
     }
 
+    /// What the profile measured on this layout so far, which it forgets.
+    fn take_prof(&self) -> JoinProfile {
+        self.prof.take()
+    }
+
+    /// Add `secs` to one of the profile's phases.
+    fn prof_add(&self, f: impl FnOnce(&mut JoinProfile)) {
+        let mut p = self.prof.get();
+        f(&mut p);
+        self.prof.set(p);
+    }
+
+    /// Profile: run what is queued to the end and charge its wall time
+    /// (since `t`) to a phase; returns the new mark.
+    fn prof_mark(&self, t: Instant, f: impl FnOnce(&mut JoinProfile, f64)) -> Result<Instant> {
+        profile_sync(&self.client)?;
+        let secs = t.elapsed().as_secs_f64();
+        self.prof_add(|p| f(p, secs));
+        Ok(Instant::now())
+    }
+
+    /// Profile: the batch's certified tops, and from the per-slot work
+    /// items and bucket counts its listed entries, tested pairs and live
+    /// buckets (after the bucket kernel ran).
+    #[allow(clippy::cast_possible_truncation)]
+    fn prof_counts(&self, vs: &[u32], grp_cnt: &Handle) -> Result<()> {
+        let t = Instant::now();
+        let nslots = vs.len();
+        let gc = self.read_u32(grp_cnt)?;
+        let roots = self.read_u32(&self.roots)?;
+        let counts = self.read_u32(&self.counts)?;
+        let nb = self.nb as usize;
+        let m1 = self.b as usize - 1;
+        let wave = u64::from(ENTRIES_PER_THREAD * JOIN_WG);
+        let (mut pairs, mut padded, mut live) = (0u64, 0u64, 0u64);
+        // #249: work item w = (slot, key, class) takes one group per root.
+        for wi in 0..nslots * nb {
+            let slot = wi / nb;
+            let bx = wi % nb;
+            let (dkey, cls) = (bx / m1, bx % m1);
+            let v = vs[slot] as usize;
+            let mut nt = 0u64;
+            for &r in &roots[..self.nroots as usize] {
+                let c0 = (r as usize + 2 * m1 - cls - v % m1) % m1;
+                nt += u64::from(gc[slot * nb + dkey * m1 + c0]);
+            }
+            let ne = u64::from(counts[wi]);
+            if nt > 0 {
+                live += 1;
+                pairs += nt * ne;
+                padded += nt * ne.div_ceil(wave) * wave;
+            }
+        }
+        let listed: u64 = counts[..nslots * nb].iter().map(|&c| u64::from(c)).sum();
+        let tops: u64 = gc[..nslots * nb].iter().map(|&c| u64::from(c)).sum();
+        self.prof_add(|p| {
+            p.tops += tops;
+            p.listed += listed;
+            p.pairs += pairs;
+            p.padded_pairs += padded;
+            p.live_buckets += live;
+            p.buckets += (nslots * nb) as u64;
+            p.probe_secs += t.elapsed().as_secs_f64();
+        });
+        Ok(())
+    }
+
     /// Launch one batch of partition values (one slot each): certify,
     /// bucket, extend, join, prefilter, check. Returns immediately.
     /// `probe`: the check kernel reports every n it rebuilds instead of
@@ -3678,6 +3841,12 @@ impl<R: Runtime> JoinDevice<R> {
         let nwork_u32 = u32::try_from(nwork)?;
         let max_slots = self.max_slots;
         let rec_len = TOP_REC_WORDS as usize * max_slots * ntl;
+        let mut pt = if self.profile {
+            profile_sync(c)?;
+            Some(Instant::now())
+        } else {
+            None
+        };
         let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vs.to_vec()));
         // Kept tops per (slot, group), which the top stage appends.
         let grp_cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots * nb]));
@@ -3710,7 +3879,13 @@ impl<R: Runtime> JoinDevice<R> {
                 expect,
             });
         }
+        if let Some(t) = pt {
+            pt = Some(self.prof_mark(t, |p, s| p.inputs_secs += s)?);
+        }
         self.launch_top(vs, &vs_h, &grp_cnt, &ran, self.top_fd);
+        if pt.is_some() {
+            pt = Some(Instant::now());
+        }
         unsafe {
             bucket_kernel::launch_unchecked::<R>(
                 c,
@@ -3739,6 +3914,11 @@ impl<R: Runtime> JoinDevice<R> {
                 self.key_level,
                 self.key_level && self.k == 1,
             );
+            if let Some(t) = pt {
+                self.prof_mark(t, |p, s| p.bucket_secs += s)?;
+                self.prof_counts(vs, &grp_cnt)?;
+                pt = Some(Instant::now());
+            }
             join_kernel::launch_unchecked::<R>(
                 c,
                 CubeCount::Static(join_cubes, 1, 1),
@@ -3775,6 +3955,9 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k2,
                 self.walk_sync,
             );
+            if let Some(t) = pt {
+                pt = Some(self.prof_mark(t, |p, s| p.join_secs += s)?);
+            }
         }
         unsafe {
             check_kernel::launch_unchecked::<R>(
@@ -3805,6 +3988,9 @@ impl<R: Runtime> JoinDevice<R> {
             );
         }
         c.flush().map_err(|e| anyhow!("flush failed: {e:?}"))?;
+        if let Some(t) = pt {
+            self.prof_mark(t, |p, s| p.check_secs += s)?;
+        }
         Ok(BatchRec {
             survivors,
             checked,
@@ -3849,6 +4035,15 @@ impl<R: Runtime> JoinDevice<R> {
     /// # Errors
     /// Device read failure or output overflow.
     pub fn read_hits(&self) -> Result<Vec<u128>> {
+        let t = Instant::now();
+        let hits = self.read_hits_inner();
+        if self.profile {
+            self.prof_add(|p| p.read_secs += t.elapsed().as_secs_f64());
+        }
+        hits
+    }
+
+    fn read_hits_inner(&self) -> Result<Vec<u128>> {
         let written = self.read_u32(&self.nice_count)?[0] as usize;
         ensure!(
             written <= self.nice_cap as usize,
@@ -3965,6 +4160,8 @@ pub(crate) struct JoinFieldStats {
     /// Layouts the device did not run, each followed by one of at most
     /// half the size (normally none; see [`JoinCeiling`]).
     pub refused: u32,
+    /// `NICE_EXP_GPU_PROFILE`'s phases and counts (zero when it is off).
+    pub prof: JoinProfile,
 }
 
 /// Run one prepared field through the join on `client`: slice by slice
@@ -4129,6 +4326,8 @@ fn run_slice<R: Runtime>(
         return Ok(slots_hint);
     }
     let t0 = Instant::now();
+    st.prof.ntlay += fs.tlay.len() as u64;
+    st.prof.nbp += fs.bp_r.len() as u64;
     let (plan, mut retry) = layouts;
     let mut dev = JoinDevice::new(client, fs, &plan)?;
     let mut slots = slots_hint.clamp(1, dev.max_slots);
@@ -4140,6 +4339,7 @@ fn run_slice<R: Runtime>(
             // What the batches that ran found stays found; the rest goes
             // again, with what overflowed, in a smaller layout.
             hits.extend(dev.read_hits()?);
+            st.prof.add(&dev.take_prof());
             drop(dev);
             let (plan, smaller) = refit(client, fs, lim, ceiling, &why, st)?;
             retry = smaller;
@@ -4162,6 +4362,7 @@ fn run_slice<R: Runtime>(
             // run again; hits they already found come back again and are
             // deduplicated by the caller.
             hits.extend(dev.read_hits()?);
+            st.prof.add(&dev.take_prof());
             drop(dev);
             for &v in &left.overflowed {
                 rerun_partition(client, fs, &mut retry, lim, ceiling, v, st, hits)?;
@@ -4173,6 +4374,7 @@ fn run_slice<R: Runtime>(
         todo = left.overflowed;
     }
     hits.extend(dev.read_hits()?);
+    st.prof.add(&dev.take_prof());
     st.device_secs += t0.elapsed().as_secs_f64();
     Ok(slots)
 }
@@ -4282,8 +4484,12 @@ fn run_pass<R: Runtime>(
         .iter()
         .flat_map(|(_, r)| [r.survivors.clone(), r.checked.clone(), r.ran.clone()])
         .collect();
+    let tr = Instant::now();
     let counts = cubecl::future::block_on(client.read_async(handles))
         .map_err(|e| anyhow!("read failed: {e:?}"))?;
+    if dev.profile {
+        st.prof.read_secs += tr.elapsed().as_secs_f64();
+    }
     count_to(launched);
     let mut left = Leftover::default();
     for (i, (batch, rec)) in recs.iter().enumerate() {
@@ -4302,6 +4508,59 @@ fn run_pass<R: Runtime>(
         }
     }
     Ok(left)
+}
+
+/// One `GPU_PROFILE` line per field on stderr (`NICE_EXP_GPU_PROFILE`).
+#[allow(clippy::cast_precision_loss)]
+fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize) {
+    let p = &js.prof;
+    let (s, e) = match (field.slices.first(), field.slices.last()) {
+        (Some(a), Some(z)) => (a.start(), z.end()),
+        _ => (field.fs.s, field.fs.e),
+    };
+    let phases = p.upload_secs
+        + p.inputs_secs
+        + p.top_secs
+        + p.bucket_secs
+        + p.join_secs
+        + p.check_secs
+        + p.read_secs;
+    eprintln!(
+        "GPU_PROFILE base={base} start={s} end={e} size={} slices={} partitions={} batches={} \
+         slots={} min_slots={} retried={} splits={} | setup={:.4} device_wall={:.4} \
+         upload={:.4} inputs={:.4} top={:.4} bucket={:.4} join={:.4} check={:.4} read={:.4} \
+         probe={:.4} unattributed={:.4} | ntlay={} nbp={} tops={} listed={} pairs={} \
+         padded_pairs={} live_buckets={} buckets={} survivors={} checked={} hits={hits}",
+        e - s,
+        js.slices,
+        js.partitions,
+        js.batches,
+        js.slots,
+        js.min_slots,
+        js.retried_partitions,
+        js.splits,
+        js.setup_secs,
+        js.device_secs,
+        p.upload_secs,
+        p.inputs_secs,
+        p.top_secs,
+        p.bucket_secs,
+        p.join_secs,
+        p.check_secs,
+        p.read_secs,
+        p.probe_secs,
+        js.device_secs - phases - p.probe_secs,
+        p.ntlay,
+        p.nbp,
+        p.tops,
+        p.listed,
+        p.pairs,
+        p.padded_pairs,
+        p.live_buckets,
+        p.buckets,
+        js.survivors,
+        js.checked,
+    );
 }
 
 impl JoinFieldStats {
@@ -4356,8 +4615,10 @@ fn run_partition<R: Runtime>(
         st.survivors += u64::from(surv);
         st.checked += u64::from(checked);
         hits.extend(dev.read_hits()?);
+        st.prof.add(&dev.take_prof());
         return Ok(());
     }
+    st.prof.add(&dev.take_prof());
     drop(dev);
     ensure!(
         depth < MAX_SPLITS && fs.tlay.len() >= 2,
@@ -4457,6 +4718,9 @@ impl JoinPipeline {
                         js.splits,
                         stats.total_secs
                     );
+                    if gpu_profile_enabled() {
+                        print_profile(base, &job.field, &js, hits.len());
+                    }
                     (stats, hits, js)
                 });
                 if results_tx.send(out).is_err() {
