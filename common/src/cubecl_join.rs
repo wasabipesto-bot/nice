@@ -3077,7 +3077,9 @@ mod tests {
     /// (partitions per launch, MiB), re-runs, survivor counts and the
     /// device's memory. `NICE_TEST_JOIN_COMPARE=1` also runs every field
     /// through the stride pipeline and asserts the same nice numbers.
-    /// `NICE_TEST_JOIN_SIZE` sets the field size (default 1e14).
+    /// `NICE_TEST_JOIN_SIZE` sets the field size (default 1e14; the warm-up
+    /// field stays at most 1e14), and `NICE_TEST_JOIN_STARTS=b:start,...`
+    /// overrides the table's starts.
     #[allow(
         clippy::cast_precision_loss,
         clippy::cast_possible_truncation,
@@ -3101,13 +3103,27 @@ mod tests {
         let size: u128 = std::env::var("NICE_TEST_JOIN_SIZE").map_or(100_000_000_000_000, |v| {
             v.parse::<f64>().expect("NICE_TEST_JOIN_SIZE: a field size") as u128
         });
+        let overrides: Vec<(u32, u128)> = std::env::var("NICE_TEST_JOIN_STARTS")
+            .unwrap_or_default()
+            .split(',')
+            .filter(|x| !x.trim().is_empty())
+            .map(|x| {
+                let (b, s) = x.split_once(':').expect("NICE_TEST_JOIN_STARTS: b:start");
+                (
+                    b.trim().parse().expect("a base"),
+                    s.trim().replace('_', "").parse().expect("a start"),
+                )
+            })
+            .collect();
+        let warm_size = size.min(100_000_000_000_000);
         let mib = |b: u64| b >> 20;
         for base in bases {
-            let &(_, start) = THROUGHPUT_STARTS
+            let &(_, start) = overrides
                 .iter()
+                .chain(THROUGHPUT_STARTS)
                 .find(|&&(b, _)| b == base)
                 .expect("a base with throughput fields (57, 58, 60, 62, 64)");
-            let warm = FieldSize::new(start - size, start);
+            let warm = FieldSize::new(start - warm_size, start);
             run_routed(ctx, base, &warm);
             let fields: Vec<FieldSize> = (0..n)
                 .map(|i| FieldSize::new(start + i * size, start + (i + 1) * size))
