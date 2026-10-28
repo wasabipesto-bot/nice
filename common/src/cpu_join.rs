@@ -787,6 +787,9 @@ struct Pass<'a> {
 }
 
 #[cfg(test)]
+mod selectivity;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::client_process::process_range_niceonly;

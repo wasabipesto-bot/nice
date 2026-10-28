@@ -1137,6 +1137,49 @@ pub fn join_range(
     st
 }
 
+#[cfg(test)]
+impl Base {
+    /// [`Self::cert`], with how many digits of n² and of n³ it knows (the
+    /// certificate's digits are distinct, so the two add up to its
+    /// popcount). For the join's selectivity measurement (`cpu_join`).
+    pub(crate) fn cert_split(&self, a: u128, e: u128, cap: u32) -> Option<(u64, u32, u32)> {
+        let a2 = W4::mul_u128_u128(a, a);
+        let e2 = W4::mul_u128_u128(e, e);
+        let a3 = a2.mul_u128(a);
+        let e3 = e2.mul_u128(e);
+        let mut mask = 0u64;
+        let mut known = [0u32; 2];
+        let mut dx = [0u8; DIGIT_BUF];
+        let mut dy = [0u8; DIGIT_BUF];
+        for (j, (x, y, sp)) in [(a2, e2, self.s2), (a3, e3, self.s3)]
+            .into_iter()
+            .enumerate()
+        {
+            let c0 = cap.max(self.ndig_w(&y.sub(&x)));
+            if c0 >= sp {
+                continue;
+            }
+            let len = sp - c0;
+            let qx = self.shift_down(x, c0);
+            let qy = self.shift_down(y, c0);
+            self.digits_w(qx, len, &mut dx);
+            self.digits_w(qy, len, &mut dy);
+            for i in (0..len as usize).rev() {
+                if dx[i] != dy[i] {
+                    break;
+                }
+                let bit = 1u64 << dx[i];
+                if mask & bit != 0 {
+                    return None;
+                }
+                mask |= bit;
+                known[j] += 1;
+            }
+        }
+        Some((mask, known[0], known[1]))
+    }
+}
+
 /// Fields the tests share: production-size fields that the join takes.
 #[cfg(test)]
 pub(crate) mod test_fields {
