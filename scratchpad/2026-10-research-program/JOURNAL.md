@@ -21,8 +21,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   on CPU against the reference join; GPU A/B running on the third box of the day (the
   first two replacement boxes were the same Taiwan machine refusing ssh keys; machine
   146647 is now excluded in the rental query).
-- **Side finding:** 5 entries per thread beats 4 (current) and 6 (PR #205) at b62/b64 on
-  the 3080 by 3.4–5.4 %, two rounds, one field; wave padding explains it. Not a claim yet.
+- **Prune A/B (L1.3): ×1.15 / 1.15 / 1.42 / 1.64 at b58/60/62/64 on 1e16 fields, NiceMark
+  score +28 %, exact on every parity test.** With the prune, EPT 2 beats 4 by 5–14 % (EPT 6 =
+  #205 and the EPT 5 note are superseded); prune + EPT 2 = 1.51× (b62), 1.91× (b64) vs main.
+  PR to open tomorrow; it needs the staging-flush tweak (b64 crosses a test's 1e-4 limit).
 - **L2/L3 merged into one lead:** detailed mode is compute-bound on per-number long
   division on both CPU and GPU (GPU kernel: one thread per number, u32 limbs, divide by
   b⁵; SM 98 %). Finite differences (digit arrays updated by addition) remove the

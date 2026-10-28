@@ -12,10 +12,10 @@ verdict missed (user, 2026-10-28).
 
 | id | lead | path | status | expected | cost | kill criterion | last update |
 |---|---|---|---|---|---|---|---|
-| L1 | Join per-prefix cost at b62–b64 (BACKLOG 68): phase profile per base; why cost per prefix climbs ~2.5× at b64, and whether b62 already pays part of it | compute | active (day 1: roots-per-base explanation found, CPU counts + GPU profile running) | 5–20 % on b62_msd_weak | 2 days, ~$1 | profile shows the climb is irreducible bottom-layer work | 2026-10-28 |
+| L1 | Join per-prefix cost at b62–b64 (BACKLOG 68): phase profile per base; why cost per prefix climbs ~2.5× at b64, and whether b62 already pays part of it | compute | **verdict: explained (root count); lever confirmed** — field-certificate prune ×1.15/1.15/1.42/1.64 at b58/60/62/64, NiceMark +28 %; PR to open 2026-10-29 | 5–20 % on b62_msd_weak | 2 days, ~$1 | — | 2026-10-28 |
 | L2 | Detailed mode by finite differences (digit arrays updated by addition; supersedes BACKLOG 55's SIMD framing; `L2/SCOPING.md`) | compute | scoped; prototype queued | 3–8× on b40/b50_detailed (op-count estimate) | 1 agent-day prototype, 1–2 weeks to PR | scalar prototype under 1.3× on b50_detailed_1t | 2026-10-28 |
 | L3 | Detailed mode GPU: compute-bound on per-number long division (`L3/NOTES.md`); the L2 finite-difference scheme targets exactly that | compute | scoped; merged into L2's plan (CPU prototype first, GPU port second) | unknown | 3 days, ~$1 | already bound by the final check | 2026-10-28 |
-| L5 | CUDA occupancy hint for the join (BACKLOG 19); now also the wave size / entries-per-thread question (EPT 5 beat 4 and 6 at b62/b64 on a 3080, L1.2) | compute | queued, after the prune | 0–5 % | 1 day, $0.50 | no scenario moves 2 % | 2026-10-28 |
+| L5 | Join wave size: with the prune, EPT 2 beats 4 by 5–14 % (L1.3); supersedes #205's EPT 6; needs a second GPU and 3 rounds; also BACKLOG 19's occupancy hint | compute | queued (next after the prune PR) | 0–5 % | 1 day, $0.50 | no scenario moves 2 % | 2026-10-28 |
 | L7 | Weekly literature sweep: arXiv math.NT / cs.DS / cs.DC; GPU hash-join and bit-sliced scan work for the AND scan | math+compute | recurring (weekly) | leads | 2 h/week | none | 2026-10-28 |
 | L8 | Near-miss tail test (BACKLOG 39) | science | queued | model validation | 2 days | none | 2026-10-28 |
 | L9 | H100 / L40S on the join (BACKLOG 59) | sourcing | queued | fleet pricing data | $1 | none | 2026-10-28 |

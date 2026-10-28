@@ -5,6 +5,42 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L1.3 Field-certificate bottom prune, GPU A/B (2026-10-28, agent; `L1/PRUNE.md`, `L1/prune-raw/`)
+
+Branches on the fork: `rp/field-cert-prune` (head 4670ffe; the prune is c1174c1, the rest
+tests), `rp/field-cert-prune-base` (2d740d3 = 85b5b4e + the same harness, the A tree),
+`rp/field-cert-prune-ept` (6e4e895, prune + EPT override). Vast RTX 3080 (58056651),
+1e16 fields, 2 per base, the L1.2 starts, A B A B A B (3 rounds), median s/field (spread):
+
+| base | main | prune | speed-up | bottoms removed |
+|---|---|---|---|---|
+| 58 | 69.36 (0.9 %) | 60.18 (1.1 %) | **1.153×** | 59.5 % |
+| 60 | 45.26 (1.2 %) | 39.52 (1.2 %) | **1.145×** | 54.6 % |
+| 62 | 26.98 (1.0 %) | 19.07 (0.6 %) | **1.415×** | 74.3 / 66.7 % |
+| 64 | 83.42 (2.4 %) | 50.79 (0.6 %) | **1.643×** | 77.1 % |
+
+NiceMark nice-only, 3 rounds, every scenario on the join in both trees: b58_msd_weak
++17.6 %, b58_msd_strong +32.5 %, b60_msd_weak +20.1 %, b62_msd_weak +43.9 %; score
+2892 → 3705 (+28 %). Batches and slots identical (buffers still sized by the unpruned
+count). At 1e14 production size the prune removes 73–86 %, so production gains are
+probably larger (unmeasured).
+
+Exactness on the box: CUDA kernel compiles; 194 host tests; `cubecl_cuda_join_matches_the_cpu_reference`,
+the dense-field and whole-field CUDA tests, the CPU reference test, and the throughput
+harness with `NICE_TEST_JOIN_COMPARE=1` (join = stride on 1e14 fields) all pass; clippy
+`--features gpu -D warnings` clean. One behavioural ripple: the prune tree records 0.94× the
+AND survivors and correspondingly more unfiltered prefilter survivors (2–2.5e-4 of
+survivors), i.e. survivors that overflow the join kernel's staging area go to the check list
+unfiltered, as on main but a little more often; +0.3–0.4 % full checks, and b64 crosses the
+dense-field test's 1e-4 limit. Fix for the PR: flush every 16 tops or a larger stage.
+
+**EPT sweep with the prune (`rp/field-cert-prune-ept`):** EPT 2 is best at every base:
+×1.088 (b58, 1 round), ×1.053 (b60, 1 round), ×1.060 (b62, 2 rounds), ×1.139 (b64, 2
+rounds) over EPT 4; EPT 1 worse than 2 everywhere. Prune + EPT 2 vs main at EPT 4:
+**1.51× at b62, 1.91× at b64** (against the L1.2 numbers on the same machine, not
+interleaved). So PR #205's EPT 6 and the EPT 5 note both give way to EPT 2 once the prune
+is in; pruned buckets are 3–4× smaller, so the wave shrinks.
+
 ## L1.2 GPU join phase profile by base (2026-10-28, agent; `L1/GPU-RESULTS.md`, branch `rp/gpu-profile` on the fork)
 
 Vast RTX 3080 (instance 58051111, $0.134/h), upstream 85b5b4e + `NICE_EXP_GPU_PROFILE=1`

@@ -1,7 +1,13 @@
 #!/bin/bash
-# Usage: nicemark.sh TREE ROUND
-T=$1; RD=$2
-cd /root/$T
-echo "== $(date -u +%FT%TZ) tree=$T round=$RD commit=$(git rev-parse --short HEAD)" >&2
-LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH RUST_LOG=info ./target/release/nice_client niceonly --gpu --benchmark --benchmark-secs 150 --benchmark-json < /dev/null
-echo "== end $(date -u +%FT%TZ) exit=$?" >&2
+# NiceMark nice-only A/B, interleaved A B A B A B (run under nohup).
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+for r in 1 2 3; do
+  for t in main prune; do
+    cd /root/$t
+    echo "== $(date -u +%T) round=$r tree=$t commit=$(git rev-parse --short HEAD)"
+    RUST_LOG=info ./target/release/nice_client niceonly --gpu --benchmark --benchmark-secs 150 --benchmark-json \
+      < /dev/null > /root/ab/nm_r${r}_$t.json 2> /root/ab/nm_r${r}_$t.err
+    echo "exit $? $(date -u +%T)"
+  done
+done
+echo "NM_DONE $(date -u +%T)"
