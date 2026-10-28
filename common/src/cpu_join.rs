@@ -992,9 +992,31 @@ mod tests {
     /// certificate: on every production field, `bpre` and the bottom lists
     /// of sampled partitions (every key digit) equal the unpruned ones
     /// filtered by it. Prints the counts before and after.
+    /// `NICE_TEST_PRUNE_FIELDS=base:start:size,...` checks those fields
+    /// instead.
     #[test]
     fn the_field_prune_drops_exactly_the_bottoms_that_meet_the_certificate() {
-        for &(b, s, size) in PLAN_FIELDS {
+        let fields: Vec<(u32, u128, u128)> = std::env::var("NICE_TEST_PRUNE_FIELDS").map_or_else(
+            |_| PLAN_FIELDS.to_vec(),
+            |v| {
+                v.split(',')
+                    .map(|f| {
+                        // Integers, or sizes such as 1e16.
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                        let num = |x: &str| -> u128 {
+                            if x.contains('e') {
+                                x.parse::<f64>().expect("a number") as u128
+                            } else {
+                                x.parse().expect("a number")
+                            }
+                        };
+                        let x: Vec<u128> = f.split(':').map(|x| num(x.trim())).collect();
+                        (u32::try_from(x[0]).expect("a base"), x[1], x[2])
+                    })
+                    .collect()
+            },
+        );
+        for (b, s, size) in fields {
             let range = FieldSize::new(s, s + size);
             let jp = join_params_for(b, &range).expect("a join field");
             let join = CpuJoin::new(b, &range, jp).expect("field setup");
