@@ -36,8 +36,8 @@ cap, rentals below the credit floor, the user's machines.
 ## Channels
 
 - Daily report: this session's reply.
-- Urgent / blocking: ntfy topic: (pending; ask the user) — until then, the session
-  reply plus a push notification.
+- Urgent / blocking only: `curl -s -H "Title: nice research" -d "<what and what is needed>" https://ntfy.sh/wasabipesto-claude`
+  (public topic, no secrets). Never routine progress.
 - Questions: numbered in the report; the user answers in the session.
 
 ## Rotation
