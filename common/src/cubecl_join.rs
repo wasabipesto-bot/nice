@@ -75,8 +75,16 @@ pub const DEAD_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 /// base. Six win from base 62 up (+6-9% per field at base 62 and +14-16% at
 /// base 64 on an RTX 3080, RTX 4090, A100 and RX 9070 XT) and lose 7-11% at
 /// bases 58-60, which keep four.
+/// Experimental: `NICE_EXP_JOIN_EPT=n` (1-8) overrides it for every base.
 fn entries_per_thread(base: u32) -> u32 {
-    if base >= 62 { 6 } else { 4 }
+    static EPT: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
+    let o = *EPT.get_or_init(|| {
+        std::env::var("NICE_EXP_JOIN_EPT")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .filter(|n| (1..=8).contains(n))
+    });
+    o.unwrap_or(if base >= 62 { 6 } else { 4 })
 }
 /// Cubes for the prefilter and check kernels (grid-stride loops).
 const CHECK_CUBES: u32 = 1024;
@@ -1343,7 +1351,7 @@ pub(crate) struct JoinProfile {
     /// Top × entry pairs the AND scan tested, `Σ (tops in bucket) ×
     /// (entries in bucket)` over every (partition, bucket), and the same
     /// with each bucket's entries rounded up to whole waves of
-    /// `ENTRIES_PER_THREAD · JOIN_WG` (the lanes the kernel runs).
+    /// `entries_per_thread(b) · JOIN_WG` (the lanes the kernel runs).
     pub pairs: u64,
     pub padded_pairs: u64,
     /// Buckets with at least one top (work items with work).
@@ -1667,7 +1675,7 @@ impl<R: Runtime> JoinDevice<R> {
         let work = self.read_u32(&self.work)?;
         let counts = self.read_u32(&self.counts)?;
         let nb = self.nb as usize;
-        let wave = u64::from(ENTRIES_PER_THREAD * JOIN_WG);
+        let wave = u64::from(entries_per_thread(self.b) * JOIN_WG);
         let (mut pairs, mut padded, mut live) = (0u64, 0u64, 0u64);
         for wi in 0..nslots * nb {
             let nt = u64::from(work[4 * wi + 3] - work[4 * wi + 2]);
@@ -2459,11 +2467,12 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         + p.check_secs
         + p.read_secs;
     eprintln!(
-        "GPU_PROFILE base={base} start={s} end={e} size={} slices={} partitions={} batches={} \
+        "GPU_PROFILE base={base} ept={} start={s} end={e} size={} slices={} partitions={} batches={} \
          slots={} min_slots={} retried={} splits={} | setup={:.4} device_wall={:.4} \
          upload={:.4} inputs={:.4} top={:.4} bucket={:.4} join={:.4} check={:.4} read={:.4} \
          probe={:.4} unattributed={:.4} | ntlay={} nbp={} tops={} listed={} pairs={} \
          padded_pairs={} live_buckets={} buckets={} survivors={} checked={} hits={hits}",
+        entries_per_thread(base),
         e - s,
         js.slices,
         js.partitions,
