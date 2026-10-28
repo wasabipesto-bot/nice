@@ -13,8 +13,9 @@ Rules it enforces (PROPOSAL.md section 3):
 Commands:
   credit                      account credit
   offers [--gpu X] [--max-dph D] [--bid] [--query EXTRA] [-n N]
-  create OFFER --name NAME [--ttl-hours H] [--image IMG] [--disk GB]
-                              [--onstart-cmd CMD] [--bid PRICE] [--purpose TEXT]
+  create [OFFER | --gpu NAME [--max-dph D]] --name NAME [--ttl-hours H] [--image IMG]
+                              [--disk GB] [--onstart-cmd CMD] [--bid PRICE] [--purpose TEXT]
+                              (offer ids go stale in minutes; --gpu picks the cheapest live offer)
   list                        research instances with age and running cost
   ssh ID                      print the ssh command
   destroy ID|all              destroy (research-labelled only)
@@ -181,32 +182,59 @@ def cmd_offers(a):
               f"{str(o.get('cpu_name',''))[:28]} / {o.get('geolocation','')}")
 
 
+def find_offers(a):
+    """Candidate offers, cheapest first: a given id (looked up client-side, since the
+    API has no id filter) or the cheapest offers for --gpu under --max-dph."""
+    q = DEFAULT_QUERY
+    if a.gpu:
+        q += f' gpu_name="{a.gpu}"'
+    if a.max_dph:
+        q += f" dph_total<{a.max_dph}"
+    typ = "bid" if a.bid else "on-demand"
+    offers = vast("search", "offers", "-o", "dph_total", q, "--type", typ)
+    if a.offer:
+        return [o for o in offers if str(o["id"]) == str(a.offer)]
+    return offers[:5]
+
+
 def cmd_create(a):
+    if not a.offer and not a.gpu:
+        sys.exit("give an offer id or --gpu NAME")
     label = PREFIX + a.name
-    offer = next((o for o in vast("search", "offers", f"id={a.offer}") if str(o["id"]) == str(a.offer)), None)
-    if offer is None:
-        sys.exit(f"offer {a.offer} not found (stale?)")
-    dph = float(a.bid) if a.bid else float(offer["dph_total"])
-    budget_check(dph * a.ttl_hours * 1.25)   # 25 % headroom for disk and bandwidth
+    cands = find_offers(a)
+    if not cands:
+        sys.exit("no matching offer (ids go stale within minutes; prefer --gpu NAME --max-dph D)")
     ttl_s = int(a.ttl_hours * 3600)
     body = a.onstart_cmd or "sleep infinity"
     onstart = f"( sleep {ttl_s}; {SELF_DESTROY} ) & {body}"
-    args = ["create", "instance", str(a.offer), "--image", a.image, "--disk", str(a.disk),
-            "--label", label, "--ssh", "--cancel-unavail", "--onstart-cmd", onstart]
-    if a.bid:
-        args += ["--bid_price", str(a.bid)]
-    r = vast(*args)
-    iid = r.get("new_contract") or r.get("id")
-    if not iid:
-        sys.exit(f"create returned no instance id: {r}")
-    rows = read_ledger()
-    rows.append({"created_utc": now().strftime("%Y-%m-%dT%H:%M:%SZ"), "instance_id": str(iid), "label": label,
-                 "offer_id": str(a.offer), "gpu": offer.get("gpu_name", ""), "dph": f"{dph:.4f}",
-                 "ttl_h": f"{a.ttl_hours:g}", "purpose": a.purpose or "", "status": "open",
-                 "closed_utc": "", "est_usd": "", "note": ""})
-    write_ledger(rows)
-    print(f"created instance {iid} ({label}, {offer.get('gpu_name')}, ${dph:.3f}/h, TTL {a.ttl_hours:g} h). "
-          f"`vast.py ssh {iid}` once it is running.")
+    last_err = None
+    for offer in cands[:3]:
+        dph = float(a.bid) if a.bid else float(offer["dph_total"])
+        budget_check(dph * a.ttl_hours * 1.25)   # 25 % headroom for disk and bandwidth
+        args = ["create", "instance", str(offer["id"]), "--image", a.image, "--disk", str(a.disk),
+                "--label", label, "--ssh", "--cancel-unavail", "--onstart-cmd", onstart]
+        if a.bid:
+            args += ["--bid_price", str(a.bid)]
+        p = subprocess.run(["vastai", *args, "--raw"], capture_output=True, text=True, timeout=120)
+        try:
+            r = json.loads(p.stdout) if p.stdout.strip() else {}
+        except json.JSONDecodeError:
+            r = {}
+        iid = r.get("new_contract") or r.get("id")
+        if p.returncode != 0 or not iid:
+            last_err = (p.stderr.strip() or p.stdout.strip())[:300]
+            print(f"offer {offer['id']} failed ({last_err}); trying the next")
+            continue
+        rows = read_ledger()
+        rows.append({"created_utc": now().strftime("%Y-%m-%dT%H:%M:%SZ"), "instance_id": str(iid), "label": label,
+                     "offer_id": str(offer["id"]), "gpu": offer.get("gpu_name", ""), "dph": f"{dph:.4f}",
+                     "ttl_h": f"{a.ttl_hours:g}", "purpose": a.purpose or "", "status": "open",
+                     "closed_utc": "", "est_usd": "", "note": ""})
+        write_ledger(rows)
+        print(f"created instance {iid} ({label}, {offer.get('gpu_name')}, ${dph:.3f}/h, TTL {a.ttl_hours:g} h, "
+              f"{offer.get('geolocation','')}). `vast.py ssh {iid}` once it is running.")
+        return
+    sys.exit(f"all candidate offers failed: {last_err}")
 
 
 def cmd_list(a):
@@ -311,7 +339,7 @@ def main():
     o.add_argument("--gpu"); o.add_argument("--max-dph", type=float); o.add_argument("--bid", action="store_true")
     o.add_argument("--query", default=""); o.add_argument("-n", type=int, default=15)
     c = s.add_parser("create"); c.set_defaults(f=cmd_create)
-    c.add_argument("offer"); c.add_argument("--name", required=True); c.add_argument("--ttl-hours", type=float, default=DEFAULT_TTL_H)
+    c.add_argument("offer", nargs="?"); c.add_argument("--gpu"); c.add_argument("--max-dph", type=float); c.add_argument("--name", required=True); c.add_argument("--ttl-hours", type=float, default=DEFAULT_TTL_H)
     c.add_argument("--image", default=DEFAULT_IMAGE); c.add_argument("--disk", type=int, default=16)
     c.add_argument("--onstart-cmd", default=""); c.add_argument("--bid", type=float); c.add_argument("--purpose", default="")
     s.add_parser("list").set_defaults(f=cmd_list)

@@ -12,12 +12,11 @@ verdict missed (user, 2026-10-28).
 
 | id | lead | path | status | expected | cost | kill criterion | last update |
 |---|---|---|---|---|---|---|---|
-| L1 | Join per-prefix cost at b62–b64 (BACKLOG 68): phase profile per base; why cost per prefix climbs ~2.5× at b64, and whether b62 already pays part of it | compute | queued (first) | 5–20 % on b62_msd_weak | 2 days, ~$1 | profile shows the climb is irreducible bottom-layer work | 2026-10-28 |
-| L2 | Detailed mode CPU: SIMD batch digit extraction (BACKLOG 55) | compute | queued (scope first) | 2–4× on b40/b50_detailed | 2–4 weeks | prototype under 1.3× on one core | 2026-10-28 |
-| L3 | Detailed mode GPU: profile the kernel; it has had none of the join's attention | compute | queued (scope first) | unknown | 3 days, ~$1 | already bound by the final check | 2026-10-28 |
+| L1 | Join per-prefix cost at b62–b64 (BACKLOG 68): phase profile per base; why cost per prefix climbs ~2.5× at b64, and whether b62 already pays part of it | compute | active (day 1: roots-per-base explanation found, CPU counts + GPU profile running) | 5–20 % on b62_msd_weak | 2 days, ~$1 | profile shows the climb is irreducible bottom-layer work | 2026-10-28 |
+| L2 | Detailed mode by finite differences (digit arrays updated by addition; supersedes BACKLOG 55's SIMD framing; `L2/SCOPING.md`) | compute | scoped; prototype queued | 3–8× on b40/b50_detailed (op-count estimate) | 1 agent-day prototype, 1–2 weeks to PR | scalar prototype under 1.3× on b50_detailed_1t | 2026-10-28 |
+| L3 | Detailed mode GPU: profile the kernel; it has had none of the join's attention; the L2 finite-difference idea may port | compute | scoping (day 1, on the Vast box) | unknown | 3 days, ~$1 | already bound by the final check | 2026-10-28 |
 | L4 | Post-join filter bundle (BACKLOG 56 + math-reassessment full-Hall cut): measure the final check's share of join time first | compute+math | queued (scope first) | 3–10 % if the final check is >30 % of time | 1 week | final check under 15 % of join time | 2026-10-28 |
 | L5 | CUDA occupancy hint for the join (BACKLOG 19) | compute | queued | 0–5 % | 1 day, $0.50 | no scenario moves 2 % | 2026-10-28 |
-| L6 | Bassily–Kátai interior-digit theorems; carry-contraction lemma (literature EVALUATION §1, ranked table): a sound bottom-layer rejection? | math | queued | new filter or a closed question | 1 week + prototype | no admissible hypothesis at our lengths (as Swaenepoel) | 2026-10-28 |
 | L7 | Weekly literature sweep: arXiv math.NT / cs.DS / cs.DC; GPU hash-join and bit-sliced scan work for the AND scan | math+compute | recurring (weekly) | leads | 2 h/week | none | 2026-10-28 |
 | L8 | Near-miss tail test (BACKLOG 39) | science | queued | model validation | 2 days | none | 2026-10-28 |
 | L9 | H100 / L40S on the join (BACKLOG 59) | sourcing | queued | fleet pricing data | $1 | none | 2026-10-28 |
@@ -56,3 +55,4 @@ verdict missed (user, 2026-10-28).
 | Per-device join autotune (BACKLOG 35) | only entries-per-thread moves, and it follows a per-base rule | BACKLOG 2026-10-09 |
 | Colour-coded join below b80; hand-CUDA join phase 2; removing the 1e13 cutoff; runtime fallback to stride; nice-only under BOINC; PRs #170/#173/#174 | see BACKLOG "Not re-proposed" | BACKLOG 2026-10-09 |
 | Routing fields by predicted cost | does not change throughput (user) | filter map round 3, 2026-10-23 |
+| L6: Bassily–Kátai / Drmota interior-digit distribution as a rejection rule | Drmota 2001 (via Steiner 2002) gives joint uniformity of any *fixed* set of interior positions of n², n³ with a non-effective error term; nothing computable at b58–64, and pandigitality needs all positions jointly. Eight 2020–26 papers checked, none explicit at 20–40 digits. (The note's "4–5 known digits" sizing used t≈6–7; the join's t = L−3 knows ~19–20 output digits. Immaterial to the verdict.) `L6-literature-2026-10-28.md` | research program day 1, 2026-10-28 |
