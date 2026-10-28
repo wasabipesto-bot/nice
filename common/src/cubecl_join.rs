@@ -3059,7 +3059,11 @@ mod tests {
     /// at bases 60 and 64.
     const THROUGHPUT_STARTS: &[(u32, u128)] = &[
         (57, FRONTIER_57),
+        // EXPERIMENTS item 18's b58 GPU field.
+        (58, 130_525_216_587_923_470_200),
         (60, 1_573_714_731_429_953_349_518),
+        // `PLAN_FIELDS`' b62 start.
+        (62, 7_997_740_455_941_656_911_841),
         (64, 41_242_006_262_957_161_709_568),
     ];
 
@@ -3073,7 +3077,13 @@ mod tests {
     /// (partitions per launch, MiB), re-runs, survivor counts and the
     /// device's memory. `NICE_TEST_JOIN_COMPARE=1` also runs every field
     /// through the stride pipeline and asserts the same nice numbers.
-    #[allow(clippy::cast_precision_loss, clippy::too_many_lines)]
+    /// `NICE_TEST_JOIN_SIZE` sets the field size (default 1e14).
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::too_many_lines
+    )]
     fn join_throughput(ctx: &CubeclContext) {
         use crate::cubecl_backend::memory_usage;
         use crate::gpu_niceonly::fields_in_flight;
@@ -3088,13 +3098,15 @@ mod tests {
             .map(|b| b.trim().parse().expect("NICE_TEST_JOIN_BASES: bases"))
             .collect();
         let compare = std::env::var("NICE_TEST_JOIN_COMPARE").is_ok();
-        let size = 100_000_000_000_000u128;
+        let size: u128 = std::env::var("NICE_TEST_JOIN_SIZE").map_or(100_000_000_000_000, |v| {
+            v.parse::<f64>().expect("NICE_TEST_JOIN_SIZE: a field size") as u128
+        });
         let mib = |b: u64| b >> 20;
         for base in bases {
             let &(_, start) = THROUGHPUT_STARTS
                 .iter()
                 .find(|&&(b, _)| b == base)
-                .expect("a base with throughput fields (57, 60, 64)");
+                .expect("a base with throughput fields (57, 58, 60, 62, 64)");
             let warm = FieldSize::new(start - size, start);
             run_routed(ctx, base, &warm);
             let fields: Vec<FieldSize> = (0..n)
