@@ -5,6 +5,58 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L1.4 Prune against new main on an RTX 4090, and the wave size (2026-10-29, agent; `L1/AB-4090.md`, `L1/pr-raw/4090/`)
+
+Vast RTX 4090 (58197772, Poland, $0.375/h; **power-limited to 330 W**, so absolute times
+are slow, ratios hold). A = upstream main 2709d3f (+ the two test-only harness commits);
+B = `pr/field-cert-prune` 26a8b15 (rebased prune). 3 interleaved rounds, spreads ≤ 2.4 %.
+
+| fields | b58 | b60 | b62 | b64 |
+|---|---|---|---|---|
+| prune vs main, 1e16 (2 per base) | ×1.097 | ×1.084 | ×1.112 | ×1.205 |
+| prune vs main, **1e14 (production size, 20 per base)** | ×1.41 | ×1.50 | ×1.87 | ×1.79 |
+| prune + EPT 2 vs main, 1e16 | ×1.19 | ×1.16 | ×1.26 | ×1.52 |
+| prune + EPT 2 vs main, 1e14 | ×1.55 | ×1.55 | ×1.97 | ×2.08 |
+| old pair on this card (85b5b4e base vs prune), 1e16 | ×1.14 | ×1.14 | ×1.37 | ×1.58 |
+
+The 1e16 gains are below the 3080's day-1 numbers because new main carries #205's EPT 6 at
+b62/b64 (a bad wave for pruned buckets) and #203/#206's own gains; the card is not the
+cause (old pair reproduces the 3080). NiceMark (prune as pushed): 8086 → 9494 (×1.174);
+b58 weak ×1.152, b58 strong ×1.330, b60 weak ×1.075, b62 weak ×1.126; all on the join.
+**EPT with the prune: 2 < 3 < 4 < 6 in every round at every base**; 2 beats 4 by
+×1.07–1.13 and 6 by ×1.15–1.27; at 1e14 EPT 1 is ~5 % better at b58 and tied elsewhere.
+Exactness: `NICE_TEST_JOIN_COMPARE=1` 0 = 0 at every base; survivor and check counts identical
+to the last digit across trees at 1e14; CUDA parity 3/3; CPU prune test passes; the 3080's
+stage-overrun shift does not appear on new main. Bottoms removed: 55–77 % at 1e16, 72–86 %
+at 1e14. Not done: the b64 1e16 dense test timed out at 300 s; NiceMark with EPT 2; EPT 1 at 1e16.
+
+## L2.1 Detailed mode by finite differences, CPU prototype (2026-10-29, agent; `L2/RESULTS.md`, branch `rp/l2-finite-diff` on the fork: b003967 scalar, da9aaeb 8 digits per 64-bit add)
+
+`common/src/detailed_fd.rs::process_range_detailed_fd`, same signature and output as
+`process_range_detailed`; bases 40, 42–45, 47–50, 52–55, 57–60, 62, 64 (others fall back).
+Not wired into the client. ivory, one thread pinned to core 3, the `b50_detailed_1t` window
+(base-range start, 1,000,000 numbers), two passes of 3 interleaved rounds, median ns/number:
+
+| base | old | scalar | × | 8 digits per add | × |
+|---|---|---|---|---|---|
+| 40 | 265 | 60 | 4.4 | 42 | 6.2–6.3 |
+| 50 | 416–418 | 73–74 | 5.6–5.7 | 48–49 | 8.5–8.6 |
+| 60 | 537–541 | 89 | 6.0–6.1 | 50–53 | 10.1–10.8 |
+
+Old within ±1 %, new within ±2–5 %. Cycles per number at b50: old 1,390, scalar 244, packed 163.
+Exactness: 11 tests, all pass for both variants: per-number equality with `get_num_unique_digits`
+on 20 seeded 10k windows plus both range ends at b40/50/60 and b42/47/53/59/64; 7 windows per
+base around every digit-gain point of n² and n³; b7 and b10 from n = 0; whole `FieldResults`
+identical on the b40_detailed and b50_detailed windows; 27 near-misses identical over bases
+10–24. Clippy clean, 179 lib tests pass.
+Lessons: LLVM first compiled the digit carry as a mispredicted branch (17.5 misses per number,
+only 1.6–2.2×); a branch-free select fixed it, and the GPU port must watch for the same. Packed
+version profile: adds + bookkeeping 57 %, mask build 30 %, popcount + histogram 13 %. Production
+builds target baseline x86-64, so `count_ones()` is a 17-instruction software popcount (both paths).
+Next: wire into `client/src/main.rs` (~line 845) and run the 5 % protocol on b40_detailed,
+b50_detailed, b50_detailed_1t (needs a box: ivory cannot build the client); then the GPU port
+(each thread walks a run of ≥100 consecutive numbers with ~24 u32 of digit arrays in registers).
+
 ## L1.3 Field-certificate bottom prune, GPU A/B (2026-10-28, agent; `L1/PRUNE.md`, `L1/prune-raw/`)
 
 Branches on the fork: `rp/field-cert-prune` (head 4670ffe; the prune is c1174c1, the rest

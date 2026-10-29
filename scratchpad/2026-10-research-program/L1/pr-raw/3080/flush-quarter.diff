@@ -1,0 +1,56 @@
+diff --git a/common/src/cubecl_join.rs b/common/src/cubecl_join.rs
+index 5ace307..442898a 100644
+--- a/common/src/cubecl_join.rs
++++ b/common/src/cubecl_join.rs
+@@ -67,8 +67,9 @@ pub const JOIN_WG: u32 = 256;
+ pub const TOP_CAP: u32 = 256;
+ /// Survivors staged in shared memory before a flush to the global list.
+ pub const SURV_SH_CAP: u32 = 1024;
+-/// Staged-survivor level that triggers a flush at the next barrier.
+-pub const SURV_FLUSH: u32 = 512;
++/// Staged-survivor level that triggers a flush at the next barrier: a
++/// quarter of the stage, so a chunk of 32 tops has at least 769 places.
++pub const SURV_FLUSH: u32 = 256;
+ /// Sentinel mask of an extended entry that failed its fixed positions.
+ pub const DEAD_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
+ /// Bottom entries each thread holds in registers in [`join_kernel`], per
+@@ -302,8 +303,8 @@ mod kernels {
+     /// Step 2 (v3): one cube per work item over the dense (slot, d, c) list
+     /// built by [`bucket_kernel`]; `ept` entries per thread per wave, every
+     /// thread runs every wave (uniform), survivors staged and flushed through
+-    /// the prefilter whenever the stage is half full, checked after every 32
+-    /// tops.
++    /// the prefilter whenever the stage is a quarter full, checked after
++    /// every 32 tops.
+     #[cube(launch_unchecked)]
+     pub fn join_kernel(
+         ext_m: &Array<u32>,
+@@ -485,18 +486,21 @@ mod kernels {
+                                 }
+                             }
+                         }
+-                        // Flush the stage once it is half full, after every
+-                        // chunk of 32 tops. Once a wave pairs its 1,024
++                        // Flush the stage once it is a quarter full, after
++                        // every chunk of 32 tops. Once a wave pairs its 1,024
+                         // entries with a full 256 tops (buckets that dense
+                         // come with fields of about 1e15 and up), checking
+                         // only at the wave's end let the stage overrun, and
+                         // its overflow went to the list unfiltered: 11x the
+                         // full checks on a base-58 field of 1e15, and lists
+-                        // that overflowed. A chunk can still overrun the
+-                        // half left (about 2e-5 of the survivors there, and
+-                        // no more on larger fields, since a chunk is the same
+-                        // size); that overflow takes the same unfiltered
+-                        // path, which costs only its full checks.
++                        // that overflowed. Flushing at half full still let a
++                        // chunk overrun the half left: a chunk of 32 tops
++                        // stages about 430-540 survivors on average at bases
++                        // 58-64 on fields of 1e16, and at base 60 0.4% of
++                        // the survivors (5% of the full checks) took that
++                        // unfiltered path. From a quarter, no chunk on those
++                        // fields overran; one that does takes the same path,
++                        // which costs only its full checks.
+                         sync_cube();
+                         let sc = s_cnt[0].load();
+                         if sc >= SURV_FLUSH {

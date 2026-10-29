@@ -1,0 +1,27 @@
+== 07:35:36 PR 941e39e test: harness knobs for the join A/B at bases 58-64
+== 07:35:36 CUDA join vs the CPU reference; dense b58 1e15 on 32 partitions
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 239 filtered out; finished in 63.22s
+  0 survivors overran the stage (0.0e0 of them)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 239 filtered out; finished in 22.20s
+== 07:37:01 dense-field test at b64 1e16 (the A/B field), 8 partitions
+  19069 survivors overran the stage (2.5e-5 of them)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 239 filtered out; finished in 50.32s
+== 07:37:52 CPU join vs reference on production fields (2 partitions each)
+b42 JoinParams { t: 6, k: 6, p: 2 }: 0.6s
+b50 JoinParams { t: 7, k: 6, p: 2 }: 9.6s
+b57 JoinParams { t: 9, k: 6, p: 2 }: 4.1s
+b60 JoinParams { t: 9, k: 6, p: 2 }: 1.5s
+b62 JoinParams { t: 10, k: 6, p: 2 }: 2.1s
+b64 JoinParams { t: 10, k: 6, p: 2 }: 4.1s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 239 filtered out; finished in 21.97s
+== 07:38:14 throughput harness with NICE_TEST_JOIN_COMPARE=1 (2 fields of 1e14 per base, A/B starts)
+test cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields ... JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=58 fields=2 in_flight=2 secs=2.20 per_field=1.101 rate=9.085e13 n/s | setup=0.067s device=1.066s wall=1.565s batches=211 slots=16 plan_mib=1211 | empty_top=0 retried=0 splits=0 survivors=7621203662 checked=429530619 found=0 | peak_in_use_mib=0 peak_reserved_mib=9
+STRIDE base=58 fields=2 secs=65.36 per_field=32.679 (one at a time) found=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=60 fields=2 in_flight=2 secs=1.86 per_field=0.931 rate=1.074e14 n/s | setup=0.078s device=0.890s wall=1.271s batches=225 slots=16 plan_mib=1196 | empty_top=0 retried=0 splits=0 survivors=5634417625 checked=377421465 found=0 | peak_in_use_mib=0 peak_reserved_mib=9
+STRIDE base=60 fields=2 secs=34.47 per_field=17.235 (one at a time) found=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=62 fields=2 in_flight=2 secs=1.73 per_field=0.865 rate=1.156e14 n/s | setup=0.063s device=0.831s wall=1.232s batches=241 slots=16 plan_mib=1358 | empty_top=0 retried=0 splits=0 survivors=2723010177 checked=166801084 found=0 | peak_in_use_mib=0 peak_reserved_mib=9
+STRIDE base=62 fields=2 secs=33.73 per_field=16.866 (one at a time) found=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=64 fields=2 in_flight=2 secs=2.77 per_field=1.387 rate=7.212e13 n/s | setup=0.062s device=1.354s wall=1.997s batches=256 slots=16 plan_mib=1402 | empty_top=0 retried=0 splits=0 survivors=11007394280 checked=669464864 found=0 | peak_in_use_mib=0 peak_reserved_mib=9
+STRIDE base=64 fields=2 secs=98.66 per_field=49.328 (one at a time) found=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 239 filtered out; finished in 256.49s
+TESTS2_DONE 07:42:31

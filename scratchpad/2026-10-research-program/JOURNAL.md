@@ -4,6 +4,35 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-10-29 (day 2; routine fired 04:41 UTC)
+
+- **Reconcile:** no research instances; October research invoiced $0.44; fleet $62.83;
+  credit $20.61 (fleet burns ~$2/day); ivory disk 96 % (3.6 GB free; the day-1 build
+  caches); no user replies since the day-1 report.
+- **The user merged the queue on 10-28 evening:** #188–#193, #195–#197, #200–#209,
+  #211–#214, including #203 (closure), #205 (EPT 6 from b62), #206 (memory budget),
+  #204, #207. Open upstream: #194 (fleet host CPU) and #160 (Lean). main = 2709d3f.
+  So the prune PR rebases onto a main that already has EPT 6 at b62/b64; the prune's
+  gain there must be re-measured against it, and the wave size may need to move with it.
+- **L2 prototype (finite differences for detailed mode): 5.6× scalar, 8.5× packed on
+  b50_detailed_1t, exact on 11 tests** (`rp/l2-finite-diff`, EXPERIMENTS L2.1). Not wired
+  into the client yet; ivory cannot build the client (disk 1.6 GB free after the build).
+- **L7 sweep 1:** no new papers; two counting ideas (L18 bit-sliced bucket scan, L19).
+- **Prune vs new main, two cards (L1.4, PR-RESULTS-3080.md):** 1e16 ×1.10–1.25, 1e14
+  ×1.4–2.3; NiceMark ×1.17–1.22; exact (counts identical to the last digit at 1e14). The
+  day-1 stage-overrun ripple does not exist on new main (#205's wave already holds a
+  bucket); main itself overruns 0.4 % at b60 (+5 % full checks), a follow-up.
+- **PR #215 opened** ("Overlap join: prune the bottom list by the field certificate",
+  head 941e39e). `pr/join-ept-2` (cb38b91, EPT 2 everywhere, replaces #205's rule) is
+  stacked and measured; PR named for tomorrow.
+- **Boxes:** 3080 KR 3.1 h ($0.38), 4090 PL 2.2 h ($0.81; 330 W-limited). The 3080 was
+  host-capped at 150 W. Both destroyed. Month-to-date $1.66.
+- **ivory disk 97 %:** cleaned my rp-l1 build cache (641 MB); the rest is the user's
+  (old worktrees 8 GB, yarn/uv caches 8 GB, docker images 6 GB, toolchain 1.99.0).
+  No more builds on ivory until there is room; client builds go to boxes anyway.
+- **Tomorrow:** open the EPT PR; L2 client wiring + 5 % protocol on a box; GPU port
+  scoping; L18 counting experiment if time allows.
+
 ## 2026-10-28 (day 1; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; research invoiced $0.00 for October; fleet $61.33;
