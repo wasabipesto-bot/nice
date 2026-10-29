@@ -69,6 +69,21 @@ pub const TOP_CAP: u32 = 256;
 pub const SURV_SH_CAP: u32 = 1024;
 /// Staged-survivor level that triggers a flush at the next barrier.
 pub const SURV_FLUSH: u32 = 512;
+/// Experimental: `NICE_EXP_SURV_FLUSH=n` sets the stage level that
+/// triggers a flush (default [`SURV_FLUSH`]).
+fn exp_flush_at() -> u32 {
+    static F: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *F.get_or_init(|| {
+        std::env::var("NICE_EXP_SURV_FLUSH")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .filter(|n| (1..=SURV_SH_CAP).contains(n))
+            .unwrap_or(SURV_FLUSH)
+    })
+}
+/// Experimental: survivors that overran the join kernel's stage (went to
+/// the list unprefiltered and uncounted), over every counted batch.
+pub(crate) static EXP_OVERRAN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 /// Sentinel mask of an extended entry that failed its fixed positions.
 pub const DEAD_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 /// Bottom entries each thread holds in registers in [`join_kernel`]: a wave
@@ -121,7 +136,7 @@ pub use kernels::{
     clippy::manual_is_power_of_two
 )]
 mod kernels {
-    use super::{DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP};
+    use super::{DEAD_MASK, JOIN_WG, SURV_SH_CAP, TOP_CAP};
     use crate::cubecl_backend::candidate_check;
     use cubecl::prelude::*;
 
@@ -324,6 +339,7 @@ mod kernels {
         nwork: u32,
         nbp: u32,
         surv_cap: u32,
+        flush_at: u32,
         #[comptime] base: u32,
         #[comptime] key_level: bool,
         #[comptime] key_at_zero: bool,
@@ -499,7 +515,7 @@ mod kernels {
                         // path, which costs only its full checks.
                         sync_cube();
                         let sc = s_cnt[0].load();
-                        if sc >= SURV_FLUSH {
+                        if sc >= flush_at {
                             flush_survivors(
                                 &s_t,
                                 &s_r,
@@ -1180,6 +1196,9 @@ mod kernels {
         }
         if UNIT_POS_X == 0u32 {
             staged[0].fetch_add(n);
+            if sc > SURV_SH_CAP {
+                staged[1].fetch_add(sc - SURV_SH_CAP);
+            }
         }
         let my_plane = UNIT_POS_X / PLANE_DIM;
         let num_planes = CUBE_DIM_X / PLANE_DIM;
@@ -1592,7 +1611,7 @@ impl<R: Runtime> JoinDevice<R> {
         let bucket_cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots * nb]));
         // The join kernel counts its survivors and writes only those that
         // pass the prefilter to the list, which it counts too.
-        let survivors = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
+        let survivors = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 2]));
         let checked = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
         // Every kernel counts its cubes as they finish, against the cubes
         // it was launched with. A device that drops a dispatch without an
@@ -1729,11 +1748,12 @@ impl<R: Runtime> JoinDevice<R> {
                 ArrayArg::from_raw_parts(self.list.clone(), 2 * self.list_cap as usize),
                 ArrayArg::from_raw_parts(checked.clone(), 1),
                 ArrayArg::from_raw_parts(self.top_x.clone(), 2 * max_slots * ntl),
-                ArrayArg::from_raw_parts(survivors.clone(), 1),
+                ArrayArg::from_raw_parts(survivors.clone(), 2),
                 ArrayArg::from_raw_parts(ran.clone(), nran),
                 nwork_u32,
                 self.nbp,
                 self.list_cap,
+                exp_flush_at(),
                 self.b,
                 self.key_level,
                 self.key_level && self.k == 1,
@@ -2260,11 +2280,13 @@ fn run_pass<R: Runtime>(
             left.refused.get_or_insert(why);
             continue;
         }
-        let surv = u32::from_bytes(&counts[3 * i])[0];
+        let survs = u32::from_bytes(&counts[3 * i]);
+        let surv = survs[0];
         let checked = u32::from_bytes(&counts[3 * i + 1])[0];
         if dev.overflowed(checked) {
             left.overflowed.extend_from_slice(batch);
         } else {
+            EXP_OVERRAN.fetch_add(u64::from(survs[1]), std::sync::atomic::Ordering::Relaxed);
             st.survivors += u64::from(surv);
             st.checked += u64::from(checked);
         }
@@ -2318,9 +2340,11 @@ fn run_partition<R: Runtime>(
     let rec = dev.launch_batch(&[v], false)?;
     st.batches += 1;
     dev.ensure_ran(&dev.read_u32(&rec.ran)?, &rec.expect)?;
-    let surv = dev.read_u32(&rec.survivors)?[0];
+    let survs = dev.read_u32(&rec.survivors)?;
+    let surv = survs[0];
     let checked = dev.read_u32(&rec.checked)?[0];
     if !dev.overflowed(checked) {
+        EXP_OVERRAN.fetch_add(u64::from(survs[1]), std::sync::atomic::Ordering::Relaxed);
         st.survivors += u64::from(surv);
         st.checked += u64::from(checked);
         hits.extend(dev.read_hits()?);
@@ -2981,9 +3005,15 @@ mod tests {
         let total = u32::try_from(field.fs.nparts).unwrap();
         let parts: Vec<u32> = (0..n).map(|i| i * total / n.max(1)).collect();
         let t0 = Instant::now();
+        EXP_OVERRAN.store(0, std::sync::atomic::Ordering::Relaxed);
         let (hits, st) =
             run_slices(&client, &field, 1, &parts, &JoinCeiling::default()).expect("device run");
         let gpu_secs = t0.elapsed().as_secs_f64();
+        println!(
+            "  EXP_OVERRAN flush_at={} counted {}",
+            exp_flush_at(),
+            EXP_OVERRAN.load(std::sync::atomic::Ordering::Relaxed)
+        );
         let cpu =
             crate::cpu_join::CpuJoin::new(b, &field.slices[0], field.fs.jp).expect("cpu setup");
         let mut sc = crate::cpu_join::Scratch::default();
@@ -3247,6 +3277,7 @@ mod tests {
                 .expect("a base with throughput fields (57, 58, 60, 62, 64)");
             let warm = FieldSize::new(start - warm_size, start);
             run_routed(ctx, base, &warm);
+            EXP_OVERRAN.store(0, std::sync::atomic::Ordering::Relaxed);
             let fields: Vec<FieldSize> = (0..n)
                 .map(|i| FieldSize::new(start + i * size, start + (i + 1) * size))
                 .collect();
@@ -3286,6 +3317,13 @@ mod tests {
             let sum =
                 |f: &dyn Fn(&JoinFieldStats) -> u64| per_field.iter().map(|x| f(&x.1)).sum::<u64>();
             let (in_use, reserved) = peak;
+            let overran = EXP_OVERRAN.load(std::sync::atomic::Ordering::Relaxed);
+            eprintln!(
+                "EXP_OVERRAN base={base} flush_at={} overran={overran} survivors={} share={:.3e}",
+                exp_flush_at(),
+                sum(&|x| x.survivors),
+                overran as f64 / (sum(&|x| x.survivors) + overran).max(1) as f64
+            );
             eprintln!(
                 "JOIN THROUGHPUT device={} base={base} fields={n} in_flight={} secs={secs:.2} \
                  per_field={:.3} rate={:.3e} n/s | setup={:.3}s device={:.3}s wall={:.3}s \
