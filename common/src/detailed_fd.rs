@@ -29,10 +29,35 @@ use crate::client_process::process_range_detailed;
 use crate::fixed_width::U256;
 use crate::{FieldResults, FieldSize, NiceNumberSimple, UniquesDistributionSimple, number_stats};
 
-/// Digit capacity of every array. The largest value carried is n³: 38 digits
-/// at base 64 over its legal range. The slack covers the out-of-range test
-/// windows; an overflow would panic on the bounds check, never wrap.
-const CAP: usize = 64;
+/// Digit capacity of every array, a whole number of 64-bit words. The largest
+/// value carried is n³: 38 digits at base 64 over its legal range. The slack
+/// covers the out-of-range test windows and the word past the top that the
+/// word-parallel add always touches; an overflow would panic on the bounds
+/// check, never wrap.
+const CAP: usize = 72;
+
+/// One in every byte of a word.
+const LO: u64 = 0x0101_0101_0101_0101;
+
+/// One word (8 digits, one per byte) of base-`BASE` addition: `a + r + cin`.
+///
+/// Classic biased addition, as in BCD: add `256 - BASE` to every byte of the
+/// addend, so a byte overflows into the next exactly when its digit sum
+/// reaches `BASE`, and the native 64-bit add propagates all eight carries.
+/// Bytes that did not carry out then take the bias back off. Needs every byte
+/// of `a` and `r` below `BASE`.
+#[inline(always)]
+fn add_word<const BASE: u32>(a: u64, r: u64, cin: bool) -> (u64, bool) {
+    let bias = 256 - u64::from(BASE);
+    let rb = r + bias * LO; // per byte r + bias ≤ 255: no cross-byte carry
+    let (t, c1) = a.overflowing_add(rb);
+    let (t, c2) = t.overflowing_add(u64::from(cin));
+    let cout = c1 | c2;
+    // Bit 8j of t ^ a ^ rb is the carry into byte j; the carry out of byte j
+    // is the carry into byte j + 1, and `cout` for the top byte.
+    let carried = (((t ^ a ^ rb) >> 8) & LO) | (u64::from(cout) << 56);
+    (t - (carried ^ LO) * bias, cout)
+}
 
 /// A non-negative integer as base-`BASE` digits, least significant first.
 #[derive(Clone, Copy)]
@@ -130,6 +155,68 @@ impl Digits {
         self.add_digits::<BASE>(&[k]);
     }
 
+    #[inline(always)]
+    fn word(&self, i: usize) -> u64 {
+        u64::from_le_bytes(self.d[8 * i..8 * i + 8].try_into().unwrap())
+    }
+
+    #[inline(always)]
+    fn set_word(&mut self, i: usize, w: u64) {
+        self.d[8 * i..8 * i + 8].copy_from_slice(&w.to_le_bytes());
+    }
+
+    /// Carry one into word `i` and up (rare: needs eight digits of b - 1).
+    #[inline(never)]
+    fn ripple_words<const BASE: u32>(&mut self, mut i: usize) {
+        loop {
+            let (t, c) = add_word::<BASE>(self.word(i), 0, true);
+            self.set_word(i, t);
+            if !c {
+                return;
+            }
+            i += 1;
+        }
+    }
+
+    /// The sum has at most one digit more than the longer operand.
+    #[inline(always)]
+    fn fix_len(&mut self, operand_len: usize) {
+        let len = self.len.max(operand_len);
+        self.len = len + usize::from(self.d[len] != 0);
+    }
+
+    /// `self += rhs`, eight digits per 64-bit add.
+    ///
+    /// The word above the addend's top word always takes the carry (it is
+    /// often set); only a carry out of that one branches.
+    #[inline(always)]
+    fn add_assign_swar<const BASE: u32>(&mut self, rhs: &Self) {
+        let nw = rhs.len.div_ceil(8);
+        let mut c = false;
+        for i in 0..nw {
+            let (t, co) = add_word::<BASE>(self.word(i), rhs.word(i), c);
+            self.set_word(i, t);
+            c = co;
+        }
+        let (t, co) = add_word::<BASE>(self.word(nw), 0, c);
+        self.set_word(nw, t);
+        if co {
+            self.ripple_words::<BASE>(nw + 1);
+        }
+        self.fix_len(rhs.len);
+    }
+
+    /// `self += k` for a single digit `0 < k < BASE`, eight digits per add.
+    #[inline(always)]
+    fn add_small_swar<const BASE: u32>(&mut self, k: u8) {
+        let (t, co) = add_word::<BASE>(self.word(0), u64::from(k), false);
+        self.set_word(0, t);
+        if co {
+            self.ripple_words::<BASE>(1);
+        }
+        self.fix_len(1);
+    }
+
     /// Bit `d` set for every significant digit `d`.
     #[inline(always)]
     fn mask(&self) -> u64 {
@@ -180,21 +267,34 @@ impl State {
         (self.s.mask() | self.c.mask()).count_ones()
     }
 
-    /// Advance from n to n + 1.
+    /// Advance from n to n + 1, by digit-serial adds or (`SWAR`) eight
+    /// digits per 64-bit add.
     #[inline(always)]
-    fn step<const BASE: u32>(&mut self) {
-        self.s.add_assign::<BASE>(&self.ds);
-        self.ds.add_small::<BASE>(2);
-        self.c.add_assign::<BASE>(&self.dc);
-        self.dc.add_assign::<BASE>(&self.ddc);
-        self.ddc.add_small::<BASE>(6);
+    fn step<const BASE: u32, const SWAR: bool>(&mut self) {
+        if SWAR {
+            self.s.add_assign_swar::<BASE>(&self.ds);
+            self.ds.add_small_swar::<BASE>(2);
+            self.c.add_assign_swar::<BASE>(&self.dc);
+            self.dc.add_assign_swar::<BASE>(&self.ddc);
+            self.ddc.add_small_swar::<BASE>(6);
+        } else {
+            self.s.add_assign::<BASE>(&self.ds);
+            self.ds.add_small::<BASE>(2);
+            self.c.add_assign::<BASE>(&self.dc);
+            self.dc.add_assign::<BASE>(&self.ddc);
+            self.ddc.add_small::<BASE>(6);
+        }
     }
 }
 
 /// Per-number `num_uniques` over `[start, end)` by finite differences,
 /// passed to `f` in order. Exposed for the exactness tests.
 #[inline(always)]
-fn for_each_uniques<const BASE: u32>(start: u128, end: u128, mut f: impl FnMut(u128, u32)) {
+fn for_each_uniques<const BASE: u32, const SWAR: bool>(
+    start: u128,
+    end: u128,
+    mut f: impl FnMut(u128, u32),
+) {
     const { assert!(BASE >= 7 && BASE <= 64, "u64 mask, and 6 must be one digit") };
     if start >= end {
         return;
@@ -202,16 +302,16 @@ fn for_each_uniques<const BASE: u32>(start: u128, end: u128, mut f: impl FnMut(u
     let mut st = State::new::<BASE>(start);
     for num in start..end {
         f(num, st.num_uniques());
-        st.step::<BASE>();
+        st.step::<BASE, SWAR>();
     }
 }
 
 #[allow(clippy::cast_possible_truncation)]
-fn run<const BASE: u32>(range: &FieldSize) -> FieldResults {
+fn run<const BASE: u32, const SWAR: bool>(range: &FieldSize) -> FieldResults {
     let cutoff = number_stats::get_near_miss_cutoff(BASE);
     let mut nice_numbers: Vec<NiceNumberSimple> = Vec::new();
     let mut histogram = [0u128; 65];
-    for_each_uniques::<BASE>(range.start(), range.end(), |number, num_uniques| {
+    for_each_uniques::<BASE, SWAR>(range.start(), range.end(), |number, num_uniques| {
         histogram[num_uniques as usize] += 1;
         if num_uniques > cutoff {
             nice_numbers.push(NiceNumberSimple {
@@ -237,26 +337,30 @@ fn run<const BASE: u32>(range: &FieldSize) -> FieldResults {
 /// path covers; every other base falls through to `process_range_detailed`.
 #[must_use]
 pub fn process_range_detailed_fd(range: &FieldSize, base: u32) -> FieldResults {
+    dispatch::<true>(range, base)
+}
+
+fn dispatch<const SWAR: bool>(range: &FieldSize, base: u32) -> FieldResults {
     match base {
-        40 => run::<40>(range),
-        42 => run::<42>(range),
-        43 => run::<43>(range),
-        44 => run::<44>(range),
-        45 => run::<45>(range),
-        47 => run::<47>(range),
-        48 => run::<48>(range),
-        49 => run::<49>(range),
-        50 => run::<50>(range),
-        52 => run::<52>(range),
-        53 => run::<53>(range),
-        54 => run::<54>(range),
-        55 => run::<55>(range),
-        57 => run::<57>(range),
-        58 => run::<58>(range),
-        59 => run::<59>(range),
-        60 => run::<60>(range),
-        62 => run::<62>(range),
-        64 => run::<64>(range),
+        40 => run::<40, SWAR>(range),
+        42 => run::<42, SWAR>(range),
+        43 => run::<43, SWAR>(range),
+        44 => run::<44, SWAR>(range),
+        45 => run::<45, SWAR>(range),
+        47 => run::<47, SWAR>(range),
+        48 => run::<48, SWAR>(range),
+        49 => run::<49, SWAR>(range),
+        50 => run::<50, SWAR>(range),
+        52 => run::<52, SWAR>(range),
+        53 => run::<53, SWAR>(range),
+        54 => run::<54, SWAR>(range),
+        55 => run::<55, SWAR>(range),
+        57 => run::<57, SWAR>(range),
+        58 => run::<58, SWAR>(range),
+        59 => run::<59, SWAR>(range),
+        60 => run::<60, SWAR>(range),
+        62 => run::<62, SWAR>(range),
+        64 => run::<64, SWAR>(range),
         _ => process_range_detailed(range, base),
     }
 }
@@ -288,13 +392,18 @@ mod tests {
     /// Compare finite differences with `get_num_unique_digits` number by
     /// number over `[start, start + len)`.
     fn check_window<const BASE: u32>(start: u128, len: u128) {
+        check_window_variant::<BASE, false>(start, len);
+        check_window_variant::<BASE, true>(start, len);
+    }
+
+    fn check_window_variant<const BASE: u32, const SWAR: bool>(start: u128, len: u128) {
         let mut expect = start;
-        for_each_uniques::<BASE>(start, start + len, |n, u| {
+        for_each_uniques::<BASE, SWAR>(start, start + len, |n, u| {
             assert_eq!(n, expect);
             assert_eq!(
                 u,
                 get_num_unique_digits(n, BASE),
-                "base {BASE}, n = {n} (window start {start})"
+                "base {BASE}, swar {SWAR}, n = {n} (window start {start})"
             );
             expect += 1;
         });
@@ -396,6 +505,7 @@ mod tests {
             let old = process_range_detailed(&range, def.base);
             let new = process_range_detailed_fd(&range, def.base);
             assert_eq!(old, new, "{}", def.key);
+            assert_eq!(old, dispatch::<false>(&range, def.base), "{}", def.key);
             let total: u128 = new.distribution.iter().map(|d| d.count).sum();
             assert_eq!(total, def.window_cpu, "{}", def.key);
             eprintln!(
@@ -417,8 +527,9 @@ mod tests {
             if range.size() > 5_000_000 {
                 return 0;
             }
-            let new = run::<B>(&range);
+            let new = run::<B, true>(&range);
             assert_eq!(new, process_range_detailed(&range, B), "base {B}");
+            assert_eq!(new, run::<B, false>(&range), "base {B}");
             new.nice_numbers.len()
         }
         let near_misses = check::<10>()
@@ -450,11 +561,15 @@ mod tests {
         );
     }
 
-    /// Single-thread timing of the division loop against the finite-difference
-    /// loop on the same 1,000,000-number window at the start of each base's
-    /// range, interleaved old/new over three rounds.
+    /// Single-thread timing of the division loop against the two
+    /// finite-difference loops (digit-serial adds, then word-parallel adds) on
+    /// the same 1,000,000-number window at the start of each base's range,
+    /// interleaved old / bytes / words over three rounds.
     ///
-    /// `taskset -c 3 cargo test --release -p nice_common fd_timing -- --ignored --nocapture --test-threads 1`
+    /// `taskset -c 3 cargo test --release -p nice_common --lib fd_timing -- --ignored --nocapture --test-threads 1`
+    ///
+    /// For per-variant hardware counters, `FD_TIMING_BASE=50` and
+    /// `FD_TIMING_ONLY=old|bytes|words` restrict the run (under `perf stat`).
     #[test]
     #[ignore = "timing, run by hand"]
     #[allow(clippy::cast_precision_loss)]
@@ -463,38 +578,60 @@ mod tests {
         use std::time::Instant;
         let window: u128 = 1_000_000;
         let rounds = 3;
+        let fmt = |v: &[f64]| {
+            v.iter()
+                .map(|x| format!("{x:.2}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let med = |v: &[f64]| {
+            let mut s = v.to_vec();
+            s.sort_by(f64::total_cmp);
+            s[s.len() / 2]
+        };
+        let only_base: Option<u32> = std::env::var("FD_TIMING_BASE")
+            .ok()
+            .map(|b| b.parse().unwrap());
+        let only = std::env::var("FD_TIMING_ONLY").ok();
+        let names = ["old", "bytes", "words"];
         for base in [40u32, 50, 60] {
+            if only_base.is_some_and(|b| b != base) {
+                continue;
+            }
             let start = get_base_range_u128(base).unwrap().unwrap().start();
             let range = FieldSize::new(start, start + window);
-            let mut old_ns = Vec::new();
-            let mut new_ns = Vec::new();
+            let mut ns = [Vec::new(), Vec::new(), Vec::new()];
             for _ in 0..rounds {
-                let t = Instant::now();
-                let a = black_box(process_range_detailed(black_box(&range), base));
-                old_ns.push(t.elapsed().as_nanos() as f64 / window as f64);
-                let t = Instant::now();
-                let b = black_box(process_range_detailed_fd(black_box(&range), base));
-                new_ns.push(t.elapsed().as_nanos() as f64 / window as f64);
-                assert_eq!(a, b);
+                let mut results = Vec::new();
+                for (k, f) in [
+                    process_range_detailed as fn(&FieldSize, u32) -> FieldResults,
+                    dispatch::<false>,
+                    dispatch::<true>,
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    if only.as_ref().is_some_and(|o| o != names[k]) {
+                        ns[k].push(f64::NAN);
+                        continue;
+                    }
+                    let t = Instant::now();
+                    results.push(black_box(f(black_box(&range), base)));
+                    ns[k].push(t.elapsed().as_nanos() as f64 / window as f64);
+                }
+                assert!(results.iter().all(|r| *r == results[0]));
             }
-            let fmt = |v: &[f64]| {
-                v.iter()
-                    .map(|x| format!("{x:.2}"))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            };
-            let med = |v: &[f64]| {
-                let mut s = v.to_vec();
-                s.sort_by(f64::total_cmp);
-                s[s.len() / 2]
-            };
+            let [old, bytes, words] = &ns;
             eprintln!(
-                "TIMING b{base}: old ns/num [{}] median {:.2}; fd ns/num [{}] median {:.2}; ratio {:.2}x",
-                fmt(&old_ns),
-                med(&old_ns),
-                fmt(&new_ns),
-                med(&new_ns),
-                med(&old_ns) / med(&new_ns)
+                "TIMING b{base}: old [{}] med {:.2} | fd-bytes [{}] med {:.2} ({:.2}x) | fd-words [{}] med {:.2} ({:.2}x)",
+                fmt(old),
+                med(old),
+                fmt(bytes),
+                med(bytes),
+                med(old) / med(bytes),
+                fmt(words),
+                med(words),
+                med(old) / med(words),
             );
         }
     }
