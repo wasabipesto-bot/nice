@@ -117,8 +117,10 @@ same for every claim:
 - Where it matters, a production cross-check against `/submissions` telemetry after
   release, as done for the join.
 
-PR hygiene: numbers in the PR body, CHANGELOG one to three sentences, every PR named
-in the daily report before it is opened. **Cap: 3 program PRs open at a time.** You
+PR hygiene: numbers in the PR body, CHANGELOG one to three sentences; a PR is opened as
+soon as it is measured and endorsed, and the daily report lists it (user, 2026-10-29).
+Bodies never mention the program or its files; follow-ups are a short, explicit "Not in
+this PR" list; benchmark references are re-pinned by ops before a release, not here. **Cap: 3 program PRs open at a time.** You
 already have 19 open PRs (8 from 10-15, 7 from 10-10, Lean, dependabot); I will not add
 to that queue faster than you clear it. I can keep those rebased and green and tell
 you which are ready, if you want that.

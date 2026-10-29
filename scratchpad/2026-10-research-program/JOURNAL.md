@@ -30,8 +30,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **ivory disk 97 %:** cleaned my rp-l1 build cache (641 MB); the rest is the user's
   (old worktrees 8 GB, yarn/uv caches 8 GB, docker images 6 GB, toolchain 1.99.0).
   No more builds on ivory until there is room; client builds go to boxes anyway.
-- **Tomorrow:** open the EPT PR; L2 client wiring + 5 % protocol on a box; GPU port
-  scoping; L18 counting experiment if time allows.
+- **User feedback after the report (saved to memory):** PR bodies must not reference the
+  program or scratchpad; follow-ups brief and explicitly excluded; open PRs immediately when
+  measured; re-pinning is ops. #215's body trimmed; **PR #216 (EPT 2) opened**. Cleanup on
+  the user's instruction: yarn cache 4.5 GB, toolchain 1.99.0, 19 worktrees older than 7 days.
+- **Tomorrow:** L2 client wiring + 5 % protocol on a box, then its PR; GPU port scoping;
+  L18 counting experiment if time allows.
 
 ## 2026-10-28 (day 1; routine fired 04:41 UTC)
 

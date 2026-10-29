@@ -27,6 +27,12 @@ director session can be replaced from it at any time.
 4. Record: journal, ledger, experiments; `./sync.sh "<summary>"`.
 5. Report, then end the turn. Long waits: a one-shot reminder into this session.
 
+## PRs
+
+Open immediately once the 5 % protocol and exactness pass; the report lists them. Bodies:
+what, why, soundness, measurements, exactness, short "Not in this PR"; no mention of the
+program, the scratchpad or fork-only write-ups; no reference re-pinning (ops does it).
+
 ## Rails (PROPOSAL §6)
 
 Never without asking: live fleet (config, crontab, `~/fleet-run`), server, schema,
