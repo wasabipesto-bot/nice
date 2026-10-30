@@ -1320,9 +1320,16 @@ fn u32_words(x: u128) -> [u32; 4] {
 }
 
 /// What `client`'s device allows the join: `CubeCL` reports its largest
-/// buffer as `max_page_size`.
+/// buffer as `max_page_size`. In tests, `NICE_TEST_JOIN_MAX_BUFFER` (bytes)
+/// stands in for it, to plan as for another card: 2684354560 is a 10 GB
+/// card on CUDA, which reports a quarter of the device.
 pub(crate) fn limits_of<R: Runtime>(client: &ComputeClient<R>) -> JoinLimits {
-    JoinLimits::for_buffer(client.properties().memory.max_page_size)
+    let max_buffer = client.properties().memory.max_page_size;
+    #[cfg(test)]
+    let max_buffer = std::env::var("NICE_TEST_JOIN_MAX_BUFFER").map_or(max_buffer, |v| {
+        v.parse().expect("NICE_TEST_JOIN_MAX_BUFFER: a size in bytes")
+    });
+    JoinLimits::for_buffer(max_buffer)
 }
 
 /// Device buffers for one field: the field's tables, the per-slot scratch
