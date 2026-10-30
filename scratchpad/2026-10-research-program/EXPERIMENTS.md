@@ -29,6 +29,24 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L3.3 Second card for #224/#225: RTX 4090 (2026-10-30, agent; `L3/AB-4090.md`, `L3/pr-raw/4090/`)
+
+Vast RTX 4090 (58401579, CA, $0.374/h), not power-limited (480 W limit never reached) but
+thermally limited (85–90 °C vs 83 °C target, fan 100 %, slowdown active in every snapshot);
+clocks ~2.5–2.6 GHz main/rb, ~2.63 GHz FD. Trees main 46e4dc4 / rb 6a1e396 / fd f3a33cf.
+
+| measurement | rb vs main (b40 / b50) | FD vs main |
+|---|---|---|
+| NiceMark detailed GPU, 6 interleaved rounds | 1.137 / 1.093 | 3.459 / 3.922 |
+| NiceMark score (main 11,493) | 12,800 (×1.114) | 42,296 (×3.680) |
+| 2e9 windows, 3 rounds | 1.023 / 1.007 | 3.022 / 3.634 |
+| 1e10 fields, production path (`--repeat`, mock API, 3×8) | 0.997 / 0.995 | 3.061 / 3.767 |
+
+FD vs rb per clock 2.87× / 3.31× (3080: 2.78× / 3.42×). An FD 1e10 field is ~0.11–0.12 s, so a
+4090 needs ~9 claims/s. Exactness: all FD tests under CUDA; results identical across the three
+trees on every window and on all 147 production submissions. wgpu FD test ran on llvmpipe only
+(the NVIDIA Vulkan driver did not load in the container). Both PR bodies updated with these.
+
 ## L1.6 Partitions per launch + pruned buffer sizing, and the flush race (2026-10-30, agent; `L1/LAUNCH-RESULTS.md`, `L1/launch-raw/`; branches `pr/join-partitions-per-launch` c4ac700, `rp/join-flush-barrier` 61e6ba9 → PR #222, `rp/launch-with-barrier`)
 
 RTX 3080 20 GB (58361499, 320 W = default), 10 GB layouts via test-only `NICE_TEST_JOIN_MAX_BUFFER`.

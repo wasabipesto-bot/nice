@@ -23,7 +23,7 @@ Per window that is 19.6 → 18.0 ms at base 40 and 26.6 → 24.8 ms at base 50: 
 | b50, one 1e10-number field (the server's cap), median of 6 | 1.218 s | 1.214 s | 1.003× |
 | b52, one 1e10-number field, median of 6 | 1.288 s | 1.287 s | 1.001× |
 
-So a production field gains nothing measurable today; the benchmark windows gain most, and so does any faster kernel, since the copy does not shrink with it (the finite-difference kernel proposed on top of this branch runs a 1e10 field in 0.32 s). Results were identical on every window (the same hash of distribution and near-miss list across both trees). No scenario regresses.
+So a production field gains nothing measurable today; the benchmark windows gain most, and so does any faster kernel, since the copy does not shrink with it (the finite-difference kernel proposed on top of this branch runs a 1e10 field in 0.32 s). Results were identical on every window (the same hash of distribution and near-miss list across both trees). No scenario regresses. On an RTX 4090 (24 GB, thermally limited at its 83 °C target, not power-limited; same protocol over six interleaved rounds): b40_detailed 1.137×, b50_detailed 1.093×, detailed GPU score 11,493 → 12,800 (1.114×); 2e9-number windows 1.023× and 1.007×; 1e10-number fields 0.997× and 0.995× (within noise). Results identical on every window and on 147 production-size fields.
 
 ## Exactness
 
