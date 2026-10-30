@@ -14,6 +14,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   11,493 → 42,296; 1e10 fields ×3.06/3.77; identical results on 147 production fields (L3.3).
   Both PR bodies updated. Boxes destroyed (3080 2.1 h, 4090 2.3 h); today's Vast $2.33, month $4.00.
 
+- **Evening, user's notes:** #224 merged; #225 CI red (`variant Division is never constructed`
+  in the lib-test build: the agent's `cfg_attr(not(test), allow(dead_code))` does not cover
+  `--all-targets`). Fixed properly: `DetailedKernel::for_base(base)` picks FD where `fd_plan`
+  has a plan and `Division` elsewhere, so both variants are production code; rebased onto
+  946ec15 (#224 in main), squashed, force-pushed as 18cba8b; local clippy (default, all
+  targets) and fmt clean; CI running. Clippy build took ~7 GB on ivory; target removed after.
+- **mayalaran (M4) authorised for 1 h** → agent testing #225's Metal path (tests + A/B).
+- **User questions:** detailed auto order (answer: no change; CubeCL CUDA already leads and
+  wgpu serves AMD/Apple; hand-CUDA detailed is a third-stop fallback now ~3.5× slower) and the
+  web runner port (L23 CPU ~half a day, L24 GPU 1–2 days; both queued as requested).
+
 ## 2026-10-30 (day 3; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; October research invoiced $1.66; fleet $65.02;
