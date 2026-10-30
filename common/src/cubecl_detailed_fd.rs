@@ -33,17 +33,10 @@
 //!
 //! Portability: the kernel needs what the per-number kernel needs (u64 add,
 //! multiply and shift; a u64 division only in the CUDA and HIP seed, the
-//! split16 division on wgpu). It is exact on CUDA and on Vulkan (lavapipe,
-//! through naga's WGSL and through `CubeCL`'s SPIR-V compiler). On an Apple
-//! M4 (macOS 26.3) its first seed was wrong at bases 23, 25, 27-30, 49, 50
-//! and 52-55: Apple's GPU compiler miscompiles a constant division of a
-//! half-width right shift, which the split16 long division's first step was
-//! (see [`fd_to_digits`]). The seed no longer divides one and the kernel is
-//! exact on that M4, but production still keeps the per-number kernel on
-//! Metal adapters (`DetailedKernel::for_device` in
-//! [`crate::cubecl_backend`]), since no other Apple GPU or macOS version has
-//! been checked. `cubecl_fd_seed_matches_cpu` and
-//! `cubecl_fd_matches_cpu_detailed` below run this kernel on any wgpu device.
+//! split16 division on wgpu). It is exact on CUDA, on Vulkan (lavapipe,
+//! through naga's WGSL and through `CubeCL`'s SPIR-V compiler) and on an
+//! Apple M4 (macOS 26.3) through Metal, whose compiler miscompiled the
+//! seed's first form (see [`fd_to_digits`]).
 
 #![cfg(feature = "cubecl")]
 // The cube macro evaluates comptime! expressions host-side, where fn-level
@@ -1093,8 +1086,7 @@ mod tests {
 
     /// As [`cubecl_cuda_fd_matches_cpu_detailed`] on the default wgpu
     /// device, sized for a software rasterizer: windows of 1e5 numbers and
-    /// bases 10-24 in full. It runs the kernel even on Metal, where
-    /// production does not (`DetailedKernel::for_device`).
+    /// bases 10-24 in full.
     #[test]
     #[ignore = "requires a wgpu device"]
     fn cubecl_fd_matches_cpu_detailed() {

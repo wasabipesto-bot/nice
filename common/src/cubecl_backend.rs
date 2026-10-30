@@ -1401,33 +1401,10 @@ fn smoke_kernel(out: &mut Array<u32>) {
 /// The process-wide wgpu client: `init_setup` registers the device server
 /// and is not idempotent, so setup runs exactly once per process and later
 /// contexts clone the client — shared by the sync and async constructors.
-/// With it, the adapter's name and whether it runs on Metal
-/// ([`describe_adapter`]).
 static WGPU_DEFAULT: OnceLock<(
     cubecl::prelude::ComputeClient<cubecl::wgpu::WgpuRuntime>,
     String,
-    bool,
 )> = OnceLock::new();
-
-/// A wgpu adapter's name for reports, and whether its graphics API is Metal.
-///
-/// The name includes the resolved graphics API (`AutoGraphicsApi` may pick
-/// DX12 on Windows, and reports need to know which API actually ran) and the
-/// compiler. Metal is read from the adapter's `wgpu::Backend`, not the name.
-fn describe_adapter(
-    setup: &cubecl::wgpu::WgpuSetup,
-    client: &cubecl::prelude::ComputeClient<cubecl::wgpu::WgpuRuntime>,
-) -> (String, bool) {
-    let info = setup.adapter.get_info();
-    let device_name = format!(
-        "{} ({:?}, {})",
-        info.name,
-        info.backend,
-        <cubecl::wgpu::WgpuRuntime as cubecl::prelude::Runtime>::name(client)
-    );
-    let metal = info.backend == <cubecl::wgpu::Metal as cubecl::wgpu::GraphicsApi>::backend();
-    (device_name, metal)
-}
 
 /// What a timed sample of the overlap join on one field did
 /// ([`CubeclContext::join_sample`]).
@@ -1465,9 +1442,6 @@ pub enum CubeclContext {
     Wgpu {
         client: cubecl::prelude::ComputeClient<cubecl::wgpu::WgpuRuntime>,
         device_name: String,
-        /// The adapter's graphics API is Metal, where detailed fields keep
-        /// the per-number kernel (see `DetailedKernel::for_device`).
-        metal: bool,
         /// Per-base niceonly plans, cached across fields — see [`NiceonlyPlan`].
         /// Shared with the niceonly pipeline's dispatch thread.
         niceonly_plans: Arc<Mutex<HashMap<u32, Arc<NiceonlyPlan>>>>,
@@ -1601,20 +1575,28 @@ impl CubeclContext {
     /// # Errors
     /// Returns an error if no wgpu device is available.
     pub fn new_default() -> Result<Self> {
-        let (client, device_name, metal) = WGPU_DEFAULT.get_or_init(|| {
+        let (client, device_name) = WGPU_DEFAULT.get_or_init(|| {
             let device = cubecl::wgpu::WgpuDevice::default();
             let setup = cubecl::wgpu::init_setup::<cubecl::wgpu::AutoGraphicsApi>(
                 &device,
                 Self::runtime_options(),
             );
+            // Include the resolved graphics API: AutoGraphicsApi may pick
+            // DX12 on Windows, and reports need to know which API actually
+            // ran.
+            let info = setup.adapter.get_info();
             let client = cubecl::wgpu::WgpuRuntime::client(&device);
-            let (device_name, metal) = describe_adapter(&setup, &client);
-            (client, device_name, metal)
+            let device_name = format!(
+                "{} ({:?}, {})",
+                info.name,
+                info.backend,
+                <cubecl::wgpu::WgpuRuntime as cubecl::prelude::Runtime>::name(&client)
+            );
+            (client, device_name)
         });
         Ok(Self::Wgpu {
             client: client.clone(),
             device_name: device_name.clone(),
-            metal: *metal,
             niceonly_plans: Arc::new(Mutex::new(HashMap::new())),
             niceonly_pipeline: Mutex::new(None),
             join_pipeline: Mutex::new(None),
@@ -1640,19 +1622,24 @@ impl CubeclContext {
                 Self::runtime_options(),
             )
             .await;
+            let info = setup.adapter.get_info();
             let client = cubecl::wgpu::WgpuRuntime::client(&device);
-            let (device_name, metal) = describe_adapter(&setup, &client);
+            let device_name = format!(
+                "{} ({:?}, {})",
+                info.name,
+                info.backend,
+                <cubecl::wgpu::WgpuRuntime as cubecl::prelude::Runtime>::name(&client)
+            );
             // A racing initializer winning this set is fine: both describe
             // the same process-wide runtime registration.
-            let _ = WGPU_DEFAULT.set((client, device_name, metal));
+            let _ = WGPU_DEFAULT.set((client, device_name));
         }
-        let (client, device_name, metal) = WGPU_DEFAULT
+        let (client, device_name) = WGPU_DEFAULT
             .get()
             .expect("just initialized the wgpu default client");
         Ok(Self::Wgpu {
             client: client.clone(),
             device_name: device_name.clone(),
-            metal: *metal,
             niceonly_plans: Arc::new(Mutex::new(HashMap::new())),
             niceonly_pipeline: Mutex::new(None),
             join_pipeline: Mutex::new(None),
@@ -1860,9 +1847,7 @@ pub async fn process_range_detailed_cubecl_async(
     range: &FieldSize,
     base: u32,
 ) -> Result<FieldResults> {
-    let metal = matches!(ctx, CubeclContext::Wgpu { metal: true, .. });
-    let kernel = DetailedKernel::for_device(base, metal);
-    process_range_detailed_cubecl_kernel(ctx, range, base, kernel).await
+    process_range_detailed_cubecl_kernel(ctx, range, base, DetailedKernel::for_base(base)).await
 }
 
 /// Which kernel the detailed path runs on candidates inside a base's legal
@@ -1885,22 +1870,10 @@ impl DetailedKernel {
         batch: CUBECL_BATCH_SIZE,
     };
 
-    /// What production runs for `base` on a device: [`Self::DEFAULT`] where
-    /// [`fd_plan`] has a plan, the per-number kernel elsewhere, and the
-    /// per-number kernel at every base on a Metal adapter (`metal`).
-    ///
-    /// Metal is excluded as a precaution. On an Apple M4 (macOS 26.3, WGSL
-    /// through naga's MSL) the finite-difference kernel's first seed came out
-    /// wrong at bases 23, 25, 27-30, 49, 50 and 52-55, through an Apple GPU
-    /// compiler bug (a constant division of a half-width right shift; see
-    /// `fd_to_digits` in [`crate::cubecl_detailed_fd`]). The seed no longer
-    /// has that pattern and the kernel is exact on that M4, but no other
-    /// Apple GPU or macOS version has been checked. `cubecl_fd_seed_matches_cpu`
-    /// and `cubecl_fd_matches_cpu_detailed` run this kernel on the default
-    /// wgpu device whatever its API: they are the tests to pass on an Apple
-    /// GPU before lifting this.
-    pub(crate) fn for_device(base: u32, metal: bool) -> Self {
-        if fd_plan(base).is_some() && !metal {
+    /// What production runs for `base`: [`Self::DEFAULT`] where [`fd_plan`]
+    /// has a plan, the per-number kernel elsewhere.
+    pub(crate) fn for_base(base: u32) -> Self {
+        if fd_plan(base).is_some() {
             Self::DEFAULT
         } else {
             Self::Division
@@ -2255,8 +2228,7 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
     {
         let secs = start_time.elapsed().as_secs_f64();
         debug!(
-            "CubeCL detailed b{base} ({kernel:?}): {:.2e} numbers in {secs:.2}s ({:.2e} n/s), \
-             {} near-misses",
+            "CubeCL detailed b{base}: {:.2e} numbers in {secs:.2}s ({:.2e} n/s), {} near-misses",
             range.size() as f64,
             range.size() as f64 / secs,
             nice_numbers.len(),
@@ -3152,30 +3124,6 @@ mod tests {
             false,
             "Intel(R) UHD Graphics 620 (Dx12, wgpu<wgsl>)"
         ));
-    }
-
-    /// Metal adapters take the per-number kernel at every base; every other
-    /// device takes the finite-difference kernel wherever it has a plan
-    /// (bases 10-64 with a range), and the per-number kernel elsewhere.
-    #[test]
-    fn detailed_kernel_by_device() {
-        let mut fd = 0;
-        for base in 2..=128 {
-            let planned = fd_plan(base).is_some();
-            let expected = if planned {
-                DetailedKernel::DEFAULT
-            } else {
-                DetailedKernel::Division
-            };
-            assert_eq!(DetailedKernel::for_device(base, false), expected, "b{base}");
-            assert_eq!(
-                DetailedKernel::for_device(base, true),
-                DetailedKernel::Division,
-                "b{base} on Metal"
-            );
-            fd += usize::from(planned);
-        }
-        assert_eq!(fd, 44, "bases on the finite-difference kernel");
     }
 
     /// CPU/CubeCL parity on the detailed path. Runs on lavapipe:
