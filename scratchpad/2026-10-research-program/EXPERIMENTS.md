@@ -5,6 +5,60 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L3.1 GPU detailed mode by finite differences, prototype (2026-10-30, agent; `L3/GPU-FD.md`, `L3/raw-fd/`; branch `exp/gpu-detailed-fd` e0c1b4c on the fork)
+
+Vast RTX 3080 (58350503, KR, $0.108/h), **power-capped at 180 W** (default 340 W): the old
+kernel ran ~1,425 MHz, FD ~1,690 MHz, so ~1.18× of the gain is clock; per clock FD is ~2.2×
+(b40) / 2.7× (b50). 3 interleaved rounds, medians. Best variant v3: 128 numbers per thread,
+high words of n²/n³ masked once per run (they change only on a rare carry; removes 14 of 50
+masked digits at b50), one rare-carry branch per step.
+
+| measure | b40 | b50 |
+|---|---|---|
+| benchmark harness, production host path | 2.60× (2.05e10 vs 7.88e9 n/s) | 3.22× (1.86e10 vs 5.78e9) |
+| harness, both arms with the near-miss readback fix | 3.22× | 3.97× |
+| 2e9-number window (mostly kernel) | 3.28× | 3.97–4.03× |
+
+Run length flat within 3 % from 64 to 512 numbers per thread. Per-thread histogram was 5–7 %
+slower than one shared atomic per number; a 2-digit lookup table within 2 % (both off).
+Registers 96 (v1) → 48 (v3), no spills, 83 % occupancy; limited by integer instruction rate:
+mask build ~4.5 instructions per digit = 55–60 % of the work, digit adds ~30 %.
+Exactness: histogram and near-miss list equal the CPU's at every commit; test covers b40/b50
+range start/end, 8 random windows, addend digit-gain windows, a window straddling the range
+start (split across the two kernels), under 7 option sets, plus the full 2e8 benchmark windows
+and every base 10–28 in full (73 near-misses). CUDA parity test, library tests, clippy clean.
+**Side finding (independent of FD):** every call copied back the whole 20 MB near-miss buffer
+(~1.7 ms over PCIe 3) even with zero misses; reading only what was written gives +5–8 % for
+the current kernel and +30 % for FD. Worth its own small PR.
+**Caveat for production:** at FD speed a 1e9-number detailed field is ~40 ms of GPU, so the
+claim/submit round trip may dominate wall-clock; server-side detailed field size (BACKLOG 13)
+becomes the limiter before the 3–4× shows in production throughput.
+
+## L1.5 Join re-profile on main d1ff798 (prune + EPT 2 + closure + memory budget) (2026-10-30, agent; `L1/PROFILE-2.md`, `L1/profile2-raw/`; branch `rp/gpu-profile-2`)
+
+Vast RTX 3080 **20 GB** (58350591, US, $0.149/h; 320 W cap = default; so the memory budget is
+4 GiB and 1e16 layouts differ from 10 GB cards). Profiled with the probe readback excluded;
+profiling adds 6–10 % at 1e14, ~0 at 1e16; unprofiled main matches within 1.5 %.
+
+| | device s/field (b58/60/62/64) | top | bucket | join | check | other |
+|---|---|---|---|---|---|---|
+| 1e14 (20 fields) | 0.689 / 0.585 / 0.569 / 0.679 | 22/19/17/9 % | 11/14/16/14 % | 52/50/49/58 % | 6–7 % | 9–12 % |
+| 1e16 (2 fields) | 46.3 / 33.9 / 14.6 / 42.9 | 30/34/41/15 % | ≤1 % | 62/57/51/77 % | 5–7 % | 1–3 % |
+
+Refit at 1e16: 0.62 ps per padded lane-pair + 64 ps per AND survivor (rms 5.7 %, max 11 %,
+over-predicts b64: empty lanes are cheaper than filled); + 406 ps per top → rms 2.9 %. At
+1e14 the two-term fit fails (rms 33 %); + 15.6 ns per (partition, bucket) work item → rms
+5.9 %. Each launch costs ~0.5 ms; **the 1e14 per-field fixed cost is 40–74 % of a field.**
+
+**Levers ranked:** (1) more partitions per launch at 1e14: 16→32 gives ×0.92/0.90/0.83/0.87
+of the time, 16→64 ×0.88/0.86/0.78/0.83 (b58/60/62/64); 32 fits 10 GB cards, 64 needs the
+lists sized by the pruned slice (#215's deferred buffer sizing); one b64 run at 64 showed
+0.4 % extra full checks, cause unknown, to be understood first. (2) survivor handling at
+1e16: 25–59 % of device time. (3) top certification: 15–41 % (41 % at b62 1e16). (4) real
+AND lanes at 1e16: 13–26 %. (5) wave padding: ~0 at 1e14 (EPT 1 costs ×1.08–1.10), 2–7 %
+at 1e16, 9–15 % at b64. (6) bucket build 11–16 % at 1e14. (7) b60 stage overrun ~0.3 %.
+(8) partitions per launch at 1e16: nothing.
+
 ## L2.2 Detailed finite differences through the client, NiceMark protocol (2026-10-30, agent; `L2/PR-RESULTS.md`, `L2/pr-raw/`; PR #221, branch `pr/detailed-finite-diff` 7019653)
 
 Vast box 58350466: Xeon E5-2682 v4 (Broadwell), container quota 15.36 CPUs (`--threads 0`

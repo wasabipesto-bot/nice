@@ -1,0 +1,1429 @@
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::smoke_kernel::SmokeKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::smoke_kernel::SmokeKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 1,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: SmokeKernelInfo {
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct info_st {
+    uint32 static_meta[2];
+};
+
+
+extern "C" __global__ void __launch_bounds__(1)smoke_kernel (
+    uint32* buffer_0, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+const bool l_0 = absoluteIdx.x == uint32(0);
+if (l_0) {
+buffer_0[uint32(0)] = uint32(42);
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 108.281657ms | SmokeKernel | CudaRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::detailed_kernel::DetailedKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::detailed_kernel::DetailedKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 256,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: DetailedKernelInfo {
+        base: 40,
+        limbs: 2,
+        chunk_digits: 5,
+        chunk_div: 102400000,
+        cutoff: 36,
+        wide_chunk: true,
+        hist: ArrayCompilationArg {
+            inplace: None,
+        },
+        miss_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        miss_data: ArrayCompilationArg {
+            inplace: None,
+        },
+        s0: (),
+        s1: (),
+        s2: (),
+        s3: (),
+        cnt_lo: (),
+        cnt_hi: (),
+        miss_cap: (),
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct info_st {
+    uint32 scalars_uint32[8];uint32 static_meta[6];
+};
+
+
+extern "C" __global__ void __launch_bounds__(256)detailed_kernel (
+    uint32* buffer_0, uint32* buffer_1, uint32* buffer_2, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+extern __shared__ __align__(4) uint8 dynamic_shared_mem[];
+// Shared array size: 1792, 7168 bytes
+uint32 *shared_memory_22 = reinterpret_cast<uint32*>(&dynamic_shared_mem[0]);
+// Shared array size: 164, 656 bytes
+uint32 *shared_memory_0 = reinterpret_cast<uint32*>(&dynamic_shared_mem[7168]);
+uint32 l_arr_31[2];
+
+uint32 l_arr_36[4];
+
+uint32 l_arr_84[6];
+
+uint32 l_mut_1;
+uint32 l_mut_178;
+uint32 l_mut_213;
+uint32 l_mut_239;
+uint64 l_mut_25;
+uint64 l_mut_29;
+uint64 l_mut_37;
+uint64 l_mut_177;
+uint64 l_mut_214;
+int32 l_mut_204;
+int32 l_mut_215;
+l_mut_1 = threadIdx.x;
+while (true) {
+const bool l_2 = l_mut_1 < uint32(164);
+const bool l_3 = !l_2;
+if (l_3) {
+break;}
+uint32* l_4 = &shared_memory_0[l_mut_1];
+uint32 _tmp_0 = atomicExch(l_4, uint32(0));
+l_mut_1 = l_mut_1 + blockDim.x;
+}
+__syncthreads();
+
+const uint64 l_5 = uint64(info.scalars_uint32[1]);
+const uint64 l_6 = l_5 << uint64(32);
+const uint64 l_7 = uint64(info.scalars_uint32[0]);
+const uint64 l_8 = l_6 | l_7;
+const uint64 l_9 = uint64(info.scalars_uint32[3]);
+const uint64 l_10 = l_9 << uint64(32);
+const uint64 l_11 = uint64(info.scalars_uint32[2]);
+const uint64 l_12 = l_10 | l_11;
+const uint64 l_13 = uint64(info.scalars_uint32[5]);
+const uint64 l_14 = l_13 << uint64(32);
+const uint64 l_15 = uint64(info.scalars_uint32[4]);
+const uint64 l_16 = l_14 | l_15;
+const uint32 l_17 = threadIdx.x >> uint32(5);
+const uint32 l_18 = l_17 % uint32(4);
+const uint64 l_19 = uint64(gridDim.x);
+const uint64 l_20 = uint64(blockDim.x);
+const uint64 l_21 = l_19 * l_20;
+const uint32 l_23 = threadIdx.x * uint32(7);
+const uint64 l_24 = uint64(absoluteIdx.x);
+l_mut_25 = l_24;
+while (true) {
+const bool l_26 = l_mut_25 < l_16;
+const bool l_27 = !l_26;
+if (l_27) {
+break;}
+const uint64 l_28 = l_8 + l_mut_25;
+l_mut_29 = l_12;
+const bool l_30 = l_28 < l_8;
+if (l_30) {
+l_mut_29 = l_mut_29 + uint64(1);
+}
+const uint64 l_32 = l_28 >> uint64(0);
+const uint32 l_33 = uint32(l_32);
+l_arr_31[uint32(0)] = l_33;
+const uint64 l_34 = l_28 >> uint64(32);
+const uint32 l_35 = uint32(l_34);
+l_arr_31[uint32(1)] = l_35;
+l_arr_36[uint32(0)] = uint32(0);
+l_arr_36[uint32(1)] = uint32(0);
+l_arr_36[uint32(2)] = uint32(0);
+l_arr_36[uint32(3)] = uint32(0);
+l_mut_37 = uint64(0);
+const uint32 l_38 = l_arr_31[uint32(0)];
+const uint64 l_39 = uint64(l_38);
+const uint32 l_40 = l_arr_31[uint32(0)];
+const uint64 l_41 = uint64(l_40);
+const uint64 l_42 = l_39 * l_41;
+const uint32 l_43 = l_arr_36[uint32(0)];
+const uint64 l_44 = uint64(l_43);
+const uint64 l_45 = l_42 + l_44;
+const uint64 l_46 = l_45 + l_mut_37;
+const uint32 l_47 = uint32(l_46);
+l_arr_36[uint32(0)] = l_47;
+const uint64 l_48 = l_46 >> uint64(32);
+l_mut_37 = l_48;
+const uint32 l_49 = l_arr_31[uint32(0)];
+const uint64 l_50 = uint64(l_49);
+const uint32 l_51 = l_arr_31[uint32(1)];
+const uint64 l_52 = uint64(l_51);
+const uint64 l_53 = l_50 * l_52;
+const uint32 l_54 = l_arr_36[uint32(1)];
+const uint64 l_55 = uint64(l_54);
+const uint64 l_56 = l_53 + l_55;
+const uint64 l_57 = l_56 + l_mut_37;
+const uint32 l_58 = uint32(l_57);
+l_arr_36[uint32(1)] = l_58;
+const uint64 l_59 = l_57 >> uint64(32);
+l_mut_37 = l_59;
+const uint32 l_60 = uint32(l_mut_37);
+l_arr_36[uint32(2)] = l_60;
+l_mut_37 = uint64(0);
+const uint32 l_61 = l_arr_31[uint32(1)];
+const uint64 l_62 = uint64(l_61);
+const uint32 l_63 = l_arr_31[uint32(0)];
+const uint64 l_64 = uint64(l_63);
+const uint64 l_65 = l_62 * l_64;
+const uint32 l_66 = l_arr_36[uint32(1)];
+const uint64 l_67 = uint64(l_66);
+const uint64 l_68 = l_65 + l_67;
+const uint64 l_69 = l_68 + l_mut_37;
+const uint32 l_70 = uint32(l_69);
+l_arr_36[uint32(1)] = l_70;
+const uint64 l_71 = l_69 >> uint64(32);
+l_mut_37 = l_71;
+const uint32 l_72 = l_arr_31[uint32(1)];
+const uint64 l_73 = uint64(l_72);
+const uint32 l_74 = l_arr_31[uint32(1)];
+const uint64 l_75 = uint64(l_74);
+const uint64 l_76 = l_73 * l_75;
+const uint32 l_77 = l_arr_36[uint32(2)];
+const uint64 l_78 = uint64(l_77);
+const uint64 l_79 = l_76 + l_78;
+const uint64 l_80 = l_79 + l_mut_37;
+const uint32 l_81 = uint32(l_80);
+l_arr_36[uint32(2)] = l_81;
+const uint64 l_82 = l_80 >> uint64(32);
+l_mut_37 = l_82;
+const uint32 l_83 = uint32(l_mut_37);
+l_arr_36[uint32(3)] = l_83;
+l_arr_84[uint32(0)] = uint32(0);
+l_arr_84[uint32(1)] = uint32(0);
+l_arr_84[uint32(2)] = uint32(0);
+l_arr_84[uint32(3)] = uint32(0);
+l_arr_84[uint32(4)] = uint32(0);
+l_arr_84[uint32(5)] = uint32(0);
+l_mut_37 = uint64(0);
+const uint32 l_85 = l_arr_36[uint32(0)];
+const uint64 l_86 = uint64(l_85);
+const uint32 l_87 = l_arr_31[uint32(0)];
+const uint64 l_88 = uint64(l_87);
+const uint64 l_89 = l_86 * l_88;
+const uint32 l_90 = l_arr_84[uint32(0)];
+const uint64 l_91 = uint64(l_90);
+const uint64 l_92 = l_89 + l_91;
+const uint64 l_93 = l_92 + l_mut_37;
+const uint32 l_94 = uint32(l_93);
+l_arr_84[uint32(0)] = l_94;
+const uint64 l_95 = l_93 >> uint64(32);
+l_mut_37 = l_95;
+const uint32 l_96 = l_arr_36[uint32(0)];
+const uint64 l_97 = uint64(l_96);
+const uint32 l_98 = l_arr_31[uint32(1)];
+const uint64 l_99 = uint64(l_98);
+const uint64 l_100 = l_97 * l_99;
+const uint32 l_101 = l_arr_84[uint32(1)];
+const uint64 l_102 = uint64(l_101);
+const uint64 l_103 = l_100 + l_102;
+const uint64 l_104 = l_103 + l_mut_37;
+const uint32 l_105 = uint32(l_104);
+l_arr_84[uint32(1)] = l_105;
+const uint64 l_106 = l_104 >> uint64(32);
+l_mut_37 = l_106;
+const uint32 l_107 = uint32(l_mut_37);
+l_arr_84[uint32(2)] = l_107;
+l_mut_37 = uint64(0);
+const uint32 l_108 = l_arr_36[uint32(1)];
+const uint64 l_109 = uint64(l_108);
+const uint32 l_110 = l_arr_31[uint32(0)];
+const uint64 l_111 = uint64(l_110);
+const uint64 l_112 = l_109 * l_111;
+const uint32 l_113 = l_arr_84[uint32(1)];
+const uint64 l_114 = uint64(l_113);
+const uint64 l_115 = l_112 + l_114;
+const uint64 l_116 = l_115 + l_mut_37;
+const uint32 l_117 = uint32(l_116);
+l_arr_84[uint32(1)] = l_117;
+const uint64 l_118 = l_116 >> uint64(32);
+l_mut_37 = l_118;
+const uint32 l_119 = l_arr_36[uint32(1)];
+const uint64 l_120 = uint64(l_119);
+const uint32 l_121 = l_arr_31[uint32(1)];
+const uint64 l_122 = uint64(l_121);
+const uint64 l_123 = l_120 * l_122;
+const uint32 l_124 = l_arr_84[uint32(2)];
+const uint64 l_125 = uint64(l_124);
+const uint64 l_126 = l_123 + l_125;
+const uint64 l_127 = l_126 + l_mut_37;
+const uint32 l_128 = uint32(l_127);
+l_arr_84[uint32(2)] = l_128;
+const uint64 l_129 = l_127 >> uint64(32);
+l_mut_37 = l_129;
+const uint32 l_130 = uint32(l_mut_37);
+l_arr_84[uint32(3)] = l_130;
+l_mut_37 = uint64(0);
+const uint32 l_131 = l_arr_36[uint32(2)];
+const uint64 l_132 = uint64(l_131);
+const uint32 l_133 = l_arr_31[uint32(0)];
+const uint64 l_134 = uint64(l_133);
+const uint64 l_135 = l_132 * l_134;
+const uint32 l_136 = l_arr_84[uint32(2)];
+const uint64 l_137 = uint64(l_136);
+const uint64 l_138 = l_135 + l_137;
+const uint64 l_139 = l_138 + l_mut_37;
+const uint32 l_140 = uint32(l_139);
+l_arr_84[uint32(2)] = l_140;
+const uint64 l_141 = l_139 >> uint64(32);
+l_mut_37 = l_141;
+const uint32 l_142 = l_arr_36[uint32(2)];
+const uint64 l_143 = uint64(l_142);
+const uint32 l_144 = l_arr_31[uint32(1)];
+const uint64 l_145 = uint64(l_144);
+const uint64 l_146 = l_143 * l_145;
+const uint32 l_147 = l_arr_84[uint32(3)];
+const uint64 l_148 = uint64(l_147);
+const uint64 l_149 = l_146 + l_148;
+const uint64 l_150 = l_149 + l_mut_37;
+const uint32 l_151 = uint32(l_150);
+l_arr_84[uint32(3)] = l_151;
+const uint64 l_152 = l_150 >> uint64(32);
+l_mut_37 = l_152;
+const uint32 l_153 = uint32(l_mut_37);
+l_arr_84[uint32(4)] = l_153;
+l_mut_37 = uint64(0);
+const uint32 l_154 = l_arr_36[uint32(3)];
+const uint64 l_155 = uint64(l_154);
+const uint32 l_156 = l_arr_31[uint32(0)];
+const uint64 l_157 = uint64(l_156);
+const uint64 l_158 = l_155 * l_157;
+const uint32 l_159 = l_arr_84[uint32(3)];
+const uint64 l_160 = uint64(l_159);
+const uint64 l_161 = l_158 + l_160;
+const uint64 l_162 = l_161 + l_mut_37;
+const uint32 l_163 = uint32(l_162);
+l_arr_84[uint32(3)] = l_163;
+const uint64 l_164 = l_162 >> uint64(32);
+l_mut_37 = l_164;
+const uint32 l_165 = l_arr_36[uint32(3)];
+const uint64 l_166 = uint64(l_165);
+const uint32 l_167 = l_arr_31[uint32(1)];
+const uint64 l_168 = uint64(l_167);
+const uint64 l_169 = l_166 * l_168;
+const uint32 l_170 = l_arr_84[uint32(4)];
+const uint64 l_171 = uint64(l_170);
+const uint64 l_172 = l_169 + l_171;
+const uint64 l_173 = l_172 + l_mut_37;
+const uint32 l_174 = uint32(l_173);
+l_arr_84[uint32(4)] = l_174;
+const uint64 l_175 = l_173 >> uint64(32);
+l_mut_37 = l_175;
+const uint32 l_176 = uint32(l_mut_37);
+l_arr_84[uint32(5)] = l_176;
+l_mut_37 = uint64(0);
+l_mut_177 = uint64(0);
+l_mut_178 = uint32(0);
+while (true) {
+const bool l_179 = l_mut_178 < uint32(2);
+const bool l_180 = !l_179;
+if (l_180) {
+break;}
+const bool l_181 = l_mut_178 == uint32(0);
+if (l_181) {
+const uint32 l_182 = l_23 + uint32(0);
+const uint32 l_183 = l_arr_36[uint32(0)];
+shared_memory_22[l_182] = l_183;
+const uint32 l_184 = l_23 + uint32(1);
+const uint32 l_185 = l_arr_36[uint32(1)];
+shared_memory_22[l_184] = l_185;
+const uint32 l_186 = l_23 + uint32(2);
+const uint32 l_187 = l_arr_36[uint32(2)];
+shared_memory_22[l_186] = l_187;
+const uint32 l_188 = l_23 + uint32(3);
+const uint32 l_189 = l_arr_36[uint32(3)];
+shared_memory_22[l_188] = l_189;
+const uint32 l_190 = l_23 + uint32(4);
+shared_memory_22[l_190] = uint32(0);
+const uint32 l_191 = l_23 + uint32(5);
+shared_memory_22[l_191] = uint32(0);
+} else {
+const uint32 l_192 = l_23 + uint32(0);
+const uint32 l_193 = l_arr_84[uint32(0)];
+shared_memory_22[l_192] = l_193;
+const uint32 l_194 = l_23 + uint32(1);
+const uint32 l_195 = l_arr_84[uint32(1)];
+shared_memory_22[l_194] = l_195;
+const uint32 l_196 = l_23 + uint32(2);
+const uint32 l_197 = l_arr_84[uint32(2)];
+shared_memory_22[l_196] = l_197;
+const uint32 l_198 = l_23 + uint32(3);
+const uint32 l_199 = l_arr_84[uint32(3)];
+shared_memory_22[l_198] = l_199;
+const uint32 l_200 = l_23 + uint32(4);
+const uint32 l_201 = l_arr_84[uint32(4)];
+shared_memory_22[l_200] = l_201;
+const uint32 l_202 = l_23 + uint32(5);
+const uint32 l_203 = l_arr_84[uint32(5)];
+shared_memory_22[l_202] = l_203;
+}
+l_mut_204 = int32(5);
+while (true) {
+const bool l_205 = l_mut_204 >= int32(0);
+const bool l_206 = !l_205;
+if (l_206) {
+break;}
+const uint32 l_207 = uint32(l_mut_204);
+const uint32 l_208 = l_23 + l_207;
+const uint32 l_209 = shared_memory_22[l_208];
+const bool l_210 = l_209 != uint32(0);
+if (l_210) {
+break;}
+l_mut_204 = l_mut_204 - int32(1);
+}
+while (true) {
+const bool l_211 = l_mut_204 >= int32(0);
+const bool l_212 = !l_211;
+if (l_212) {
+break;}
+l_mut_213 = uint32(0);
+l_mut_214 = uint64(0);
+l_mut_215 = l_mut_204;
+while (true) {
+const bool l_216 = l_mut_215 >= int32(0);
+const bool l_217 = !l_216;
+if (l_217) {
+break;}
+const uint64 l_218 = l_mut_214 << uint64(32);
+const uint32 l_219 = uint32(l_mut_215);
+const uint32 l_220 = l_23 + l_219;
+const uint32 l_221 = shared_memory_22[l_220];
+const uint64 l_222 = uint64(l_221);
+const uint64 l_223 = l_218 | l_222;
+const uint64 l_224 = uint64(uint32(102400000));
+const uint64 l_225 = l_223 / l_224;
+const uint32 l_226 = uint32(l_mut_215);
+const uint32 l_227 = l_23 + l_226;
+const uint32 l_228 = uint32(l_225);
+shared_memory_22[l_227] = l_228;
+const uint64 l_229 = uint64(uint32(102400000));
+const uint64 l_230 = l_225 * l_229;
+const uint64 l_231 = l_223 - l_230;
+l_mut_214 = l_231;
+l_mut_215 = l_mut_215 - int32(1);
+}
+const uint32 l_232 = uint32(l_mut_214);
+l_mut_213 = l_232;
+while (true) {
+const bool l_233 = l_mut_204 >= int32(0);
+const bool l_234 = !l_233;
+if (l_234) {
+break;}
+const uint32 l_235 = uint32(l_mut_204);
+const uint32 l_236 = l_23 + l_235;
+const uint32 l_237 = shared_memory_22[l_236];
+const bool l_238 = l_237 != uint32(0);
+if (l_238) {
+break;}
+l_mut_204 = l_mut_204 - int32(1);
+}
+l_mut_239 = l_mut_213;
+const bool l_240 = l_mut_204 >= int32(0);
+if (l_240) {
+const uint32 l_241 = l_mut_239 / uint32(40);
+const uint32 l_242 = l_241 * uint32(40);
+const uint32 l_243 = l_mut_239 - l_242;
+l_mut_239 = l_241;
+const uint64 l_244 = uint64(l_243);
+const uint64 l_245 = uint64(1) << l_244;
+l_mut_37 = l_mut_37 | l_245;
+const uint32 l_246 = l_mut_239 / uint32(40);
+const uint32 l_247 = l_246 * uint32(40);
+const uint32 l_248 = l_mut_239 - l_247;
+l_mut_239 = l_246;
+const uint64 l_249 = uint64(l_248);
+const uint64 l_250 = uint64(1) << l_249;
+l_mut_37 = l_mut_37 | l_250;
+const uint32 l_251 = l_mut_239 / uint32(40);
+const uint32 l_252 = l_251 * uint32(40);
+const uint32 l_253 = l_mut_239 - l_252;
+l_mut_239 = l_251;
+const uint64 l_254 = uint64(l_253);
+const uint64 l_255 = uint64(1) << l_254;
+l_mut_37 = l_mut_37 | l_255;
+const uint32 l_256 = l_mut_239 / uint32(40);
+const uint32 l_257 = l_256 * uint32(40);
+const uint32 l_258 = l_mut_239 - l_257;
+l_mut_239 = l_256;
+const uint64 l_259 = uint64(l_258);
+const uint64 l_260 = uint64(1) << l_259;
+l_mut_37 = l_mut_37 | l_260;
+const uint32 l_261 = l_mut_239 / uint32(40);
+const uint32 l_262 = l_261 * uint32(40);
+const uint32 l_263 = l_mut_239 - l_262;
+l_mut_239 = l_261;
+const uint64 l_264 = uint64(l_263);
+const uint64 l_265 = uint64(1) << l_264;
+l_mut_37 = l_mut_37 | l_265;
+} else {
+while (true) {
+const bool l_266 = l_mut_239 != uint32(0);
+const bool l_267 = !l_266;
+if (l_267) {
+break;}
+const uint32 l_268 = l_mut_239 / uint32(40);
+const uint32 l_269 = l_268 * uint32(40);
+const uint32 l_270 = l_mut_239 - l_269;
+l_mut_239 = l_268;
+const uint64 l_271 = uint64(l_270);
+const uint64 l_272 = uint64(1) << l_271;
+l_mut_37 = l_mut_37 | l_272;
+}
+}
+}
+l_mut_178 = l_mut_178 + uint32(1);
+}
+const uint32 l_273 = uint32(l_mut_37);
+const uint32 l_274 = uint32(__popc(l_273));
+const uint64 l_275 = l_mut_37 >> uint64(32);
+const uint32 l_276 = uint32(l_275);
+const uint32 l_277 = uint32(__popc(l_276));
+const uint32 l_278 = l_274 + l_277;
+l_mut_239 = l_278;
+const uint32 l_279 = l_18 * uint32(41);
+const uint32 l_280 = l_279 + l_mut_239;
+uint32* l_281 = &shared_memory_0[l_280];
+const uint32 l_282 = atomicAdd(l_281, uint32(1));
+const bool l_283 = l_mut_239 > uint32(36);
+if (l_283) {
+uint32* l_284 = &buffer_1[uint32(0)];
+const uint32 l_285 = atomicAdd(l_284, uint32(1));
+const bool l_286 = l_285 < info.scalars_uint32[6];
+if (l_286) {
+const uint32 l_287 = uint32(5) * l_285;
+const uint32 l_288 = uint32(l_28);
+buffer_2[l_287] = l_288;
+const uint32 l_289 = l_287 + uint32(1);
+const uint64 l_290 = l_28 >> uint64(32);
+const uint32 l_291 = uint32(l_290);
+buffer_2[l_289] = l_291;
+const uint32 l_292 = l_287 + uint32(2);
+const uint32 l_293 = uint32(l_mut_29);
+buffer_2[l_292] = l_293;
+const uint32 l_294 = l_287 + uint32(3);
+const uint64 l_295 = l_mut_29 >> uint64(32);
+const uint32 l_296 = uint32(l_295);
+buffer_2[l_294] = l_296;
+const uint32 l_297 = l_287 + uint32(4);
+buffer_2[l_297] = l_mut_239;
+}
+}
+l_mut_25 = l_mut_25 + l_21;
+}
+__syncthreads();
+
+l_mut_239 = threadIdx.x;
+while (true) {
+const bool l_298 = l_mut_239 < uint32(41);
+const bool l_299 = !l_298;
+if (l_299) {
+break;}
+l_mut_213 = uint32(0);
+const uint32 l_300 = uint32(0) + l_mut_239;
+uint32* l_301 = &shared_memory_0[l_300];
+const uint32 l_302 = atomicAdd(l_301, uint32(0));
+l_mut_213 = l_mut_213 + l_302;
+const uint32 l_303 = uint32(41) + l_mut_239;
+uint32* l_304 = &shared_memory_0[l_303];
+const uint32 l_305 = atomicAdd(l_304, uint32(0));
+l_mut_213 = l_mut_213 + l_305;
+const uint32 l_306 = uint32(82) + l_mut_239;
+uint32* l_307 = &shared_memory_0[l_306];
+const uint32 l_308 = atomicAdd(l_307, uint32(0));
+l_mut_213 = l_mut_213 + l_308;
+const uint32 l_309 = uint32(123) + l_mut_239;
+uint32* l_310 = &shared_memory_0[l_309];
+const uint32 l_311 = atomicAdd(l_310, uint32(0));
+l_mut_213 = l_mut_213 + l_311;
+const bool l_312 = l_mut_213 != uint32(0);
+if (l_312) {
+uint32* l_313 = &buffer_0[l_mut_239];
+const uint32 l_314 = atomicAdd(l_313, l_mut_213);
+}
+l_mut_239 = l_mut_239 + blockDim.x;
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 299.665613ms | DetailedKernel | CudaRuntime
+| 4.66505ms  | DetailedKernel | CudaRuntime
+| 4.668748ms | DetailedKernel | CudaRuntime
+| 4.673939ms | DetailedKernel | CudaRuntime
+| 4.688411ms | DetailedKernel | CudaRuntime
+| 4.677605ms | DetailedKernel | CudaRuntime
+| 4.655217ms | DetailedKernel | CudaRuntime
+| 4.657392ms | DetailedKernel | CudaRuntime
+| 4.898626ms | DetailedKernel | CudaRuntime
+| 4.893799ms | DetailedKernel | CudaRuntime
+| 4.890726ms | DetailedKernel | CudaRuntime
+| 4.937864ms | DetailedKernel | CudaRuntime
+| 5.025692ms | DetailedKernel | CudaRuntime
+| 5.025426ms | DetailedKernel | CudaRuntime
+| 5.033712ms | DetailedKernel | CudaRuntime
+| 5.049308ms | DetailedKernel | CudaRuntime
+| 5.060311ms | DetailedKernel | CudaRuntime
+| 5.049224ms | DetailedKernel | CudaRuntime
+| 5.05714ms  | DetailedKernel | CudaRuntime
+| 5.057883ms | DetailedKernel | CudaRuntime
+| 5.092766ms | DetailedKernel | CudaRuntime
+| 5.147882ms | DetailedKernel | CudaRuntime
+| 5.169902ms | DetailedKernel | CudaRuntime
+| 5.198671ms | DetailedKernel | CudaRuntime
+| 5.114505ms | DetailedKernel | CudaRuntime
+| 5.05774ms  | DetailedKernel | CudaRuntime
+| 5.057092ms | DetailedKernel | CudaRuntime
+| 5.029332ms | DetailedKernel | CudaRuntime
+| 5.028877ms | DetailedKernel | CudaRuntime
+| 5.012152ms | DetailedKernel | CudaRuntime
+| 5.011739ms | DetailedKernel | CudaRuntime
+| 5.013281ms | DetailedKernel | CudaRuntime
+| 5.020812ms | DetailedKernel | CudaRuntime
+| 5.008204ms | DetailedKernel | CudaRuntime
+| 5.005299ms | DetailedKernel | CudaRuntime
+| 5.019004ms | DetailedKernel | CudaRuntime
+| 5.073961ms | DetailedKernel | CudaRuntime
+| 5.100609ms | DetailedKernel | CudaRuntime
+| 5.09872ms  | DetailedKernel | CudaRuntime
+| 5.116735ms | DetailedKernel | CudaRuntime
+| 5.114003ms | DetailedKernel | CudaRuntime
+| 5.116481ms | DetailedKernel | CudaRuntime
+| 5.142153ms | DetailedKernel | CudaRuntime
+| 5.113881ms | DetailedKernel | CudaRuntime
+| 5.120597ms | DetailedKernel | CudaRuntime
+| 5.108811ms | DetailedKernel | CudaRuntime
+| 5.092803ms | DetailedKernel | CudaRuntime
+| 5.030812ms | DetailedKernel | CudaRuntime
+| 5.054634ms | DetailedKernel | CudaRuntime
+| 5.044722ms | DetailedKernel | CudaRuntime
+| 5.052861ms | DetailedKernel | CudaRuntime
+| 5.057963ms | DetailedKernel | CudaRuntime
+| 5.051478ms | DetailedKernel | CudaRuntime
+| 5.065176ms | DetailedKernel | CudaRuntime
+| 5.074945ms | DetailedKernel | CudaRuntime
+| 5.100947ms | DetailedKernel | CudaRuntime
+| 5.206632ms | DetailedKernel | CudaRuntime
+| 5.195077ms | DetailedKernel | CudaRuntime
+| 5.196789ms | DetailedKernel | CudaRuntime
+| 5.178332ms | DetailedKernel | CudaRuntime
+| 5.117373ms | DetailedKernel | CudaRuntime
+| 5.105141ms | DetailedKernel | CudaRuntime
+| 5.095989ms | DetailedKernel | CudaRuntime
+| 5.044148ms | DetailedKernel | CudaRuntime
+| 5.060078ms | DetailedKernel | CudaRuntime
+| 5.047665ms | DetailedKernel | CudaRuntime
+| 5.039909ms | DetailedKernel | CudaRuntime
+| 5.042485ms | DetailedKernel | CudaRuntime
+| 5.063665ms | DetailedKernel | CudaRuntime
+| 5.043168ms | DetailedKernel | CudaRuntime
+| 5.046284ms | DetailedKernel | CudaRuntime
+| 5.042661ms | DetailedKernel | CudaRuntime
+| 5.178201ms | DetailedKernel | CudaRuntime
+| 5.196578ms | DetailedKernel | CudaRuntime
+| 5.196516ms | DetailedKernel | CudaRuntime
+| 5.166205ms | DetailedKernel | CudaRuntime
+| 5.108338ms | DetailedKernel | CudaRuntime
+| 5.08906ms  | DetailedKernel | CudaRuntime
+| 5.086353ms | DetailedKernel | CudaRuntime
+| 5.098992ms | DetailedKernel | CudaRuntime
+| 5.092314ms | DetailedKernel | CudaRuntime
+| 5.079549ms | DetailedKernel | CudaRuntime
+| 5.08343ms  | DetailedKernel | CudaRuntime
+| 5.092748ms | DetailedKernel | CudaRuntime
+| 5.106521ms | DetailedKernel | CudaRuntime
+| 5.028004ms | DetailedKernel | CudaRuntime
+| 5.051321ms | DetailedKernel | CudaRuntime
+| 5.059901ms | DetailedKernel | CudaRuntime
+| 5.21272ms  | DetailedKernel | CudaRuntime
+| 5.160903ms | DetailedKernel | CudaRuntime
+| 5.16391ms  | DetailedKernel | CudaRuntime
+| 5.127088ms | DetailedKernel | CudaRuntime
+| 5.060536ms | DetailedKernel | CudaRuntime
+| 5.058522ms | DetailedKernel | CudaRuntime
+| 5.067355ms | DetailedKernel | CudaRuntime
+| 5.054899ms | DetailedKernel | CudaRuntime
+| 5.05786ms  | DetailedKernel | CudaRuntime
+| 5.049495ms | DetailedKernel | CudaRuntime
+| 5.058307ms | DetailedKernel | CudaRuntime
+| 5.055759ms | DetailedKernel | CudaRuntime
+| 5.041782ms | DetailedKernel | CudaRuntime
+| 5.017452ms | DetailedKernel | CudaRuntime
+| 5.059563ms | DetailedKernel | CudaRuntime
+| 5.066869ms | DetailedKernel | CudaRuntime
+| 5.161512ms | DetailedKernel | CudaRuntime
+| 5.157673ms | DetailedKernel | CudaRuntime
+| 5.168048ms | DetailedKernel | CudaRuntime
+| 5.13972ms  | DetailedKernel | CudaRuntime
+| 5.11718ms  | DetailedKernel | CudaRuntime
+| 5.110997ms | DetailedKernel | CudaRuntime
+| 5.093325ms | DetailedKernel | CudaRuntime
+| 5.052498ms | DetailedKernel | CudaRuntime
+| 5.074887ms | DetailedKernel | CudaRuntime
+| 5.050937ms | DetailedKernel | CudaRuntime
+| 5.051998ms | DetailedKernel | CudaRuntime
+| 5.057703ms | DetailedKernel | CudaRuntime
+| 5.067996ms | DetailedKernel | CudaRuntime
+| 5.11464ms  | DetailedKernel | CudaRuntime
+| 5.106001ms | DetailedKernel | CudaRuntime
+| 5.093406ms | DetailedKernel | CudaRuntime
+| 5.149558ms | DetailedKernel | CudaRuntime
+| 5.152983ms | DetailedKernel | CudaRuntime
+| 5.192635ms | DetailedKernel | CudaRuntime
+| 5.166824ms | DetailedKernel | CudaRuntime
+| 5.155062ms | DetailedKernel | CudaRuntime
+| 5.152607ms | DetailedKernel | CudaRuntime
+| 5.12562ms  | DetailedKernel | CudaRuntime
+| 5.052151ms | DetailedKernel | CudaRuntime
+| 5.114334ms | DetailedKernel | CudaRuntime
+| 5.105004ms | DetailedKernel | CudaRuntime
+| 5.088228ms | DetailedKernel | CudaRuntime
+| 5.101319ms | DetailedKernel | CudaRuntime
+| 5.107421ms | DetailedKernel | CudaRuntime
+| 5.087629ms | DetailedKernel | CudaRuntime
+| 5.086386ms | DetailedKernel | CudaRuntime
+| 5.084222ms | DetailedKernel | CudaRuntime
+| 5.193721ms | DetailedKernel | CudaRuntime
+| 5.218223ms | DetailedKernel | CudaRuntime
+| 5.216402ms | DetailedKernel | CudaRuntime
+| 5.198227ms | DetailedKernel | CudaRuntime
+| 5.189428ms | DetailedKernel | CudaRuntime
+| 5.176934ms | DetailedKernel | CudaRuntime
+| 5.187256ms | DetailedKernel | CudaRuntime
+| 5.320637ms | DetailedKernel | CudaRuntime
+| 5.32203ms  | DetailedKernel | CudaRuntime
+| 5.321622ms | DetailedKernel | CudaRuntime
+| 5.32193ms  | DetailedKernel | CudaRuntime
+| 5.321151ms | DetailedKernel | CudaRuntime
+| 5.336433ms | DetailedKernel | CudaRuntime
+| 5.325815ms | DetailedKernel | CudaRuntime
+| 5.369299ms | DetailedKernel | CudaRuntime
+| 5.322089ms | DetailedKernel | CudaRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::detailed_kernel::DetailedKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::detailed_kernel::DetailedKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 256,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: DetailedKernelInfo {
+        base: 50,
+        limbs: 2,
+        chunk_digits: 5,
+        chunk_div: 312500000,
+        cutoff: 45,
+        wide_chunk: true,
+        hist: ArrayCompilationArg {
+            inplace: None,
+        },
+        miss_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        miss_data: ArrayCompilationArg {
+            inplace: None,
+        },
+        s0: (),
+        s1: (),
+        s2: (),
+        s3: (),
+        cnt_lo: (),
+        cnt_hi: (),
+        miss_cap: (),
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct info_st {
+    uint32 scalars_uint32[8];uint32 static_meta[6];
+};
+
+
+extern "C" __global__ void __launch_bounds__(256)detailed_kernel (
+    uint32* buffer_0, uint32* buffer_1, uint32* buffer_2, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+extern __shared__ __align__(4) uint8 dynamic_shared_mem[];
+// Shared array size: 1792, 7168 bytes
+uint32 *shared_memory_22 = reinterpret_cast<uint32*>(&dynamic_shared_mem[816]);
+// Shared array size: 204, 816 bytes
+uint32 *shared_memory_0 = reinterpret_cast<uint32*>(&dynamic_shared_mem[0]);
+uint32 l_arr_31[2];
+
+uint32 l_arr_36[4];
+
+uint32 l_arr_84[6];
+
+uint32 l_mut_1;
+uint32 l_mut_178;
+uint32 l_mut_213;
+uint32 l_mut_239;
+uint64 l_mut_25;
+uint64 l_mut_29;
+uint64 l_mut_37;
+uint64 l_mut_177;
+uint64 l_mut_214;
+int32 l_mut_204;
+int32 l_mut_215;
+l_mut_1 = threadIdx.x;
+while (true) {
+const bool l_2 = l_mut_1 < uint32(204);
+const bool l_3 = !l_2;
+if (l_3) {
+break;}
+uint32* l_4 = &shared_memory_0[l_mut_1];
+uint32 _tmp_0 = atomicExch(l_4, uint32(0));
+l_mut_1 = l_mut_1 + blockDim.x;
+}
+__syncthreads();
+
+const uint64 l_5 = uint64(info.scalars_uint32[1]);
+const uint64 l_6 = l_5 << uint64(32);
+const uint64 l_7 = uint64(info.scalars_uint32[0]);
+const uint64 l_8 = l_6 | l_7;
+const uint64 l_9 = uint64(info.scalars_uint32[3]);
+const uint64 l_10 = l_9 << uint64(32);
+const uint64 l_11 = uint64(info.scalars_uint32[2]);
+const uint64 l_12 = l_10 | l_11;
+const uint64 l_13 = uint64(info.scalars_uint32[5]);
+const uint64 l_14 = l_13 << uint64(32);
+const uint64 l_15 = uint64(info.scalars_uint32[4]);
+const uint64 l_16 = l_14 | l_15;
+const uint32 l_17 = threadIdx.x >> uint32(5);
+const uint32 l_18 = l_17 % uint32(4);
+const uint64 l_19 = uint64(gridDim.x);
+const uint64 l_20 = uint64(blockDim.x);
+const uint64 l_21 = l_19 * l_20;
+const uint32 l_23 = threadIdx.x * uint32(7);
+const uint64 l_24 = uint64(absoluteIdx.x);
+l_mut_25 = l_24;
+while (true) {
+const bool l_26 = l_mut_25 < l_16;
+const bool l_27 = !l_26;
+if (l_27) {
+break;}
+const uint64 l_28 = l_8 + l_mut_25;
+l_mut_29 = l_12;
+const bool l_30 = l_28 < l_8;
+if (l_30) {
+l_mut_29 = l_mut_29 + uint64(1);
+}
+const uint64 l_32 = l_28 >> uint64(0);
+const uint32 l_33 = uint32(l_32);
+l_arr_31[uint32(0)] = l_33;
+const uint64 l_34 = l_28 >> uint64(32);
+const uint32 l_35 = uint32(l_34);
+l_arr_31[uint32(1)] = l_35;
+l_arr_36[uint32(0)] = uint32(0);
+l_arr_36[uint32(1)] = uint32(0);
+l_arr_36[uint32(2)] = uint32(0);
+l_arr_36[uint32(3)] = uint32(0);
+l_mut_37 = uint64(0);
+const uint32 l_38 = l_arr_31[uint32(0)];
+const uint64 l_39 = uint64(l_38);
+const uint32 l_40 = l_arr_31[uint32(0)];
+const uint64 l_41 = uint64(l_40);
+const uint64 l_42 = l_39 * l_41;
+const uint32 l_43 = l_arr_36[uint32(0)];
+const uint64 l_44 = uint64(l_43);
+const uint64 l_45 = l_42 + l_44;
+const uint64 l_46 = l_45 + l_mut_37;
+const uint32 l_47 = uint32(l_46);
+l_arr_36[uint32(0)] = l_47;
+const uint64 l_48 = l_46 >> uint64(32);
+l_mut_37 = l_48;
+const uint32 l_49 = l_arr_31[uint32(0)];
+const uint64 l_50 = uint64(l_49);
+const uint32 l_51 = l_arr_31[uint32(1)];
+const uint64 l_52 = uint64(l_51);
+const uint64 l_53 = l_50 * l_52;
+const uint32 l_54 = l_arr_36[uint32(1)];
+const uint64 l_55 = uint64(l_54);
+const uint64 l_56 = l_53 + l_55;
+const uint64 l_57 = l_56 + l_mut_37;
+const uint32 l_58 = uint32(l_57);
+l_arr_36[uint32(1)] = l_58;
+const uint64 l_59 = l_57 >> uint64(32);
+l_mut_37 = l_59;
+const uint32 l_60 = uint32(l_mut_37);
+l_arr_36[uint32(2)] = l_60;
+l_mut_37 = uint64(0);
+const uint32 l_61 = l_arr_31[uint32(1)];
+const uint64 l_62 = uint64(l_61);
+const uint32 l_63 = l_arr_31[uint32(0)];
+const uint64 l_64 = uint64(l_63);
+const uint64 l_65 = l_62 * l_64;
+const uint32 l_66 = l_arr_36[uint32(1)];
+const uint64 l_67 = uint64(l_66);
+const uint64 l_68 = l_65 + l_67;
+const uint64 l_69 = l_68 + l_mut_37;
+const uint32 l_70 = uint32(l_69);
+l_arr_36[uint32(1)] = l_70;
+const uint64 l_71 = l_69 >> uint64(32);
+l_mut_37 = l_71;
+const uint32 l_72 = l_arr_31[uint32(1)];
+const uint64 l_73 = uint64(l_72);
+const uint32 l_74 = l_arr_31[uint32(1)];
+const uint64 l_75 = uint64(l_74);
+const uint64 l_76 = l_73 * l_75;
+const uint32 l_77 = l_arr_36[uint32(2)];
+const uint64 l_78 = uint64(l_77);
+const uint64 l_79 = l_76 + l_78;
+const uint64 l_80 = l_79 + l_mut_37;
+const uint32 l_81 = uint32(l_80);
+l_arr_36[uint32(2)] = l_81;
+const uint64 l_82 = l_80 >> uint64(32);
+l_mut_37 = l_82;
+const uint32 l_83 = uint32(l_mut_37);
+l_arr_36[uint32(3)] = l_83;
+l_arr_84[uint32(0)] = uint32(0);
+l_arr_84[uint32(1)] = uint32(0);
+l_arr_84[uint32(2)] = uint32(0);
+l_arr_84[uint32(3)] = uint32(0);
+l_arr_84[uint32(4)] = uint32(0);
+l_arr_84[uint32(5)] = uint32(0);
+l_mut_37 = uint64(0);
+const uint32 l_85 = l_arr_36[uint32(0)];
+const uint64 l_86 = uint64(l_85);
+const uint32 l_87 = l_arr_31[uint32(0)];
+const uint64 l_88 = uint64(l_87);
+const uint64 l_89 = l_86 * l_88;
+const uint32 l_90 = l_arr_84[uint32(0)];
+const uint64 l_91 = uint64(l_90);
+const uint64 l_92 = l_89 + l_91;
+const uint64 l_93 = l_92 + l_mut_37;
+const uint32 l_94 = uint32(l_93);
+l_arr_84[uint32(0)] = l_94;
+const uint64 l_95 = l_93 >> uint64(32);
+l_mut_37 = l_95;
+const uint32 l_96 = l_arr_36[uint32(0)];
+const uint64 l_97 = uint64(l_96);
+const uint32 l_98 = l_arr_31[uint32(1)];
+const uint64 l_99 = uint64(l_98);
+const uint64 l_100 = l_97 * l_99;
+const uint32 l_101 = l_arr_84[uint32(1)];
+const uint64 l_102 = uint64(l_101);
+const uint64 l_103 = l_100 + l_102;
+const uint64 l_104 = l_103 + l_mut_37;
+const uint32 l_105 = uint32(l_104);
+l_arr_84[uint32(1)] = l_105;
+const uint64 l_106 = l_104 >> uint64(32);
+l_mut_37 = l_106;
+const uint32 l_107 = uint32(l_mut_37);
+l_arr_84[uint32(2)] = l_107;
+l_mut_37 = uint64(0);
+const uint32 l_108 = l_arr_36[uint32(1)];
+const uint64 l_109 = uint64(l_108);
+const uint32 l_110 = l_arr_31[uint32(0)];
+const uint64 l_111 = uint64(l_110);
+const uint64 l_112 = l_109 * l_111;
+const uint32 l_113 = l_arr_84[uint32(1)];
+const uint64 l_114 = uint64(l_113);
+const uint64 l_115 = l_112 + l_114;
+const uint64 l_116 = l_115 + l_mut_37;
+const uint32 l_117 = uint32(l_116);
+l_arr_84[uint32(1)] = l_117;
+const uint64 l_118 = l_116 >> uint64(32);
+l_mut_37 = l_118;
+const uint32 l_119 = l_arr_36[uint32(1)];
+const uint64 l_120 = uint64(l_119);
+const uint32 l_121 = l_arr_31[uint32(1)];
+const uint64 l_122 = uint64(l_121);
+const uint64 l_123 = l_120 * l_122;
+const uint32 l_124 = l_arr_84[uint32(2)];
+const uint64 l_125 = uint64(l_124);
+const uint64 l_126 = l_123 + l_125;
+const uint64 l_127 = l_126 + l_mut_37;
+const uint32 l_128 = uint32(l_127);
+l_arr_84[uint32(2)] = l_128;
+const uint64 l_129 = l_127 >> uint64(32);
+l_mut_37 = l_129;
+const uint32 l_130 = uint32(l_mut_37);
+l_arr_84[uint32(3)] = l_130;
+l_mut_37 = uint64(0);
+const uint32 l_131 = l_arr_36[uint32(2)];
+const uint64 l_132 = uint64(l_131);
+const uint32 l_133 = l_arr_31[uint32(0)];
+const uint64 l_134 = uint64(l_133);
+const uint64 l_135 = l_132 * l_134;
+const uint32 l_136 = l_arr_84[uint32(2)];
+const uint64 l_137 = uint64(l_136);
+const uint64 l_138 = l_135 + l_137;
+const uint64 l_139 = l_138 + l_mut_37;
+const uint32 l_140 = uint32(l_139);
+l_arr_84[uint32(2)] = l_140;
+const uint64 l_141 = l_139 >> uint64(32);
+l_mut_37 = l_141;
+const uint32 l_142 = l_arr_36[uint32(2)];
+const uint64 l_143 = uint64(l_142);
+const uint32 l_144 = l_arr_31[uint32(1)];
+const uint64 l_145 = uint64(l_144);
+const uint64 l_146 = l_143 * l_145;
+const uint32 l_147 = l_arr_84[uint32(3)];
+const uint64 l_148 = uint64(l_147);
+const uint64 l_149 = l_146 + l_148;
+const uint64 l_150 = l_149 + l_mut_37;
+const uint32 l_151 = uint32(l_150);
+l_arr_84[uint32(3)] = l_151;
+const uint64 l_152 = l_150 >> uint64(32);
+l_mut_37 = l_152;
+const uint32 l_153 = uint32(l_mut_37);
+l_arr_84[uint32(4)] = l_153;
+l_mut_37 = uint64(0);
+const uint32 l_154 = l_arr_36[uint32(3)];
+const uint64 l_155 = uint64(l_154);
+const uint32 l_156 = l_arr_31[uint32(0)];
+const uint64 l_157 = uint64(l_156);
+const uint64 l_158 = l_155 * l_157;
+const uint32 l_159 = l_arr_84[uint32(3)];
+const uint64 l_160 = uint64(l_159);
+const uint64 l_161 = l_158 + l_160;
+const uint64 l_162 = l_161 + l_mut_37;
+const uint32 l_163 = uint32(l_162);
+l_arr_84[uint32(3)] = l_163;
+const uint64 l_164 = l_162 >> uint64(32);
+l_mut_37 = l_164;
+const uint32 l_165 = l_arr_36[uint32(3)];
+const uint64 l_166 = uint64(l_165);
+const uint32 l_167 = l_arr_31[uint32(1)];
+const uint64 l_168 = uint64(l_167);
+const uint64 l_169 = l_166 * l_168;
+const uint32 l_170 = l_arr_84[uint32(4)];
+const uint64 l_171 = uint64(l_170);
+const uint64 l_172 = l_169 + l_171;
+const uint64 l_173 = l_172 + l_mut_37;
+const uint32 l_174 = uint32(l_173);
+l_arr_84[uint32(4)] = l_174;
+const uint64 l_175 = l_173 >> uint64(32);
+l_mut_37 = l_175;
+const uint32 l_176 = uint32(l_mut_37);
+l_arr_84[uint32(5)] = l_176;
+l_mut_37 = uint64(0);
+l_mut_177 = uint64(0);
+l_mut_178 = uint32(0);
+while (true) {
+const bool l_179 = l_mut_178 < uint32(2);
+const bool l_180 = !l_179;
+if (l_180) {
+break;}
+const bool l_181 = l_mut_178 == uint32(0);
+if (l_181) {
+const uint32 l_182 = l_23 + uint32(0);
+const uint32 l_183 = l_arr_36[uint32(0)];
+shared_memory_22[l_182] = l_183;
+const uint32 l_184 = l_23 + uint32(1);
+const uint32 l_185 = l_arr_36[uint32(1)];
+shared_memory_22[l_184] = l_185;
+const uint32 l_186 = l_23 + uint32(2);
+const uint32 l_187 = l_arr_36[uint32(2)];
+shared_memory_22[l_186] = l_187;
+const uint32 l_188 = l_23 + uint32(3);
+const uint32 l_189 = l_arr_36[uint32(3)];
+shared_memory_22[l_188] = l_189;
+const uint32 l_190 = l_23 + uint32(4);
+shared_memory_22[l_190] = uint32(0);
+const uint32 l_191 = l_23 + uint32(5);
+shared_memory_22[l_191] = uint32(0);
+} else {
+const uint32 l_192 = l_23 + uint32(0);
+const uint32 l_193 = l_arr_84[uint32(0)];
+shared_memory_22[l_192] = l_193;
+const uint32 l_194 = l_23 + uint32(1);
+const uint32 l_195 = l_arr_84[uint32(1)];
+shared_memory_22[l_194] = l_195;
+const uint32 l_196 = l_23 + uint32(2);
+const uint32 l_197 = l_arr_84[uint32(2)];
+shared_memory_22[l_196] = l_197;
+const uint32 l_198 = l_23 + uint32(3);
+const uint32 l_199 = l_arr_84[uint32(3)];
+shared_memory_22[l_198] = l_199;
+const uint32 l_200 = l_23 + uint32(4);
+const uint32 l_201 = l_arr_84[uint32(4)];
+shared_memory_22[l_200] = l_201;
+const uint32 l_202 = l_23 + uint32(5);
+const uint32 l_203 = l_arr_84[uint32(5)];
+shared_memory_22[l_202] = l_203;
+}
+l_mut_204 = int32(5);
+while (true) {
+const bool l_205 = l_mut_204 >= int32(0);
+const bool l_206 = !l_205;
+if (l_206) {
+break;}
+const uint32 l_207 = uint32(l_mut_204);
+const uint32 l_208 = l_23 + l_207;
+const uint32 l_209 = shared_memory_22[l_208];
+const bool l_210 = l_209 != uint32(0);
+if (l_210) {
+break;}
+l_mut_204 = l_mut_204 - int32(1);
+}
+while (true) {
+const bool l_211 = l_mut_204 >= int32(0);
+const bool l_212 = !l_211;
+if (l_212) {
+break;}
+l_mut_213 = uint32(0);
+l_mut_214 = uint64(0);
+l_mut_215 = l_mut_204;
+while (true) {
+const bool l_216 = l_mut_215 >= int32(0);
+const bool l_217 = !l_216;
+if (l_217) {
+break;}
+const uint64 l_218 = l_mut_214 << uint64(32);
+const uint32 l_219 = uint32(l_mut_215);
+const uint32 l_220 = l_23 + l_219;
+const uint32 l_221 = shared_memory_22[l_220];
+const uint64 l_222 = uint64(l_221);
+const uint64 l_223 = l_218 | l_222;
+const uint64 l_224 = uint64(uint32(312500000));
+const uint64 l_225 = l_223 / l_224;
+const uint32 l_226 = uint32(l_mut_215);
+const uint32 l_227 = l_23 + l_226;
+const uint32 l_228 = uint32(l_225);
+shared_memory_22[l_227] = l_228;
+const uint64 l_229 = uint64(uint32(312500000));
+const uint64 l_230 = l_225 * l_229;
+const uint64 l_231 = l_223 - l_230;
+l_mut_214 = l_231;
+l_mut_215 = l_mut_215 - int32(1);
+}
+const uint32 l_232 = uint32(l_mut_214);
+l_mut_213 = l_232;
+while (true) {
+const bool l_233 = l_mut_204 >= int32(0);
+const bool l_234 = !l_233;
+if (l_234) {
+break;}
+const uint32 l_235 = uint32(l_mut_204);
+const uint32 l_236 = l_23 + l_235;
+const uint32 l_237 = shared_memory_22[l_236];
+const bool l_238 = l_237 != uint32(0);
+if (l_238) {
+break;}
+l_mut_204 = l_mut_204 - int32(1);
+}
+l_mut_239 = l_mut_213;
+const bool l_240 = l_mut_204 >= int32(0);
+if (l_240) {
+const uint32 l_241 = l_mut_239 / uint32(50);
+const uint32 l_242 = l_241 * uint32(50);
+const uint32 l_243 = l_mut_239 - l_242;
+l_mut_239 = l_241;
+const uint64 l_244 = uint64(l_243);
+const uint64 l_245 = uint64(1) << l_244;
+l_mut_37 = l_mut_37 | l_245;
+const uint32 l_246 = l_mut_239 / uint32(50);
+const uint32 l_247 = l_246 * uint32(50);
+const uint32 l_248 = l_mut_239 - l_247;
+l_mut_239 = l_246;
+const uint64 l_249 = uint64(l_248);
+const uint64 l_250 = uint64(1) << l_249;
+l_mut_37 = l_mut_37 | l_250;
+const uint32 l_251 = l_mut_239 / uint32(50);
+const uint32 l_252 = l_251 * uint32(50);
+const uint32 l_253 = l_mut_239 - l_252;
+l_mut_239 = l_251;
+const uint64 l_254 = uint64(l_253);
+const uint64 l_255 = uint64(1) << l_254;
+l_mut_37 = l_mut_37 | l_255;
+const uint32 l_256 = l_mut_239 / uint32(50);
+const uint32 l_257 = l_256 * uint32(50);
+const uint32 l_258 = l_mut_239 - l_257;
+l_mut_239 = l_256;
+const uint64 l_259 = uint64(l_258);
+const uint64 l_260 = uint64(1) << l_259;
+l_mut_37 = l_mut_37 | l_260;
+const uint32 l_261 = l_mut_239 / uint32(50);
+const uint32 l_262 = l_261 * uint32(50);
+const uint32 l_263 = l_mut_239 - l_262;
+l_mut_239 = l_261;
+const uint64 l_264 = uint64(l_263);
+const uint64 l_265 = uint64(1) << l_264;
+l_mut_37 = l_mut_37 | l_265;
+} else {
+while (true) {
+const bool l_266 = l_mut_239 != uint32(0);
+const bool l_267 = !l_266;
+if (l_267) {
+break;}
+const uint32 l_268 = l_mut_239 / uint32(50);
+const uint32 l_269 = l_268 * uint32(50);
+const uint32 l_270 = l_mut_239 - l_269;
+l_mut_239 = l_268;
+const uint64 l_271 = uint64(l_270);
+const uint64 l_272 = uint64(1) << l_271;
+l_mut_37 = l_mut_37 | l_272;
+}
+}
+}
+l_mut_178 = l_mut_178 + uint32(1);
+}
+const uint32 l_273 = uint32(l_mut_37);
+const uint32 l_274 = uint32(__popc(l_273));
+const uint64 l_275 = l_mut_37 >> uint64(32);
+const uint32 l_276 = uint32(l_275);
+const uint32 l_277 = uint32(__popc(l_276));
+const uint32 l_278 = l_274 + l_277;
+l_mut_239 = l_278;
+const uint32 l_279 = l_18 * uint32(51);
+const uint32 l_280 = l_279 + l_mut_239;
+uint32* l_281 = &shared_memory_0[l_280];
+const uint32 l_282 = atomicAdd(l_281, uint32(1));
+const bool l_283 = l_mut_239 > uint32(45);
+if (l_283) {
+uint32* l_284 = &buffer_1[uint32(0)];
+const uint32 l_285 = atomicAdd(l_284, uint32(1));
+const bool l_286 = l_285 < info.scalars_uint32[6];
+if (l_286) {
+const uint32 l_287 = uint32(5) * l_285;
+const uint32 l_288 = uint32(l_28);
+buffer_2[l_287] = l_288;
+const uint32 l_289 = l_287 + uint32(1);
+const uint64 l_290 = l_28 >> uint64(32);
+const uint32 l_291 = uint32(l_290);
+buffer_2[l_289] = l_291;
+const uint32 l_292 = l_287 + uint32(2);
+const uint32 l_293 = uint32(l_mut_29);
+buffer_2[l_292] = l_293;
+const uint32 l_294 = l_287 + uint32(3);
+const uint64 l_295 = l_mut_29 >> uint64(32);
+const uint32 l_296 = uint32(l_295);
+buffer_2[l_294] = l_296;
+const uint32 l_297 = l_287 + uint32(4);
+buffer_2[l_297] = l_mut_239;
+}
+}
+l_mut_25 = l_mut_25 + l_21;
+}
+__syncthreads();
+
+l_mut_239 = threadIdx.x;
+while (true) {
+const bool l_298 = l_mut_239 < uint32(51);
+const bool l_299 = !l_298;
+if (l_299) {
+break;}
+l_mut_213 = uint32(0);
+const uint32 l_300 = uint32(0) + l_mut_239;
+uint32* l_301 = &shared_memory_0[l_300];
+const uint32 l_302 = atomicAdd(l_301, uint32(0));
+l_mut_213 = l_mut_213 + l_302;
+const uint32 l_303 = uint32(51) + l_mut_239;
+uint32* l_304 = &shared_memory_0[l_303];
+const uint32 l_305 = atomicAdd(l_304, uint32(0));
+l_mut_213 = l_mut_213 + l_305;
+const uint32 l_306 = uint32(102) + l_mut_239;
+uint32* l_307 = &shared_memory_0[l_306];
+const uint32 l_308 = atomicAdd(l_307, uint32(0));
+l_mut_213 = l_mut_213 + l_308;
+const uint32 l_309 = uint32(153) + l_mut_239;
+uint32* l_310 = &shared_memory_0[l_309];
+const uint32 l_311 = atomicAdd(l_310, uint32(0));
+l_mut_213 = l_mut_213 + l_311;
+const bool l_312 = l_mut_213 != uint32(0);
+if (l_312) {
+uint32* l_313 = &buffer_0[l_mut_239];
+const uint32 l_314 = atomicAdd(l_313, l_mut_213);
+}
+l_mut_239 = l_mut_239 + blockDim.x;
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 277.522356ms | DetailedKernel | CudaRuntime
+| 5.703773ms | DetailedKernel | CudaRuntime
+| 5.693149ms | DetailedKernel | CudaRuntime
+| 5.682641ms | DetailedKernel | CudaRuntime
+| 7.241705ms | DetailedKernel | CudaRuntime
+| 7.268253ms | DetailedKernel | CudaRuntime
+| 7.213342ms | DetailedKernel | CudaRuntime
+| 7.144129ms | DetailedKernel | CudaRuntime
+| 7.145144ms | DetailedKernel | CudaRuntime
+| 7.036035ms | DetailedKernel | CudaRuntime
+| 7.062653ms | DetailedKernel | CudaRuntime
+| 7.180081ms | DetailedKernel | CudaRuntime
+| 7.507457ms | DetailedKernel | CudaRuntime
+| 7.453979ms | DetailedKernel | CudaRuntime
+| 7.263459ms | DetailedKernel | CudaRuntime
+| 7.272464ms | DetailedKernel | CudaRuntime
+| 7.512981ms | DetailedKernel | CudaRuntime
+| 7.555383ms | DetailedKernel | CudaRuntime
+| 7.466481ms | DetailedKernel | CudaRuntime
+| 7.346872ms | DetailedKernel | CudaRuntime
+| 7.335497ms | DetailedKernel | CudaRuntime
+| 7.187398ms | DetailedKernel | CudaRuntime
+| 7.186128ms | DetailedKernel | CudaRuntime
+| 7.318973ms | DetailedKernel | CudaRuntime
+| 7.448548ms | DetailedKernel | CudaRuntime
+| 7.404265ms | DetailedKernel | CudaRuntime
+| 7.34617ms  | DetailedKernel | CudaRuntime
+| 7.345098ms | DetailedKernel | CudaRuntime
+| 7.387656ms | DetailedKernel | CudaRuntime
+| 7.364648ms | DetailedKernel | CudaRuntime
+| 7.295646ms | DetailedKernel | CudaRuntime
+| 7.22273ms  | DetailedKernel | CudaRuntime
+| 7.21717ms  | DetailedKernel | CudaRuntime
+| 7.153873ms | DetailedKernel | CudaRuntime
+| 7.158234ms | DetailedKernel | CudaRuntime
+| 7.305758ms | DetailedKernel | CudaRuntime
+| 7.445563ms | DetailedKernel | CudaRuntime
+| 7.380146ms | DetailedKernel | CudaRuntime
+| 7.28897ms  | DetailedKernel | CudaRuntime
+| 7.289578ms | DetailedKernel | CudaRuntime
+| 7.374158ms | DetailedKernel | CudaRuntime
+| 7.396117ms | DetailedKernel | CudaRuntime
+| 7.309904ms | DetailedKernel | CudaRuntime
+| 7.271524ms | DetailedKernel | CudaRuntime
+| 7.288725ms | DetailedKernel | CudaRuntime
+| 7.272503ms | DetailedKernel | CudaRuntime
+| 7.277134ms | DetailedKernel | CudaRuntime
+| 7.320163ms | DetailedKernel | CudaRuntime
+| 7.386206ms | DetailedKernel | CudaRuntime
+| 7.272233ms | DetailedKernel | CudaRuntime
+| 7.195065ms | DetailedKernel | CudaRuntime
+| 7.200289ms | DetailedKernel | CudaRuntime
+| 7.453077ms | DetailedKernel | CudaRuntime
+| 7.453675ms | DetailedKernel | CudaRuntime
+| 7.255691ms | DetailedKernel | CudaRuntime
+| 7.215311ms | DetailedKernel | CudaRuntime
+| 7.266825ms | DetailedKernel | CudaRuntime
+| 7.292208ms | DetailedKernel | CudaRuntime
+| 7.293079ms | DetailedKernel | CudaRuntime
+| 7.159296ms | DetailedKernel | CudaRuntime
+| 7.166377ms | DetailedKernel | CudaRuntime
+| 7.099728ms | DetailedKernel | CudaRuntime
+| 7.093915ms | DetailedKernel | CudaRuntime
+| 7.124988ms | DetailedKernel | CudaRuntime
+| 7.310997ms | DetailedKernel | CudaRuntime
+| 7.297121ms | DetailedKernel | CudaRuntime
+| 7.142926ms | DetailedKernel | CudaRuntime
+| 7.150084ms | DetailedKernel | CudaRuntime
+| 7.397574ms | DetailedKernel | CudaRuntime
+| 7.443999ms | DetailedKernel | CudaRuntime
+| 7.36809ms  | DetailedKernel | CudaRuntime
+| 7.215662ms | DetailedKernel | CudaRuntime
+| 7.218047ms | DetailedKernel | CudaRuntime
+| 7.084283ms | DetailedKernel | CudaRuntime
+| 7.085403ms | DetailedKernel | CudaRuntime
+| 7.243151ms | DetailedKernel | CudaRuntime
+| 7.449446ms | DetailedKernel | CudaRuntime
+| 7.35684ms  | DetailedKernel | CudaRuntime
+| 7.224269ms | DetailedKernel | CudaRuntime
+| 7.236132ms | DetailedKernel | CudaRuntime
+| 7.308614ms | DetailedKernel | CudaRuntime
+| 7.28186ms  | DetailedKernel | CudaRuntime
+| 7.188599ms | DetailedKernel | CudaRuntime
+| 7.156029ms | DetailedKernel | CudaRuntime
+| 7.165422ms | DetailedKernel | CudaRuntime
+| 7.148436ms | DetailedKernel | CudaRuntime
+| 7.152941ms | DetailedKernel | CudaRuntime
+| 7.148696ms | DetailedKernel | CudaRuntime
+| 7.173759ms | DetailedKernel | CudaRuntime
+| 7.105142ms | DetailedKernel | CudaRuntime
+| 7.072119ms | DetailedKernel | CudaRuntime
+| 7.080621ms | DetailedKernel | CudaRuntime
+| 7.434835ms | DetailedKernel | CudaRuntime
+| 7.425876ms | DetailedKernel | CudaRuntime
+| 7.287798ms | DetailedKernel | CudaRuntime
+| 7.298501ms | DetailedKernel | CudaRuntime
+| 7.778307ms | DetailedKernel | CudaRuntime
+| 7.90438ms  | DetailedKernel | CudaRuntime
+| 7.847623ms | DetailedKernel | CudaRuntime
+| 7.73958ms  | DetailedKernel | CudaRuntime
+| 7.778531ms | DetailedKernel | CudaRuntime
+| 7.764213ms | DetailedKernel | CudaRuntime
+| 7.748938ms | DetailedKernel | CudaRuntime
+| 8.485022ms | DetailedKernel | CudaRuntime
+| 8.754373ms | DetailedKernel | CudaRuntime
+| 7.824568ms | DetailedKernel | CudaRuntime
+| 7.820713ms | DetailedKernel | CudaRuntime
+| 7.743458ms | DetailedKernel | CudaRuntime
+| 7.682221ms | DetailedKernel | CudaRuntime
+| 7.528325ms | DetailedKernel | CudaRuntime
+| 7.388024ms | DetailedKernel | CudaRuntime
+| 7.456714ms | DetailedKernel | CudaRuntime

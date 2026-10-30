@@ -14,11 +14,15 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **PR #221 opened** ("Detailed mode: digit arrays by finite differences instead of
   division", 7019653): CPU detailed score ×6.76 on a 15-CPU Broadwell box, no regression at
   any thread count (EXPERIMENTS L2.2). Box destroyed after 1.15 h.
-- **Leads today:** L2 client wiring + NiceMark CPU protocol → PR (box `l2-cpu`, 3080 KR
-  16 cores); L3 GPU detailed finite-difference prototype (box `l3-gpu-fd`, 3080 KR);
-  L1 re-profile of the join on d1ff798 at 1e14 and 1e16 to rank the next join lever
-  (box `l1-profile2`, 3080 US). Kill criteria: L3 under 1.3× at b50 → park; L2 is past
-  its kill criterion (prototype 8.5×), the PR opens when the protocol passes.
+- **L3 GPU detailed FD prototype: 2.6× / 3.2× (b40/b50) on a 180 W-capped 3080, ~2.2–2.7× per
+  clock, exact; 3.2–4.0× with the near-miss readback fix** (L3.1; `exp/gpu-detailed-fd`
+  e0c1b4c). PR tomorrow after an uncapped run; readback fix = L21, its own small PR.
+- **L1 re-profile on d1ff798 (L1.5):** 1e14 fixed cost 40–74 % of a field; partitions per
+  launch 16→32/64 gives ×0.78–0.92; new lead L20 (buffers sized by pruned lists + more
+  partitions per launch), agent running on a 20 GB 3080 with a 10 GB-budget override;
+  finishes ~10:15 UTC, after the director window → one-shot reminder set.
+- Boxes: l2-cpu 1.15 h, l1-profile2 1.67 h, l3-gpu-fd 1.93 h destroyed; l20-launch running.
+- Agents: 4 Opus. Director ~4.5 h.
 
 ## 2026-10-29 (day 2; routine fired 04:41 UTC)
 
