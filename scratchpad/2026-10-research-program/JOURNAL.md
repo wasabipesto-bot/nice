@@ -28,7 +28,7 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   Apple `(x>>16)/K` miscompile explains everything but b23 (L3.5); PR body updated. **M4 root cause found and fixed (L3.6):** Apple compiler miscompiles `(x>>16)/K`; seed
   rewritten in 16-bit limbs; exact on all 44 bases on the M4, speed unchanged; 1 h 11 min of
   machine time, cleaned up. CUDA/lavapipe verification passed (L3.7); squashed to dbe2ab7 on main 9747e39, body
-  rewritten, **#225 ready for review**, resolution comment posted; CI watching. Boxes all
+  rewritten, **#225 ready for review**, resolution comment posted; **CI fully green on dbe2ab7** (incl. Metal, lavapipe, wasm). Boxes all
   destroyed; today's Vast $2.36 (month $4.24). New lead L25: audit nice-only kernels for the
   Metal pattern. mayalaran total today: 29 min + 1 h 11 min.
 - **User questions:** detailed auto order (answer: no change; CubeCL CUDA already leads and
