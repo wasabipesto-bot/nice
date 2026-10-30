@@ -1,0 +1,59 @@
+== 08:52:45 building the final head 40d6a26 Overlap join: size the bottom buffers by the pruned lists and run more partitions per launch
+==> /root/logs/build_pr_test.log <==
+test exit 0
+
+==> /root/logs/build_pr_client.log <==
+client exit 0
+d929bedf75b3428b2094ec83e47637f0  /root/bin/prfinal/nice_client
+fb43b3590c174bc1703226d875bc6747  /root/bin/prfinal/nice_common_test
+== 08:58:45 pr 40d6a26 Overlap join: size the bottom buffers by the pruned lists and run more partitions per launch
+== 08:58:45 non-ignored nice_common tests
+test result: ok. 209 passed; 0 failed; 33 ignored; 0 measured; 0 filtered out; finished in 39.85s
+== 08:59:25 join_plan tests, verbose
+b60 1e14 on a 10 GB card: 64 partitions per launch, 1752 MiB (sized before the prune: 55); bottoms 66634 of 137775
+b62 1e14 on a 10 GB card: 64 partitions per launch, 1831 MiB (sized before the prune: 41); bottoms 65394 of 176671
+b64 1e14 on a 10 GB card: 64 partitions per launch, 2114 MiB (sized before the prune: 39); bottoms 78784 of 180003
+b58 1e15: 1 slice(s), first 517768 prefixes, 8 per launch, 501 MiB
+b60 1e16: 7 slice(s), first 991925 prefixes, 4 per launch, 412 MiB
+b62 1e17: 53 slice(s), first 771170 prefixes, 5 per launch, 411 MiB
+b50: 29 partitions per launch, 737 MiB
+b57: 51 partitions per launch, 1013 MiB
+b60: 51 partitions per launch, 1014 MiB
+b62: 48 partitions per launch, 1021 MiB
+b64: 38 partitions per launch, 1004 MiB
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 234 filtered out; finished in 6.28s
+== 08:59:31 CUDA join vs the CPU reference (windows, tight layouts, slices, refusals, production shape)
+NVIDIA GeForce RTX 3080: b64 [52125117810081128433988, 52125117810081128733988) (11,4,2) agrees
+NVIDIA GeForce RTX 3080: b57 frontier field JoinParams { t: 9, k: 6, p: 2 }, partitions 0, 1000, 3248 agree
+NVIDIA GeForce RTX 3080: b20 [58945, 160000) JoinParams { t: 3, k: 2, p: 0 } tight layouts agree (1 partitions re-run, 110 splits)
+NVIDIA GeForce RTX 3080: b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (10 partitions re-run, 29 splits)
+NVIDIA GeForce RTX 3080: b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (8 partitions re-run, 20 splits)
+NVIDIA GeForce RTX 3080: b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } tight layouts agree (12 partitions re-run, 58 splits)
+NVIDIA GeForce RTX 3080: 5 windows agree whole and in slices
+NVIDIA GeForce RTX 3080: b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 1024 MiB layout (1 refusals, ceiling 512 MiB)
+NVIDIA GeForce RTX 3080: b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 1024 MiB layout (1 refusals, ceiling 512 MiB)
+NVIDIA GeForce RTX 3080: b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } agrees after the device refused a 1026 MiB layout (1 refusals, ceiling 513 MiB)
+NVIDIA GeForce RTX 3080: b57 frontier partitions [0, 1000, 3248] agree in a tight layout (3 re-run, 6 splits) and after a refused one
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 241 filtered out; finished in 75.22s
+== 09:00:47 CUDA whole b42 field vs reference
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 241 filtered out; finished in 37.97s
+== 09:01:25 dense-field test b58 102121216587923470200 +1e15, 64 partitions
+  0 survivors overran the stage (0.0e0 of them)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 241 filtered out; finished in 43.26s
+== 09:02:08 dense-field test b64 41242006262957161709568 +1e16, 8 partitions
+  20534 survivors overran the stage (2.7e-5 of them)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 241 filtered out; finished in 53.82s
+== 09:03:03 dense-field test b64 41242006262957161709568 +1e14, 1024 partitions
+  8078 survivors overran the stage (5.7e-6 of them)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 241 filtered out; finished in 116.57s
+== 09:04:59 throughput harness with NICE_TEST_JOIN_COMPARE=1 (5 fields of 1e14 per base, A/B starts, budget B10)
+test cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields ... JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=58 fields=5 in_flight=2 secs=3.22 per_field=0.645 rate=1.551e14 n/s | setup=0.065s device=0.630s wall=1.088s batches=53 slots=64 plan_mib=2049 | empty_top=0 retried=0 splits=0 survivors=17371603872 checked=979616261 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+STRIDE base=58 fields=5 secs=107.26 per_field=21.451 (one at a time) found=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=60 fields=5 in_flight=2 secs=3.12 per_field=0.624 rate=1.604e14 n/s | setup=0.064s device=0.609s wall=1.051s batches=57 slots=64 plan_mib=2113 | empty_top=0 retried=0 splits=0 survivors=14645237787 checked=981021090 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+STRIDE base=60 fields=5 secs=61.24 per_field=12.248 (one at a time) found=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=62 fields=5 in_flight=2 secs=2.31 per_field=0.462 rate=2.165e14 n/s | setup=0.074s device=0.447s wall=0.741s batches=61 slots=64 plan_mib=1831 | empty_top=0 retried=0 splits=0 survivors=6203535335 checked=380084279 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+STRIDE base=62 fields=5 secs=52.26 per_field=10.452 (one at a time) found=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=64 fields=5 in_flight=2 secs=3.27 per_field=0.654 rate=1.528e14 n/s | setup=0.061s device=0.642s wall=1.142s batches=64 slots=64 plan_mib=2223 | empty_top=0 retried=0 splits=0 survivors=20138412809 checked=1235559204 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+STRIDE base=64 fields=5 secs=109.94 per_field=21.989 (one at a time) found=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 241 filtered out; finished in 358.01s
+EXACT_pr_DONE 09:10:58

@@ -20,9 +20,16 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **L1 re-profile on d1ff798 (L1.5):** 1e14 fixed cost 40–74 % of a field; partitions per
   launch 16→32/64 gives ×0.78–0.92; new lead L20 (buffers sized by pruned lists + more
   partitions per launch), agent running on a 20 GB 3080 with a 10 GB-budget override;
-  finishes ~10:15 UTC, after the director window → one-shot reminder set.
-- Boxes: l2-cpu 1.15 h, l1-profile2 1.67 h, l3-gpu-fd 1.93 h destroyed; l20-launch running.
-- Agents: 4 Opus. Director ~4.5 h.
+  due by ~10:15 UTC at the latest; a one-shot reminder at 08:02 UTC is the fallback.
+- **L20 result:** ×0.79–0.88 at 1e14, neutral at 1e16 → **parked**: the live fields are 1e16
+  (b60) and 1e17 (b62) per the data API, so it does not help production. My brief's
+  "production size = 1e14" came from a stale code comment. Lesson: check the live field
+  sizes before calling a size "production".
+- **Found a latent race in `join_kernel`'s flush decision** (L1.6): **PR #222** opened (one
+  barrier; correctness; cost within noise).
+- Boxes: l2-cpu 1.15 h, l1-profile2 1.67 h, l3-gpu-fd 1.93 h, l20-launch 3.36 h; all destroyed.
+  Today $1.14; month $2.80. Credit $15.45.
+- Agents: 4 Opus. Director ~5.3 h (over by 20 min: the L20 analysis ran long).
 
 ## 2026-10-29 (day 2; routine fired 04:41 UTC)
 

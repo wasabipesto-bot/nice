@@ -5,6 +5,27 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L1.6 Partitions per launch + pruned buffer sizing, and the flush race (2026-10-30, agent; `L1/LAUNCH-RESULTS.md`, `L1/launch-raw/`; branches `pr/join-partitions-per-launch` c4ac700, `rp/join-flush-barrier` 61e6ba9 → PR #222, `rp/launch-with-barrier`)
+
+RTX 3080 20 GB (58361499, 320 W = default), 10 GB layouts via test-only `NICE_TEST_JOIN_MAX_BUFFER`.
+- **1e14, 10 GB budget, 3 rounds:** ×0.881 / 0.868 / 0.793 / 0.832 of main's time at b58/60/62/64
+  (16 → 64 partitions per launch; 211–256 → 53–64 batches). 20 GB: ×0.899 / 0.868 / 0.787 / 0.826.
+  Cap 64 beats "as many as fit" (105–177) by 1–4 %; a 16–177 sweep is fastest at 64 at every base.
+- **1e16: neutral** (×0.992–1.011); 1e15 neutral with b58 1–2 % slower; NiceMark ×1.002
+  (b58_msd_weak ×0.969 in 3 rounds, within that scenario's ±3 % noise here).
+- **PARKED (director):** the live fields are 1e16 at b60 and **1e17 at b62** (data API
+  `fields`, 2026-10-30), so a change that is neutral above 1e15 does not help production and
+  does not move NiceMark. The "production size = 1e14" premise in the L1.5 brief came from a
+  stale code comment ("Production fields at the frontier are 1e14"). Keep for small-field work.
+- **The extra full checks are a race in `join_kernel`'s per-chunk flush decision**, not stage
+  overruns: no barrier between the `s_cnt` load and the next chunk's appends, so a late plane
+  can decide alone to flush and the cube's barriers pair at different call sites; stale list
+  entries get fully checked and entries can be overwritten (survivors never checked). Frequent
+  once cubes grid-stride (>16–19 partitions per launch); possible by the code in main's 1e16
+  layouts. Instrumented: 12 of 50 base-runs at ≥64 per launch without the barrier showed a
+  signature, 0 of 18 with it; 0 of 76 at 16–32. Fix = one `sync_cube()` after the load; cost
+  within noise at 1e14 (×0.99–1.00), ≤ ~1.5 % at 1e16 unresolved. **PR #222.**
+
 ## L3.1 GPU detailed mode by finite differences, prototype (2026-10-30, agent; `L3/GPU-FD.md`, `L3/raw-fd/`; branch `exp/gpu-detailed-fd` e0c1b4c on the fork)
 
 Vast RTX 3080 (58350503, KR, $0.108/h), **power-capped at 180 W** (default 340 W): the old
