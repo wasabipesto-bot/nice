@@ -19,8 +19,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   `--all-targets`). Fixed properly: `DetailedKernel::for_base(base)` picks FD where `fd_plan`
   has a plan and `Division` elsewhere, so both variants are production code; rebased onto
   946ec15 (#224 in main), squashed, force-pushed as 18cba8b; local clippy (default, all
-  targets) and fmt clean; CI running. Clippy build took ~7 GB on ivory; target removed after.
-- **mayalaran (M4) authorised for 1 h** → agent testing #225's Metal path (tests + A/B).
+  targets) and fmt clean; **CI fully green on 18cba8b**, including the macOS Metal job (first
+  real Metal run of the FD kernel) and lavapipe. Clippy build took ~7 GB on ivory; target removed after.
+- **mayalaran (M4), 29 min used: #225's FD kernel is WRONG on Metal** at b23, b27–30, b49/50,
+  b52–55 (division exact; CI's paravirtual Metal passed). → #225 converted to draft, comment
+  posted; next: gate FD off on Metal adapters, then root-cause with another M4 window (L3.4).
 - **User questions:** detailed auto order (answer: no change; CubeCL CUDA already leads and
   wgpu serves AMD/Apple; hand-CUDA detailed is a third-stop fallback now ~3.5× slower) and the
   web runner port (L23 CPU ~half a day, L24 GPU 1–2 days; both queued as requested).

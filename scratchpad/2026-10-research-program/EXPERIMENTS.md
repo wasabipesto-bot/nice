@@ -29,6 +29,24 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L3.4 #225 on Apple M4 (Metal): WRONG RESULTS (2026-10-30, agent, user-authorised 1 h; `L3/METAL-M4.md`, `L3/pr-raw/m4/`)
+
+mayalaran: macOS 26.3 (25D125), M4, Rust 1.99.1; offline build (179 crates copied from ivory);
+29 min of machine time, cleaned up. `auto` = CubeCL wgpu, "Apple M4 (Metal, wgpu<wgsl>)".
+- `cubecl_fd_matches_cpu_detailed` FAILS (first b50 window; all b40 windows pass under every run
+  shape); `cubecl_reads_back_every_near_miss` FAILS at b23; main's tests pass on the device.
+- Per-base sweep: FD wrong at b23, b27–30, b49 (mid), b50, b52 (mid), b53–55; division exact in
+  all 79 windows. Per n: 77 % wrong at b23 start, 87 % at b50; window histograms move only a few
+  percent (the tests barely catch it).
+- Every run length fails incl. 1 number per run → not stepping; seed, packing or mask build as
+  compiled by Metal. Root cause unknown; prime suspect the Apple Metal compiler (cf. the
+  2026-10-06 hi(a·b)/const miscompile seen via cubecl-metal). WGSL + naga MSL dumps saved.
+- The CI "cubecl (Metal) on macOS" job (paravirtual GPU, #218) passed the same commit: it does
+  not reproduce real-hardware Metal behaviour.
+- Speed (3 rounds, spreads ≤0.3 %): b40 8.116e8 → 2.437e9 (3.00×); b50 4.812e8 → 2.183e9 (wrong
+  kernel); NiceMark 329 → 1216. No thermal decline over 60 s reruns.
+Action: #225 → draft + comment; gate FD off on Metal adapters pending the root cause.
+
 ## L3.3 Second card for #224/#225: RTX 4090 (2026-10-30, agent; `L3/AB-4090.md`, `L3/pr-raw/4090/`)
 
 Vast RTX 4090 (58401579, CA, $0.374/h), not power-limited (480 W limit never reached) but

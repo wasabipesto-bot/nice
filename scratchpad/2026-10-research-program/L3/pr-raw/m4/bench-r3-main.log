@@ -1,0 +1,14 @@
+[2026-10-30T15:16:38Z INFO  nice_client] Nice Client v3.4.7-dev started in Detailed mode, using GPU device 0.
+[2026-10-30T15:16:38Z INFO  cubecl_wgpu::runtime] Using adapter AdapterInfo { name: "Apple M4", vendor: 0, device: 0, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "", driver_info: "", backend: Metal, subgroup_min_size: 4, subgroup_max_size: 64, transient_saves_memory: true }
+[2026-10-30T15:16:38Z INFO  cubecl_wgpu::runtime] Created wgpu compute server on device Device { inner: Core(CoreDevice { context: ContextWgpuCore { type: "Native" }, id: Id(0,1), error_sink: Mutex { data: ErrorSink }, features: Features { features_wgpu: FeaturesWGPU(SHADER_FLOAT32_ATOMIC | TEXTURE_FORMAT_16BIT_NORM | TEXTURE_COMPRESSION_ASTC_HDR | TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | TIMESTAMP_QUERY_INSIDE_ENCODERS | TEXTURE_BINDING_ARRAY | STORAGE_RESOURCE_BINDING_ARRAY | SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING | STORAGE_TEXTURE_ARRAY_NON_UNIFORM_INDEXING | PARTIALLY_BOUND_BINDING_ARRAY | ADDRESS_MODE_CLAMP_TO_ZERO | ADDRESS_MODE_CLAMP_TO_BORDER | POLYGON_MODE_LINE | VERTEX_WRITABLE_STORAGE | CLEAR_TEXTURE | MULTIVIEW | TEXTURE_ATOMIC | EXTERNAL_TEXTURE | EXPERIMENTAL_RAY_QUERY | SHADER_INT64 | SUBGROUP | SUBGROUP_BARRIER | SHADER_INT64_ATOMIC_MIN_MAX | TEXTURE_INT64_ATOMIC | EXPERIMENTAL_MESH_SHADER | PASSTHROUGH_SHADERS | SHADER_BARYCENTRICS | EXPERIMENTAL_COOPERATIVE_MATRIX | MEMORY_DECORATION_COHERENT), features_webgpu: FeaturesWebGPU(DEPTH_CLIP_CONTROL | DEPTH32FLOAT_STENCIL8 | TEXTURE_COMPRESSION_BC | TEXTURE_COMPRESSION_BC_SLICED_3D | TEXTURE_COMPRESSION_ETC2 | TEXTURE_COMPRESSION_ASTC | TEXTURE_COMPRESSION_ASTC_SLICED_3D | TIMESTAMP_QUERY | INDIRECT_FIRST_INSTANCE | SHADER_F16 | RG11B10UFLOAT_RENDERABLE | BGRA8UNORM_STORAGE | FLOAT32_FILTERABLE | FLOAT32_BLENDABLE | DUAL_SOURCE_BLENDING | IMMEDIATES | PRIMITIVE_INDEX) } }) } => AdapterInfo { name: "Apple M4", vendor: 0, device: 0, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "", driver_info: "", backend: Metal, subgroup_min_size: 4, subgroup_max_size: 64, transient_saves_memory: true }
+[2026-10-30T15:16:38Z INFO  nice_client] GPU initialized: CubeCL wgpu device (Apple M4 (Metal, wgpu<wgsl>)), batch size 50000000
+Nice benchmark sweep: v3.4.7-dev, Detailed mode, GPU device 0, 90.0s budget
+
+scenario             base character      threads     window   reps     secs  numbers/sec    floor
+b40_detailed           40 uniform              4      2.0e8    165   40.660      8.116e8        -
+b50_detailed           50 uniform              4      2.0e8     98   40.746      4.810e8        -
+
+API latency: unavailable (10 attempts failed)
+
+NiceMark: 329 (v3.4.7-dev, Detailed gpu)
+Not uploading (non-interactive; pass --benchmark-upload to upload).

@@ -1,0 +1,88 @@
+ common/src/cubecl_detailed_fd.rs | 59 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+     Removed 64 files, 46.1MiB total
+    Finished `release` profile [optimized] target(s) in 56.80s
+  Executable unittests src/lib.rs (/Users/justin/claude-exp-2026-10-30-fd/target/release/deps/nice_common-d0848b236b51588b)
+  Executable tests/claim_queries.rs (/Users/justin/claude-exp-2026-10-30-fd/target/release/deps/claim_queries-f9e499fd1e702c62)
+  Executable tests/notable_numbers_cache.rs (/Users/justin/claude-exp-2026-10-30-fd/target/release/deps/notable_numbers_cache-9552a93745bf3acc)
+  Executable tests/search_caches.rs (/Users/justin/claude-exp-2026-10-30-fd/target/release/deps/search_caches-6c52d3e88ab4c1e5)
+TEST_BUILD_SECS 57 rc 0
+cubecl_detailed_fd::tests::zz_metal_diag: test
+=== DIAG wide=default
+
+running 1 test
+test cubecl_detailed_fd::tests::zz_metal_diag ... b23 [795831, 1342071) size 546240: division kernel distribution exact near-misses exact
+b23 FD run 128 batch 50000000: MISMATCH (at least 8580 numbers moved bins)
+  first wrong n = 795835 (offset 4 from start, position 4 in its run): cpu [(12, 1)] fd-alone [(13, 1)] division-alone [(12, 1)]
+b23 FD run 61 batch 50000000: MISMATCH (at least 8580 numbers moved bins)
+  first wrong n = 795835 (offset 4 from start, position 4 in its run): cpu [(12, 1)] fd-alone [(13, 1)] division-alone [(12, 1)]
+b23 FD run 1 batch 50000000: MISMATCH (at least 8580 numbers moved bins)
+  first wrong n = 795835 (offset 4 from start, position 0 in its run): cpu [(12, 1)] fd-alone [(13, 1)] division-alone [(12, 1)]
+b23 FD run 1000 batch 333333: MISMATCH (at least 8580 numbers moved bins)
+  first wrong n = 795835 (offset 4 from start, position 4 in its run): cpu [(12, 1)] fd-alone [(13, 1)] division-alone [(12, 1)]
+b24 [1625364, 2760488) size 1135124: division kernel distribution exact near-misses exact
+b24 FD run 128 batch 50000000: exact (at least 0 numbers moved bins)
+b24 FD run 61 batch 50000000: exact (at least 0 numbers moved bins)
+b24 FD run 1 batch 50000000: exact (at least 0 numbers moved bins)
+b24 FD run 1000 batch 333333: exact (at least 0 numbers moved bins)
+b50 [26507984537059635, 26507984537259635) size 200000: division kernel distribution exact near-misses exact
+b50 FD run 128 batch 50000000: MISMATCH (at least 7367 numbers moved bins)
+  first wrong n = 26507984537059635 (offset 0 from start, position 0 in its run): cpu [(29, 1)] fd-alone [(27, 1)] division-alone [(29, 1)]
+b50 FD run 61 batch 50000000: MISMATCH (at least 7367 numbers moved bins)
+  first wrong n = 26507984537059635 (offset 0 from start, position 0 in its run): cpu [(29, 1)] fd-alone [(27, 1)] division-alone [(29, 1)]
+b50 FD run 1 batch 50000000: MISMATCH (at least 7367 numbers moved bins)
+  first wrong n = 26507984537059635 (offset 0 from start, position 0 in its run): cpu [(29, 1)] fd-alone [(27, 1)] division-alone [(29, 1)]
+b50 FD run 1000 batch 333333: MISMATCH (at least 7367 numbers moved bins)
+  first wrong n = 26507984537059635 (offset 0 from start, position 0 in its run): cpu [(29, 1)] fd-alone [(27, 1)] division-alone [(29, 1)]
+b40 [1916284264916, 1916284464916) size 200000: division kernel distribution exact near-misses exact
+b40 FD run 128 batch 50000000: exact (at least 0 numbers moved bins)
+b40 FD run 61 batch 50000000: exact (at least 0 numbers moved bins)
+b40 FD run 1 batch 50000000: exact (at least 0 numbers moved bins)
+b40 FD run 1000 batch 333333: exact (at least 0 numbers moved bins)
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 217 filtered out; finished in 4.54s
+
+=== RESULT wide=default rc=0 secs=5
+=== DIAG wide=1
+
+running 1 test
+test cubecl_detailed_fd::tests::zz_metal_diag ... 
+thread 'DSD-4-0' (20854524) panicked at /Users/justin/claude-exp-2026-10-30-fd/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wgpu-29.0.4/src/backend/wgpu_core.rs:1560:26:
+wgpu error: Validation Error
+
+Caused by:
+  In Device::create_compute_pipeline, label = 'detailed_kernel'
+    Internal error: Metal: program_source:48:18: error: call to 'select' is ambiguous
+    return lhs / metal::select(rhs, 1u, rhs == 0u);
+                 ^~~~~~~~~~~~~
+/System/Library/PrivateFrameworks/GPUCompiler.framework/Versions/32023/Libraries/lib/clang/32023.864/include/metal/metal_relational:1020:17: note: candidate function
+METAL_FUNC uint select(uint x, uint y, bool c)
+                ^
+/System/Library/PrivateFrameworks/GPUCompiler.framework/Versions/32023/Libraries/lib/clang/32023.864/include/metal/metal_relational:1089:18: note: candidate function
+METAL_FUNC ulong select(ulong x, ulong y, bool c)
+                 ^
+program_source:411:14: warning: unused variable '_e436' [-Wunused-variable]
+        uint _e436 = metal::atomic_fetch_add_explicit(&shared_memory_0_.inner[l_170_], 1u, metal::memory_order_relaxed);
+             ^
+program_source:478:18: warning: unused variable '_e535' [-Wunused-variable]
+            uint _e535 = metal::atomic_fetch_add_explicit(&buffer_0_global[_e532], _e534, metal::memory_order_relaxed);
+                 ^
+
+
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'cubecl_detailed_fd::tests::zz_metal_diag' (20854521) panicked at common/src/cubecl_detailed_fd.rs:713:10:
+cubecl detailed run: GPU histogram counted 0 of 546240 candidates; the device dropped work (was the device reset by the driver's watchdog? check the kernel log)
+FAILED
+
+failures:
+
+failures:
+    cubecl_detailed_fd::tests::zz_metal_diag
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 217 filtered out; finished in 0.07s
+
+=== RESULT wide=1 rc=101 secs=0
+DIAG_DONE
