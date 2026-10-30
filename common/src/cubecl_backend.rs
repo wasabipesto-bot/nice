@@ -390,6 +390,43 @@ fn fd_add(
     fd_carry(x, cin, wy, wx, base);
 }
 
+/// Biased add `x += y` like [`fd_add`], but words `wy..kd` take the carry
+/// unconditionally and anything above `kd` only on a (rare) ripple, which
+/// is reported: returns 1 when a word at or above `kd` changed.
+#[cube]
+fn fd_add_split(
+    x: &mut Array<u32>,
+    y: &Array<u32>,
+    #[comptime] wy: u32,
+    #[comptime] kd: u32,
+    #[comptime] wx: u32,
+    #[comptime] base: u32,
+) -> u32 {
+    let bias = comptime!((256 - base) * 0x0101_0101u32);
+    let fix = comptime!(256 - base);
+    let mut cin = 0u32;
+    #[unroll]
+    for w in 0..wy {
+        let t = x[w as usize] + y[w as usize] + bias + cin;
+        cin = (t >> 31u32) ^ 1u32;
+        x[w as usize] = t - ((t >> 7u32) & 0x0101_0101u32) * fix;
+    }
+    #[unroll]
+    for w in wy..kd {
+        let t = x[w as usize] + bias + cin;
+        cin = (t >> 31u32) ^ 1u32;
+        x[w as usize] = t - ((t >> 7u32) & 0x0101_0101u32) * fix;
+    }
+    let mut rippled = 0u32;
+    if comptime!(kd < wx) {
+        if cin != 0u32 {
+            fd_ripple(x, kd, wx, base);
+            rippled = 1u32;
+        }
+    }
+    rippled
+}
+
 /// Biased add of a one-digit constant `c < base` into word 0 of `x`.
 #[cube]
 fn fd_add_const(x: &mut Array<u32>, #[comptime] c: u32, #[comptime] wx: u32, #[comptime] base: u32) {
@@ -485,12 +522,12 @@ fn fd_to_digits(
     }
 }
 
-/// OR `1 << d` into `m` for the `ndig` packed digits of `x`.
+/// OR `1 << d` into `m` for packed digits `from..ndig` of `x`.
 #[cube]
-fn fd_mask(x: &Array<u32>, m: u64, #[comptime] ndig: u32) -> u64 {
+fn fd_mask(x: &Array<u32>, m: u64, #[comptime] from: u32, #[comptime] ndig: u32) -> u64 {
     let mut mm = m;
     #[unroll]
-    for j in 0..ndig {
+    for j in from..ndig {
         let w = comptime!(j / 4);
         let sh = comptime!(8 * (j % 4));
         let d = if comptime!(j % 4 == 3) {
@@ -531,6 +568,9 @@ fn detailed_fd_kernel(
     #[comptime] lds: u32,
     #[comptime] ldc: u32,
     #[comptime] lddc: u32,
+    #[comptime] static_mask: bool,
+    #[comptime] hist_local: bool,
+    #[comptime] hist_lo: u32,
 ) {
     let hist_bins = comptime!(base + 1);
     let sq_limbs = comptime!(2 * limbs);
@@ -540,6 +580,13 @@ fn detailed_fd_kernel(
     let wds = comptime!(lds.div_ceil(4));
     let wdc = comptime!(ldc.div_ceil(4));
     let wddc = comptime!(lddc.div_ceil(4));
+    // Words of S and C that change on most steps: the addend's words plus,
+    // when the addend fills its top word, one more. Above them a word only
+    // changes on a ripple (four digits of b-1), and their mask is cached.
+    let ks = comptime!(if static_mask { (lds + 1).div_ceil(4).min(ws) } else { ws });
+    let kc = comptime!(if static_mask { (ldc + 1).div_ceil(4).min(wc) } else { wc });
+    let ks_dig = comptime!((4 * ks).min(ls));
+    let kc_dig = comptime!((4 * kc).min(lc));
 
     let hist_s = SharedMemory::<Atomic<u32>>::new(comptime!((HIST_COPIES * (base + 1)) as usize));
     let mut zi = UNIT_POS_X;
@@ -678,12 +725,77 @@ fn detailed_fd_kernel(
         fd_to_digits(&mut v_ddc, &mut ddc, comptime!(limbs + 1), lddc, base, chunk_digits, chunk_div);
 
         // --- walk the run ----------------------------------------------------
+        let mut ms = 0u64;
+        if static_mask {
+            ms = fd_mask(&sd, ms, ks_dig, ls);
+            ms = fd_mask(&cd, ms, kc_dig, lc);
+        }
+        // Per-thread packed histogram: 8-bit counters for bins
+        // hist_lo..hist_lo+16 in four words, flushed every 255 numbers.
+        let mut h0: u32 = 0u32;
+        let mut h1: u32 = 0u32;
+        let mut h2: u32 = 0u32;
+        let mut h3: u32 = 0u32;
+        let mut hfill: u32 = 0u32;
         let mut i = 0u32;
         while i < len {
-            let mut m = fd_mask(&sd, 0u64, ls);
-            m = fd_mask(&cd, m, lc);
+            let mut m = ms;
+            m = fd_mask(&sd, m, 0u32, ks_dig);
+            m = fd_mask(&cd, m, 0u32, kc_dig);
             let u = u32::cast_from(m).count_ones() + u32::cast_from(m >> 32u64).count_ones();
-            hist_s[(copy * hist_bins + u) as usize].fetch_add(1u32);
+            if hist_local {
+                let k = u - hist_lo;
+                if k < 16u32 {
+                    let inc = 1u32 << ((k & 3u32) << 3u32);
+                    let q = k >> 2u32;
+                    h0 += select(q == 0u32, inc, 0u32);
+                    h1 += select(q == 1u32, inc, 0u32);
+                    h2 += select(q == 2u32, inc, 0u32);
+                    h3 += select(q == 3u32, inc, 0u32);
+                } else {
+                    hist_s[(copy * hist_bins + u) as usize].fetch_add(1u32);
+                }
+                hfill += 1u32;
+                let last = i + 1u32 == len;
+                if hfill == 255u32 || last {
+                    let hb = copy * hist_bins + hist_lo;
+                    #[unroll]
+                    for j in 0..4u32 {
+                        let c = (h0 >> comptime!(8 * j)) & 0xFFu32;
+                        if c != 0u32 {
+                            hist_s[(hb + j) as usize].fetch_add(c);
+                        }
+                    }
+                    #[unroll]
+                    for j in 0..4u32 {
+                        let c = (h1 >> comptime!(8 * j)) & 0xFFu32;
+                        if c != 0u32 {
+                            hist_s[(hb + comptime!(4 + j)) as usize].fetch_add(c);
+                        }
+                    }
+                    #[unroll]
+                    for j in 0..4u32 {
+                        let c = (h2 >> comptime!(8 * j)) & 0xFFu32;
+                        if c != 0u32 {
+                            hist_s[(hb + comptime!(8 + j)) as usize].fetch_add(c);
+                        }
+                    }
+                    #[unroll]
+                    for j in 0..4u32 {
+                        let c = (h3 >> comptime!(8 * j)) & 0xFFu32;
+                        if c != 0u32 {
+                            hist_s[(hb + comptime!(12 + j)) as usize].fetch_add(c);
+                        }
+                    }
+                    h0 = 0u32;
+                    h1 = 0u32;
+                    h2 = 0u32;
+                    h3 = 0u32;
+                    hfill = 0u32;
+                }
+            } else {
+                hist_s[(copy * hist_bins + u) as usize].fetch_add(1u32);
+            }
             if u > cutoff {
                 let pos = miss_count[0].fetch_add(1u32);
                 if pos < miss_cap {
@@ -701,11 +813,23 @@ fn detailed_fd_kernel(
                 }
             }
             // Step n -> n+1.
-            fd_add(&mut sd, &ds, wds, ws, base);
-            fd_add_const(&mut ds, 2u32, wds, base);
-            fd_add(&mut cd, &dc, wdc, wc, base);
-            fd_add(&mut dc, &ddc, wddc, wdc, base);
-            fd_add_const(&mut ddc, 6u32, wddc, base);
+            if static_mask {
+                let r = fd_add_split(&mut sd, &ds, wds, ks, ws, base)
+                    | fd_add_split(&mut cd, &dc, wdc, kc, wc, base);
+                fd_add_const(&mut ds, 2u32, wds, base);
+                fd_add_split(&mut dc, &ddc, wddc, wddc, wdc, base);
+                fd_add_const(&mut ddc, 6u32, wddc, base);
+                if r != 0u32 {
+                    ms = fd_mask(&sd, 0u64, ks_dig, ls);
+                    ms = fd_mask(&cd, ms, kc_dig, lc);
+                }
+            } else {
+                fd_add(&mut sd, &ds, wds, ws, base);
+                fd_add_const(&mut ds, 2u32, wds, base);
+                fd_add(&mut cd, &dc, wdc, wc, base);
+                fd_add(&mut dc, &ddc, wddc, wdc, base);
+                fd_add_const(&mut ddc, 6u32, wddc, base);
+            }
             i += 1u32;
         }
 
@@ -2237,6 +2361,24 @@ pub struct FdOptions {
     pub run_len: u32,
     /// Candidates per dispatch (the histogram drain interval follows).
     pub batch: u128,
+    /// Cache the mask of the slow-changing high words of n² and n³.
+    pub static_mask: bool,
+    /// Per-thread packed histogram instead of one shared atomic per number.
+    pub hist_local: bool,
+}
+
+impl FdOptions {
+    /// Enabled, run length `run_len`, default batch and variant.
+    #[must_use]
+    pub fn with_run(run_len: u32) -> Self {
+        Self {
+            enabled: true,
+            run_len,
+            batch: CUBECL_BATCH_SIZE,
+            static_mask: true,
+            hist_local: false,
+        }
+    }
 }
 
 impl FdOptions {
@@ -2255,10 +2397,14 @@ impl FdOptions {
             .and_then(|v| v.parse().ok())
             .unwrap_or(CUBECL_BATCH_SIZE)
             .clamp(1, 1_000_000_000);
+        let static_mask = std::env::var("NICE_FD_STATIC").map_or(true, |v| v != "0");
+        let hist_local = std::env::var("NICE_FD_HIST").is_ok_and(|v| v == "1");
         Self {
             enabled,
             run_len,
             batch,
+            static_mask,
+            hist_local,
         }
     }
 }
@@ -2438,6 +2584,10 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
     /// bound is checked below.
     const DRAIN_INTERVAL: usize = 64;
     const _: () = assert!((DRAIN_INTERVAL as u128) * CUBECL_BATCH_SIZE < u32::MAX as u128);
+    // Packed-histogram window: 16 bins around the typical unique count
+    // (about 0.59 b at the live bases); only speed depends on it.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let hist_lo = ((f64::from(base) * 0.59).round() as u32).saturating_sub(8).min(base.saturating_sub(15));
     let plan = if fd.enabled && wide_chunk {
         fd_plan(base)
     } else {
@@ -2539,6 +2689,9 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
                     p.lds,
                     p.ldc,
                     p.lddc,
+                    fd.static_mask,
+                    fd.hist_local,
+                    hist_lo,
                 );
             }
             continue;
@@ -3738,10 +3891,19 @@ mod tests {
     #[allow(clippy::too_many_lines)]
     fn cubecl_cuda_fd_matches_cpu_detailed() {
         let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
+        let v = |run_len: u32, batch: u128, static_mask: bool, hist_local: bool| FdOptions {
+            enabled: true,
+            run_len,
+            batch,
+            static_mask,
+            hist_local,
+        };
         let opts = [
-            FdOptions { enabled: true, run_len: 256, batch: CUBECL_BATCH_SIZE },
-            FdOptions { enabled: true, run_len: 61, batch: CUBECL_BATCH_SIZE },
-            FdOptions { enabled: true, run_len: 1000, batch: 333_333 },
+            v(256, CUBECL_BATCH_SIZE, true, false),
+            v(256, CUBECL_BATCH_SIZE, false, false),
+            v(61, CUBECL_BATCH_SIZE, true, true),
+            v(1000, 333_333, true, true),
+            v(1000, 333_333, false, false),
         ];
         let check = |range: &FieldSize, base: u32, cpu: &FieldResults, what: &str| {
             for o in &opts {
@@ -3803,13 +3965,13 @@ mod tests {
             let range = FieldSize::new(rs, rs + 200_000_000);
             let cpu = cpu_detailed_parallel(&range, base);
             let gpu = cubecl::future::block_on(process_range_detailed_cubecl_with(
-                &ctx, &range, base, FdOptions { enabled: true, run_len: 256, batch: CUBECL_BATCH_SIZE },
+                &ctx, &range, base, FdOptions::with_run(256),
             ))
             .expect("fd run");
             assert_eq!(gpu.distribution, cpu.distribution, "b{base} benchmark window");
             assert_eq!(gpu.nice_numbers, cpu.nice_numbers, "b{base} benchmark window");
             let old = cubecl::future::block_on(process_range_detailed_cubecl_with(
-                &ctx, &range, base, FdOptions { enabled: false, run_len: 256, batch: CUBECL_BATCH_SIZE },
+                &ctx, &range, base, FdOptions { enabled: false, ..FdOptions::with_run(256) },
             ))
             .expect("old run");
             assert_eq!(old.distribution, cpu.distribution, "b{base} benchmark window (old kernel)");
@@ -3864,12 +4026,26 @@ mod tests {
             let base = base as u32;
             let rs = crate::base_range::get_base_range_u128(base).unwrap().unwrap().range_start;
             let range = FieldSize::new(rs, rs + window);
+            let variants = std::env::var("FD_TIMING_VARIANTS").unwrap_or_else(|_| "s".into());
             let mut arms: Vec<(String, FdOptions)> = vec![(
                 "old".into(),
-                FdOptions { enabled: false, run_len: 1, batch: CUBECL_BATCH_SIZE },
+                FdOptions { enabled: false, ..FdOptions::with_run(1) },
             )];
-            for &r in &runs {
-                arms.push((format!("fd R={r}"), FdOptions { enabled: true, run_len: r as u32, batch }));
+            for var in variants.split(',') {
+                // p = plain (v1), s = static mask, h = static + local histogram,
+                // q = plain + local histogram
+                let (sm, hl) = match var {
+                    "p" => (false, false),
+                    "h" => (true, true),
+                    "q" => (false, true),
+                    _ => (true, false),
+                };
+                for &r in &runs {
+                    arms.push((
+                        format!("fd{var} R={r}"),
+                        FdOptions { run_len: r as u32, batch, static_mask: sm, hist_local: hl, ..FdOptions::with_run(1) },
+                    ));
+                }
             }
             // Warm up (JIT) and cross-check every arm once.
             let reference = cubecl::future::block_on(process_range_detailed_cubecl_with(&ctx, &range, base, arms[0].1)).unwrap();
