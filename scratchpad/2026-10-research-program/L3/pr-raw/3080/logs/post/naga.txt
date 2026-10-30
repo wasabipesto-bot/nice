@@ -1,0 +1,61 @@
+Fri Oct 30 14:11:22 UTC 2026
+  Installing /root/nagacli/bin/naga
+   Installed package `naga-cli v29.0.4` (executable `naga`)
+warning: be sure to add `/root/nagacli/bin` to your PATH to be able to run the installed binaries
+Usage: naga [--validate <validate>] [--index-bounds-check-policy <index-bounds-check-policy>] [--buffer-bounds-check-policy <buffer-bounds-check-policy>] [--image-load-bounds-check-policy <image-load-bounds-check-policy>] [--block-ctx-dir <block-ctx-dir>] [--entry-point <entry-point>] [--profile <profile>] [--shader-model <shader-model>] [--spirv-version <spirv-version>] [--shader-stage <shader-stage>] [--input-kind <input-kind>] [--metal-version <metal-version>] [--keep-coordinate-space] [--dot-cfg-only] [--stdin-file-path <stdin-file-path>] [-g] [--compact] [--before-compaction <before-compaction>] [--bulk-validate] [--version] [--override <override...>] [-D <defines...>] [--capabilities <capabilities>] [--task-limits <task-limits>] [--validate-mesh-output <validate-mesh-output>] [--] [<files...>]
+
+Translate shaders to different formats.
+
+Positional Arguments:
+  files             the input and output files. First positional argument is the
+                    input file. If not specified, the input will be read from
+                    stdin. In the case, --stdin-file-path must also be
+                    specified. The rest arguments are the output files. If not
+                    specified, only validation will be performed. In bulk
+                    validation mode, these are all input files to be validated.
+
+Options:
+  --validate        bitmask of the ValidationFlags to be used, use 0 to disable
+                    validation
+  --index-bounds-check-policy
+                    what policy to use for index bounds checking for arrays,
+                    vectors, and matrices. May be `Restrict` (force all indices
+                    in-bounds), `ReadZeroSkipWrite` (out-of-bounds indices read
+                    zeros, and don't write at all), or `Unchecked` (generate the
+                    simplest code, and whatever happens, happens) `Unchecked` is
+                    the default.
+  --buffer-bounds-check-policy
+                    what policy to use for index bounds checking for arrays,
+                    vectors, and matrices, when they are stored in globals in
+                    the `storage` or `uniform` storage classes. Possible values
+                    are the same as for `index-bounds-check-policy`. If omitted,
+                    defaults to the index bounds check policy.
+  --image-load-bounds-check-policy
+                    what policy to use for texture loads bounds checking.
+                    Possible values are the same as for
+                    `index-bounds-check-policy`. If omitted, defaults to the
+                    index bounds check policy.
+  --block-ctx-dir   directory to dump the SPIR-V block context dump to
+  --entry-point     the shader entrypoint. When specified along with the
+                    `--compact` option, anything not reachable from the selected
+                    entry point will not appear in the output module. When
+                    specified without the `--compact` option, alternate entry
+                    points will not appear in the output module, and other
+                    declarations referenced by alternate entrypoints may or may
+== wgsl_div_b10.wgsl
+rc=0
+-rw-r--r-- 1 root root 20024 Oct 30 14:12 wgsl_div_b10.metal
+== wgsl_div_b80.wgsl
+rc=0
+-rw-r--r-- 1 root root 53848 Oct 30 14:12 wgsl_div_b80.metal
+== wgsl_fd_b10.wgsl
+rc=0
+-rw-r--r-- 1 root root 45105 Oct 30 14:12 wgsl_fd_b10.metal
+== wgsl_fd_b40.wgsl
+rc=0
+-rw-r--r-- 1 root root 173254 Oct 30 14:12 wgsl_fd_b40.metal
+== wgsl_fd_b62.wgsl
+rc=0
+-rw-r--r-- 1 root root 421615 Oct 30 14:12 wgsl_fd_b62.metal
+Fri Oct 30 14:12:17 UTC 2026
+NAGA_DONE

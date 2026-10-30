@@ -5,6 +5,30 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L3.2 GPU detailed finite differences and the readback fix, protocol on a default-power 3080 (2026-10-30, agent; `L3/PR-RESULTS-3080.md`, `L3/pr-raw/3080/`; PRs #224 readback, #225 FD)
+
+RTX 3080 20 GB (58401551, US), power limit 320 W = default = enforced = max; both kernels hit
+it (~318 W): division kernel 1755–1770 MHz, FD 1860–1890 MHz (×1.07 clock). `auto` = CubeCL
+CUDA. NiceMark detailed GPU, 150 s, A B C × 3:
+
+| | main | readback (rb) | FD | FD/rb | FD/main |
+|---|---|---|---|---|---|
+| b40_detailed | 1.018e10 | 1.108e10 (+8.8 %) | 3.352e10 | 3.03× | 3.29× |
+| b50_detailed | 7.512e9 | 8.052e9 (+7.2 %) | 2.978e10 | 3.70× | 3.96× |
+| detailed GPU score | 4609 | 4986 | 16624 | 3.33× | 3.61× |
+
+2e9 windows: FD/rb 3.09× (b40), 3.60× (b50). One 1e10 field (the new server cap, #223): b50
+1.218 s → 0.325 s (3.75×), b52 1.288 → 0.333 s (3.86×); the readback fix is nothing at that
+size. Per clock FD/rb ≈ 2.8× (b40), 3.5× (b50), same as the capped card yesterday.
+Exactness: all CUDA FD tests; main vs FD identical on 100 windows across every base 10–64
+(8.6e9 numbers, 261 near-misses); bases 10–28 in full (73 near-misses). Portability: wgpu uses
+a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL SPIR-V, also
+`NICE_CUBECL_WIDE=1`; all 19 CI lavapipe tests pass; Metal translated by naga 29.0.4, no Mac
+(the macOS CI job is the first real run); HIP not built. Branch heads: readback 6a1e396
+(CubeCL `offset_end` read of `count` records, hand-CUDA slices its copy; 3 tests), FD f3a33cf
+(`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
+division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
+
 ## L1.6 Partitions per launch + pruned buffer sizing, and the flush race (2026-10-30, agent; `L1/LAUNCH-RESULTS.md`, `L1/launch-raw/`; branches `pr/join-partitions-per-launch` c4ac700, `rp/join-flush-barrier` 61e6ba9 → PR #222, `rp/launch-with-barrier`)
 
 RTX 3080 20 GB (58361499, 320 W = default), 10 GB layouts via test-only `NICE_TEST_JOIN_MAX_BUFFER`.

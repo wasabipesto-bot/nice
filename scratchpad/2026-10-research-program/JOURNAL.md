@@ -4,6 +4,15 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-10-30 (day 3, afternoon; user: "keep working on the FD ports today ... get all results submitted as PRs")
+
+- 12:25 UTC: credit topped up to $65.37; **#222 merged**, **#223 merged** (the user raised the
+  detailed field cap 1e9 → 1e10 after the report's round-trip note); #221 green, awaiting review.
+  main = 46e4dc4.
+- **PR #224 (readback, +7–9 %) and PR #225 (GPU FD, 3.3–4.0×, stacked) opened** from the 3080
+  run (320 W default card; EXPERIMENTS L3.2). The 4090 agent is still measuring; its numbers
+  replace the FD body's "second card" paragraph (yesterday's capped 3080) when they land.
+
 ## 2026-10-30 (day 3; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; October research invoiced $1.66; fleet $65.02;
