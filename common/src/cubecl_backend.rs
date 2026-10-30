@@ -394,6 +394,7 @@ fn fd_add(
 /// unconditionally and anything above `kd` only on a (rare) ripple, which
 /// is reported: returns 1 when a word at or above `kd` changed.
 #[cube]
+#[allow(clippy::collapsible_if)]
 fn fd_add_split(
     x: &mut Array<u32>,
     y: &Array<u32>,
@@ -470,6 +471,7 @@ fn fd_add_const_top(x: &mut Array<u32>, #[comptime] c: u32, #[comptime] base: u3
 
 /// Biased add of a one-digit constant `c < base` into word 0 of `x`.
 #[cube]
+#[allow(clippy::collapsible_if)]
 fn fd_add_const(x: &mut Array<u32>, #[comptime] c: u32, #[comptime] wx: u32, #[comptime] base: u32) {
     let bias = comptime!((256 - base) * 0x0101_0101u32);
     let fix = comptime!(256 - base);
@@ -487,6 +489,7 @@ fn fd_add_const(x: &mut Array<u32>, #[comptime] c: u32, #[comptime] wx: u32, #[c
 /// addend's top word takes a carry often), then ripple further only when that
 /// word carried out too, which is rare.
 #[cube]
+#[allow(clippy::collapsible_if)]
 fn fd_carry(
     x: &mut Array<u32>,
     cin: u32,
@@ -586,7 +589,14 @@ fn fd_mask(x: &Array<u32>, m: u64, #[comptime] from: u32, #[comptime] ndig: u32)
 /// (grid-stride over runs), seeds its digit arrays from the run's first n
 /// and steps through the run by digit-array addition.
 #[cube(launch_unchecked)]
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::collapsible_if,
+    clippy::fn_params_excessive_bools
+)]
 fn detailed_fd_kernel(
     hist: &mut Array<Atomic<u32>>,
     miss_count: &mut Array<Atomic<u32>>,
@@ -2473,6 +2483,7 @@ pub async fn process_range_detailed_cubecl_async(
 
 /// Knobs for the finite-difference detailed kernel (experiment).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct FdOptions {
     /// Use the finite-difference kernel where it applies (wide chunk flavor,
     /// base <= 64, inside the base's regular digit-count interval).
@@ -2570,6 +2581,7 @@ fn natural_digits(x: &malachite::natural::Natural, base: u32) -> u32 {
 /// The finite-difference plan for `base`, or `None` where the kernel does not
 /// apply (no u128 range, or a base above 64, which needs two masks).
 #[must_use]
+#[allow(clippy::similar_names)]
 pub fn fd_plan(base: u32) -> Option<FdPlan> {
     use malachite::base::num::arithmetic::traits::{CeilingRoot, Pow};
     use malachite::natural::Natural;
@@ -4015,7 +4027,7 @@ mod tests {
     /// `process_range_detailed` over `threads` scoped threads, merged.
     #[cfg(feature = "cubecl-cuda")]
     fn cpu_detailed_parallel(range: &FieldSize, base: u32) -> FieldResults {
-        let threads = std::thread::available_parallelism().map_or(8, |n| n.get()) as u128;
+        let threads = std::thread::available_parallelism().map_or(8, std::num::NonZero::get) as u128;
         let size = range.size();
         let step = size.div_ceil(threads).max(1);
         let parts: Vec<FieldResults> = std::thread::scope(|sc| {
@@ -4056,7 +4068,7 @@ mod tests {
     #[test]
     #[cfg(feature = "cubecl-cuda")]
     #[ignore = "requires an NVIDIA device"]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::many_single_char_names)]
     fn cubecl_cuda_fd_matches_cpu_detailed() {
         let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
         let v = |run_len: u32, batch: u128, static_mask: bool, merged: bool, hist_local: bool, table: bool| FdOptions {
@@ -4117,7 +4129,7 @@ mod tests {
                 // smallest n with 3n²+3n+1 >= b^k
                 let (mut lo, mut hi) = (0u128, 1u128 << 64);
                 while lo < hi {
-                    let m = (lo + hi) / 2;
+                    let m = lo.midpoint(hi);
                     let v = m.checked_mul(m).and_then(|q| q.checked_mul(3)).and_then(|q| q.checked_add(3 * m + 1));
                     if v.is_none_or(|v| v >= bk) { hi = m } else { lo = m + 1 }
                 }
