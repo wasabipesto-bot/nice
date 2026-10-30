@@ -591,6 +591,7 @@ fn detailed_fd_kernel(
     hist: &mut Array<Atomic<u32>>,
     miss_count: &mut Array<Atomic<u32>>,
     miss_data: &mut Array<u32>,
+    low_table: &Array<u64>,
     s0: u32,
     s1: u32,
     s2: u32,
@@ -613,8 +614,13 @@ fn detailed_fd_kernel(
     #[comptime] merged: bool,
     #[comptime] hist_local: bool,
     #[comptime] hist_lo: u32,
+    #[comptime] use_table: bool,
 ) {
     let hist_bins = comptime!(base + 1);
+    // Low-digit table: entry r is the mask of digits 0 and 1 of r² and r³
+    // mod b², i.e. of n² and n³ for every n ≡ r (mod b²).
+    let b2 = comptime!(base * base);
+    let low_dig = comptime!(if use_table { 2u32 } else { 0u32 });
     let sq_limbs = comptime!(2 * limbs);
     let cu_limbs = comptime!(3 * limbs);
     let ws = comptime!(ls.div_ceil(4));
@@ -779,11 +785,24 @@ fn detailed_fd_kernel(
         let mut h2: u32 = 0u32;
         let mut h3: u32 = 0u32;
         let mut hfill: u32 = 0u32;
+        let mut r: u32 = 0u32;
+        if use_table {
+            let m64 = comptime!(u64::from(base * base));
+            let p64 = comptime!(((1u128 << 64) % u128::from(base * base)) as u64);
+            r = u32::cast_from(((n_hi % m64) * p64 + n_lo % m64) % m64);
+        }
         let mut i = 0u32;
         while i < len {
             let mut m = ms;
-            m = fd_mask(&sd, m, 0u32, ks_dig);
-            m = fd_mask(&cd, m, 0u32, kc_dig);
+            if use_table {
+                m |= low_table[r as usize];
+                r += 1u32;
+                if r == b2 {
+                    r = 0u32;
+                }
+            }
+            m = fd_mask(&sd, m, low_dig, ks_dig);
+            m = fd_mask(&cd, m, low_dig, kc_dig);
             let u = u32::cast_from(m).count_ones() + u32::cast_from(m >> 32u64).count_ones();
             if hist_local {
                 let k = u - hist_lo;
@@ -2468,6 +2487,9 @@ pub struct FdOptions {
     pub merged: bool,
     /// Per-thread packed histogram instead of one shared atomic per number.
     pub hist_local: bool,
+    /// Masks of the two lowest digits of n² and n³ from a b²-entry table
+    /// (v4; measured within 2 % of v3, so off by default).
+    pub table: bool,
 }
 
 impl FdOptions {
@@ -2481,6 +2503,7 @@ impl FdOptions {
             static_mask: true,
             merged: true,
             hist_local: false,
+            table: false,
         }
     }
 }
@@ -2504,6 +2527,7 @@ impl FdOptions {
         let static_mask = std::env::var("NICE_FD_STATIC").map_or(true, |v| v != "0");
         let hist_local = std::env::var("NICE_FD_HIST").is_ok_and(|v| v == "1");
         let merged = static_mask && std::env::var("NICE_FD_MERGED").map_or(true, |v| v != "0");
+        let table = std::env::var("NICE_FD_TABLE").is_ok_and(|v| v == "1");
         Self {
             enabled,
             run_len,
@@ -2511,6 +2535,7 @@ impl FdOptions {
             static_mask,
             merged,
             hist_local,
+            table,
         }
     }
 }
@@ -2699,6 +2724,21 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
     } else {
         None
     };
+    let use_table = fd.table && plan.is_some_and(|p| p.ls >= 2 && p.lc >= 2);
+    let low_table: Vec<u64> = if use_table {
+        let b = u64::from(base);
+        (0..b * b)
+            .map(|r| {
+                let sq = (r * r) % (b * b);
+                let cu = (sq * r) % (b * b);
+                (1u64 << (sq % b)) | (1u64 << (sq / b)) | (1u64 << (cu % b)) | (1u64 << (cu / b))
+            })
+            .collect()
+    } else {
+        vec![0u64; 1]
+    };
+    let low_table_len = low_table.len();
+    let low_table_handle = client.create(cubecl::bytes::Bytes::from_elems(low_table));
     let batch_size = if plan.is_some() {
         fd.batch
     } else {
@@ -2777,6 +2817,7 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
                         miss_data_handle.clone(),
                         NEAR_MISS_CAPACITY * MISS_STRIDE as usize,
                     ),
+                    ArrayArg::from_raw_parts(low_table_handle.clone(), low_table_len),
                     start as u32,
                     (start >> 32) as u32,
                     (start >> 64) as u32,
@@ -2799,6 +2840,7 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
                     fd.static_mask && fd.merged,
                     fd.hist_local,
                     hist_lo,
+                    use_table,
                 );
             }
             continue;
@@ -2897,12 +2939,31 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
         miss_total <= NEAR_MISS_CAPACITY,
         "near-miss buffer overflow: {miss_total} > {NEAR_MISS_CAPACITY}"
     );
-    let bytes = client
-        .read_async(vec![miss_data_handle])
-        .await
-        .map_err(|e| anyhow::anyhow!("miss data read failed: {e:?}"))?
-        .remove(0);
-    let words = u32::from_bytes(&bytes);
+    // Read back only the records written (none when there are none): the
+    // whole buffer is 20 MB, a ~1-2 ms PCIe copy per field that is a fifth
+    // of a benchmark window at finite-difference speed.
+    // NICE_MISS_READ_ALL=1 restores the full read for A/B runs.
+    let read_all = std::env::var("NICE_MISS_READ_ALL").is_ok_and(|v| v == "1");
+    let miss_bytes = if miss_total == 0 && !read_all {
+        None
+    } else {
+        let handle = if read_all {
+            miss_data_handle
+        } else {
+            miss_data_handle.offset_end(
+                ((NEAR_MISS_CAPACITY - miss_total) * MISS_STRIDE as usize * core::mem::size_of::<u32>())
+                    as u64,
+            )
+        };
+        Some(
+            client
+                .read_async(vec![handle])
+                .await
+                .map_err(|e| anyhow::anyhow!("miss data read failed: {e:?}"))?
+                .remove(0),
+        )
+    };
+    let words: &[u32] = miss_bytes.as_ref().map_or(&[], |b| u32::from_bytes(b));
     let mut nice_numbers: Vec<NiceNumberSimple> = (0..miss_total)
         .map(|i| {
             let o = i * MISS_STRIDE as usize;
@@ -3998,21 +4059,23 @@ mod tests {
     #[allow(clippy::too_many_lines)]
     fn cubecl_cuda_fd_matches_cpu_detailed() {
         let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
-        let v = |run_len: u32, batch: u128, static_mask: bool, merged: bool, hist_local: bool| FdOptions {
+        let v = |run_len: u32, batch: u128, static_mask: bool, merged: bool, hist_local: bool, table: bool| FdOptions {
             enabled: true,
             run_len,
             batch,
             static_mask,
             merged,
             hist_local,
+            table,
         };
         let opts = [
-            v(128, CUBECL_BATCH_SIZE, true, true, false),
-            v(256, CUBECL_BATCH_SIZE, true, false, false),
-            v(256, CUBECL_BATCH_SIZE, false, false, false),
-            v(61, CUBECL_BATCH_SIZE, true, true, true),
-            v(1000, 333_333, true, false, true),
-            v(1000, 333_333, true, true, false),
+            v(128, CUBECL_BATCH_SIZE, true, true, false, true),
+            v(128, CUBECL_BATCH_SIZE, true, true, false, false),
+            v(256, CUBECL_BATCH_SIZE, true, false, false, false),
+            v(256, CUBECL_BATCH_SIZE, false, false, false, false),
+            v(61, CUBECL_BATCH_SIZE, true, true, true, true),
+            v(1000, 333_333, true, false, true, false),
+            v(1000, 333_333, true, true, false, true),
         ];
         let check = |range: &FieldSize, base: u32, cpu: &FieldResults, what: &str| {
             for o in &opts {
@@ -4142,18 +4205,20 @@ mod tests {
             )];
             for var in variants.split(',') {
                 // p = plain (v1), s = static mask (v2), m = static + merged
-                // rare branch (v3), h = v3 + local histogram, q = v2 + local
-                let (sm, mg, hl) = match var {
-                    "p" => (false, false, false),
-                    "s" => (true, false, false),
-                    "h" => (true, true, true),
-                    "q" => (true, false, true),
-                    _ => (true, true, false),
+                // rare branch (v3), t = v3 + low-digit table (v4),
+                // h = v3 + local histogram, q = v2 + local histogram
+                let (sm, mg, hl, tb) = match var {
+                    "p" => (false, false, false, false),
+                    "s" => (true, false, false, false),
+                    "h" => (true, true, true, false),
+                    "q" => (true, false, true, false),
+                    "t" => (true, true, false, true),
+                    _ => (true, true, false, false),
                 };
                 for &r in &runs {
                     arms.push((
                         format!("fd{var} R={r}"),
-                        FdOptions { run_len: r as u32, batch, static_mask: sm, merged: mg, hist_local: hl, ..FdOptions::with_run(1) },
+                        FdOptions { run_len: r as u32, batch, static_mask: sm, merged: mg, hist_local: hl, table: tb, ..FdOptions::with_run(1) },
                     ));
                 }
             }
