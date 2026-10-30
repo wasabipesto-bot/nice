@@ -983,8 +983,9 @@ pub struct FieldSetup {
     pub bp_m: Vec<u64>,
     pub seg: Vec<u32>,
     /// `bpre` before the prune by `fc`, in the same order, which slices
-    /// ([`Self::sub_range`]) prune by their own certificate. Its length
-    /// sizes the device buffers, so the layout does not depend on the prune.
+    /// ([`Self::sub_range`]) prune by their own certificate. No slice's list
+    /// is longer, so its length bounds them all where a field is cut into
+    /// slices before they are built (`join_plan::max_slice_prefixes`).
     pub bp_all: Arc<(Vec<u32>, Vec<u64>)>,
     /// The prefilter tests the output digits below `k2` (1 or 2 more than
     /// the bottom list's `k`).

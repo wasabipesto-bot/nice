@@ -1327,7 +1327,8 @@ pub(crate) fn limits_of<R: Runtime>(client: &ComputeClient<R>) -> JoinLimits {
     let max_buffer = client.properties().memory.max_page_size;
     #[cfg(test)]
     let max_buffer = std::env::var("NICE_TEST_JOIN_MAX_BUFFER").map_or(max_buffer, |v| {
-        v.parse().expect("NICE_TEST_JOIN_MAX_BUFFER: a size in bytes")
+        v.parse()
+            .expect("NICE_TEST_JOIN_MAX_BUFFER: a size in bytes")
     });
     JoinLimits::for_buffer(max_buffer)
 }
