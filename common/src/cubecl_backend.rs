@@ -427,6 +427,47 @@ fn fd_add_split(
     rippled
 }
 
+/// Biased add `x += y` over words `0..wy`, then the carry into words
+/// `wy..kd`; no ripple above `kd`. Returns the last word's raw sum, whose
+/// bit 31 is clear exactly when it carried out (the caller ripples).
+#[cube]
+fn fd_add_top(
+    x: &mut Array<u32>,
+    y: &Array<u32>,
+    #[comptime] wy: u32,
+    #[comptime] kd: u32,
+    #[comptime] base: u32,
+) -> u32 {
+    let bias = comptime!((256 - base) * 0x0101_0101u32);
+    let fix = comptime!(256 - base);
+    let mut cin: u32 = 0u32;
+    let mut t: u32 = 0u32;
+    #[unroll]
+    for w in 0..wy {
+        t = x[w as usize] + y[w as usize] + bias + cin;
+        cin = (t >> 31u32) ^ 1u32;
+        x[w as usize] = t - ((t >> 7u32) & 0x0101_0101u32) * fix;
+    }
+    #[unroll]
+    for w in wy..kd {
+        t = x[w as usize] + bias + cin;
+        cin = (t >> 31u32) ^ 1u32;
+        x[w as usize] = t - ((t >> 7u32) & 0x0101_0101u32) * fix;
+    }
+    t
+}
+
+/// Biased add of a one-digit constant into word 0; returns the raw sum as
+/// [`fd_add_top`] does.
+#[cube]
+fn fd_add_const_top(x: &mut Array<u32>, #[comptime] c: u32, #[comptime] base: u32) -> u32 {
+    let bias = comptime!((256 - base) * 0x0101_0101u32);
+    let fix = comptime!(256 - base);
+    let t = x[0] + comptime!(bias + c);
+    x[0] = t - ((t >> 7u32) & 0x0101_0101u32) * fix;
+    t
+}
+
 /// Biased add of a one-digit constant `c < base` into word 0 of `x`.
 #[cube]
 fn fd_add_const(x: &mut Array<u32>, #[comptime] c: u32, #[comptime] wx: u32, #[comptime] base: u32) {
@@ -569,6 +610,7 @@ fn detailed_fd_kernel(
     #[comptime] ldc: u32,
     #[comptime] lddc: u32,
     #[comptime] static_mask: bool,
+    #[comptime] merged: bool,
     #[comptime] hist_local: bool,
     #[comptime] hist_lo: u32,
 ) {
@@ -813,7 +855,66 @@ fn detailed_fd_kernel(
                 }
             }
             // Step n -> n+1.
-            if static_mask {
+            if merged {
+                // All five adds without their (rare) ripples, then one branch
+                // for all of them: a word carried out iff bit 31 of its raw
+                // sum is clear.
+                let ts = fd_add_top(&mut sd, &ds, wds, ks, base);
+                let tds = fd_add_const_top(&mut ds, 2u32, base);
+                let tc = fd_add_top(&mut cd, &dc, wdc, kc, base);
+                let tdc = fd_add_top(&mut dc, &ddc, wddc, wddc, base);
+                let tddc = fd_add_const_top(&mut ddc, 6u32, base);
+                let mut all: u32 = 0xFFFF_FFFFu32;
+                if comptime!(ks < ws) {
+                    all &= ts;
+                }
+                if comptime!(wds > 1) {
+                    all &= tds;
+                }
+                if comptime!(kc < wc) {
+                    all &= tc;
+                }
+                if comptime!(wddc < wdc) {
+                    all &= tdc;
+                }
+                if comptime!(wddc > 1) {
+                    all &= tddc;
+                }
+                if all < 0x8000_0000u32 {
+                    let mut rec: u32 = 0u32;
+                    if comptime!(ks < ws) {
+                        if ts < 0x8000_0000u32 {
+                            fd_ripple(&mut sd, ks, ws, base);
+                            rec = 1u32;
+                        }
+                    }
+                    if comptime!(wds > 1) {
+                        if tds < 0x8000_0000u32 {
+                            fd_ripple(&mut ds, 1u32, wds, base);
+                        }
+                    }
+                    if comptime!(kc < wc) {
+                        if tc < 0x8000_0000u32 {
+                            fd_ripple(&mut cd, kc, wc, base);
+                            rec = 1u32;
+                        }
+                    }
+                    if comptime!(wddc < wdc) {
+                        if tdc < 0x8000_0000u32 {
+                            fd_ripple(&mut dc, wddc, wdc, base);
+                        }
+                    }
+                    if comptime!(wddc > 1) {
+                        if tddc < 0x8000_0000u32 {
+                            fd_ripple(&mut ddc, 1u32, wddc, base);
+                        }
+                    }
+                    if rec != 0u32 {
+                        ms = fd_mask(&sd, 0u64, ks_dig, ls);
+                        ms = fd_mask(&cd, ms, kc_dig, lc);
+                    }
+                }
+            } else if static_mask {
                 let r = fd_add_split(&mut sd, &ds, wds, ks, ws, base)
                     | fd_add_split(&mut cd, &dc, wdc, kc, wc, base);
                 fd_add_const(&mut ds, 2u32, wds, base);
@@ -2363,6 +2464,8 @@ pub struct FdOptions {
     pub batch: u128,
     /// Cache the mask of the slow-changing high words of n² and n³.
     pub static_mask: bool,
+    /// One branch per step for all rare carries (needs `static_mask`).
+    pub merged: bool,
     /// Per-thread packed histogram instead of one shared atomic per number.
     pub hist_local: bool,
 }
@@ -2376,6 +2479,7 @@ impl FdOptions {
             run_len,
             batch: CUBECL_BATCH_SIZE,
             static_mask: true,
+            merged: true,
             hist_local: false,
         }
     }
@@ -2390,7 +2494,7 @@ impl FdOptions {
         let run_len = std::env::var("NICE_FD_RUN")
             .ok()
             .and_then(|v| v.parse().ok())
-            .unwrap_or(256u32)
+            .unwrap_or(128u32)
             .max(1);
         let batch = std::env::var("NICE_FD_BATCH")
             .ok()
@@ -2399,11 +2503,13 @@ impl FdOptions {
             .clamp(1, 1_000_000_000);
         let static_mask = std::env::var("NICE_FD_STATIC").map_or(true, |v| v != "0");
         let hist_local = std::env::var("NICE_FD_HIST").is_ok_and(|v| v == "1");
+        let merged = static_mask && std::env::var("NICE_FD_MERGED").map_or(true, |v| v != "0");
         Self {
             enabled,
             run_len,
             batch,
             static_mask,
+            merged,
             hist_local,
         }
     }
@@ -2690,6 +2796,7 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
                     p.ldc,
                     p.lddc,
                     fd.static_mask,
+                    fd.static_mask && fd.merged,
                     fd.hist_local,
                     hist_lo,
                 );
@@ -3891,19 +3998,21 @@ mod tests {
     #[allow(clippy::too_many_lines)]
     fn cubecl_cuda_fd_matches_cpu_detailed() {
         let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
-        let v = |run_len: u32, batch: u128, static_mask: bool, hist_local: bool| FdOptions {
+        let v = |run_len: u32, batch: u128, static_mask: bool, merged: bool, hist_local: bool| FdOptions {
             enabled: true,
             run_len,
             batch,
             static_mask,
+            merged,
             hist_local,
         };
         let opts = [
-            v(256, CUBECL_BATCH_SIZE, true, false),
-            v(256, CUBECL_BATCH_SIZE, false, false),
-            v(61, CUBECL_BATCH_SIZE, true, true),
-            v(1000, 333_333, true, true),
-            v(1000, 333_333, false, false),
+            v(128, CUBECL_BATCH_SIZE, true, true, false),
+            v(256, CUBECL_BATCH_SIZE, true, false, false),
+            v(256, CUBECL_BATCH_SIZE, false, false, false),
+            v(61, CUBECL_BATCH_SIZE, true, true, true),
+            v(1000, 333_333, true, false, true),
+            v(1000, 333_333, true, true, false),
         ];
         let check = |range: &FieldSize, base: u32, cpu: &FieldResults, what: &str| {
             for o in &opts {
@@ -4032,18 +4141,19 @@ mod tests {
                 FdOptions { enabled: false, ..FdOptions::with_run(1) },
             )];
             for var in variants.split(',') {
-                // p = plain (v1), s = static mask, h = static + local histogram,
-                // q = plain + local histogram
-                let (sm, hl) = match var {
-                    "p" => (false, false),
-                    "h" => (true, true),
-                    "q" => (false, true),
-                    _ => (true, false),
+                // p = plain (v1), s = static mask (v2), m = static + merged
+                // rare branch (v3), h = v3 + local histogram, q = v2 + local
+                let (sm, mg, hl) = match var {
+                    "p" => (false, false, false),
+                    "s" => (true, false, false),
+                    "h" => (true, true, true),
+                    "q" => (true, false, true),
+                    _ => (true, true, false),
                 };
                 for &r in &runs {
                     arms.push((
                         format!("fd{var} R={r}"),
-                        FdOptions { run_len: r as u32, batch, static_mask: sm, hist_local: hl, ..FdOptions::with_run(1) },
+                        FdOptions { run_len: r as u32, batch, static_mask: sm, merged: mg, hist_local: hl, ..FdOptions::with_run(1) },
                     ));
                 }
             }
