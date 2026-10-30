@@ -29,6 +29,18 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L3.7 Verification of the fixed FD branch on CUDA and lavapipe (2026-10-30, agent; `L3/verify/VERIFY-297a969.md`)
+
+RTX 3080 (58428313, KR; host-capped at 150 W, 1545 MHz), 297a969: fmt, both lint clippy lines +
+`--features gpu`, release build; 209 host tests; CUDA `cubecl_cuda_fd_matches_cpu_detailed` (every
+window exact, FD = division = CPU on the benchmark windows, 73 near-misses), `..._matches_cpu_detailed`,
+`..._reads_back_every_near_miss`, hand-CUDA `gpu_matches_cpu_detailed_small`; lavapipe all six wgpu
+tests incl. `cubecl_fd_seed_matches_cpu` 132/132 windows; reproducer passes on llvmpipe. A
+diagnostic build confirmed FD serves every b40/b50 window on CUDA and llvmpipe. Speed vs the
+pre-fix PR (18cba8b), interleaved: 1.000× (b40), 0.999× (b50); absolute 2.86e10 / 2.50e10 at 150 W.
+**#225 → single commit dbe2ab7 on main 9747e39 (tree = 297a969 + main's pool-size change), body
+rewritten, marked ready for review, resolution comment posted.**
+
 ## L3.6 Root cause and fix on the M4 (2026-10-30, agent, 1 h 11 min of mayalaran; `L3/METAL-FIX.md`, `L3/metalfix/`; branch `pr/gpu-detailed-fd-metalfix` 297a969)
 
 **Apple GPU compiler bug, confirmed with hand-written MSL (no wgpu/naga):** unsigned division or

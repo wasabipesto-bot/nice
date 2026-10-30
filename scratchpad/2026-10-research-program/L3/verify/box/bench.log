@@ -1,0 +1,78 @@
+=== 17:26:28 head
+297a969 GPU detailed mode: run the finite-difference kernel on Metal again
+=== 17:26:28 power
+        Average Power Draw                             : 19.54 W
+        Instantaneous Power Draw                       : 19.91 W
+        Current Power Limit                            : 150.00 W
+        Requested Power Limit                          : 150.00 W
+        Default Power Limit                            : 320.00 W
+        Min Power Limit                                : 100.00 W
+        Max Power Limit                                : 320.00 W
+        Average Power Draw                             : N/A
+        Instantaneous Power Draw                       : N/A
+        Average Power Draw                             : N/A
+        Instantaneous Power Draw                       : N/A
+        Current Power Limit                            : N/A
+        Requested Power Limit                          : N/A
+        Default Power Limit                            : N/A
+        Min Power Limit                                : N/A
+        Max Power Limit                                : N/A
+name, memory.total [MiB], power.limit [W], power.default_limit [W], power.max_limit [W], clocks.max.sm [MHz], temperature.gpu, driver_version
+NVIDIA GeForce RTX 3080, 10240 MiB, 150.00 W, 320.00 W, 320.00 W, 2100 MHz, 36, 580.159.03
+2512664025c06112535cbd1ea272d540298541ee7504a068a4acf4e1e63bcafa  target/release/nice_client
+=== 17:26:28 bench-cuda round 1
+BENCH1 rc 0
+[2026-10-30T17:26:29Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+b40_detailed           40 uniform              4      2.0e8   3877   27.005     2.871e10        -
+b50_detailed           50 uniform              4      2.0e8   3372   27.007     2.497e10        -
+NiceMark: 14113 (v3.4.7-dev, Detailed gpu)
+per-window debug lines: b40 3878, b50 3373
+=== 17:27:25 bench-cuda round 2
+BENCH2 rc 0
+[2026-10-30T17:27:25Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+b40_detailed           40 uniform              4      2.0e8   3843   27.003     2.846e10        -
+b50_detailed           50 uniform              4      2.0e8   3388   27.003     2.509e10        -
+NiceMark: 14086 (v3.4.7-dev, Detailed gpu)
+per-window debug lines: b40 3844, b50 3389
+=== 17:28:21 bench-lavapipe-prod-path
+BENCHLVP rc 0
+[2026-10-30T17:28:21Z INFO  nice_client] GPU initialized: CubeCL wgpu device (llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>)), batch size 50000000
+b40_detailed           40 uniform              4      2.0e8     13    4.778      5.442e8        -
+b50_detailed           50 uniform              4      2.0e8     12    4.679      5.129e8        -
+NiceMark: 278 (v3.4.7-dev, Detailed gpu)
+[2026-10-30T17:28:22Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 1.05s (1.91e8 n/s), 0 near-misses
+[2026-10-30T17:28:23Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.37s (5.37e8 n/s), 0 near-misses
+[2026-10-30T17:28:23Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.36s (5.50e8 n/s), 0 near-misses
+[2026-10-30T17:28:23Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.36s (5.56e8 n/s), 0 near-misses
+[2026-10-30T17:28:24Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.36s (5.55e8 n/s), 0 near-misses
+[2026-10-30T17:28:24Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.38s (5.20e8 n/s), 0 near-misses
+[2026-10-30T17:28:24Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.36s (5.61e8 n/s), 0 near-misses
+[2026-10-30T17:28:25Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.36s (5.56e8 n/s), 0 near-misses
+[2026-10-30T17:28:25Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.36s (5.58e8 n/s), 0 near-misses
+[2026-10-30T17:28:26Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.36s (5.57e8 n/s), 0 near-misses
+[2026-10-30T17:28:26Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.41s (4.84e8 n/s), 0 near-misses
+[2026-10-30T17:28:26Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.37s (5.43e8 n/s), 0 near-misses
+[2026-10-30T17:28:27Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.36s (5.58e8 n/s), 0 near-misses
+[2026-10-30T17:28:27Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.36s (5.53e8 n/s), 0 near-misses
+=== 17:28:33 diag-build
+ common/src/cubecl_backend.rs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+    Finished `release` profile [optimized] target(s) in 2m 53s
+=== 17:31:27 diag-cuda
+DIAGCUDA rc 0
+[2026-10-30T17:31:28Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+NiceMark: 14124 (v3.4.7-dev, Detailed gpu)
+    650 CubeCL detailed b40 (FiniteDifference { run_len: 128, batch: 50000000 })
+    562 CubeCL detailed b50 (FiniteDifference { run_len: 128, batch: 50000000 })
+=== 17:31:38 diag-lavapipe
+DIAGLVP rc 0
+[2026-10-30T17:31:38Z INFO  nice_client] GPU initialized: CubeCL wgpu device (llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>)), batch size 50000000
+NiceMark: 281 (v3.4.7-dev, Detailed gpu)
+     14 CubeCL detailed b40 (FiniteDifference { run_len: 128, batch: 50000000 })
+     13 CubeCL detailed b50 (FiniteDifference { run_len: 128, batch: 50000000 })
+=== 17:31:50 power-after
+        Current Power Limit                            : 150.00 W
+        Default Power Limit                            : 320.00 W
+        Current Power Limit                            : N/A
+        Default Power Limit                            : N/A
+=== 17:31:50 done-v3

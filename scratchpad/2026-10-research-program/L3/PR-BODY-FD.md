@@ -1,6 +1,6 @@
 # GPU detailed mode: digit arrays by finite differences instead of division
 
-Two commits on `main`: the finite-difference kernel, and a gate that keeps Apple GPUs on the per-number kernel (see Portability). The measurements below compare against `main` (46e4dc4) and against the readback branch, since merged as #224.
+One commit on `main`. The measurements below compare against `main` (46e4dc4) and against the readback branch, since merged as #224.
 
 The `CubeCL` detailed kernel squares and cubes every candidate in u32 limbs and then divides both results down to base-b digits, a chunked long division whose length grows with limbs × chunks (about 20 division steps per number at base 40, 30 at base 50). Over a run of consecutive n none of that is needed: with dS = 2n + 1, dC = 3n² + 3n + 1 and ddC = 6n + 6, stepping to n + 1 is S += dS, dS += 2, C += dC, dC += ddC, ddC += 6. This is the same identity #221 uses on the CPU. This PR adds `common/src/cubecl_detailed_fd.rs`, a second detailed kernel built on it:
 
@@ -8,7 +8,7 @@ The `CubeCL` detailed kernel squares and cubes every candidate in u32 limbs and 
 - **Digit arrays.** The five values live in registers as base-b digits, four per u32 (one byte lane each, little-endian). An addition is biased, as on the CPU: adding 256 − b to every byte makes a lane overflow into the next exactly when its digit sum reaches b, so one native add carries four digits, and `t − ((t >> 7) & 0x01010101) · (256 − b)` takes the bias back from the lanes that did not carry (bit 7 of a lane is clear exactly when it carried, for b ≤ 128). No compare or select per digit.
 - **Cached high words.** Words of S and C above the addend's width change only when a carry ripples through four digits of b − 1. Their part of the digit mask is computed once per run, and each step's five additions return the raw sum of their last fast word; one AND of those sums guards a single, rare branch that does every ripple and refreshes the cached mask. The hot loop masks 36 digits per number at base 50 instead of 50, with one branch per step.
 - **Mask, histogram, near-misses.** Unchanged from the per-number kernel: `m |= 1u64 << d` per digit, two `count_ones`, one shared-memory atomic into the 4-copy workgroup histogram, and the same near-miss records.
-- **Where it runs.** `fd_plan(base)` computes, with exact integer roots, the interval where n² has exactly `ls` digits and n³ exactly `lc`, and the widths of the three addends at the interval's top. `detailed_impl` sends the part of each batch inside that interval to the new kernel and anything outside it to the per-number kernel. The interval is exactly the legal range at every base from 10 to 64 (the two digit counts sum to the base and neither can fall, so neither can rise), so production fields run entirely on the new kernel, except on Metal adapters (see Portability). The per-number kernel stays for bases above 64, whose mask needs two words, for candidates outside a base's range (tests only), and as the reference in the tests (`DetailedKernel::Division`).
+- **Where it runs.** `fd_plan(base)` computes, with exact integer roots, the interval where n² has exactly `ls` digits and n³ exactly `lc`, and the widths of the three addends at the interval's top. `detailed_impl` sends the part of each batch inside that interval to the new kernel and anything outside it to the per-number kernel. The interval is exactly the legal range at every base from 10 to 64 (the two digit counts sum to the base and neither can fall, so neither can rise), so production fields run entirely on the new kernel. The per-number kernel stays for bases above 64, whose mask needs two words, for candidates outside a base's range (tests only), and as the reference in the tests (`DetailedKernel::Division`).
 
 Measured on an RTX 3080 at its default 320 W power limit, the new kernel is 3.0× (base 40) and 3.7× (base 50) faster than the readback branch on the benchmark's detailed GPU windows (3.3× and 4.0× faster than `main`), and a production field of 1e10 numbers at base 50 takes 0.32 s instead of 1.22 s.
 
@@ -68,19 +68,8 @@ All on the RTX 3080 above unless noted.
 - `plan_covers_exactly_the_legal_range` (normal suite, no GPU): the plan's interval equals the legal range at all 44 bases from 10 to 64 that have one, and there is no plan above 64.
 - The existing parity tests pass through the new default: `cubecl_cuda_matches_cpu_detailed` (base 10 1e6 from the range start, which runs 53 numbers on the new kernel and the rest, past the range end, on the per-number kernel, with 556,846 near-misses; b40 2e6; b62 2e5 with a three-limb n; b80 on the per-number kernel), `cubecl_cuda_reads_back_every_near_miss`, and the whole `nice_common` lib suite (209 passed).
 - On lavapipe (llvmpipe, LLVM 20.1.2): `cubecl_fd_matches_cpu_detailed`, `cubecl_reads_back_every_near_miss`, `cubecl_matches_cpu_detailed`, `cubecl_finds_69_in_base_10` and `web_kernel_near_miss_matches_cpu_at_base_49` (which compares the browser kernel with the native path, now this kernel, at base 49) pass through naga's WGSL path (wgpu's default compiler, as in a `--features cubecl` build; 15 s) and through `CubeCL`'s SPIR-V compiler (`--features cubecl-spirv`, 20 s; the device reports `wgpu<spirv>`). The first two pass again under SPIR-V with `NICE_CUBECL_WIDE=1`, which makes the seed divide in u64 (`wide_chunk: true` in the compile log). Every ignored test the lavapipe CI job runs (19, from the `--features gpu` test binary minus the CUDA, hand-CUDA and timing ones; the nice-only and join tests included) passes on this branch. Pinned to 4 cores (`taskset`, `LP_NUM_THREADS=4`, like a hosted runner) `cubecl_fd_matches_cpu_detailed` takes 7.4 s and `cubecl_reads_back_every_near_miss` 3.2 s.
-- **With the Metal gate (the second commit).**
-  - **CUDA** (RTX 3080, driver 595.91.07): `cubecl_cuda_fd_matches_cpu_detailed`, `cubecl_cuda_matches_cpu_detailed` and `cubecl_cuda_reads_back_every_near_miss` pass, and the client's debug log shows the new kernel serving every benchmark window.
-  - **lavapipe:** `cubecl_fd_matches_cpu_detailed`, `cubecl_reads_back_every_near_miss`, `cubecl_matches_cpu_detailed`, `cubecl_finds_69_in_base_10` and `web_kernel_near_miss_matches_cpu_at_base_49` pass, and the client's production path still takes the new kernel.
-  - **Lib suite:** 210 passed, including the new `detailed_kernel_by_device`.
-  - **Speed is unchanged.** 60 s benchmarks, interleaved without the gate and with it:
 
-    | | without the gate | with the gate |
-    |---|---|---|
-    | b40 | 3.331e10 to 3.467e10 | 3.339e10 |
-    | b50 | 2.968e10 to 3.044e10 | 2.968e10 to 2.976e10 |
-    | score | 16,571 to 17,121 | 16,591 to 16,614 |
-
-    The highest run without the gate was the first, on a cold card.
+- **After the seed change,** on an RTX 3080 (CUDA) and on lavapipe: `cubecl_cuda_fd_matches_cpu_detailed` (every window exact; FD = division = CPU on the benchmark windows, 73 near-misses), `cubecl_cuda_matches_cpu_detailed`, `cubecl_cuda_reads_back_every_near_miss`, the hand-CUDA `gpu_matches_cpu_detailed_small`; on lavapipe all six wgpu tests including `cubecl_fd_seed_matches_cpu` (132 of 132 windows exact); 209 host tests. Speed against the version before the seed change, interleaved on the same card: 1.000× (b40), 0.999× (b50).
 
 ## Portability
 
@@ -88,23 +77,17 @@ The kernel needs nothing the per-number kernel does not already need on every ba
 
 - CUDA: run on the RTX 3080 (NVRTC 12.8).
 - Vulkan: run on lavapipe through both compilers, as above.
-- **Metal: off.** The new kernel gives wrong results on an Apple M4, so detailed fields on any Metal adapter keep the per-number kernel, exactly as on `main`.
-  - **Device.** Apple M4, macOS 26.3, through wgpu with naga's MSL.
-  - **Failures.** `cubecl_fd_matches_cpu_detailed` fails at the base 50 range start, and `cubecl_reads_back_every_near_miss` fails at base 23.
-  - **Sweep.** 1e5 numbers at the start and middle of every base from 10 to 64. The new kernel is wrong at bases 23, 27–30, 49 (mid-range), 50, 52 (mid-range) and 53–55, with most unique counts off by 1 to 4; the per-number kernel is exact in every window.
-  - **The fault is in the seed or the mask build.** The kernel fails even at one number per run, so the stepping is not to blame.
-  - **Elsewhere it is exact.** The same code passes on CUDA, on lavapipe, and on the macOS CI runner's paravirtual Metal device (macOS 26.6.2), through naga's MSL and through `CubeCL`'s own MSL compiler.
-  - **Suspected cause (not yet shown on the device).** In the seed's digit conversion, the division `(x >> 16) / K` of the top word x of n² and n³ is computed from the low 16 bits of x. Modelling that reproduces the M4's histograms exactly in every window except base 23's. It is the 16-bit form of a Metal miscompilation seen before on the same machine, where `hi(a·b) / K` divides the low word.
-  - **The gate.** `DetailedKernel::for_device` checks the adapter's wgpu backend. CUDA, HIP and the other wgpu backends keep the new kernel.
-  - **Before lifting it,** `cubecl_fd_matches_cpu_detailed` (which runs the new kernel on any wgpu device) has to pass on Apple hardware.
+- **Metal: run on an Apple M4 (macOS 26.3), exact after a fix to the seed.** The first version was wrong there at bases 23, 27–30, 49, 50 and 52–55 while the per-number kernel was exact. The cause, confirmed with hand-written MSL sent to Metal with no wgpu or naga involved: Apple's compiler miscompiles an unsigned division or remainder by a non-power-of-two constant when the dividend is a right shift by half its width (`(x >> 16) / K`, `(x >> 16) % K`, `uint(ulong p >> 32) / K`), and the unrolled seed made every chunk's first dividend a bare `top_limb >> 16`. The wgpu seed now works in 16-bit limbs with u32 arithmetic only, each chunk's division starting from the top two limbs as one word, so no division sees a bare shift (one division fewer per chunk; the CUDA/HIP seed, the hot loop, the mask build and the histogram are unchanged). The per-number kernel never hit it because its long division is a runtime loop with a loop-carried remainder.
+  - **Tests.** `cubecl_fd_seed_matches_cpu` checks the five digit arrays of 1,024 n at the start, middle and end of all 44 bases word for word against the CPU on whatever wgpu device runs it; on the M4 it failed before the fix at bases 23, 25, 27–30, 49, 50 and 52–55 and passes after. Every FD and readback test passes there, and a 220-window sweep of bases 10–64 (3.08e7 numbers, including one number per run) is identical to the CPU. `metal_half_shift_div_repro` (ignored, and gated on `NICE_METAL_DIV_REPRO=1` because CI runs ignored tests) is the minimal reproducer for a report to Apple.
+  - **Speed on the M4** (60 s budgets, three rounds): b40_detailed 8.12e8 → 2.435e9 (3.00×), b50_detailed 4.81e8 → 2.187e9 (4.54×), detailed GPU score 330 → 1216; the fix did not change it.
+  - **CI cannot catch this.** The macOS runner (26.6.2, paravirtual GPU) passed the wrong kernel; only real Apple hardware shows it.
 - HIP: the same code path as CUDA (`wide_chunk_for` picks the u64 seed there); not built or run (no ROCm here).
-- Speed is not measured on AMD GPUs. Through wgpu they take the split16 seed: by count about 530 u32 divisions per run at base 50, about 4 per number at 128 per run, against about 200 per number in the per-number kernel's split16 scan. On the M4, before the gate, the new kernel ran 3.0× (base 40) and 4.5× (base 50) faster than `main` on the benchmark windows. That is the speed a fix would recover; the base 50 figure came from wrong results.
+- Speed is not measured on AMD GPUs. Through wgpu they take the split16 seed: by count about 530 u32 divisions per run at base 50, about 4 per number at 128 per run, against about 200 per number in the per-number kernel's split16 scan.
 
 ## Not in this PR
 
 - The hand-CUDA backend (`--gpu-backend cuda`) and the browser kernel (`cubecl_web.rs`, u32 only): both still divide per number.
 - Bases above 64: the per-number kernel, as before.
-- **Apple GPUs.** The new kernel stays off on Metal until the miscompilation is understood and worked around.
   - The likely fix is to convert the seed to digits the way the per-number kernel does: through shared memory, in a runtime loop. That code is exact on the M4 in every window.
   - The seed is about 5 % of a run, so a slower conversion costs little.
 - Measurements on AMD GPUs.
