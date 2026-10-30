@@ -344,6 +344,389 @@ fn detailed_kernel(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Finite-difference detailed kernel (experiment, exp/gpu-detailed-fd).
+//
+// Each thread walks a run of consecutive n. The run's first n is seeded with
+// exact limb arithmetic and long division (the same u64-by-constant chunk
+// split the per-number kernel uses), into base-b digit arrays packed four
+// digits per u32 (one byte lane each, little-endian): S = n², C = n³,
+// dS = 2n+1, dC = 3n²+3n+1, ddC = 6n+6. Every later n costs five digit-array
+// additions and the mask build, with no division at all.
+//
+// Digit-array addition is the biased-byte add from the L2 CPU prototype:
+// adding `256 - b` to every addend byte makes a byte overflow into the next
+// exactly when its digit sum reaches b, so one native u32 add carries all four
+// lanes. For b <= 128 a lane that carried out holds a value below b (bit 7
+// clear) and one that did not holds at least 256 - b (bit 7 set), so bit 7
+// both selects the lanes that need the bias taken back and, for the top lane,
+// is the carry out of the word. Branch-free; the only branch is the carry out
+// of the word above the addend's top word (four digits of b-1 in a row).
+//
+// The host runs this kernel only on the part of a batch where n² has exactly
+// `ls` digits and n³ exactly `lc` (the whole of a base's legal range), so the
+// mask covers comptime digit positions and leading zeros never enter it.
+// ---------------------------------------------------------------------------
+
+/// Biased add `x += y` over packed digit words: `y` has `wy` words, `x` has
+/// `wx >= wy`. The carry out of `x`'s top word is dropped.
+#[cube]
+fn fd_add(
+    x: &mut Array<u32>,
+    y: &Array<u32>,
+    #[comptime] wy: u32,
+    #[comptime] wx: u32,
+    #[comptime] base: u32,
+) {
+    let bias = comptime!((256 - base) * 0x0101_0101u32);
+    let fix = comptime!(256 - base);
+    let mut cin = 0u32;
+    #[unroll]
+    for w in 0..wy {
+        let t = x[w as usize] + y[w as usize] + bias + cin;
+        cin = (t >> 31u32) ^ 1u32;
+        x[w as usize] = t - ((t >> 7u32) & 0x0101_0101u32) * fix;
+    }
+    fd_carry(x, cin, wy, wx, base);
+}
+
+/// Biased add of a one-digit constant `c < base` into word 0 of `x`.
+#[cube]
+fn fd_add_const(x: &mut Array<u32>, #[comptime] c: u32, #[comptime] wx: u32, #[comptime] base: u32) {
+    let bias = comptime!((256 - base) * 0x0101_0101u32);
+    let fix = comptime!(256 - base);
+    let t = x[0] + comptime!(bias + c);
+    let cin = (t >> 31u32) ^ 1u32;
+    x[0] = t - ((t >> 7u32) & 0x0101_0101u32) * fix;
+    if comptime!(wx > 1) {
+        if cin != 0u32 {
+            fd_ripple(x, 1u32, wx, base);
+        }
+    }
+}
+
+/// Carry `cin` into word `from` of `x` unconditionally (the word above the
+/// addend's top word takes a carry often), then ripple further only when that
+/// word carried out too, which is rare.
+#[cube]
+fn fd_carry(
+    x: &mut Array<u32>,
+    cin: u32,
+    #[comptime] from: u32,
+    #[comptime] wx: u32,
+    #[comptime] base: u32,
+) {
+    let bias = comptime!((256 - base) * 0x0101_0101u32);
+    let fix = comptime!(256 - base);
+    if comptime!(from < wx) {
+        let t = x[from as usize] + bias + cin;
+        let c2 = (t >> 31u32) ^ 1u32;
+        x[from as usize] = t - ((t >> 7u32) & 0x0101_0101u32) * fix;
+        if comptime!(from + 1 < wx) {
+            if c2 != 0u32 {
+                fd_ripple(x, comptime!(from + 1), wx, base);
+            }
+        }
+    }
+}
+
+/// Add a carry of 1 into word `from` and ripple it up to word `wx - 1`.
+#[cube]
+fn fd_ripple(x: &mut Array<u32>, #[comptime] from: u32, #[comptime] wx: u32, #[comptime] base: u32) {
+    let bias = comptime!((256 - base) * 0x0101_0101u32);
+    let fix = comptime!(256 - base);
+    let mut cin = 1u32;
+    #[unroll]
+    for w in from..wx {
+        let t = x[w as usize] + bias + cin;
+        cin = (t >> 31u32) ^ 1u32;
+        x[w as usize] = t - ((t >> 7u32) & 0x0101_0101u32) * fix;
+    }
+}
+
+/// Convert a little-endian u32 limb value `v` (destroyed) into packed
+/// base-b digits in `out` (`ndig` digits, `out` pre-zeroed), peeling
+/// `chunk_digits` digits per u64-by-constant long division.
+#[cube]
+fn fd_to_digits(
+    v: &mut Array<u32>,
+    out: &mut Array<u32>,
+    #[comptime] nlimbs: u32,
+    #[comptime] ndig: u32,
+    #[comptime] base: u32,
+    #[comptime] chunk_digits: u32,
+    #[comptime] chunk_div: u32,
+) {
+    let nchunks = comptime!(ndig.div_ceil(chunk_digits));
+    #[unroll]
+    for k in 0..nchunks {
+        let mut rem64 = 0u64;
+        #[unroll]
+        for ii in 0..nlimbs {
+            let i = comptime!(nlimbs - 1 - ii);
+            let cur = (rem64 << 32u64) | u64::cast_from(v[i as usize]);
+            let q = cur / u64::cast_from(chunk_div);
+            v[i as usize] = u32::cast_from(q);
+            rem64 = cur - q * u64::cast_from(chunk_div);
+        }
+        let mut chunk = u32::cast_from(rem64);
+        #[unroll]
+        for i in 0..chunk_digits {
+            let j = comptime!(k * chunk_digits + i);
+            if comptime!(j < ndig) {
+                let cq = chunk / base;
+                let d = chunk - cq * base;
+                chunk = cq;
+                let w = comptime!(j / 4);
+                let sh = comptime!(8 * (j % 4));
+                out[w as usize] |= d << sh;
+            }
+        }
+    }
+}
+
+/// OR `1 << d` into `m` for the `ndig` packed digits of `x`.
+#[cube]
+fn fd_mask(x: &Array<u32>, m: u64, #[comptime] ndig: u32) -> u64 {
+    let mut mm = m;
+    #[unroll]
+    for j in 0..ndig {
+        let w = comptime!(j / 4);
+        let sh = comptime!(8 * (j % 4));
+        let d = if comptime!(j % 4 == 3) {
+            x[w as usize] >> 24u32
+        } else {
+            (x[w as usize] >> sh) & 0xFFu32
+        };
+        mm |= 1u64 << u64::cast_from(d);
+    }
+    mm
+}
+
+/// The finite-difference detailed kernel: thread `t` takes the run of
+/// `run_len` consecutive candidates starting at `start + t * run_len`
+/// (grid-stride over runs), seeds its digit arrays from the run's first n
+/// and steps through the run by digit-array addition.
+#[cube(launch_unchecked)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+fn detailed_fd_kernel(
+    hist: &mut Array<Atomic<u32>>,
+    miss_count: &mut Array<Atomic<u32>>,
+    miss_data: &mut Array<u32>,
+    s0: u32,
+    s1: u32,
+    s2: u32,
+    s3: u32,
+    cnt_lo: u32,
+    cnt_hi: u32,
+    run_len: u32,
+    miss_cap: u32,
+    #[comptime] base: u32,
+    #[comptime] limbs: u32,
+    #[comptime] chunk_digits: u32,
+    #[comptime] chunk_div: u32,
+    #[comptime] cutoff: u32,
+    #[comptime] ls: u32,
+    #[comptime] lc: u32,
+    #[comptime] lds: u32,
+    #[comptime] ldc: u32,
+    #[comptime] lddc: u32,
+) {
+    let hist_bins = comptime!(base + 1);
+    let sq_limbs = comptime!(2 * limbs);
+    let cu_limbs = comptime!(3 * limbs);
+    let ws = comptime!(ls.div_ceil(4));
+    let wc = comptime!(lc.div_ceil(4));
+    let wds = comptime!(lds.div_ceil(4));
+    let wdc = comptime!(ldc.div_ceil(4));
+    let wddc = comptime!(lddc.div_ceil(4));
+
+    let hist_s = SharedMemory::<Atomic<u32>>::new(comptime!((HIST_COPIES * (base + 1)) as usize));
+    let mut zi = UNIT_POS_X;
+    while zi < HIST_COPIES * hist_bins {
+        hist_s[zi as usize].store(0u32);
+        zi += CUBE_DIM_X;
+    }
+    sync_cube();
+
+    let start_lo = (u64::cast_from(s1) << 32u64) | u64::cast_from(s0);
+    let start_hi = (u64::cast_from(s3) << 32u64) | u64::cast_from(s2);
+    let count = (u64::cast_from(cnt_hi) << 32u64) | u64::cast_from(cnt_lo);
+    let copy = (UNIT_POS_X >> 5u32) % HIST_COPIES;
+    let stride = u64::cast_from(CUBE_COUNT_X) * u64::cast_from(CUBE_DIM_X) * u64::cast_from(run_len);
+
+    let mut off = u64::cast_from(ABSOLUTE_POS_X) * u64::cast_from(run_len);
+    while off < count {
+        let mut len = u32::cast_from(count - off);
+        if count - off > u64::cast_from(run_len) {
+            len = run_len;
+        }
+        let n_lo = start_lo + off;
+        let mut n_hi = start_hi;
+        if n_lo < start_lo {
+            n_hi += 1u64;
+        }
+
+        // --- seed: exact limbs of n, n², n³, 2n+1, 3n²+3n+1, 6n+6 ----------
+        let mut nl = Array::<u32>::new(limbs as usize);
+        #[unroll]
+        for i in 0..limbs {
+            let shift = comptime!(((i & 1) * 32) as u64);
+            if comptime!(i < 2) {
+                nl[i as usize] = u32::cast_from(n_lo >> shift);
+            } else {
+                nl[i as usize] = u32::cast_from(n_hi >> shift);
+            }
+        }
+        let mut sq = Array::<u32>::new(sq_limbs as usize);
+        #[unroll]
+        for i in 0..sq_limbs {
+            sq[i as usize] = 0u32;
+        }
+        #[unroll]
+        for i in 0..limbs {
+            let mut carry = 0u64;
+            #[unroll]
+            for j in 0..limbs {
+                let k = comptime!(i + j);
+                let t = u64::cast_from(nl[i as usize]) * u64::cast_from(nl[j as usize])
+                    + u64::cast_from(sq[k as usize])
+                    + carry;
+                sq[k as usize] = u32::cast_from(t);
+                carry = t >> 32u64;
+            }
+            sq[comptime!(i + limbs) as usize] = u32::cast_from(carry);
+        }
+        let mut cu = Array::<u32>::new(cu_limbs as usize);
+        #[unroll]
+        for i in 0..cu_limbs {
+            cu[i as usize] = 0u32;
+        }
+        #[unroll]
+        for i in 0..sq_limbs {
+            let mut carry = 0u64;
+            #[unroll]
+            for j in 0..limbs {
+                let k = comptime!(i + j);
+                let t = u64::cast_from(sq[i as usize]) * u64::cast_from(nl[j as usize])
+                    + u64::cast_from(cu[k as usize])
+                    + carry;
+                cu[k as usize] = u32::cast_from(t);
+                carry = t >> 32u64;
+            }
+            cu[comptime!(i + limbs) as usize] = u32::cast_from(carry);
+        }
+        // 2n+1 and 6n+6 (limbs + 1 words), 3n²+3n+1 (2·limbs + 1 words).
+        let mut v_ds = Array::<u32>::new(comptime!(limbs + 1) as usize);
+        let mut v_ddc = Array::<u32>::new(comptime!(limbs + 1) as usize);
+        let mut c_ds = 1u64;
+        let mut c_ddc = 6u64;
+        #[unroll]
+        for i in 0..comptime!(limbs + 1) {
+            if comptime!(i < limbs) {
+                c_ds += 2u64 * u64::cast_from(nl[i as usize]);
+                c_ddc += 6u64 * u64::cast_from(nl[i as usize]);
+            }
+            v_ds[i as usize] = u32::cast_from(c_ds);
+            v_ddc[i as usize] = u32::cast_from(c_ddc);
+            c_ds >>= 32u64;
+            c_ddc >>= 32u64;
+        }
+        let mut v_dc = Array::<u32>::new(comptime!(sq_limbs + 1) as usize);
+        let mut c_dc = 1u64;
+        #[unroll]
+        for i in 0..comptime!(sq_limbs + 1) {
+            if comptime!(i < sq_limbs) {
+                c_dc += 3u64 * u64::cast_from(sq[i as usize]);
+            }
+            if comptime!(i < limbs) {
+                c_dc += 3u64 * u64::cast_from(nl[i as usize]);
+            }
+            v_dc[i as usize] = u32::cast_from(c_dc);
+            c_dc >>= 32u64;
+        }
+
+        let mut ds = Array::<u32>::new(wds as usize);
+        let mut dc = Array::<u32>::new(wdc as usize);
+        let mut ddc = Array::<u32>::new(wddc as usize);
+        let mut sd = Array::<u32>::new(ws as usize);
+        let mut cd = Array::<u32>::new(wc as usize);
+        #[unroll]
+        for i in 0..ws {
+            sd[i as usize] = 0u32;
+        }
+        #[unroll]
+        for i in 0..wc {
+            cd[i as usize] = 0u32;
+        }
+        #[unroll]
+        for i in 0..wds {
+            ds[i as usize] = 0u32;
+        }
+        #[unroll]
+        for i in 0..wdc {
+            dc[i as usize] = 0u32;
+        }
+        #[unroll]
+        for i in 0..wddc {
+            ddc[i as usize] = 0u32;
+        }
+        fd_to_digits(&mut sq, &mut sd, sq_limbs, ls, base, chunk_digits, chunk_div);
+        fd_to_digits(&mut cu, &mut cd, cu_limbs, lc, base, chunk_digits, chunk_div);
+        fd_to_digits(&mut v_ds, &mut ds, comptime!(limbs + 1), lds, base, chunk_digits, chunk_div);
+        fd_to_digits(&mut v_dc, &mut dc, comptime!(sq_limbs + 1), ldc, base, chunk_digits, chunk_div);
+        fd_to_digits(&mut v_ddc, &mut ddc, comptime!(limbs + 1), lddc, base, chunk_digits, chunk_div);
+
+        // --- walk the run ----------------------------------------------------
+        let mut i = 0u32;
+        while i < len {
+            let mut m = fd_mask(&sd, 0u64, ls);
+            m = fd_mask(&cd, m, lc);
+            let u = u32::cast_from(m).count_ones() + u32::cast_from(m >> 32u64).count_ones();
+            hist_s[(copy * hist_bins + u) as usize].fetch_add(1u32);
+            if u > cutoff {
+                let pos = miss_count[0].fetch_add(1u32);
+                if pos < miss_cap {
+                    let x_lo = n_lo + u64::cast_from(i);
+                    let mut x_hi = n_hi;
+                    if x_lo < n_lo {
+                        x_hi += 1u64;
+                    }
+                    let o = MISS_STRIDE * pos;
+                    miss_data[o as usize] = u32::cast_from(x_lo);
+                    miss_data[(o + 1u32) as usize] = u32::cast_from(x_lo >> 32u64);
+                    miss_data[(o + 2u32) as usize] = u32::cast_from(x_hi);
+                    miss_data[(o + 3u32) as usize] = u32::cast_from(x_hi >> 32u64);
+                    miss_data[(o + 4u32) as usize] = u;
+                }
+            }
+            // Step n -> n+1.
+            fd_add(&mut sd, &ds, wds, ws, base);
+            fd_add_const(&mut ds, 2u32, wds, base);
+            fd_add(&mut cd, &dc, wdc, wc, base);
+            fd_add(&mut dc, &ddc, wddc, wdc, base);
+            fd_add_const(&mut ddc, 6u32, wddc, base);
+            i += 1u32;
+        }
+
+        off += stride;
+    }
+
+    sync_cube();
+    let mut b = UNIT_POS_X;
+    while b < hist_bins {
+        let mut acc = 0u32;
+        #[unroll]
+        for c in 0..HIST_COPIES {
+            acc += hist_s[(c * hist_bins + b) as usize].load();
+        }
+        if acc != 0u32 {
+            hist[b as usize].fetch_add(acc);
+        }
+        b += CUBE_DIM_X;
+    }
+}
+
 /// u32 slots per niceonly hit: n as four u32 limbs.
 pub const NICEONLY_STRIDE: u32 = 4;
 
@@ -1841,6 +2224,122 @@ pub async fn process_range_detailed_cubecl_async(
     range: &FieldSize,
     base: u32,
 ) -> Result<FieldResults> {
+    process_range_detailed_cubecl_with(ctx, range, base, FdOptions::from_env()).await
+}
+
+/// Knobs for the finite-difference detailed kernel (experiment).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FdOptions {
+    /// Use the finite-difference kernel where it applies (wide chunk flavor,
+    /// base <= 64, inside the base's regular digit-count interval).
+    pub enabled: bool,
+    /// Consecutive candidates per thread.
+    pub run_len: u32,
+    /// Candidates per dispatch (the histogram drain interval follows).
+    pub batch: u128,
+}
+
+impl FdOptions {
+    /// `NICE_DETAILED_FD=0` disables it; `NICE_FD_RUN` and `NICE_FD_BATCH`
+    /// set the run length and batch size.
+    #[must_use]
+    pub fn from_env() -> Self {
+        let enabled = std::env::var("NICE_DETAILED_FD").map_or(true, |v| v != "0");
+        let run_len = std::env::var("NICE_FD_RUN")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(256u32)
+            .max(1);
+        let batch = std::env::var("NICE_FD_BATCH")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(CUBECL_BATCH_SIZE)
+            .clamp(1, 1_000_000_000);
+        Self {
+            enabled,
+            run_len,
+            batch,
+        }
+    }
+}
+
+/// Digit counts the finite-difference kernel is specialised for at one base:
+/// n² has `ls` digits and n³ `lc` for every n in `[reg_lo, reg_hi)`, and the
+/// addends 2n+1, 3n²+3n+1, 6n+6 fit in `lds`, `ldc`, `lddc` digits up to
+/// `reg_hi`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FdPlan {
+    pub ls: u32,
+    pub lc: u32,
+    pub lds: u32,
+    pub ldc: u32,
+    pub lddc: u32,
+    pub reg_lo: u128,
+    pub reg_hi: u128,
+}
+
+/// Number of base-`base` digits of `x` (0 for 0).
+fn natural_digits(x: &malachite::natural::Natural, base: u32) -> u32 {
+    use malachite::base::num::arithmetic::traits::DivAssignRem;
+    let mut y = x.clone();
+    let mut c = 0;
+    while y != 0u32 {
+        y.div_assign_rem(malachite::natural::Natural::from(base));
+        c += 1;
+    }
+    c
+}
+
+/// The finite-difference plan for `base`, or `None` where the kernel does not
+/// apply (no u128 range, or a base above 64, which needs two masks).
+#[must_use]
+pub fn fd_plan(base: u32) -> Option<FdPlan> {
+    use malachite::base::num::arithmetic::traits::{CeilingRoot, Pow};
+    use malachite::natural::Natural;
+    if base > 64 || !gpu_supports_base(base) {
+        return None;
+    }
+    let range = crate::base_range::get_base_range_u128(base).ok()??;
+    let b = Natural::from(base);
+    let n0 = Natural::from(range.range_start);
+    let ls = natural_digits(&(&n0 * &n0), base);
+    let lc = natural_digits(&(&n0 * &n0 * &n0), base);
+    let lo_s = b.clone().pow(u64::from(ls - 1)).ceiling_root(2);
+    let lo_c = b.clone().pow(u64::from(lc - 1)).ceiling_root(3);
+    let hi_s = b.clone().pow(u64::from(ls)).ceiling_root(2);
+    let hi_c = b.pow(u64::from(lc)).ceiling_root(3);
+    let reg_lo = u128::try_from(&lo_s.max(lo_c)).ok()?;
+    let hi = hi_s.min(hi_c);
+    let reg_hi = u128::try_from(&hi).ok()?;
+    let lds = natural_digits(&(&hi * Natural::from(2u32) + Natural::from(1u32)), base);
+    let ldc = natural_digits(
+        &(&hi * &hi * Natural::from(3u32) + &hi * Natural::from(3u32) + Natural::from(1u32)),
+        base,
+    );
+    let lddc = natural_digits(&(&hi * Natural::from(6u32) + Natural::from(6u32)), base);
+    Some(FdPlan {
+        ls,
+        lc,
+        lds,
+        ldc,
+        lddc,
+        reg_lo,
+        reg_hi,
+    })
+}
+
+/// As [`process_range_detailed_cubecl_async`] with explicit
+/// finite-difference knobs (tests and A/B runs).
+///
+/// # Errors
+/// Returns an error on any device failure or if the near-miss buffer
+/// overflows.
+pub async fn process_range_detailed_cubecl_with(
+    ctx: &CubeclContext,
+    range: &FieldSize,
+    base: u32,
+    fd: FdOptions,
+) -> Result<FieldResults> {
     if !gpu_supports_base(base) {
         warn!("base {base} not supported on GPU, falling back to CPU for this field");
         return Ok(process_range_detailed(range, base));
@@ -1848,15 +2347,15 @@ pub async fn process_range_detailed_cubecl_async(
 
     match ctx {
         CubeclContext::Wgpu { client, .. } => {
-            detailed_impl(client, range, base, wide_chunk_for(client)).await
+            detailed_impl(client, range, base, wide_chunk_for(client), fd).await
         }
         #[cfg(feature = "cubecl-cuda")]
         CubeclContext::Cuda { client, .. } => {
-            detailed_impl(client, range, base, wide_chunk_for(client)).await
+            detailed_impl(client, range, base, wide_chunk_for(client), fd).await
         }
         #[cfg(feature = "cubecl-hip")]
         CubeclContext::Hip { client, .. } => {
-            detailed_impl(client, range, base, wide_chunk_for(client)).await
+            detailed_impl(client, range, base, wide_chunk_for(client), fd).await
         }
     }
 }
@@ -1933,11 +2432,24 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
     range: &FieldSize,
     base: u32,
     wide_chunk: bool,
+    fd: FdOptions,
 ) -> Result<FieldResults> {
     /// Batches launched between blocking histogram drains; the overflow
     /// bound is checked below.
     const DRAIN_INTERVAL: usize = 64;
     const _: () = assert!((DRAIN_INTERVAL as u128) * CUBECL_BATCH_SIZE < u32::MAX as u128);
+    let plan = if fd.enabled && wide_chunk {
+        fd_plan(base)
+    } else {
+        None
+    };
+    let batch_size = if plan.is_some() {
+        fd.batch
+    } else {
+        CUBECL_BATCH_SIZE
+    };
+    #[allow(clippy::cast_possible_truncation)]
+    let drain_interval = ((u128::from(u32::MAX) / batch_size) as usize).clamp(1, DRAIN_INTERVAL);
 
     let start_time = Instant::now();
     let limbs = n_limbs(base).with_context(|| format!("base {base} has no u128 range"))?;
@@ -1968,11 +2480,69 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
     // Ticks on submission: without a per-batch sync there is nothing cheap
     // to wait on here, so the bar runs ahead of the device by however many
     // batches the runtime queues. It still shows the field is moving.
-    let progress = crate::progress::FieldProgress::begin(range, CUBECL_BATCH_SIZE);
+    let progress = crate::progress::FieldProgress::begin(range, batch_size);
 
-    for batch in range.chunks(CUBECL_BATCH_SIZE) {
-        let start = batch.start();
-        let count = batch.size() as u64;
+    for batch in range.chunks(batch_size) {
+      // Split the batch at the finite-difference kernel's regular interval:
+      // the inside goes to it, anything outside to the per-number kernel.
+      let mut pieces: Vec<(u128, u128, bool)> = Vec::with_capacity(3);
+      match plan {
+          Some(p) => {
+              let (a, z) = (batch.start(), batch.end());
+              let lo = a.max(p.reg_lo).min(z);
+              let hi = z.min(p.reg_hi).max(lo);
+              if lo > a {
+                  pieces.push((a, lo - a, false));
+              }
+              if hi > lo {
+                  pieces.push((lo, hi - lo, true));
+              }
+              if z > hi {
+                  pieces.push((hi, z - hi, false));
+              }
+          }
+          None => pieces.push((batch.start(), batch.size(), false)),
+      }
+      for (start, count, use_fd) in pieces {
+        let count = count as u64;
+        if let (true, Some(p)) = (use_fd, plan) {
+            let runs = count.div_ceil(u64::from(fd.run_len));
+            let cubes = u32::try_from(runs.div_ceil(u64::from(WORKGROUP_SIZE)))
+                .unwrap_or(65_535)
+                .clamp(1, 65_535);
+            unsafe {
+                detailed_fd_kernel::launch_unchecked::<R>(
+                    client,
+                    CubeCount::Static(cubes, 1, 1),
+                    CubeDim::new_1d(WORKGROUP_SIZE),
+                    ArrayArg::from_raw_parts(hist_handle.clone(), hist_bins),
+                    ArrayArg::from_raw_parts(miss_count_handle.clone(), 1),
+                    ArrayArg::from_raw_parts(
+                        miss_data_handle.clone(),
+                        NEAR_MISS_CAPACITY * MISS_STRIDE as usize,
+                    ),
+                    start as u32,
+                    (start >> 32) as u32,
+                    (start >> 64) as u32,
+                    (start >> 96) as u32,
+                    count as u32,
+                    (count >> 32) as u32,
+                    fd.run_len,
+                    NEAR_MISS_CAPACITY as u32,
+                    base,
+                    limbs,
+                    chunk_digits,
+                    chunk_div,
+                    cutoff,
+                    p.ls,
+                    p.lc,
+                    p.lds,
+                    p.ldc,
+                    p.lddc,
+                );
+            }
+            continue;
+        }
         let cubes = u32::try_from(count.div_ceil(u64::from(WORKGROUP_SIZE)))
             .unwrap_or(MAX_CUBES)
             .clamp(1, MAX_CUBES);
@@ -2003,6 +2573,7 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
                 wide_chunk,
             );
         }
+      }
 
         // Submit this batch on its own, because a GPU driver kills a
         // submission that runs too long. CubeCL aggregates dispatches into one
@@ -2028,7 +2599,7 @@ async fn detailed_impl<R: cubecl::prelude::Runtime>(
             .map_err(|e| anyhow::anyhow!("stream flush failed: {e:?}"))?;
 
         undrained += 1;
-        if undrained == DRAIN_INTERVAL {
+        if undrained == drain_interval {
             drain(client, hist_handle, &mut histogram).await?;
             hist_handle = client.create(cubecl::bytes::Bytes::from_elems(vec![0u32; hist_bins]));
             undrained = 0;
@@ -3117,6 +3688,223 @@ mod tests {
                 "base {base}: near-miss mismatch"
             );
             println!("base {base}: {count} candidates match the CPU exactly (CUDA runtime)");
+        }
+    }
+
+    /// `process_range_detailed` over `threads` scoped threads, merged.
+    #[cfg(feature = "cubecl-cuda")]
+    fn cpu_detailed_parallel(range: &FieldSize, base: u32) -> FieldResults {
+        let threads = std::thread::available_parallelism().map_or(8, |n| n.get()) as u128;
+        let size = range.size();
+        let step = size.div_ceil(threads).max(1);
+        let parts: Vec<FieldResults> = std::thread::scope(|sc| {
+            let hs: Vec<_> = (0..threads)
+                .filter_map(|t| {
+                    let a = range.start() + t * step;
+                    let z = (a + step).min(range.end());
+                    (a < z).then(|| sc.spawn(move || process_range_detailed(&FieldSize::new(a, z), base)))
+                })
+                .collect();
+            hs.into_iter().map(|h| h.join().unwrap()).collect()
+        });
+        let mut distribution = parts[0].distribution.clone();
+        let mut nice_numbers = Vec::new();
+        for (k, p) in parts.iter().enumerate() {
+            if k > 0 {
+                for (acc, d) in distribution.iter_mut().zip(&p.distribution) {
+                    acc.count += d.count;
+                }
+            }
+            nice_numbers.extend(p.nice_numbers.iter().cloned());
+        }
+        nice_numbers.sort_by_key(|n| n.number);
+        FieldResults {
+            distribution,
+            nice_numbers,
+        }
+    }
+
+    /// The finite-difference kernel against the CPU at b40 and b50: the range
+    /// start and end, seeded random windows, windows centred on every point
+    /// inside the range where an addend (2n+1, 3n²+3n+1, 6n+6) gains a
+    /// digit, and a window straddling the range start (n³ gains a digit
+    /// there, so the batch splits between the two kernels). Several run
+    /// lengths and batch sizes, so partial runs and batch edges are hit.
+    /// Then the full range of every small base (the only windows with
+    /// near-misses) and the benchmark GPU windows, whole.
+    #[test]
+    #[cfg(feature = "cubecl-cuda")]
+    #[ignore = "requires an NVIDIA device"]
+    #[allow(clippy::too_many_lines)]
+    fn cubecl_cuda_fd_matches_cpu_detailed() {
+        let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
+        let opts = [
+            FdOptions { enabled: true, run_len: 256, batch: CUBECL_BATCH_SIZE },
+            FdOptions { enabled: true, run_len: 61, batch: CUBECL_BATCH_SIZE },
+            FdOptions { enabled: true, run_len: 1000, batch: 333_333 },
+        ];
+        let check = |range: &FieldSize, base: u32, cpu: &FieldResults, what: &str| {
+            for o in &opts {
+                let gpu = cubecl::future::block_on(process_range_detailed_cubecl_with(
+                    &ctx, range, base, *o,
+                ))
+                .expect("cubecl-cuda fd run");
+                assert_eq!(gpu.distribution, cpu.distribution, "b{base} {what} {o:?}: distribution");
+                assert_eq!(gpu.nice_numbers, cpu.nice_numbers, "b{base} {what} {o:?}: near-misses");
+            }
+        };
+        for base in [40u32, 50] {
+            let plan = fd_plan(base).expect("fd plan");
+            let r = crate::base_range::get_base_range_u128(base).unwrap().unwrap();
+            let (rs, re) = (r.range_start, r.range_end);
+            assert_eq!((plan.reg_lo, plan.reg_hi), (rs, re), "b{base}: regular interval");
+            println!("b{base}: {plan:?}");
+            let w = 1_000_000u128;
+            let mut windows: Vec<(u128, u128, String)> = vec![
+                (rs, rs + 2 * w, "range start".into()),
+                (re - 2 * w, re, "range end".into()),
+                (rs - w, rs + w, "straddles range start".into()),
+            ];
+            let mut x = 0x9E37_79B9_7F4A_7C15u64 ^ u64::from(base);
+            for i in 0..8 {
+                x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
+                let mut z = x;
+                z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+                z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+                z ^= z >> 31;
+                let off = (u128::from(z) * (re - rs - w)) >> 64;
+                windows.push((rs + off, rs + off + w, format!("random {i}")));
+            }
+            let b = u128::from(base);
+            for k in 1..=30u32 {
+                let Some(bk) = b.checked_pow(k) else { break };
+                let g_ds = bk.saturating_sub(1).div_ceil(2);
+                let g_ddc = bk.saturating_sub(6).div_ceil(6);
+                // smallest n with 3n²+3n+1 >= b^k
+                let (mut lo, mut hi) = (0u128, 1u128 << 64);
+                while lo < hi {
+                    let m = (lo + hi) / 2;
+                    let v = m.checked_mul(m).and_then(|q| q.checked_mul(3)).and_then(|q| q.checked_add(3 * m + 1));
+                    if v.is_none_or(|v| v >= bk) { hi = m } else { lo = m + 1 }
+                }
+                for (name, g) in [("dS", g_ds), ("ddC", g_ddc), ("dC", lo)] {
+                    if g > rs + w && g + w < re {
+                        windows.push((g - w / 2, g + w / 2, format!("{name} gains digit {k} at {g}")));
+                    }
+                }
+            }
+            for (a, z, what) in &windows {
+                let range = FieldSize::new(*a, *z);
+                let cpu = cpu_detailed_parallel(&range, base);
+                check(&range, base, &cpu, what);
+                println!("b{base} {what}: [{a}, {z}) exact for {} option sets", opts.len());
+            }
+            // The benchmark GPU window, whole, at the default options.
+            let range = FieldSize::new(rs, rs + 200_000_000);
+            let cpu = cpu_detailed_parallel(&range, base);
+            let gpu = cubecl::future::block_on(process_range_detailed_cubecl_with(
+                &ctx, &range, base, FdOptions { enabled: true, run_len: 256, batch: CUBECL_BATCH_SIZE },
+            ))
+            .expect("fd run");
+            assert_eq!(gpu.distribution, cpu.distribution, "b{base} benchmark window");
+            assert_eq!(gpu.nice_numbers, cpu.nice_numbers, "b{base} benchmark window");
+            let old = cubecl::future::block_on(process_range_detailed_cubecl_with(
+                &ctx, &range, base, FdOptions { enabled: false, run_len: 256, batch: CUBECL_BATCH_SIZE },
+            ))
+            .expect("old run");
+            assert_eq!(old.distribution, cpu.distribution, "b{base} benchmark window (old kernel)");
+            println!(
+                "b{base} benchmark window [{rs}, +2e8): fd = old = cpu, {} near-misses",
+                cpu.nice_numbers.len()
+            );
+        }
+        // Small bases, full range: the near-miss list is non-empty here.
+        let mut misses = 0;
+        for base in 10u32..=30 {
+            let Some(plan) = fd_plan(base) else { continue };
+            let r = crate::base_range::get_base_range_u128(base).unwrap().unwrap();
+            if r.size() > 50_000_000 {
+                continue;
+            }
+            let cpu = cpu_detailed_parallel(&r, base);
+            check(&r, base, &cpu, "full range");
+            misses += cpu.nice_numbers.len();
+            println!("b{base} full range ({} numbers, {plan:?}): exact, {} near-misses", r.size(), cpu.nice_numbers.len());
+        }
+        assert!(misses > 0, "no near-misses exercised");
+    }
+
+    /// Interleaved timing of the per-number kernel against the
+    /// finite-difference kernel over a sweep of run lengths, on the
+    /// benchmark GPU window (each base's range start, 2e8 numbers).
+    /// Knobs: `FD_TIMING_BASES` (default "40,50"), `FD_TIMING_RUNS`
+    /// (default "64,128,256,512,1024"), `FD_TIMING_REPS` windows per cell
+    /// (default 10), `FD_TIMING_ROUNDS` (default 3), `FD_TIMING_BATCH`
+    /// (default `CUBECL_BATCH_SIZE`), `FD_TIMING_WINDOW` (default 2e8).
+    #[test]
+    #[cfg(feature = "cubecl-cuda")]
+    #[ignore = "timing; requires an NVIDIA device"]
+    fn fd_timing() {
+        let env_list = |k: &str, d: &str| -> Vec<u128> {
+            std::env::var(k)
+                .unwrap_or_else(|_| d.to_string())
+                .split(',')
+                .filter(|x| !x.is_empty())
+                .map(|x| x.trim().parse().unwrap())
+                .collect()
+        };
+        let bases = env_list("FD_TIMING_BASES", "40,50");
+        let runs = env_list("FD_TIMING_RUNS", "64,128,256,512,1024");
+        let reps = env_list("FD_TIMING_REPS", "10")[0];
+        let rounds = env_list("FD_TIMING_ROUNDS", "3")[0];
+        let batch = env_list("FD_TIMING_BATCH", &CUBECL_BATCH_SIZE.to_string())[0];
+        let window = env_list("FD_TIMING_WINDOW", "200000000")[0];
+        let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
+        for &base in &bases {
+            let base = base as u32;
+            let rs = crate::base_range::get_base_range_u128(base).unwrap().unwrap().range_start;
+            let range = FieldSize::new(rs, rs + window);
+            let mut arms: Vec<(String, FdOptions)> = vec![(
+                "old".into(),
+                FdOptions { enabled: false, run_len: 1, batch: CUBECL_BATCH_SIZE },
+            )];
+            for &r in &runs {
+                arms.push((format!("fd R={r}"), FdOptions { enabled: true, run_len: r as u32, batch }));
+            }
+            // Warm up (JIT) and cross-check every arm once.
+            let reference = cubecl::future::block_on(process_range_detailed_cubecl_with(&ctx, &range, base, arms[0].1)).unwrap();
+            for (name, o) in &arms {
+                let r = cubecl::future::block_on(process_range_detailed_cubecl_with(&ctx, &range, base, *o)).unwrap();
+                assert_eq!(r.distribution, reference.distribution, "b{base} {name}");
+                assert_eq!(r.nice_numbers, reference.nice_numbers, "b{base} {name}");
+            }
+            let mut rates: Vec<Vec<f64>> = vec![Vec::new(); arms.len()];
+            for _ in 0..rounds {
+                for (k, (_, o)) in arms.iter().enumerate() {
+                    let t = Instant::now();
+                    for _ in 0..reps {
+                        let r = cubecl::future::block_on(process_range_detailed_cubecl_with(&ctx, &range, base, *o)).unwrap();
+                        assert_eq!(r.distribution, reference.distribution);
+                    }
+                    #[allow(clippy::cast_precision_loss)]
+                    rates[k].push((window * reps) as f64 / t.elapsed().as_secs_f64());
+                }
+            }
+            let med = |v: &Vec<f64>| {
+                let mut v = v.clone();
+                v.sort_by(f64::total_cmp);
+                v[v.len() / 2]
+            };
+            let old = med(&rates[0]);
+            for (k, (name, _)) in arms.iter().enumerate() {
+                let rs: Vec<String> = rates[k].iter().map(|r| format!("{r:.3e}")).collect();
+                println!(
+                    "FDTIME b{base} batch {batch} {name:>10}: rounds [{}] median {:.3e} n/s  x{:.2}",
+                    rs.join(" "),
+                    med(&rates[k]),
+                    med(&rates[k]) / old
+                );
+            }
         }
     }
 
