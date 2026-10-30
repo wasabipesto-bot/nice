@@ -29,6 +29,18 @@
 //! and the host sends any part of a batch outside it to the per-number kernel.
 //! The addends' widths are taken at the interval's top, where they are
 //! largest, so no addend can outgrow its array.
+//!
+//! Portability: the kernel needs what the per-number kernel needs (u64 add,
+//! multiply and shift; a u64 division only in the CUDA and HIP seed, the
+//! split16 division on wgpu). It is exact on CUDA and on Vulkan (lavapipe,
+//! through naga's WGSL and through `CubeCL`'s SPIR-V compiler), but not on
+//! Metal: on an Apple M4 it returned wrong unique counts for most numbers at
+//! bases 23, 27-30, 49, 50 and 52-55, even at one number per run, so the
+//! fault lies in the seed, the digit packing or the mask build. The root
+//! cause is open, so production keeps the per-number kernel on Metal
+//! adapters (`DetailedKernel::for_device` in [`crate::cubecl_backend`]), and
+//! `cubecl_fd_matches_cpu_detailed` below, which runs this kernel on any
+//! wgpu device, is the test that shows it.
 
 #![cfg(feature = "cubecl")]
 // The cube macro evaluates comptime! expressions host-side, where fn-level
@@ -872,7 +884,8 @@ mod tests {
 
     /// As [`cubecl_cuda_fd_matches_cpu_detailed`] on the default wgpu
     /// device, sized for a software rasterizer: windows of 1e5 numbers and
-    /// bases 10-24 in full.
+    /// bases 10-24 in full. It runs the kernel even on Metal, where
+    /// production does not: on an Apple M4 it fails at the b50 range start.
     #[test]
     #[ignore = "requires a wgpu device"]
     fn cubecl_fd_matches_cpu_detailed() {
