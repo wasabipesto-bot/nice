@@ -34,6 +34,18 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// the bottom buffers were sized by the pruned list, that was 15-21 % of a
 /// 1e14 field at bases 58-64.
 const SLOTS: usize = 65_535;
+/// Experimental: `NICE_EXP_SLOTS=n` caps the production layout's partitions
+/// per launch at n (default [`SLOTS`]).
+fn exp_slots() -> usize {
+    static S: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *S.get_or_init(|| {
+        std::env::var("NICE_EXP_SLOTS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|&n| (1..=SLOTS).contains(&n))
+            .unwrap_or(SLOTS)
+    })
+}
 /// Launched batches kept in flight before the driver waits for the oldest
 /// (each holds a little scratch of its own, counted in [`Footprint`]).
 pub(crate) const BATCHES_IN_FLIGHT: usize = 4;
@@ -344,7 +356,7 @@ impl JoinPlan {
     /// `None` if the device cannot hold one partition with a re-run list of
     /// [`MIN_RETRY_CAP`].
     pub(crate) fn for_field(fs: &FieldSetup, lim: JoinLimits) -> Option<(Self, Self)> {
-        let main = Self::new(fs, lim, SLOTS, list_bound(lim), 1, lim.budget / 4)?;
+        let main = Self::new(fs, lim, exp_slots(), list_bound(lim), 1, lim.budget / 4)?;
         let fp = Footprint::of(fs, NICE_CAP);
         let spare = lim.budget.saturating_sub(fp.fixed + fp.per_slot());
         let retry = Self::new(fs, lim, 1, SURV_CAP_RETRY, MIN_RETRY_CAP, spare)?;
