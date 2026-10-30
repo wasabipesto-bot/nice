@@ -425,3 +425,13 @@ The PR alone moved 2.8 % between these two rounds at b58, and prb's own r1 is th
 - **NiceMark ran at the card's own budget only.** The override exists in test builds only.
 - **Main's exactness suite was not re-run here.** Main's counters come from the A/B runs, identical to the last digit in every 1e14 run.
 
+
+## 9. Follow-up NiceMark rounds 4–6 (partial: none completed)
+
+Requested after the first report: NiceMark nice-only rounds 4–6, A = main against B = `rp/launch-with-barrier` (`4f153aa`, needed a client build), and, if b58_msd_weak stayed below ×0.98 over six rounds, a b58 1e15 fixed-field A/B (3 rounds). Script `launch-raw/nm2.sh`, analysis `launch-raw/analyze_nm2.py` (main r1–6 against pr r1–3 + prb r4–6).
+
+`nm2.sh` started at 09:48:16 UTC. By 09:48:34 it was still building the `prb` client (`nice_common` compiling). After that the box refused connections. It was destroyed (instance 58361499) before any of rounds 4–6 or the 1e15 runs could be read or copied. **There are no new numbers.** Every log copied before then is in `launch-raw/box/` (last sync 09:44, after `prb_ab.sh` finished). The b58_msd_weak question therefore rests on the evidence already above:
+- NiceMark rounds 1–3: ×0.969. The spreads were 2.6 % (main) and 2.1 % (PR), and b60's identical-layout scenario moved 1.8 %.
+- The harness 1e15 A/B at b58 (section 4b): ×1.018 at the 10 GB budget and ×1.012 at 20 GB. That is 1–2 % slower at 32–51 partitions per launch, and outside the rounds' spreads only at 20 GB (0.5–0.6 %).
+
+Status: the partitions-per-launch change is parked. Live production fields are 1e16 (b60) and 1e17 (b62), where it gains nothing (section 4). The flush-decision barrier is to be opened on its own from `rp/join-flush-barrier` (`61e6ba9`).
