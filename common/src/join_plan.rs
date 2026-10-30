@@ -30,6 +30,18 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// measured 1.11-1.37x faster per field than 4 on an RTX 3080 and an RTX
 /// 4090, where launch overhead was most of the join's fixed per-field cost.
 const SLOTS: usize = 16;
+/// Experimental: `NICE_EXP_SLOTS=n` (1-64) overrides [`SLOTS`] in the
+/// production layout, for measuring the per-launch cost.
+fn exp_slots() -> usize {
+    static S: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *S.get_or_init(|| {
+        std::env::var("NICE_EXP_SLOTS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|n| (1..=64).contains(n))
+            .unwrap_or(SLOTS)
+    })
+}
 /// Launched batches kept in flight before the driver waits for the oldest
 /// (each holds a little scratch of its own, counted in [`Footprint`]).
 pub(crate) const BATCHES_IN_FLIGHT: usize = 4;
@@ -334,7 +346,7 @@ impl JoinPlan {
     /// `None` if the device cannot hold one partition with a re-run list of
     /// [`MIN_RETRY_CAP`].
     pub(crate) fn for_field(fs: &FieldSetup, lim: JoinLimits) -> Option<(Self, Self)> {
-        let main = Self::new(fs, lim, SLOTS, list_bound(lim), 1, lim.budget / 4)?;
+        let main = Self::new(fs, lim, exp_slots(), list_bound(lim), 1, lim.budget / 4)?;
         let fp = Footprint::of(fs, NICE_CAP);
         let spare = lim.budget.saturating_sub(fp.fixed + fp.per_slot());
         let retry = Self::new(fs, lim, 1, SURV_CAP_RETRY, MIN_RETRY_CAP, spare)?;

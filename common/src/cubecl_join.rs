@@ -93,6 +93,18 @@ pub const DEAD_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 /// waves of 1,024 or 1,536 entries (4 below base 62 and 6 from it before)
 /// ran mostly empty lanes. Two are the fastest at every base measured.
 const ENTRIES_PER_THREAD: u32 = 2;
+/// Experimental: `NICE_EXP_JOIN_EPT=n` (1-8) overrides [`ENTRIES_PER_THREAD`]
+/// for every base, for measuring the wave size against bucket occupancy.
+fn entries_per_thread() -> u32 {
+    static EPT: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *EPT.get_or_init(|| {
+        std::env::var("NICE_EXP_JOIN_EPT")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .filter(|n| (1..=8).contains(n))
+            .unwrap_or(ENTRIES_PER_THREAD)
+    })
+}
 /// Cubes for the prefilter and check kernels (grid-stride loops).
 const CHECK_CUBES: u32 = 1024;
 /// How deep the halving of an overflowing partition's top layer may go: a
@@ -1701,7 +1713,7 @@ impl<R: Runtime> JoinDevice<R> {
         let work = self.read_u32(&self.work)?;
         let counts = self.read_u32(&self.counts)?;
         let nb = self.nb as usize;
-        let wave = u64::from(ENTRIES_PER_THREAD * JOIN_WG);
+        let wave = u64::from(entries_per_thread() * JOIN_WG);
         let (mut pairs, mut padded, mut live) = (0u64, 0u64, 0u64);
         for wi in 0..nslots * nb {
             let nt = u64::from(work[4 * wi + 3] - work[4 * wi + 2]);
@@ -1919,7 +1931,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.b,
                 self.key_level,
                 self.key_level && self.k == 1,
-                ENTRIES_PER_THREAD,
+                entries_per_thread(),
                 self.f0,
                 self.k2,
                 self.walk_sync,
@@ -2498,11 +2510,12 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         + p.check_secs
         + p.read_secs;
     eprintln!(
-        "GPU_PROFILE base={base} start={s} end={e} size={} slices={} partitions={} batches={} \
+        "GPU_PROFILE base={base} ept={} start={s} end={e} size={} slices={} partitions={} batches={} \
          slots={} min_slots={} retried={} splits={} | setup={:.4} device_wall={:.4} \
          upload={:.4} inputs={:.4} top={:.4} bucket={:.4} join={:.4} check={:.4} read={:.4} \
          probe={:.4} unattributed={:.4} | ntlay={} nbp={} tops={} listed={} pairs={} \
          padded_pairs={} live_buckets={} buckets={} survivors={} checked={} hits={hits}",
+        entries_per_thread(),
         e - s,
         js.slices,
         js.partitions,
