@@ -4,6 +4,22 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-10-30 (day 3; routine fired 04:41 UTC)
+
+- **Reconcile:** no research instances; October research invoiced $1.66; fleet $65.02;
+  credit $17.20 (fleet ~$2/day → the $10 floor in about 3.5 days); ivory disk 84 % after
+  yesterday's cleanup. **#215 and #216 merged 2026-10-29 12:56–12:57 UTC**; #218 (the
+  user's macOS paravirtual-GPU CI fix) too; main = d1ff798. Open upstream: #194, #160,
+  #220 (dependabot). No user messages since the feedback of 10-29.
+- **PR #221 opened** ("Detailed mode: digit arrays by finite differences instead of
+  division", 7019653): CPU detailed score ×6.76 on a 15-CPU Broadwell box, no regression at
+  any thread count (EXPERIMENTS L2.2). Box destroyed after 1.15 h.
+- **Leads today:** L2 client wiring + NiceMark CPU protocol → PR (box `l2-cpu`, 3080 KR
+  16 cores); L3 GPU detailed finite-difference prototype (box `l3-gpu-fd`, 3080 KR);
+  L1 re-profile of the join on d1ff798 at 1e14 and 1e16 to rank the next join lever
+  (box `l1-profile2`, 3080 US). Kill criteria: L3 under 1.3× at b50 → park; L2 is past
+  its kill criterion (prototype 8.5×), the PR opens when the protocol passes.
+
 ## 2026-10-29 (day 2; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; October research invoiced $0.44; fleet $62.83;

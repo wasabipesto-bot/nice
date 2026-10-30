@@ -5,6 +5,26 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L2.2 Detailed finite differences through the client, NiceMark protocol (2026-10-30, agent; `L2/PR-RESULTS.md`, `L2/pr-raw/`; PR #221, branch `pr/detailed-finite-diff` 7019653)
+
+Vast box 58350466: Xeon E5-2682 v4 (Broadwell), container quota 15.36 CPUs (`--threads 0`
+→ 15), clocks uncapped. A = main d1ff798, B = branch (045797e, comment-only diff to
+7019653), `nice_client detailed --benchmark --benchmark-secs 150`, A B A B A B.
+
+| scenario | A (M n/s) | B | B/A |
+|---|---|---|---|
+| b40_detailed, 15 threads | 51.55 (−0.1/+0.9 %) | 287.95 (−0.2/+1.2 %) | **5.59×** |
+| b50_detailed, 15 threads | 33.80 (−0.3/+0.1 %) | 271.09 (−0.0/+0.5 %) | **8.02×** |
+| b50_detailed_1t | 2.22 | 15.23 | **6.85×** |
+| detailed score | 1247 | 8424 | **6.76×** |
+
+`--threads 1`: 5.57× / 8.12× / 6.80×, score 6.75×. `--threads 64` (4× oversubscribed,
+cgroup throttled): 3.10× / 5.15×, score 4.80×; both trees slow, the new loop more. Pinned
+per-number: b40 280→50 ns, b50 435→57, b60 560→58. Tests on the box: 180 passed, 5 ignored.
+Production = the packed variant only (8 digits per 64-bit biased add); dispatch in common
+(`process_range_detailed_fd`, bases 40–64 with a legal range except 63; others → division);
+client's CPU chunk path calls it. Not run: GPU-feature clippy, WASM build (CI will).
+
 ## L1.4 Prune against new main on an RTX 4090, and the wave size (2026-10-29, agent; `L1/AB-4090.md`, `L1/pr-raw/4090/`)
 
 Vast RTX 4090 (58197772, Poland, $0.375/h; **power-limited to 330 W**, so absolute times
