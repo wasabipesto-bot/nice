@@ -1,0 +1,48 @@
+=== BUILD gate: af41956 GPU detailed FD: split16 seed without dividing a bare half-width shift        0 dirty
+TEST_BUILD gate secs 80 rc 0
+CLIENT_BUILD gate secs 64 rc 0
+=== BUILD lift: 297a969 GPU detailed mode: run the finite-difference kernel on Metal again        0 dirty
+TEST_BUILD lift secs 58 rc 0
+CLIENT_BUILD lift secs 63 rc 0
+=== gate fd
+test cubecl_detailed_fd::tests::cubecl_fd_matches_cpu_detailed ... ignored, requires a wgpu device
+test cubecl_detailed_fd::tests::cubecl_fd_seed_matches_cpu ... ignored, requires a wgpu device
+test cubecl_detailed_fd::tests::metal_half_shift_div_repro ... ignored, Apple Metal compiler reproducer: set NICE_METAL_DIV_REPRO=1
+test cubecl_detailed_fd::tests::plan_covers_exactly_the_legal_range ... ok
+test result: ok. 1 passed; 0 failed; 3 ignored; 0 measured; 216 filtered out; finished in 0.00s
+=== gate detailed_kernel_by_device
+test cubecl_backend::tests::detailed_kernel_by_device ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 219 filtered out; finished in 0.00s
+=== gate cubecl_detailed_fd::tests::cubecl_fd_seed_matches_cpu rc=0 secs=4 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 219 filtered out; finished in 3.51s
+=== gate cubecl_detailed_fd::tests::cubecl_fd_matches_cpu_detailed rc=0 secs=3 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 219 filtered out; finished in 3.40s
+=== gate cubecl_detailed_fd::tests::metal_half_shift_div_repro rc=0 secs=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 219 filtered out; finished in 0.00s
+=== gate cubecl_backend::tests::cubecl_reads_back_every_near_miss rc=0 secs=1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 219 filtered out; finished in 0.89s
+=== gate cubecl_backend::tests::cubecl_matches_cpu_detailed rc=0 secs=1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 219 filtered out; finished in 0.79s
+=== gate cubecl_backend::tests::cubecl_detailed_survives_more_batches_than_the_task_cap rc=0 secs=2 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 219 filtered out; finished in 2.37s
+=== lift fd
+test cubecl_detailed_fd::tests::cubecl_fd_matches_cpu_detailed ... ignored, requires a wgpu device
+test cubecl_detailed_fd::tests::cubecl_fd_seed_matches_cpu ... ignored, requires a wgpu device
+test cubecl_detailed_fd::tests::metal_half_shift_div_repro ... ignored, Apple Metal compiler reproducer: set NICE_METAL_DIV_REPRO=1
+test cubecl_detailed_fd::tests::plan_covers_exactly_the_legal_range ... ok
+test result: ok. 1 passed; 0 failed; 3 ignored; 0 measured; 215 filtered out; finished in 0.00s
+=== lift detailed_kernel_by_device
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 219 filtered out; finished in 0.00s
+=== lift cubecl_detailed_fd::tests::cubecl_fd_seed_matches_cpu rc=0 secs=3 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 218 filtered out; finished in 2.58s
+=== lift cubecl_detailed_fd::tests::cubecl_fd_matches_cpu_detailed rc=0 secs=3 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 218 filtered out; finished in 3.47s
+=== lift cubecl_detailed_fd::tests::metal_half_shift_div_repro rc=0 secs=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 218 filtered out; finished in 0.00s
+=== lift cubecl_backend::tests::cubecl_reads_back_every_near_miss rc=0 secs=1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 218 filtered out; finished in 0.72s
+=== lift cubecl_backend::tests::cubecl_matches_cpu_detailed rc=0 secs=1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 218 filtered out; finished in 0.81s
+=== lift cubecl_backend::tests::cubecl_detailed_survives_more_batches_than_the_task_cap rc=0 secs=1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 218 filtered out; finished in 0.73s
+BENCH gate rc=0 secs=56
+b40_detailed           40 uniform              4      2.0e8    110   27.082      8.124e8        -
+b50_detailed           50 uniform              4      2.0e8     65   27.066      4.803e8        -
+NiceMark: 329 (v3.4.7-dev, Detailed gpu)
+[2026-10-30T16:46:22Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40 (Division): 2.00e8 numbers in 0.29s (6.80e8 n/s), 0 near-misses
+[2026-10-30T16:46:22Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40 (Division): 2.00e8 numbers in 0.25s (7.92e8 n/s), 0 near-misses
+BENCH lift rc=0 secs=55
+b40_detailed           40 uniform              4      2.0e8    329   27.060      2.432e9        -
+b50_detailed           50 uniform              4      2.0e8    296   27.086      2.186e9        -
+NiceMark: 1215 (v3.4.7-dev, Detailed gpu)
+[2026-10-30T16:47:18Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.17s (1.17e9 n/s), 0 near-misses
+[2026-10-30T16:47:18Z DEBUG nice_common::cubecl_backend] CubeCL detailed b40: 2.00e8 numbers in 0.08s (2.43e9 n/s), 0 near-misses
+FINAL2_DONE

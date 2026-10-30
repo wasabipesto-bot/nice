@@ -25,9 +25,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   b52–55 (division exact; CI's paravirtual Metal passed). → #225 converted to draft, comment
   posted. **User: keep using mayalaran until resolved (max 24 h from ~19:30 UTC 10-30).**
   Gate landed (d8038d6; CUDA/lavapipe still FD, speed unchanged) and the desk model of the
-  Apple `(x>>16)/K` miscompile explains everything but b23 (L3.5); PR body updated. M4
-  root-cause agent (diagnostic dumps per stage at b50/b23, minimal reproducer, fix on
-  `pr/gpu-detailed-fd-metalfix`).
+  Apple `(x>>16)/K` miscompile explains everything but b23 (L3.5); PR body updated. **M4 root cause found and fixed (L3.6):** Apple compiler miscompiles `(x>>16)/K`; seed
+  rewritten in 16-bit limbs; exact on all 44 bases on the M4, speed unchanged; 1 h 11 min of
+  machine time, cleaned up. CUDA/lavapipe verification of 297a969 running on a 3080; then
+  squash, body update, ready for review. New lead L25: audit nice-only kernels for the pattern.
 - **User questions:** detailed auto order (answer: no change; CubeCL CUDA already leads and
   wgpu serves AMD/Apple; hand-CUDA detailed is a third-stop fallback now ~3.5× slower) and the
   web runner port (L23 CPU ~half a day, L24 GPU 1–2 days; both queued as requested).

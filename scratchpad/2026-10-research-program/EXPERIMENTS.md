@@ -29,6 +29,27 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L3.6 Root cause and fix on the M4 (2026-10-30, agent, 1 h 11 min of mayalaran; `L3/METAL-FIX.md`, `L3/metalfix/`; branch `pr/gpu-detailed-fd-metalfix` 297a969)
+
+**Apple GPU compiler bug, confirmed with hand-written MSL (no wgpu/naga):** unsigned division or
+remainder by a non-power-of-two constant is wrong when the dividend is a right shift by half the
+width: `naga_div(x >> 16u, K)`, `(x >> 16u) % K`, `uint(ulong p >> 32) / K`. The unrolled split16
+seed (`fd_to_digits`) made the first dividend of every chunk a bare `top_limb >> 16`, so n²'s (and
+at some bases n³'s) digits were wrong from digit 0; limbs were exact. b23 is the same bug (at
+K = 12167 a zero dividend returns 4), not a second fault. The per-number kernel is exact because
+its long division is a runtime loop with a loop-carried remainder.
+**Fix (af41956):** the wgpu seed in 16-bit limbs, u32 arithmetic only, each chunk's division
+starting from the top two limbs as one u32 (no bare shift; one division fewer per chunk);
+CUDA/HIP path, hot loop, mask and histogram unchanged. d9261a8: `fd_seed` + per-n seed test
+`cubecl_fd_seed_matches_cpu` (1024 n at start/middle/end of all 44 bases, word for word) + the
+minimal reproducer `metal_half_shift_div_repro` (ignored, `NICE_METAL_DIV_REPRO=1`). 297a969
+reverts the gate.
+**M4:** seed test failed before at b23, 25, 27–30, 49, 50, 52–55 and passes after; all FD/readback
+tests pass; 220-window sweep of bases 10–64 (3.08e7 numbers, incl. run length 1) identical to the
+CPU. Speed unchanged vs the PR: b40 2.435e9, b50 2.187e9, NiceMark 1216 (main 330): 3.00× / 4.54×.
+Not done: CUDA/Vulkan re-run (verification agent), other Apple GPUs/macOS versions, Apple
+Feedback report, **nice-only kernels not audited for the pattern (L25)**.
+
 ## L3.5 Metal gate for #225 and the desk root cause (2026-10-30, agent; `L3/METAL-ROOT-CAUSE.md`, `L3/pr-raw/gate/`)
 
 Gate commit d8038d6 (head of `pr/gpu-detailed-fd`): the wgpu context records whether the adapter
