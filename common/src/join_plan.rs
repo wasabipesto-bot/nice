@@ -25,11 +25,14 @@ use anyhow::Result;
 use log::warn;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-/// Partitions per launch (device slots), bounded below by memory. A field
-/// is b^p partitions (3,249 at base 57), so this sets the launch count: 16
-/// measured 1.11-1.37x faster per field than 4 on an RTX 3080 and an RTX
-/// 4090, where launch overhead was most of the join's fixed per-field cost.
-const SLOTS: usize = 16;
+/// The most partitions one launch may take (device slots); fewer where
+/// the budget, the largest binding or the expected survivors allow fewer
+/// ([`JoinPlan::new`]). Every launched batch costs about 0.5 ms of fixed
+/// work on an RTX 3080, which at 16 per launch (the cap while the bottom
+/// buffers were sized by the unpruned list) was 15-21 % of a 1e14 field at
+/// bases 58-64. On that card 64 measured the fastest of 16-177 at bases
+/// 58-64; 96 to 177 were up to 4 % slower.
+const SLOTS: usize = 64;
 /// Launched batches kept in flight before the driver waits for the oldest
 /// (each holds a little scratch of its own, counted in [`Footprint`]).
 pub(crate) const BATCHES_IN_FLIGHT: usize = 4;
@@ -54,8 +57,8 @@ const NICE_CAP: u32 = 1 << 10;
 /// kernels write it.
 pub(crate) const NICE_RECORD_BYTES: usize = 16;
 /// The join's working-set budget on a device whose largest buffer is this
-/// size or smaller (down to half of it); a field at bases 40-64 needs
-/// 0.3-0.9 GiB at 16 partitions per launch. See [`JoinLimits`].
+/// size or smaller (down to half of it); a 1e14 field at bases 57-64 takes
+/// 38-51 partitions per launch in it. See [`JoinLimits`].
 const JOIN_MEMORY: usize = 1 << 30;
 /// The largest working-set budget, reached by devices of 16 GiB and more on
 /// CUDA. With a quarter of it for the survivor list, a 1e16 field at bases
@@ -181,6 +184,13 @@ impl JoinCeiling {
 /// Bytes in each of one field's device buffers, as the GPU stage allocates
 /// them (`cubecl_join`'s `JoinDevice::new`): per slot for those that grow
 /// with the partitions per launch, then the field's own tables.
+///
+/// The bottom side (`ext_m`, `ext_pk` and the bucket lists, most of a slot)
+/// is sized by the field's own bottom list, pruned by its certificate
+/// ([`FieldSetup::bp_r`]), which is what the kernels index: 37-48 % of the
+/// list before the prune on a 1e14 field at bases 57-64. Every slice of a
+/// field is planned again with its own list (`cubecl_join::run_slices`),
+/// so each layout fits the slice it runs.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Footprint {
     pub(crate) ext_m: usize,
@@ -203,16 +213,13 @@ pub(crate) struct Footprint {
 
 impl Footprint {
     pub(crate) fn of(fs: &FieldSetup, nice_cap: u32) -> Self {
-        Self::with_prefixes(fs, fs.tlay.len(), nice_cap)
+        Self::with_sides(fs, fs.tlay.len(), fs.bp_r.len(), nice_cap)
     }
 
-    /// The footprint `fs`'s field would have with `ntl` top-layer prefixes:
-    /// every buffer is affine in it.
-    pub(crate) fn with_prefixes(fs: &FieldSetup, ntl: usize, nice_cap: u32) -> Self {
+    /// The footprint `fs`'s field would have with `ntl` top-layer prefixes
+    /// and `nbp` bottom prefixes: every buffer is affine in each.
+    pub(crate) fn with_sides(fs: &FieldSetup, ntl: usize, nbp: usize, nice_cap: u32) -> Self {
         let b = fs.b as usize;
-        // The bottom list before the field prune: a slice's pruned list is
-        // never longer, so the layout fits every slice of the field.
-        let nbp = fs.bp_all.0.len();
         let ntl = ntl.max(1);
         let nroots = fs.base.roots.len();
         let nkeys = if fs.key_level { b } else { 1 };
@@ -308,6 +315,7 @@ impl JoinPlan {
         let fp = Footprint::of(fs, NICE_CAP);
         let list_cap = u32::try_from((cap as usize).min(lim.max_binding / 8).min(list_budget / 8))
             .unwrap_or(u32::MAX);
+        let partitions = usize::try_from(fs.nparts).unwrap_or(usize::MAX);
         if list_cap < min_cap.max(1) || fp.largest_fixed > lim.max_binding {
             return None;
         }
@@ -317,6 +325,7 @@ impl JoinPlan {
         let by_survivors =
             (list_cap as usize / 2 / (SURV_PER_PREFIX * fs.tlay.len().max(1))).max(1);
         let slots = slots
+            .min(partitions)
             .min(lim.max_binding / fp.largest_per_slot().max(1))
             .min(room / fp.per_slot().max(1))
             .min(by_survivors);
@@ -348,11 +357,14 @@ impl JoinPlan {
 /// list. 0 if not even one prefix fits.
 ///
 /// Every buffer that grows with the field grows with its top layer, so this
-/// bounds them all, whatever the field's size ([`plan_join`]).
+/// bounds them all, whatever the field's size ([`plan_join`]). The slices
+/// are not built yet, so their bottom lists are taken at the length before
+/// the prune (`FieldSetup::bp_all`), which none of them exceeds.
 pub(crate) fn max_slice_prefixes(fs: &FieldSetup, lim: JoinLimits) -> usize {
+    let nbp = fs.bp_all.0.len();
     let (one, two) = (
-        Footprint::with_prefixes(fs, 1, NICE_CAP),
-        Footprint::with_prefixes(fs, 2, NICE_CAP),
+        Footprint::with_sides(fs, 1, nbp, NICE_CAP),
+        Footprint::with_sides(fs, 2, nbp, NICE_CAP),
     );
     // Bytes per prefix: in the field's tables, and per slot.
     let per_fixed = two.fixed - one.fixed;
@@ -522,9 +534,27 @@ pub(crate) mod tests {
         FieldSetup::new(base, range.start(), range.end(), jp).expect("field setup")
     }
 
+    /// `plan` takes as many partitions per launch as `lim` allows `fs`: one
+    /// more would pass the budget, the largest binding, half the survivor
+    /// list on the expected survivors, or the field's partitions.
+    fn assert_takes_all_that_fit(fs: &FieldSetup, lim: JoinLimits, plan: &JoinPlan) {
+        let fp = Footprint::of(fs, NICE_CAP);
+        let more = plan.slots + 1;
+        assert!(plan.bytes <= lim.budget, "{plan:?}");
+        assert!(
+            more > SLOTS
+                || u128::try_from(more).unwrap() > fs.nparts
+                || plan.bytes + fp.per_slot() > lim.budget
+                || more * fp.largest_per_slot() > lim.max_binding
+                || more * SURV_PER_PREFIX * fs.tlay.len().max(1) > plan.list_cap as usize / 2,
+            "{plan:?} leaves room for another partition per launch"
+        );
+    }
+
     /// On a desktop GPU (CUDA reports a quarter of an 8 GB card as its
-    /// largest buffer) every production field gets the measured layout: 16
-    /// partitions per launch and full lists, within the budget.
+    /// largest buffer) every production field gets full lists and as many
+    /// partitions per launch as the budget holds: at least the 16 the
+    /// layout had while the bottom buffers were sized before the prune.
     #[test]
     fn production_fields_get_the_full_layout() {
         let lim = JoinLimits {
@@ -534,7 +564,14 @@ pub(crate) mod tests {
         for &(base, start, size) in PLAN_FIELDS {
             let fs = plan_field(base, start, size);
             let (plan, retry) = JoinPlan::for_field(&fs, lim).expect("fits a desktop GPU");
-            assert_eq!((plan.slots, plan.list_cap), (SLOTS, SURV_CAP), "b{base}");
+            assert_eq!(plan.list_cap, SURV_CAP, "b{base}");
+            assert!(plan.slots >= 16, "b{base}: {plan:?}");
+            assert_takes_all_that_fit(&fs, lim, &plan);
+            println!(
+                "b{base}: {} partitions per launch, {} MiB",
+                plan.slots,
+                plan.bytes >> 20
+            );
             assert_eq!(
                 (retry.slots, retry.list_cap),
                 (1, SURV_CAP_RETRY),
@@ -698,6 +735,63 @@ pub(crate) mod tests {
         );
     }
 
+    /// The bottom buffers are sized by each slice's own pruned list, which
+    /// the kernels index, and no slice's list is longer than the unpruned
+    /// one the field was cut into slices by. Under a fixed budget the plan
+    /// then takes as many partitions per launch as fit, up to [`SLOTS`]: on
+    /// a 10 GB card a 1e14 field at bases 57-64 gets the cap, where the
+    /// unpruned sizing left room for 39-55.
+    #[test]
+    fn bottom_buffers_follow_each_slices_pruned_list() {
+        let lim = JoinLimits::for_buffer(2_684_354_560);
+        assert_eq!(lim.budget, 2_684_354_560);
+        // A field of several slices: base 58, 1e15, cut into four.
+        let range = FieldSize::new(DENSE_58, DENSE_58 + 1_000_000_000_000_000);
+        let field = plan_join(58, &range, lim).expect("a join field");
+        let ntl = field.fs.tlay.len() as u128;
+        let field = field.resliced(ntl.div_ceil(4)).expect("slices");
+        assert!(field.slices.len() >= 3, "{} slices", field.slices.len());
+        let mut pruned = 0;
+        for sl in &field.slices {
+            let fs = field.fs.sub_range(sl.start(), sl.end()).expect("a slice");
+            let (nbp, b) = (fs.bp_r.len(), fs.b as usize);
+            assert!(nbp <= fs.bp_all.0.len());
+            pruned += usize::from(nbp < fs.bp_all.0.len());
+            let fp = Footprint::of(&fs, NICE_CAP);
+            assert_eq!(
+                (fp.ext_m, fp.ext_pk, fp.lists),
+                (nbp * 8, nbp * 4, nbp * b * 4)
+            );
+            let (plan, retry) = JoinPlan::for_field(&fs, lim).expect("the slice fits");
+            assert!(plan.slots >= SLICE_SLOTS, "{plan:?}");
+            assert!(retry.bytes <= lim.budget, "{retry:?}");
+            assert_takes_all_that_fit(&fs, lim, &plan);
+        }
+        // A slice whose certificate fails (a repeated digit) has no tops and
+        // prunes nothing; the others prune.
+        assert!(pruned >= 2, "{pruned} slices pruned");
+        for &(base, start, size) in &PLAN_FIELDS[2..] {
+            let fs = plan_field(base, start, size);
+            let (plan, _) = JoinPlan::for_field(&fs, lim).expect("fits a 10 GB card");
+            assert_takes_all_that_fit(&fs, lim, &plan);
+            let unpruned = Footprint::with_sides(&fs, fs.tlay.len(), fs.bp_all.0.len(), NICE_CAP);
+            let list = plan.list_cap as usize * 8;
+            let before = (lim.budget - unpruned.fixed - list) / unpruned.per_slot();
+            println!(
+                "b{base} 1e14 on a 10 GB card: {} partitions per launch, {} MiB (sized \
+                 before the prune: {before}); bottoms {} of {}",
+                plan.slots,
+                plan.bytes >> 20,
+                fs.bp_r.len(),
+                fs.bp_all.0.len()
+            );
+            assert!(
+                plan.slots == SLOTS || plan.slots > before * 3 / 2,
+                "b{base}: {plan:?}"
+            );
+        }
+    }
+
     /// A device with small buffers gets a smaller layout that respects them,
     /// and one that cannot hold a single partition gets none (its fields
     /// stay on the stride pipeline).
@@ -716,16 +810,18 @@ pub(crate) mod tests {
         assert!(plan.list_cap as usize * 8 <= lim.max_binding);
         assert!(retry.list_cap >= MIN_RETRY_CAP);
         assert!(plan.bytes <= lim.budget && retry.bytes <= lim.budget);
-        // Buffers smaller than one partition's bucket lists (29 MiB here).
+        // Buffers smaller than one partition's bucket lists.
+        assert_eq!(fp.largest_per_slot(), fp.lists);
         let lim = JoinLimits {
-            max_binding: 16 << 20,
+            max_binding: fp.lists - 1,
             budget: 1 << 30,
         };
         assert_eq!(JoinPlan::for_field(&fs, lim), None);
-        // A budget smaller than one partition and the re-run's list.
+        // A budget that holds one partition, but not the re-run's list
+        // beside it.
         let lim = JoinLimits {
             max_binding: 1 << 30,
-            budget: 32 << 20,
+            budget: fp.fixed + fp.per_slot() + MIN_RETRY_CAP as usize * 8 - 8,
         };
         assert_eq!(JoinPlan::for_field(&fs, lim), None);
     }
