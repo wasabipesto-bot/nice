@@ -1,0 +1,51 @@
+=== 16:15:52 vulkaninfo
+	apiVersion         = 1.4.318
+	deviceName         = llvmpipe (LLVM 20.1.2, 256 bits)
+	driverName         = llvmpipe
+ICD /usr/share/vulkan/icd.d/lvp_icd.json
+=== 16:15:52 lavapipe-gpu-binary
+    Finished `release` profile [optimized] target(s) in 0.26s
+     Running unittests src/lib.rs (target/release/deps/nice_common-c0034331d0049e16)
+
+running 5 tests
+--- single candidate ---
+cpu    nice_numbers: []
+web    nice_numbers: []
+native nice_numbers: []
+test cubecl_backend::tests::cubecl_finds_69_in_base_10 ... ok
+--- small window ---
+cpu    nice_numbers: [NiceNumberSimple { number: 20363742218601559, num_uniques: 45 }]
+web    nice_numbers: [NiceNumberSimple { number: 20363742218601559, num_uniques: 45 }]
+native nice_numbers: [NiceNumberSimple { number: 20363742218601559, num_uniques: 45 }]
+test cubecl_web::tests::web_kernel_near_miss_matches_cpu_at_base_49 ... ok
+b40 range start: [1916284264916, 1916284464916) exact
+b40 range end: [6553599800000, 6553600000000) exact
+base 10: 1000000 candidates match the CPU exactly
+b40 straddling the range start: [1916284164916, 1916284364916) exact
+base 40: 2000000 candidates match the CPU exactly
+base 62: 200000 candidates match the CPU exactly
+b50 range start: [26507984537059635, 26507984537259635) exact
+b50 range end: [97656249999800000, 97656250000000000) exact
+base 80: 100000 candidates match the CPU exactly
+test cubecl_backend::tests::cubecl_matches_cpu_detailed ... ok
+b50 straddling the range start: [26507984536959635, 26507984537159635) exact
+b10 full range (53 numbers): exact, 1 near-misses
+b12 full range (186 numbers): exact, 0 near-misses
+b13 full range (212 numbers): exact, 0 near-misses
+b14 full range (405 numbers): exact, 0 near-misses
+b15 full range (2006 numbers): exact, 1 near-misses
+b17 full range (7720 numbers): exact, 2 near-misses
+b18 full range (9459 numbers): exact, 0 near-misses
+b19 full range (18941 numbers): exact, 0 near-misses
+b20 full range (101055 numbers): exact, 1 near-misses
+bases 10-24 in full: 27 near-misses match the CPU exactly
+test cubecl_backend::tests::cubecl_reads_back_every_near_miss ... ok
+b22 full range (422139 numbers): exact, 10 near-misses
+b23 full range (546240 numbers): exact, 8 near-misses
+b24 full range (1135124 numbers): exact, 4 near-misses
+bases 10-24: 27 near-misses
+test cubecl_detailed_fd::tests::cubecl_fd_matches_cpu_detailed ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 243 filtered out; finished in 12.51s
+
+LVP rc 0

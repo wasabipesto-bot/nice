@@ -1,0 +1,382 @@
+diff --git a/common/src/cubecl_detailed_fd.rs b/common/src/cubecl_detailed_fd.rs
+index 6d51c8b..5f76d8b 100644
+--- a/common/src/cubecl_detailed_fd.rs
++++ b/common/src/cubecl_detailed_fd.rs
+@@ -901,4 +901,377 @@ mod tests {
+         assert!(misses > 0, "no near-misses compared");
+         println!("bases 10-24: {misses} near-misses");
+     }
++
++    // ---------------------------------------------------------------------
++    // DIAGNOSTIC (not for merge): the seed alone, to localise the Apple M4
++    // failure. `zz_seed_dump` is `detailed_fd_kernel`'s seed block verbatim
++    // (copied by script), for n = start + t with n < 2^64, writing the packed
++    // words of S, C, dS, dC and ddC; the host compares them with the exact
++    // digits.
++
++    #[cube(launch_unchecked)]
++    #[allow(
++        clippy::too_many_arguments,
++        clippy::too_many_lines,
++        clippy::similar_names
++    )]
++    fn zz_seed_dump(
++        out: &mut Array<u32>,
++        s0: u32,
++        s1: u32,
++        cnt: u32,
++        #[comptime] base: u32,
++        #[comptime] limbs: u32,
++        #[comptime] chunk_digits: u32,
++        #[comptime] chunk_div: u32,
++        #[comptime] wide_chunk: bool,
++        #[comptime] ls: u32,
++        #[comptime] lc: u32,
++        #[comptime] lds: u32,
++        #[comptime] ldc: u32,
++        #[comptime] lddc: u32,
++    ) {
++        let sq_limbs = comptime!(2 * limbs);
++        let cu_limbs = comptime!(3 * limbs);
++        let ws = comptime!(ls.div_ceil(4));
++        let wc = comptime!(lc.div_ceil(4));
++        let wds = comptime!(lds.div_ceil(4));
++        let wdc = comptime!(ldc.div_ceil(4));
++        let wddc = comptime!(lddc.div_ceil(4));
++        let words = comptime!(ws + wc + wds + wdc + wddc);
++        let t = ABSOLUTE_POS_X;
++        if t < cnt {
++            let n_lo = ((u64::cast_from(s1) << 32u64) | u64::cast_from(s0)) + u64::cast_from(t);
++            let n_hi = 0u64;
++            // --- seed: exact limbs of n, n², n³, 2n+1, 3n²+3n+1, 6n+6 ----------
++            let mut nl = Array::<u32>::new(limbs as usize);
++            #[unroll]
++            for i in 0..limbs {
++                let shift = comptime!(((i & 1) * 32) as u64);
++                if comptime!(i < 2) {
++                    nl[i as usize] = u32::cast_from(n_lo >> shift);
++                } else {
++                    nl[i as usize] = u32::cast_from(n_hi >> shift);
++                }
++            }
++            let mut sq = Array::<u32>::new(sq_limbs as usize);
++            #[unroll]
++            for i in 0..sq_limbs {
++                sq[i as usize] = 0u32;
++            }
++            #[unroll]
++            for i in 0..limbs {
++                let mut carry = 0u64;
++                #[unroll]
++                for j in 0..limbs {
++                    let k = comptime!(i + j);
++                    let t = u64::cast_from(nl[i as usize]) * u64::cast_from(nl[j as usize])
++                        + u64::cast_from(sq[k as usize])
++                        + carry;
++                    sq[k as usize] = u32::cast_from(t);
++                    carry = t >> 32u64;
++                }
++                sq[comptime!(i + limbs) as usize] = u32::cast_from(carry);
++            }
++            let mut cu = Array::<u32>::new(cu_limbs as usize);
++            #[unroll]
++            for i in 0..cu_limbs {
++                cu[i as usize] = 0u32;
++            }
++            #[unroll]
++            for i in 0..sq_limbs {
++                let mut carry = 0u64;
++                #[unroll]
++                for j in 0..limbs {
++                    let k = comptime!(i + j);
++                    let t = u64::cast_from(sq[i as usize]) * u64::cast_from(nl[j as usize])
++                        + u64::cast_from(cu[k as usize])
++                        + carry;
++                    cu[k as usize] = u32::cast_from(t);
++                    carry = t >> 32u64;
++                }
++                cu[comptime!(i + limbs) as usize] = u32::cast_from(carry);
++            }
++            // 2n+1 and 6n+6 (limbs + 1 words), 3n²+3n+1 (2·limbs + 1 words).
++            let mut v_ds = Array::<u32>::new(comptime!(limbs + 1) as usize);
++            let mut v_ddc = Array::<u32>::new(comptime!(limbs + 1) as usize);
++            let mut c_ds = 1u64;
++            let mut c_ddc = 6u64;
++            #[unroll]
++            for i in 0..comptime!(limbs + 1) {
++                if comptime!(i < limbs) {
++                    c_ds += 2u64 * u64::cast_from(nl[i as usize]);
++                    c_ddc += 6u64 * u64::cast_from(nl[i as usize]);
++                }
++                v_ds[i as usize] = u32::cast_from(c_ds);
++                v_ddc[i as usize] = u32::cast_from(c_ddc);
++                c_ds >>= 32u64;
++                c_ddc >>= 32u64;
++            }
++            let mut v_dc = Array::<u32>::new(comptime!(sq_limbs + 1) as usize);
++            let mut c_dc = 1u64;
++            #[unroll]
++            for i in 0..comptime!(sq_limbs + 1) {
++                if comptime!(i < sq_limbs) {
++                    c_dc += 3u64 * u64::cast_from(sq[i as usize]);
++                }
++                if comptime!(i < limbs) {
++                    c_dc += 3u64 * u64::cast_from(nl[i as usize]);
++                }
++                v_dc[i as usize] = u32::cast_from(c_dc);
++                c_dc >>= 32u64;
++            }
++
++            let mut sd = Array::<u32>::new(ws as usize);
++            let mut cd = Array::<u32>::new(wc as usize);
++            let mut ds = Array::<u32>::new(wds as usize);
++            let mut dc = Array::<u32>::new(wdc as usize);
++            let mut ddc = Array::<u32>::new(wddc as usize);
++            #[unroll]
++            for i in 0..ws {
++                sd[i as usize] = 0u32;
++            }
++            #[unroll]
++            for i in 0..wc {
++                cd[i as usize] = 0u32;
++            }
++            #[unroll]
++            for i in 0..wds {
++                ds[i as usize] = 0u32;
++            }
++            #[unroll]
++            for i in 0..wdc {
++                dc[i as usize] = 0u32;
++            }
++            #[unroll]
++            for i in 0..wddc {
++                ddc[i as usize] = 0u32;
++            }
++            fd_to_digits(
++                &mut sq,
++                &mut sd,
++                sq_limbs,
++                ls,
++                base,
++                chunk_digits,
++                chunk_div,
++                wide_chunk,
++            );
++            fd_to_digits(
++                &mut cu,
++                &mut cd,
++                cu_limbs,
++                lc,
++                base,
++                chunk_digits,
++                chunk_div,
++                wide_chunk,
++            );
++            fd_to_digits(
++                &mut v_ds,
++                &mut ds,
++                comptime!(limbs + 1),
++                lds,
++                base,
++                chunk_digits,
++                chunk_div,
++                wide_chunk,
++            );
++            fd_to_digits(
++                &mut v_dc,
++                &mut dc,
++                comptime!(sq_limbs + 1),
++                ldc,
++                base,
++                chunk_digits,
++                chunk_div,
++                wide_chunk,
++            );
++            fd_to_digits(
++                &mut v_ddc,
++                &mut ddc,
++                comptime!(limbs + 1),
++                lddc,
++                base,
++                chunk_digits,
++                chunk_div,
++                wide_chunk,
++            );
++            let o = t * words;
++            #[unroll]
++            for i in 0..ws {
++                out[(o + i) as usize] = sd[i as usize];
++            }
++            #[unroll]
++            for i in 0..wc {
++                out[(o + comptime!(ws + i)) as usize] = cd[i as usize];
++            }
++            #[unroll]
++            for i in 0..wds {
++                out[(o + comptime!(ws + wc + i)) as usize] = ds[i as usize];
++            }
++            #[unroll]
++            for i in 0..wdc {
++                out[(o + comptime!(ws + wc + wds + i)) as usize] = dc[i as usize];
++            }
++            #[unroll]
++            for i in 0..wddc {
++                out[(o + comptime!(ws + wc + wds + wdc + i)) as usize] = ddc[i as usize];
++            }
++        }
++    }
++
++    /// Packed little-endian base-`base` digits of `x`, `len` of them, four per
++    /// word.
++    fn packed(x: &Natural, base: u32, len: u32) -> Vec<u32> {
++        let mut y = x.clone();
++        let mut w = vec![0u32; len.div_ceil(4) as usize];
++        for j in 0..len {
++            let d = y.div_assign_rem(Natural::from(base));
++            w[(j / 4) as usize] |= u32::try_from(&d).unwrap() << (8 * (j % 4));
++        }
++        w
++    }
++
++    /// The seed of `count` consecutive n from `start` on `client`, against the
++    /// exact digits: per value, the mismatching n, the words they differ in,
++    /// and the first example. Returns the total of mismatching (n, value).
++    fn seed_dump_on<R: cubecl::prelude::Runtime>(
++        client: &cubecl::prelude::ComputeClient<R>,
++        base: u32,
++        start: u128,
++        count: u32,
++        wide: bool,
++        what: &str,
++    ) -> usize {
++        let p = fd_plan(base).expect("plan");
++        let limbs = crate::gpu_config::n_limbs(base).expect("limbs");
++        let (cdg, cdv) = if wide {
++            crate::gpu_config::chunk_constants(base)
++        } else {
++            crate::gpu_config::chunk_constants_u16(base)
++        };
++        let lens = [p.ls, p.lc, p.lds, p.ldc, p.lddc];
++        let words: u32 = lens.iter().map(|l| l.div_ceil(4)).sum();
++        let total = (count * words) as usize;
++        let out = client.create(cubecl::bytes::Bytes::from_elems(vec![0u32; total]));
++        unsafe {
++            zz_seed_dump::launch_unchecked::<R>(
++                client,
++                CubeCount::Static(count.div_ceil(256), 1, 1),
++                CubeDim::new_1d(256),
++                ArrayArg::from_raw_parts(out.clone(), total),
++                start as u32,
++                (start >> 32) as u32,
++                count,
++                base,
++                limbs,
++                cdg,
++                cdv,
++                wide,
++                p.ls,
++                p.lc,
++                p.lds,
++                p.ldc,
++                p.lddc,
++            );
++        }
++        let bytes = client.read_one(out).expect("seed dump read");
++        let got = u32::from_bytes(&bytes);
++        let names = ["S=n^2", "C=n^3", "dS=2n+1", "dC=3n^2+3n+1", "ddC=6n+6"];
++        let mut bad = 0;
++        for (v, name) in names.iter().enumerate() {
++            let off: u32 = lens[..v].iter().map(|l| l.div_ceil(4)).sum();
++            let nw = lens[v].div_ceil(4);
++            let mut wrong = 0usize;
++            let mut word_hits = vec![0usize; nw as usize];
++            let mut example = String::new();
++            for t in 0..count {
++                let n = Natural::from(start + u128::from(t));
++                let x = match v {
++                    0 => &n * &n,
++                    1 => &n * &n * &n,
++                    2 => &n * Natural::from(2u32) + Natural::from(1u32),
++                    3 => {
++                        &n * &n * Natural::from(3u32)
++                            + &n * Natural::from(3u32)
++                            + Natural::from(1u32)
++                    }
++                    _ => &n * Natural::from(6u32) + Natural::from(6u32),
++                };
++                let want = packed(&x, base, lens[v]);
++                let o = (t * words + off) as usize;
++                let have = &got[o..o + nw as usize];
++                if have != want.as_slice() {
++                    wrong += 1;
++                    for (k, (a, b)) in have.iter().zip(&want).enumerate() {
++                        if a != b {
++                            word_hits[k] += 1;
++                        }
++                    }
++                    if example.is_empty() {
++                        example = format!(
++                            "n={} got {:08x?} want {:08x?}",
++                            start + u128::from(t),
++                            have,
++                            want
++                        );
++                    }
++                }
++            }
++            bad += wrong;
++            println!(
++                "SEED b{base} {what} wide={wide} {name}: {wrong} of {count} n wrong; \
++                 per word {word_hits:?}{}{example}",
++                if wrong > 0 { "; e.g. " } else { "" }
++            );
++        }
++        bad
++    }
++
++    fn seed_dump_all<R: cubecl::prelude::Runtime>(
++        client: &cubecl::prelude::ComputeClient<R>,
++        wide: bool,
++    ) -> usize {
++        let mut bad = 0;
++        for base in [22u32, 23, 24, 25, 27, 28, 32, 40, 49, 50, 52, 53, 55] {
++            let r = crate::base_range::get_base_range_u128(base)
++                .unwrap()
++                .unwrap();
++            let mid = r.range_start + (r.range_end - r.range_start) / 2;
++            for (what, start) in [("start", r.range_start), ("mid", mid)] {
++                let count = u32::try_from((r.range_end - start).min(4096)).unwrap();
++                bad += seed_dump_on(client, base, start, count, wide, what);
++            }
++        }
++        bad
++    }
++
++    /// Diagnostic: the seed on the default wgpu device (split16), every value.
++    #[test]
++    #[ignore = "diagnostic"]
++    fn zz_seed_dump_wgpu() {
++        let ctx = CubeclContext::new_default().expect("CubeCL init");
++        println!("SEED device {}", ctx.device_name());
++        let CubeclContext::Wgpu { client, .. } = &ctx else {
++            unreachable!()
++        };
++        let bad = seed_dump_all(client, false);
++        println!("SEED total wrong (n, value): {bad}");
++        assert_eq!(bad, 0, "seed differs from the exact digits");
++    }
++
++    /// Diagnostic: the seed through the CUDA runtime, both chunk flavors.
++    #[test]
++    #[cfg(feature = "cubecl-cuda")]
++    #[ignore = "diagnostic"]
++    fn zz_seed_dump_cuda() {
++        let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
++        let CubeclContext::Cuda { client, .. } = &ctx else {
++            unreachable!()
++        };
++        let bad = seed_dump_all(client, true) + seed_dump_all(client, false);
++        println!("SEED total wrong (n, value): {bad}");
++        assert_eq!(bad, 0, "seed differs from the exact digits");
++    }
+ }

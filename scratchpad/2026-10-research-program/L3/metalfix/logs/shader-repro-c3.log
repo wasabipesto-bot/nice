@@ -1,0 +1,3048 @@
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 3,
+        variant: 0,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 / u32(3);
+buffer_1_global[global_id.x] = l_11;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 5.041µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 1000,
+        variant: 0,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 / u32(1000);
+buffer_1_global[global_id.x] = l_11;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.458µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 2500,
+        variant: 0,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 / u32(2500);
+buffer_1_global[global_id.x] = l_11;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.625µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 12167,
+        variant: 0,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 / u32(12167);
+buffer_1_global[global_id.x] = l_11;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.667µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 21952,
+        variant: 0,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 / u32(21952);
+buffer_1_global[global_id.x] = l_11;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.666µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 32768,
+        variant: 0,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 / u32(32768);
+buffer_1_global[global_id.x] = l_11;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.167µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 3,
+        variant: 1,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 >> u32(16);
+let l_12 = l_11 / u32(3);
+buffer_1_global[global_id.x] = l_12;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.666µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 1000,
+        variant: 1,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 >> u32(16);
+let l_12 = l_11 / u32(1000);
+buffer_1_global[global_id.x] = l_12;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.666µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 2500,
+        variant: 1,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 >> u32(16);
+let l_12 = l_11 / u32(2500);
+buffer_1_global[global_id.x] = l_12;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 3.5µs      | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 12167,
+        variant: 1,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 >> u32(16);
+let l_12 = l_11 / u32(12167);
+buffer_1_global[global_id.x] = l_12;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 3.542µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 21952,
+        variant: 1,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 >> u32(16);
+let l_12 = l_11 / u32(21952);
+buffer_1_global[global_id.x] = l_12;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 3.5µs      | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 32768,
+        variant: 1,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = u64(l_2);
+let l_7 = u64(l_5);
+let l_8 = l_6 * l_7;
+let l_9 = l_8 >> u32(bitcast<u64>(u64(32)));
+let l_10 = u32(bitcast<u64>(l_9));
+let l_11 = l_10 >> u32(16);
+let l_12 = l_11 / u32(32768);
+buffer_1_global[global_id.x] = l_12;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.625µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 3,
+        variant: 2,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_2 >> u32(16);
+let l_8 = l_5 & u32(65535);
+let l_9 = l_5 >> u32(16);
+let l_10 = l_6 * l_8;
+let l_11 = l_7 * l_8;
+let l_12 = l_10 >> u32(16);
+let l_13 = l_11 + l_12;
+let l_14 = l_6 * l_9;
+let l_15 = l_13 & u32(65535);
+let l_16 = l_14 + l_15;
+let l_17 = l_7 * l_9;
+let l_18 = l_13 >> u32(16);
+let l_19 = l_17 + l_18;
+let l_20 = l_16 >> u32(16);
+let l_21 = l_19 + l_20;
+let l_22 = l_21 / u32(3);
+buffer_1_global[global_id.x] = l_22;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.959µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 1000,
+        variant: 2,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_2 >> u32(16);
+let l_8 = l_5 & u32(65535);
+let l_9 = l_5 >> u32(16);
+let l_10 = l_6 * l_8;
+let l_11 = l_7 * l_8;
+let l_12 = l_10 >> u32(16);
+let l_13 = l_11 + l_12;
+let l_14 = l_6 * l_9;
+let l_15 = l_13 & u32(65535);
+let l_16 = l_14 + l_15;
+let l_17 = l_7 * l_9;
+let l_18 = l_13 >> u32(16);
+let l_19 = l_17 + l_18;
+let l_20 = l_16 >> u32(16);
+let l_21 = l_19 + l_20;
+let l_22 = l_21 / u32(1000);
+buffer_1_global[global_id.x] = l_22;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.791µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 2500,
+        variant: 2,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_2 >> u32(16);
+let l_8 = l_5 & u32(65535);
+let l_9 = l_5 >> u32(16);
+let l_10 = l_6 * l_8;
+let l_11 = l_7 * l_8;
+let l_12 = l_10 >> u32(16);
+let l_13 = l_11 + l_12;
+let l_14 = l_6 * l_9;
+let l_15 = l_13 & u32(65535);
+let l_16 = l_14 + l_15;
+let l_17 = l_7 * l_9;
+let l_18 = l_13 >> u32(16);
+let l_19 = l_17 + l_18;
+let l_20 = l_16 >> u32(16);
+let l_21 = l_19 + l_20;
+let l_22 = l_21 / u32(2500);
+buffer_1_global[global_id.x] = l_22;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 3.5µs      | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 12167,
+        variant: 2,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_2 >> u32(16);
+let l_8 = l_5 & u32(65535);
+let l_9 = l_5 >> u32(16);
+let l_10 = l_6 * l_8;
+let l_11 = l_7 * l_8;
+let l_12 = l_10 >> u32(16);
+let l_13 = l_11 + l_12;
+let l_14 = l_6 * l_9;
+let l_15 = l_13 & u32(65535);
+let l_16 = l_14 + l_15;
+let l_17 = l_7 * l_9;
+let l_18 = l_13 >> u32(16);
+let l_19 = l_17 + l_18;
+let l_20 = l_16 >> u32(16);
+let l_21 = l_19 + l_20;
+let l_22 = l_21 / u32(12167);
+buffer_1_global[global_id.x] = l_22;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.334µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 21952,
+        variant: 2,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_2 >> u32(16);
+let l_8 = l_5 & u32(65535);
+let l_9 = l_5 >> u32(16);
+let l_10 = l_6 * l_8;
+let l_11 = l_7 * l_8;
+let l_12 = l_10 >> u32(16);
+let l_13 = l_11 + l_12;
+let l_14 = l_6 * l_9;
+let l_15 = l_13 & u32(65535);
+let l_16 = l_14 + l_15;
+let l_17 = l_7 * l_9;
+let l_18 = l_13 >> u32(16);
+let l_19 = l_17 + l_18;
+let l_20 = l_16 >> u32(16);
+let l_21 = l_19 + l_20;
+let l_22 = l_21 / u32(21952);
+buffer_1_global[global_id.x] = l_22;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.709µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 32768,
+        variant: 2,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_2 >> u32(16);
+let l_8 = l_5 & u32(65535);
+let l_9 = l_5 >> u32(16);
+let l_10 = l_6 * l_8;
+let l_11 = l_7 * l_8;
+let l_12 = l_10 >> u32(16);
+let l_13 = l_11 + l_12;
+let l_14 = l_6 * l_9;
+let l_15 = l_13 & u32(65535);
+let l_16 = l_14 + l_15;
+let l_17 = l_7 * l_9;
+let l_18 = l_13 >> u32(16);
+let l_19 = l_17 + l_18;
+let l_20 = l_16 >> u32(16);
+let l_21 = l_19 + l_20;
+let l_22 = l_21 / u32(32768);
+buffer_1_global[global_id.x] = l_22;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.75µs     | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 3,
+        variant: 3,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_6 / u32(3);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 5.708µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 1000,
+        variant: 3,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_6 / u32(1000);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.25µs     | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 2500,
+        variant: 3,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_6 / u32(2500);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.417µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 12167,
+        variant: 3,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_6 / u32(12167);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.208µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 21952,
+        variant: 3,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_6 / u32(21952);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.375µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 32768,
+        variant: 3,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_6 / u32(32768);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.459µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 3,
+        variant: 4,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_6 / u32(3);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 5.292µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 1000,
+        variant: 4,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_6 / u32(1000);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.458µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 2500,
+        variant: 4,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_6 / u32(2500);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 5.125µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 12167,
+        variant: 4,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_6 / u32(12167);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.625µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 21952,
+        variant: 4,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_6 / u32(21952);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.875µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 32768,
+        variant: 4,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 & u32(65535);
+let l_7 = l_6 / u32(32768);
+buffer_1_global[global_id.x] = l_7;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.125µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 3,
+        variant: 5,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 / u32(3);
+buffer_1_global[global_id.x] = l_6;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.625µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 1000,
+        variant: 5,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 / u32(1000);
+buffer_1_global[global_id.x] = l_6;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 3.916µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 2500,
+        variant: 5,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 / u32(2500);
+buffer_1_global[global_id.x] = l_6;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.125µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 12167,
+        variant: 5,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 / u32(12167);
+buffer_1_global[global_id.x] = l_6;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.375µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 21952,
+        variant: 5,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 / u32(21952);
+buffer_1_global[global_id.x] = l_6;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 5.125µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 32768,
+        variant: 5,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 / u32(32768);
+buffer_1_global[global_id.x] = l_6;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.75µs     | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 3,
+        variant: 6,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_5 << u32(16);
+let l_8 = l_6 | l_7;
+let l_9 = l_8 / u32(3);
+buffer_1_global[global_id.x] = l_9;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 5.084µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 1000,
+        variant: 6,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_5 << u32(16);
+let l_8 = l_6 | l_7;
+let l_9 = l_8 / u32(1000);
+buffer_1_global[global_id.x] = l_9;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.583µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 2500,
+        variant: 6,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_5 << u32(16);
+let l_8 = l_6 | l_7;
+let l_9 = l_8 / u32(2500);
+buffer_1_global[global_id.x] = l_9;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 5.083µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 12167,
+        variant: 6,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_5 << u32(16);
+let l_8 = l_6 | l_7;
+let l_9 = l_8 / u32(12167);
+buffer_1_global[global_id.x] = l_9;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.667µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 21952,
+        variant: 6,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_5 << u32(16);
+let l_8 = l_6 | l_7;
+let l_9 = l_8 / u32(21952);
+buffer_1_global[global_id.x] = l_9;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.208µs    | HiDivReproKernel | WgpuRuntime
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_detailed_fd::tests::hi_div_repro_kernel::HiDivReproKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: HiDivReproKernelInfo {
+        k: 32768,
+        variant: 6,
+        inp: ArrayCompilationArg {
+            inplace: None,
+        },
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+        pairs: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 2>,
+   static_meta: array<u32, 4>,
+}
+
+@group(0)
+@binding(2)
+var<storage, read> info: info_st;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn hi_div_repro_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+) {
+let l_0 = global_id.x < info.scalars_u32[0];
+if l_0 {
+let l_1 = u32(2) * global_id.x;
+let l_2 = buffer_0_global[l_1];
+let l_3 = u32(2) * global_id.x;
+let l_4 = l_3 + u32(1);
+let l_5 = buffer_0_global[l_4];
+let l_6 = l_2 >> u32(16);
+let l_7 = l_5 << u32(16);
+let l_8 = l_6 | l_7;
+let l_9 = l_8 / u32(32768);
+buffer_1_global[global_id.x] = l_9;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 4.25µs     | HiDivReproKernel | WgpuRuntime

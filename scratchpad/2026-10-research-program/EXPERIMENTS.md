@@ -29,6 +29,23 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L3.5 Metal gate for #225 and the desk root cause (2026-10-30, agent; `L3/METAL-ROOT-CAUSE.md`, `L3/pr-raw/gate/`)
+
+Gate commit d8038d6 (head of `pr/gpu-detailed-fd`): the wgpu context records whether the adapter
+backend is Metal (wgpu's backend enum, not the name); `DetailedKernel::for_device(base, metal)`
+sends Metal to the per-number kernel; CUDA/HIP/Vulkan/DX12/GL keep FD; unit test
+`detailed_kernel_by_device`. RTX 3080 box 58419619: fmt, all clippy lines, 210 lib tests, CUDA FD
+tests and lavapipe FD tests pass with FD still serving; speed unchanged (b40 3.339e10 vs
+3.331–3.467e10; score 16,591–16,614 vs 16,571–17,121).
+**Root cause, modelled:** the seed's digit conversion computes `(x >> 16) / K` on the top word x
+of n² and n³; if Apple's compiler divides the low 16 bits of x instead (the 16-bit form of the
+2026-10-06 `hi(a·b)/K` miscompile), the model reproduces all 400 per-number results at b50 and
+77 of 79 sweep windows exactly, including the base bands, the b32 exemption (power-of-two
+divisor) and the passing windows inside failing bases. **b23 is not explained** (top words too
+small). Artefacts for the Mac: `h2_repro.swift` (standalone Metal reproducer), `seed-dump-diag.patch`
+(ignored test `zz_seed_dump_wgpu`, exact on CUDA and lavapipe). Cheapest fix: seed through the
+per-number kernel's shared-memory long division (exact on the M4); never fold into one `x / K`.
+
 ## L3.4 #225 on Apple M4 (Metal): WRONG RESULTS (2026-10-30, agent, user-authorised 1 h; `L3/METAL-M4.md`, `L3/pr-raw/m4/`)
 
 mayalaran: macOS 26.3 (25D125), M4, Rust 1.99.1; offline build (179 crates copied from ivory);

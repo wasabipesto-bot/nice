@@ -23,7 +23,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   real Metal run of the FD kernel) and lavapipe. Clippy build took ~7 GB on ivory; target removed after.
 - **mayalaran (M4), 29 min used: #225's FD kernel is WRONG on Metal** at b23, b27–30, b49/50,
   b52–55 (division exact; CI's paravirtual Metal passed). → #225 converted to draft, comment
-  posted; next: gate FD off on Metal adapters, then root-cause with another M4 window (L3.4).
+  posted. **User: keep using mayalaran until resolved (max 24 h from ~19:30 UTC 10-30).**
+  Gate landed (d8038d6; CUDA/lavapipe still FD, speed unchanged) and the desk model of the
+  Apple `(x>>16)/K` miscompile explains everything but b23 (L3.5); PR body updated. M4
+  root-cause agent (diagnostic dumps per stage at b50/b23, minimal reproducer, fix on
+  `pr/gpu-detailed-fd-metalfix`).
 - **User questions:** detailed auto order (answer: no change; CubeCL CUDA already leads and
   wgpu serves AMD/Apple; hand-CUDA detailed is a third-stop fallback now ~3.5× slower) and the
   web runner port (L23 CPU ~half a day, L24 GPU 1–2 days; both queued as requested).
