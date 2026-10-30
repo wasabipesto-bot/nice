@@ -1889,17 +1889,16 @@ impl DetailedKernel {
     /// [`fd_plan`] has a plan, the per-number kernel elsewhere, and the
     /// per-number kernel at every base on a Metal adapter (`metal`).
     ///
-    /// Metal is excluded because the finite-difference kernel gave wrong
-    /// results on an Apple M4 (macOS 26.3, WGSL through naga's MSL): wrong
-    /// unique counts for most numbers at bases 23, 27-30, 49, 50 and 52-55,
-    /// even at one number per run, so the fault is in its seed, digit packing
-    /// or mask build rather than its stepping. The per-number kernel was
-    /// exact on the same device and windows, and the same WGSL is exact on
-    /// lavapipe, as the kernel is on CUDA. The root cause is open; a
-    /// miscompilation is suspected. `cubecl_fd_matches_cpu_detailed` runs
-    /// this kernel on the default wgpu device whatever its API, and failed
-    /// there at base 50: it is the test to pass on an Apple GPU before
-    /// lifting this.
+    /// Metal is excluded as a precaution. On an Apple M4 (macOS 26.3, WGSL
+    /// through naga's MSL) the finite-difference kernel's first seed came out
+    /// wrong at bases 23, 25, 27-30, 49, 50 and 52-55, through an Apple GPU
+    /// compiler bug (a constant division of a half-width right shift; see
+    /// `fd_to_digits` in [`crate::cubecl_detailed_fd`]). The seed no longer
+    /// has that pattern and the kernel is exact on that M4, but no other
+    /// Apple GPU or macOS version has been checked. `cubecl_fd_seed_matches_cpu`
+    /// and `cubecl_fd_matches_cpu_detailed` run this kernel on the default
+    /// wgpu device whatever its API: they are the tests to pass on an Apple
+    /// GPU before lifting this.
     pub(crate) fn for_device(base: u32, metal: bool) -> Self {
         if fd_plan(base).is_some() && !metal {
             Self::DEFAULT

@@ -6,17 +6,18 @@
 //! division is unnecessary: with dS = 2n+1, dC = 3n²+3n+1 and ddC = 6n+6,
 //! stepping n to n+1 is S += dS, dS += 2, C += dC, dC += ddC, ddC += 6. Here
 //! each thread takes a run of [`FD_RUN_LEN`] consecutive n, seeds the five
-//! values once from the run's first n (the same limb products and
-//! division-by-constant chunk split as the per-number kernel), and keeps them
-//! as base-b digit arrays in registers, four digits to a u32 (one byte lane
-//! each, little-endian). Each step is five digit-array additions, each four
-//! digits per native add: adding 256 - b to every byte of the addend makes a
-//! lane overflow into the next exactly when its digit sum reaches b, and the
-//! lanes that did not overflow give the bias back (`fd_add_top`). Words of
-//! S and C above the addend's width change only when a carry ripples through
-//! four digits of b-1, so their part of the digit mask is cached per run and
-//! one rare branch per step does every such ripple and the cache refresh. The
-//! mask build, histogram and near-miss records are the per-number kernel's.
+//! values once from the run's first n (limb products and a division-by-
+//! constant chunk split as in the per-number kernel; [`fd_seed`] has the wgpu
+//! form), and keeps them as base-b digit arrays in registers, four digits to a
+//! u32 (one byte lane each, little-endian). Each step is five digit-array
+//! additions, each four digits per native add: adding 256 - b to every byte of
+//! the addend makes a lane overflow into the next exactly when its digit sum
+//! reaches b, and the lanes that did not overflow give the bias back
+//! (`fd_add_top`). Words of S and C above the addend's width change only when
+//! a carry ripples through four digits of b-1, so their part of the digit mask
+//! is cached per run and one rare branch per step does every such ripple and
+//! the cache refresh. The mask build, histogram and near-miss records are the
+//! per-number kernel's.
 //!
 //! Exactness: the seed is exact integer arithmetic, and every step is an exact
 //! base-b addition, so after k steps the arrays hold exactly (n+k)², (n+k)³ and
@@ -33,14 +34,16 @@
 //! Portability: the kernel needs what the per-number kernel needs (u64 add,
 //! multiply and shift; a u64 division only in the CUDA and HIP seed, the
 //! split16 division on wgpu). It is exact on CUDA and on Vulkan (lavapipe,
-//! through naga's WGSL and through `CubeCL`'s SPIR-V compiler), but not on
-//! Metal: on an Apple M4 it returned wrong unique counts for most numbers at
-//! bases 23, 27-30, 49, 50 and 52-55, even at one number per run, so the
-//! fault lies in the seed, the digit packing or the mask build. The root
-//! cause is open, so production keeps the per-number kernel on Metal
-//! adapters (`DetailedKernel::for_device` in [`crate::cubecl_backend`]), and
-//! `cubecl_fd_matches_cpu_detailed` below, which runs this kernel on any
-//! wgpu device, is the test that shows it.
+//! through naga's WGSL and through `CubeCL`'s SPIR-V compiler). On an Apple
+//! M4 (macOS 26.3) its first seed was wrong at bases 23, 25, 27-30, 49, 50
+//! and 52-55: Apple's GPU compiler miscompiles a constant division of a
+//! half-width right shift, which the split16 long division's first step was
+//! (see [`fd_to_digits`]). The seed no longer divides one and the kernel is
+//! exact on that M4, but production still keeps the per-number kernel on
+//! Metal adapters (`DetailedKernel::for_device` in
+//! [`crate::cubecl_backend`]), since no other Apple GPU or macOS version has
+//! been checked. `cubecl_fd_seed_matches_cpu` and
+//! `cubecl_fd_matches_cpu_detailed` below run this kernel on any wgpu device.
 
 #![cfg(feature = "cubecl")]
 // The cube macro evaluates comptime! expressions host-side, where fn-level
@@ -135,12 +138,24 @@ fn fd_ripple(
     }
 }
 
-/// Convert the little-endian u32 limbs `v` (destroyed) into `ndig` packed
+/// Convert the little-endian limbs `v` (destroyed) into `ndig` packed
 /// base-b digits in `out` (pre-zeroed), `chunk_digits` digits per long
-/// division by `chunk_div` = b^`chunk_digits`. The two flavors are the
-/// per-number kernel's: `wide_chunk` divides limb pairs in u64 (a
-/// multiply-high under nvcc and hipcc); split16 divides 16-bit halves in u32,
-/// with `chunk_div` below 2^16, for targets without a fast u64 division.
+/// division by `chunk_div` = b^`chunk_digits`. With `wide_chunk` the limbs
+/// are 32-bit and each step divides a limb pair in u64 (a multiply-high
+/// under nvcc and hipcc), as in the per-number kernel; otherwise (split16)
+/// they are 16-bit, one to a u32 (at least two), and each step divides
+/// `rem << 16 | limb` in u32, with `chunk_div` below 2^16, for targets
+/// without a fast u64 division.
+///
+/// In split16 the first step of each division takes the top two limbs as
+/// one u32 (the remainder is still 0 there, so this is the same long
+/// division). Dividing the top limb alone would divide, in the first chunk,
+/// a value that is a bare `t >> 16` (the top limb of a product or sum), and
+/// on an Apple M4 the Metal compiler miscompiles a constant division whose
+/// dividend is a right shift by half its width (see the
+/// `metal_half_shift_div_repro` test): the seed came out wrong at b23,
+/// b25, b27-b30 and b49-b55 there. The pair is `t` itself, and no dividend
+/// below is a bare shift.
 #[cube]
 #[allow(clippy::too_many_arguments)]
 fn fd_to_digits(
@@ -168,18 +183,20 @@ fn fd_to_digits(
             }
             u32::cast_from(rem64)
         } else {
-            let mut rem = 0u32;
+            let top = comptime!(nlimbs - 1);
+            let next = comptime!(nlimbs - 2);
+            let c = (v[top as usize] << 16u32) | v[next as usize];
+            let q = c / chunk_div;
+            let mut rem = c - q * chunk_div;
+            v[top as usize] = q >> 16u32;
+            v[next as usize] = q & 0xFFFFu32;
             #[unroll]
-            for ii in 0..nlimbs {
+            for ii in 2..nlimbs {
                 let i = comptime!(nlimbs - 1 - ii);
-                let vi = v[i as usize];
-                let c1 = (rem << 16u32) | (vi >> 16u32);
-                let q1 = c1 / chunk_div;
-                let r1 = c1 - q1 * chunk_div;
-                let c2 = (r1 << 16u32) | (vi & 0xFFFFu32);
-                let q2 = c2 / chunk_div;
-                rem = c2 - q2 * chunk_div;
-                v[i as usize] = (q1 << 16u32) | q2;
+                let c = (rem << 16u32) | v[i as usize];
+                let q = c / chunk_div;
+                rem = c - q * chunk_div;
+                v[i as usize] = q;
             }
             rem
         };
@@ -201,6 +218,15 @@ fn fd_to_digits(
 /// The run's seed: the packed base-b digits of n² into `sd`, n³ into `cd`,
 /// 2n+1 into `ds`, 3n²+3n+1 into `dc` and 6n+6 into `ddc`, for n =
 /// `n_hi`·2^64 + `n_lo`.
+///
+/// The wide flavor (CUDA, HIP) multiplies 32-bit limbs in u64. The split16
+/// flavor (wgpu) works in 16-bit limbs, one to a u32, so that
+/// [`fd_to_digits`] can take a value's top 32 bits as one dividend: with
+/// 32-bit limbs the top limb of n² or n³ is the high half of a u64 sum or
+/// product, and dividing that by a constant is the Apple M4 Metal
+/// miscompile `fd_to_digits` describes. Every product here is of two 16-bit
+/// limbs and every sum stays below 2^32 (a limb product plus two values
+/// below 2^16 is at most 2^32 - 1).
 #[cube]
 #[allow(
     clippy::too_many_arguments,
@@ -233,84 +259,6 @@ fn fd_seed(
     let wds = comptime!(lds.div_ceil(4));
     let wdc = comptime!(ldc.div_ceil(4));
     let wddc = comptime!(lddc.div_ceil(4));
-    let mut nl = Array::<u32>::new(limbs as usize);
-    #[unroll]
-    for i in 0..limbs {
-        let shift = comptime!(((i & 1) * 32) as u64);
-        if comptime!(i < 2) {
-            nl[i as usize] = u32::cast_from(n_lo >> shift);
-        } else {
-            nl[i as usize] = u32::cast_from(n_hi >> shift);
-        }
-    }
-    let mut sq = Array::<u32>::new(sq_limbs as usize);
-    #[unroll]
-    for i in 0..sq_limbs {
-        sq[i as usize] = 0u32;
-    }
-    #[unroll]
-    for i in 0..limbs {
-        let mut carry = 0u64;
-        #[unroll]
-        for j in 0..limbs {
-            let k = comptime!(i + j);
-            let t = u64::cast_from(nl[i as usize]) * u64::cast_from(nl[j as usize])
-                + u64::cast_from(sq[k as usize])
-                + carry;
-            sq[k as usize] = u32::cast_from(t);
-            carry = t >> 32u64;
-        }
-        sq[comptime!(i + limbs) as usize] = u32::cast_from(carry);
-    }
-    let mut cu = Array::<u32>::new(cu_limbs as usize);
-    #[unroll]
-    for i in 0..cu_limbs {
-        cu[i as usize] = 0u32;
-    }
-    #[unroll]
-    for i in 0..sq_limbs {
-        let mut carry = 0u64;
-        #[unroll]
-        for j in 0..limbs {
-            let k = comptime!(i + j);
-            let t = u64::cast_from(sq[i as usize]) * u64::cast_from(nl[j as usize])
-                + u64::cast_from(cu[k as usize])
-                + carry;
-            cu[k as usize] = u32::cast_from(t);
-            carry = t >> 32u64;
-        }
-        cu[comptime!(i + limbs) as usize] = u32::cast_from(carry);
-    }
-    // 2n+1 and 6n+6 (limbs + 1 words), 3n²+3n+1 (2·limbs + 1 words).
-    let mut v_ds = Array::<u32>::new(comptime!(limbs + 1) as usize);
-    let mut v_ddc = Array::<u32>::new(comptime!(limbs + 1) as usize);
-    let mut c_ds = 1u64;
-    let mut c_ddc = 6u64;
-    #[unroll]
-    for i in 0..comptime!(limbs + 1) {
-        if comptime!(i < limbs) {
-            c_ds += 2u64 * u64::cast_from(nl[i as usize]);
-            c_ddc += 6u64 * u64::cast_from(nl[i as usize]);
-        }
-        v_ds[i as usize] = u32::cast_from(c_ds);
-        v_ddc[i as usize] = u32::cast_from(c_ddc);
-        c_ds >>= 32u64;
-        c_ddc >>= 32u64;
-    }
-    let mut v_dc = Array::<u32>::new(comptime!(sq_limbs + 1) as usize);
-    let mut c_dc = 1u64;
-    #[unroll]
-    for i in 0..comptime!(sq_limbs + 1) {
-        if comptime!(i < sq_limbs) {
-            c_dc += 3u64 * u64::cast_from(sq[i as usize]);
-        }
-        if comptime!(i < limbs) {
-            c_dc += 3u64 * u64::cast_from(nl[i as usize]);
-        }
-        v_dc[i as usize] = u32::cast_from(c_dc);
-        c_dc >>= 32u64;
-    }
-
     #[unroll]
     for i in 0..ws {
         sd[i as usize] = 0u32;
@@ -331,56 +279,263 @@ fn fd_seed(
     for i in 0..wddc {
         ddc[i as usize] = 0u32;
     }
-    fd_to_digits(
-        &mut sq,
-        sd,
-        sq_limbs,
-        ls,
-        base,
-        chunk_digits,
-        chunk_div,
-        wide_chunk,
-    );
-    fd_to_digits(
-        &mut cu,
-        cd,
-        cu_limbs,
-        lc,
-        base,
-        chunk_digits,
-        chunk_div,
-        wide_chunk,
-    );
-    fd_to_digits(
-        &mut v_ds,
-        ds,
-        comptime!(limbs + 1),
-        lds,
-        base,
-        chunk_digits,
-        chunk_div,
-        wide_chunk,
-    );
-    fd_to_digits(
-        &mut v_dc,
-        dc,
-        comptime!(sq_limbs + 1),
-        ldc,
-        base,
-        chunk_digits,
-        chunk_div,
-        wide_chunk,
-    );
-    fd_to_digits(
-        &mut v_ddc,
-        ddc,
-        comptime!(limbs + 1),
-        lddc,
-        base,
-        chunk_digits,
-        chunk_div,
-        wide_chunk,
-    );
+    if comptime!(wide_chunk) {
+        let mut nl = Array::<u32>::new(limbs as usize);
+        #[unroll]
+        for i in 0..limbs {
+            let shift = comptime!(((i & 1) * 32) as u64);
+            if comptime!(i < 2) {
+                nl[i as usize] = u32::cast_from(n_lo >> shift);
+            } else {
+                nl[i as usize] = u32::cast_from(n_hi >> shift);
+            }
+        }
+        let mut sq = Array::<u32>::new(sq_limbs as usize);
+        #[unroll]
+        for i in 0..sq_limbs {
+            sq[i as usize] = 0u32;
+        }
+        #[unroll]
+        for i in 0..limbs {
+            let mut carry = 0u64;
+            #[unroll]
+            for j in 0..limbs {
+                let k = comptime!(i + j);
+                let t = u64::cast_from(nl[i as usize]) * u64::cast_from(nl[j as usize])
+                    + u64::cast_from(sq[k as usize])
+                    + carry;
+                sq[k as usize] = u32::cast_from(t);
+                carry = t >> 32u64;
+            }
+            sq[comptime!(i + limbs) as usize] = u32::cast_from(carry);
+        }
+        let mut cu = Array::<u32>::new(cu_limbs as usize);
+        #[unroll]
+        for i in 0..cu_limbs {
+            cu[i as usize] = 0u32;
+        }
+        #[unroll]
+        for i in 0..sq_limbs {
+            let mut carry = 0u64;
+            #[unroll]
+            for j in 0..limbs {
+                let k = comptime!(i + j);
+                let t = u64::cast_from(sq[i as usize]) * u64::cast_from(nl[j as usize])
+                    + u64::cast_from(cu[k as usize])
+                    + carry;
+                cu[k as usize] = u32::cast_from(t);
+                carry = t >> 32u64;
+            }
+            cu[comptime!(i + limbs) as usize] = u32::cast_from(carry);
+        }
+        // 2n+1 and 6n+6 (limbs + 1 words), 3n²+3n+1 (2·limbs + 1 words).
+        let mut v_ds = Array::<u32>::new(comptime!(limbs + 1) as usize);
+        let mut v_ddc = Array::<u32>::new(comptime!(limbs + 1) as usize);
+        let mut c_ds = 1u64;
+        let mut c_ddc = 6u64;
+        #[unroll]
+        for i in 0..comptime!(limbs + 1) {
+            if comptime!(i < limbs) {
+                c_ds += 2u64 * u64::cast_from(nl[i as usize]);
+                c_ddc += 6u64 * u64::cast_from(nl[i as usize]);
+            }
+            v_ds[i as usize] = u32::cast_from(c_ds);
+            v_ddc[i as usize] = u32::cast_from(c_ddc);
+            c_ds >>= 32u64;
+            c_ddc >>= 32u64;
+        }
+        let mut v_dc = Array::<u32>::new(comptime!(sq_limbs + 1) as usize);
+        let mut c_dc = 1u64;
+        #[unroll]
+        for i in 0..comptime!(sq_limbs + 1) {
+            if comptime!(i < sq_limbs) {
+                c_dc += 3u64 * u64::cast_from(sq[i as usize]);
+            }
+            if comptime!(i < limbs) {
+                c_dc += 3u64 * u64::cast_from(nl[i as usize]);
+            }
+            v_dc[i as usize] = u32::cast_from(c_dc);
+            c_dc >>= 32u64;
+        }
+
+        fd_to_digits(
+            &mut sq,
+            sd,
+            sq_limbs,
+            ls,
+            base,
+            chunk_digits,
+            chunk_div,
+            wide_chunk,
+        );
+        fd_to_digits(
+            &mut cu,
+            cd,
+            cu_limbs,
+            lc,
+            base,
+            chunk_digits,
+            chunk_div,
+            wide_chunk,
+        );
+        fd_to_digits(
+            &mut v_ds,
+            ds,
+            comptime!(limbs + 1),
+            lds,
+            base,
+            chunk_digits,
+            chunk_div,
+            wide_chunk,
+        );
+        fd_to_digits(
+            &mut v_dc,
+            dc,
+            comptime!(sq_limbs + 1),
+            ldc,
+            base,
+            chunk_digits,
+            chunk_div,
+            wide_chunk,
+        );
+        fd_to_digits(
+            &mut v_ddc,
+            ddc,
+            comptime!(limbs + 1),
+            lddc,
+            base,
+            chunk_digits,
+            chunk_div,
+            wide_chunk,
+        );
+    } else {
+        let h = comptime!(2 * limbs);
+        let mut nh = Array::<u32>::new(h as usize);
+        #[unroll]
+        for i in 0..limbs {
+            let shift = comptime!(((i & 1) * 32) as u64);
+            let w = if comptime!(i < 2) {
+                u32::cast_from(n_lo >> shift)
+            } else {
+                u32::cast_from(n_hi >> shift)
+            };
+            nh[comptime!(2 * i) as usize] = w & 0xFFFFu32;
+            nh[comptime!(2 * i + 1) as usize] = w >> 16u32;
+        }
+        let mut sq = Array::<u32>::new(comptime!(2 * h) as usize);
+        #[unroll]
+        for i in 0..comptime!(2 * h) {
+            sq[i as usize] = 0u32;
+        }
+        #[unroll]
+        for i in 0..h {
+            let mut carry = 0u32;
+            #[unroll]
+            for j in 0..h {
+                let k = comptime!(i + j);
+                let t = nh[i as usize] * nh[j as usize] + sq[k as usize] + carry;
+                sq[k as usize] = t & 0xFFFFu32;
+                carry = t >> 16u32;
+            }
+            sq[comptime!(i + h) as usize] = carry;
+        }
+        let mut cu = Array::<u32>::new(comptime!(3 * h) as usize);
+        #[unroll]
+        for i in 0..comptime!(3 * h) {
+            cu[i as usize] = 0u32;
+        }
+        #[unroll]
+        for i in 0..comptime!(2 * h) {
+            let mut carry = 0u32;
+            #[unroll]
+            for j in 0..h {
+                let k = comptime!(i + j);
+                let t = sq[i as usize] * nh[j as usize] + cu[k as usize] + carry;
+                cu[k as usize] = t & 0xFFFFu32;
+                carry = t >> 16u32;
+            }
+            cu[comptime!(i + h) as usize] = carry;
+        }
+        // 2n+1 and 6n+6 (h + 1 limbs), 3n²+3n+1 (2h + 1 limbs).
+        let mut v_ds = Array::<u32>::new(comptime!(h + 1) as usize);
+        let mut v_ddc = Array::<u32>::new(comptime!(h + 1) as usize);
+        let mut c_ds = 1u32;
+        let mut c_ddc = 6u32;
+        #[unroll]
+        for i in 0..comptime!(h + 1) {
+            if comptime!(i < h) {
+                c_ds += 2u32 * nh[i as usize];
+                c_ddc += 6u32 * nh[i as usize];
+            }
+            v_ds[i as usize] = c_ds & 0xFFFFu32;
+            v_ddc[i as usize] = c_ddc & 0xFFFFu32;
+            c_ds >>= 16u32;
+            c_ddc >>= 16u32;
+        }
+        let mut v_dc = Array::<u32>::new(comptime!(2 * h + 1) as usize);
+        let mut c_dc = 1u32;
+        #[unroll]
+        for i in 0..comptime!(2 * h + 1) {
+            if comptime!(i < 2 * h) {
+                c_dc += 3u32 * sq[i as usize];
+            }
+            if comptime!(i < h) {
+                c_dc += 3u32 * nh[i as usize];
+            }
+            v_dc[i as usize] = c_dc & 0xFFFFu32;
+            c_dc >>= 16u32;
+        }
+        fd_to_digits(
+            &mut sq,
+            sd,
+            comptime!(2 * h),
+            ls,
+            base,
+            chunk_digits,
+            chunk_div,
+            false,
+        );
+        fd_to_digits(
+            &mut cu,
+            cd,
+            comptime!(3 * h),
+            lc,
+            base,
+            chunk_digits,
+            chunk_div,
+            false,
+        );
+        fd_to_digits(
+            &mut v_ds,
+            ds,
+            comptime!(h + 1),
+            lds,
+            base,
+            chunk_digits,
+            chunk_div,
+            false,
+        );
+        fd_to_digits(
+            &mut v_dc,
+            dc,
+            comptime!(2 * h + 1),
+            ldc,
+            base,
+            chunk_digits,
+            chunk_div,
+            false,
+        );
+        fd_to_digits(
+            &mut v_ddc,
+            ddc,
+            comptime!(h + 1),
+            lddc,
+            base,
+            chunk_digits,
+            chunk_div,
+            false,
+        );
+    }
 }
 
 /// OR `1 << d` into `m` for packed digits `from..ndig` of `x`.
@@ -939,7 +1094,7 @@ mod tests {
     /// As [`cubecl_cuda_fd_matches_cpu_detailed`] on the default wgpu
     /// device, sized for a software rasterizer: windows of 1e5 numbers and
     /// bases 10-24 in full. It runs the kernel even on Metal, where
-    /// production does not: on an Apple M4 it fails at the b50 range start.
+    /// production does not (`DetailedKernel::for_device`).
     #[test]
     #[ignore = "requires a wgpu device"]
     fn cubecl_fd_matches_cpu_detailed() {
@@ -1136,9 +1291,10 @@ mod tests {
     /// digit arrays of each of 1024 n at the range start, the middle and the
     /// end, word for word against the CPU. Run length 1 and histograms hide
     /// most seed errors (a wrong digit string has nearly the random-digit
-    /// distribution); this sees every digit. On an Apple M4 it catches the
-    /// Metal miscompile of [`metal_half_shift_div_repro`] at b23, b25,
-    /// b27-b30, b49, b50 and b52-b55.
+    /// distribution); this sees every digit. Before the split16 seed took
+    /// its top two limbs together, it caught the Apple M4 Metal miscompile
+    /// of [`metal_half_shift_div_repro`] at b23, b25, b27-b30, b49, b50 and
+    /// b52-b55 there.
     #[test]
     #[ignore = "requires a wgpu device"]
     fn cubecl_fd_seed_matches_cpu() {
@@ -1201,7 +1357,7 @@ mod tests {
     /// right shift by half its width. One thread per input pair (a, b);
     /// variant 0 stores `(a >> 16) / k`, 1 `(a >> 16) % k`, 2
     /// `u32((u64(a) * u64(b)) >> 32) / k`; the controls are 3 `(a >> 15) / k`,
-    /// 4 `(a & 0xFFFF) / k` and 5 a top-pair form,
+    /// 4 `(a & 0xFFFF) / k` and 5 the top-pair form `fd_to_digits` uses,
     /// `((a >> 16) << 16 | (b & 0xFFFF)) / k`.
     ///
     /// Seen on an Apple M4 (macOS 26.3 25D125, wgpu 29.0.4 / naga 29.0.4,
