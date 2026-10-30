@@ -1,6 +1,6 @@
 # GPU detailed mode: digit arrays by finite differences instead of division
 
-Stacked on "GPU detailed mode: read back only the near-misses that were written" (branch `pr/gpu-detailed-readback`); this PR is the one commit on top of it, and its measurements compare against that branch as well as `main`.
+Two commits on `main`: the finite-difference kernel, and a gate that keeps Apple GPUs on the per-number kernel (see Portability). The measurements below compare against `main` (46e4dc4) and against the readback branch, since merged as #224.
 
 The `CubeCL` detailed kernel squares and cubes every candidate in u32 limbs and then divides both results down to base-b digits, a chunked long division whose length grows with limbs × chunks (about 20 division steps per number at base 40, 30 at base 50). Over a run of consecutive n none of that is needed: with dS = 2n + 1, dC = 3n² + 3n + 1 and ddC = 6n + 6, stepping to n + 1 is S += dS, dS += 2, C += dC, dC += ddC, ddC += 6. This is the same identity #221 uses on the CPU. This PR adds `common/src/cubecl_detailed_fd.rs`, a second detailed kernel built on it:
 
