@@ -82,6 +82,20 @@ const JOIN_MEMORY_MAX: usize = 4 << 30;
 /// survivor list on this bound; one that still overflows is re-run in
 /// smaller batches (`cubecl_join::run_field`).
 const SURV_PER_PREFIX: usize = 2;
+/// Experimental: `NICE_EXP_SURV_PER_PREFIX=n` (1-8) overrides
+/// [`SURV_PER_PREFIX`] in the batch's partitions-per-launch bound only (not
+/// in the slice size), for measuring more partitions per launch on large
+/// fields.
+fn exp_surv_per_prefix() -> usize {
+    static S: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *S.get_or_init(|| {
+        std::env::var("NICE_EXP_SURV_PER_PREFIX")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|n| (1..=8).contains(n))
+            .unwrap_or(SURV_PER_PREFIX)
+    })
+}
 /// Partitions per launch a slice of a large field is cut for
 /// ([`max_slice_prefixes`]). A slice of that size usually gets two or three
 /// times as many, since only a third to a half of its top-layer prefixes
@@ -327,7 +341,7 @@ impl JoinPlan {
         let room = lim.budget.checked_sub(fp.fixed + list)?;
         // The batch's expected prefilter survivors fill at most half its list.
         let by_survivors =
-            (list_cap as usize / 2 / (SURV_PER_PREFIX * fs.tlay.len().max(1))).max(1);
+            (list_cap as usize / 2 / (exp_surv_per_prefix() * fs.tlay.len().max(1))).max(1);
         let slots = slots
             .min(lim.max_binding / fp.largest_per_slot().max(1))
             .min(room / fp.per_slot().max(1))
