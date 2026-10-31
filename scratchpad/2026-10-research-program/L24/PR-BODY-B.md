@@ -111,7 +111,7 @@ Apple M4 (10-core GPU, macOS 26.3 25D125), headless Chromium 151.0.7922.34 with 
 
 ## Not in this PR
 
-- **AMD and Linux browser numbers** (RX 9070 XT) wait on the maintainer's demoux run: parity, the suite before and after, and run length 64 against 128.
+- **AMD and Linux browser speed** (RX 9070 XT): parity is done there (Exactness above); the benchmark suite before and after, and run length 64 against 128, are not measured on that card.
 - **Run-length tuning on AMD.** On the M4, 64 is slower and 256 is within 2.4 %, so the default stays 128 unless the 9070 XT shows a tail effect.
 - **Safari (WebKit's own WGSL compiler) and Windows (D3D12)** are untested.
 - **Firefox on a Mac** is covered only through the native tests' naga → MSL run above, not in the browser itself.

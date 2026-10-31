@@ -65,6 +65,8 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **User ran parity on demoux (RX 9070 XT, LibreWolf/Firefox 155): 199 windows identical** (L24.4);
   added to #233's body and comments. Decision 9's AMD layer is covered; only the AMD speed suite
   remains unmeasured.
+- **#233 merged by the user.** Dev server torn down (pid 944040 killed, `~/nice-web-tls` removed).
+  **The web GPU port (L24) is complete:** #230, #231, #233 merged; AMD parity by the user.
 - Today: 13 agents (all Opus), boxes: 3060 ×2, 3080 ×3; mayalaran ~1 h 45 min total today.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
