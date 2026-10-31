@@ -40,7 +40,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   fix agent launched (L27). Stray tracked `oom` file on main since #226 (rootless podman artefact).
 - **PR #232 opened** (pin the MSD floor in the threaded-pipeline test; L27). #231 has one red
   check from that flake and cannot be rerun by me (no admin rights); rebase after #232 merges.
-- Today so far: 12 agents (all Opus), boxes: 3060 ×2, 3080 ×3.
+- **PR #233 opened** (L24 (b): browser GPU FD kernel; M4 6.7×/10.1×, score 265 → 2170; exact on
+  lavapipe/SPIR-V/SwiftShader/M4 Chromium/M4 native; L24.3). All three L24 PRs are open (#230
+  merged). #232 fixes the flake; after it merges, rebase #231 and #233; the lint's require list
+  needs `DetailedFdKernelU32@40/50` in whichever of #231/#233 lands second. New lead L28.
+- Today: 13 agents (all Opus), boxes: 3060 ×2, 3080 ×3; mayalaran ~1 h 45 min total today.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
   path on finite differences (ivory build + Playwright docker parity + web NiceMark) — kill

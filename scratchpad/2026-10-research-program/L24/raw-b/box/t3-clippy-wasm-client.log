@@ -1,0 +1,76 @@
+   Compiling num-traits v0.2.19
+    Checking log v0.4.34
+    Checking futures-core v0.3.34
+   Compiling wasm-bindgen-shared v0.2.127
+    Checking indexmap v2.14.1
+   Compiling cubecl-common v0.10.0
+   Compiling rustversion v1.0.23
+    Checking hashbrown v0.15.5
+   Compiling bumpalo v3.20.3
+    Checking futures-lite v2.6.1
+    Checking wgpu-types v29.0.4
+    Checking gpu-allocator v0.28.0
+    Checking wayland-sys v0.31.11
+   Compiling wasm-bindgen-macro-support v0.2.127
+    Checking async-channel v2.5.0
+    Checking gpu-descriptor v0.3.2
+    Checking slab v0.4.12
+    Checking futures-task v0.3.34
+   Compiling wasm-bindgen v0.2.127
+   Compiling cubecl v0.10.0
+   Compiling nice_common v3.4.7-dev (/root/nice/common)
+    Checking half v2.7.1
+    Checking ordered-float v5.5.0
+    Checking futures-util v0.3.34
+    Checking chrono v0.4.45
+    Checking naga v29.0.4
+    Checking float8 v0.7.0
+   Compiling cubecl-macros v0.10.0
+    Checking cubecl-ir v0.10.0
+   Compiling wasm-bindgen-macro v0.2.127
+    Checking js-sys v0.3.104
+    Checking console_error_panic_hook v0.1.7
+    Checking cubecl-runtime v0.10.0
+    Checking cubecl-core v0.10.0
+    Checking wgpu-naga-bridge v29.0.4
+    Checking wgpu-hal v29.0.4
+    Checking cubecl-std v0.10.0
+    Checking wasm-bindgen-futures v0.4.77
+    Checking web-sys v0.3.104
+    Checking wgpu-core-deps-windows-linux-android v29.0.4
+    Checking wgpu-core v29.0.4
+    Checking wgpu v29.0.4
+    Checking cubecl-wgpu v0.10.0
+error: 5 bindings with single-character names in scope
+   --> common/src/cubecl_web.rs:440:5
+    |
+440 |     x: &Array<u32>,
+    |     ^
+...
+446 |     let mut l = lo;
+    |             ^
+447 |     let mut h = hi;
+    |             ^
+...
+450 |         let w = comptime!(j / 4);
+    |             ^
+451 |         let sh = comptime!(8 * (j % 4));
+452 |         let d = if comptime!(j % 4 == 3) {
+    |             ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+    = note: `-D clippy::many-single-char-names` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::many_single_char_names)]`
+
+error: checked cast can be simplified
+   --> common/src/cubecl_web.rs:935:17
+    |
+935 |                 u64::from(count) + stride <= u64::from(u32::MAX),
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `u32::try_from(u64::from(count) + stride).is_ok()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#checked_conversions
+    = note: `-D clippy::checked-conversions` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::checked_conversions)]`
+
+error: could not compile `nice_common` (lib) due to 2 previous errors
+rc=101 wall=23s

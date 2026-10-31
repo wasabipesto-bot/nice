@@ -1,0 +1,55 @@
+   Compiling syn v1.0.109
+    Checking cubecl-opt v0.10.0
+    Checking tracel-rspirv v0.12.1+sdk-1.4.341.0
+   Compiling cubecl-wgpu v0.10.0
+   Compiling cubecl v0.10.0
+   Compiling nice_common v3.4.7-dev (/root/nice/common)
+    Checking cubecl-cpp v0.10.0
+    Checking cubecl-cuda v0.10.0
+   Compiling c2rust-bitfields-derive v0.20.0
+    Checking c2rust-bitfields v0.20.0
+    Checking tracel-ash v0.39.5+sdk1.4.357
+    Checking cubecl-spirv v0.10.0
+error: 5 bindings with single-character names in scope
+   --> common/src/cubecl_web.rs:440:5
+    |
+440 |     x: &Array<u32>,
+    |     ^
+...
+446 |     let mut l = lo;
+    |             ^
+447 |     let mut h = hi;
+    |             ^
+...
+450 |         let w = comptime!(j / 4);
+    |             ^
+451 |         let sh = comptime!(8 * (j % 4));
+452 |         let d = if comptime!(j % 4 == 3) {
+    |             ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+    = note: `-D clippy::many-single-char-names` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::many_single_char_names)]`
+
+error: checked cast can be simplified
+   --> common/src/cubecl_web.rs:935:17
+    |
+935 |                 u64::from(count) + stride <= u64::from(u32::MAX),
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `u32::try_from(u64::from(count) + stride).is_ok()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#checked_conversions
+    = note: `-D clippy::checked-conversions` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::checked_conversions)]`
+
+error: could not compile `nice_common` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: checked cast can be simplified
+    --> common/src/cubecl_web.rs:1207:21
+     |
+1207 |                     u64::from(count) + stride <= u64::from(u32::MAX),
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `u32::try_from(u64::from(count) + stride).is_ok()`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#checked_conversions
+
+error: could not compile `nice_common` (lib test) due to 3 previous errors
+rc=101 wall=26s

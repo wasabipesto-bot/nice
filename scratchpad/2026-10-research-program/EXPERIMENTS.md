@@ -29,6 +29,26 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L24.3 Browser GPU detailed mode by finite differences (PR #233) (2026-10-31, agent; `L24/RESULTS-B.md`, `L24/raw-b/`; branch `pr/web-detailed-fd`, rebased onto main ba03322)
+
+Exactness, 0 differences everywhere: native lavapipe (naga) `web_fd_matches_cpu_detailed` 430
+windows (§3.3 list), `web_fd_seed_matches_cpu` 132/132 word for word, existing `web_kernel_*`
+tests; CubeCL SPIR-V compiler: same five tests; CUDA FD suite + native lavapipe FD suite (native
+kernel unchanged); host 221; fmt/clippy clean (default, gpu, gpu+spirv, wasm crate host and
+wasm32 `--no-deps`); WGSL lint 122 shaders 0 flagged (FD kernel + seed probe at all 44 bases; no
+u64; hot loop has no division); SwiftShader (CI image) `run.sh`, harness parity 199 + 13 windows,
+seed probe 132/132, 78 run-shape runs; **M4 Chromium 151 headless no flags: parity 201 windows
+(4.25e8 numbers, 50 near misses) + 440-window sweep, seed probe 132/132, 318 run-shape runs**; M4
+native naga→MSL (Firefox's path): five tests pass, with the half-shift reproducer still failing
+there as a live control.
+**M4 speed (3 rounds, interleaved, spreads ≤0.4 %):** b40 6.59e8 → 4.40e9 (**6.7×**), b50 3.82e8 →
+3.86e9 (**10.1×**), browser GPU NiceMark 265 → **2170 (8.2×)**. The browser now runs ~1.8× the native
+wgpu FD kernel on the same M4 (guess: the native kernel's u64 mask is emulated on Apple; a u32 mask
+there is a separate change = new lead). Run length stays 128 (64 is 3–5.5 % slower, 256 +0.7/+2.4 %).
+Machine time 29 min wall (~15 min running). CI cost: +~85 s per lavapipe pass, +~140 s on SPIR-V.
+**Coordination:** #231's lint `--require DetailedKernelU32@40/50` must gain `DetailedFdKernelU32@40/50`
+(and keep one per-number call) once both are in; whichever lands second carries that edit.
+
 ## L24.2 Parity step, adapter check and WGSL lint (PR #231) and the CI flake (2026-10-31)
 
 **PR #231** (`pr/browser-parity-step` 0f87771 on 2a1caf2): `web/search/parity.html` + `parity.js`
