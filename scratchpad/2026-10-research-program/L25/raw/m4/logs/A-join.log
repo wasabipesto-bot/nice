@@ -1,0 +1,36 @@
+=== A-join: tree A (tree A: a8aca8b L25 M4 ad-hoc diagnostic (tree A, local only); base a115c3b) /Users/justin/claude-exp-2026-10-31-top/bin/nice_common-test-A cubecl_join_matches_the_cpu_reference --ignored
+
+running 1 test
+test cubecl_join::tests::cubecl_join_matches_the_cpu_reference ... Apple M4 (Metal, wgpu<wgsl>): b20 [58945, 160000) (3,2,0) agrees
+Apple M4 (Metal, wgpu<wgsl>): b20 [58945, 160000) (2,3,1) agrees
+Apple M4 (Metal, wgpu<wgsl>): b20 [60001, 150003) (2,3,1) agrees
+Apple M4 (Metal, wgpu<wgsl>): b25 [3339797, 4339797) (4,3,1) agrees
+Apple M4 (Metal, wgpu<wgsl>): b25 [5000123, 5700456) (3,4,2) agrees
+Apple M4 (Metal, wgpu<wgsl>): b30 [300000000, 301000000) (5,4,2) agrees
+Apple M4 (Metal, wgpu<wgsl>): b34 [12000000017, 12001000017) (5,5,2) agrees
+Apple M4 (Metal, wgpu<wgsl>): b40 [3000000000000, 3000002000000) (6,5,2) agrees
+Apple M4 (Metal, wgpu<wgsl>): b40 [3000000000000, 3000002000000) (7,4,2) agrees
+
+thread 'cubecl_join::tests::cubecl_join_matches_the_cpu_reference' (21234441) panicked at common/src/cubecl_join.rs:2596:13:
+assertion `left == right` failed: b50 [62082117268529817, 62082117268829817) JoinParams { t: 7, k: 4, p: 1 } partitions [0, 48, 49]: join survivors differ
+  left: 0
+ right: 934
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<u64, u64>
+   4: nice_common::cubecl_join::tests::check_window::<cubecl_wgpu::runtime::WgpuRuntime>
+   5: nice_common::cubecl_join::tests::check_all::<cubecl_wgpu::runtime::WgpuRuntime>
+   6: <nice_common::cubecl_join::tests::cubecl_join_matches_the_cpu_reference::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    cubecl_join::tests::cubecl_join_matches_the_cpu_reference
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 215 filtered out; finished in 9.41s
+
+=== RESULT A-join rc=101 secs=10
