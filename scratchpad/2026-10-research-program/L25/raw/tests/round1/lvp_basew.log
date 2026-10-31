@@ -1,0 +1,48 @@
+== basew 472c9a0 API: serve detailed Next claims from a cursor; wait for refills; claim with NO KEY UPDATE (#226)  M common/src/overlap_join.rs 
+Sat Oct 31 05:23:37 UTC 2026
+
+running 3 tests
+test cubecl_join::tests::cubecl_join_matches_the_cpu_reference ... llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) (3,2,0) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) (2,3,1) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b20 [60001, 150003) (2,3,1) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b25 [3339797, 4339797) (4,3,1) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b25 [5000123, 5700456) (3,4,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b30 [300000000, 301000000) (5,4,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b34 [12000000017, 12001000017) (5,5,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b40 [3000000000000, 3000002000000) (6,5,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b40 [3000000000000, 3000002000000) (7,4,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b50 [50000000000000017, 50000000000300017) (7,4,1) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b54 [2200000000000000011, 2200000000000300011) (8,4,1) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b57 [30000000000000000000, 30000000000000300000) (10,4,1) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b57 [20635899893042801193, 20635899893043101193) (9,5,1) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b57 [78920310198429586458, 78920310198429886458) (9,5,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b58 [114041927169846138720, 114041927169846438720) (10,4,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b60 [1573714731429953349518, 1573714731429953649518) (10,4,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b64 [52125117810081128433988, 52125117810081128733988) (11,4,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b57 frontier field JoinParams { t: 9, k: 6, p: 2 }, partitions 0, 1000, 3248 agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) JoinParams { t: 3, k: 2, p: 0 } tight layouts agree (1 partitions re-run, 110 splits)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (10 partitions re-run, 29 splits)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (8 partitions re-run, 20 splits)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } tight layouts agree (12 partitions re-run, 58 splits)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): 5 windows agree whole and in slices
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 64 MiB layout (1 refusals, ceiling 32 MiB)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 64 MiB layout (1 refusals, ceiling 32 MiB)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } agrees after the device refused a 65 MiB layout (1 refusals, ceiling 32 MiB)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): b57 frontier partitions [0, 1000, 3248] agree in a tight layout (3 re-run, 6 splits) and after a refused one
+ok
+test cubecl_join::tests::cubecl_niceonly_keeps_join_and_stride_apart_by_ticket ... ok
+test cubecl_join::tests::join_sample_runs_partitions_of_a_production_field ... llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>): limits JoinLimits { max_binding: 134217728, budget: 268435456 }; 1 slice(s); plan JoinPlan { slots: 4, list_cap: 8388608, nice_cap: 1024, bytes: 218576024 }; re-run JoinPlan { slots: 1, list_cap: 16777216, nice_cap: 1024, bytes: 174514368 }
+partition 1000: CPU (1486824, 82672); production layout (1486824, 82672, 0 re-run, 0 refused, ceiling none); 4-slot layout (1486824, 82672)
+Memory Usage Report:
+  Number of allocations: 0
+  Bytes in use: 0 B
+  Bytes used for padding: 0 B
+  Total bytes reserved: 318.77 MB
+  Usage efficiency: 0.00%
+  Padding overhead: NaN%
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 241 filtered out; finished in 123.07s
+
+rc=0 secs=123

@@ -29,6 +29,23 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L25.1 Apple half-shift-divide audit of the GPU kernels (2026-10-31, agent; `L25/AUDIT.md`, `L25/raw/`; PR #228, branch `pr/metal-halfshift-top-kernel` 56b68bf on 472c9a0)
+
+Source audit + WGSL dumps of 97 kernels on lavapipe (RTX 3060 box 58492432, $0.056/h, 1.17 h).
+**One production kernel carries the pattern: the join's `top_kernel` (`cert_power`,
+cubecl_join.rs:656–665)**: unrolled split16 division, first dividend each pass `x[top] >> 16` ÷ b^k;
+28–64 flagged WGSL sites per base. Harmless at b40–44 and b57–64 (top limb of n², n³ is 0; b64's
+divisor is a power of two); **wrong on Apple at b49–55** (the low-half model predicts 76–100 % wrong
+digits) → lost join survivors → a nice number could be missed on a rescan/verification run on a Mac.
+Stride prefilter (b ≤ 40 only) has the shape (6 sites) in a paired `/`+`%` form that passed the M4
+probe in August (that August mul-sub failure was very likely this bug). Everything else is clean.
+**Fix (ed972c7):** powers in 16-bit limbs, top limb pair divided first (the #225 construction);
+no flagged sites in any of the 97 dumped kernels; `56b68bf` adds join windows with survivors at b50
+(934/97) and b54 (445/51). CUDA 3/3 and lavapipe 3/3 on the branch and on main+windows; host 208;
+lint clean. Throughput 0.997 (b58) / 0.984 (b62), inside main's 1.2 % / 2.4 % spread; survivor and
+check counts identical over 3 × 1e14 fields per base. Not run on the M4 (needs a window): main +
+windows expected to FAIL `cubecl_join_matches_the_cpu_reference`, the branch to pass.
+
 ## L23.1 Browser CPU detailed mode on finite differences (2026-10-31, agent; `L23/RESULTS.md`, `L23/raw/`, `L23/harness/`; PR #227, branch `pr/wasm-detailed-finite-diff` fe38c7e on #221's 7019653)
 
 `process_chunk_wasm` → `process_range_detailed_fd` (2 files, 7 lines). Exactness: old wasm (d1ff798)

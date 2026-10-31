@@ -72,4 +72,5 @@ for b in bases:
             if bad != good:
                 if e == 2: w2 += 1
                 else: w3 += 1
-    print(f"b{b:<3} {L}  {K:<6} {w2/len(ns):>8.3f}        {w3/len(ns):>8.3f}")
+    note = '  (K a power of two: exact, not modelled)' if K & (K - 1) == 0 else ''
+    print(f"b{b:<3} {L}  {K:<6} {w2/len(ns):>8.3f}        {w3/len(ns):>8.3f}{note}")

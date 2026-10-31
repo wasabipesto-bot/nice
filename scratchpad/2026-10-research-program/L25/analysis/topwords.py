@@ -34,17 +34,18 @@ def ndig(x, b):
 
 def pow2(x): return x & (x - 1) == 0
 
-print("base limbs  n_bits  cd16 K16   pow2?  | top word of: n (limbs) | n^2 (2L) | n^3 (3L)  [lo..hi of range]")
-for b in range(10, 65):
-    r = base_range(b)
-    if not r: continue
-    lo, hi = r
-    if lo >= hi: continue
-    nmax = hi - 1
-    L = max(1, math.ceil(nmax.bit_length() / 32))
-    cd, K = chunk_u16(b)
-    def tw(x, nl): return x >> (32 * (nl - 1))
-    s = []
-    for e, nl in ((1, L), (2, 2 * L), (3, 3 * L)):
-        s.append(f"{tw(lo**e, nl)}..{tw(nmax**e, nl)}")
-    print(f"b{b:<3} L={L} bits={lo.bit_length()}-{nmax.bit_length():<3} cd={cd} K={K:<6} {'POW2' if pow2(K) else '    '} | " + " | ".join(s))
+if __name__ == "__main__":
+  print("base limbs  n_bits  cd16 K16   pow2?  | top word of: n (limbs) | n^2 (2L) | n^3 (3L)  [lo..hi of range]")
+  for b in range(10, 65):
+      r = base_range(b)
+      if not r: continue
+      lo, hi = r
+      if lo >= hi: continue
+      nmax = hi - 1
+      L = max(1, math.ceil(nmax.bit_length() / 32))
+      cd, K = chunk_u16(b)
+      def tw(x, nl): return x >> (32 * (nl - 1))
+      s = []
+      for e, nl in ((1, L), (2, 2 * L), (3, 3 * L)):
+          s.append(f"{tw(lo**e, nl)}..{tw(nmax**e, nl)}")
+      print(f"b{b:<3} L={L} bits={lo.bit_length()}-{nmax.bit_length():<3} cd={cd} K={K:<6} {'POW2' if pow2(K) else '    '} | " + " | ".join(s))

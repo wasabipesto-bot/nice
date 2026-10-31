@@ -14,6 +14,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   main = 472c9a0. No user messages since the authorisation; the Metal issue closed last night.
 - **PR #227 opened** (browser CPU detailed on FD, stacked on #221): ×7.0 suite, byte-identical
   in Chromium on 141 windows (L23.1). L24 plan written: ~5 days, not 1–2 (L24/PLAN.md).
+- **L25 audit (L25.1): one production kernel has the pattern (join `top_kernel`), harmless at
+  live bases, wrong at b49–55 on Apple; fix exact on CUDA/lavapipe, no cost → PR #228 opened.**
+  Needs one M4 run (main+windows expected to fail; branch to pass). Box destroyed (1.17 h).
+- Today: 4 agents (all Opus), one $0.056/h box; Vast $0.07. Credit $62.72.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
   path on finite differences (ivory build + Playwright docker parity + web NiceMark) — kill
