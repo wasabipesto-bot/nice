@@ -17,7 +17,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **L25 audit (L25.1): one production kernel has the pattern (join `top_kernel`), harmless at
   live bases, wrong at b49–55 on Apple; fix exact on CUDA/lavapipe, no cost → PR #228 opened.**
   Needs one M4 run (main+windows expected to fail; branch to pass). Box destroyed (1.17 h).
-- Today: 4 agents (all Opus), one $0.056/h box; Vast $0.07. Credit $62.72.
+- **Afternoon (user):** 1 h of mayalaran granted → #228 confirmed on the M4 (0 vs 934 / 0 vs 445
+  survivors on main; branch passes), 8 min used; stride prefilter probe passes on main (fix is
+  defensive → small PR, L26). L24 detailed proposal written (`L24/PROPOSAL.md`, ~6 days, PR split
+  (a) seed refactor → (c) parity step → (b) kernel; headless Playwright on real GPUs; 10 open
+  questions). Stride-prefilter detail answered in chat.
+- Today: 6 agents (all Opus), one $0.056/h box; Vast $0.07. Credit $62.57.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
   path on finite differences (ivory build + Playwright docker parity + web NiceMark) — kill

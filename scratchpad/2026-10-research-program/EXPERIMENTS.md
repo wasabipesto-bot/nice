@@ -29,6 +29,20 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L25.2 M4 confirmation of #228 and the stride prefilter probe (2026-10-31, agent, 8 min of mayalaran; `L25/M4-CONFIRM.md`, `L25/raw/m4/`)
+
+**#228 prediction confirmed (twice):** 472c9a0 + windows fails `cubecl_join_matches_the_cpu_reference`
+at b50 with **0 join survivors vs the CPU's 934** (prefilter 0 vs 97); a per-window run shows b54
+**0 vs 445** (0 vs 51); the other 18 windows agree. The branch (56b68bf) passes everything incl.
+both windows, the b57 frontier field, tight/sliced/refused layouts; `join_sample_runs_partitions_
+of_a_production_field` passes on both trees. The device loses every survivor → missed nice numbers
+at b49–55 on a Mac without the fix. PR body + comment updated.
+**Stride prefilter (cubecl_backend.rs:433–437), main:** `cubecl_prefilter_survivors_match_the_host_
+mirror` passes twice at b30/34/40 (every lane width); `cubecl_matches_cpu_niceonly` (b10–80),
+`cubecl_cross_filter_survivors_match_the_host_mirror`, `cubecl_niceonly_finds_69_in_base_10` pass.
+So the paired `/`+`%` form still dodges the bug today; the fix is defensive (user: fix unless it
+costs current work; it runs only at b ≤ 40, so it cannot).
+
 ## L25.1 Apple half-shift-divide audit of the GPU kernels (2026-10-31, agent; `L25/AUDIT.md`, `L25/raw/`; PR #228, branch `pr/metal-halfshift-top-kernel` 56b68bf on 472c9a0)
 
 Source audit + WGSL dumps of 97 kernels on lavapipe (RTX 3060 box 58492432, $0.056/h, 1.17 h).
