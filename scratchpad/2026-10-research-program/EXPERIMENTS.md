@@ -29,6 +29,17 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L24.4 AMD parity for #233, run by the user (2026-10-31; `parity-demoux-1031.json`)
+
+demoux, RX 9070 XT, LibreWolf (Firefox 155, wgpu → naga → Vulkan), `parity.html` served from
+ivory (https://100.109.36.42:8443), build ae8b0bd, `gpu_build_info.detailed_kernel = "fd"`.
+**199 windows, 25,471,443 numbers, 50 near misses, 0 differences, 23 s wall**; adapter present,
+not a fallback (Firefox blanks vendor/architecture/description). Rate check: 2e8 at b40 in 0.117 s
+= 1.71e9 n/s with Firefox's 16.7 ms timer steps (sanity floor only; the browser benchmark suite
+on AMD is still unmeasured). The user noted LibreWolf now runs it without flags ("they must have
+pushed some updates"). With this, #233 is exact on: lavapipe, SPIR-V, SwiftShader, M4 Chromium
+(Tint → Metal), M4 native (naga → Metal), and AMD Firefox (naga → Vulkan).
+
 ## L24.3 Browser GPU detailed mode by finite differences (PR #233) (2026-10-31, agent; `L24/RESULTS-B.md`, `L24/raw-b/`; branch `pr/web-detailed-fd`, rebased onto main ba03322)
 
 Exactness, 0 differences everywhere: native lavapipe (naga) `web_fd_matches_cpu_detailed` 430

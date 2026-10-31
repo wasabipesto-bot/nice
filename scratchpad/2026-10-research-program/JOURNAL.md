@@ -62,6 +62,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   100.109.36.42 / ivory / ivory.neon-locrian.ts.net) on **https://100.109.36.42:8443/search/**
   (pid 944040, log `~/nice-web-tls/serve.log`). `tailscale serve` was denied (needs
   `sudo tailscale set --operator=claude` once). Stop with `kill 944040`.
+- **User ran parity on demoux (RX 9070 XT, LibreWolf/Firefox 155): 199 windows identical** (L24.4);
+  added to #233's body and comments. Decision 9's AMD layer is covered; only the AMD speed suite
+  remains unmeasured.
 - Today: 13 agents (all Opus), boxes: 3060 ×2, 3080 ×3; mayalaran ~1 h 45 min total today.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
