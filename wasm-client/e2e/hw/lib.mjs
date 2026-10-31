@@ -9,11 +9,17 @@
 //   curl nodejs.org/dist/v24.14.1/node-v24.14.1-darwin-arm64.tar.gz, unpack to $D/node
 //   export PATH=$D/node/bin:$PATH npm_config_cache=$D/npm-cache \
 //          PLAYWRIGHT_BROWSERS_PATH=$D/pw-browsers TMPDIR=$D/tmp/
-//   (in $D/harness) npm i --no-save playwright@1.62.0   # CI's version
+//   (in $D/harness) npm i --no-save --omit=optional --ignore-scripts playwright@1.62.0
 //   npx playwright install --no-shell chromium          # 179 MiB, ~40 s
 //   copy this directory to $D/harness/hw and the built site to $D/site
 //   NICE_E2E_ROOT=$D/site node $D/harness/hw/adapter.mjs --expect-vendor apple
-// TMPDIR keeps Chromium's throwaway profile inside $D too.
+// TMPDIR keeps Chromium's throwaway profile inside $D too. Two things still
+// land outside $D: a plain `npm i` runs node-gyp for the optional fsevents
+// (headers to ~/Library/Caches/node-gyp/<ver>, .pyc files under
+// ~/Library/Caches/com.apple.python/<path of $D>), which the flags above
+// skip; and Chrome for Testing writes
+// ~/Library/Preferences/com.google.chrome.for.testing.plist (remove with
+// `defaults delete com.google.chrome.for.testing`, then the empty plist).
 //
 //   adapter.mjs  adapter record + hardware (or --software) assertion
 //   parity.mjs   process_chunk_gpu vs process_chunk_wasm, raw JSON, per window
@@ -161,6 +167,8 @@ export async function adapterRecord(page) {
                 rec.subgroupMinSize = i?.subgroupMinSize;
                 rec.subgroupMaxSize = i?.subgroupMaxSize;
                 rec.fallback = i?.isFallbackAdapter ?? a.isFallbackAdapter;
+                // Where the flag lives (GPUAdapterInfo since Chrome 136).
+                rec.fallback_source = i && "isFallbackAdapter" in i ? "info" : "isFallbackAdapter" in a ? "adapter" : null;
                 rec.features = [...a.features].sort();
                 rec.limits = {
                     maxComputeWorkgroupSizeX: a.limits.maxComputeWorkgroupSizeX,
