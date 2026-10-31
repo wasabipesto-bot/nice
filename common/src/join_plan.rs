@@ -393,7 +393,23 @@ pub(crate) fn max_slice_prefixes(fs: &FieldSetup, lim: JoinLimits) -> usize {
     let by_binding =
         (lim.max_binding / s / per_largest.max(1)).min(lim.max_binding / per_fixed.max(1));
     let by_survivors = list_cap / 2 / (s * SURV_PER_PREFIX);
-    by_budget.min(by_binding).min(by_survivors)
+    by_budget.min(by_binding).min(by_survivors) * exp_slice_mult()
+}
+
+/// Experimental: `NICE_EXP_SLICE_MULT=n` (1-8) multiplies
+/// [`max_slice_prefixes`], for measuring the per-slice cost on fields cut
+/// into several slices. A slice is cut by prefix blocks, of which only a
+/// fraction are top-layer prefixes, so a larger cap still fits the device
+/// at fewer partitions per launch (`JoinPlan::new` fits the slots).
+fn exp_slice_mult() -> usize {
+    static S: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *S.get_or_init(|| {
+        std::env::var("NICE_EXP_SLICE_MULT")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|n| (1..=8).contains(n))
+            .unwrap_or(1)
+    })
 }
 
 /// A nice-only field ready for the join on one device: its slices (one, for
