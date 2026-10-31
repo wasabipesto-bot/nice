@@ -44,6 +44,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   lavapipe/SPIR-V/SwiftShader/M4 Chromium/M4 native; L24.3). All three L24 PRs are open (#230
   merged). #232 fixes the flake; after it merges, rebase #231 and #233; the lint's require list
   needs `DetailedFdKernelU32@40/50` in whichever of #231/#233 lands second. New lead L28.
+- #231 got a follow-up commit (1e4ffcf): the lint requires the browser per-number kernel at base
+  80 instead of 40/50, so it holds whichever of #231/#233 lands first; #233 adds its own kernel's
+  requirement after #231 is in. CI watches on #231, #232, #233.
+- **State at end of day:** open program PRs #231 (parity step + lint), #232 (test flake fix), #233
+  (browser GPU FD). Merged today: #221, #225, #227, #228, #229, #230. Remaining L24 work after
+  merges: rebase #233 onto #231 and add `--require DetailedFdKernelU32@40/50`; demoux (AMD) browser
+  run by the user or by request; Safari/Windows skipped (decision 9).
 - Today: 13 agents (all Opus), boxes: 3060 ×2, 3080 ×3; mayalaran ~1 h 45 min total today.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
