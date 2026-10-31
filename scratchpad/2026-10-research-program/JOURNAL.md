@@ -55,7 +55,7 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   carries the base-40/50 requirement). #233's lavapipe job then failed the lint's *requirement*
   (not a flagged site: 0 flagged on 14 shaders) because its kernel makes bases 40/50 compile
   `DetailedFdKernelU32`. Fixed in #233 (ae8b0bd): rebased onto main, dump test calls the browser
-  path at base 80 too, lint requires `DetailedKernelU32@80` + `DetailedFdKernelU32@40/50`. CI watch on.
+  path at base 80 too, lint requires `DetailedKernelU32@80` + `DetailedFdKernelU32@40/50`. **#233 CI fully green on ae8b0bd.**
 - **Dev server for the user's demoux test (10-31 ~20:30 UTC):** #233 (ae8b0bd) built with
   `wasm-pack build --target web` + `vendor-fetch` in `.worktrees/pr-web-fd-rb/web`, served by
   `~/nice-web-tls/serve.py` (Python ThreadingHTTPServer + self-signed cert, 30 days, SANs
