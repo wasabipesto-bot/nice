@@ -56,6 +56,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   (not a flagged site: 0 flagged on 14 shaders) because its kernel makes bases 40/50 compile
   `DetailedFdKernelU32`. Fixed in #233 (ae8b0bd): rebased onto main, dump test calls the browser
   path at base 80 too, lint requires `DetailedKernelU32@80` + `DetailedFdKernelU32@40/50`. CI watch on.
+- **Dev server for the user's demoux test (10-31 ~20:30 UTC):** #233 (ae8b0bd) built with
+  `wasm-pack build --target web` + `vendor-fetch` in `.worktrees/pr-web-fd-rb/web`, served by
+  `~/nice-web-tls/serve.py` (Python ThreadingHTTPServer + self-signed cert, 30 days, SANs
+  100.109.36.42 / ivory / ivory.neon-locrian.ts.net) on **https://100.109.36.42:8443/search/**
+  (pid 944040, log `~/nice-web-tls/serve.log`). `tailscale serve` was denied (needs
+  `sudo tailscale set --operator=claude` once). Stop with `kill 944040`.
 - Today: 13 agents (all Opus), boxes: 3060 ×2, 3080 ×3; mayalaran ~1 h 45 min total today.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
