@@ -51,6 +51,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   (browser GPU FD). Merged today: #221, #225, #227, #228, #229, #230. Remaining L24 work after
   merges: rebase #233 onto #231 and add `--require DetailedFdKernelU32@40/50`; demoux (AMD) browser
   run by the user or by request; Safari/Windows skipped (decision 9).
+- **#231 and #232 merged by the user** (#231 before my base-80 follow-up 1e4ffcf landed, so main
+  carries the base-40/50 requirement). #233's lavapipe job then failed the lint's *requirement*
+  (not a flagged site: 0 flagged on 14 shaders) because its kernel makes bases 40/50 compile
+  `DetailedFdKernelU32`. Fixed in #233 (ae8b0bd): rebased onto main, dump test calls the browser
+  path at base 80 too, lint requires `DetailedKernelU32@80` + `DetailedFdKernelU32@40/50`. CI watch on.
 - Today: 13 agents (all Opus), boxes: 3060 ×2, 3080 ×3; mayalaran ~1 h 45 min total today.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
