@@ -29,6 +29,21 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L26.1 Stride prefilter defensive fix (2026-10-31, agent; `L26/RESULTS.md`, `L26/raw/`; PR #229, branch `pr/metal-halfshift-prefilter`)
+
+`candidate_check`'s low-digit prefilter (b ≤ 40 only). The #228 "top pair as one u32" construction
+would, at two limbs (b33–40), divide `u32(n_lo >> 32)` = the u64 form of the bug (a compiler folds
+the rebuilt halves back into the word; #228 escapes because its pair is a u32 sum). So each pass
+divides the top pair as hi·Q + (hi·R + lo)/K with 2^16 = Q·K + R; every dividend is that sum or
+`rem << 16 | limb` with a run-time remainder. Python model exact over ~3M cases, no overflow.
+RTX 3060 (58548226, 1.08 h): lavapipe probe/cross-filter/`matches_cpu_niceonly`/`finds_69` pass;
+CUDA `cubecl_cuda_matches_cpu_niceonly` + local CUDA copies of the probe and cross-filter tests
+pass; 27-window sweep b28–40: 9,675 of 1,475,822 survivors = host mirror = main on both runtimes.
+WGSL flagged sites main → fix: b30 6→0, b34 6→0, b40 6→0. Host 208/208, fmt/clippy clean. Not
+M4-run (the paired form passes there today; the fix is defensive). Note: `matches_cpu_niceonly`
+and `finds_69` barely touch the prefilter (none at b10/12/25; b40's 5e6 window launches nothing);
+M4-CONFIRM's "b25 runs the prefilter" was wrong. Rebased onto main 7362e18 (CHANGELOG conflict).
+
 ## L25.2 M4 confirmation of #228 and the stride prefilter probe (2026-10-31, agent, 8 min of mayalaran; `L25/M4-CONFIRM.md`, `L25/raw/m4/`)
 
 **#228 prediction confirmed (twice):** 472c9a0 + windows fails `cubecl_join_matches_the_cpu_reference`

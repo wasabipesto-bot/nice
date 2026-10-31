@@ -171,4 +171,75 @@ mod l26_local {
             }
         }
     }
+
+    /// Prefilter survivors against the mirror over windows at the start,
+    /// middle and end of every base with a prefilter, on whatever client.
+    fn sweep<R: cubecl::prelude::Runtime>(client: &cubecl::prelude::ComputeClient<R>, label: &str) {
+        println!("{TREE} {label}");
+        let len: u32 = 1_000_000;
+        let mut total = (0usize, 0usize);
+        for base in 10u32..=40 {
+            let Some(pre) = vulkan_prefilter_params(base) else { continue };
+            let r = crate::base_range::get_base_range_u128(base).unwrap().unwrap();
+            let mid = r.range_start + (r.range_end - r.range_start) / 2;
+            for (tag, s) in [("start", r.range_start), ("mid", mid), ("end", r.range_end - u128::from(len))] {
+                let table = StrideTable::new(base, GPU_LSD_K);
+                let mut run = match CubeclNiceonlyRun::new(client, base, s, false) {
+                    Ok(run) => run,
+                    Err(e) => {
+                        println!("{label} base {base}: skipped ({e})");
+                        break;
+                    }
+                };
+                assert!(run.plan.prefilter.is_some());
+                run.probe = true;
+                run.launch(0, &[0], &[len], &[0]).expect("dispatch");
+                let mut got: Vec<u128> = run.finish().expect("results").iter().map(|n| n.number).collect();
+                got.sort_unstable();
+                let end = s + u128::from(len);
+                let (mut n, mut idx) = table.first_valid_at_or_after(s);
+                let mut want = Vec::new();
+                let mut cands = 0usize;
+                while n < end {
+                    cands += 1;
+                    if mirror(n, base, &pre) {
+                        want.push(n);
+                    }
+                    n += u128::from(table.gap_table[idx]);
+                    idx = (idx + 1) % table.gap_table.len();
+                }
+                assert_eq!(got, want, "{label} base {base} {tag} [{s}, +{len})");
+                assert!(!want.is_empty() && want.len() < cands);
+                total.0 += want.len();
+                total.1 += cands;
+                println!(
+                    "{label} base {base} limbs {:?} K {} {tag} [{s}, +{len}): {} of {cands} survive, device agrees",
+                    crate::gpu_config::n_limbs(base),
+                    pre.chunk_div,
+                    want.len()
+                );
+            }
+        }
+        println!("{label} total: {} of {} candidates survive, all windows agree", total.0, total.1);
+    }
+
+    #[test]
+    #[ignore = "L26 sweep"]
+    fn l26_wgpu_prefilter_sweep() {
+        let ctx = CubeclContext::new_default().expect("CubeCL init");
+        println!("device: {}", ctx.device_name());
+        #[allow(irrefutable_let_patterns)]
+        let CubeclContext::Wgpu { client, .. } = &ctx else { unreachable!() };
+        sweep(client, "wgpu");
+    }
+
+    #[test]
+    #[cfg(feature = "cubecl-cuda")]
+    #[ignore = "L26 sweep"]
+    fn l26_cuda_prefilter_sweep() {
+        let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
+        println!("device: {}", ctx.device_name());
+        let CubeclContext::Cuda { client, .. } = &ctx else { unreachable!() };
+        sweep(client, "cuda");
+    }
 }

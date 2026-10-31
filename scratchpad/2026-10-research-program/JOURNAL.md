@@ -27,7 +27,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   ~16:30 UTC or until the web GPU runner is complete.** Started L24 (a) seed-refactor PR (3080 box
   + M4 seed test) and the headless WebGPU bring-up on the M4 in parallel; L26 prefilter PR agent
   still running (3060 box). Stale agent pins stopped at the user's request.
-- Today so far: 8 agents (all Opus), boxes: 3060 ×2, 3080 ×1.
+- **PR #229 opened** (stride prefilter defensive fix; L26.1). **Headless Metal bring-up done:** no
+  flags needed, adapter apple/metal-3, today's browser kernel exact on Apple via Chrome's Tint on
+  201 windows (`L24/BRINGUP-M4.md`, harness `exp/browser-gpu-harness` 5eeed09); 22 min of Mac
+  time. L24 (c) parity-step PR agent launched.
+- Today so far: 9 agents (all Opus), boxes: 3060 ×2, 3080 ×1.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
   path on finite differences (ivory build + Playwright docker parity + web NiceMark) — kill
