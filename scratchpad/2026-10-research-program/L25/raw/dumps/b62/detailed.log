@@ -1,0 +1,777 @@
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::detailed_kernel::DetailedKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::detailed_kernel::DetailedKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 256,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: DetailedKernelInfo {
+        base: 62,
+        limbs: 3,
+        chunk_digits: 2,
+        chunk_div: 3844,
+        cutoff: 55,
+        wide_chunk: false,
+        hist: ArrayCompilationArg {
+            inplace: None,
+        },
+        miss_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        miss_data: ArrayCompilationArg {
+            inplace: None,
+        },
+        s0: (),
+        s1: (),
+        s2: (),
+        s3: (),
+        cnt_lo: (),
+        cnt_hi: (),
+        miss_cap: (),
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<atomic<u32>>;
+
+@group(0)
+@binding(1)
+var<storage, read_write> buffer_1_global: array<atomic<u32>>;
+
+@group(0)
+@binding(2)
+var<storage, read_write> buffer_2_global: array<u32>;
+
+struct info_st {
+   scalars_u32: array<u32, 8>,
+   static_meta: array<u32, 6>,
+}
+
+@group(0)
+@binding(3)
+var<storage, read> info: info_st;
+
+var<workgroup> shared_memory_0: array<atomic<u32>, 252>;
+
+var<workgroup> shared_memory_22: array<u32, 2304>;
+
+const WORKGROUP_SIZE_X = 256u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(256, 1, 1)
+fn detailed_kernel(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+    @builtin(local_invocation_id) local_invocation_id: vec3<u32>,
+    @builtin(num_workgroups) num_workgroups: vec3<u32>,
+) {
+var a_31: array<u32, 3>;
+
+var a_38: array<u32, 6>;
+
+var a_142: array<u32, 9>;
+
+var l_mut_25: u64;
+var l_mut_29: u64;
+var l_mut_39: u64;
+var l_mut_347: u64;
+var l_mut_385: i32;
+var l_mut_395: i32;
+var l_mut_1: u32;
+var l_mut_348: u32;
+var l_mut_394: u32;
+var l_mut_423: u32;
+l_mut_1 = local_invocation_id.x;
+loop {
+let l_2 = l_mut_1 < u32(252);
+let l_3 = !l_2;
+if l_3 {
+break;
+}
+let l_4 = &shared_memory_0[l_mut_1];
+atomicStore(l_4,u32(0));
+l_mut_1 = l_mut_1 + WORKGROUP_SIZE_X;
+}
+workgroupBarrier();
+let l_5 = u64(info.scalars_u32[1]);
+let l_6 = l_5 << u32(bitcast<u64>(u64(32)));
+let l_7 = u64(info.scalars_u32[0]);
+let l_8 = l_6 | l_7;
+let l_9 = u64(info.scalars_u32[3]);
+let l_10 = l_9 << u32(bitcast<u64>(u64(32)));
+let l_11 = u64(info.scalars_u32[2]);
+let l_12 = l_10 | l_11;
+let l_13 = u64(info.scalars_u32[5]);
+let l_14 = l_13 << u32(bitcast<u64>(u64(32)));
+let l_15 = u64(info.scalars_u32[4]);
+let l_16 = l_14 | l_15;
+let l_17 = local_invocation_id.x >> u32(5);
+let l_18 = l_17 % u32(4);
+let l_19 = u64(num_workgroups.x);
+let l_20 = u64(WORKGROUP_SIZE_X);
+let l_21 = l_19 * l_20;
+let l_23 = local_invocation_id.x * u32(9);
+let l_24 = u64(global_id.x);
+l_mut_25 = l_24;
+loop {
+let l_26 = l_mut_25 < l_16;
+let l_27 = !l_26;
+if l_27 {
+break;
+}
+let l_28 = l_8 + l_mut_25;
+l_mut_29 = l_12;
+let l_30 = l_28 < l_8;
+if l_30 {
+l_mut_29 = l_mut_29 + u64(1);
+}
+let l_32 = l_28 >> u32(bitcast<u64>(u64(0)));
+let l_33 = u32(bitcast<u64>(l_32));
+a_31[u32(0)] = l_33;
+let l_34 = l_28 >> u32(bitcast<u64>(u64(32)));
+let l_35 = u32(bitcast<u64>(l_34));
+a_31[u32(1)] = l_35;
+let l_36 = l_mut_29 >> u32(bitcast<u64>(u64(0)));
+let l_37 = u32(bitcast<u64>(l_36));
+a_31[u32(2)] = l_37;
+a_38[u32(0)] = u32(0);
+a_38[u32(1)] = u32(0);
+a_38[u32(2)] = u32(0);
+a_38[u32(3)] = u32(0);
+a_38[u32(4)] = u32(0);
+a_38[u32(5)] = u32(0);
+l_mut_39 = u64(0);
+let l_40 = a_31[u32(0)];
+let l_41 = u64(l_40);
+let l_42 = a_31[u32(0)];
+let l_43 = u64(l_42);
+let l_44 = l_41 * l_43;
+let l_45 = a_38[u32(0)];
+let l_46 = u64(l_45);
+let l_47 = l_44 + l_46;
+let l_48 = l_47 + l_mut_39;
+let l_49 = u32(bitcast<u64>(l_48));
+a_38[u32(0)] = l_49;
+let l_50 = l_48 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_50;
+let l_51 = a_31[u32(0)];
+let l_52 = u64(l_51);
+let l_53 = a_31[u32(1)];
+let l_54 = u64(l_53);
+let l_55 = l_52 * l_54;
+let l_56 = a_38[u32(1)];
+let l_57 = u64(l_56);
+let l_58 = l_55 + l_57;
+let l_59 = l_58 + l_mut_39;
+let l_60 = u32(bitcast<u64>(l_59));
+a_38[u32(1)] = l_60;
+let l_61 = l_59 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_61;
+let l_62 = a_31[u32(0)];
+let l_63 = u64(l_62);
+let l_64 = a_31[u32(2)];
+let l_65 = u64(l_64);
+let l_66 = l_63 * l_65;
+let l_67 = a_38[u32(2)];
+let l_68 = u64(l_67);
+let l_69 = l_66 + l_68;
+let l_70 = l_69 + l_mut_39;
+let l_71 = u32(bitcast<u64>(l_70));
+a_38[u32(2)] = l_71;
+let l_72 = l_70 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_72;
+let l_73 = u32(bitcast<u64>(l_mut_39));
+a_38[u32(3)] = l_73;
+l_mut_39 = u64(0);
+let l_74 = a_31[u32(1)];
+let l_75 = u64(l_74);
+let l_76 = a_31[u32(0)];
+let l_77 = u64(l_76);
+let l_78 = l_75 * l_77;
+let l_79 = a_38[u32(1)];
+let l_80 = u64(l_79);
+let l_81 = l_78 + l_80;
+let l_82 = l_81 + l_mut_39;
+let l_83 = u32(bitcast<u64>(l_82));
+a_38[u32(1)] = l_83;
+let l_84 = l_82 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_84;
+let l_85 = a_31[u32(1)];
+let l_86 = u64(l_85);
+let l_87 = a_31[u32(1)];
+let l_88 = u64(l_87);
+let l_89 = l_86 * l_88;
+let l_90 = a_38[u32(2)];
+let l_91 = u64(l_90);
+let l_92 = l_89 + l_91;
+let l_93 = l_92 + l_mut_39;
+let l_94 = u32(bitcast<u64>(l_93));
+a_38[u32(2)] = l_94;
+let l_95 = l_93 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_95;
+let l_96 = a_31[u32(1)];
+let l_97 = u64(l_96);
+let l_98 = a_31[u32(2)];
+let l_99 = u64(l_98);
+let l_100 = l_97 * l_99;
+let l_101 = a_38[u32(3)];
+let l_102 = u64(l_101);
+let l_103 = l_100 + l_102;
+let l_104 = l_103 + l_mut_39;
+let l_105 = u32(bitcast<u64>(l_104));
+a_38[u32(3)] = l_105;
+let l_106 = l_104 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_106;
+let l_107 = u32(bitcast<u64>(l_mut_39));
+a_38[u32(4)] = l_107;
+l_mut_39 = u64(0);
+let l_108 = a_31[u32(2)];
+let l_109 = u64(l_108);
+let l_110 = a_31[u32(0)];
+let l_111 = u64(l_110);
+let l_112 = l_109 * l_111;
+let l_113 = a_38[u32(2)];
+let l_114 = u64(l_113);
+let l_115 = l_112 + l_114;
+let l_116 = l_115 + l_mut_39;
+let l_117 = u32(bitcast<u64>(l_116));
+a_38[u32(2)] = l_117;
+let l_118 = l_116 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_118;
+let l_119 = a_31[u32(2)];
+let l_120 = u64(l_119);
+let l_121 = a_31[u32(1)];
+let l_122 = u64(l_121);
+let l_123 = l_120 * l_122;
+let l_124 = a_38[u32(3)];
+let l_125 = u64(l_124);
+let l_126 = l_123 + l_125;
+let l_127 = l_126 + l_mut_39;
+let l_128 = u32(bitcast<u64>(l_127));
+a_38[u32(3)] = l_128;
+let l_129 = l_127 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_129;
+let l_130 = a_31[u32(2)];
+let l_131 = u64(l_130);
+let l_132 = a_31[u32(2)];
+let l_133 = u64(l_132);
+let l_134 = l_131 * l_133;
+let l_135 = a_38[u32(4)];
+let l_136 = u64(l_135);
+let l_137 = l_134 + l_136;
+let l_138 = l_137 + l_mut_39;
+let l_139 = u32(bitcast<u64>(l_138));
+a_38[u32(4)] = l_139;
+let l_140 = l_138 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_140;
+let l_141 = u32(bitcast<u64>(l_mut_39));
+a_38[u32(5)] = l_141;
+a_142[u32(0)] = u32(0);
+a_142[u32(1)] = u32(0);
+a_142[u32(2)] = u32(0);
+a_142[u32(3)] = u32(0);
+a_142[u32(4)] = u32(0);
+a_142[u32(5)] = u32(0);
+a_142[u32(6)] = u32(0);
+a_142[u32(7)] = u32(0);
+a_142[u32(8)] = u32(0);
+l_mut_39 = u64(0);
+let l_143 = a_38[u32(0)];
+let l_144 = u64(l_143);
+let l_145 = a_31[u32(0)];
+let l_146 = u64(l_145);
+let l_147 = l_144 * l_146;
+let l_148 = a_142[u32(0)];
+let l_149 = u64(l_148);
+let l_150 = l_147 + l_149;
+let l_151 = l_150 + l_mut_39;
+let l_152 = u32(bitcast<u64>(l_151));
+a_142[u32(0)] = l_152;
+let l_153 = l_151 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_153;
+let l_154 = a_38[u32(0)];
+let l_155 = u64(l_154);
+let l_156 = a_31[u32(1)];
+let l_157 = u64(l_156);
+let l_158 = l_155 * l_157;
+let l_159 = a_142[u32(1)];
+let l_160 = u64(l_159);
+let l_161 = l_158 + l_160;
+let l_162 = l_161 + l_mut_39;
+let l_163 = u32(bitcast<u64>(l_162));
+a_142[u32(1)] = l_163;
+let l_164 = l_162 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_164;
+let l_165 = a_38[u32(0)];
+let l_166 = u64(l_165);
+let l_167 = a_31[u32(2)];
+let l_168 = u64(l_167);
+let l_169 = l_166 * l_168;
+let l_170 = a_142[u32(2)];
+let l_171 = u64(l_170);
+let l_172 = l_169 + l_171;
+let l_173 = l_172 + l_mut_39;
+let l_174 = u32(bitcast<u64>(l_173));
+a_142[u32(2)] = l_174;
+let l_175 = l_173 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_175;
+let l_176 = u32(bitcast<u64>(l_mut_39));
+a_142[u32(3)] = l_176;
+l_mut_39 = u64(0);
+let l_177 = a_38[u32(1)];
+let l_178 = u64(l_177);
+let l_179 = a_31[u32(0)];
+let l_180 = u64(l_179);
+let l_181 = l_178 * l_180;
+let l_182 = a_142[u32(1)];
+let l_183 = u64(l_182);
+let l_184 = l_181 + l_183;
+let l_185 = l_184 + l_mut_39;
+let l_186 = u32(bitcast<u64>(l_185));
+a_142[u32(1)] = l_186;
+let l_187 = l_185 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_187;
+let l_188 = a_38[u32(1)];
+let l_189 = u64(l_188);
+let l_190 = a_31[u32(1)];
+let l_191 = u64(l_190);
+let l_192 = l_189 * l_191;
+let l_193 = a_142[u32(2)];
+let l_194 = u64(l_193);
+let l_195 = l_192 + l_194;
+let l_196 = l_195 + l_mut_39;
+let l_197 = u32(bitcast<u64>(l_196));
+a_142[u32(2)] = l_197;
+let l_198 = l_196 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_198;
+let l_199 = a_38[u32(1)];
+let l_200 = u64(l_199);
+let l_201 = a_31[u32(2)];
+let l_202 = u64(l_201);
+let l_203 = l_200 * l_202;
+let l_204 = a_142[u32(3)];
+let l_205 = u64(l_204);
+let l_206 = l_203 + l_205;
+let l_207 = l_206 + l_mut_39;
+let l_208 = u32(bitcast<u64>(l_207));
+a_142[u32(3)] = l_208;
+let l_209 = l_207 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_209;
+let l_210 = u32(bitcast<u64>(l_mut_39));
+a_142[u32(4)] = l_210;
+l_mut_39 = u64(0);
+let l_211 = a_38[u32(2)];
+let l_212 = u64(l_211);
+let l_213 = a_31[u32(0)];
+let l_214 = u64(l_213);
+let l_215 = l_212 * l_214;
+let l_216 = a_142[u32(2)];
+let l_217 = u64(l_216);
+let l_218 = l_215 + l_217;
+let l_219 = l_218 + l_mut_39;
+let l_220 = u32(bitcast<u64>(l_219));
+a_142[u32(2)] = l_220;
+let l_221 = l_219 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_221;
+let l_222 = a_38[u32(2)];
+let l_223 = u64(l_222);
+let l_224 = a_31[u32(1)];
+let l_225 = u64(l_224);
+let l_226 = l_223 * l_225;
+let l_227 = a_142[u32(3)];
+let l_228 = u64(l_227);
+let l_229 = l_226 + l_228;
+let l_230 = l_229 + l_mut_39;
+let l_231 = u32(bitcast<u64>(l_230));
+a_142[u32(3)] = l_231;
+let l_232 = l_230 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_232;
+let l_233 = a_38[u32(2)];
+let l_234 = u64(l_233);
+let l_235 = a_31[u32(2)];
+let l_236 = u64(l_235);
+let l_237 = l_234 * l_236;
+let l_238 = a_142[u32(4)];
+let l_239 = u64(l_238);
+let l_240 = l_237 + l_239;
+let l_241 = l_240 + l_mut_39;
+let l_242 = u32(bitcast<u64>(l_241));
+a_142[u32(4)] = l_242;
+let l_243 = l_241 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_243;
+let l_244 = u32(bitcast<u64>(l_mut_39));
+a_142[u32(5)] = l_244;
+l_mut_39 = u64(0);
+let l_245 = a_38[u32(3)];
+let l_246 = u64(l_245);
+let l_247 = a_31[u32(0)];
+let l_248 = u64(l_247);
+let l_249 = l_246 * l_248;
+let l_250 = a_142[u32(3)];
+let l_251 = u64(l_250);
+let l_252 = l_249 + l_251;
+let l_253 = l_252 + l_mut_39;
+let l_254 = u32(bitcast<u64>(l_253));
+a_142[u32(3)] = l_254;
+let l_255 = l_253 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_255;
+let l_256 = a_38[u32(3)];
+let l_257 = u64(l_256);
+let l_258 = a_31[u32(1)];
+let l_259 = u64(l_258);
+let l_260 = l_257 * l_259;
+let l_261 = a_142[u32(4)];
+let l_262 = u64(l_261);
+let l_263 = l_260 + l_262;
+let l_264 = l_263 + l_mut_39;
+let l_265 = u32(bitcast<u64>(l_264));
+a_142[u32(4)] = l_265;
+let l_266 = l_264 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_266;
+let l_267 = a_38[u32(3)];
+let l_268 = u64(l_267);
+let l_269 = a_31[u32(2)];
+let l_270 = u64(l_269);
+let l_271 = l_268 * l_270;
+let l_272 = a_142[u32(5)];
+let l_273 = u64(l_272);
+let l_274 = l_271 + l_273;
+let l_275 = l_274 + l_mut_39;
+let l_276 = u32(bitcast<u64>(l_275));
+a_142[u32(5)] = l_276;
+let l_277 = l_275 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_277;
+let l_278 = u32(bitcast<u64>(l_mut_39));
+a_142[u32(6)] = l_278;
+l_mut_39 = u64(0);
+let l_279 = a_38[u32(4)];
+let l_280 = u64(l_279);
+let l_281 = a_31[u32(0)];
+let l_282 = u64(l_281);
+let l_283 = l_280 * l_282;
+let l_284 = a_142[u32(4)];
+let l_285 = u64(l_284);
+let l_286 = l_283 + l_285;
+let l_287 = l_286 + l_mut_39;
+let l_288 = u32(bitcast<u64>(l_287));
+a_142[u32(4)] = l_288;
+let l_289 = l_287 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_289;
+let l_290 = a_38[u32(4)];
+let l_291 = u64(l_290);
+let l_292 = a_31[u32(1)];
+let l_293 = u64(l_292);
+let l_294 = l_291 * l_293;
+let l_295 = a_142[u32(5)];
+let l_296 = u64(l_295);
+let l_297 = l_294 + l_296;
+let l_298 = l_297 + l_mut_39;
+let l_299 = u32(bitcast<u64>(l_298));
+a_142[u32(5)] = l_299;
+let l_300 = l_298 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_300;
+let l_301 = a_38[u32(4)];
+let l_302 = u64(l_301);
+let l_303 = a_31[u32(2)];
+let l_304 = u64(l_303);
+let l_305 = l_302 * l_304;
+let l_306 = a_142[u32(6)];
+let l_307 = u64(l_306);
+let l_308 = l_305 + l_307;
+let l_309 = l_308 + l_mut_39;
+let l_310 = u32(bitcast<u64>(l_309));
+a_142[u32(6)] = l_310;
+let l_311 = l_309 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_311;
+let l_312 = u32(bitcast<u64>(l_mut_39));
+a_142[u32(7)] = l_312;
+l_mut_39 = u64(0);
+let l_313 = a_38[u32(5)];
+let l_314 = u64(l_313);
+let l_315 = a_31[u32(0)];
+let l_316 = u64(l_315);
+let l_317 = l_314 * l_316;
+let l_318 = a_142[u32(5)];
+let l_319 = u64(l_318);
+let l_320 = l_317 + l_319;
+let l_321 = l_320 + l_mut_39;
+let l_322 = u32(bitcast<u64>(l_321));
+a_142[u32(5)] = l_322;
+let l_323 = l_321 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_323;
+let l_324 = a_38[u32(5)];
+let l_325 = u64(l_324);
+let l_326 = a_31[u32(1)];
+let l_327 = u64(l_326);
+let l_328 = l_325 * l_327;
+let l_329 = a_142[u32(6)];
+let l_330 = u64(l_329);
+let l_331 = l_328 + l_330;
+let l_332 = l_331 + l_mut_39;
+let l_333 = u32(bitcast<u64>(l_332));
+a_142[u32(6)] = l_333;
+let l_334 = l_332 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_334;
+let l_335 = a_38[u32(5)];
+let l_336 = u64(l_335);
+let l_337 = a_31[u32(2)];
+let l_338 = u64(l_337);
+let l_339 = l_336 * l_338;
+let l_340 = a_142[u32(7)];
+let l_341 = u64(l_340);
+let l_342 = l_339 + l_341;
+let l_343 = l_342 + l_mut_39;
+let l_344 = u32(bitcast<u64>(l_343));
+a_142[u32(7)] = l_344;
+let l_345 = l_343 >> u32(bitcast<u64>(u64(32)));
+l_mut_39 = l_345;
+let l_346 = u32(bitcast<u64>(l_mut_39));
+a_142[u32(8)] = l_346;
+l_mut_39 = u64(0);
+l_mut_347 = u64(0);
+l_mut_348 = u32(0);
+loop {
+let l_349 = l_mut_348 < u32(2);
+let l_350 = !l_349;
+if l_350 {
+break;
+}
+let l_351 = l_mut_348 == u32(0);
+if l_351 {
+let l_352 = l_23 + u32(0);
+let l_353 = a_38[u32(0)];
+shared_memory_22[l_352] = l_353;
+let l_354 = l_23 + u32(1);
+let l_355 = a_38[u32(1)];
+shared_memory_22[l_354] = l_355;
+let l_356 = l_23 + u32(2);
+let l_357 = a_38[u32(2)];
+shared_memory_22[l_356] = l_357;
+let l_358 = l_23 + u32(3);
+let l_359 = a_38[u32(3)];
+shared_memory_22[l_358] = l_359;
+let l_360 = l_23 + u32(4);
+let l_361 = a_38[u32(4)];
+shared_memory_22[l_360] = l_361;
+let l_362 = l_23 + u32(5);
+let l_363 = a_38[u32(5)];
+shared_memory_22[l_362] = l_363;
+let l_364 = l_23 + u32(6);
+shared_memory_22[l_364] = u32(0);
+let l_365 = l_23 + u32(7);
+shared_memory_22[l_365] = u32(0);
+let l_366 = l_23 + u32(8);
+shared_memory_22[l_366] = u32(0);
+} else {
+let l_367 = l_23 + u32(0);
+let l_368 = a_142[u32(0)];
+shared_memory_22[l_367] = l_368;
+let l_369 = l_23 + u32(1);
+let l_370 = a_142[u32(1)];
+shared_memory_22[l_369] = l_370;
+let l_371 = l_23 + u32(2);
+let l_372 = a_142[u32(2)];
+shared_memory_22[l_371] = l_372;
+let l_373 = l_23 + u32(3);
+let l_374 = a_142[u32(3)];
+shared_memory_22[l_373] = l_374;
+let l_375 = l_23 + u32(4);
+let l_376 = a_142[u32(4)];
+shared_memory_22[l_375] = l_376;
+let l_377 = l_23 + u32(5);
+let l_378 = a_142[u32(5)];
+shared_memory_22[l_377] = l_378;
+let l_379 = l_23 + u32(6);
+let l_380 = a_142[u32(6)];
+shared_memory_22[l_379] = l_380;
+let l_381 = l_23 + u32(7);
+let l_382 = a_142[u32(7)];
+shared_memory_22[l_381] = l_382;
+let l_383 = l_23 + u32(8);
+let l_384 = a_142[u32(8)];
+shared_memory_22[l_383] = l_384;
+}
+l_mut_385 = i32(8);
+loop {
+let l_386 = l_mut_385 >= i32(0);
+let l_387 = !l_386;
+if l_387 {
+break;
+}
+let l_388 = u32(l_mut_385);
+let l_389 = l_23 + l_388;
+let l_390 = shared_memory_22[l_389];
+let l_391 = l_390 != u32(0);
+if l_391 {
+break;
+}
+l_mut_385 = l_mut_385 - i32(1);
+}
+loop {
+let l_392 = l_mut_385 >= i32(0);
+let l_393 = !l_392;
+if l_393 {
+break;
+}
+l_mut_394 = u32(0);
+l_mut_395 = l_mut_385;
+loop {
+let l_396 = l_mut_395 >= i32(0);
+let l_397 = !l_396;
+if l_397 {
+break;
+}
+let l_398 = u32(l_mut_395);
+let l_399 = l_23 + l_398;
+let l_400 = shared_memory_22[l_399];
+let l_401 = l_mut_394 << u32(16);
+let l_402 = l_400 >> u32(16);
+let l_403 = l_401 | l_402;
+let l_404 = l_403 / u32(3844);
+let l_405 = l_404 * u32(3844);
+let l_406 = l_403 - l_405;
+let l_407 = l_406 << u32(16);
+let l_408 = l_400 & u32(65535);
+let l_409 = l_407 | l_408;
+let l_410 = l_409 / u32(3844);
+let l_411 = l_410 * u32(3844);
+let l_412 = l_409 - l_411;
+l_mut_394 = l_412;
+let l_413 = u32(l_mut_395);
+let l_414 = l_23 + l_413;
+let l_415 = l_404 << u32(16);
+let l_416 = l_415 | l_410;
+shared_memory_22[l_414] = l_416;
+l_mut_395 = l_mut_395 - i32(1);
+}
+loop {
+let l_417 = l_mut_385 >= i32(0);
+let l_418 = !l_417;
+if l_418 {
+break;
+}
+let l_419 = u32(l_mut_385);
+let l_420 = l_23 + l_419;
+let l_421 = shared_memory_22[l_420];
+let l_422 = l_421 != u32(0);
+if l_422 {
+break;
+}
+l_mut_385 = l_mut_385 - i32(1);
+}
+l_mut_423 = l_mut_394;
+let l_424 = l_mut_385 >= i32(0);
+if l_424 {
+let l_425 = l_mut_423 / u32(62);
+let l_426 = l_425 * u32(62);
+let l_427 = l_mut_423 - l_426;
+l_mut_423 = l_425;
+let l_428 = u64(l_427);
+let l_429 = u64(1) << u32(bitcast<u64>(l_428));
+l_mut_39 = l_mut_39 | l_429;
+let l_430 = l_mut_423 / u32(62);
+let l_431 = l_430 * u32(62);
+let l_432 = l_mut_423 - l_431;
+l_mut_423 = l_430;
+let l_433 = u64(l_432);
+let l_434 = u64(1) << u32(bitcast<u64>(l_433));
+l_mut_39 = l_mut_39 | l_434;
+} else {
+loop {
+let l_435 = l_mut_423 != u32(0);
+let l_436 = !l_435;
+if l_436 {
+break;
+}
+let l_437 = l_mut_423 / u32(62);
+let l_438 = l_437 * u32(62);
+let l_439 = l_mut_423 - l_438;
+l_mut_423 = l_437;
+let l_440 = u64(l_439);
+let l_441 = u64(1) << u32(bitcast<u64>(l_440));
+l_mut_39 = l_mut_39 | l_441;
+}
+}
+}
+l_mut_348 = l_mut_348 + u32(1);
+}
+let l_442 = u32(bitcast<u64>(l_mut_39));
+let l_443 = countOneBits(l_442);
+let l_444 = l_mut_39 >> u32(bitcast<u64>(u64(32)));
+let l_445 = u32(bitcast<u64>(l_444));
+let l_446 = countOneBits(l_445);
+let l_447 = l_443 + l_446;
+l_mut_423 = l_447;
+let l_448 = l_18 * u32(63);
+let l_449 = l_448 + l_mut_423;
+let l_450 = &shared_memory_0[l_449];
+let l_451 = atomicAdd(l_450, u32(1));let l_452 = l_mut_423 > u32(55);
+if l_452 {
+let l_453 = &buffer_1_global[u32(0)];
+let l_454 = atomicAdd(l_453, u32(1));let l_455 = l_454 < info.scalars_u32[6];
+if l_455 {
+let l_456 = u32(5) * l_454;
+let l_457 = u32(bitcast<u64>(l_28));
+buffer_2_global[l_456] = l_457;
+let l_458 = l_456 + u32(1);
+let l_459 = l_28 >> u32(bitcast<u64>(u64(32)));
+let l_460 = u32(bitcast<u64>(l_459));
+buffer_2_global[l_458] = l_460;
+let l_461 = l_456 + u32(2);
+let l_462 = u32(bitcast<u64>(l_mut_29));
+buffer_2_global[l_461] = l_462;
+let l_463 = l_456 + u32(3);
+let l_464 = l_mut_29 >> u32(bitcast<u64>(u64(32)));
+let l_465 = u32(bitcast<u64>(l_464));
+buffer_2_global[l_463] = l_465;
+let l_466 = l_456 + u32(4);
+buffer_2_global[l_466] = l_mut_423;
+}
+}
+l_mut_25 = l_mut_25 + l_21;
+}
+workgroupBarrier();
+l_mut_423 = local_invocation_id.x;
+loop {
+let l_467 = l_mut_423 < u32(63);
+let l_468 = !l_467;
+if l_468 {
+break;
+}
+l_mut_394 = u32(0);
+let l_469 = u32(0) + l_mut_423;
+let l_470 = &shared_memory_0[l_469];
+let l_471 = atomicLoad(l_470);
+l_mut_394 = l_mut_394 + l_471;
+let l_472 = u32(63) + l_mut_423;
+let l_473 = &shared_memory_0[l_472];
+let l_474 = atomicLoad(l_473);
+l_mut_394 = l_mut_394 + l_474;
+let l_475 = u32(126) + l_mut_423;
+let l_476 = &shared_memory_0[l_475];
+let l_477 = atomicLoad(l_476);
+l_mut_394 = l_mut_394 + l_477;
+let l_478 = u32(189) + l_mut_423;
+let l_479 = &shared_memory_0[l_478];
+let l_480 = atomicLoad(l_479);
+l_mut_394 = l_mut_394 + l_480;
+let l_481 = l_mut_394 != u32(0);
+if l_481 {
+let l_482 = &buffer_0_global[l_mut_423];
+let l_483 = atomicAdd(l_482, l_mut_394);}
+l_mut_423 = l_mut_423 + WORKGROUP_SIZE_X;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+| 1.304617473s | DetailedKernel | WgpuRuntime

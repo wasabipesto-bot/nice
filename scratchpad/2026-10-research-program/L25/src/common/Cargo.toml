@@ -1,0 +1,80 @@
+[package]
+name = "nice_common"
+description = "common utilities for dealing with square-cube pandigitals"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+license-file.workspace = true
+
+[features]
+database = ["dep:diesel", "dep:dotenvy", "dep:bigdecimal", "dep:rand"]
+openssl-tls = ["reqwest/native-tls", "dep:openssl", "dep:tokio"]
+rustls-tls = ["reqwest/rustls", "dep:tokio"]
+cuda = ["dep:cudarc"]
+# Umbrella: every GPU backend this crate knows how to build. Building any of
+# them needs no GPU libraries at compile time; each backend dlopens its driver
+# at runtime.
+gpu = ["cuda", "cubecl", "cubecl-cuda"]
+cubecl = ["dep:cubecl", "dep:getrandom", "dep:cubecl-common", "dep:web-time"]
+# `dep:cudarc` without the `cuda` feature: this pulls in the driver bindings
+# (which cubecl-cuda already depends on) so `cuda_device_name` can ask the
+# driver what the GPU is called, *without* also building the hand-written CUDA
+# backend. See the note on `cuda_device_name` in cubecl_backend.rs.
+cubecl-cuda = ["cubecl", "cubecl/cuda", "dep:cudarc"]
+# Direct compilers inside the wgpu runtime (experimental, 2026-09): SPIR-V
+# emitted by cubecl-spirv on Vulkan, MSL emitted by cubecl-cpp on Metal,
+# instead of WGSL through naga. Build-time selection; see scratchpad/2026-09-cubecl-explore.
+# Neither is in `gpu`: `cubecl-spirv` needs the Vulkan SDK to build on macOS
+# (and is inert there — wgpu selects Metal). See the client manifest.
+cubecl-spirv = ["cubecl", "cubecl/vulkan"]
+cubecl-metal = ["cubecl", "cubecl/metal"]
+# CubeCL over its native HIP runtime (AMD). Links libamdhip64/libhiprtc at
+# build time via `hipconfig`, so it is NOT in the gpu umbrella; opt-in for
+# machines with ROCm installed.
+cubecl-hip = ["cubecl", "cubecl/hip"]
+
+[dependencies]
+# Pinned exactly: CubeCL is pre-1.0 and its host API drifts between
+# releases (0.10 differed from its own docs in places). Bump deliberately,
+# with the device parity suite as the gate.
+cubecl = { version = "=0.10.0", features = ["wgpu"], optional = true }
+# std::time::Instant panics at runtime on wasm32; web-time re-exports std on
+# native, so the cubecl backend imports Instant from here unconditionally.
+web-time = { version = "1", optional = true }
+anyhow = { version = "1.0" }
+bigdecimal = { version = "0.4.10", optional = true }
+chrono = { version = "0.4.43", features = ["serde"] }
+clap = { version = "4.6.1", features = ["derive"] }
+diesel = { version = "2.3", features = ["chrono", "postgres", "r2d2", "serde_json", "numeric"], optional = true }
+dotenvy = { version = "0.15", optional = true }
+log = { version = "0.4" }
+malachite = { version = "0.14" }
+malachite-nz = { version = "0.14", features = ["enable_serde"] }
+openssl = { version = "0.10", features = ["vendored"], optional = true }
+reqwest = { version = "0.13", features = ["json"], optional = true, default-features = false }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "time"], optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
+rand = { version = "0.10.1", optional = true }
+# cuda-12080 is the binding *surface*, not a driver floor: cudarc dlopens
+# lazily, so a symbol must exist only if called. The hand-CUDA path calls
+# nothing newer than 12.0; cubecl-cuda compiles against 12.8 declarations
+# (tensor-map) but our kernels never launch them — parity-verified on a
+# CUDA 12.x driver. Raising this further is safe by the same argument.
+cudarc = { version = "0.19", features = ["cuda-12080"], optional = true }
+
+# wasm32 feature unification for the cubecl/wgpu dependency graph: getrandom
+# needs its JS entropy backend named explicitly on the browser target, serde
+# and cubecl-common need std/serde enabled where a wasm-side consumer would
+# otherwise leave them off. No effect on native builds.
+[target.'cfg(target_family = "wasm")'.dependencies]
+getrandom = { version = "0.4", features = ["wasm_js"], optional = true }
+cubecl-common = { version = "0.10", features = ["serde"], optional = true }
+
+[build-dependencies]
+cc = { version = "1.2", optional = true }
+
+[dev-dependencies]
+test-log = "0.2.19"

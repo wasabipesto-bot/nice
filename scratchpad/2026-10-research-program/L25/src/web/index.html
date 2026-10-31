@@ -1,0 +1,643 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Nice!</title>
+        <link
+            rel="preconnect"
+            href="https://data.nicenumbers.net"
+            crossorigin
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css"
+        />
+        <link
+            rel="icon"
+            href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>"
+        />
+        <style>
+            .modebar-btn .icon {
+                height: 0.75em;
+                width: 0.75em;
+            }
+            /* Reserve the shape each chart will take so the column doesn't
+               jump as charts arrive one at a time. Plot's SVG scales to the
+               column width, so the reservation has to be a ratio rather than a
+               fixed height. It sits on the placeholder rather than the slot so
+               that it can never constrain the chart that replaces it. */
+            .chart-placeholder {
+                display: flex;
+                align-items: center;
+                aspect-ratio: 3 / 1;
+            }
+            .chart-placeholder.is-tall {
+                aspect-ratio: 9 / 4;
+            }
+            .chart-placeholder.is-short {
+                aspect-ratio: 18 / 5;
+            }
+        </style>
+
+        <script>
+            // Start the data fetches during head parsing. Everything below is
+            // deferred, so without this the requests would not begin until the
+            // plot bundle had downloaded and run - a serial wait for no reason.
+            window.niceData = (() => {
+                const BASE = "https://data.nicenumbers.net";
+                const get = (path) => {
+                    const p = fetch(BASE + path).then((response) => {
+                        if (!response.ok) {
+                            throw new Error(`${path}: HTTP ${response.status}`);
+                        }
+                        return response.json();
+                    });
+                    // Mark the rejection handled now; the real handler does not
+                    // attach until the deferred script runs, and without this a
+                    // failed fetch logs an unhandled rejection in the meantime.
+                    p.catch(() => {});
+                    return p;
+                };
+                return {
+                    notable: get(
+                        "/cache_notable_numbers?select=number,niceness,base,num_uniques&order=off_by.desc",
+                    ),
+                    niceness: get(
+                        "/chunks?select=id,base_id,range_start,range_end,niceness_mean,niceness_stdev&niceness_mean=not.is.null&order=id.asc",
+                    ),
+                    completion: get(
+                        "/chunks?select=id,base_id,range_start,range_end,range_size,minimum_cl&base_id=gte.35&order=id.asc",
+                    ),
+                    rate: get("/cache_search_rate_daily?order=date.asc"),
+                    leaderboard: get(
+                        "/cache_search_leaderboard?order=total_range.desc",
+                    ),
+                };
+            })();
+        </script>
+        <!-- Two flat files instead of the 48-module, six-level import waterfall
+             the CDN's ESM build pulls in, none of which the page can start
+             fetching data behind. Downloaded by `just vendor-fetch`. Deferred
+             scripts run in document order, so d3 is defined before Plot reads
+             it, and both are defined before the inline module below. -->
+        <script src="vendor/d3.min.js" defer></script>
+        <script src="vendor/plot.umd.min.js" defer></script>
+    </head>
+    <body class="has-background-dark">
+        <section class="section">
+            <div class="container">
+                <div class="columns">
+                    <div class="column">
+                        <div class="box content p-6">
+                            <p class="subtitle is-3">
+                                <strong>330,169,542,960,890</strong> is
+                                <strong>97.8%</strong> nice.
+                            </p>
+                            <p class="title is-2">
+                                Join the search to find the next nice number.
+                            </p>
+                        </div>
+                        <div class="box content">
+                            <h1 class="title is-4 mb-3">What is this?</h1>
+                            <p>
+                                We're looking for a specific kind of number
+                                called square-cube pandigitals, or "nice
+                                numbers". A number is "nice" if the digits in
+                                its square and cube contain all possible values
+                                with no repeats. Right now the only known nice
+                                number is 69 (evaluated in base 10), but the
+                                math says if we expand our search to other bases
+                                there should be more, possibly infinitely many
+                                more! This site is a summary of our progress so
+                                far.
+                            </p>
+                        </div>
+                        <div class="box content">
+                            <h1 class="title is-4 mb-3">How can I help?</h1>
+                            <p>
+                                There are two main ways to help with this
+                                project.
+                            </p>
+                            <p>
+                                The first is to search a range yourself!
+                                <a href="search">This page</a>
+                                has a super convenient app that connects to a
+                                central server and "checks out" a range to
+                                search for nice numbers. If you let it run it
+                                will show you the results and report back with
+                                any results and credit those discoveries to your
+                                name!
+                            </p>
+                            <p>
+                                If you're interested in running it even faster,
+                                like with the old distributed computing
+                                initiatives such as SETI@Home,
+                                <a href="https://github.com/wasabipesto/nice"
+                                    >this repository</a
+                                >
+                                has all the code which runs even faster directly
+                                on your computer rather than a webapp.
+                            </p>
+                            <p>
+                                The second is to help with the math. This site
+                                collects a lot of information from the clients,
+                                such as a log of highly-nice numbers and the
+                                "niceness" distribution for each range that you
+                                can query for analysis. You can use that data to
+                                find patterns or just attack the problem with
+                                pure theory at one of the discussion links
+                                below.
+                            </p>
+                        </div>
+                        <div class="box content">
+                            <h1 class="title is-4 mb-3">
+                                Where can I learn more?
+                            </h1>
+                            <ul>
+                                <li>
+                                    My blog post over at
+                                    <a href="https://wasabipesto.com/nice"
+                                        >wasabipesto.com/nice</a
+                                    >, which walks through the concept of nice
+                                    numbers with some graphs and explainers.
+                                </li>
+                                <li>
+                                    Jacob Cohen's
+                                    <a
+                                        href="https://beautifulthorns.wixsite.com/home/post/is-69-unique"
+                                        >excellent post</a
+                                    >
+                                    over at Chromatic Conflux that started this
+                                    whole thing. All of the original ideas and
+                                    concepts are 100% from his efforts.
+                                </li>
+                                <li>
+                                    Also check out Jacob's
+                                    <a
+                                        href="https://beautifulthorns.wixsite.com/home/post/progress-update-on-the-search-for-nice-numbers"
+                                        >followup post</a
+                                    >
+                                    on advances in the theory and procedure of
+                                    finding nice numbers, including information
+                                    on residue class filtering, or just go watch
+                                    the
+                                    <a
+                                        href="https://www.youtube.com/watch?v=FO3XBTDG7GY"
+                                        >video here</a
+                                    >.
+                                </li>
+                                <li>
+                                    The
+                                    <a
+                                        href="https://manifold.markets/Conflux/will-i-learn-of-a-nice-number-besid"
+                                        >original prediction market</a
+                                    >
+                                    that has since been closed but contains a
+                                    lot of early advancements on the topic.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="column is-three-fifths">
+                        <div class="box content">
+                            <h1 class="title is-4 mb-1">
+                                Notably Nice Numbers
+                            </h1>
+                            <p>Which numbers are closest to being 100% nice?</p>
+                            <div id="numbers">
+                                <div class="chart-placeholder">
+                                    <progress
+                                        class="progress is-small is-primary"
+                                        max="100"
+                                    ></progress>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="box content">
+                            <h1 class="title is-4 mb-1">Chunk Niceness</h1>
+                            <p>
+                                On average, how nice is each chunk we've
+                                searched?
+                            </p>
+                            <div id="niceness">
+                                <div class="chart-placeholder">
+                                    <progress
+                                        class="progress is-small is-primary"
+                                        max="100"
+                                    ></progress>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="box content">
+                            <h1 class="title is-4 mb-1">Chunk Completion</h1>
+                            <p>
+                                How many chunks have we searched? The first few
+                                bases are small and can be checked in a few
+                                seconds each, but the higher bases have
+                                quintillions of numbers and take many months of
+                                CPU time.
+                            </p>
+                            <div id="completion">
+                                <div class="chart-placeholder is-tall">
+                                    <progress
+                                        class="progress is-small is-primary"
+                                        max="100"
+                                    ></progress>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="box content">
+                            <h1 class="title is-4 mb-1">Search Rate</h1>
+                            <p>How much progress have we made recently?</p>
+                            <h3 class="title is-5 mb-1">Detailed</h3>
+                            <div id="rate-detailed">
+                                <div class="chart-placeholder">
+                                    <progress
+                                        class="progress is-small is-primary"
+                                        max="100"
+                                    ></progress>
+                                </div>
+                            </div>
+                            <h3 class="title is-5 mb-1">Nice Only</h3>
+                            <div id="rate-niceonly">
+                                <div class="chart-placeholder">
+                                    <progress
+                                        class="progress is-small is-primary"
+                                        max="100"
+                                    ></progress>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="box content">
+                            <h1 class="title is-4 mb-1">Leaderboard</h1>
+                            <p>
+                                Total range searched all time, by contributor.
+                            </p>
+                            <h3 class="title is-5 mb-1">Detailed</h3>
+                            <div id="leaderboard-detailed">
+                                <div class="chart-placeholder is-short">
+                                    <progress
+                                        class="progress is-small is-primary"
+                                        max="100"
+                                    ></progress>
+                                </div>
+                            </div>
+                            <h3 class="title is-5 mb-1">Nice Only</h3>
+                            <div id="leaderboard-niceonly">
+                                <div class="chart-placeholder is-short">
+                                    <progress
+                                        class="progress is-small is-primary"
+                                        max="100"
+                                    ></progress>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="box content has-text-centered">
+                    <p>
+                        nicenumbers.net made with ♡ by
+                        <a href="https://wasabipesto.com">wasabipesto</a>
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <script type="module">
+            const Plot = window.Plot;
+            const data = window.niceData;
+
+            if (!Plot) {
+                // Every chart slot will fall through to its error branch below.
+                console.error(
+                    "vendor/plot.umd.min.js did not load - run `just vendor-fetch`",
+                );
+            }
+
+            // Give the browser a frame to actually paint what we just handed it
+            // before we start building the next chart. Without this every chart
+            // is built in one task and nothing appears until all of them finish.
+            const paint = () =>
+                new Promise((resolve) =>
+                    requestAnimationFrame(() => setTimeout(resolve, 0)),
+                );
+
+            // Fill one chart slot once its data arrives. Each chart is
+            // independent: a slow or failed fetch only affects its own slot.
+            async function draw(selector, promise, build) {
+                const slot = document.querySelector(selector);
+                let content;
+                try {
+                    const rows = await promise;
+                    await paint();
+                    content = build(rows);
+                } catch (error) {
+                    console.error(selector, error);
+                    content = "Could not load this chart.";
+                }
+                slot.replaceChildren(content ?? "No data yet.");
+            }
+
+            // Helper: given an array of {username, total_range} objects, return a Set of the
+            // top N usernames by total_range (summed across all rows for that username).
+            function topNUsernames(rows, n = 10) {
+                const totals = new Map();
+                for (const row of rows) {
+                    const prev = totals.get(row.username) ?? 0n;
+                    totals.set(row.username, prev + BigInt(row.total_range));
+                }
+                return new Set(
+                    [...totals.entries()]
+                        .sort((a, b) =>
+                            b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0,
+                        )
+                        .slice(0, n)
+                        .map(([u]) => u),
+                );
+            }
+
+            // Bucket rows: usernames not in topSet become "Other", then re-aggregate per (date, username).
+            function bucketAndAggregate(rows, topSet, groupKeys) {
+                const map = new Map();
+                for (const row of rows) {
+                    const username = topSet.has(row.username)
+                        ? row.username
+                        : "other";
+                    const key = groupKeys
+                        .map((k) => (k === "username" ? username : row[k]))
+                        .join("|");
+                    const prev = map.get(key) ?? {
+                        ...row,
+                        username,
+                        total_range: 0n,
+                    };
+                    prev.total_range =
+                        BigInt(prev.total_range) + BigInt(row.total_range);
+                    map.set(key, prev);
+                }
+                return [...map.values()].map((r) => ({
+                    ...r,
+                    total_range: Number(r.total_range),
+                }));
+            }
+
+            // ── Notable Numbers ──────────────────────────────────────────────────
+            // The rows are already thinned to the points that are visually
+            // distinguishable at this chart's size; see the cache_notable_numbers
+            // migration. Plotting every number in every base's top-10k list was
+            // ~81k marks and about two seconds of blocking work.
+            function buildNumbersChart(numbers) {
+                return Plot.plot({
+                    width: 900,
+                    height: 300,
+                    inset: 10,
+                    x: { label: "Number", type: "log" },
+                    y: { label: "Niceness" },
+                    color: { legend: false, scheme: "Reds", reverse: true },
+                    marks: [
+                        Plot.dot(numbers, {
+                            x: "number",
+                            y: "niceness",
+                            channels: { Base: "base", Uniques: "num_uniques" },
+                            fill: (i) => i.base - i.num_uniques,
+                            tip: { format: { fill: false } },
+                        }),
+                        Plot.tip(["69 is the only known nice number."], {
+                            x: 69,
+                            y: 1,
+                            dy: 3,
+                            anchor: "top-left",
+                        }),
+                        Plot.tip(
+                            [
+                                "330,169,542,960,890 is the largest known off-by-one!",
+                            ],
+                            {
+                                x: 330169542960890,
+                                y: 0.978,
+                                dy: -3,
+                                anchor: "bottom-right",
+                            },
+                        ),
+                        Plot.tip(['This arc is the "off-by-two" crowd.'], {
+                            x: 324147,
+                            y: 0.90909,
+                            dx: -3,
+                            anchor: "right",
+                        }),
+                        Plot.ruleY([1], {
+                            stroke: "rgb(103, 0, 13)",
+                            opacity: 0.5,
+                        }),
+                    ],
+                });
+            }
+
+            // ── Chunk Niceness ───────────────────────────────────────────────────
+            function buildNicenessChart(nicenessChunks) {
+                const max_range_end = nicenessChunks.reduce(
+                    (max, item) =>
+                        item.range_end > max ? item.range_end : max,
+                    -Infinity,
+                );
+                return Plot.plot({
+                    width: 900,
+                    height: 300,
+                    insetLeft: 10,
+                    x: {
+                        label: "Chunk",
+                        type: "log",
+                        domain: [45, max_range_end],
+                    },
+                    y: { label: "Niceness", domain: [0.35, 0.9] },
+                    color: { legend: false, scheme: "Reds" },
+                    marks: [
+                        Plot.rect(nicenessChunks, {
+                            x1: (i) => i.range_start,
+                            x2: (i) => i.range_end,
+                            y1: (i) => i.niceness_mean - i.niceness_stdev,
+                            y2: (i) => i.niceness_mean + i.niceness_stdev,
+                            stroke: "black",
+                            strokeWidth: (i) => (i.base_id == 12 ? 1 : 0),
+                            fill: "niceness_mean",
+                            opacity: 0.5,
+                            channels: {
+                                Base: "base_id",
+                                "Niceness Mean": "niceness_mean",
+                                "Niceness StDev": "niceness_stdev",
+                            },
+                            tip: {
+                                format: {
+                                    base_id: false,
+                                    fill: false,
+                                    y: false,
+                                    strokeWidth: false,
+                                },
+                            },
+                        }),
+                        Plot.tip(
+                            [
+                                "Base 10's average niceness is skewed high due to 69.",
+                            ],
+                            {
+                                x: 69,
+                                y: 0.775,
+                                anchor: "bottom-left",
+                            },
+                        ),
+                        Plot.tip(["Base 12's niceness is surprisingly low."], {
+                            x: 236,
+                            y: 0.48,
+                            anchor: "top-left",
+                        }),
+                        Plot.tip(
+                            [
+                                "The niceness of the first few chunks in each range starts low before returning to the expected value.",
+                            ],
+                            { x: 9.5e10, y: 0.563, anchor: "top" },
+                        ),
+                        Plot.tip(
+                            [
+                                "The ranges seem to be approaching a niceness of 0.632, which is what we would expect for a random distribution.",
+                            ],
+                            { x: 7e14, y: 0.685, anchor: "bottom-right" },
+                        ),
+                        Plot.ruleY([0.632], { stroke: "black", opacity: 0.3 }),
+                    ],
+                });
+            }
+
+            // ── Chunk Completion (base 35+) ──────────────────────────────────────
+            function buildCompletionChart(completionChunks) {
+                let currentBase = null;
+                let x = -1;
+                const chunks_for_completion_plot = completionChunks.map(
+                    (chunk) => {
+                        if (chunk.base_id !== currentBase) {
+                            currentBase = chunk.base_id;
+                            x = 0;
+                        } else {
+                            x += 1;
+                        }
+                        return { ...chunk, chunk_x: x };
+                    },
+                );
+                return Plot.plot({
+                    width: 900,
+                    x: { axis: null },
+                    y: { label: "Base" },
+                    marks: [
+                        Plot.rect(chunks_for_completion_plot, {
+                            y: "base_id",
+                            x: "chunk_x",
+                            fill: (i) =>
+                                i.minimum_cl > 2
+                                    ? "Searched (Double-Checked)"
+                                    : i.minimum_cl > 1
+                                      ? "Searched (Detailed)"
+                                      : i.minimum_cl > 0
+                                        ? "Searched (Nice Only)"
+                                        : "Unsearched",
+                            channels: { Size: "range_size", Status: "fill" },
+                            tip: {
+                                format: {
+                                    base: true,
+                                    size: true,
+                                    x: false,
+                                    y: true,
+                                },
+                            },
+                        }),
+                    ],
+                });
+            }
+
+            // ── Search Rate helpers ───────────────────────────────────────────────
+            function buildRateChart(rows, mode) {
+                const modeRows = rows.filter((r) => r.search_mode === mode);
+                if (modeRows.length === 0) return null;
+
+                const top = topNUsernames(modeRows, 7);
+                const bucketed = bucketAndAggregate(modeRows, top, [
+                    "date",
+                    "username",
+                ]);
+
+                return Plot.plot({
+                    width: 900,
+                    height: 300,
+                    x: { label: "Date" },
+                    y: { label: "Range Searched", tickFormat: ".0s" },
+                    marks: [
+                        Plot.rectY(
+                            bucketed,
+                            Plot.binX(
+                                { y: "sum" },
+                                {
+                                    x: {
+                                        value: "date",
+                                        interval: "2 days",
+                                    },
+                                    y: "total_range",
+                                    fill: "username",
+                                    tip: true,
+                                },
+                            ),
+                        ),
+                        Plot.ruleY([0]),
+                    ],
+                });
+            }
+
+            // ── Leaderboard helpers ───────────────────────────────────────────────
+            function buildLeaderboardChart(rows, mode) {
+                const modeRows = rows.filter((r) => r.search_mode === mode);
+                if (modeRows.length === 0) return null;
+
+                const top = topNUsernames(modeRows, 10);
+                const bucketed = bucketAndAggregate(modeRows, top, [
+                    "username",
+                ]);
+
+                return Plot.plot({
+                    width: 900,
+                    height: 250,
+                    marginLeft: 100,
+                    x: { label: "Total Range Searched", tickFormat: ".0s" },
+                    y: { label: null },
+                    marks: [
+                        Plot.barX(bucketed, {
+                            y: "username",
+                            x: "total_range",
+                            fill: "username",
+                            sort: { y: "-x" },
+                            tip: true,
+                        }),
+                        Plot.ruleX([0]),
+                    ],
+                });
+            }
+
+            // The numbers scatter is by far the most expensive chart to build,
+            // so let the cheap ones paint first instead of queueing behind it.
+            await Promise.allSettled([
+                draw("#niceness", data.niceness, buildNicenessChart),
+                draw("#completion", data.completion, buildCompletionChart),
+                draw("#rate-detailed", data.rate, (rows) =>
+                    buildRateChart(rows, "detailed"),
+                ),
+                draw("#rate-niceonly", data.rate, (rows) =>
+                    buildRateChart(rows, "niceonly"),
+                ),
+                draw("#leaderboard-detailed", data.leaderboard, (rows) =>
+                    buildLeaderboardChart(rows, "detailed"),
+                ),
+                draw("#leaderboard-niceonly", data.leaderboard, (rows) =>
+                    buildLeaderboardChart(rows, "niceonly"),
+                ),
+            ]);
+            await draw("#numbers", data.notable, buildNumbersChart);
+        </script>
+    </body>
+</html>

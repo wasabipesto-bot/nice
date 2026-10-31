@@ -1,0 +1,50 @@
+[package]
+name = "nice_client"
+description = "a client for distributed search of square-cube pandigitals"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+license-file.workspace = true
+
+[features]
+default = ["rustls-tls"]
+openssl-tls = ["nice_common/openssl-tls"]
+rustls-tls = ["nice_common/rustls-tls"]
+cuda = ["nice_common/cuda", "dep:cudarc"]
+# Umbrella: one binary that runs on any supported GPU (or plain CPU). The
+# release recipe is two builds: default features = lightweight CPU-only,
+# `--features gpu` = CPU + every backend, selected at runtime by
+# `--gpu-backend` (auto picks the fastest available). Everything in here
+# builds on every platform with no GPU libraries installed — each backend
+# dlopens its driver at runtime — and that is the contract: a feature that
+# needs an SDK to compile does not belong in the umbrella.
+gpu = ["cuda", "cubecl", "cubecl-cuda"]
+cubecl = ["nice_common/cubecl"]
+# Must also enable this crate's own cubecl gate: feature cfgs do not
+# propagate upward from nice_common.
+cubecl-cuda = ["cubecl", "nice_common/cubecl-cuda"]
+# Direct compilers for the cubecl (wgpu) backend; see nice_common.
+cubecl-spirv = ["cubecl", "nice_common/cubecl-spirv"]
+cubecl-metal = ["cubecl", "nice_common/cubecl-metal"]
+# CubeCL over ROCm/HIP (AMD, needs ROCm at build and run time; not in `gpu`).
+cubecl-hip = ["cubecl", "nice_common/cubecl-hip"]
+
+[dependencies]
+nice_common = { workspace = true }
+anyhow = { version = "1.0" }
+clap = { version = "4.6.1", features = ["env", "derive"] }
+env_logger = { version = "0.11" }
+log = { version = "0.4" }
+rayon = { version = "1.11" }
+serde_json = { version = "1.0" }
+# The progress bar (src/progress.rs).
+indicatif = "0.18"
+# cuda-12080 is the binding *surface*, not a driver floor: cudarc dlopens
+# lazily, so a symbol must exist only if called. The hand-CUDA path calls
+# nothing newer than 12.0; cubecl-cuda compiles against 12.8 declarations
+# (tensor-map) but our kernels never launch them — parity-verified on a
+# CUDA 12.x driver. Raising this further is safe by the same argument.
+cudarc = { version = "0.19", features = ["cuda-12080"], optional = true }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }

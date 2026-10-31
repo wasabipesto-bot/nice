@@ -1,0 +1,1791 @@
+//! A filter module for detecting ranges that can be skipped based on most significant digits (MSD).
+//!
+//! The main source of processing time for the reference client is converting
+//! each square and cube to the base representation and checking for unique digits.
+//!
+//! This module implements a common MSD prefix pre-check filter:
+//! Before processing an entire range, we check if all numbers in the range
+//! can be eliminated based on their most significant digits (MSD).
+//!
+//! ## How It Works
+//!
+//! 1. Convert `range_start²`, `range_end²`, `range_start³`, and `range_end³` to base digits.
+//!    - IMPORTANT: `to_digits_asc` returns digits in ascending order (LSD first, MSD last)
+//!    - For 10,004,569 in base 10: returns [9,6,5,4,0,0,0,1] not [1,0,0,0,4,5,6,9]
+//!    - We work backwards from the end of vectors to examine most significant digits
+//! 2. Find the longest common MSD prefix shared by all squares in the range.
+//! 3. Find the longest common MSD prefix shared by all cubes in the range.
+//! 4. Check three early-exit conditions:
+//!    - If the square MSD prefix contains duplicate digits → all numbers invalid
+//!    - If the cube MSD prefix contains duplicate digits → all numbers invalid
+//!    - If square and cube MSD prefixes share any digits → all numbers invalid
+//! 5. If any condition triggers, return `true` (range can be skipped).
+//! 6. Otherwise, return `false` (range must be processed normally).
+
+#![allow(clippy::inline_always)]
+
+use log::trace;
+use malachite::base::num::arithmetic::traits::Pow;
+use malachite::base::num::conversion::traits::Digits;
+use malachite::natural::Natural;
+
+use crate::FieldSize;
+use crate::fixed_width::U256;
+
+// Maximum digit count for n³ in any specialized base.
+// For b40: log_40(40^24) = 24 digits.
+// For b50: log_50(50^30) = 30 digits.
+// For b60: log_60(60^36) = 36 digits.
+// For b62: k=12, b%5=2 → n³ has 3k+1 = 37 digits.
+// For b64: k=12, b%5=4 → n³ has 3k+2 = 38 digits.
+// 38 covers all specialized bases ≤ 64.
+const MAX_FW_DIGITS: usize = 38;
+
+/// Stack-resident digit sequence used by the fixed-width MSD path. Stores
+/// digits in LSD-first order (matching malachite's `to_digits_asc`) so the
+/// existing `find_common_msd_prefix` / `has_duplicate_digits` helpers work
+/// unchanged on the slice `&buf[..len]`.
+#[derive(Copy, Clone)]
+struct FwDigits {
+    buf: [u32; MAX_FW_DIGITS],
+    len: usize,
+}
+
+impl FwDigits {
+    #[inline(always)]
+    fn as_slice(&self) -> &[u32] {
+        &self.buf[..self.len]
+    }
+}
+
+/// Digits peeled per wide division in the chunked extraction: the largest
+/// `e` with `base^e < 2^32`, so a chunk fits a `u32` and its digits come
+/// out of cheap 32-bit constant divisions.
+const fn chunk_digits(base: u32) -> u32 {
+    let mut e = 0;
+    let mut div: u64 = 1;
+    while div * (base as u64) < (1u64 << 32) {
+        div *= base as u64;
+        e += 1;
+    }
+    e
+}
+
+/// `base^chunk_digits(base)`.
+#[allow(clippy::cast_possible_truncation)]
+const fn chunk_div(base: u32) -> u32 {
+    (base as u64).pow(chunk_digits(base)) as u32
+}
+
+/// Unpack a `u32` chunk holding exactly `count` base-`BASE` digits (zero
+/// padded) into `buf`, LSD first.
+#[inline(always)]
+fn push_chunk_digits<const BASE: u32>(mut chunk: u32, count: usize, buf: &mut FwDigits) {
+    for _ in 0..count {
+        debug_assert!(buf.len < MAX_FW_DIGITS);
+        buf.buf[buf.len] = chunk % BASE;
+        chunk /= BASE;
+        buf.len += 1;
+    }
+}
+
+/// Unpack the most significant chunk: its digits up to the leading one.
+#[inline(always)]
+fn push_top_chunk_digits<const BASE: u32>(mut chunk: u32, buf: &mut FwDigits) {
+    while chunk != 0 {
+        debug_assert!(buf.len < MAX_FW_DIGITS);
+        buf.buf[buf.len] = chunk % BASE;
+        chunk /= BASE;
+        buf.len += 1;
+    }
+}
+
+/// Extract base-`BASE` digits of `n` (LSD first) into a stack array.
+/// Used by the const-generic fixed-width MSD path.
+///
+/// Chunked: each wide division peels `chunk_digits(BASE)` digits at once
+/// (dividing by `BASE^e < 2^32`, a compile-time constant that lowers to
+/// multiply-by-magic), and the chunk's digits are then split with 32-bit
+/// constant divisions. An endpoint's 16-38 digits cost 3-8 wide divisions
+/// instead of one per digit — measured 3.5-5x cheaper on bases 40-60, and
+/// endpoint extraction was ~80% of every MSD node's cost.
+// `(n % CD) as u32` is bounded by `CD - 1 < 2^32`. Hot path:
+// `inline(always)` matches the convention in `fixed_width.rs`.
+#[allow(clippy::cast_possible_truncation)]
+#[inline(always)]
+fn extract_digits_u128_const<const BASE: u32>(mut n: u128) -> FwDigits {
+    let cd = u128::from(const { chunk_div(BASE) });
+    let e = const { chunk_digits(BASE) } as usize;
+    let mut out = FwDigits {
+        buf: [0u32; MAX_FW_DIGITS],
+        len: 0,
+    };
+    if n == 0 {
+        out.len = 1;
+        return out;
+    }
+    while n != 0 {
+        let chunk = (n % cd) as u32;
+        n /= cd;
+        if n == 0 {
+            push_top_chunk_digits::<BASE>(chunk, &mut out);
+        } else {
+            push_chunk_digits::<BASE>(chunk, e, &mut out);
+        }
+    }
+    out
+}
+
+/// Extract base-`BASE` digits of a U256 (LSD first) into a stack array;
+/// chunked exactly like [`extract_digits_u128_const`]. The divisor is a
+/// compile-time constant, so the inlined limb division strength-reduces.
+#[inline(always)]
+fn extract_digits_u256_const<const BASE: u32>(mut n: U256) -> FwDigits {
+    let cd = const { chunk_div(BASE) };
+    let e = const { chunk_digits(BASE) } as usize;
+    let mut out = FwDigits {
+        buf: [0u32; MAX_FW_DIGITS],
+        len: 0,
+    };
+    if n.is_zero() {
+        out.len = 1;
+        return out;
+    }
+    while !n.is_zero() {
+        let chunk = n.div_assign_rem_u32(cd);
+        if n.is_zero() {
+            push_top_chunk_digits::<BASE>(chunk, &mut out);
+        } else {
+            push_chunk_digits::<BASE>(chunk, e, &mut out);
+        }
+    }
+    out
+}
+
+/// Both powers' digit arrays for one endpoint `n` of a range.
+#[derive(Copy, Clone)]
+struct Endpoint {
+    sq: FwDigits,
+    cu: FwDigits,
+}
+
+/// Compute an endpoint's digit arrays. `b40` fits `n³` in `u128`
+/// (`(40^8 - 1)³ < 40^24 ≈ 2.81e38 < u128::MAX ≈ 3.40e38`); every other specialized
+/// base needs U256. Chosen at compile time from `BASE`.
+#[inline(always)]
+fn endpoint_const<const BASE: u32>(n: u128) -> Endpoint {
+    if const { BASE <= 40 } {
+        let sq = n * n;
+        let cu = sq * n;
+        Endpoint {
+            sq: extract_digits_u128_const::<BASE>(sq),
+            cu: extract_digits_u128_const::<BASE>(cu),
+        }
+    } else {
+        let sq = U256::mul_u128_u128(n, n);
+        let cu = sq.mul_u128_truncating(n);
+        Endpoint {
+            sq: extract_digits_u256_const::<BASE>(sq),
+            cu: extract_digits_u256_const::<BASE>(cu),
+        }
+    }
+}
+
+/// Maximum number of constrained output positions the Hall check tracks:
+/// every digit position of both powers, plus slack.
+const HALL_MAX_POSITIONS: usize = 2 * MAX_FW_DIGITS + 2;
+
+/// Append the digit domains of one power's constrained output positions.
+///
+/// `xd`/`yd` are the LSD-first digit arrays of `low^p` and `high^p` for a
+/// contiguous range `[low, high]`; they must have equal length. For output
+/// position `j`, every value of `n^p` in between has its digit-`j` quotient
+/// `q = floor(n^p / b^j)` inside `[u_j, v_j]` where `u_j = floor(low^p / b^j)`
+/// and `v_j = floor(high^p / b^j)` (the power is monotone). The digit at
+/// position `j` is `q mod b`, so it lies in the cyclic residue interval
+/// starting at `u_j mod b = xd[j]` of size `v_j - u_j + 1` — a conservative
+/// superset of the digits that actually occur.
+///
+/// Walking positions from most significant down, the interval width follows
+/// `diff_{j-1} = diff_j * b + (yd[j-1] - xd[j-1])` with `diff_top` seeded by
+/// the leading digits, so no wide arithmetic is needed. Once
+/// `diff >= base - 1` the domain covers all digits and every lower position
+/// is unconstrained (the width only grows as `j` decreases).
+///
+/// A `diff == 0` position is a singleton — exactly a digit of the classic
+/// common MSD prefix — so this generalizes the previous prefix extraction.
+/// `fixed_lsd_k` and `fixed` feed the cross-end residue filter: a singleton
+/// (`diff == 0`) position at `j >= fixed_lsd_k` means every `n` in the range
+/// has that exact digit in that output position, so the digit can be
+/// recorded as certainly-used. Positions below `fixed_lsd_k` are excluded —
+/// those positions' digits are known exactly per stride residue instead,
+/// and a digit shared with *the same* position is not a conflict.
+#[inline]
+fn collect_power_domains(
+    base: u32,
+    xd: &[u32],
+    yd: &[u32],
+    doms: &mut [u64],
+    count: &mut usize,
+    fixed_lsd_k: usize,
+    fixed: &mut u64,
+) {
+    debug_assert_eq!(xd.len(), yd.len());
+    debug_assert!(base <= 64);
+    let mut diff: i64 = 0;
+    for j in (0..xd.len()).rev() {
+        if *count == doms.len() {
+            // Out of slots (only possible for very long digit arrays outside
+            // the fixed-width path). Dropping the remaining positions just
+            // loses constraints, which is sound.
+            return;
+        }
+        diff = diff * i64::from(base) + (i64::from(yd[j]) - i64::from(xd[j]));
+        debug_assert!(diff >= 0, "endpoint digits imply high < low");
+        if diff >= i64::from(base) - 1 {
+            return;
+        }
+        if diff == 0 && j >= fixed_lsd_k {
+            *fixed |= 1u64 << xd[j];
+        }
+        // Cyclic interval of `diff + 1` residues starting at xd[j].
+        // diff is bounded by base² here, so the cast is lossless.
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let size = (diff as u32) + 1;
+        let lo = xd[j];
+        #[allow(clippy::cast_possible_truncation)]
+        let mask: u64 = if lo + size <= base {
+            (((1u128 << size) - 1) << lo) as u64
+        } else {
+            // Interval wraps past digit base-1 back to 0.
+            let wrapped = lo + size - base;
+            ((((1u128 << (base - lo)) - 1) << lo) | ((1u128 << wrapped) - 1)) as u64
+        };
+        doms[*count] = mask;
+        *count += 1;
+    }
+}
+
+/// Try to give position `i` a digit from its domain, recursively evicting
+/// current owners along an augmenting path (Kuhn's matching algorithm).
+fn hall_augment(i: usize, doms: &[u64], visited: &mut u64, owner: &mut [usize; 64]) -> bool {
+    let mut cand = doms[i] & !*visited;
+    while cand != 0 {
+        let d = cand.trailing_zeros() as usize;
+        *visited |= 1u64 << d;
+        if owner[d] == usize::MAX || hall_augment(owner[d], doms, visited, owner) {
+            owner[d] = i;
+            return true;
+        }
+        cand = doms[i] & !*visited;
+    }
+    false
+}
+
+/// [`has_distinct_assignment`] with singleton closure first.
+///
+/// Most constrained positions are singletons (the classic common-prefix
+/// digits). Those must be pairwise distinct, and a wider domain can never
+/// use a singleton's digit; removing singleton digits from the wider
+/// domains can leave one of them a singleton too, which then joins the set
+/// (repeat to closure). Only the domains still wider than one digit need
+/// the matching, and they are few. Same verdict as running Kuhn on the full
+/// set, at up to 1.6x lower cost on bases 50-60 (the codebase's pinned
+/// tests compare the two).
+fn has_distinct_assignment_closure(doms: &[u64]) -> bool {
+    let mut single: u64 = 0;
+    let mut rest = [0u64; HALL_MAX_POSITIONS];
+    let mut nr = 0usize;
+    for &d in doms {
+        if d.is_power_of_two() {
+            if single & d != 0 {
+                return false;
+            }
+            single |= d;
+        } else {
+            rest[nr] = d;
+            nr += 1;
+        }
+    }
+    let mut changed = true;
+    while changed {
+        changed = false;
+        let mut i = 0;
+        while i < nr {
+            let d = rest[i] & !single;
+            if d == 0 {
+                return false;
+            }
+            if d.is_power_of_two() {
+                // Newly forced: leaves `rest`, its digit is reserved.
+                single |= d;
+                nr -= 1;
+                rest[i] = rest[nr];
+                changed = true;
+            } else {
+                rest[i] = d;
+                i += 1;
+            }
+        }
+    }
+    // Singletons hold their own digits and those digits are gone from every
+    // remaining domain, so matching the rest is the whole question.
+    nr == 0 || has_distinct_assignment(&rest[..nr])
+}
+
+/// Can every constrained position be assigned a distinct digit from its
+/// domain? By Hall's theorem this fails exactly when some set of positions
+/// collectively offers fewer digits than positions — which makes a nice
+/// number in the range impossible, since a nice number's actual digits are
+/// one such distinct assignment.
+fn has_distinct_assignment(doms: &[u64]) -> bool {
+    let m = doms.len();
+    if m <= 1 {
+        return true;
+    }
+    // Fast global check: m positions need at least m distinct digits.
+    let mut union: u64 = 0;
+    for &d in doms {
+        union |= d;
+    }
+    if (union.count_ones() as usize) < m {
+        return false;
+    }
+    let mut owner = [usize::MAX; 64];
+    for i in 0..m {
+        let mut visited: u64 = 0;
+        if !hall_augment(i, doms, &mut visited, &mut owner) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Interval digit-domain analysis (Hall check) given pre-extracted endpoint
+/// digit arrays. Factored out so both u128 and U256 paths share identical
+/// post-extraction logic.
+///
+/// This subsumes the previous common-MSD-prefix duplicate/overlap checks:
+/// prefix digits are exactly the singleton domains, and pairwise
+/// duplicate/overlap failures are two-position Hall violations. The interval
+/// domains additionally catch collective violations among near-fixed
+/// positions (e.g. three positions that only have two digits between them)
+/// that no pairwise test can see.
+///
+/// A power whose endpoint digit counts differ contributes no domains (its
+/// positions are unconstrained), matching the previous bail-out behavior.
+///
+/// NOTE (2026-08 theory review): an unsound cross MSD×LSD collision check
+/// was removed from this spot; low-digit filtering is handled soundly by
+/// the stride table (`lsd_filter`), whose fixed low digits are per-candidate
+/// facts rather than per-range ones.
+#[inline(always)]
+fn analyze_msd_prefix<const BASE: u32>(
+    start_sq_d: &FwDigits,
+    end_sq_d: &FwDigits,
+    start_cu_d: &FwDigits,
+    end_cu_d: &FwDigits,
+    fixed_lsd_k: usize,
+) -> MsdAnalysis {
+    const { assert!(BASE <= 64, "u64 digit-domain masks can't index past bit 63") };
+    let mut doms = [0u64; HALL_MAX_POSITIONS];
+    let mut m = 0usize;
+    let mut fixed = 0u64;
+    if start_sq_d.len == end_sq_d.len {
+        collect_power_domains(
+            BASE,
+            start_sq_d.as_slice(),
+            end_sq_d.as_slice(),
+            &mut doms,
+            &mut m,
+            fixed_lsd_k,
+            &mut fixed,
+        );
+    }
+    if start_cu_d.len == end_cu_d.len {
+        collect_power_domains(
+            BASE,
+            start_cu_d.as_slice(),
+            end_cu_d.as_slice(),
+            &mut doms,
+            &mut m,
+            fixed_lsd_k,
+            &mut fixed,
+        );
+    }
+    if m == 0 {
+        return MsdAnalysis::Live { fixed_mask: 0 };
+    }
+    if has_distinct_assignment_closure(&doms[..m]) {
+        MsdAnalysis::Live { fixed_mask: fixed }
+    } else {
+        MsdAnalysis::Rejected
+    }
+}
+
+/// Interval analysis of a range from its two endpoints' digit arrays.
+#[inline(always)]
+fn analyze_endpoints<const BASE: u32>(
+    lo: &Endpoint,
+    hi: &Endpoint,
+    fixed_lsd_k: usize,
+) -> MsdAnalysis {
+    analyze_msd_prefix::<BASE>(&lo.sq, &hi.sq, &lo.cu, &hi.cu, fixed_lsd_k)
+}
+
+/// Specialized const-generic MSD analysis: fixed-width endpoint arithmetic
+/// (see [`endpoint_const`]) in place of malachite's heap-allocated
+/// `Natural::pow().to_digits_asc()`, which #16 found to be ~17% of all
+/// cycles on the MSD-heavy benchmark. The `FwDigits` buffer has 38 slots,
+/// enough for any specialized base ≤ 64's cube digit count (b64 needs 38).
+#[inline]
+fn analyze_range_const<const BASE: u32>(range: FieldSize, fixed_lsd_k: usize) -> MsdAnalysis {
+    if range.size() == 1 {
+        return MsdAnalysis::Live { fixed_mask: 0 };
+    }
+    let lo = endpoint_const::<BASE>(range.first());
+    let hi = endpoint_const::<BASE>(range.last());
+    analyze_endpoints::<BASE>(&lo, &hi, fixed_lsd_k)
+}
+
+// Recursive MSD filter subdivision parameters for the binary search.
+// These are tuned to try and find the natural bounds of MSD shifts without wasting too much
+// time when they are naturally chaotic.
+//
+// The floor trades MSD recursion time against extra candidates for the
+// stride table: halving it roughly doubles the number of endpoint
+// digit-extractions while the deepest levels skip only slivers. The
+// cross-end residue filter moved the optimum sharply coarser: most of the
+// candidates a coarse floor lets through now die on a one-AND mask test
+// instead of a full nice check. A 2026-08 whole-field sweep through the
+// masked production path (production-weighted slices, two machines) has
+// its minimum at 8000 on b40 and is flat 8000-16000 on b52; 2000 costs
+// ~25-40% more and 1000 ~70-100% more. Note binary subdivision of
+// 1e6-number chunks quantizes leaf sizes to ~976/1953/3906/7812/..., so
+// only power-of-two-ish floors are distinct.
+//
+// 2026-09: with the affine middle-digit filter (cheaper survivors) and the
+// 2-3x cheaper MSD node (chunked extraction, endpoint reuse), a single-core
+// sweep through the production paths on 16 production-weighted 5e7 windows
+// per base puts the minimum at 4000: vs 8000 it is +5% (b40), 0% (b50),
+// +2% (b52), +2% (b57); 2000 is within 1% of 4000 at b40/b50 and 8-10%
+// worse at b52/b57; 16000 is 7-14% worse everywhere.
+pub const MSD_RECURSIVE_MAX_DEPTH: u32 = 22;
+pub const MSD_RECURSIVE_MIN_RANGE_SIZE: u128 = 4000;
+pub const MSD_RECURSIVE_SUBDIVISION_FACTOR: usize = 2;
+
+/// Find the longest common prefix of the most significant digits.
+///
+/// Since `to_digits_asc` returns digits in ascending order (least-to-most significant),
+/// we need to work from the END of the vectors to examine the most significant digits.
+///
+/// For example, if `to_digits_asc(&10)` returns [9,6,5,4,0,0,0,1] for 10,004,569,
+/// the most significant digits are at the end: [1,0,0,0,...].
+fn find_common_msd_prefix(digits1: &[u32], digits2: &[u32]) -> Vec<u32> {
+    let len1 = digits1.len();
+    let len2 = digits2.len();
+    let mut common_prefix = Vec::new();
+
+    // Work backwards from the end (most significant digits)
+    let min_len = len1.min(len2);
+    for i in 0..min_len {
+        let idx1 = len1 - 1 - i;
+        let idx2 = len2 - 1 - i;
+        if digits1[idx1] == digits2[idx2] {
+            common_prefix.push(digits1[idx1]);
+        } else {
+            break;
+        }
+    }
+
+    common_prefix
+}
+
+/// Check if a sequence of digits contains any duplicates.
+/// Support bases up to 256.
+fn has_duplicate_digits(digits: &[u32]) -> bool {
+    let mut seen = vec![false; 256];
+    for &digit in digits {
+        debug_assert!(digit < 256, "Digit {digit} exceeds base limit");
+        if digit < 256 {
+            if seen[digit as usize] {
+                return true;
+            }
+            seen[digit as usize] = true;
+        }
+    }
+    false
+}
+
+/// Check if two digit sequences share any common digits.
+/// Support bases up to 256.
+fn has_overlapping_digits(digits1: &[u32], digits2: &[u32]) -> bool {
+    let mut seen = vec![false; 256];
+    for &digit in digits1 {
+        debug_assert!(digit < 256, "Digit {digit} exceeds base limit");
+        if digit < 256 {
+            seen[digit as usize] = true;
+        }
+    }
+    for &digit in digits2 {
+        debug_assert!(digit < 256, "Digit {digit} exceeds base limit");
+        if digit < 256 && seen[digit as usize] {
+            return true;
+        }
+    }
+    false
+}
+
+/// Check if a range can be skipped based on duplicate or overlapping digits in the MSD prefix.
+///
+/// Returns `true` if the range can be skipped entirely (all numbers will fail the nice check),
+/// `false` if the range needs to be processed normally.
+///
+/// This function checks if all squares and cubes in the range share a common most significant
+/// digit prefix that contains duplicates or overlaps, which would make all numbers in the
+/// range invalid.
+///
+/// Note that this is half-open, meaning that the range is inclusive of the start value and
+/// exclusive of the end value. This follows the Rust convention for ranges.
+///
+/// # Panics
+/// Panics if the range is invalid or the base is greater than 256.
+#[must_use]
+pub fn has_duplicate_msd_prefix(range: FieldSize, base: u32) -> bool {
+    matches!(analyze_range(range, base, 0), MsdAnalysis::Rejected)
+}
+
+/// Result of the interval-domain MSD analysis over a range.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MsdAnalysis {
+    /// No `n` in the range can be nice.
+    Rejected,
+    /// The range may contain nice numbers. `fixed_mask` holds digits that
+    /// provably occupy some output position `>= fixed_lsd_k` of `n²` or
+    /// `n³` for **every** `n` in the range (the singleton interval
+    /// domains). A stride residue whose exact low-digit mask intersects it
+    /// therefore cannot yield a nice number anywhere in the range — the
+    /// cross-end residue filter. Always empty for bases above 64 (digits
+    /// would not fit the u64 mask) and for size-1 ranges.
+    Live { fixed_mask: u64 },
+}
+
+/// Interval-domain MSD analysis returning the full certificate.
+///
+/// `fixed_lsd_k` is the stride table's LSD depth: singleton digits at
+/// output positions below it are excluded from `fixed_mask`, because those
+/// positions are exactly the ones a stride residue's low mask describes —
+/// a digit shared with the *same* position is not a conflict. Pass 0 when
+/// the mask will not be used.
+///
+/// # Panics
+/// Panics if the range is invalid or the base is greater than 256.
+#[must_use]
+pub fn analyze_range(range: FieldSize, base: u32, fixed_lsd_k: usize) -> MsdAnalysis {
+    // Check for edge cases
+    assert!(
+        range.size() > 0,
+        "Range has invalid bounds, range_start must be < range_end (half-open interval)"
+    );
+    assert!(base <= 256, "Base must be 256 or less");
+
+    // Stack-resident fixed-width MSD path: bypasses malachite's
+    // 4 per-call `Natural::pow().to_digits_asc()` invocations (each a
+    // heap alloc + multi-limb arithmetic). Profile evidence puts the
+    // malachite/heap work at ~17% of total cycles on xlarge benchmark.
+    //
+    // b40 fits in u128 (max n³ ≈ 2.81e38 < u128::MAX ≈ 3.40e38). All
+    // other production bases overflow u128 and need U256.
+    match base {
+        40 => return analyze_range_const::<40>(range, fixed_lsd_k),
+        42 => return analyze_range_const::<42>(range, fixed_lsd_k),
+        43 => return analyze_range_const::<43>(range, fixed_lsd_k),
+        44 => return analyze_range_const::<44>(range, fixed_lsd_k),
+        45 => return analyze_range_const::<45>(range, fixed_lsd_k),
+        47 => return analyze_range_const::<47>(range, fixed_lsd_k),
+        48 => return analyze_range_const::<48>(range, fixed_lsd_k),
+        49 => return analyze_range_const::<49>(range, fixed_lsd_k),
+        50 => return analyze_range_const::<50>(range, fixed_lsd_k),
+        52 => return analyze_range_const::<52>(range, fixed_lsd_k),
+        53 => return analyze_range_const::<53>(range, fixed_lsd_k),
+        54 => return analyze_range_const::<54>(range, fixed_lsd_k),
+        55 => return analyze_range_const::<55>(range, fixed_lsd_k),
+        57 => return analyze_range_const::<57>(range, fixed_lsd_k),
+        58 => return analyze_range_const::<58>(range, fixed_lsd_k),
+        59 => return analyze_range_const::<59>(range, fixed_lsd_k),
+        60 => return analyze_range_const::<60>(range, fixed_lsd_k),
+        62 => return analyze_range_const::<62>(range, fixed_lsd_k),
+        64 => return analyze_range_const::<64>(range, fixed_lsd_k),
+        _ => {}
+    }
+
+    // Can't check for duplicate values when there is only one element
+    if range.size() == 1 {
+        trace!("Range has only a single value, cannot use prefix optimization.");
+        return MsdAnalysis::Live { fixed_mask: 0 };
+    }
+
+    // Interval digit-domain (Hall) analysis for unspecialized bases that
+    // still fit u64 digit masks — mirrors analyze_msd_prefix so the
+    // fixed-width and malachite paths stay behaviorally identical.
+    if base <= 64 {
+        let s_sq = Natural::from(range.first()).pow(2).to_digits_asc(&base);
+        let e_sq = Natural::from(range.last()).pow(2).to_digits_asc(&base);
+        let s_cu = Natural::from(range.first()).pow(3).to_digits_asc(&base);
+        let e_cu = Natural::from(range.last()).pow(3).to_digits_asc(&base);
+        let mut doms = [0u64; HALL_MAX_POSITIONS];
+        let mut m = 0usize;
+        let mut fixed = 0u64;
+        if s_sq.len() == e_sq.len() {
+            collect_power_domains(
+                base,
+                &s_sq,
+                &e_sq,
+                &mut doms,
+                &mut m,
+                fixed_lsd_k,
+                &mut fixed,
+            );
+        }
+        if s_cu.len() == e_cu.len() {
+            collect_power_domains(
+                base,
+                &s_cu,
+                &e_cu,
+                &mut doms,
+                &mut m,
+                fixed_lsd_k,
+                &mut fixed,
+            );
+        }
+        if m == 0 {
+            return MsdAnalysis::Live { fixed_mask: 0 };
+        }
+        return if has_distinct_assignment(&doms[..m]) {
+            MsdAnalysis::Live { fixed_mask: fixed }
+        } else {
+            MsdAnalysis::Rejected
+        };
+    }
+
+    analyze_range_over_64(range, base)
+}
+
+/// The classic common-MSD-prefix duplicate/overlap analysis for bases above
+/// 64, whose digits don't fit u64 domain masks. Never emits a certificate
+/// (`fixed_mask` stays 0), matching the empty `low_digit_masks` there.
+fn analyze_range_over_64(range: FieldSize, base: u32) -> MsdAnalysis {
+    // Bases above 64 don't fit u64 digit masks; keep the classic
+    // common-MSD-prefix duplicate/overlap analysis for them.
+
+    // Convert range boundaries to digit representations and find common prefixes of most significant digits
+    let range_start_square = Natural::from(range.first()).pow(2).to_digits_asc(&base);
+    let range_end_square = Natural::from(range.last()).pow(2).to_digits_asc(&base);
+
+    // If the number of digits changes, it's harder to evaluate the prefix
+    // For now we reject these to avoid false positives
+    if range_start_square.len() != range_end_square.len() {
+        trace!(
+            "Range start and end squares have a different number of digits, erring on the side of caution."
+        );
+        return MsdAnalysis::Live { fixed_mask: 0 };
+    }
+
+    // If the common prefix has duplicate digits, all numbers in range are invalid
+    let square_prefix = find_common_msd_prefix(&range_start_square, &range_end_square);
+    if has_duplicate_digits(&square_prefix) {
+        trace!("Square prefix has duplicate digits: {square_prefix:?}");
+        return MsdAnalysis::Rejected;
+    }
+
+    // Check the same thing for the cubes
+    let range_start_cube = Natural::from(range.first()).pow(3).to_digits_asc(&base);
+    let range_end_cube = Natural::from(range.last()).pow(3).to_digits_asc(&base);
+
+    // If the number of digits changes, it's harder to evaluate the prefix
+    // For now we reject these to avoid false positives
+    if range_start_cube.len() != range_end_cube.len() {
+        trace!(
+            "Range start and end cubes have a different number of digits, erring on the side of caution."
+        );
+        return MsdAnalysis::Live { fixed_mask: 0 };
+    }
+
+    // If the common prefix has duplicate digits, all numbers in range are invalid
+    let cube_prefix = find_common_msd_prefix(&range_start_cube, &range_end_cube);
+    if has_duplicate_digits(&cube_prefix) {
+        trace!("Cube prefix has duplicate digits: {cube_prefix:?}");
+        return MsdAnalysis::Rejected;
+    }
+
+    // If the square and cube prefixes overlap, all numbers in range are invalid
+    if has_overlapping_digits(&square_prefix, &cube_prefix) {
+        trace!(
+            "Square and cube prefixes have overlapping digits: {square_prefix:?}, {cube_prefix:?}"
+        );
+        return MsdAnalysis::Rejected;
+    }
+
+    // NOTE (2026-08 theory review): a "cross MSD×LSD collision check" used to
+    // live here, gated on `range.first() / b^k == range.last() / b^k`. That
+    // condition only means the range fits inside one quotient block of b^k;
+    // the residues n mod b^k still vary across the range, so the low digits
+    // of n² and n³ are NOT constant and using the range start's low digits
+    // for the whole range was unsound (it could skip ranges containing nice
+    // numbers, e.g. [68, 70) in base 10 which contains 69). The check has
+    // been removed. Sound low-digit filtering is done per-candidate by the
+    // stride table (lsd_filter).
+
+    // No early exit possible
+    MsdAnalysis::Live { fixed_mask: 0 }
+}
+
+/// Recursively subdivide a range to find sub-ranges that need to be processed.
+///
+/// This function applies the MSD prefix filter recursively:
+/// 1. If the entire range can be skipped (has duplicate MSD prefix), return empty vec
+/// 2. If the range is small or max depth reached, return the range (needs processing)
+/// 3. Otherwise, subdivide into smaller ranges and recursively check each
+///
+/// Returns a vector of `FieldSize` structs representing ranges that need processing.
+/// All ranges are half-open intervals [start, end) following Rust's standard convention.
+///
+/// # Arguments
+/// * `range` - The range (exclusive, following half-open convention)
+/// * `base` - The base to check
+/// * `current_depth` - Current recursion depth (should start at 0)
+/// * `max_depth` - Maximum recursion depth to prevent excessive subdivision
+/// * `min_range_size` - Minimum range size before stopping subdivision
+/// * `subdivision_factor` - Number of parts to subdivide into (2-4 recommended)
+#[must_use]
+pub fn get_valid_ranges_recursive(
+    range: FieldSize,
+    base: u32,
+    current_depth: u32,
+    max_depth: u32,
+    min_range_size: u128,
+    subdivision_factor: usize,
+) -> Vec<FieldSize> {
+    // Check if range is too small or we've hit max depth
+    if current_depth >= max_depth {
+        trace!(
+            "Depth {current_depth}: Range [{}, {}) max depth reached, returning for processing",
+            range.range_start, range.range_end
+        );
+        return vec![range];
+    }
+    if range.size() <= min_range_size {
+        trace!(
+            "Depth {current_depth}: Range [{}, {}) too small, returning for processing",
+            range.range_start, range.range_end
+        );
+        return vec![range];
+    }
+
+    // Check if the entire range can be skipped
+    if has_duplicate_msd_prefix(range, base) {
+        trace!(
+            "Depth {current_depth}: Range [{}, {}) can be skipped entirely",
+            range.range_start, range.range_end
+        );
+        return vec![]; // Skip this entire range
+    }
+
+    // Check if subdivision would be worthwhile
+    // If the range is not much larger than min_range_size, don't bother subdividing
+    if range.size() < min_range_size * (subdivision_factor as u128) {
+        trace!(
+            "Depth {current_depth}: Range [{}, {}) not worth subdividing, returning for processing",
+            range.range_start, range.range_end
+        );
+        return vec![range];
+    }
+
+    // Subdivide the range and recursively check each part
+    trace!(
+        "Depth {current_depth}: Subdividing range [{}, {}) into {subdivision_factor} parts",
+        range.range_start, range.range_end
+    );
+
+    let chunk_size = range.size() / (subdivision_factor as u128);
+    let mut valid_ranges = Vec::new();
+
+    for i in 0..subdivision_factor {
+        let sub_start = range.range_start + (i as u128) * chunk_size;
+        let sub_end = if i == subdivision_factor - 1 {
+            range.range_end // Last chunk gets any remainder
+        } else {
+            sub_start + chunk_size
+        };
+        let sub_range = FieldSize::new(sub_start, sub_end);
+
+        if sub_start < sub_end {
+            let sub_ranges = get_valid_ranges_recursive(
+                sub_range,
+                base,
+                current_depth + 1,
+                max_depth,
+                min_range_size,
+                subdivision_factor,
+            );
+            valid_ranges.extend(sub_ranges);
+        }
+    }
+
+    valid_ranges
+}
+
+/// Convenience wrapper for `get_valid_ranges_recursive` using default parameters from lib.rs.
+///
+/// Returns a vector of `FieldSize` structs representing half-open ranges [start, end) that need
+/// processing. Ranges that can be skipped based on MSD prefix are not included.
+#[must_use]
+pub fn get_valid_ranges(range: FieldSize, base: u32) -> Vec<FieldSize> {
+    get_valid_ranges_recursive(
+        range,
+        base,
+        0,
+        MSD_RECURSIVE_MAX_DEPTH,
+        MSD_RECURSIVE_MIN_RANGE_SIZE,
+        MSD_RECURSIVE_SUBDIVISION_FACTOR,
+    )
+}
+
+/// `get_valid_ranges_recursive` with the cross-end certificate: each emitted
+/// leaf carries the union of every analyzed ancestor's `fixed_mask` — a fact
+/// proved for a range holds on all of its subranges, so leaves that stop at
+/// the floor (and are never analyzed themselves) still inherit their
+/// ancestors' certain digits. Same traversal, same rejections, same leaves
+/// as the unmasked recursion; results stream into `out` instead of being
+/// rebuilt through per-call `Vec`s.
+/// The per-traversal constants of a masked recursion, bundled so the
+/// recursive signature stays small: (what varies per call) × (what doesn't).
+#[derive(Clone, Copy)]
+pub struct MaskedRecursion {
+    pub base: u32,
+    /// Stride-table LSD depth; singleton digits below this output position
+    /// are excluded from certificates (see [`analyze_range`]).
+    pub fixed_lsd_k: usize,
+    pub max_depth: u32,
+    pub min_range_size: u128,
+    pub subdivision_factor: usize,
+}
+
+pub fn get_valid_ranges_recursive_masked(
+    range: FieldSize,
+    params: &MaskedRecursion,
+    current_depth: u32,
+    inherited_mask: u64,
+    out: &mut Vec<(FieldSize, u64)>,
+) {
+    // A root that is already a leaf is emitted without analysis; check that
+    // before paying for its endpoints.
+    if current_depth >= params.max_depth || range.size() <= params.min_range_size {
+        out.push((range, inherited_mask));
+        return;
+    }
+    macro_rules! fw {
+        ($($b:literal),*) => {
+            match params.base {
+                $($b => {
+                    let lo = endpoint_const::<$b>(range.first());
+                    let hi = endpoint_const::<$b>(range.last());
+                    recurse_fw::<$b>(range, &lo, &hi, params, current_depth, inherited_mask, out);
+                    return;
+                })*
+                _ => {}
+            }
+        };
+    }
+    fw!(
+        40, 42, 43, 44, 45, 47, 48, 49, 50, 52, 53, 54, 55, 57, 58, 59, 60, 62, 64
+    );
+    recurse_generic(range, params, current_depth, inherited_mask, out);
+}
+
+/// The masked recursion for a specialized base, carrying each range's two
+/// endpoint digit arrays down the tree. A binary split shares its outer
+/// endpoints with the parent and needs only the two new adjacent ones
+/// (`mid - 1`, `mid`), so the recursion computes about half as many
+/// endpoints as analyzing every child from scratch (measured 47-49% of
+/// endpoints are shared on production windows). Identical traversal and
+/// output to [`recurse_generic`].
+fn recurse_fw<const BASE: u32>(
+    range: FieldSize,
+    lo: &Endpoint,
+    hi: &Endpoint,
+    params: &MaskedRecursion,
+    current_depth: u32,
+    inherited_mask: u64,
+    out: &mut Vec<(FieldSize, u64)>,
+) {
+    if current_depth >= params.max_depth || range.size() <= params.min_range_size {
+        out.push((range, inherited_mask));
+        return;
+    }
+    let analysis = if range.size() == 1 {
+        MsdAnalysis::Live { fixed_mask: 0 }
+    } else {
+        analyze_endpoints::<BASE>(lo, hi, params.fixed_lsd_k)
+    };
+    let mask = match analysis {
+        MsdAnalysis::Rejected => return,
+        MsdAnalysis::Live { fixed_mask } => inherited_mask | fixed_mask,
+    };
+    if range.size() < params.min_range_size * (params.subdivision_factor as u128) {
+        out.push((range, mask));
+        return;
+    }
+    let chunk_size = range.size() / (params.subdivision_factor as u128);
+    for i in 0..params.subdivision_factor {
+        let sub_start = range.start() + (i as u128) * chunk_size;
+        let sub_end = if i == params.subdivision_factor - 1 {
+            range.end()
+        } else {
+            sub_start + chunk_size
+        };
+        if sub_start < sub_end {
+            // A child that is a leaf is emitted unanalysed: skip its
+            // endpoints (at a power-of-two floor, every child of the last
+            // analysed level is one).
+            if current_depth + 1 >= params.max_depth || sub_end - sub_start <= params.min_range_size
+            {
+                out.push((FieldSize::new(sub_start, sub_end), mask));
+                continue;
+            }
+            let new_lo;
+            let sub_lo: &Endpoint = if i == 0 {
+                lo
+            } else {
+                new_lo = endpoint_const::<BASE>(sub_start);
+                &new_lo
+            };
+            let new_hi;
+            let sub_hi: &Endpoint = if i == params.subdivision_factor - 1 {
+                hi
+            } else {
+                new_hi = endpoint_const::<BASE>(sub_end - 1);
+                &new_hi
+            };
+            recurse_fw::<BASE>(
+                FieldSize::new(sub_start, sub_end),
+                sub_lo,
+                sub_hi,
+                params,
+                current_depth + 1,
+                mask,
+                out,
+            );
+        }
+    }
+}
+
+/// The masked recursion for unspecialized bases, analyzing every range from
+/// scratch through [`analyze_range`].
+fn recurse_generic(
+    range: FieldSize,
+    params: &MaskedRecursion,
+    current_depth: u32,
+    inherited_mask: u64,
+    out: &mut Vec<(FieldSize, u64)>,
+) {
+    if current_depth >= params.max_depth || range.size() <= params.min_range_size {
+        out.push((range, inherited_mask));
+        return;
+    }
+    let mask = match analyze_range(range, params.base, params.fixed_lsd_k) {
+        MsdAnalysis::Rejected => return,
+        MsdAnalysis::Live { fixed_mask } => inherited_mask | fixed_mask,
+    };
+    if range.size() < params.min_range_size * (params.subdivision_factor as u128) {
+        out.push((range, mask));
+        return;
+    }
+    let chunk_size = range.size() / (params.subdivision_factor as u128);
+    for i in 0..params.subdivision_factor {
+        let sub_start = range.start() + (i as u128) * chunk_size;
+        let sub_end = if i == params.subdivision_factor - 1 {
+            range.end()
+        } else {
+            sub_start + chunk_size
+        };
+        if sub_start < sub_end {
+            recurse_generic(
+                FieldSize::new(sub_start, sub_end),
+                params,
+                current_depth + 1,
+                mask,
+                out,
+            );
+        }
+    }
+}
+
+/// Convenience wrapper for `get_valid_ranges_recursive_masked` using default
+/// parameters, for the CPU niceonly path.
+#[must_use]
+pub fn get_valid_ranges_masked(
+    range: FieldSize,
+    base: u32,
+    fixed_lsd_k: usize,
+) -> Vec<(FieldSize, u64)> {
+    let mut out = Vec::new();
+    get_valid_ranges_recursive_masked(
+        range,
+        &MaskedRecursion {
+            base,
+            fixed_lsd_k,
+            max_depth: MSD_RECURSIVE_MAX_DEPTH,
+            min_range_size: MSD_RECURSIVE_MIN_RANGE_SIZE,
+            subdivision_factor: MSD_RECURSIVE_SUBDIVISION_FACTOR,
+        },
+        0,
+        0,
+        &mut out,
+    );
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::base_range;
+    use crate::client_process::get_is_nice;
+    use log::debug;
+
+    /// Break up the range into chunks, returning the start and end of each.
+    fn chunked_ranges(range_start: u128, range_end: u128, chunk_size: u128) -> Vec<(u128, u128)> {
+        let mut chunks = Vec::new();
+        let mut start = range_start;
+
+        while start < range_end {
+            let end = (start + chunk_size).min(range_end);
+            chunks.push((start, end));
+            start = end;
+        }
+
+        chunks
+    }
+
+    /// Reference implementation that always uses the malachite path.
+    /// Used in `test_fixed_width_matches_malachite_*` to verify the
+    /// fixed-width const-generic dispatch path produces identical
+    /// results across all specialized bases.
+    fn malachite_msd_reference(range: FieldSize, base: u32) -> bool {
+        if range.size() == 1 {
+            return false;
+        }
+        let s_sq = Natural::from(range.first()).pow(2).to_digits_asc(&base);
+        let e_sq = Natural::from(range.last()).pow(2).to_digits_asc(&base);
+        let s_cu = Natural::from(range.first()).pow(3).to_digits_asc(&base);
+        let e_cu = Natural::from(range.last()).pow(3).to_digits_asc(&base);
+        let mut doms = [0u64; HALL_MAX_POSITIONS];
+        let mut m = 0usize;
+        let mut fixed = 0u64;
+        if s_sq.len() == e_sq.len() {
+            collect_power_domains(base, &s_sq, &e_sq, &mut doms, &mut m, 0, &mut fixed);
+        }
+        if s_cu.len() == e_cu.len() {
+            collect_power_domains(base, &s_cu, &e_cu, &mut doms, &mut m, 0, &mut fixed);
+        }
+        if m == 0 {
+            return false;
+        }
+        !has_distinct_assignment(&doms[..m])
+    }
+
+    /// Cross-check: every (base, range) sample must produce the same
+    /// answer through the dispatched path (which routes to the fixed-width
+    /// const-generic variant for specialized bases) as through a fresh
+    /// malachite computation. Catches any const-power overflow,
+    /// digit-extraction off-by-one, or analyze-step deviation in the
+    /// u128/U256 paths added by #16.
+    #[test_log::test]
+    fn test_fixed_width_msd_matches_malachite_all_bases() {
+        // 50 samples per base × 17 bases = 850 cross-checks. Keep
+        // sample count modest so the test stays sub-second.
+        let bases: &[u32] = &[
+            40, 42, 43, 44, 45, 47, 48, 49, 50, 52, 53, 54, 55, 57, 58, 59, 60, 62, 64,
+        ];
+        let mut state: u128 = 0x1234_5678_9abc_def0_cafe_babe_dead_beef;
+        let mut rng = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            state
+        };
+        for &base in bases {
+            let r = base_range::get_base_range_u128(base)
+                .unwrap_or_else(|_| panic!("b{base} range error"))
+                .unwrap_or_else(|| panic!("b{base} no range"));
+            let n_low = r.start();
+            let n_high = r.end();
+            let span = n_high - n_low;
+            for _ in 0..50 {
+                let s = n_low + (rng() % (span / 2));
+                let sz = (rng() % (span / 100).max(1)) + 1;
+                let e = (s + sz).min(n_high);
+                if e <= s {
+                    continue;
+                }
+                let range = FieldSize::new(s, e);
+                let want = malachite_msd_reference(range, base);
+                let got = has_duplicate_msd_prefix(range, base);
+                assert_eq!(
+                    want, got,
+                    "b{base} disagrees on [{s}, {e}): malachite={want}, fixed_width={got}"
+                );
+            }
+        }
+    }
+
+    #[test_log::test]
+    fn test_find_common_msd_prefix() {
+        // Simulate to_digits_asc format: [LSD, ..., MSD]
+        // 12345 in base 10 = [5, 4, 3, 2, 1]
+        // 12367 in base 10 = [7, 6, 3, 2, 1]
+        // Common MSD prefix: [1, 2, 3]
+        let digits1 = vec![5, 4, 3, 2, 1];
+        let digits2 = vec![7, 6, 3, 2, 1];
+        assert_eq!(find_common_msd_prefix(&digits1, &digits2), vec![1, 2, 3]);
+
+        // 5512 = [2, 1, 5, 5]
+        // 5598 = [8, 9, 5, 5]
+        // Common MSD prefix: [5, 5]
+        let digits1 = vec![2, 1, 5, 5];
+        let digits2 = vec![8, 9, 5, 5];
+        assert_eq!(find_common_msd_prefix(&digits1, &digits2), vec![5, 5]);
+
+        // 123 = [3, 2, 1]
+        // 456 = [6, 5, 4]
+        // No common MSD prefix
+        let digits1 = vec![3, 2, 1];
+        let digits2 = vec![6, 5, 4];
+        assert_eq!(
+            find_common_msd_prefix(&digits1, &digits2),
+            Vec::<u32>::new()
+        );
+
+        // Identical numbers
+        let digits1 = vec![9, 8, 7];
+        let digits2 = vec![9, 8, 7];
+        assert_eq!(find_common_msd_prefix(&digits1, &digits2), vec![7, 8, 9]);
+
+        // Different lengths
+        // 10000 = [0, 0, 0, 0, 1]
+        // 10100 = [0, 0, 1, 0, 1]
+        // Common MSD prefix: [1, 0]
+        let digits1 = vec![0, 0, 0, 0, 1];
+        let digits2 = vec![0, 0, 1, 0, 1];
+        assert_eq!(find_common_msd_prefix(&digits1, &digits2), vec![1, 0]);
+    }
+
+    #[test_log::test]
+    fn test_has_duplicate_digits() {
+        assert!(!has_duplicate_digits(&[1, 2, 3, 4]));
+        assert!(has_duplicate_digits(&[1, 2, 1, 4]));
+        assert!(has_duplicate_digits(&[5, 5]));
+        assert!(!has_duplicate_digits(&[]));
+        assert!(!has_duplicate_digits(&[1]));
+        assert!(has_duplicate_digits(&[7, 7, 1, 2, 3]));
+    }
+
+    #[test_log::test]
+    fn test_has_overlapping_digits() {
+        assert!(!has_overlapping_digits(&[1, 2, 3], &[4, 5, 6]));
+        assert!(has_overlapping_digits(&[1, 2, 3], &[3, 4, 5]));
+        assert!(has_overlapping_digits(&[1, 2, 3], &[1, 2, 3]));
+        assert!(!has_overlapping_digits(&[], &[1, 2, 3]));
+        assert!(!has_overlapping_digits(&[1, 2, 3], &[]));
+        assert!(has_overlapping_digits(&[7], &[7]));
+    }
+
+    #[test_log::test]
+    fn test_digit_order_verification() {
+        // Verify that to_digits_asc returns LSD first
+        let num = Natural::from(10_004_569u32);
+        let digits = num.to_digits_asc(&10u32);
+        // 10,004,569 should be [9,6,5,4,0,0,0,1] in ascending order
+        assert_eq!(digits[0], 9); // least significant digit
+        assert_eq!(digits[7], 1); // most significant digit
+
+        // Test our MSD prefix finder
+        let digits1 = Natural::from(10_004_569u32).to_digits_asc(&10u32);
+        let digits2 = Natural::from(10_010_896u32).to_digits_asc(&10u32);
+        let msd_prefix = find_common_msd_prefix(&digits1, &digits2);
+        // Both start with 1,0,0,... in normal notation
+        assert_eq!(msd_prefix, vec![1, 0, 0]);
+        // This prefix has duplicate 0s
+        assert!(has_duplicate_digits(&msd_prefix));
+    }
+
+    #[test_log::test]
+    fn test_early_exit_demonstration() {
+        // This test demonstrates the early exit optimization
+        // Range: 3163-3165, base 10 (i.e., [3163, 3165) which includes 3163 and 3164)
+        // 3163² = 10,004,569 → to_digits_asc: [9,6,5,4,0,0,0,1]
+        // 3164² = 10,010,896 → to_digits_asc: [6,9,8,0,1,0,0,1]
+        // Common MSD prefix: [1,0,0] which has duplicate 0s
+
+        let range_start = 3163; // 3163² = 10,004,569
+        let range_end = 3165; // So range is [3163, 3165), last number is 3164: 3164² = 10,010,896
+        let range = FieldSize::new(range_start, range_end);
+        let base = 10;
+        let can_skip = has_duplicate_msd_prefix(range, base);
+
+        // Should return true because squares share MSD prefix [1,0,0] with duplicate 0s
+        assert!(can_skip);
+    }
+
+    #[test_log::test]
+    fn test_single_element_range() {
+        // This test demonstrates the bug: when range_end = range_start + 1,
+        // the range contains only one element [range_start, range_start+1)
+        // This means the "common prefix" is the entire number, not a real prefix.
+
+        let range_start = 3163;
+        let range_end = 3164; // Range is [3163, 3164), which contains only 3163
+        let range = FieldSize::new(range_start, range_end);
+        let base = 10;
+
+        let can_skip = has_duplicate_msd_prefix(range, base);
+        assert!(!can_skip);
+    }
+
+    #[test_log::test]
+    #[should_panic = "invalid bounds"]
+    fn test_invalid_bounds() {
+        let range_start = 3163;
+        let range_end = 3163;
+        let range = FieldSize::new(range_start, range_end);
+        let base = 10;
+
+        let _can_skip = has_duplicate_msd_prefix(range, base);
+    }
+
+    #[test_log::test]
+    fn test_early_exit_b10() {
+        let base = 10;
+        let base_range = base_range::get_base_range_u128(base).unwrap().unwrap();
+        let can_skip = has_duplicate_msd_prefix(base_range, base);
+        assert!(!can_skip);
+    }
+
+    #[test_log::test]
+    fn test_early_exit_b40_whole() {
+        let base = 40;
+        let base_range = base_range::get_base_range_u128(base).unwrap().unwrap();
+        let can_skip = has_duplicate_msd_prefix(base_range, base);
+        assert!(!can_skip);
+    }
+
+    #[test_log::test]
+    fn test_early_exit_b50_whole() {
+        let base = 50;
+        let base_range = base_range::get_base_range_u128(base).unwrap().unwrap();
+        let can_skip = has_duplicate_msd_prefix(base_range, base);
+        assert!(!can_skip);
+    }
+
+    #[test_log::test]
+    fn test_early_exit_b50_segments_large() {
+        let base = 50;
+        let base_range = base_range::get_base_range_u128(base).unwrap().unwrap();
+        let chunk_size = base_range.size() / 100;
+        let segments = chunked_ranges(base_range.range_start, base_range.range_end, chunk_size);
+
+        let expected_results = vec![
+            (0, false),
+            (10, false),
+            (30, false),
+            (40, false),
+            (50, false),
+            (60, false),
+            (70, false),
+            (80, false),
+            (90, false),
+            (100, true),
+        ];
+        for (segment_num, expected_result) in expected_results {
+            let segment = segments[segment_num];
+            let range = FieldSize::new(segment.0, segment.1);
+            debug!("Testing base {base} segment #{segment_num}: ({segment:?})");
+            let can_skip = has_duplicate_msd_prefix(range, base);
+            assert_eq!(can_skip, expected_result);
+        }
+    }
+
+    #[test_log::test]
+    fn test_early_exit_b50_segments_small() {
+        let base = 50;
+        let base_range = base_range::get_base_range_u128(base).unwrap().unwrap();
+        let chunk_size = base_range.size() / 10_000;
+        let segments = chunked_ranges(base_range.range_start, base_range.range_end, chunk_size);
+
+        let expected_results = vec![
+            (0, false),
+            (10, false),
+            (30, true),
+            (40, true),
+            (50, false),
+            (60, false),
+            (70, false),
+            (80, true),
+            (90, true),
+            (100, false),
+        ];
+        for (segment_num, expected_result) in expected_results {
+            let segment = segments[segment_num];
+            let range = FieldSize::new(segment.0, segment.1);
+            debug!("Testing base {base} segment #{segment_num}: ({segment:?})");
+            let can_skip = has_duplicate_msd_prefix(range, base);
+            assert_eq!(can_skip, expected_result);
+        }
+    }
+
+    #[test_log::test]
+    fn test_collect_power_domains() {
+        // 68² = 4624, 69² = 4761 in base 10 (LSD-first digit arrays).
+        // Top digit: fixed 4 (singleton). Next: quotients 46..47 → {6,7}.
+        // Next: quotients 462..476 span ≥ 10 values → unconstrained, stop.
+        let xd = [4u32, 2, 6, 4];
+        let yd = [1u32, 6, 7, 4];
+        let mut doms = [0u64; HALL_MAX_POSITIONS];
+        let mut m = 0;
+        let mut fixed = 0u64;
+        collect_power_domains(10, &xd, &yd, &mut doms, &mut m, 0, &mut fixed);
+        assert_eq!(&doms[..m], &[1 << 4, (1 << 6) | (1 << 7)]);
+
+        // Wraparound: 193..207 → digits [3,9,1] vs [7,0,2].
+        // Top: {1,2}. Next: quotients 19..20 → digits {9,0} (wraps).
+        let xd = [3u32, 9, 1];
+        let yd = [7u32, 0, 2];
+        let mut doms = [0u64; HALL_MAX_POSITIONS];
+        let mut m = 0;
+        let mut fixed = 0u64;
+        collect_power_domains(10, &xd, &yd, &mut doms, &mut m, 0, &mut fixed);
+        assert_eq!(&doms[..m], &[(1 << 1) | (1 << 2), (1 << 9) | (1 << 0)]);
+    }
+
+    #[test_log::test]
+    fn test_has_distinct_assignment() {
+        // Two positions, two digits: fine.
+        assert!(has_distinct_assignment(&[0b01, 0b10]));
+        // Duplicate singletons (the classic prefix-duplicate case): fail.
+        assert!(!has_distinct_assignment(&[0b100, 0b100]));
+        // Three positions sharing two digits: no pairwise conflict between
+        // distinct masks, but collectively impossible.
+        assert!(!has_distinct_assignment(&[0b11, 0b11, 0b11]));
+        // Four positions over three digits, every pair satisfiable: fail.
+        assert!(!has_distinct_assignment(&[0b011, 0b011, 0b110, 0b101]));
+        // Augmenting path required: position order forces reassignment.
+        assert!(has_distinct_assignment(&[0b01, 0b11, 0b110]));
+    }
+
+    /// Brute-force oracle for `has_distinct_assignment`: does an injective
+    /// choice of one digit per position exist? Exhaustive backtracking over
+    /// the positions, no cleverness — the point is to have something that
+    /// is obviously right to compare Kuhn's algorithm against.
+    fn has_sdr_brute_force(doms: &[u64]) -> bool {
+        fn go(doms: &[u64], i: usize, used: u64) -> bool {
+            if i == doms.len() {
+                return true;
+            }
+            let mut cand = doms[i] & !used;
+            while cand != 0 {
+                let d = cand.trailing_zeros();
+                if go(doms, i + 1, used | (1u64 << d)) {
+                    return true;
+                }
+                cand &= cand - 1;
+            }
+            false
+        }
+        go(doms, 0, 0)
+    }
+
+    /// Kuhn's augmenting-path search must agree with the brute-force SDR
+    /// oracle on every input, both ways: a wrong `false` would skip a range
+    /// that may hold a nice number (unsound), a wrong `true` only costs work.
+    /// No parity or brute-force-nice-number test can catch the unsound
+    /// direction — nice numbers are far too rare for a wrongly-rejected
+    /// range to ever contain one — so the algorithm gets its own oracle.
+    ///
+    /// Domains are drawn as narrow cyclic intervals over few digits, the
+    /// shape `collect_power_domains` actually produces, so that collective
+    /// (non-pairwise) Hall violations are common rather than vanishingly
+    /// rare. A deterministic xorshift keeps the test reproducible without a
+    /// `rand` dev-dependency.
+    #[test_log::test]
+    fn has_distinct_assignment_matches_brute_force_sdr_oracle() {
+        let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let mut agreements = [0usize; 2];
+        for _ in 0..20_000 {
+            let base = 3 + u32::try_from(next() % 10).unwrap(); // 3..=12 digits
+            let m = 1 + usize::try_from(next() % 12).unwrap(); // 1..=12 positions
+            let doms: Vec<u64> = (0..m)
+                .map(|_| {
+                    let lo = u32::try_from(next() % u64::from(base)).unwrap();
+                    let width = 1 + u32::try_from(next() % u64::from(base.min(4))).unwrap();
+                    let mut mask = 0u64;
+                    for i in 0..width {
+                        mask |= 1u64 << ((lo + i) % base);
+                    }
+                    mask
+                })
+                .collect();
+            let expected = has_sdr_brute_force(&doms);
+            assert_eq!(
+                has_distinct_assignment(&doms),
+                expected,
+                "Kuhn disagrees with the SDR oracle on domains {doms:?}"
+            );
+            agreements[usize::from(expected)] += 1;
+        }
+        // The distribution must actually exercise both answers.
+        assert!(
+            agreements[0] > 1_000,
+            "too few unsatisfiable cases: {agreements:?}"
+        );
+        assert!(
+            agreements[1] > 1_000,
+            "too few satisfiable cases: {agreements:?}"
+        );
+    }
+
+    #[test_log::test]
+    fn test_hall_rejects_more_than_prefix_checks() {
+        // Regression pin for the interval-domain upgrade: this b42 range has
+        // no duplicate or overlap among its fixed common-prefix digits, but
+        // the constrained near-fixed positions collectively lack enough
+        // distinct digits, so the range is skippable only via the Hall check.
+        let range = FieldSize::new(12_283_591_331_194, 12_297_719_016_486);
+        assert!(has_duplicate_msd_prefix(range, 42));
+    }
+
+    #[test_log::test]
+    fn test_range_containing_nice_number_not_skipped() {
+        // Regression test for the unsound cross MSD×LSD check (removed in the
+        // 2026-08 theory review). The old check skipped [68, 70) in base 10
+        // because 68 and 69 share a b² quotient block and 68's low square
+        // digits collide with the square MSD prefix — but the low digits are
+        // not constant across the range, and 69 (a nice number!) is inside.
+        let range = FieldSize::new(68, 70);
+        assert!(
+            !has_duplicate_msd_prefix(range, 10),
+            "[68, 70) contains the nice number 69 and must not be skipped"
+        );
+    }
+
+    #[test_log::test]
+    fn test_msd_filter_never_skips_nice_numbers_small_bases() {
+        // Soundness: for every nice number found by brute force in small
+        // bases, no range containing it may be reported as skippable —
+        // regardless of the range's size or alignment.
+        for base in 4u32..=16 {
+            let Ok(Some(base_range)) = base_range::get_base_range_u128(base) else {
+                continue;
+            };
+            let nice: Vec<u128> = (base_range.start()..base_range.end())
+                .filter(|&n| get_is_nice(n, base))
+                .collect();
+            debug!("base {base}: nice numbers {nice:?}");
+            for &n in &nice {
+                for size in [2u128, 3, 5, 10, 50, 251, 1000] {
+                    for offset in 0..size.min(8) {
+                        let start = n.saturating_sub(offset).max(base_range.start());
+                        let end = (start + size).min(base_range.end());
+                        if start >= end || n < start || n >= end {
+                            continue;
+                        }
+                        let range = FieldSize::new(start, end);
+                        assert!(
+                            !has_duplicate_msd_prefix(range, base),
+                            "base {base}: range [{start}, {end}) containing nice number {n} was skipped"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test_log::test]
+    fn test_get_valid_ranges_covers_all_nice_numbers_small_bases() {
+        // Integration-level soundness: running the production recursion over
+        // the full base range must leave every nice number inside some
+        // returned "must process" sub-range.
+        for base in 4u32..=16 {
+            let Ok(Some(base_range)) = base_range::get_base_range_u128(base) else {
+                continue;
+            };
+            let nice: Vec<u128> = (base_range.start()..base_range.end())
+                .filter(|&n| get_is_nice(n, base))
+                .collect();
+            let ranges = get_valid_ranges(base_range, base);
+            for &n in &nice {
+                assert!(
+                    ranges.iter().any(|r| r.start() <= n && n < r.end()),
+                    "base {base}: nice number {n} not covered by get_valid_ranges output"
+                );
+            }
+        }
+    }
+
+    /// Per-digit reference extraction (what the chunked version replaced).
+    fn extract_digits_reference(mut n: U256, base: u32) -> Vec<u32> {
+        let mut out = Vec::new();
+        if n.is_zero() {
+            return vec![0];
+        }
+        while !n.is_zero() {
+            out.push(n.div_assign_rem_u32(base));
+        }
+        out
+    }
+
+    /// The chunked extraction must produce exactly the per-digit stream for
+    /// every specialized base, over squares and cubes across the range,
+    /// including the zero-padded interior chunks.
+    #[test_log::test]
+    fn chunked_extraction_matches_per_digit() {
+        macro_rules! check {
+            ($($b:literal),*) => {$({
+                let base: u32 = $b;
+                let r = base_range::get_base_range_u128(base).unwrap().unwrap();
+                let mut x: u128 = 0x2545_f491_4f6c_dd1d_9e37_79b9_7f4a_7c15;
+                for i in 0..400u128 {
+                    x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(i);
+                    let n = r.start() + x % r.size();
+                    let e = endpoint_const::<$b>(n);
+                    let sq = U256::mul_u128_u128(n, n);
+                    let cu = sq.mul_u128_truncating(n);
+                    assert_eq!(e.sq.as_slice(), &extract_digits_reference(sq, base)[..], "b{base} n={n} square");
+                    assert_eq!(e.cu.as_slice(), &extract_digits_reference(cu, base)[..], "b{base} n={n} cube");
+                }
+                // Small values exercise the leading-chunk path and zero.
+                for n in [0u128, 1, $b - 1, $b, $b * $b, u128::from(chunk_div($b)), u128::from(chunk_div($b)) * $b] {
+                    let got = if $b <= 40 {
+                        extract_digits_u128_const::<$b>(n)
+                    } else {
+                        extract_digits_u256_const::<$b>(U256::from_u128(n))
+                    };
+                    assert_eq!(got.as_slice(), &extract_digits_reference(U256::from_u128(n), base)[..], "b{base} small n={n}");
+                }
+            })*};
+        }
+        check!(
+            40, 42, 43, 44, 45, 47, 48, 49, 50, 52, 53, 54, 55, 57, 58, 59, 60, 62, 64
+        );
+    }
+
+    /// Endpoint reuse must not change the traversal: the fixed-width
+    /// recursion and the from-scratch recursion emit the same leaves with
+    /// the same certificates, at production and at forced-fine floors.
+    #[test_log::test]
+    fn endpoint_reuse_matches_from_scratch_recursion() {
+        // MSD-weak windows (the benchmark's b40/b52 regions and a mid-range
+        // b60 slice), so that the recursion really descends and emits leaves.
+        for (base, start, floor) in [
+            (40u32, 5_007_828_088_304u128, 8000u128),
+            (40, 5_007_828_088_304, 500),
+            (52, 407_887_399_136_188_818, 8000),
+            (52, 407_887_399_136_188_818, 977),
+            (60, 1_500_000_000_000_000_000_000, 4000),
+        ] {
+            let slice = FieldSize::new(start, start + 4_000_000);
+            let params = MaskedRecursion {
+                base,
+                fixed_lsd_k: 3,
+                max_depth: MSD_RECURSIVE_MAX_DEPTH,
+                min_range_size: floor,
+                subdivision_factor: MSD_RECURSIVE_SUBDIVISION_FACTOR,
+            };
+            let mut reused = Vec::new();
+            get_valid_ranges_recursive_masked(slice, &params, 0, 0, &mut reused);
+            let mut scratch = Vec::new();
+            recurse_generic(slice, &params, 0, 0, &mut scratch);
+            assert_eq!(reused, scratch, "b{base} floor {floor}");
+            assert!(!reused.is_empty(), "b{base} floor {floor}: no ranges");
+        }
+    }
+
+    /// Singleton closure must agree with the plain matching and with Hall's
+    /// condition checked by brute force (every subset of positions offers at
+    /// least as many digits as it has positions), on hand-built cases and on
+    /// random sets of cyclic-interval domains like the ones the analysis
+    /// builds: 1-10 positions, intervals of 1-4 digits, alphabets of 8, 16
+    /// and 64 digits (the last reaching bit 63).
+    #[test_log::test]
+    #[allow(clippy::cast_possible_truncation)]
+    fn closure_matching_agrees_with_kuhn() {
+        assert!(has_distinct_assignment_closure(&[0b01, 0b10]));
+        assert!(!has_distinct_assignment_closure(&[0b100, 0b100]));
+        assert!(!has_distinct_assignment_closure(&[0b11, 0b11, 0b11]));
+        assert!(!has_distinct_assignment_closure(&[
+            0b011, 0b011, 0b110, 0b101
+        ]));
+        assert!(has_distinct_assignment_closure(&[0b01, 0b11, 0b110]));
+        // Closure chain: {7} forces {7,8} to 8, which forces {8,9} to 9,
+        // which collides with the singleton {9}.
+        assert!(!has_distinct_assignment_closure(&[
+            1 << 7,
+            0b11 << 7,
+            0b11 << 8,
+            1 << 9
+        ]));
+        assert!(has_distinct_assignment_closure(&[
+            1 << 7,
+            0b11 << 7,
+            0b11 << 8
+        ]));
+        // Hall's condition by brute force over all 2^m subsets.
+        let hall = |doms: &[u64]| {
+            (1u32..1 << doms.len()).all(|set| {
+                let (mut union, mut count) = (0u64, 0u32);
+                for (i, d) in doms.iter().enumerate() {
+                    if set >> i & 1 == 1 {
+                        union |= d;
+                        count += 1;
+                    }
+                }
+                union.count_ones() >= count
+            })
+        };
+        let mut x: u128 = 0x1234_5678_9abc_def0_0fed_cba9_8765_4321;
+        let mut next = || {
+            x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            // The high half only: a power-of-two LCG's low bits cycle with
+            // short periods.
+            (x >> 64) as u64
+        };
+        let (mut accepted, mut rejected) = (0u32, 0u32);
+        for _ in 0..20_000 {
+            let m = 1 + (next() % 10) as usize;
+            let alphabet = [8u64, 16, 64][(next() % 3) as usize];
+            let mut doms = [0u64; 10];
+            for d in doms.iter_mut().take(m) {
+                let lo = next() % alphabet;
+                let size = 1 + next() % 4;
+                let mut mask = 0u64;
+                for t in 0..size {
+                    mask |= 1u64 << ((lo + t) % alphabet);
+                }
+                *d = mask;
+            }
+            let doms = &doms[..m];
+            let expected = hall(doms);
+            assert_eq!(has_distinct_assignment_closure(doms), expected, "{doms:?}");
+            assert_eq!(has_distinct_assignment(doms), expected, "{doms:?}");
+            if expected {
+                accepted += 1;
+            } else {
+                rejected += 1;
+            }
+        }
+        // Both verdicts well represented.
+        assert!(
+            accepted > 2_000 && rejected > 2_000,
+            "{accepted} / {rejected}"
+        );
+    }
+
+    /// The masked recursion must traverse identically to the unmasked one:
+    /// same rejections, same emitted leaves. Covers a fixed-width base and
+    /// an over-64 (prefix-path) base.
+    #[test_log::test]
+    fn masked_recursion_emits_identical_leaves() {
+        for base in [40u32, 70] {
+            let range = base_range::get_base_range_u128(base).unwrap().unwrap();
+            let slice = FieldSize::new(range.start(), range.start() + 20_000_000);
+            let plain = get_valid_ranges(slice, base);
+            let masked: Vec<FieldSize> = get_valid_ranges_masked(slice, base, 3)
+                .into_iter()
+                .map(|(r, _)| r)
+                .collect();
+            assert_eq!(plain, masked, "leaf mismatch at base {base}");
+        }
+    }
+
+    /// Every digit in a Live certificate must really appear at an output
+    /// position >= k of n² or n³ for every n in the range — including the
+    /// endpoints, where an off-by-one in the interval walk would show first.
+    #[test_log::test]
+    fn fixed_mask_digits_are_real_high_digits() {
+        let k = 3usize;
+        for base in [40u32, 52, 60] {
+            let range = base_range::get_base_range_u128(base).unwrap().unwrap();
+            let span = range.end() - range.start();
+            let mut x: u128 = 0x5851_f42d_4c95_7f2d_1405_7b7e_f767_814f;
+            for i in 0..200u128 {
+                x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(i);
+                let start = range.start() + (x % (span - 2000));
+                let sub = FieldSize::new(start, start + 1953);
+                let MsdAnalysis::Live { fixed_mask } = analyze_range(sub, base, k) else {
+                    continue;
+                };
+                for n in [sub.first(), sub.first() + sub.size() / 2, sub.last()] {
+                    let mut high: u64 = 0;
+                    for p in [2u64, 3] {
+                        let digits: Vec<u32> = Natural::from(n).pow(p).to_digits_asc(&base);
+                        for &d in &digits[k..] {
+                            high |= 1u64 << d;
+                        }
+                    }
+                    assert_eq!(
+                        fixed_mask & !high,
+                        0,
+                        "b{base} [{},{}): mask digit not among high digits of n={n}",
+                        sub.start(),
+                        sub.end()
+                    );
+                }
+            }
+        }
+    }
+
+    /// End-to-end gate for the cross-end residue filter: over complete small
+    /// bases, a masked scan (forced-fine floors so real certificates exist)
+    /// finds exactly the brute-force nice set. Base 10 covers the historic
+    /// unsound-cross-check shape: 69 must survive.
+    #[test_log::test]
+    fn cross_filter_preserves_the_nice_set() {
+        for (base, floor) in [(10u32, 4u128), (10, 32), (17, 16), (22, 64), (25, 256)] {
+            let range = base_range::get_base_range_u128(base).unwrap().unwrap();
+            let brute: Vec<u128> = (range.start()..range.end())
+                .filter(|&n| get_is_nice(n, base))
+                .collect();
+
+            let table = crate::stride_filter::StrideTable::new(base, 3);
+            let mut leaves = Vec::new();
+            get_valid_ranges_recursive_masked(
+                range,
+                &MaskedRecursion {
+                    base,
+                    fixed_lsd_k: table.k as usize,
+                    max_depth: MSD_RECURSIVE_MAX_DEPTH,
+                    min_range_size: floor,
+                    subdivision_factor: MSD_RECURSIVE_SUBDIVISION_FACTOR,
+                },
+                0,
+                0,
+                &mut leaves,
+            );
+            let mut found: Vec<u128> = leaves
+                .iter()
+                .flat_map(|(r, high_mask)| table.iterate_range_masked(r, base, *high_mask))
+                .map(|nn| nn.number)
+                .collect();
+            found.sort_unstable();
+            assert_eq!(
+                brute, found,
+                "nice set changed at base {base}, floor {floor}"
+            );
+        }
+    }
+}

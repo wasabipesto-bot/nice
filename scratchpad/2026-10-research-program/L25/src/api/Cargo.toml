@@ -1,0 +1,22 @@
+[package]
+name = "nice_api"
+description = "an api for coordinating the search for square-cube pandigitals"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+license-file.workspace = true
+
+[dependencies]
+nice_common = { workspace = true, features = ["database", "rustls-tls"] }
+anyhow = { version = "1.0" }
+chrono = { version = "0.4.43", features = ["serde"] }
+rand = { version = "0.10.1" }
+rocket = { version = "0.5.1", features = ["json"] }
+rocket_prometheus = { version = "0.11.0" }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+diesel = { version = "2.3", features = ["postgres", "r2d2"] }

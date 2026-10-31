@@ -1,0 +1,189 @@
+-- DROP TABLES IN REVERSE ORDER
+DROP TABLE IF EXISTS cache_notable_numbers;
+DROP TABLE IF EXISTS cache_search_daily_totals;
+DROP TABLE IF EXISTS cache_search_rate_daily;
+DROP TABLE IF EXISTS cache_search_leaderboard;
+DROP TABLE IF EXISTS submissions;
+DROP TABLE IF EXISTS claims;
+DROP TABLE IF EXISTS fields;
+DROP TABLE IF EXISTS chunks;
+DROP TABLE IF EXISTS bases;
+
+-- BASES: ENTRIE BASE RANGE
+CREATE TABLE bases (
+    -- ID is the acual base
+    id INTEGER PRIMARY KEY,
+    range_start DECIMAL NOT NULL,
+    range_end DECIMAL NOT NULL,
+    range_size DECIMAL NOT NULL,
+    checked_detailed DECIMAL NOT NULL DEFAULT 0,
+    checked_niceonly DECIMAL NOT NULL DEFAULT 0,
+    minimum_cl INTEGER NOT NULL DEFAULT 0,
+    niceness_mean REAL,
+    niceness_stdev REAL,
+    distribution JSONB NOT NULL DEFAULT '[]',
+    numbers JSONB NOT NULL DEFAULT '[]'
+);
+
+-- CHUNKS: AGGREGATE FIELDS FOR ANALYTICS
+CREATE TABLE chunks (
+    id SERIAL PRIMARY KEY,
+    base_id INTEGER NOT NULL REFERENCES bases(id),
+    range_start DECIMAL NOT NULL,
+    range_end DECIMAL NOT NULL,
+    range_size DECIMAL NOT NULL,
+    checked_detailed DECIMAL NOT NULL DEFAULT 0,
+    checked_niceonly DECIMAL NOT NULL DEFAULT 0,
+    minimum_cl INTEGER NOT NULL DEFAULT 0,
+    niceness_mean REAL,
+    niceness_stdev REAL,
+    distribution JSONB NOT NULL DEFAULT '[]',
+    numbers JSONB NOT NULL DEFAULT '[]'
+);
+
+-- FIELDS: INDIVIDUAL SEARCH RANGES
+CREATE TABLE fields (
+    id BIGSERIAL PRIMARY KEY,
+    base_id INTEGER NOT NULL REFERENCES bases(id),
+    chunk_id INTEGER REFERENCES chunks(id),
+    range_start DECIMAL NOT NULL,
+    range_end DECIMAL NOT NULL,
+    range_size DECIMAL NOT NULL,
+    last_claim_time TIMESTAMPTZ,
+    canon_submission_id INTEGER,
+    check_level INTEGER NOT NULL DEFAULT 0,
+    prioritize BOOLEAN NOT NULL DEFAULT 'false'
+);
+
+-- CLAIMS: LOG OF CLAIM REQUESTS
+CREATE TABLE claims (
+    id BIGSERIAL PRIMARY KEY,
+    field_id INTEGER NOT NULL REFERENCES fields(id),
+    search_mode VARCHAR NOT NULL,
+    claim_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    user_ip VARCHAR NOT NULL
+);
+
+-- SUBMISSIONS: LOG OF ALL VALIDATED SUIBMISSIONS
+CREATE TABLE submissions (
+    id BIGSERIAL PRIMARY KEY,
+    claim_id INTEGER NOT NULL REFERENCES claims(id),
+    field_id INTEGER NOT NULL REFERENCES fields(id),
+    search_mode VARCHAR NOT NULL,
+    submit_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    elapsed_secs REAL NOT NULL,
+    username VARCHAR NOT NULL,
+    user_ip VARCHAR NOT NULL,
+    client_version VARCHAR NOT NULL,
+    disqualified BOOLEAN NOT NULL DEFAULT 'false',
+    distribution JSONB,
+    numbers JSONB NOT NULL DEFAULT '[]',
+    telemetry JSONB
+);
+
+-- BENCHMARKS: UPLOADED --benchmark SWEEP REPORTS
+-- Full versioned report in `data`; client_version extracted for filtering.
+-- Readable by web_anon (granted below): the fleet controller mirrors this
+-- table through PostgREST. The API stores user_ip as "unknown", so rows carry
+-- no client IP; revisit the grant if that ever changes.
+CREATE TABLE benchmarks (
+    id BIGSERIAL PRIMARY KEY,
+    submit_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    username VARCHAR NOT NULL,
+    user_ip VARCHAR NOT NULL,
+    client_version VARCHAR NOT NULL,
+    data JSONB NOT NULL
+);
+CREATE INDEX idx_benchmarks_submit_time ON benchmarks(submit_time);
+CREATE INDEX idx_benchmarks_client_version ON benchmarks(client_version);
+
+-- POSTGREST USER ACCESS
+CREATE ROLE web_anon NOLOGIN;
+GRANT SELECT ON bases TO web_anon;
+GRANT SELECT ON chunks TO web_anon;
+GRANT SELECT ON fields TO web_anon;
+GRANT SELECT ON claims TO web_anon;
+GRANT SELECT ON submissions TO web_anon;
+GRANT SELECT ON benchmarks TO web_anon;
+
+-- ADDITIONAL INDEXES
+CREATE INDEX IF NOT EXISTS idx_fields_base_id ON fields(base_id);
+CREATE INDEX IF NOT EXISTS idx_fields_range_start ON fields(range_start);
+CREATE INDEX IF NOT EXISTS idx_fields_range_end ON fields(range_end);
+CREATE INDEX IF NOT EXISTS idx_fields_check_level ON fields(check_level);
+CREATE INDEX IF NOT EXISTS idx_fields_last_claim_time ON fields(last_claim_time);
+CREATE INDEX IF NOT EXISTS idx_fields_chunk_id ON fields(chunk_id);
+CREATE INDEX IF NOT EXISTS idx_fields_base_check_level ON fields(base_id, check_level);
+CREATE INDEX IF NOT EXISTS idx_fields_range_start_end ON fields(range_start, range_end);
+CREATE INDEX IF NOT EXISTS idx_fields_base_range ON fields(base_id, range_start, range_end);
+CREATE INDEX IF NOT EXISTS idx_fields_check_level_range_size_last_claim_time_id ON fields(check_level, range_size, last_claim_time, id);
+CREATE INDEX IF NOT EXISTS idx_fields_canon_submission ON fields(canon_submission_id) WHERE canon_submission_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_fields_cl0_id ON fields(id) WHERE check_level = 0;
+CREATE INDEX IF NOT EXISTS idx_submissions_search_mode_field_id ON submissions(search_mode, field_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_field_mode_disq ON submissions(field_id, search_mode, disqualified);
+CREATE INDEX IF NOT EXISTS idx_submissions_id_field ON submissions(id, field_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_claims_field_id ON claims (field_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_submissions_field_id ON submissions (field_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_submissions_claim_id ON submissions (claim_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chunks_base_range ON chunks(base_id, range_start, range_end);
+
+-- JOB STATE: watermark for incremental scheduled jobs, and the highest
+-- submission id counted into cache_search_daily_totals (exact; NULL if the
+-- totals have never been built). The totals start empty, so the cursor
+-- starts at 0.
+CREATE TABLE IF NOT EXISTS job_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    last_processed_submission_id BIGINT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    cache_last_submission_id BIGINT
+);
+INSERT INTO job_state (id, last_processed_submission_id, cache_last_submission_id)
+SELECT 1, COALESCE(MAX(id), 0), 0 FROM submissions
+ON CONFLICT (id) DO NOTHING;
+
+-- CACHE: All-time daily search totals per user/mode. The scheduled jobs add
+-- each run's new submissions to it and derive the two tables below from it.
+-- Not granted to web_anon; the website reads the derived tables.
+CREATE TABLE IF NOT EXISTS cache_search_daily_totals (
+    date DATE NOT NULL,
+    search_mode VARCHAR NOT NULL,
+    username VARCHAR NOT NULL,
+    total_range DECIMAL NOT NULL,
+    PRIMARY KEY (date, search_mode, username)
+);
+
+-- CACHE: Daily search totals per user/mode
+CREATE TABLE IF NOT EXISTS cache_search_rate_daily (
+    date DATE NOT NULL,
+    search_mode VARCHAR NOT NULL,
+    username VARCHAR NOT NULL,
+    total_range DECIMAL NOT NULL,
+    PRIMARY KEY (date, search_mode, username)
+);
+
+-- CACHE: All-time leaderboard totals per user/mode
+CREATE TABLE IF NOT EXISTS cache_search_leaderboard (
+    search_mode VARCHAR NOT NULL,
+    username VARCHAR NOT NULL,
+    total_range DECIMAL NOT NULL,
+    PRIMARY KEY (search_mode, username)
+);
+
+-- CACHE: Plot-ready points for the website's notable numbers chart. Only the
+-- visually distinguishable subset of every base's top-10k list; see
+-- migrations/2026-08-26_cache_notable_numbers.sql for how it is thinned.
+CREATE TABLE IF NOT EXISTS cache_notable_numbers (
+    base        INTEGER NOT NULL,
+    number      DECIMAL NOT NULL,
+    num_uniques INTEGER NOT NULL,
+    off_by      INTEGER NOT NULL,
+    niceness    REAL    NOT NULL,
+    PRIMARY KEY (base, number)
+);
+
+GRANT SELECT ON cache_search_rate_daily TO web_anon;
+GRANT SELECT ON cache_search_leaderboard TO web_anon;
+GRANT SELECT ON cache_notable_numbers TO web_anon;
+
+CREATE INDEX IF NOT EXISTS idx_cache_rate_daily_mode_date ON cache_search_rate_daily(search_mode, date);
+CREATE INDEX IF NOT EXISTS idx_cache_leaderboard_mode ON cache_search_leaderboard(search_mode, total_range DESC);

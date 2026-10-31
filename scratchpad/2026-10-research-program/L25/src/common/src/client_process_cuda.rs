@@ -1,0 +1,1850 @@
+//! GPU-accelerated implementation of nice number checking using CUDA.
+//!
+//! This module offloads the hot loops to the GPU while keeping the same
+//! filter cascade and result semantics as the CPU path:
+//!
+//! - **Niceonly**: the CPU runs the real MSD prefix filter (parallelized
+//!   across cores) with a coarser recursion floor than the CPU client (see
+//!   [`AdaptiveFloor`]), then ships only compact *range descriptors*
+//!   to the GPU (20 bytes per surviving range, including its cross-end
+//!   certificate mask). The GPU reconstructs the
+//!   stride filter's candidates on-device from the residue table — the g-th
+//!   valid candidate at or after a range start is
+//!   `B0 + (g/R)*M + residues[g%R]` — and runs the early-exit nice check.
+//!   No per-candidate data ever crosses the bus. The GPU checks a superset
+//!   of the CPU path's candidates (coarser pruning is still sound), so the
+//!   nice numbers found are identical.
+//! - **Detailed**: each GPU thread derives its own `n = start + idx`, so
+//!   there is no input transfer at all. Unique-digit counts accumulate in an
+//!   on-device histogram; only the histogram and the (rare) near-miss list
+//!   come back.
+//!
+//! Kernels are compiled at runtime with NVRTC, **once per (base, mode)**,
+//! with all base-dependent values injected as preprocessor defines. This is
+//! the GPU analog of the CPU's const-generic dispatch: the compiler
+//! strength-reduces every division by the base (or the stride modulus) into
+//! multiply-high sequences, for *every* base — not just a hardcoded list.
+//! Compiled modules are cached in the context.
+//!
+//! The GPU path supports every base with a valid u128 search range (through
+//! ~b97): kernel buffers are sized per base at JIT time from `N_LIMBS`, so
+//! there is no 256-bit ceiling like the CPU's `U256` fast path, and bases
+//! above 64 use a two-word digit mask. Bases with no u128 range fall back to
+//! the CPU implementation with a logged warning.
+
+#![cfg(feature = "cuda")]
+#![allow(clippy::cast_possible_truncation)]
+
+use crate::client_process::process_range_detailed;
+use crate::gpu_config::{
+    MAX_GPU_DIGIT_MASK_BASE, affine_params, chunk_constants, gpu_supports_base, prefilter_params,
+};
+use crate::gpu_niceonly::{
+    BATCHES_IN_FLIGHT, DeviceResult, NiceonlyPipeline, NiceonlyStats, PendingField, RangeSink,
+};
+use crate::gpu_route::{FieldTicket, NiceonlyGpu};
+use crate::{
+    CLIENT_VERSION, DataToClient, DataToServer, FieldResults, FieldSize, NiceNumberSimple,
+    UniquesDistributionSimple,
+};
+use crate::{base_range, number_stats, stride_filter};
+use anyhow::{Context as _, Result, bail, ensure};
+use cudarc::driver::sys::CUevent_flags;
+use cudarc::driver::{
+    CudaContext as DriverContext, CudaEvent, CudaFunction, CudaSlice, CudaStream, LaunchConfig,
+    PushKernelArg,
+};
+use cudarc::nvrtc::{CompileOptions, Ptx, compile_ptx_with_opts};
+use log::{debug, warn};
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
+/// The MSD/descriptor pipeline these two constants belong to now lives in
+/// [`crate::gpu_niceonly`], which the `CubeCL` backend shares. Re-exported so the
+/// CUDA path's public surface is unchanged.
+pub use crate::gpu_niceonly::{GPU_LSD_K, PROCESSING_CHUNK_SIZE};
+
+/// Numbers processed per detailed-mode kernel launch. Larger batches amortize
+/// launch overhead; since the detailed kernel takes no input arrays, batch
+/// size costs no memory or transfer bandwidth.
+pub const CUDA_BATCH_SIZE: usize = 50_000_000;
+
+/// Threads per block. Must match `BLOCK_THREADS` in `nice_kernels.cu` (the
+/// detailed kernel's shared-memory histogram is sized from it).
+const BLOCK_THREADS: u32 = 256;
+
+/// Capacity of the niceonly output buffer (in nice numbers) per field.
+/// Genuinely nice numbers are astronomically rare; this is pure headroom.
+const NICE_OUT_CAPACITY: usize = 1 << 16;
+
+/// Capacity of the detailed-mode near-miss buffer per field.
+const NEAR_MISS_CAPACITY: usize = 1 << 20;
+
+/// Maximum MSD-valid ranges per niceonly kernel launch.
+const RANGES_PER_LAUNCH: usize = 1 << 22;
+
+/// Compiled niceonly kernel plus the per-base stride data living on-device.
+struct NiceonlyPlan {
+    base: u32,
+    func: CudaFunction,
+    residues: CudaSlice<u32>,
+    modulus: u32,
+    num_residues: u32,
+    /// Per-residue exact low-digit masks on device, present when the kernel
+    /// was compiled with `CROSS_FILTER` (it then takes two extra arguments).
+    low_masks: Option<CudaSlice<u64>>,
+}
+
+impl CudaNiceonlyShared {
+    /// Get or build the compiled niceonly kernel + device residue table for a base.
+    fn niceonly_plan(&self, base: u32) -> Result<Arc<NiceonlyPlan>> {
+        if let Some(plan) = self.plans.lock().unwrap().get(&base) {
+            return Ok(plan.clone());
+        }
+
+        let build_start = Instant::now();
+        let (defines, table) = niceonly_defines(base)?;
+        let modulus = table.modulus as u32;
+        let residues_host: Vec<u32> = table.valid_residues.clone();
+        let num_residues = residues_host.len() as u32;
+
+        let ptx = compile_kernel_ptx(&defines)
+            .with_context(|| format!("compiling niceonly kernel for base {base}"))?;
+        let module = self.device.load_module(ptx)?;
+        let func = module.load_function("niceonly_ranges_kernel")?;
+        let residues = self.stream.clone_htod(&residues_host)?;
+        let low_masks = if defines.iter().any(|d| d == "CROSS_FILTER") {
+            Some(self.stream.clone_htod(&table.low_digit_masks)?)
+        } else {
+            None
+        };
+
+        debug!(
+            "GPU niceonly plan for base {base}: M={modulus}, R={num_residues}, built in {:.2}s",
+            build_start.elapsed().as_secs_f64()
+        );
+
+        let plan = Arc::new(NiceonlyPlan {
+            base,
+            func,
+            residues,
+            modulus,
+            num_residues,
+            low_masks,
+        });
+        self.plans.lock().unwrap().insert(base, plan.clone());
+        Ok(plan)
+    }
+}
+
+/// GPU context: CUDA device handle plus caches of per-base compiled kernels.
+pub struct CudaContext {
+    device: Arc<DriverContext>,
+    stream: Arc<CudaStream>,
+    /// What the niceonly pipeline's device thread needs: shared with it.
+    niceonly: Arc<CudaNiceonlyShared>,
+    /// The continuous niceonly pipeline, started on the first niceonly field.
+    niceonly_pipeline: Mutex<Option<NiceonlyPipeline<CudaPendingField>>>,
+    detailed_kernels: Mutex<HashMap<u32, CudaFunction>>,
+}
+
+/// The device handles and per-base niceonly plans, shared between the
+/// context and the pipeline's dispatch thread.
+struct CudaNiceonlyShared {
+    device: Arc<DriverContext>,
+    stream: Arc<CudaStream>,
+    plans: Mutex<HashMap<u32, Arc<NiceonlyPlan>>>,
+}
+
+impl CudaContext {
+    /// Initialize the GPU context and verify that NVRTC compilation works.
+    ///
+    /// Kernels themselves are compiled lazily, once per (base, mode), when
+    /// the first field for that base arrives.
+    ///
+    /// # Arguments
+    /// * `device_ordinal` - Which GPU to use (0 for first GPU, etc.)
+    ///
+    /// # Errors
+    /// Returns an error if the CUDA context cannot be initialized or if a
+    /// smoke-test NVRTC compilation fails (e.g. missing NVRTC library).
+    pub fn new(device_ordinal: usize) -> Result<Self> {
+        let device = DriverContext::new(device_ordinal)
+            .with_context(|| format!("initializing CUDA device {device_ordinal}"))?;
+        let stream = device.default_stream();
+
+        // Smoke-test NVRTC + module loading now so a broken install fails at
+        // startup with a clear error instead of mid-run on the first field.
+        let smoke_start = Instant::now();
+        let defines = detailed_defines(10).context("building smoke-test kernel config")?;
+        let ptx = compile_kernel_ptx(&defines).context(
+            "NVRTC smoke-test compilation failed (is the CUDA toolkit's NVRTC available?)",
+        )?;
+        let module = device
+            .load_module(ptx)
+            .context("loading smoke-test module")?;
+        module
+            .load_function("detailed_kernel")
+            .context("resolving smoke-test kernel")?;
+        debug!(
+            "GPU init: NVRTC smoke test passed in {:.2}s",
+            smoke_start.elapsed().as_secs_f64()
+        );
+
+        Ok(CudaContext {
+            niceonly: Arc::new(CudaNiceonlyShared {
+                device: device.clone(),
+                stream: stream.clone(),
+                plans: Mutex::new(HashMap::new()),
+            }),
+            niceonly_pipeline: Mutex::new(None),
+            device,
+            stream,
+            detailed_kernels: Mutex::new(HashMap::new()),
+        })
+    }
+
+    /// Get or build the compiled detailed kernel for a base.
+    fn detailed_kernel(&self, base: u32) -> Result<CudaFunction> {
+        if let Some(func) = self.detailed_kernels.lock().unwrap().get(&base) {
+            return Ok(func.clone());
+        }
+
+        let build_start = Instant::now();
+        let defines = detailed_defines(base)?;
+        let ptx = compile_kernel_ptx(&defines)
+            .with_context(|| format!("compiling detailed kernel for base {base}"))?;
+        let module = self.device.load_module(ptx)?;
+        let func = module.load_function("detailed_kernel")?;
+        debug!(
+            "GPU detailed kernel for base {base} built in {:.2}s",
+            build_start.elapsed().as_secs_f64()
+        );
+
+        self.detailed_kernels
+            .lock()
+            .unwrap()
+            .insert(base, func.clone());
+        Ok(func)
+    }
+}
+
+/// Defines shared by both kernels for a base: `BASE`, `N_LIMBS`,
+/// `CHUNK_DIGITS`, `CHUNK_DIV`. Fails for bases the GPU cannot handle
+/// (see [`gpu_supports_base`]).
+fn common_defines(base: u32) -> Result<Vec<String>> {
+    ensure!(
+        base <= MAX_GPU_DIGIT_MASK_BASE,
+        "base {base} exceeds the GPU digit mask limit {MAX_GPU_DIGIT_MASK_BASE}"
+    );
+    let range = base_range::get_base_range_u128(base)
+        .context("computing base range")?
+        .with_context(|| format!("base {base} has no valid u128 search range"))?;
+    let n_max = range.range_end - 1;
+    let n_bits = 128 - n_max.leading_zeros();
+    let n_limbs = n_bits.div_ceil(32).max(1);
+    let (chunk_digits, chunk_div) = chunk_constants(base);
+    Ok(vec![
+        format!("BASE={base}"),
+        format!("N_LIMBS={n_limbs}"),
+        format!("CHUNK_DIGITS={chunk_digits}"),
+        format!("CHUNK_DIV={chunk_div}u"),
+    ])
+}
+
+fn detailed_defines(base: u32) -> Result<Vec<String>> {
+    let mut defines = common_defines(base)?;
+    defines.push("DETAILED".to_string());
+    defines.push(format!(
+        "NEAR_MISS_CUTOFF={}",
+        number_stats::get_near_miss_cutoff(base)
+    ));
+    Ok(defines)
+}
+
+/// Full define set for the niceonly kernel (common + stride + prefilter),
+/// along with the stride table whose residues the caller uploads. Requires
+/// no GPU or NVRTC, so tests can exercise kernel configuration for every
+/// base without hardware.
+fn niceonly_defines(base: u32) -> Result<(Vec<String>, stride_filter::StrideTable)> {
+    let table = stride_filter::StrideTable::new(base, GPU_LSD_K);
+    ensure!(
+        !table.valid_residues.is_empty(),
+        "no valid stride residues for base {base} (residue-empty base?)"
+    );
+    ensure!(
+        table.modulus <= u128::from(u32::MAX),
+        "stride modulus {} exceeds u32 for base {base}",
+        table.modulus
+    );
+    let modulus = table.modulus as u32;
+    let num_residues = table.valid_residues.len() as u32;
+    let pow64_mod_m = ((1u128 << 64) % table.modulus) as u32;
+
+    let mut defines = common_defines(base)?;
+    defines.push("NICEONLY".to_string());
+    defines.push(format!("STRIDE_M={modulus}u"));
+    defines.push(format!("STRIDE_R={num_residues}u"));
+    defines.push(format!("POW64_MOD_M={pow64_mod_m}u"));
+    if let Some(pre) = prefilter_params(base) {
+        defines.push("PREFILTER".to_string());
+        defines.push(format!("PRE_DIGITS={}", pre.digits));
+        defines.push(format!("PRE_MOD={}ull", pre.modulus));
+        defines.push(format!("POW64_MOD_PRE={}ull", pre.pow64_mod));
+    } else {
+        debug!("modular prefilter disabled for base {base}");
+    }
+    // Cross-end residue filter, with its warp compaction: wherever the
+    // low-mask table exists (base <= 64).
+    if !table.low_digit_masks.is_empty() {
+        defines.push("CROSS_FILTER".to_string());
+        defines.push("COMPACT".to_string());
+        // Affine middle-digit filter on the cross survivors (NICE_CUDA_AFFINE=0
+        // disables it for A/B measurement).
+        if let Some(aff) = affine_params(base, GPU_LSD_K)
+            && std::env::var("NICE_CUDA_AFFINE").map_or(true, |v| v != "0")
+        {
+            defines.push("AFFINE".to_string());
+            defines.push(format!("AFF_BK={}u", aff.bk));
+            defines.push(format!("AFF_B2K={}ull", aff.b2k));
+            defines.push(format!("POW64_MOD_B2K={}ull", aff.pow64_mod));
+        }
+    }
+    Ok((defines, table))
+}
+
+/// Compile the embedded CUDA source with the given `-D` defines via NVRTC.
+fn compile_kernel_ptx(defines: &[String]) -> Result<Ptx> {
+    let kernel_src = include_str!("cuda/nice_kernels.cu");
+    let opts = CompileOptions {
+        options: defines
+            .iter()
+            .map(|d| format!("--define-macro={d}"))
+            .collect(),
+        ..Default::default()
+    };
+    compile_ptx_with_opts(kernel_src, opts)
+        .map_err(|e| anyhow::anyhow!("NVRTC compilation failed: {e:?}"))
+}
+
+/// Split a u128 into (lo, hi) u64 halves for kernel arguments.
+fn split_u128(num: u128) -> (u64, u64) {
+    (num as u64, (num >> 64) as u64)
+}
+
+fn combine_u64(lo: u64, hi: u64) -> u128 {
+    (u128::from(hi) << 64) | u128::from(lo)
+}
+
+// ============================================================================
+// Niceonly
+// ============================================================================
+
+/// The hand-CUDA nice-only path: the MSD prefix filter runs on the CPU (all
+/// cores), and the GPU checks the surviving ranges' stride-valid candidates.
+/// It finds exactly the nice numbers the CPU path finds. Fields start
+/// through [`crate::gpu_route::begin_niceonly`]; hand-CUDA has no overlap
+/// join (yet), so every field it takes goes to the stride pipeline.
+impl NiceonlyGpu for CudaContext {
+    fn begin_stride(&self, range: &FieldSize, base: u32) -> Result<FieldTicket> {
+        let mut guard = self.niceonly_pipeline.lock().unwrap();
+        let pipeline = guard.get_or_insert_with(|| {
+            NiceonlyPipeline::start(
+                "GPU",
+                CudaNiceonlySink {
+                    shared: self.niceonly.clone(),
+                    open: HashMap::new(),
+                    inflight: VecDeque::new(),
+                },
+            )
+        });
+        pipeline.push(base, range)
+    }
+
+    fn finish(&self, ticket: FieldTicket) -> Result<(FieldResults, NiceonlyStats)> {
+        let mut guard = self.niceonly_pipeline.lock().unwrap();
+        let pipeline = guard
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("no niceonly field has been begun"))?;
+        let (stats, nice_numbers) = pipeline.next_result(ticket)?;
+        debug!(
+            "GPU niceonly pipeline: {} ranges in {} launches, found {}",
+            stats.num_ranges,
+            stats.launches,
+            nice_numbers.len()
+        );
+        Ok((
+            FieldResults {
+                distribution: Vec::new(),
+                nice_numbers,
+            },
+            stats,
+        ))
+    }
+}
+
+/// NVIDIA nice-only with the overlap join: hand-CUDA's stride pipeline, and
+/// `CubeCL`'s CUDA runtime for the join, which hand-CUDA does not have yet.
+/// Each field's ticket says which of the two holds it. The client uses this
+/// for nice-only under `--gpu-backend auto` and `cuda` alike.
+#[cfg(feature = "cubecl-cuda")]
+pub struct CudaWithJoin {
+    pub cuda: CudaContext,
+    pub join: crate::cubecl_backend::CubeclContext,
+}
+
+#[cfg(feature = "cubecl-cuda")]
+impl NiceonlyGpu for CudaWithJoin {
+    fn join_limits(
+        &self,
+    ) -> std::result::Result<crate::join_plan::JoinLimits, crate::overlap_join::StrideReason> {
+        self.join.join_limits()
+    }
+
+    fn begin_stride(&self, range: &FieldSize, base: u32) -> Result<FieldTicket> {
+        self.cuda.begin_stride(range, base)
+    }
+
+    fn begin_join(&self, field: crate::join_plan::JoinField) -> Result<FieldTicket> {
+        self.join.begin_join(field)
+    }
+
+    fn finish(&self, ticket: FieldTicket) -> Result<(FieldResults, NiceonlyStats)> {
+        match ticket.route() {
+            crate::gpu_route::Route::Stride => self.cuda.finish(ticket),
+            crate::gpu_route::Route::Join => self.join.finish(ticket),
+        }
+    }
+}
+
+/// The device end of the niceonly pipeline: owns the stream on the dispatch
+/// thread, keeps each open field's output buffers, and bounds the launches in
+/// flight with a ring of events.
+struct CudaNiceonlySink {
+    shared: Arc<CudaNiceonlyShared>,
+    open: HashMap<u64, CudaOpenField>,
+    /// One event per launched batch, oldest first. Before a launch, if the
+    /// ring is full, the oldest is waited for: that is the backpressure the
+    /// pipeline's floor controller reads as "the device is behind".
+    inflight: VecDeque<CudaEvent>,
+}
+
+struct CudaOpenField {
+    plan: Arc<NiceonlyPlan>,
+    field_start_lo: u64,
+    field_start_hi: u64,
+    d_nice_out: CudaSlice<u64>,
+    d_nice_count: CudaSlice<u32>,
+    start: Option<CudaEvent>,
+    /// (before, after) events around each batch's kernel: the stream is
+    /// in-order, so `before` completes when the kernel can start and `after`
+    /// when it is done, and their elapsed time is the device's busy time on
+    /// that batch whether or not the queue ran dry in between batches.
+    batches: Vec<(CudaEvent, CudaEvent)>,
+}
+
+/// Record an event that can be timed against another. cudarc's
+/// `record_event(None)` creates events with `CU_EVENT_DISABLE_TIMING`, and
+/// `cuEventElapsedTime` on such an event fails with
+/// `CUDA_ERROR_INVALID_HANDLE` — which is what took down every niceonly
+/// field's `wait` in v3.4.4. The backpressure ring keeps the cheaper
+/// timing-disabled events; only the pairs that are ever subtracted use this.
+fn record_timing_event(stream: &CudaStream) -> Result<CudaEvent> {
+    let event = stream
+        .context()
+        .new_event(Some(CUevent_flags::CU_EVENT_DEFAULT))?;
+    event.record(stream)?;
+    Ok(event)
+}
+
+/// A closed field's device work: the events bracketing it and the buffers
+/// its results land in. Waited for on the client's thread.
+pub struct CudaPendingField {
+    stream: Arc<CudaStream>,
+    base: u32,
+    d_nice_out: CudaSlice<u64>,
+    d_nice_count: CudaSlice<u32>,
+    start: Option<CudaEvent>,
+    end: CudaEvent,
+    batches: Vec<(CudaEvent, CudaEvent)>,
+}
+
+impl PendingField for CudaPendingField {
+    fn wait(self: Box<Self>) -> Result<DeviceResult> {
+        self.end.synchronize()?;
+        if let Some(start) = &self.start {
+            match start.elapsed_ms(&self.end) {
+                Ok(ms) => debug!(
+                    "GPU niceonly field device span {:.3}s",
+                    f64::from(ms) / 1000.0
+                ),
+                Err(e) => warn!("GPU niceonly field span timing failed: {e:?}"),
+            }
+        }
+        // Telemetry only: a timing failure must never fail the field.
+        let mut busy_ms = Some(0.0f64);
+        for (before, after) in &self.batches {
+            match before.elapsed_ms(after) {
+                Ok(ms) => {
+                    if let Some(b) = busy_ms.as_mut() {
+                        *b += f64::from(ms);
+                    }
+                }
+                Err(e) => {
+                    if busy_ms.take().is_some() {
+                        warn!("GPU niceonly batch timing failed, device_busy_secs dropped: {e:?}");
+                    }
+                }
+            }
+        }
+        let device_busy_secs = busy_ms.map(|ms| ms / 1000.0);
+        let nice_count = self.stream.clone_dtoh(&self.d_nice_count)?[0] as usize;
+        if nice_count > NICE_OUT_CAPACITY {
+            bail!(
+                "niceonly output buffer overflow: {nice_count} > {NICE_OUT_CAPACITY} \
+                 (this strongly suggests a kernel bug)"
+            );
+        }
+        let mut nice_numbers = Vec::with_capacity(nice_count);
+        if nice_count > 0 {
+            let out = self.stream.clone_dtoh(&self.d_nice_out)?;
+            for i in 0..nice_count {
+                nice_numbers.push(NiceNumberSimple {
+                    number: combine_u64(out[2 * i], out[2 * i + 1]),
+                    num_uniques: self.base,
+                });
+            }
+            nice_numbers.sort_by_key(|n| n.number);
+        }
+        Ok(DeviceResult {
+            nice_numbers,
+            device_busy_secs,
+        })
+    }
+}
+
+impl RangeSink for CudaNiceonlySink {
+    type Pending = CudaPendingField;
+
+    fn begin_field(&mut self, seq: u64, base: u32, range: &FieldSize) -> Result<()> {
+        let plan = self.shared.niceonly_plan(base)?;
+        debug!(
+            "GPU niceonly field {seq}: base {base}, M={}, R={}",
+            plan.modulus, plan.num_residues
+        );
+        let (field_start_lo, field_start_hi) = split_u128(range.start());
+        let stream = &self.shared.stream;
+        self.open.insert(
+            seq,
+            CudaOpenField {
+                plan,
+                field_start_lo,
+                field_start_hi,
+                d_nice_out: stream.alloc_zeros::<u64>(2 * NICE_OUT_CAPACITY)?,
+                d_nice_count: stream.alloc_zeros::<u32>(1)?,
+                start: None,
+                batches: Vec::new(),
+            },
+        );
+        Ok(())
+    }
+
+    /// Upload a batch of range descriptors and launch the kernel on them.
+    /// Launches are asynchronous on the stream; results accumulate in the
+    /// field's output buffers until it is closed.
+    fn launch(&mut self, field: u64, offsets: &[u64], lens: &[u32], masks: &[u64]) -> Result<()> {
+        ensure!(
+            offsets.len() == lens.len() && offsets.len() == masks.len(),
+            "range descriptor slices have mismatched lengths ({}/{}/{})",
+            offsets.len(),
+            lens.len(),
+            masks.len()
+        );
+        let stream = self.shared.stream.clone();
+        let open = self
+            .open
+            .get_mut(&field)
+            .ok_or_else(|| anyhow::anyhow!("launch for a field that is not open ({field})"))?;
+        if open.start.is_none() {
+            open.start = Some(record_timing_event(&stream)?);
+        }
+        let nice_capacity = NICE_OUT_CAPACITY as u32;
+        let max_inflight = BATCHES_IN_FLIGHT;
+        for ((batch_offsets, batch_lens), batch_masks) in offsets
+            .chunks(RANGES_PER_LAUNCH)
+            .zip(lens.chunks(RANGES_PER_LAUNCH))
+            .zip(masks.chunks(RANGES_PER_LAUNCH))
+        {
+            // Backpressure: no more than `max_inflight` batches outstanding.
+            while self.inflight.len() >= max_inflight {
+                if let Some(oldest) = self.inflight.pop_front() {
+                    oldest.synchronize()?;
+                }
+            }
+            let d_offsets = stream.clone_htod(batch_offsets)?;
+            let d_lens = stream.clone_htod(batch_lens)?;
+            let d_masks = if open.plan.low_masks.is_some() {
+                Some(stream.clone_htod(batch_masks)?)
+            } else {
+                None
+            };
+            let num_ranges = batch_offsets.len() as u32;
+
+            // One warp per range.
+            let total_threads = u64::from(num_ranges) * 32;
+            let grid_blocks = total_threads.div_ceil(u64::from(BLOCK_THREADS)) as u32;
+            let cfg = LaunchConfig {
+                grid_dim: (grid_blocks, 1, 1),
+                block_dim: (BLOCK_THREADS, 1, 1),
+                shared_mem_bytes: 0,
+            };
+
+            let mut launch_args = stream.launch_builder(&open.plan.func);
+            launch_args.arg(&open.field_start_lo);
+            launch_args.arg(&open.field_start_hi);
+            launch_args.arg(&d_offsets);
+            launch_args.arg(&d_lens);
+            launch_args.arg(&num_ranges);
+            launch_args.arg(&open.plan.residues);
+            launch_args.arg(&open.d_nice_out);
+            launch_args.arg(&mut open.d_nice_count);
+            launch_args.arg(&nice_capacity);
+            if let Some(low_masks) = &open.plan.low_masks {
+                launch_args.arg(low_masks);
+                let d_masks = d_masks
+                    .as_ref()
+                    .expect("range masks uploaded whenever the kernel has CROSS_FILTER");
+                launch_args.arg(d_masks);
+            }
+            let before = record_timing_event(&stream)?;
+            unsafe {
+                launch_args.launch(cfg)?;
+            }
+            let after = record_timing_event(&stream)?;
+            self.inflight.push_back(stream.record_event(None)?);
+            open.batches.push((before, after));
+        }
+        Ok(())
+    }
+
+    fn end_field(&mut self, seq: u64) -> Result<Self::Pending> {
+        let open = self
+            .open
+            .remove(&seq)
+            .ok_or_else(|| anyhow::anyhow!("end of a field that is not open ({seq})"))?;
+        let end = record_timing_event(&self.shared.stream)?;
+        Ok(CudaPendingField {
+            stream: self.shared.stream.clone(),
+            base: open.plan.base,
+            d_nice_out: open.d_nice_out,
+            d_nice_count: open.d_nice_count,
+            start: open.start,
+            end,
+            batches: open.batches,
+        })
+    }
+}
+
+// ============================================================================
+// Detailed
+// ============================================================================
+
+/// Detailed-mode launches kept queued ahead of the progress bar's wait.
+const DETAILED_INFLIGHT: usize = 4;
+
+/// GPU implementation of `process_range_detailed`.
+///
+/// Each GPU thread derives its own candidate (no input transfer); the
+/// distribution accumulates in an on-device histogram and only near-miss
+/// numbers come back individually.
+///
+/// **Range semantics**: half-open [`range_start`, `range_end`).
+///
+/// # Errors
+/// Returns an error on any CUDA failure or if the near-miss buffer overflows.
+pub fn process_range_detailed_cuda(
+    ctx: &CudaContext,
+    range: &FieldSize,
+    base: u32,
+) -> Result<FieldResults> {
+    if !gpu_supports_base(base) {
+        warn!("base {base} not supported on GPU, falling back to CPU for this field");
+        return Ok(process_range_detailed(range, base));
+    }
+
+    let start_time = Instant::now();
+    let func = ctx.detailed_kernel(base)?;
+
+    let hist_bins = (base + 1) as usize;
+    let d_hist = ctx.stream.alloc_zeros::<u64>(hist_bins)?;
+    let d_miss_out = ctx.stream.alloc_zeros::<u64>(2 * NEAR_MISS_CAPACITY)?;
+    let mut d_miss_uniques = ctx.stream.alloc_zeros::<u32>(NEAR_MISS_CAPACITY)?;
+    let mut d_miss_count = ctx.stream.alloc_zeros::<u32>(1)?;
+    let miss_capacity = NEAR_MISS_CAPACITY as u32;
+
+    // Launches are asynchronous, so the progress bar ticks on completion:
+    // each batch records an event, and the loop waits for the batch
+    // `DETAILED_INFLIGHT` launches back before adding another. With that
+    // many queued the device never starves, and the wait is what keeps the
+    // bar honest.
+    let progress = crate::progress::FieldProgress::begin(range, CUDA_BATCH_SIZE as u128);
+    let mut inflight: VecDeque<CudaEvent> = VecDeque::with_capacity(DETAILED_INFLIGHT);
+
+    for batch in range.chunks(CUDA_BATCH_SIZE as u128) {
+        if inflight.len() == DETAILED_INFLIGHT
+            && let Some(oldest) = inflight.pop_front()
+        {
+            oldest.synchronize()?;
+            progress.tick();
+        }
+        let (start_lo, start_hi) = split_u128(batch.start());
+        let count = batch.size() as u64;
+
+        // Grid-stride: cap the grid and let threads loop.
+        let grid_blocks = count.div_ceil(u64::from(BLOCK_THREADS)).min(65_536) as u32;
+        let cfg = LaunchConfig {
+            grid_dim: (grid_blocks, 1, 1),
+            block_dim: (BLOCK_THREADS, 1, 1),
+            shared_mem_bytes: 0,
+        };
+
+        let mut launch_args = ctx.stream.launch_builder(&func);
+        launch_args.arg(&start_lo);
+        launch_args.arg(&start_hi);
+        launch_args.arg(&count);
+        launch_args.arg(&d_hist);
+        launch_args.arg(&d_miss_out);
+        launch_args.arg(&mut d_miss_uniques);
+        launch_args.arg(&mut d_miss_count);
+        launch_args.arg(&miss_capacity);
+        unsafe {
+            launch_args.launch(cfg)?;
+        }
+        inflight.push_back(ctx.stream.record_event(None)?);
+    }
+
+    let histogram = ctx.stream.clone_dtoh(&d_hist)?;
+    // The blocking read above drained the stream, so the tail is done too.
+    for _ in inflight.drain(..) {
+        progress.tick();
+    }
+    let miss_count = ctx.stream.clone_dtoh(&d_miss_count)?[0] as usize;
+    if miss_count > NEAR_MISS_CAPACITY {
+        bail!("near-miss buffer overflow: {miss_count} > {NEAR_MISS_CAPACITY}");
+    }
+    let mut nice_numbers = Vec::with_capacity(miss_count);
+    if miss_count > 0 {
+        // Only the records written: the buffers hold NEAR_MISS_CAPACITY.
+        let out = ctx.stream.clone_dtoh(&d_miss_out.slice(..2 * miss_count))?;
+        let uniques = ctx.stream.clone_dtoh(&d_miss_uniques.slice(..miss_count))?;
+        for i in 0..miss_count {
+            nice_numbers.push(NiceNumberSimple {
+                number: combine_u64(out[2 * i], out[2 * i + 1]),
+                num_uniques: uniques[i],
+            });
+        }
+        nice_numbers.sort_by_key(|n| n.number);
+    }
+
+    let distribution: Vec<UniquesDistributionSimple> = (1..=base)
+        .map(|i| UniquesDistributionSimple {
+            num_uniques: i,
+            count: u128::from(histogram[i as usize]),
+        })
+        .collect();
+
+    #[allow(clippy::cast_precision_loss)]
+    {
+        let secs = start_time.elapsed().as_secs_f64();
+        debug!(
+            "GPU detailed b{base}: {:.2e} numbers in {secs:.2}s ({:.2e} n/s), {miss_count} near-misses",
+            range.size() as f64,
+            range.size() as f64 / secs,
+        );
+    }
+
+    Ok(FieldResults {
+        distribution,
+        nice_numbers,
+    })
+}
+
+// ============================================================================
+// Convenience wrappers (same signatures as the CPU process_* functions)
+// ============================================================================
+
+/// Process a field using GPU acceleration (detailed mode).
+///
+/// # Errors
+/// Returns an error on any CUDA failure.
+pub fn process_detailed_cuda(
+    ctx: &CudaContext,
+    claim_data: &DataToClient,
+    username: &String,
+) -> Result<DataToServer> {
+    let results = process_range_detailed_cuda(ctx, &claim_data.into(), claim_data.base)?;
+
+    Ok(DataToServer {
+        claim_id: claim_data.claim_id,
+        username: username.to_owned(),
+        client_version: CLIENT_VERSION.to_string(),
+        unique_distribution: Some(results.distribution),
+        nice_numbers: results.nice_numbers,
+        telemetry: None,
+    })
+}
+
+/// Process a field using GPU acceleration (niceonly mode).
+///
+/// # Errors
+/// Returns an error on any CUDA failure.
+pub fn process_niceonly_cuda(
+    ctx: &CudaContext,
+    claim_data: &DataToClient,
+    username: &String,
+) -> Result<DataToServer> {
+    let results = crate::gpu_route::process_niceonly(ctx, &claim_data.into(), claim_data.base)?;
+
+    Ok(DataToServer {
+        claim_id: claim_data.claim_id,
+        username: username.to_owned(),
+        client_version: CLIENT_VERSION.to_string(),
+        unique_distribution: None,
+        nice_numbers: results.nice_numbers,
+        telemetry: None,
+    })
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+//
+// The GPU-requiring tests are #[ignore]d and meant for the A100. The rest are
+// CPU-side mirrors of the kernel's algorithms — they exercise the *exact*
+// index math and digit-extraction logic the kernel uses, against the trusted
+// CPU implementations, so kernel logic bugs are caught without a GPU.
+
+// The mirror functions intentionally transliterate the kernel's C, casts and
+// all, so the cast lints are relaxed for this module.
+#[cfg(test)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss
+)]
+mod tests {
+    use super::*;
+    use crate::client_process;
+    use crate::client_process::process_range_niceonly;
+    use crate::gpu_config::{AffineParams, PrefilterParams};
+    use crate::residue_filter;
+    use crate::stride_filter::StrideTable;
+
+    /// Throughput of the continuous pipeline on a fixed run of fields, so two
+    /// configurations can be compared on identical work (production claims
+    /// hand every run different regions, whose MSD character varies 2x).
+    /// Fields are queued `FIELDS_IN_FLIGHT` deep and `NICE_GPU_MSD_FLOOR`
+    /// applies, as in production; `NICE_TEST_FIELDS` (required: it is also
+    /// the opt-in) fields of 1e13 in base 54 from the region the Anvil runs
+    /// covered.
+    #[test]
+    #[ignore = "requires an NVIDIA device; prints throughput"]
+    #[allow(clippy::cast_precision_loss)]
+    fn pipeline_throughput_fixed_fields() {
+        use crate::gpu_niceonly::{FIELDS_IN_FLIGHT, msd_floor_in_use};
+        use crate::gpu_route::{NiceonlyStarted, begin_niceonly};
+        // The parity workflow runs every ignored test in this module on a
+        // software rasterizer; a throughput run there is hours of nothing.
+        // Only run when asked for by name.
+        let Ok(n) = std::env::var("NICE_TEST_FIELDS") else {
+            eprintln!("skipping: set NICE_TEST_FIELDS to run the throughput harness");
+            return;
+        };
+        let ctx = CudaContext::new(0).expect("CUDA context");
+        let base = 54;
+        let n: usize = n.parse().expect("NICE_TEST_FIELDS must be a count");
+        let start: u128 = 2_778_136_280_153_679_229;
+        let size: u128 = 10_000_000_000_000;
+        let fields: Vec<FieldSize> = (0..n as u128)
+            .map(|i| FieldSize::new(start + i * size, start + (i + 1) * size))
+            .collect();
+        // Warm up: plan build and first-field effects.
+        let warm = FieldSize::new(start - size, start);
+        if let NiceonlyStarted::Queued(ticket) = begin_niceonly(&ctx, &warm, base).unwrap() {
+            let (_, stats) = ctx.finish(ticket).unwrap();
+            assert!(
+                stats.device_busy_secs.is_some_and(|s| s > 0.0),
+                "device busy time missing from the pipeline stats: {stats:?}"
+            );
+        }
+        let lookahead = FIELDS_IN_FLIGHT.saturating_sub(1);
+        let t = Instant::now();
+        let mut queued = std::collections::VecDeque::new();
+        let mut found = 0usize;
+        for f in &fields {
+            if let NiceonlyStarted::Queued(ticket) = begin_niceonly(&ctx, f, base).unwrap() {
+                queued.push_back(ticket);
+            }
+            while queued.len() > lookahead {
+                let ticket = queued.pop_front().unwrap();
+                found += ctx.finish(ticket).unwrap().0.nice_numbers.len();
+            }
+        }
+        for ticket in queued {
+            found += ctx.finish(ticket).unwrap().0.nice_numbers.len();
+        }
+        let secs = t.elapsed().as_secs_f64();
+        eprintln!(
+            "THROUGHPUT fields_in_flight={} floor_now={} fields={n} secs={secs:.2} rate={:.3e} n/s found={found}",
+            FIELDS_IN_FLIGHT,
+            msd_floor_in_use(),
+            (n as f64) * (size as f64) / secs
+        );
+    }
+
+    /// Bases used for CPU-side mirror tests: a mix of small, u64-range,
+    /// u128-range, two-mask (>64), and beyond-U256 (>68) regimes.
+    const MIRROR_TEST_BASES: [u32; 8] = [10, 40, 45, 57, 62, 68, 70, 94];
+
+    fn try_init_cuda() -> Option<CudaContext> {
+        CudaContext::new(0).ok()
+    }
+
+    // ------------------------------------------------------------------
+    // Mirror of the kernel's stride candidate enumeration (niceonly)
+    // ------------------------------------------------------------------
+
+    /// Rust mirror of `mod_m` in `nice_kernels.cu`.
+    fn mirror_mod_m(n: u128, modulus: u32, pow64_mod_m: u32) -> u32 {
+        let (n_lo, n_hi) = split_u128(n);
+        let hi_mod = (n_hi % u64::from(modulus)) as u32;
+        let lo_mod = (n_lo % u64::from(modulus)) as u32;
+        let t = u64::from(hi_mod) * u64::from(pow64_mod_m) + u64::from(lo_mod);
+        (t % u64::from(modulus)) as u32
+    }
+
+    /// Rust mirror of the candidate loop in `niceonly_ranges_kernel`,
+    /// with all 32 lanes' indices merged (g increments by 1).
+    fn mirror_kernel_candidates(range: &FieldSize, table: &StrideTable) -> Vec<u128> {
+        let modulus = table.modulus as u32;
+        let pow64_mod_m = ((1u128 << 64) % table.modulus) as u32;
+        let residues: Vec<u32> = table.valid_residues.clone();
+        let r_count = residues.len() as u32;
+
+        let m = mirror_mod_m(range.start(), modulus, pow64_mod_m);
+        let b0 = range.start() - u128::from(m);
+        let idx0 = residues.partition_point(|&r| r < m) as u32;
+
+        let mut out = Vec::new();
+        let mut g = idx0;
+        loop {
+            let cycle = g / r_count;
+            let j = g - cycle * r_count;
+            let add = u64::from(cycle) * u64::from(modulus) + u64::from(residues[j as usize]);
+            let n = b0 + u128::from(add);
+            if n >= range.end() {
+                break;
+            }
+            out.push(n);
+            g += 1;
+        }
+        out
+    }
+
+    /// Candidates via the trusted CPU stride table iteration.
+    fn cpu_candidates(range: &FieldSize, table: &StrideTable) -> Vec<u128> {
+        let mut out = Vec::new();
+        let (mut n, mut idx) = table.first_valid_at_or_after(range.start());
+        while n < range.end() {
+            out.push(n);
+            n += u128::from(table.gap_table[idx]);
+            idx = (idx + 1) % table.gap_table.len();
+        }
+        out
+    }
+
+    /// Mirror of the kernel's `CROSS_FILTER` candidate selection (both the
+    /// naive-skip and the compacted variant check exactly this set): the
+    /// residue index of the g-th candidate is g mod R, and a candidate
+    /// survives iff its residue's low mask misses the range's certificate.
+    fn mirror_kernel_candidates_masked(
+        range: &FieldSize,
+        table: &StrideTable,
+        high_mask: u64,
+    ) -> Vec<u128> {
+        let r_count = table.valid_residues.len() as u32;
+        let m = mirror_mod_m(
+            range.start(),
+            table.modulus as u32,
+            ((1u128 << 64) % table.modulus) as u32,
+        );
+        let b0 = range.start() - u128::from(m);
+        let idx0 = table.valid_residues.partition_point(|&r| r < m) as u32;
+        let mut out = Vec::new();
+        let mut g = idx0;
+        loop {
+            let cycle = g / r_count;
+            let j = (g - cycle * r_count) as usize;
+            let add = u64::from(cycle) * table.modulus as u64 + u64::from(table.valid_residues[j]);
+            let n = b0 + u128::from(add);
+            if n >= range.end() {
+                break;
+            }
+            if table.low_digit_masks[j] & high_mask == 0 {
+                out.push(n);
+            }
+            g += 1;
+        }
+        out
+    }
+
+    /// The kernel's mask-filtered candidate set must equal the CPU's
+    /// masked stride iteration for the same (range, certificate).
+    #[test_log::test]
+    fn kernel_cross_filter_matches_cpu_masked_iteration() {
+        for base in [40u32, 52, 62] {
+            let Ok(Some(base_range)) = base_range::get_base_range_u128(base) else {
+                continue;
+            };
+            let table = StrideTable::new(base, GPU_LSD_K);
+            let span = base_range.range_end - base_range.range_start;
+            let mut x: u128 = 0x0f0e_0d0c_0b0a_0908_0706_0504_0302_0100;
+            let mut nonempty = 0;
+            // Unconditioned random ranges reject often (no surviving
+            // ancestors pre-screen them), so sample until enough live
+            // certificates have been exercised.
+            for i in 0..2000u128 {
+                if nonempty >= 25 {
+                    break;
+                }
+                x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(i);
+                let start = base_range.range_start + (x % (span - 10_000));
+                let range = FieldSize::new(start, start + 1953);
+                let crate::msd_prefix_filter::MsdAnalysis::Live { fixed_mask } =
+                    crate::msd_prefix_filter::analyze_range(range, base, GPU_LSD_K as usize)
+                else {
+                    continue;
+                };
+                if fixed_mask != 0 {
+                    nonempty += 1;
+                }
+                // CPU truth: candidates the masked iteration would check.
+                let mut cpu = Vec::new();
+                let (mut n, mut idx) = table.first_valid_at_or_after(range.start());
+                while n < range.end() {
+                    if table.low_digit_masks[idx] & fixed_mask == 0 {
+                        cpu.push(n);
+                    }
+                    n += u128::from(table.gap_table[idx]);
+                    idx = (idx + 1) % table.gap_table.len();
+                }
+                assert_eq!(
+                    mirror_kernel_candidates_masked(&range, &table, fixed_mask),
+                    cpu,
+                    "masked candidate mismatch: base {base} range [{start}, ..)"
+                );
+            }
+            assert!(nonempty >= 25, "b{base}: too few live certificates to test");
+        }
+    }
+
+    #[test_log::test]
+    fn kernel_candidate_enumeration_matches_stride_table() {
+        for base in MIRROR_TEST_BASES {
+            let Ok(Some(base_range)) = base_range::get_base_range_u128(base) else {
+                continue;
+            };
+            let table = StrideTable::new(base, GPU_LSD_K);
+            if table.valid_residues.is_empty() {
+                continue;
+            }
+
+            // Sub-ranges probing: field start, mid-range, modulus wraparound,
+            // and small/odd sizes.
+            let modulus = table.modulus;
+            // A start whose residue lands strictly past the last valid
+            // residue, forcing the kernel's lower_bound to return R (the
+            // next-cycle wraparound case).
+            let past_last = {
+                let m_target = u128::from(table.valid_residues.last().unwrap() + 1);
+                let cycle_base = base_range.range_start - (base_range.range_start % modulus);
+                let mut s = cycle_base + m_target.min(modulus - 1);
+                if s < base_range.range_start {
+                    s += modulus;
+                }
+                s
+            };
+            let starts = [
+                base_range.range_start,
+                base_range.range_start + 1,
+                base_range.range_start + modulus - 1,
+                base_range.range_start + modulus * 7 + modulus / 2,
+                base_range.range_start + (base_range.range_end - base_range.range_start) / 2,
+                past_last,
+            ];
+            for start in starts {
+                for size in [1u128, 250, 1999, 3 * modulus + 17] {
+                    let end = (start + size).min(base_range.range_end);
+                    if start >= end {
+                        continue;
+                    }
+                    let range = FieldSize::new(start, end);
+                    assert_eq!(
+                        mirror_kernel_candidates(&range, &table),
+                        cpu_candidates(&range, &table),
+                        "candidate mismatch: base {base} range [{start}, {end})"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test_log::test]
+    fn mirror_mod_m_matches_direct() {
+        for base in MIRROR_TEST_BASES {
+            let table = StrideTable::new(base, GPU_LSD_K);
+            if table.valid_residues.is_empty() {
+                continue;
+            }
+            let modulus = table.modulus as u32;
+            let pow64_mod_m = ((1u128 << 64) % table.modulus) as u32;
+            // Deterministic pseudo-random u128 samples.
+            let mut x: u128 = 0x1234_5678_9abc_def0_1122_3344_5566_7788;
+            for _ in 0..1000 {
+                x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                assert_eq!(
+                    u128::from(mirror_mod_m(x, modulus, pow64_mod_m)),
+                    x % table.modulus,
+                    "mod_m mismatch for base {base}, n={x}"
+                );
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Mirror of the kernel's digit extraction
+    // ------------------------------------------------------------------
+
+    /// Rust mirror of `mul_limbs` in `nice_kernels.cu`.
+    fn mirror_mul_limbs(a: &[u32], b: &[u32]) -> Vec<u32> {
+        let mut r = vec![0u32; a.len() + b.len()];
+        for i in 0..a.len() {
+            let mut carry = 0u64;
+            for j in 0..b.len() {
+                let cur = u64::from(a[i]) * u64::from(b[j]) + u64::from(r[i + j]) + carry;
+                r[i + j] = cur as u32;
+                carry = cur >> 32;
+            }
+            r[i + b.len()] = carry as u32;
+        }
+        r
+    }
+
+    /// Rust mirror of `scan_digits` in `nice_kernels.cu`. Returns the digits in
+    /// extraction order, or None if `stop_on_dup` hit a duplicate (with the
+    /// digits seen so far tracked in `seen`).
+    fn mirror_scan_digits(
+        v: &mut [u32],
+        chunk_digits: u32,
+        chunk_div: u32,
+        base: u32,
+        seen: &mut [bool; 128],
+        stop_on_dup: bool,
+        digits_out: &mut Vec<u32>,
+    ) -> bool {
+        let mut top = v.len() as i32 - 1;
+        while top >= 0 && v[top as usize] == 0 {
+            top -= 1;
+        }
+        while top >= 0 {
+            let mut rem = 0u32;
+            for i in (0..=top).rev() {
+                let cur = (u64::from(rem) << 32) | u64::from(v[i as usize]);
+                let q = cur / u64::from(chunk_div);
+                rem = (cur - q * u64::from(chunk_div)) as u32;
+                v[i as usize] = q as u32;
+            }
+            while top >= 0 && v[top as usize] == 0 {
+                top -= 1;
+            }
+            let mut chunk = rem;
+            if top >= 0 {
+                for _ in 0..chunk_digits {
+                    let d = chunk % base;
+                    chunk /= base;
+                    digits_out.push(d);
+                    if stop_on_dup && seen[d as usize] {
+                        return false;
+                    }
+                    seen[d as usize] = true;
+                }
+            } else {
+                while chunk != 0 {
+                    let d = chunk % base;
+                    chunk /= base;
+                    digits_out.push(d);
+                    if stop_on_dup && seen[d as usize] {
+                        return false;
+                    }
+                    seen[d as usize] = true;
+                }
+            }
+        }
+        true
+    }
+
+    /// Rust mirror of `square_and_cube` + both scans, computing `num_uniques`
+    /// the way the detailed kernel does.
+    fn mirror_num_unique_digits(n: u128, base: u32) -> u32 {
+        let (chunk_digits, chunk_div) = chunk_constants(base);
+        let n_bits = 128 - n.leading_zeros();
+        let n_limbs = (n_bits.div_ceil(32).max(1)) as usize;
+        let n32: Vec<u32> = (0..n_limbs).map(|i| (n >> (32 * i)) as u32).collect();
+
+        let mut sq = mirror_mul_limbs(&n32, &n32);
+        let mut cu = mirror_mul_limbs(&sq, &n32);
+
+        let mut seen = [false; 128];
+        let mut digits = Vec::new();
+        mirror_scan_digits(
+            &mut sq,
+            chunk_digits,
+            chunk_div,
+            base,
+            &mut seen,
+            false,
+            &mut digits,
+        );
+        mirror_scan_digits(
+            &mut cu,
+            chunk_digits,
+            chunk_div,
+            base,
+            &mut seen,
+            false,
+            &mut digits,
+        );
+        seen.iter().filter(|&&s| s).count() as u32
+    }
+
+    /// Rust mirror of `reduce_pre` in `nice_kernels.cu`.
+    fn mirror_reduce_pre(mut hi: u64, mut lo: u64, modulus: u64, pow64_mod: u64) -> u64 {
+        while hi != 0 {
+            let p_lo = hi.wrapping_mul(pow64_mod);
+            let p_hi = ((u128::from(hi) * u128::from(pow64_mod)) >> 64) as u64;
+            lo = lo.wrapping_add(p_lo);
+            hi = p_hi + u64::from(lo < p_lo);
+        }
+        lo % modulus
+    }
+
+    /// Rust mirror of `prefilter_low_digits` in `nice_kernels.cu`.
+    fn mirror_prefilter(n: u128, base: u32, pre: &PrefilterParams) -> bool {
+        let mulhi = |a: u64, b: u64| ((u128::from(a) * u128::from(b)) >> 64) as u64;
+        let mulmod = |a: u64, b: u64| {
+            mirror_reduce_pre(mulhi(a, b), a.wrapping_mul(b), pre.modulus, pre.pow64_mod)
+        };
+        let (n_lo, n_hi) = split_u128(n);
+        let nm = mirror_reduce_pre(n_hi, n_lo, pre.modulus, pre.pow64_mod);
+        let mut sq = mulmod(nm, nm);
+        let mut cu = mulmod(sq, nm);
+
+        let mut seen = [false; 128];
+        let mut dup = false;
+        for _ in 0..pre.digits {
+            let d = (sq % u64::from(base)) as usize;
+            sq /= u64::from(base);
+            dup |= seen[d];
+            seen[d] = true;
+        }
+        for _ in 0..pre.digits {
+            let d = (cu % u64::from(base)) as usize;
+            cu /= u64::from(base);
+            dup |= seen[d];
+            seen[d] = true;
+        }
+        !dup
+    }
+
+    #[test_log::test]
+    fn prefilter_modular_arithmetic_matches_direct() {
+        for base in MIRROR_TEST_BASES {
+            let Some(pre) = prefilter_params(base) else {
+                continue;
+            };
+            let Ok(Some(base_range)) = base_range::get_base_range_u128(base) else {
+                continue;
+            };
+            let m = u128::from(pre.modulus);
+            assert_eq!(u128::from(pre.pow64_mod), (1u128 << 64) % m);
+            assert_eq!(m, u128::from(base).pow(pre.digits));
+
+            let span = base_range.range_end - base_range.range_start;
+            let mut x: u128 = 0x0123_4567_89ab_cdef_0f1e_2d3c_4b5a_6978;
+            for i in 0..500u128 {
+                x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(i);
+                let n = base_range.range_start + (x % span);
+                // reduce_pre(n) == n mod m
+                let (n_lo, n_hi) = split_u128(n);
+                let nm = mirror_reduce_pre(n_hi, n_lo, pre.modulus, pre.pow64_mod);
+                assert_eq!(u128::from(nm), n % m, "reduce_pre mismatch b{base} n={n}");
+                // and the mulmod chain reproduces n^2 mod m, n^3 mod m
+                let sq_direct = (n % m) * (n % m) % m;
+                let cu_direct = sq_direct * (n % m) % m;
+                let mulhi = |a: u64, b: u64| ((u128::from(a) * u128::from(b)) >> 64) as u64;
+                let sq = mirror_reduce_pre(
+                    mulhi(nm, nm),
+                    nm.wrapping_mul(nm),
+                    pre.modulus,
+                    pre.pow64_mod,
+                );
+                let cu = mirror_reduce_pre(
+                    mulhi(sq, nm),
+                    sq.wrapping_mul(nm),
+                    pre.modulus,
+                    pre.pow64_mod,
+                );
+                assert_eq!(u128::from(sq), sq_direct, "sq mismatch b{base} n={n}");
+                assert_eq!(u128::from(cu), cu_direct, "cu mismatch b{base} n={n}");
+            }
+        }
+    }
+
+    /// Sample count for `prefilter_is_sound_and_selective`.
+    const SAMPLES: u32 = 2000;
+
+    #[test_log::test]
+    fn prefilter_is_sound_and_selective() {
+        for base in MIRROR_TEST_BASES {
+            let Some(pre) = prefilter_params(base) else {
+                continue;
+            };
+            let Ok(Some(base_range)) = base_range::get_base_range_u128(base) else {
+                continue;
+            };
+            let span = base_range.range_end - base_range.range_start;
+            let mut x: u128 = 0xdead_beef_cafe_f00d_0d15_ea5e_feed_face;
+            let mut rejected = 0u32;
+            for i in 0..SAMPLES {
+                x = x
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(u128::from(i));
+                let n = base_range.range_start + (x % span);
+                if mirror_prefilter(n, base, &pre) {
+                    continue;
+                }
+                rejected += 1;
+                // Soundness: a rejected candidate must not be nice.
+                assert!(
+                    !client_process::get_is_nice(n, base),
+                    "prefilter rejected a nice number: b{base} n={n}"
+                );
+            }
+            // Selectivity sanity: expected kill rates are 76-99% for these
+            // bases; require at least half so a broken filter can't silently
+            // pass everything.
+            assert!(
+                rejected * 2 > SAMPLES,
+                "prefilter suspiciously weak at b{base}: {rejected}/{SAMPLES}"
+            );
+        }
+    }
+
+    #[test_log::test]
+    fn prefilter_guard_disables_small_bases() {
+        // b10's n^2 has ~4 digits, far below PRE_DIGITS — the digit-count
+        // guard must disable the prefilter or it would extract phantom zeros.
+        assert!(prefilter_params(10).is_none());
+        // Low bases where the prefilter pays (survival ~1%) keep it.
+        for base in [30, 40] {
+            assert!(
+                prefilter_params(base).is_some(),
+                "expected prefilter at b{base}"
+            );
+        }
+        // Above the profitability threshold it is compiled out even though
+        // it would be sound: at 4%+ lane survival most warps run the full
+        // check anyway (GPU_PREFILTER_MAX_BASE, g1-verdict.md).
+        for base in [42, 52, 62, 68] {
+            assert!(
+                prefilter_params(base).is_none(),
+                "expected prefilter disabled at b{base}"
+            );
+        }
+    }
+
+    /// Regression for the v3.2.14 phantom-zero bug: an `#ifndef PREFILTER`
+    /// fallback in the kernel source force-enabled the prefilter (with
+    /// base-40 constants) on the bases where the host deliberately omits it,
+    /// so the GPU silently rejected every candidate on b10-25. The define
+    /// must come only from the host or the standalone syntax-check block.
+    #[test_log::test]
+    fn prefilter_has_no_ifndef_fallback() {
+        let kernel_src = include_str!("cuda/nice_kernels.cu");
+        assert!(
+            !kernel_src.contains("#ifndef PREFILTER"),
+            "PREFILTER must not have an #ifndef fallback; the host omits the \
+             define deliberately for bases with too-short n^2/n^3"
+        );
+        // And the host must keep omitting it where the guard says so.
+        for base in [10u32, 12, 25] {
+            let (defines, _) = niceonly_defines(base).unwrap();
+            assert!(
+                !defines.iter().any(|d| d.starts_with("PREFILTER")),
+                "b{base}: host emitted PREFILTER despite disabled guard"
+            );
+        }
+    }
+
+    #[test_log::test]
+    fn mirror_digit_extraction_matches_cpu() {
+        for base in MIRROR_TEST_BASES {
+            let Ok(Some(base_range)) = base_range::get_base_range_u128(base) else {
+                continue;
+            };
+            // Deterministic samples across the base's range.
+            let span = base_range.range_end - base_range.range_start;
+            let mut x: u128 = 0x9e37_79b9_7f4a_7c15_f39c_c060_5ced_c834;
+            for i in 0..200u128 {
+                x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(i);
+                let n = base_range.range_start + (x % span);
+                assert_eq!(
+                    mirror_num_unique_digits(n, base),
+                    client_process::get_num_unique_digits(n, base),
+                    "unique digit count mismatch: base {base}, n={n}"
+                );
+            }
+        }
+    }
+
+    #[test_log::test]
+    fn mirror_digit_extraction_known_nice() {
+        // 69 is nice in base 10: 69² = 4761, 69³ = 328509.
+        assert_eq!(mirror_num_unique_digits(69, 10), 10);
+        assert!(client_process::get_is_nice(69, 10));
+    }
+
+    // ------------------------------------------------------------------
+    // Mirror of the kernel's affine middle-digit filter (niceonly, AFFINE)
+    // ------------------------------------------------------------------
+
+    /// Rust mirror of `affine_survives` in `nice_kernels.cu`: the same
+    /// (hi, lo) reduction loop and the same word arithmetic.
+    #[allow(clippy::similar_names, clippy::many_single_char_names)]
+    fn mirror_affine_survives(n: u128, base: u32, aff: &AffineParams, known: u64) -> bool {
+        let (n_lo, n_hi) = split_u128(n);
+        let nmod = mirror_reduce_pre(n_hi, n_lo, aff.b2k, aff.pow64_mod);
+        let bk = u64::from(aff.bk);
+        let s = nmod % bk;
+        let t = nmod / bk;
+        let s2 = s * s;
+        let s3 = s2 * s;
+        let q = ((s2 / bk + 2 * s * t) % bk) as u32;
+        let c = ((s3 / bk + 3 * s2 * t) % bk) as u32;
+        let (q0, q12) = (q % base, q / base);
+        let (q1, q2) = (q12 % base, q12 / base);
+        let (c0, c12) = (c % base, c / base);
+        let (c1, c2) = (c12 % base, c12 / base);
+        let mq = (1u64 << q0) | (1u64 << q1) | (1u64 << q2);
+        let mc = (1u64 << c0) | (1u64 << c1) | (1u64 << c2);
+        let dup = mq.count_ones() != 3 || mc.count_ones() != 3;
+        !dup && (((mq | mc) & known) | (mq & mc)) == 0
+    }
+
+    /// Base-`base` digits of `n²` and `n³`, least significant first.
+    fn power_digits(n: u128, base: u32) -> (Vec<u32>, Vec<u32>) {
+        let mut sq = crate::fixed_width::U256::mul_u128_u128(n, n);
+        let mut cu = sq.mul_u128_truncating(n);
+        let (mut sqd, mut cud) = (Vec::new(), Vec::new());
+        while !sq.is_zero() {
+            sqd.push(sq.div_assign_rem_u32(base));
+        }
+        while !cu.is_zero() {
+            cud.push(cu.div_assign_rem_u32(base));
+        }
+        (sqd, cud)
+    }
+
+    /// The kernel's reduction and affine arithmetic, mirrored, on every base
+    /// the host emits AFFINE for (the CPU-only bases 40-64 and the GPU-only
+    /// ones below 40, base 64 included), random `n` in the legal range plus
+    /// the word extremes: the reduction must give `n mod b^6`, and the
+    /// verdict must be exactly "the six true middle digits (wide arithmetic)
+    /// are distinct and miss `known`", for arbitrary `known`.
+    #[test_log::test]
+    fn affine_mirror_matches_true_digits() {
+        let mut bases = 0;
+        for base in 10..=64u32 {
+            let Some(aff) = affine_params(base, GPU_LSD_K) else {
+                continue;
+            };
+            bases += 1;
+            let base_range = base_range::get_base_range_u128(base).unwrap().unwrap();
+            let b6 = u128::from(base).pow(6);
+            assert_eq!(u128::from(aff.b2k), b6);
+            let span = base_range.range_end - base_range.range_start;
+            let bk = u128::from(aff.bk);
+            let block = (base_range.range_start / b6 + 1) * b6;
+            let edges = [0, 1, 2, bk / 2, bk - 2, bk - 1];
+            let extremes = edges
+                .iter()
+                .flat_map(|&s| edges.iter().map(move |&t| block + s + bk * t));
+            let mut x: u128 = 0x5eed_1234_abcd_0f0f_9876_5432_10fe_dcba;
+            let random = (0..3000u128).map(move |i| {
+                x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(i);
+                base_range.range_start + (x % span)
+            });
+            let mut y: u64 = 0x0123_4567_89ab_cdef;
+            let mut rejected = 0u32;
+            for n in extremes.chain(random) {
+                let (n_lo, n_hi) = split_u128(n);
+                assert_eq!(
+                    u128::from(mirror_reduce_pre(n_hi, n_lo, aff.b2k, aff.pow64_mod)),
+                    n % b6,
+                    "reduce_b2k mismatch b{base} n={n}"
+                );
+                y = y.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                let known = y & (u64::MAX >> (64 - base));
+                let (sq, cu) = power_digits(n, base);
+                let mut seen = known;
+                let mut ok = true;
+                for &d in sq[3..6].iter().chain(&cu[3..6]) {
+                    ok &= seen & (1u64 << d) == 0;
+                    seen |= 1u64 << d;
+                }
+                let device = mirror_affine_survives(n, base, &aff, known);
+                assert_eq!(
+                    device, ok,
+                    "affine mirror mismatch b{base} n={n} known={known:#x}"
+                );
+                if crate::affine_filter::supports(base, GPU_LSD_K) {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let nmod = (n % b6) as u64;
+                    assert_eq!(crate::affine_filter::survives(base, nmod, known), ok);
+                }
+                rejected += u32::from(!device);
+            }
+            assert!(rejected > 0, "b{base}: affine mirror never rejected");
+        }
+        assert!(bases >= 25, "only {bases} bases emit AFFINE");
+    }
+
+    #[test_log::test]
+    fn affine_define_follows_cross_filter_availability() {
+        // Too few guaranteed digits: never emitted.
+        for base in [10u32, 12] {
+            assert!(affine_params(base, GPU_LSD_K).is_none());
+            let (defines, _) = niceonly_defines(base).unwrap();
+            assert!(!defines.iter().any(|d| d == "AFFINE"), "b{base}");
+        }
+        // Production bases with low masks: emitted with its constants.
+        for base in [40u32, 52, 62, 64] {
+            let (defines, _) = niceonly_defines(base).unwrap();
+            assert!(defines.iter().any(|d| d == "AFFINE"), "b{base}");
+            assert!(defines.iter().any(|d| d.starts_with("AFF_BK=")), "b{base}");
+            assert!(defines.iter().any(|d| d.starts_with("AFF_B2K=")), "b{base}");
+            assert!(
+                defines.iter().any(|d| d.starts_with("POW64_MOD_B2K=")),
+                "b{base}"
+            );
+            assert!(defines.iter().any(|d| d == "CROSS_FILTER"), "b{base}");
+            assert!(defines.iter().any(|d| d == "COMPACT"), "b{base}");
+        }
+        // No low-mask table above 64, so no cross filter, no compaction and
+        // no affine filter.
+        for base in [68u32, 70] {
+            let (defines, _) = niceonly_defines(base).unwrap();
+            assert!(!defines.iter().any(|d| d == "CROSS_FILTER"), "b{base}");
+            assert!(!defines.iter().any(|d| d == "COMPACT"), "b{base}");
+            assert!(!defines.iter().any(|d| d == "AFFINE"), "b{base}");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // NVRTC compile tests: need libnvrtc but NO GPU device, so they run
+    // on any machine with the CUDA runtime libraries installed (e.g. inside
+    // the nvidia/cuda docker image). Skipped gracefully when NVRTC is absent.
+    // ------------------------------------------------------------------
+
+    #[test_log::test]
+    fn nvrtc_compiles_kernels_for_all_supported_bases() {
+        // Probe with a trivial program first: if THIS fails, the library is
+        // missing and we skip; any later failure is a real kernel bug.
+        // cudarc panics (rather than erroring) when libnvrtc can't be
+        // loaded, so the probe runs under catch_unwind.
+        let probe = std::panic::catch_unwind(|| {
+            compile_ptx_with_opts(
+                "extern \"C\" __global__ void probe() {}",
+                CompileOptions::default(),
+            )
+        });
+        if !matches!(probe, Ok(Ok(_))) {
+            // CI installs NVRTC and sets this, so a broken install fails
+            // there instead of passing as a skip.
+            assert!(
+                std::env::var_os("NICE_REQUIRE_NVRTC").is_none(),
+                "NICE_REQUIRE_NVRTC is set but NVRTC could not be loaded"
+            );
+            println!("NVRTC not available, skipping compile test");
+            return;
+        }
+
+        for base in 10..=MAX_GPU_DIGIT_MASK_BASE {
+            if !gpu_supports_base(base) {
+                continue;
+            }
+            let defines = detailed_defines(base).unwrap();
+            compile_kernel_ptx(&defines)
+                .unwrap_or_else(|e| panic!("detailed kernel failed to compile for b{base}: {e:?}"));
+            if !residue_filter::get_residue_filter_u128(&base).is_empty() {
+                let (defines, _table) = niceonly_defines(base).unwrap();
+                compile_kernel_ptx(&defines).unwrap_or_else(|e| {
+                    panic!("niceonly kernel failed to compile for b{base}: {e:?}")
+                });
+                // Also cover the kernel's other variants: cross without
+                // compaction (no longer selected, but still in the source),
+                // without the affine filter (NICE_CUDA_AFFINE=0), and
+                // neither, as bases above 64 compile it.
+                if defines.iter().any(|d| d == "CROSS_FILTER") {
+                    let no_compact: Vec<String> = defines
+                        .iter()
+                        .filter(|d| *d != "COMPACT")
+                        .cloned()
+                        .collect();
+                    compile_kernel_ptx(&no_compact).unwrap_or_else(|e| {
+                        panic!("no-compact niceonly kernel failed for b{base}: {e:?}")
+                    });
+                    let is_affine = |d: &String| {
+                        d == "AFFINE" || d.starts_with("AFF_") || d.starts_with("POW64_MOD_B2K")
+                    };
+                    let no_affine: Vec<String> =
+                        defines.iter().filter(|d| !is_affine(d)).cloned().collect();
+                    compile_kernel_ptx(&no_affine).unwrap_or_else(|e| {
+                        panic!("no-affine niceonly kernel failed for b{base}: {e:?}")
+                    });
+                    let plain: Vec<String> = defines
+                        .iter()
+                        .filter(|d| *d != "COMPACT" && *d != "CROSS_FILTER" && !is_affine(d))
+                        .cloned()
+                        .collect();
+                    compile_kernel_ptx(&plain).unwrap_or_else(|e| {
+                        panic!("plain niceonly kernel failed for b{base}: {e:?}")
+                    });
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // GPU integration tests (run on a CUDA machine with --ignored)
+    // ------------------------------------------------------------------
+
+    #[test_log::test]
+    #[ignore = "requires GPU"]
+    fn gpu_kernels_compile_for_all_supported_bases() {
+        let Some(ctx) = try_init_cuda() else {
+            println!("GPU not available, skipping test");
+            return;
+        };
+        for base in 2..=MAX_GPU_DIGIT_MASK_BASE {
+            if !gpu_supports_base(base) {
+                continue;
+            }
+            ctx.detailed_kernel(base)
+                .unwrap_or_else(|e| panic!("detailed kernel failed for base {base}: {e:?}"));
+            if !residue_filter::get_residue_filter_u128(&base).is_empty() {
+                ctx.niceonly
+                    .niceonly_plan(base)
+                    .unwrap_or_else(|e| panic!("niceonly kernel failed for base {base}: {e:?}"));
+            }
+        }
+    }
+
+    #[test_log::test]
+    #[ignore = "requires GPU"]
+    fn gpu_matches_cpu_detailed_small() {
+        let Some(ctx) = try_init_cuda() else {
+            println!("GPU not available, skipping test");
+            return;
+        };
+
+        for (base, start, size) in [
+            (10u32, 1_000_000u128, 10_000u128),
+            (40, 2_000_000_000_000, 100_000),
+        ] {
+            let range = FieldSize::new(start, start + size);
+            let cpu = process_range_detailed(&range, base);
+            let gpu = process_range_detailed_cuda(&ctx, &range, base).expect("GPU failed");
+
+            assert_eq!(
+                cpu.distribution, gpu.distribution,
+                "distribution mismatch at base {base}"
+            );
+            assert_eq!(
+                cpu.nice_numbers, gpu.nice_numbers,
+                "near-miss mismatch at base {base}"
+            );
+        }
+    }
+
+    /// The whole range of every base from 10 to 24 that has one (2.24
+    /// million numbers): the windows with near-misses, so the readback of
+    /// just the records written is compared in full.
+    #[test_log::test]
+    #[ignore = "requires GPU"]
+    fn gpu_reads_back_every_near_miss() {
+        let Some(ctx) = try_init_cuda() else {
+            println!("GPU not available, skipping test");
+            return;
+        };
+        let mut misses = 0;
+        for base in 10..=24 {
+            let Some(range) = crate::base_range::get_base_range_u128(base).unwrap() else {
+                continue;
+            };
+            let cpu = process_range_detailed(&range, base);
+            let gpu = process_range_detailed_cuda(&ctx, &range, base).expect("GPU failed");
+            assert_eq!(
+                cpu.distribution, gpu.distribution,
+                "distribution mismatch at base {base}"
+            );
+            assert_eq!(
+                cpu.nice_numbers, gpu.nice_numbers,
+                "near-miss mismatch at base {base}"
+            );
+            misses += cpu.nice_numbers.len();
+        }
+        assert!(misses > 0, "no near-misses compared");
+    }
+
+    #[test_log::test]
+    #[ignore = "requires GPU"]
+    fn gpu_matches_cpu_niceonly() {
+        let Some(ctx) = try_init_cuda() else {
+            println!("GPU not available, skipping test");
+            return;
+        };
+
+        // 10, 12, and 25 run with the prefilter host-disabled (regression for
+        // the v3.2.14 phantom-zero bug, where the GPU missed every nice
+        // number on such bases); the rest run the full prefilter path.
+        for base in [10u32, 12, 25, 40, 45, 62] {
+            let Ok(Some(base_range)) = base_range::get_base_range_u128(base) else {
+                continue;
+            };
+            let start = base_range.range_start;
+            let end = (start + 5_000_000).min(base_range.range_end);
+            let range = FieldSize::new(start, end);
+
+            let stride_table = StrideTable::new(base, GPU_LSD_K);
+            let cpu = process_range_niceonly(&range, base, &stride_table);
+            let gpu = crate::gpu_route::process_niceonly(&ctx, &range, base).expect("GPU failed");
+
+            let mut cpu_nice = cpu.nice_numbers;
+            cpu_nice.sort_by_key(|n| n.number);
+            assert_eq!(
+                cpu_nice, gpu.nice_numbers,
+                "niceonly mismatch at base {base}"
+            );
+        }
+    }
+
+    /// The NVIDIA pairing keeps hand-CUDA's stride fields and the `CubeCL`
+    /// join's fields apart by ticket, interleaved as the client runs them
+    /// (base 10's band, the join's parameters forced), and `begin_niceonly`
+    /// sends a production field to the join.
+    #[test]
+    #[cfg(feature = "cubecl-cuda")]
+    #[ignore = "requires an NVIDIA device"]
+    fn cuda_with_join_finishes_both_pipelines_by_ticket() {
+        use crate::cubecl_backend::CubeclContext;
+        use crate::gpu_route::{NiceonlyStarted, Route, begin_niceonly};
+        use crate::join_plan::JoinField;
+        use crate::overlap_join::JoinParams;
+        use crate::overlap_join::test_fields::FRONTIER_57;
+        let pair = CudaWithJoin {
+            cuda: CudaContext::new(0).expect("CUDA context"),
+            join: CubeclContext::new_cuda(0).expect("CubeCL CUDA context"),
+        };
+        let band = FieldSize::new(47, 100);
+        let lim = pair.join_limits().expect("the pairing has the join");
+        let join_field = || {
+            JoinField::prepare(10, &band, JoinParams { t: 2, k: 1, p: 0 }, lim)
+                .unwrap()
+                .expect("base 10 fits any device")
+        };
+        let tickets = [
+            pair.begin_join(join_field()).unwrap(),
+            pair.begin_stride(&band, 10).unwrap(),
+            pair.begin_join(join_field()).unwrap(),
+        ];
+        for ticket in tickets {
+            let route = ticket.route();
+            let (res, stats) = pair.finish(ticket).unwrap();
+            assert_eq!(stats.overlap_join, route == Route::Join);
+            let found: Vec<u128> = res.nice_numbers.iter().map(|n| n.number).collect();
+            assert_eq!(found, vec![69], "{route:?}");
+        }
+        let field = FieldSize::new(FRONTIER_57, FRONTIER_57 + 100_000_000_000_000);
+        let NiceonlyStarted::Queued(ticket) = begin_niceonly(&pair, &field, 57).unwrap() else {
+            panic!("a production field is queued");
+        };
+        assert_eq!(
+            ticket.route(),
+            Route::Join,
+            "the join takes a production field"
+        );
+        let (res, stats) = pair.finish(ticket).unwrap();
+        assert!(stats.overlap_join && res.nice_numbers.is_empty());
+    }
+
+    /// The pipeline sink's per-batch events must be timing-capable: v3.4.4
+    /// recorded them with `CU_EVENT_DISABLE_TIMING`, so the first field's
+    /// `wait` died in `cuEventElapsedTime` with `CUDA_ERROR_INVALID_HANDLE`
+    /// on every NVIDIA niceonly client. Runs a field through the real
+    /// pipeline and checks the busy time comes back and is sane.
+    #[test_log::test]
+    #[ignore = "requires GPU"]
+    fn gpu_pipeline_reports_device_busy_time() {
+        let Some(ctx) = try_init_cuda() else {
+            println!("GPU not available, skipping test");
+            return;
+        };
+        let base = 40;
+        let base_range = base_range::get_base_range_u128(base)
+            .expect("base range")
+            .expect("base 40 has a range");
+        let start = base_range.range_start;
+        let range = FieldSize::new(start, start + 2_000_000_000);
+        let crate::gpu_route::NiceonlyStarted::Queued(ticket) =
+            crate::gpu_route::begin_niceonly(&ctx, &range, base).expect("begin")
+        else {
+            panic!("CUDA niceonly fields go through the pipeline");
+        };
+        let (results, stats) = ctx.finish(ticket).expect("the field must finish");
+        let stride_table = StrideTable::new(base, GPU_LSD_K);
+        let mut cpu = process_range_niceonly(&range, base, &stride_table).nice_numbers;
+        cpu.sort_by_key(|n| n.number);
+        assert_eq!(
+            cpu, results.nice_numbers,
+            "niceonly mismatch through the pipeline"
+        );
+        let busy = stats
+            .device_busy_secs
+            .expect("device busy time is reported for every CUDA field");
+        assert!(
+            busy > 0.0 && busy <= stats.total_secs + 1.0,
+            "device busy time out of range: {busy} s of {} s total",
+            stats.total_secs
+        );
+    }
+
+    #[test_log::test]
+    fn test_split_combine_u128() {
+        for num in [0u128, 1, 12345, u128::from(u64::MAX), u128::MAX] {
+            let (lo, hi) = split_u128(num);
+            assert_eq!(combine_u64(lo, hi), num);
+        }
+    }
+}

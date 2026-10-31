@@ -4,6 +4,21 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-10-31 (day 4; routine fired 04:41 UTC)
+
+- **Reconcile:** no research instances; October research invoiced $4.24 (yesterday's $2.36
+  on seven rentals); fleet $66.92; credit $62.72; ivory disk 93 % → 89 % after removing two
+  stray build caches (pr-detailed-fd, pr-readback: agents built on ivory despite the brief).
+  #221 and #225 open and green, no review comments; #224 merged; **#226 merged** (API: detailed
+  Next claims from a cursor, wait for refills — the user's answer to the claim-rate note).
+  main = 472c9a0. No user messages since the authorisation; the Metal issue closed last night.
+- **PR #227 opened** (browser CPU detailed on FD, stacked on #221): ×7.0 suite, byte-identical
+  in Chromium on 141 windows (L23.1). L24 plan written: ~5 days, not 1–2 (L24/PLAN.md).
+- **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
+  dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
+  path on finite differences (ivory build + Playwright docker parity + web NiceMark) — kill
+  criterion: parity mismatch or no speed-up in the browser; L24 web GPU port: plan only.
+
 ## 2026-10-30 (day 3, afternoon; user: "keep working on the FD ports today ... get all results submitted as PRs")
 
 - 12:25 UTC: credit topped up to $65.37; **#222 merged**, **#223 merged** (the user raised the

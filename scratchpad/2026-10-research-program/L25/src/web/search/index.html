@@ -1,0 +1,2377 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Nice Numbers - Browser Client</title>
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css"
+        />
+        <link
+            rel="icon"
+            href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>"
+        />
+        <style>
+            .modebar-btn .icon {
+                height: 0.75em;
+                width: 0.75em;
+            }
+
+            .results {
+                font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+                font-size: 14px;
+                line-height: 1.6;
+                max-height: 400px;
+                overflow-y: auto;
+                white-space: pre-wrap;
+                word-break: break-all;
+                background: #fafafa;
+                padding: 1rem;
+                border-radius: 6px;
+            }
+
+            .worker-status {
+                padding: 0.75rem;
+                border-radius: 6px;
+                margin: 1rem 0;
+                font-size: 0.875rem;
+                font-weight: 500;
+            }
+
+            .worker-status.initializing {
+                background: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+            }
+
+            .worker-status.ready {
+                background: #d1ecf1;
+                color: #0c5460;
+                border: 1px solid #bee5eb;
+            }
+
+            .worker-status.error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+
+            /* Thread count slider styling */
+            .slider {
+                -webkit-appearance: none;
+                appearance: none;
+                height: 8px;
+                border-radius: 4px;
+                background: #ddd;
+                outline: none;
+                opacity: 0.7;
+                transition: opacity 0.2s;
+                margin: 10px 0;
+            }
+
+            .slider:hover {
+                opacity: 1;
+            }
+
+            .slider::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #3273dc;
+                cursor: pointer;
+                border: 2px solid #fff;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+
+            .slider::-moz-range-thumb {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #3273dc;
+                cursor: pointer;
+                border: 2px solid #fff;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+
+            .slider::-webkit-slider-track {
+                -webkit-appearance: none;
+                appearance: none;
+                height: 8px;
+                border-radius: 4px;
+                background: linear-gradient(
+                    to right,
+                    #48c774 0%,
+                    #ffdd57 70%,
+                    #ff3860 100%
+                );
+            }
+
+            .slider::-moz-range-track {
+                height: 8px;
+                border-radius: 4px;
+                background: linear-gradient(
+                    to right,
+                    #48c774 0%,
+                    #ffdd57 70%,
+                    #ff3860 100%
+                );
+                border: none;
+            }
+        </style>
+    </head>
+    <body class="has-background-dark">
+        <section class="section">
+            <div class="container">
+                <div class="columns">
+                    <div class="column is-two-fifths">
+                        <div class="box content">
+                            <h1 class="title is-3 pt-4">
+                                Nice Numbers Browser Client
+                            </h1>
+
+                            <p class="">
+                                This page lets you search for "nice numbers"
+                                (square-cube pandigitals) in different bases.
+                                The client connects to a central server and
+                                "checks out" a range to search for nice numbers.
+                                If you let it run it will report back with any
+                                results and credit those discoveries to your
+                                name!
+                            </p>
+
+                            <div class="field">
+                                <label class="label" for="username"
+                                    >Username:</label
+                                >
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        type="text"
+                                        id="username"
+                                        placeholder="anonymous"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="label" for="testMode"
+                                    >Connection:</label
+                                >
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select id="testMode">
+                                            <option value="false">
+                                                Online
+                                            </option>
+                                            <option value="true">
+                                                Offline Test Field
+                                            </option>
+                                            <option value="suite">
+                                                Benchmark Suite (NiceMark)
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="field is-hidden" id="benchBudgetField">
+                                <label class="label" for="benchBudget"
+                                    >Benchmark Budget:</label
+                                >
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select id="benchBudget">
+                                            <option value="10" selected>
+                                                10 seconds (quick)
+                                            </option>
+                                            <option value="30">
+                                                30 seconds
+                                            </option>
+                                            <option value="60">
+                                                60 seconds (thorough)
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="help">
+                                    The suite measures the same fixed windows
+                                    as the native client's benchmark; a bigger
+                                    budget just repeats them more for a
+                                    steadier number.
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="label" for="backendSelect"
+                                    >Compute Backend:</label
+                                >
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select id="backendSelect">
+                                            <option value="cpu" selected>
+                                                CPU
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="help" id="backendHelp">
+                                    Checking for WebGPU support...
+                                </div>
+                            </div>
+
+                            <div class="field" id="threadCountField">
+                                <label class="label" for="threadCount">
+                                    Thread Count:
+                                    <span id="threadCountValue">1</span>
+                                </label>
+                                <div class="control">
+                                    <input
+                                        type="range"
+                                        id="threadCount"
+                                        class="slider is-fullwidth"
+                                        min="1"
+                                        max="1"
+                                        value="1"
+                                        step="1"
+                                    />
+                                </div>
+                                <div class="help">
+                                    Use fewer threads to keep your system
+                                    responsive
+                                </div>
+                            </div>
+
+                            <div class="field is-grouped">
+                                <div class="control">
+                                    <button
+                                        id="startBtn"
+                                        class="button is-primary is-fullwidth"
+                                        onclick="startProcessing()"
+                                        disabled
+                                    >
+                                        Start Processing
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div
+                                class="field is-grouped is-hidden"
+                                id="stopContainer"
+                            >
+                                <div class="control">
+                                    <button
+                                        id="stopBtn"
+                                        class="button is-danger is-fullwidth"
+                                        onclick="stopProcessing()"
+                                    >
+                                        Stop Processing
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="status" class="notification is-info">
+                                Loading Worker Pool...
+                            </div>
+
+                            <div id="progressContainer" class="is-hidden">
+                                <progress
+                                    id="progressBar"
+                                    class="progress is-primary"
+                                    value="0"
+                                    max="100"
+                                >
+                                    0%
+                                </progress>
+                                <p
+                                    id="progressText"
+                                    class="has-text-centered is-hidden"
+                                >
+                                    Progress: 0%
+                                </p>
+                                <div
+                                    id="progressDetails"
+                                    class="has-text-centered is-size-7 mt-2 is-hidden"
+                                >
+                                    <div class="columns is-mobile is-gapless">
+                                        <div class="column">
+                                            <strong>Percent Complete:</strong>
+                                            <span id="progressPercentage"
+                                                >0%</span
+                                            >
+                                        </div>
+                                        <div class="column">
+                                            <strong>Elapsed:</strong>
+                                            <span id="timeElapsed">0s</span>
+                                        </div>
+                                        <div class="column">
+                                            <strong>ETA:</strong>
+                                            <span id="estimatedTimeRemaining"
+                                                >--</span
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="box content">
+                            <h3 class="title is-5">Processing Results:</h3>
+                            <div
+                                class="worker-status initializing"
+                                id="workerStatus"
+                            >
+                                Initializing Worker Pool...
+                            </div>
+                            <div id="results" class="results"></div>
+                        </div>
+                    </div>
+
+                    <div class="column">
+                        <div class="box content is-hidden" id="benchReport">
+                            <p class="heading has-text-centered">NiceMark</p>
+                            <p
+                                class="title is-2 has-text-centered mb-2"
+                                id="nicemarkScore"
+                            >
+                                —
+                            </p>
+                            <p
+                                class="has-text-centered is-size-7"
+                                id="nicemarkDetail"
+                            ></p>
+                            <button
+                                id="uploadBtn"
+                                class="button is-link is-fullwidth mt-2"
+                                onclick="uploadBenchmark()"
+                            >
+                                Upload score
+                            </button>
+                            <p class="is-size-7 mt-1" id="uploadStatus"></p>
+                        </div>
+
+                        <div class="box content">
+                            <h2 class="title is-4 mb-3">
+                                Session Statistics
+                            </h2>
+                            <div class="columns is-multiline">
+                                <div class="column is-one-quarter">
+                                    <div class="has-text-centered">
+                                        <p class="heading">Fields Completed</p>
+                                        <p
+                                            class="title is-4"
+                                            id="fieldsCompleted"
+                                        >
+                                            0
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="column is-one-quarter">
+                                    <div class="has-text-centered">
+                                        <p class="heading">Numbers Checked</p>
+                                        <p
+                                            class="title is-4"
+                                            id="numbersProcessed"
+                                        >
+                                            0
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="column is-one-quarter">
+                                    <div class="has-text-centered">
+                                        <p class="heading">Session Rate</p>
+                                        <p class="title is-4" id="sessionRate">
+                                            0/sec
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="column is-one-quarter">
+                                    <div class="has-text-centered">
+                                        <p class="heading">Field Rate</p>
+                                        <p
+                                            class="title is-4"
+                                            id="processingRate"
+                                        >
+                                            0/sec
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="column is-one-quarter">
+                                    <div class="has-text-centered">
+                                        <p class="heading">
+                                            Semi-nice Found
+                                        </p>
+                                        <p
+                                            class="title is-4"
+                                            id="niceNumbersFound"
+                                        >
+                                            0
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="column is-one-quarter">
+                                    <div class="has-text-centered">
+                                        <p class="heading">Best Find</p>
+                                        <p class="title is-4" id="bestFind">
+                                            -
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="column is-one-quarter">
+                                    <div class="has-text-centered">
+                                        <p class="heading">Current Base</p>
+                                        <p class="title is-4" id="currentBase">
+                                            -
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="column is-one-quarter">
+                                    <div class="has-text-centered">
+                                        <p class="heading">Claims Buffered</p>
+                                        <p
+                                            class="title is-4"
+                                            id="claimsBuffered"
+                                        >
+                                            0
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <p
+                                class="is-size-7 has-text-centered has-text-grey"
+                                id="lifetimeTotals"
+                            ></p>
+                        </div>
+
+                        <div class="box content">
+                            <h2 class="title is-4 mb-5">Digit Distribution</h2>
+                            <p class="subtitle is-6">
+                                How many unique digits each number's square and
+                                cube contained. Red ticks mark the
+                                uniform-random baseline — a fully nice number
+                                would land at the far right, past everything
+                                chance predicts.
+                            </p>
+                            <div id="histogram">
+                                <div class="is-info">
+                                    This will be auto-populated once the process
+                                    begins. Click 'Start Processing' to see
+                                    results.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="box content">
+                            <h2 class="title is-4 mb-5">Rate per Field</h2>
+                            <p class="subtitle is-6">
+                                Each point is one completed field. Dips reveal
+                                kernel warmup on a new base, thermal
+                                throttling, or a backgrounded tab.
+                            </p>
+                            <div id="rateStrip">
+                                <div class="is-info">
+                                    Populated as fields complete.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="box content has-text-centered">
+                    <p>
+                        nicenumbers.net made with ♡ by
+                        <a href="https://wasabipesto.com">wasabipesto</a>
+                        |
+                        <a href="/">return to homepage</a>
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Import worker pool -->
+        <script src="./worker-pool.js"></script>
+
+        <!-- Charting, vendored like the index page (`just vendor-fetch`):
+             the CDN ESM build fans out into 48 requests across six
+             dependency levels. Deferred scripts run in document order, so
+             d3 is defined before Plot reads it and both before the module
+             below. -->
+        <script src="./vendor/d3.min.js" defer></script>
+        <script src="./vendor/plot.umd.min.js" defer></script>
+
+        <script type="module">
+            const Plot = window.Plot;
+
+            let workerPool = null;
+            let isProcessing = false;
+            let shouldStop = false;
+            let currentClaimData = null;
+            let numbersProcessedCount = 0;
+            let startTime = null;
+            let niceNumbersCount = 0;
+
+            // ============================================================
+            // Field pipeline
+            //
+            // The native client (client/src/main.rs) overlaps its API calls
+            // with processing: a buffer of claims sized in seconds of work
+            // feeds the processor, and submissions go out without holding
+            // up the next field. This is the same design under browser
+            // constraints, replacing a serial loop that spent several
+            // GPU-speed fields' worth of time per field on round trips and
+            // a hardcoded one-second pause.
+            // ============================================================
+
+            const API_BASE = "https://api.nicenumbers.net";
+
+            // Keep roughly this many seconds of claimed work on hand...
+            const PREFETCH_SECONDS = 3;
+            // ...but never more than this many fields beyond the one being
+            // processed. Far lower than the native client's 16: a closed
+            // tab abandons its buffer for the full server-side claim expiry
+            // (an hour), and a tab is closed far more casually than a
+            // process is killed.
+            const PREFETCH_MAX_AHEAD = 3;
+            // Never claim ahead at all when a single field runs longer than
+            // this. A buffered claim waits a whole field before its own
+            // processing begins, so a device doing dozens-of-minutes fields
+            // would let it expire before finishing it — and for a device
+            // that slow, two round trips amortized over the field were
+            // never overhead worth buffering away.
+            const PREFETCH_SAFE_FIELD_SECS = 15 * 60;
+            // At most this many claim requests in flight at once.
+            const CLAIM_CONCURRENCY = 2;
+            // Submissions in flight before the loop waits for one to land.
+            // Running unbounded ahead would quietly absorb a server outage
+            // instead of surfacing it (same rationale as the native cap).
+            const MAX_SUBMITS_IN_FLIGHT = 4;
+            // Backoff schedule for retrying transient API failures.
+            const API_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
+
+            // Exponentially weighted moving average of seconds per field —
+            // what the buffer depth is derived from. Same smoothing as the
+            // native client's sizer.
+            let fieldSecsEwma = null;
+
+            const claimBuffer = [];
+            let claimsInFlight = 0;
+            let claimFailure = null;
+            let claimWaiters = [];
+
+            const submitsInFlight = new Set();
+            let submitFailure = null;
+
+            // Resolver for the field currently being processed. Completion,
+            // error, and stop all funnel through settleField/failField so
+            // the loop can await exactly one promise per field.
+            let activeField = null;
+
+            class ApiError extends Error {
+                constructor(status, body) {
+                    super(`Server responded with ${status}: ${body}`);
+                    this.status = status;
+                }
+            }
+
+            // Network failures come out of fetch as TypeError and are
+            // always worth retrying. Of the server's answers only the
+            // transient family is: any other 4xx means the request itself
+            // is wrong, and repeating it will not improve it.
+            function isRetryable(error) {
+                if (error instanceof ApiError) {
+                    return [429, 500, 502, 503, 504].includes(error.status);
+                }
+                return true;
+            }
+
+            async function apiWithRetry(call) {
+                for (let attempt = 0; ; attempt++) {
+                    try {
+                        return await call();
+                    } catch (error) {
+                        const spent = attempt >= API_RETRY_DELAYS_MS.length;
+                        if (shouldStop || spent || !isRetryable(error)) {
+                            throw error;
+                        }
+                        const delay = API_RETRY_DELAYS_MS[attempt];
+                        console.warn(
+                            `API call failed (${error.message}); retrying in ${delay} ms`,
+                        );
+                        await new Promise((r) => setTimeout(r, delay));
+                    }
+                }
+            }
+
+            // How many claims to hold beyond the one being processed.
+            function prefetchAhead() {
+                // Nothing measured yet: no idea how fast this machine is,
+                // so do not gamble a claim on it being fast.
+                if (fieldSecsEwma === null) return 0;
+                if (fieldSecsEwma > PREFETCH_SAFE_FIELD_SECS) return 0;
+                const fields = Math.ceil(
+                    PREFETCH_SECONDS / Math.max(fieldSecsEwma, 0.05),
+                );
+                return Math.min(PREFETCH_MAX_AHEAD, fields);
+            }
+
+            function wakeClaimWaiters() {
+                const waiters = claimWaiters;
+                claimWaiters = [];
+                waiters.forEach((resolve) => resolve());
+            }
+
+            // Top claim requests up to the target depth. `minimum` lets an
+            // idle processor demand one claim even when the prefetch math
+            // says zero (nothing measured yet, slow device, hidden tab).
+            function topUpClaims(minimum = 0) {
+                if (!isProcessing || shouldStop || claimFailure) return;
+                // A hidden tab is throttled and may not keep up with what
+                // it claims, so do not build a buffer for one.
+                let want = document.hidden ? 0 : prefetchAhead();
+                want = Math.max(want, minimum);
+                while (
+                    claimBuffer.length + claimsInFlight < want &&
+                    claimsInFlight < CLAIM_CONCURRENCY
+                ) {
+                    claimsInFlight++;
+                    apiWithRetry(claimField)
+                        .then((claim) => claimBuffer.push(claim))
+                        .catch((error) => {
+                            claimFailure = claimFailure ?? error;
+                        })
+                        .finally(() => {
+                            claimsInFlight--;
+                            wakeClaimWaiters();
+                        });
+                }
+            }
+
+            async function nextClaim() {
+                let waiting = false;
+                while (isProcessing && !shouldStop) {
+                    if (claimBuffer.length > 0) return claimBuffer.shift();
+                    if (claimFailure) throw claimFailure;
+                    if (!waiting) {
+                        waiting = true;
+                        updateStatus(
+                            "Getting work from server...",
+                            "is-warning",
+                        );
+                    }
+                    topUpClaims(1);
+                    await new Promise((resolve) =>
+                        claimWaiters.push(resolve),
+                    );
+                }
+                return null;
+            }
+
+            // Fire a submission without holding the next field on the round
+            // trip. Resolves immediately unless the in-flight cap is
+            // reached, in which case it waits for one submission to land.
+            function queueSubmit(claimData, result) {
+                const task = apiWithRetry(() => submitField(result))
+                    .then((responseText) => {
+                        appendResults(
+                            `Field ${claimData.claim_id} accepted: ${responseText}`,
+                        );
+                        // Only accepted contributions count toward the
+                        // all-time totals.
+                        bumpLifetime(BigInt(claimData.range_size));
+                    })
+                    .catch((error) => {
+                        submitFailure = submitFailure ?? error;
+                        appendResults(
+                            `Error submitting field ${claimData.claim_id}: ${error.message}`,
+                        );
+                    })
+                    .finally(() => submitsInFlight.delete(task));
+                submitsInFlight.add(task);
+                if (submitsInFlight.size >= MAX_SUBMITS_IN_FLIGHT) {
+                    return Promise.race([...submitsInFlight]);
+                }
+                return Promise.resolve();
+            }
+
+            // Work already done outranks whatever interrupted it: every
+            // in-flight submission is finished before the loop reports how
+            // it ended.
+            async function drainSubmits() {
+                if (submitsInFlight.size > 0) {
+                    updateStatus(
+                        `Waiting for ${submitsInFlight.size} submission(s) to finish...`,
+                        "is-warning",
+                    );
+                    await Promise.allSettled([...submitsInFlight]);
+                }
+            }
+
+            function noteFieldSeconds(seconds) {
+                fieldSecsEwma =
+                    fieldSecsEwma === null
+                        ? seconds
+                        : 0.7 * fieldSecsEwma + 0.3 * seconds;
+            }
+
+            // Process one field on the selected backend. Resolves with
+            // { result, elapsedSeconds }, or null if processing stopped.
+            function processField(claimData) {
+                return new Promise((resolve, reject) => {
+                    activeField = { resolve, reject };
+                    dispatchField(claimData);
+                });
+            }
+
+            function settleField(outcome) {
+                const settle = activeField;
+                activeField = null;
+                settle?.resolve(outcome);
+            }
+
+            function failField(error) {
+                const settle = activeField;
+                activeField = null;
+                settle?.reject(error);
+            }
+
+            // ============================================================
+            // Session statistics and charts
+            // ============================================================
+
+            // Accumulated across the fields of one processing run; the
+            // benchmark modes leave these alone.
+            let sessionStart = null;
+            let sessionFields = 0;
+            let sessionNumbers = BigInt(0);
+            let bestFind = null; // { number, num_uniques, base, pct }
+            let lastFieldRate = null;
+            // One entry per completed field, for the rate strip chart.
+            let sessionRates = [];
+            const SESSION_RATES_MAX = 500;
+            // Whether the current run is an online contribution run — the
+            // only kind that feeds the session panel and histogram; the
+            // benchmark modes drive the progress bar and results log only.
+            let onlineRun = false;
+            // Unique-count distribution accumulated over the session's
+            // completed fields (one base at a time — the server hands out
+            // fields from the frontier, so a base change is rare and just
+            // restarts the accumulation). Drawing the session total instead
+            // of each field's own tally is what stops the histogram
+            // resetting to empty — a visible flash — at every sub-second
+            // field boundary.
+            let sessionDistribution = new Map();
+            let sessionDistBase = null;
+
+            // Counts arrive as BigInt (or its decimal string) because a fast
+            // session overflows a double's integer range within hours.
+            function formatCount(value) {
+                const s = value.toString();
+                if (s.length <= 6) return Number(s).toLocaleString();
+                return `${s[0]}.${s.slice(1, 3)}e${s.length - 1}`;
+            }
+
+            function formatRate(rate) {
+                if (!Number.isFinite(rate) || rate <= 0) return "0";
+                // "1.60e9", not "1.60e+9" — the sign is noise in a tile.
+                if (rate >= 1e6) return rate.toExponential(2).replace("e+", "e");
+                return Math.round(rate).toLocaleString();
+            }
+
+            // P(k distinct digits) when `base` digits land uniformly in
+            // `base` bins — the classic occupancy distribution, which is
+            // the natural baseline here because in the valid search range a
+            // number's square and cube together have exactly `base` digits.
+            // Computed in log space via the Stirling-number recurrence
+            // S(d,k) = k·S(d-1,k) + S(d-1,k-1); the raw values overflow a
+            // double long before base 40. Approximate as a baseline: real
+            // digits are not quite uniform (no leading zeros), but the gap
+            // is far smaller than the chart can show.
+            const occupancyCache = new Map();
+            function occupancyBaseline(base) {
+                if (occupancyCache.has(base)) {
+                    return occupancyCache.get(base);
+                }
+                const logAdd = (a, b) => {
+                    if (a === -Infinity) return b;
+                    if (b === -Infinity) return a;
+                    const hi = Math.max(a, b);
+                    return (
+                        hi + Math.log1p(Math.exp(Math.min(a, b) - hi))
+                    );
+                };
+                // logS[k] holds log S(d, k) for the current d.
+                let logS = new Array(base + 1).fill(-Infinity);
+                logS[0] = 0; // S(0,0) = 1
+                for (let d = 1; d <= base; d++) {
+                    const next = new Array(base + 1).fill(-Infinity);
+                    for (let k = 1; k <= d; k++) {
+                        next[k] = logAdd(
+                            Math.log(k) + logS[k],
+                            logS[k - 1],
+                        );
+                    }
+                    logS = next;
+                }
+                // P(k) = S(b,k) · b!/(b-k)! / b^b; the falling factorial
+                // accumulates as k grows.
+                const probs = new Array(base + 1).fill(0);
+                let logFalling = 0;
+                for (let k = 1; k <= base; k++) {
+                    logFalling += Math.log(base - k + 1);
+                    probs[k] = Math.exp(
+                        logS[k] + logFalling - base * Math.log(base),
+                    );
+                }
+                occupancyCache.set(base, probs);
+                return probs;
+            }
+
+            // The session distribution plus the in-flight field's live
+            // tally, for drawing.
+            function mergedSessionDistribution(liveDistribution) {
+                const merged = new Map(sessionDistribution);
+                if (liveDistribution instanceof Map) {
+                    liveDistribution.forEach((count, numUniques) => {
+                        merged.set(
+                            numUniques,
+                            (merged.get(numUniques) || 0) + count,
+                        );
+                    });
+                }
+                return merged;
+            }
+
+            // Fold one completed field's final distribution (server-format
+            // array) into the session total.
+            function accumulateSessionDistribution(base, distribution) {
+                if (sessionDistBase !== base) {
+                    sessionDistBase = base;
+                    sessionDistribution = new Map();
+                }
+                for (const entry of distribution ?? []) {
+                    sessionDistribution.set(
+                        entry.num_uniques,
+                        (sessionDistribution.get(entry.num_uniques) || 0) +
+                            entry.count,
+                    );
+                }
+            }
+
+            // Redraws are throttled: at GPU speeds every progress tick and
+            // field boundary would otherwise rebuild the SVG several times
+            // a second.
+            let lastHistogramDraw = 0;
+            function updateHistogramThrottled(uniqueDistribution) {
+                const now = Date.now();
+                if (now - lastHistogramDraw < 500) return;
+                updateHistogram(uniqueDistribution);
+            }
+
+            // Update histogram with current digit counts, overlaying the
+            // uniform-random baseline so the shape means something.
+            function updateHistogram(uniqueDistribution) {
+                if (uniqueDistribution == undefined || !window.Plot) return;
+                lastHistogramDraw = Date.now();
+                const data = [...uniqueDistribution].map(([digit, count]) => ({
+                    digit,
+                    count,
+                }));
+
+                const marks = [
+                    Plot.barY(data, {
+                        x: "digit",
+                        y: "count",
+                        tip: true,
+                    }),
+                ];
+                const base = currentClaimData?.base;
+                const total = data.reduce((sum, d) => sum + d.count, 0);
+                if (base && total > 0) {
+                    const probs = occupancyBaseline(base);
+                    const expected = data.map((d) => ({
+                        digit: d.digit,
+                        expected: probs[d.digit] * total,
+                    }));
+                    marks.push(
+                        Plot.tickY(expected, {
+                            x: "digit",
+                            y: "expected",
+                            stroke: "#ff3860",
+                            strokeWidth: 2,
+                        }),
+                    );
+                }
+                marks.push(Plot.ruleY([0]));
+
+                const histogramDiv = document.querySelector("#histogram");
+                const plot = Plot.plot({
+                    // Fill the box; counts get compact SI ticks ("50M") so
+                    // long numbers can't outgrow the margin.
+                    width: Math.max(400, histogramDiv.clientWidth || 900),
+                    marginLeft: 60,
+                    x: {
+                        label: "Digit",
+                        domain: data.map((d) => d.digit),
+                        tickFormat: (d) => d.toString(),
+                    },
+                    y: {
+                        label: "Count",
+                        grid: true,
+                        tickFormat: "~s",
+                    },
+                    marks: marks,
+                });
+
+                // Atomic swap — clearing first paints an empty frame, which
+                // reads as a flash at every redraw.
+                histogramDiv.replaceChildren(plot);
+            }
+
+            function recordFieldRate(rate) {
+                sessionRates.push({
+                    field: sessionFields,
+                    rate: rate,
+                    backend: selectedBackend(),
+                });
+                if (sessionRates.length > SESSION_RATES_MAX) {
+                    sessionRates.shift();
+                }
+            }
+
+            function renderRateStrip() {
+                if (!window.Plot || sessionRates.length === 0) return;
+                const stripDiv = document.querySelector("#rateStrip");
+                const plot = Plot.plot({
+                    // Fill the box. No legend — it cost a whole row to
+                    // repeat what the tooltip already says; SI ticks
+                    // ("1.5G") so the labels fit the margin instead of
+                    // being clipped to ",000,000,000".
+                    width: Math.max(400, stripDiv.clientWidth || 900),
+                    height: 180,
+                    marginLeft: 60,
+                    x: { label: "Field # (this session)", tickFormat: "d" },
+                    y: { label: "numbers/sec", grid: true, tickFormat: "~s" },
+                    color: {
+                        domain: ["cpu", "gpu"],
+                        range: ["#3273dc", "#48c774"],
+                    },
+                    marks: [
+                        Plot.dot(sessionRates, {
+                            x: "field",
+                            y: "rate",
+                            fill: "backend",
+                            tip: true,
+                        }),
+                        Plot.ruleY([0]),
+                    ],
+                });
+                stripDiv.replaceChildren(plot);
+            }
+
+            // All-time totals for this browser, kept in localStorage. Purely
+            // a courtesy for returning contributors; storage can be absent
+            // (private windows) and everything degrades to session-only.
+            const LIFETIME_KEY = "nice-lifetime";
+            function loadLifetime() {
+                try {
+                    const raw = localStorage.getItem(LIFETIME_KEY);
+                    if (!raw) return { fields: 0, numbers: "0" };
+                    const parsed = JSON.parse(raw);
+                    return {
+                        fields: parsed.fields || 0,
+                        numbers: parsed.numbers || "0",
+                    };
+                } catch {
+                    return null;
+                }
+            }
+
+            function bumpLifetime(rangeSize) {
+                try {
+                    const lifetime = loadLifetime() ?? {
+                        fields: 0,
+                        numbers: "0",
+                    };
+                    lifetime.fields += 1;
+                    lifetime.numbers = (
+                        BigInt(lifetime.numbers) + rangeSize
+                    ).toString();
+                    localStorage.setItem(
+                        LIFETIME_KEY,
+                        JSON.stringify(lifetime),
+                    );
+                    renderLifetime();
+                } catch {
+                    /* storage unavailable; session stats still work */
+                }
+            }
+
+            function renderLifetime() {
+                const el = document.getElementById("lifetimeTotals");
+                const lifetime = loadLifetime();
+                if (!lifetime || lifetime.fields === 0) {
+                    el.textContent = "";
+                    return;
+                }
+                el.textContent =
+                    `All-time from this browser: ` +
+                    `${lifetime.fields.toLocaleString()} fields · ` +
+                    `${formatCount(lifetime.numbers)} numbers`;
+            }
+
+            // Refresh the session tiles. `currentFieldProcessed` and
+            // `currentFieldFinds` describe the field in flight, so the
+            // session numbers tick during long fields too.
+            function updateStatistics(currentFieldProcessed, currentFieldFinds) {
+                const current = BigInt(
+                    Math.max(0, Math.floor(currentFieldProcessed || 0)),
+                );
+                const checked = sessionNumbers + current;
+
+                document.getElementById("fieldsCompleted").textContent =
+                    sessionFields.toLocaleString();
+                document.getElementById("numbersProcessed").textContent =
+                    formatCount(checked);
+                document.getElementById("niceNumbersFound").textContent = (
+                    niceNumbersCount + (currentFieldFinds || 0)
+                ).toString();
+                document.getElementById("claimsBuffered").textContent =
+                    claimBuffer.length.toString();
+
+                if (sessionStart && checked > BigInt(0)) {
+                    const elapsed = (Date.now() - sessionStart) / 1000;
+                    document.getElementById("sessionRate").textContent =
+                        `${formatRate(Number(checked) / elapsed)}/sec`;
+                }
+
+                // Live rate for the field in flight; the last finished
+                // field's rate between fields.
+                let fieldRate = lastFieldRate;
+                if (startTime && currentFieldProcessed > 0) {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    if (elapsed > 0) {
+                        fieldRate = currentFieldProcessed / elapsed;
+                    }
+                }
+                document.getElementById("processingRate").textContent =
+                    fieldRate ? `${formatRate(fieldRate)}/sec` : "0/sec";
+
+                const bestEl = document.getElementById("bestFind");
+                if (bestFind) {
+                    bestEl.textContent = `${bestFind.pct.toFixed(1)}%`;
+                    bestEl.title = `${bestFind.number} (${bestFind.num_uniques}/${bestFind.base} unique digits)`;
+                }
+
+                if (currentClaimData) {
+                    document.getElementById("currentBase").textContent =
+                        currentClaimData.base.toString();
+                }
+            }
+
+            // Initialize Web Worker
+            async function init() {
+                try {
+                    const cores = navigator.hardwareConcurrency || 4;
+                    updateWorkerStatus(
+                        `Initializing Worker Pool with ${cores} workers...`,
+                        "initializing",
+                    );
+
+                    // Get user settings
+                    const threadCount = parseInt(
+                        document.getElementById("threadCount").value,
+                    );
+
+                    // Create the worker pool with user settings
+                    workerPool = new WorkerPool({
+                        maxWorkers: threadCount,
+                        progressUpdateInterval: 500,
+                    });
+                    await workerPool.initialize();
+
+                    updateWorkerStatus(
+                        `Worker Pool ready with ${workerPool.getWorkerCount()} workers!`,
+                        "ready",
+                    );
+                    updateStatus(
+                        `Multi-threaded processing ready with ${workerPool.getWorkerCount()} workers`,
+                        "is-success",
+                    );
+
+                    // Enable the start button
+                    document.getElementById("startBtn").disabled = false;
+                    console.log(
+                        "Worker pool initialized - start button enabled",
+                    );
+
+                    // Fallback timeout to ensure button is enabled
+                    setTimeout(() => {
+                        if (workerPool && workerPool.isReady()) {
+                            document.getElementById("startBtn").disabled =
+                                false;
+                            console.log("Fallback: start button force-enabled");
+                        }
+                    }, 1000);
+                } catch (error) {
+                    updateStatus(
+                        `Error creating Worker Pool: ${error.message}`,
+                        "is-danger",
+                    );
+                    updateWorkerStatus("Failed to create Worker Pool", "error");
+                    console.error("Failed to create Worker Pool:", error);
+                }
+            }
+
+            // Live progress from either backend (the GPU worker posts the
+            // same shape the pool aggregates to).
+            //
+            // The benchmark suite repeats small windows several times a
+            // second, so its per-window progress drives nothing here — the
+            // suite paints its own scenario-level progress, and letting the
+            // windows through made the histogram strobe and the session
+            // tiles count work that was never contributed. The session
+            // panel belongs to online runs only; the offline test field
+            // keeps its live histogram but stays out of the tiles.
+            function handleWorkerPoolProgress(progressData) {
+                if (suiteRunning) return;
+                updateProgress(progressData.percent, progressData.message);
+
+                if (onlineRun) {
+                    updateStatistics(
+                        progressData.processedCount,
+                        progressData.niceNumbers.length,
+                    );
+                    updateHistogramThrottled(
+                        mergedSessionDistribution(
+                            progressData.uniqueDistribution,
+                        ),
+                    );
+                } else {
+                    updateHistogramThrottled(progressData.uniqueDistribution);
+                }
+            }
+
+            function updateWorkerStatus(message, type) {
+                const statusDiv = document.getElementById("workerStatus");
+                statusDiv.textContent = message;
+                statusDiv.className = `worker-status ${type}`;
+            }
+
+            function updateStatus(message, type = "is-info") {
+                const statusDiv = document.getElementById("status");
+                statusDiv.textContent = message;
+                statusDiv.className = `notification ${type}`;
+            }
+
+            function updateProgress(percent, text = "") {
+                const progressBar = document.getElementById("progressBar");
+                const progressText = document.getElementById("progressText");
+                const progressDetails =
+                    document.getElementById("progressDetails");
+                const progressPercentage =
+                    document.getElementById("progressPercentage");
+                const timeElapsed = document.getElementById("timeElapsed");
+                const estimatedTimeRemaining = document.getElementById(
+                    "estimatedTimeRemaining",
+                );
+
+                progressBar.value = percent;
+                progressText.textContent =
+                    text || `Progress: ${percent.toFixed(1)}%`;
+
+                // Show progress details when processing starts
+                if (percent > 0 && startTime) {
+                    progressDetails.classList.remove("is-hidden");
+
+                    // Update percentage
+                    progressPercentage.textContent = `${percent.toFixed(1)}%`;
+
+                    // Calculate and display elapsed time
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    const elapsedMinutes = Math.floor(elapsed / 60);
+                    const elapsedSeconds = Math.floor(elapsed % 60);
+                    timeElapsed.textContent =
+                        elapsedMinutes > 0
+                            ? `${elapsedMinutes}m ${elapsedSeconds}s`
+                            : `${elapsedSeconds}s`;
+
+                    // Calculate and display ETA
+                    if (percent > 0 && percent < 100) {
+                        const remainingPercent = 100 - percent;
+                        const estimatedTotalTime = elapsed * (100 / percent);
+                        const estimatedRemaining = estimatedTotalTime - elapsed;
+
+                        if (estimatedRemaining > 0) {
+                            const etaMinutes = Math.floor(
+                                estimatedRemaining / 60,
+                            );
+                            const etaSeconds = Math.floor(
+                                estimatedRemaining % 60,
+                            );
+                            estimatedTimeRemaining.textContent =
+                                etaMinutes > 0
+                                    ? `${etaMinutes}m ${etaSeconds}s`
+                                    : `${etaSeconds}s`;
+                        } else {
+                            estimatedTimeRemaining.textContent = "0s";
+                        }
+                    } else if (percent >= 100) {
+                        estimatedTimeRemaining.textContent = "Complete";
+                    }
+                } else {
+                    // Hide progress details when not processing
+                    progressDetails.classList.add("is-hidden");
+                }
+            }
+
+            function appendResults(text) {
+                const resultsDiv = document.getElementById("results");
+                const timestamp = new Date().toLocaleTimeString();
+                resultsDiv.textContent += `[${timestamp}] ${text}\n`;
+                resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            }
+
+            async function claimField() {
+                const response = await fetch(`${API_BASE}/claim/detailed`);
+
+                if (!response.ok) {
+                    throw new ApiError(response.status, await response.text());
+                }
+                const serverData = await response.json();
+
+                // The range fields are u128 and do not survive a JS number,
+                // so they are carried as strings and parsed with BigInt at
+                // the wasm boundary. claim_id is NOT one of them: it goes
+                // straight back to /submit, which deserializes it as an
+                // integer and rejects a quoted one with a 400.
+                return {
+                    claim_id: serverData.claim_id,
+                    base: serverData.base,
+                    range_start: serverData.range_start.toString(),
+                    range_end: serverData.range_end.toString(),
+                    range_size: serverData.range_size.toString(),
+                };
+            }
+
+            // Near-miss numbers are carried through the workers as strings so
+            // that JSON.parse cannot round them (see parseFieldResults in
+            // worker.js — base-49 fields sit above 2^53, where a double stops
+            // being able to hold consecutive integers). The server wants an
+            // integer there, so the digits go back on the wire unquoted.
+            function submissionBody(data) {
+                return JSON.stringify(data).replace(
+                    /"number":"(\d+)"/g,
+                    '"number":$1',
+                );
+            }
+
+            async function submitField(data) {
+                const response = await fetch(`${API_BASE}/submit`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: submissionBody(data),
+                });
+                const responseText = await response.text();
+
+                if (!response.ok) {
+                    throw new ApiError(response.status, responseText);
+                }
+                return responseText;
+            }
+
+            // Show one finished field: stats, rate, and any finds. Purely
+            // presentation — submission is the pipeline's business.
+            function presentFieldResult(claimData, result, elapsedSeconds) {
+                // Final distribution, exposed for the e2e harness to compare
+                // across backends.
+                window.lastDistribution = result.unique_distribution;
+
+                const rangeSize = parseInt(claimData.range_size);
+                const numbersPerSecond = rangeSize / elapsedSeconds;
+
+                // Update nice numbers count and the session's best find
+                if (result.nice_numbers && result.nice_numbers.length > 0) {
+                    niceNumbersCount += result.nice_numbers.length;
+                    result.nice_numbers.forEach((nn) => {
+                        const pct =
+                            (100 * nn.num_uniques) / claimData.base;
+                        if (!bestFind || pct > bestFind.pct) {
+                            bestFind = {
+                                number: nn.number,
+                                num_uniques: nn.num_uniques,
+                                base: claimData.base,
+                                pct: pct,
+                            };
+                        }
+                    });
+                }
+
+                appendResults(
+                    `Processing completed in ${elapsedSeconds.toFixed(2)} seconds`,
+                );
+                appendResults(
+                    `Rate: ${numbersPerSecond.toFixed(0)} (${numbersPerSecond.toExponential(2)}) numbers/second`,
+                );
+                appendResults(
+                    `Found ${result.nice_numbers.length} semi-nice numbers`,
+                );
+
+                if (result.nice_numbers && result.nice_numbers.length > 0) {
+                    appendResults("Semi-nice numbers found:");
+                    result.nice_numbers.forEach((nn) => {
+                        const pct = (
+                            (100 * nn.num_uniques) /
+                            claimData.base
+                        ).toFixed(1);
+                        appendResults(
+                            `  ${nn.number} (${nn.num_uniques}/${claimData.base} unique digits — ${pct}% nice)`,
+                        );
+                    });
+                }
+            }
+
+            // Drive the claim/process/submit pipeline until stop or failure.
+            async function runFieldLoop() {
+                try {
+                    while (isProcessing && !shouldStop) {
+                        const claimData = await nextClaim();
+                        if (!claimData) break;
+                        currentClaimData = claimData;
+                        startTime = Date.now();
+                        numbersProcessedCount = 0;
+                        updateStatistics(0, 0);
+                        appendResults(
+                            `Received field ${claimData.claim_id}: range ${claimData.range_start} to ${claimData.range_end} in base ${claimData.base}`,
+                        );
+
+                        // Refill in parallel with the processing below.
+                        topUpClaims();
+                        const outcome = await processField(claimData);
+                        if (!outcome) break; // stopped mid-field
+
+                        noteFieldSeconds(outcome.elapsedSeconds);
+                        presentFieldResult(
+                            claimData,
+                            outcome.result,
+                            outcome.elapsedSeconds,
+                        );
+
+                        // Fold the field into the session's running story.
+                        const rangeSize = BigInt(claimData.range_size);
+                        sessionFields += 1;
+                        sessionNumbers += rangeSize;
+                        lastFieldRate =
+                            Number(rangeSize) / outcome.elapsedSeconds;
+                        recordFieldRate(lastFieldRate);
+                        accumulateSessionDistribution(
+                            claimData.base,
+                            outcome.result.unique_distribution,
+                        );
+                        updateStatistics(0, 0);
+                        updateHistogramThrottled(sessionDistribution);
+                        renderRateStrip();
+
+                        topUpClaims();
+                        await queueSubmit(claimData, outcome.result);
+                        if (submitFailure) break;
+                    }
+                } catch (error) {
+                    appendResults(`Error: ${error.message}`);
+                    updateStatus(
+                        `Processing error: ${error.message}`,
+                        "is-danger",
+                    );
+                    console.error("Field loop error:", error);
+                    claimFailure = claimFailure ?? error;
+                }
+
+                await drainSubmits();
+
+                // Claims never processed stay held on the server until the
+                // claim window expires; say so instead of dropping them
+                // silently.
+                const abandoned = claimBuffer.length + claimsInFlight;
+                if (abandoned > 0) {
+                    appendResults(
+                        `Abandoning ${abandoned} unprocessed claim(s); the server releases them within the hour.`,
+                    );
+                }
+                claimBuffer.length = 0;
+
+                if (submitFailure) {
+                    updateStatus(
+                        `Submission failed: ${submitFailure.message}`,
+                        "is-danger",
+                    );
+                } else if (shouldStop) {
+                    updateStatus("Processing stopped by user", "is-info");
+                } else if (!claimFailure) {
+                    updateStatus("Processing finished", "is-info");
+                }
+                resetUI();
+            }
+
+            // Offline benchmark: one fixed field, nothing claimed or
+            // submitted.
+            async function runBenchmarkField() {
+                updateStatus("Getting benchmark data...", "is-warning");
+                appendResults("Using benchmark data (offline mode)");
+                const claimData = await workerPool.getBenchmarkData();
+                currentClaimData = claimData;
+                startTime = Date.now();
+                numbersProcessedCount = 0;
+
+                const outcome = await processField(claimData);
+                if (outcome) {
+                    presentFieldResult(
+                        claimData,
+                        outcome.result,
+                        outcome.elapsedSeconds,
+                    );
+                    updateProgress(100, "Benchmark complete!");
+                    updateStatus(
+                        "Benchmark processing completed!",
+                        "is-success",
+                    );
+                }
+                resetUI();
+            }
+
+            // ============================================================
+            // Benchmark suite (NiceMark)
+            //
+            // The browser counterpart of the native client's --benchmark
+            // sweep: the same fixed measurement windows (the plan comes out
+            // of the wasm build, which shares the table with the native
+            // client), one untimed warmup per scenario, then repetitions of
+            // the window until the scenario's share of the budget is spent.
+            // Scored against the same pinned references — a browser and a
+            // native run on one machine are directly comparable, the
+            // browser just scores lower.
+            // ============================================================
+
+            // While the suite drives fields, dispatchField suppresses its
+            // per-field status lines so the scenario progress stays visible.
+            let suiteRunning = false;
+            // The finished report, held for the upload button.
+            let lastBenchReport = null;
+
+            async function pingSamples(n) {
+                const out = [];
+                for (let i = 0; i < n; i++) {
+                    if (i > 0) {
+                        await new Promise((r) => setTimeout(r, 100));
+                    }
+                    const t0 = performance.now();
+                    try {
+                        const response = await fetch(`${API_BASE}/ping`);
+                        out.push(
+                            response.ok ? performance.now() - t0 : null,
+                        );
+                    } catch {
+                        out.push(null);
+                    }
+                }
+                return out;
+            }
+
+            function median(values) {
+                if (values.length === 0) return null;
+                const sorted = [...values].sort((a, b) => a - b);
+                return sorted[Math.floor(sorted.length / 2)];
+            }
+
+            // Hardware info, best effort: browsers expose far less than
+            // /proc does, and Chromium exposes more than the others. Every
+            // field is optional downstream, matching the native report.
+            async function collectBrowserHardware(gpu) {
+                const hardware = {
+                    user_agent: navigator.userAgent,
+                    cpu_threads_available:
+                        navigator.hardwareConcurrency ?? null,
+                    mem_total_kb: null,
+                    device_memory_gb: navigator.deviceMemory ?? null,
+                    arch: null,
+                    os: null,
+                    os_pretty: null,
+                    gpu_model: gpu ? gpuAdapterName : null,
+                    gpu_backend: gpu ? "webgpu" : null,
+                };
+                try {
+                    if (navigator.userAgentData?.getHighEntropyValues) {
+                        const ua =
+                            await navigator.userAgentData.getHighEntropyValues(
+                                [
+                                    "platform",
+                                    "platformVersion",
+                                    "architecture",
+                                ],
+                            );
+                        hardware.os = ua.platform ?? null;
+                        hardware.os_pretty =
+                            ua.platform && ua.platformVersion
+                                ? `${ua.platform} ${ua.platformVersion}`
+                                : null;
+                        hardware.arch = ua.architecture ?? null;
+                    }
+                } catch {
+                    /* UA-CH is Chromium-only; the UA string above remains */
+                }
+                return hardware;
+            }
+
+            // One timed window through the production path of the chosen
+            // runner. `soloPool` (the single-worker pool for the _1t
+            // scenario) bypasses the backend dispatch; everything else goes
+            // through processField like a real field does.
+            async function runSuiteWindow(def, windowSize, soloPool) {
+                const startBig = BigInt(def.start);
+                const claimData = {
+                    claim_id: 0,
+                    base: def.base,
+                    range_start: startBig.toString(),
+                    range_end: (startBig + windowSize).toString(),
+                    range_size: windowSize.toString(),
+                };
+                const t0 = performance.now();
+                if (soloPool) {
+                    await new Promise((resolve, reject) =>
+                        soloPool.processClaimData(claimData, "benchmark", {
+                            onProgress: () => {},
+                            onComplete: resolve,
+                            onError: (error) =>
+                                reject(new Error(String(error))),
+                        }),
+                    );
+                } else {
+                    const outcome = await processField(claimData);
+                    if (!outcome) {
+                        throw new Error("benchmark stopped");
+                    }
+                }
+                return (performance.now() - t0) / 1000;
+            }
+
+            async function runSuiteScenario(def, gpu, shareSecs, soloPool) {
+                const workers = def.single_thread
+                    ? 1
+                    : workerPool.getWorkerCount();
+                let windowSize = BigInt(gpu ? def.window_gpu : def.window_cpu);
+                if (!gpu && !def.single_thread) {
+                    // The pool feeds workers from a queue of sub-ranges no
+                    // smaller than 200k numbers; keep the window big enough
+                    // that every worker gets at least one, or high-core
+                    // machines measure their own starvation (the native
+                    // sweep applies the same rule at its chunk size).
+                    // Cross-machine comparisons should use the fixed-window
+                    // single-thread scenario.
+                    const floor = BigInt(200000 * workers);
+                    if (windowSize < floor) windowSize = floor;
+                }
+
+                // One untimed warmup so one-time costs (GPU kernel JIT for
+                // this base, cold caches) land outside the measurement. The
+                // GPU needs the full window to reach the device path; the
+                // CPU warms on a fraction so slow devices don't pay the
+                // window twice.
+                const warmupWindow = gpu
+                    ? windowSize
+                    : windowSize / BigInt(8) > BigInt(0)
+                      ? windowSize / BigInt(8)
+                      : BigInt(1);
+                const warmupT0 = performance.now();
+                await runSuiteWindow(def, warmupWindow, soloPool);
+                const warmupSeconds = (performance.now() - warmupT0) / 1000;
+
+                let repetitions = 0;
+                let totalSecs = 0;
+                const scenarioT0 = performance.now();
+                do {
+                    totalSecs += await runSuiteWindow(
+                        def,
+                        windowSize,
+                        soloPool,
+                    );
+                    repetitions += 1;
+                } while (
+                    (performance.now() - scenarioT0) / 1000 <
+                        shareSecs * 0.9 &&
+                    !shouldStop
+                );
+
+                const rate =
+                    (Number(windowSize) * repetitions) /
+                    Math.max(totalSecs, 1e-4);
+                return {
+                    key: def.key,
+                    base: def.base,
+                    character: def.character,
+                    threads: gpu ? null : workers,
+                    window_start: def.start,
+                    window_size: windowSize.toString(),
+                    repetitions: repetitions,
+                    seconds: totalSecs,
+                    rate: rate,
+                    warmup_seconds: warmupSeconds,
+                };
+            }
+
+            async function runBenchmarkSuite() {
+                const gpu = selectedBackend() === "gpu" && !!gpuWorker;
+                const budgetSecs = parseInt(
+                    document.getElementById("benchBudget").value,
+                );
+                document.getElementById("benchReport").classList.add(
+                    "is-hidden",
+                );
+                lastBenchReport = null;
+
+                const plan = await workerPool.getBenchmarkPlan();
+                if (!plan) {
+                    throw new Error(
+                        "this wasm build has no benchmark plan (rebuild the pkg)",
+                    );
+                }
+                const defs = plan.scenarios.filter(
+                    (d) => !(gpu && d.single_thread),
+                );
+                const shareSecs = budgetSecs / defs.length;
+
+                appendResults(
+                    `Benchmark suite: detailed ${gpu ? "gpu" : "cpu"}, ${defs.length} scenarios, ${budgetSecs}s budget`,
+                );
+                const pingBefore = await pingSamples(5);
+
+                // The _1t scenario needs a pool of exactly one worker; the
+                // wasm module is already compiled, so this is cheap.
+                let soloPool = null;
+                const results = [];
+                suiteRunning = true;
+                try {
+                    if (!gpu && defs.some((d) => d.single_thread)) {
+                        soloPool = new WorkerPool({ maxWorkers: 1 });
+                        await soloPool.initialize();
+                    }
+                    for (let i = 0; i < defs.length; i++) {
+                        if (shouldStop) break;
+                        const def = defs[i];
+                        updateStatus(
+                            `Benchmark ${i + 1}/${defs.length}: ${def.key}...`,
+                            "is-warning",
+                        );
+                        updateProgress((100 * i) / defs.length);
+                        const result = await runSuiteScenario(
+                            def,
+                            gpu,
+                            shareSecs,
+                            def.single_thread ? soloPool : null,
+                        );
+                        results.push(result);
+                        appendResults(
+                            `${def.key}: ${result.rate.toExponential(2)} numbers/sec ` +
+                                `(${result.repetitions} reps of ${Number(result.window_size).toExponential(1)}, ${result.seconds.toFixed(2)}s)`,
+                        );
+                    }
+                } finally {
+                    suiteRunning = false;
+                    if (soloPool) soloPool.terminate();
+                }
+
+                if (shouldStop) {
+                    updateStatus("Benchmark cancelled", "is-info");
+                    resetUI();
+                    return;
+                }
+
+                const pingAfter = await pingSamples(5);
+                const pings = [...pingBefore, ...pingAfter].filter(
+                    (p) => p !== null,
+                );
+                if (pings.length > 0) {
+                    appendResults(
+                        `API latency: median ${median(pings).toFixed(1)} ms over ${pings.length}/10 samples`,
+                    );
+                } else {
+                    appendResults("API latency: unavailable (offline?)");
+                }
+
+                const score = await workerPool.getNicemarkScore(
+                    results.map((r) => ({ key: r.key, rate: r.rate })),
+                    gpu,
+                );
+                const hardware = await collectBrowserHardware(gpu);
+                const clientVersion = `${workerPool.clientVersion}-wasm-${gpu ? "webgpu" : "worker"}`;
+
+                lastBenchReport = {
+                    schema_version: plan.schema_version,
+                    client_version: clientVersion,
+                    build_sha: workerPool.buildSha,
+                    timestamp_epoch: Math.floor(Date.now() / 1000),
+                    config: {
+                        mode: "detailed",
+                        gpu: gpu,
+                        threads: gpu ? null : workerPool.getWorkerCount(),
+                        benchmark_secs: budgetSecs,
+                        // What PR'd server-side analysis keys on to keep
+                        // wasm-speed samples out of the native estimator.
+                        platform: "browser",
+                    },
+                    hardware: hardware,
+                    environment: {},
+                    api_latency: {
+                        endpoint: `${API_BASE}/ping`,
+                        before_ms: pingBefore,
+                        after_ms: pingAfter,
+                        median_ms: median(pings),
+                    },
+                    scenarios: results,
+                    score: score,
+                };
+                console.log("benchmark report:", lastBenchReport);
+
+                document.getElementById("nicemarkScore").textContent =
+                    score === null ? "n/a" : Math.round(score).toString();
+                document.getElementById("nicemarkDetail").textContent =
+                    `detailed ${gpu ? "gpu" : "cpu"} · ${clientVersion}` +
+                    (score === null ? "" : " · 1000 = reference");
+                const uploadBtn = document.getElementById("uploadBtn");
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = "Upload score";
+                document.getElementById("uploadStatus").textContent = "";
+                document
+                    .getElementById("benchReport")
+                    .classList.remove("is-hidden");
+
+                updateProgress(100, "Benchmark suite complete!");
+                updateStatus("Benchmark suite complete!", "is-success");
+                resetUI();
+            }
+
+            window.uploadBenchmark = async function () {
+                if (!lastBenchReport) return;
+                const uploadBtn = document.getElementById("uploadBtn");
+                const uploadStatus = document.getElementById("uploadStatus");
+                uploadBtn.disabled = true;
+                uploadStatus.textContent = "Uploading...";
+                try {
+                    const username =
+                        document.getElementById("username").value ||
+                        "anonymous";
+                    const response = await fetch(`${API_BASE}/benchmark`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            username: username,
+                            data: lastBenchReport,
+                        }),
+                    });
+                    const text = await response.text();
+                    if (!response.ok) {
+                        throw new ApiError(response.status, text);
+                    }
+                    let message = "stored";
+                    try {
+                        const body = JSON.parse(text);
+                        message = `${body.message ?? "stored"} (id ${body.benchmark_id ?? "?"})`;
+                    } catch {
+                        /* non-JSON success body */
+                    }
+                    uploadStatus.textContent = `Upload accepted: ${message}`;
+                    uploadBtn.textContent = "Uploaded";
+                } catch (error) {
+                    uploadStatus.textContent = `Upload failed: ${error.message}`;
+                    uploadBtn.disabled = false;
+                }
+            };
+
+            // The GPU path runs in one dedicated worker: the device supplies
+            // the parallelism, so there is nothing for a pool to do.
+            let gpuWorker = null;
+            let gpuAdapterName = null;
+
+            function selectedBackend() {
+                return document.getElementById("backendSelect").value;
+            }
+
+            // The thread slider steers the CPU pool; in GPU mode the device
+            // supplies the parallelism and the slider is just a confusing
+            // knob that does nothing.
+            function updateBackendControls() {
+                const gpu = selectedBackend() === "gpu";
+                document
+                    .getElementById("threadCountField")
+                    .classList.toggle("is-hidden", gpu);
+            }
+
+            function initGpuWorker() {
+                return new Promise((resolve) => {
+                    const worker = new Worker("worker.js");
+                    const timeout = setTimeout(() => {
+                        worker.terminate();
+                        resolve(null);
+                    }, 15000);
+                    worker.onmessage = (e) => {
+                        if (e.data.type === "initialized") {
+                            if (e.data.success) {
+                                worker.postMessage({ type: "init_gpu" });
+                            } else {
+                                clearTimeout(timeout);
+                                worker.terminate();
+                                resolve(null);
+                            }
+                        } else if (e.data.type === "gpu_build_info") {
+                            console.log("gpu build info:", e.data.info);
+                        } else if (e.data.type === "gpu_initialized") {
+                            clearTimeout(timeout);
+                            if (e.data.success) {
+                                resolve({
+                                    worker,
+                                    adapterName: e.data.adapterName,
+                                });
+                            } else {
+                                console.log(
+                                    "No WebGPU:",
+                                    e.data.error,
+                                );
+                                worker.terminate();
+                                resolve(null);
+                            }
+                        }
+                    };
+                    worker.onerror = () => {
+                        clearTimeout(timeout);
+                        worker.terminate();
+                        resolve(null);
+                    };
+                    // Same compiled module the CPU pool uses (worker-pool.js);
+                    // the GPU worker should not re-download and re-compile it.
+                    niceWasmModule().then((sharedModule) =>
+                        worker.postMessage({
+                            type: "init",
+                            data: { module: sharedModule },
+                        }),
+                    );
+                });
+            }
+
+            // Version-aware copy for browsers that expose no navigator.gpu
+            // at all. Feature detection stays the gate — this only shapes
+            // the help text. Shipped-version matrix as of 2026-08: Chrome
+            // 113+ on Windows/macOS and 121+ on Android, with Linux a
+            // driver-gated rollout that began around 144; Firefox 141+ on
+            // Windows and 145+ on macOS, Linux still ramping (Nightly has
+            // it); Safari 26 (macOS 26 / iOS 26).
+            function webGpuUpgradeHint() {
+                const ua = navigator.userAgent;
+                const major = (re) => {
+                    const m = re.exec(ua);
+                    return m ? parseInt(m[1], 10) : null;
+                };
+                const linux = /Linux/.test(ua) && !/Android/.test(ua);
+                const android = /Android/.test(ua);
+
+                const firefox = major(/Firefox\/(\d+)/);
+                if (firefox !== null) {
+                    if (linux) {
+                        return "Stable Firefox is still rolling WebGPU out on Linux; Firefox Nightly has it working today.";
+                    }
+                    if (/Mac OS X/.test(ua) && firefox < 145) {
+                        return `Firefox ${firefox} predates WebGPU on macOS — updating to Firefox 145 or newer enables the GPU option.`;
+                    }
+                    if (firefox < 141) {
+                        return `Firefox ${firefox} predates WebGPU — updating to Firefox 141 or newer enables the GPU option on Windows.`;
+                    }
+                    return "This Firefox does not expose WebGPU on this platform yet.";
+                }
+
+                // Safari's UA carries Version/NN; Chromium UAs never do.
+                const safari =
+                    /Safari\//.test(ua) && !/Chrome|Chromium/.test(ua)
+                        ? major(/Version\/(\d+)/)
+                        : null;
+                if (safari !== null) {
+                    if (safari < 26) {
+                        return `Safari ${safari} predates WebGPU — it arrived with Safari 26 (macOS 26 / iOS 26), so updating enables the GPU option.`;
+                    }
+                    return "This Safari does not expose WebGPU here; look for the WebGPU feature flag in Settings.";
+                }
+
+                const chrome = major(/Chrom(?:e|ium)\/(\d+)/);
+                if (chrome !== null) {
+                    if (/Windows NT (?:5\.|6\.[01])/.test(ua)) {
+                        return "This Windows version cannot run a WebGPU-capable browser, so the CPU pool is the option here.";
+                    }
+                    if (linux) {
+                        return "Chrome is still rolling WebGPU out on Linux one GPU family at a time; a recent version covers more hardware, and chrome://gpu shows where yours stands.";
+                    }
+                    if (android && chrome < 121) {
+                        return `Chrome ${chrome} predates WebGPU on Android — updating to 121 or newer enables the GPU option.`;
+                    }
+                    if (chrome < 113) {
+                        return `Chrome ${chrome} predates WebGPU — updating to 113 or newer enables the GPU option.`;
+                    }
+                    return "This browser build does not expose WebGPU.";
+                }
+
+                return "This browser does not expose WebGPU. Recent Chrome and Edge (113+), Firefox (141+), and Safari (26+) support it.";
+            }
+
+            // Ask the browser directly before involving wasm. Three
+            // distinguishable failures hide behind "no GPU", and each wants a
+            // different message; going through wasm first turns all of them
+            // into one opaque panic inside CubeCL's adapter request.
+            async function probeWebGpu() {
+                if (!navigator.gpu) {
+                    return {
+                        ok: false,
+                        why: window.isSecureContext
+                            ? webGpuUpgradeHint()
+                            : "WebGPU needs a secure context — open this page over HTTPS (or localhost) to enable the GPU option.",
+                    };
+                }
+                // Fallback adapters are allowed as a last resort: a software
+                // adapter is still much faster than nothing on a weak CPU,
+                // and the kernel is identical either way.
+                let adapter = null;
+                try {
+                    adapter =
+                        (await navigator.gpu.requestAdapter({
+                            powerPreference: "high-performance",
+                        })) ??
+                        (await navigator.gpu.requestAdapter()) ??
+                        (await navigator.gpu.requestAdapter({
+                            forceFallbackAdapter: true,
+                        }));
+                } catch (error) {
+                    return {
+                        ok: false,
+                        why: `WebGPU adapter request failed: ${error}`,
+                    };
+                }
+                if (!adapter) {
+                    // A machine can have working WebGPU and still refuse a
+                    // standard adapter: Chrome hands out compatibility-mode
+                    // adapters only when a page asks for them by name, and
+                    // the engine behind this client cannot drive one yet.
+                    // Distinguish that from having no GPU at all.
+                    let compat = null;
+                    try {
+                        compat = await navigator.gpu.requestAdapter({
+                            featureLevel: "compatibility",
+                        });
+                    } catch {
+                        compat = null;
+                    }
+                    return {
+                        ok: false,
+                        why: compat
+                            ? "This browser only offers a WebGPU compatibility-mode adapter, which this client cannot use yet."
+                            : "This browser has WebGPU but offered no adapter, usually because graphics acceleration is off or the GPU is not usable by the browser. Chromium reports the reason on chrome://gpu, Firefox under Graphics on about:support.",
+                    };
+                }
+                const info = adapter.info ?? {};
+                const described = [info.vendor, info.architecture, info.device]
+                    .filter(Boolean)
+                    .join(" ");
+                return {
+                    ok: true,
+                    name: described || info.description || "WebGPU device",
+                };
+            }
+
+            async function detectGpu() {
+                const help = document.getElementById("backendHelp");
+                const probe = await probeWebGpu();
+                if (!probe.ok) {
+                    help.textContent = `${probe.why} Using the CPU thread pool.`;
+                    return;
+                }
+
+                help.textContent = `Starting ${probe.name}...`;
+                const gpu = await initGpuWorker();
+                if (!gpu) {
+                    help.textContent = `WebGPU adapter found (${probe.name}) but the GPU worker failed to start; using the CPU thread pool. See the console for details.`;
+                    return;
+                }
+
+                gpuWorker = gpu.worker;
+                // Prefer the browser's adapter description: CubeCL reports an
+                // empty name on some adapters (software ones especially).
+                // Browsers deliberately redact adapter identity, so both
+                // names are often empty or a bare backend tag like
+                // "(BrowserWebGpu)". Prefer whichever actually names a
+                // device, and never render a label that starts with the
+                // backend in parentheses.
+                const cubeclName = gpu.adapterName?.trim() ?? "";
+                const named = cubeclName && !cubeclName.startsWith("(");
+                gpuAdapterName = named
+                    ? cubeclName
+                    : probe.name || "WebGPU device";
+                const select = document.getElementById("backendSelect");
+                const option = document.createElement("option");
+                option.value = "gpu";
+                option.textContent = `GPU — ${gpuAdapterName}`;
+                select.appendChild(option);
+                // The GPU outruns the CPU pool on every machine measured,
+                // so once it exists it is the default — unless the user
+                // already started (or picked a backend) while detection was
+                // still warming up.
+                if (!isProcessing) {
+                    select.value = "gpu";
+                }
+                updateBackendControls();
+                help.textContent =
+                    "WebGPU available; the GPU runs whole fields while the CPU option uses the thread pool.";
+                gpuWorker.onmessage = handleGpuWorkerMessage;
+            }
+
+            function handleGpuWorkerMessage(e) {
+                const { type, ...rest } = e.data;
+                switch (type) {
+                    case "progress":
+                        handleWorkerPoolProgress({
+                            percent: rest.percent,
+                            message: rest.message,
+                            processedCount: rest.processedCount,
+                            uniqueDistribution: rest.uniqueDistribution,
+                            niceNumbers: rest.niceNumbers,
+                        });
+                        break;
+                    case "complete":
+                        settleField({
+                            result: rest.result,
+                            elapsedSeconds: rest.elapsedSeconds,
+                        });
+                        break;
+                    case "stopped":
+                        appendResults(`Processing stopped: ${rest.message}`);
+                        settleField(null);
+                        break;
+                    case "error":
+                        failField(new Error(rest.error));
+                        break;
+                }
+            }
+
+            // Start one field on the selected backend; the outcome arrives
+            // through settleField/failField.
+            function dispatchField(claimData) {
+                const username =
+                    document.getElementById("username").value || "anonymous";
+
+                if (selectedBackend() === "gpu" && gpuWorker) {
+                    if (!suiteRunning) {
+                        updateStatus(
+                            `Processing field on ${gpuAdapterName}...`,
+                            "is-warning",
+                        );
+                        updateProgress(0, "Starting GPU processing...");
+                    }
+                    gpuWorker.postMessage({
+                        type: "process_gpu",
+                        data: {
+                            claimData: claimData,
+                            username: username,
+                        },
+                    });
+                    return;
+                }
+
+                if (!workerPool) {
+                    failField(new Error("worker pool is not ready"));
+                    return;
+                }
+                if (!suiteRunning) {
+                    updateStatus(
+                        `Processing field with ${workerPool.getWorkerCount()} workers in parallel...`,
+                        "is-warning",
+                    );
+                    updateProgress(0, "Starting multi-threaded processing...");
+                }
+
+                workerPool.processClaimData(claimData, username, {
+                    onProgress: handleWorkerPoolProgress,
+                    onComplete: (completeData) =>
+                        settleField({
+                            result: completeData.result,
+                            elapsedSeconds: completeData.elapsedSeconds,
+                        }),
+                    onError: (error) => failField(new Error(String(error))),
+                });
+            }
+
+            window.startProcessing = async function () {
+                if (isProcessing || !workerPool) return;
+
+                const mode = document.getElementById("testMode").value;
+
+                isProcessing = true;
+                shouldStop = false;
+                startTime = Date.now();
+                numbersProcessedCount = 0;
+                niceNumbersCount = 0;
+                fieldSecsEwma = null;
+                claimFailure = null;
+                submitFailure = null;
+
+                // A fresh online run starts a fresh session story; the
+                // benchmark modes leave the panel alone.
+                onlineRun = mode === "false";
+                if (onlineRun) {
+                    sessionStart = Date.now();
+                    sessionFields = 0;
+                    sessionNumbers = BigInt(0);
+                    bestFind = null;
+                    lastFieldRate = null;
+                    sessionRates = [];
+                    sessionDistribution = new Map();
+                    sessionDistBase = null;
+                }
+
+                document.getElementById("startBtn").classList.add("is-hidden");
+                document
+                    .getElementById("stopContainer")
+                    .classList.remove("is-hidden");
+                document
+                    .getElementById("progressContainer")
+                    .classList.remove("is-hidden");
+                document.getElementById("results").textContent = "";
+
+                try {
+                    if (mode === "suite") {
+                        await runBenchmarkSuite();
+                    } else if (mode === "true") {
+                        await runBenchmarkField();
+                    } else {
+                        await runFieldLoop();
+                    }
+                } catch (error) {
+                    updateStatus(
+                        `Error starting processing: ${error.message}`,
+                        "is-danger",
+                    );
+                    resetUI();
+                }
+            };
+
+            window.stopProcessing = function () {
+                shouldStop = true;
+                isProcessing = false;
+                if (gpuWorker) {
+                    gpuWorker.postMessage({ type: "stop" });
+                }
+
+                if (workerPool) {
+                    workerPool.stopProcessing();
+                }
+
+                updateStatus("Stopping all workers...", "is-warning");
+                appendResults(
+                    "Stop requested by user - stopping all parallel workers",
+                );
+
+                // Settle the in-flight field directly rather than waiting
+                // for a worker acknowledgement (the CPU pool does not route
+                // one back), so the loop can move on to draining
+                // submissions; late worker messages find activeField null
+                // and are ignored.
+                settleField(null);
+                wakeClaimWaiters();
+            };
+
+            function resetUI() {
+                isProcessing = false;
+                shouldStop = false;
+                currentClaimData = null;
+
+                document
+                    .getElementById("startBtn")
+                    .classList.remove("is-hidden");
+
+                // Re-enable the start button if worker pool is ready
+                if (workerPool && workerPool.isReady()) {
+                    document.getElementById("startBtn").disabled = false;
+                }
+                document
+                    .getElementById("stopContainer")
+                    .classList.add("is-hidden");
+                document
+                    .getElementById("progressContainer")
+                    .classList.add("is-hidden");
+
+                updateProgress(0, "");
+                document
+                    .getElementById("progressDetails")
+                    .classList.add("is-hidden");
+            }
+
+            function checkBrowserSupport() {
+                if (!window.Worker) {
+                    updateStatus(
+                        "Your browser does not support Web Workers. Multi-threaded processing requires a modern browser.",
+                        "is-danger",
+                    );
+                    updateWorkerStatus("Web Workers not supported", "error");
+                    return false;
+                }
+
+                if (!window.WebAssembly) {
+                    updateStatus(
+                        "Your browser does not support WebAssembly. High-performance processing requires a modern browser.",
+                        "is-danger",
+                    );
+                    updateWorkerStatus("WebAssembly not supported", "error");
+                    return false;
+                }
+
+                const cores = navigator.hardwareConcurrency || 4;
+                console.log(
+                    `Browser supports ${cores} concurrent threads for parallel processing`,
+                );
+
+                return true;
+            }
+
+            // Initialize when page loads
+            // Log which wasm build is actually loaded. The page is small and
+            // revalidates, but the 2 MB wasm is exactly the kind of thing a
+            // browser keeps, so "did my fix reach you" is otherwise
+            // unanswerable from a console paste.
+            async function logBuild() {
+                try {
+                    const r = await fetch("./pkg/nice_wasm_client_bg.wasm", {
+                        method: "HEAD",
+                        cache: "no-cache",
+                    });
+                    console.log(
+                        `wasm build: ${r.headers.get("content-length")} bytes, modified ${r.headers.get("last-modified")}`,
+                    );
+                } catch {
+                    /* diagnostics only */
+                }
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                logBuild();
+                detectGpu();
+                renderLifetime();
+                if (checkBrowserSupport()) {
+                    setupCpuControls();
+                    init();
+                }
+
+                // A tab returning to the foreground may start buffering
+                // claims again (a hidden one stops, see topUpClaims).
+                document.addEventListener("visibilitychange", () => {
+                    if (!document.hidden) {
+                        topUpClaims();
+                    }
+                });
+
+                // The backends differ by more than an order of magnitude,
+                // so a measured field time from one says nothing about the
+                // other.
+                document
+                    .getElementById("backendSelect")
+                    .addEventListener("change", () => {
+                        fieldSecsEwma = null;
+                        updateBackendControls();
+                    });
+
+                // The budget selector only means something to the suite.
+                document
+                    .getElementById("testMode")
+                    .addEventListener("change", (e) => {
+                        const suite = e.target.value === "suite";
+                        document
+                            .getElementById("benchBudgetField")
+                            .classList.toggle("is-hidden", !suite);
+                        if (!suite) {
+                            document
+                                .getElementById("benchReport")
+                                .classList.add("is-hidden");
+                        }
+                    });
+            });
+
+            // Setup thread controls
+            function setupCpuControls() {
+                const cores = navigator.hardwareConcurrency || 4;
+                const threadSlider = document.getElementById("threadCount");
+                const threadValue = document.getElementById("threadCountValue");
+
+                // Setup thread count slider
+                threadSlider.max = cores;
+                const defaultThreads = Math.max(1, Math.floor(cores * 0.8));
+                threadSlider.value = defaultThreads;
+                threadValue.textContent = defaultThreads;
+
+                // Update display when slider changes
+                threadSlider.addEventListener("input", () => {
+                    threadValue.textContent = threadSlider.value;
+                });
+
+                // Add event listener to update worker pool if already initialized
+                threadSlider.addEventListener("change", () => {
+                    if (workerPool && !isProcessing) {
+                        restartWorkerPool();
+                    }
+                });
+            }
+
+            // Restart worker pool with new settings
+            async function restartWorkerPool() {
+                if (workerPool && !isProcessing) {
+                    const threadCount = parseInt(
+                        document.getElementById("threadCount").value,
+                    );
+
+                    updateStatus(
+                        "Restarting worker pool with new settings...",
+                        "is-warning",
+                    );
+                    updateWorkerStatus(
+                        "Restarting Worker Pool...",
+                        "initializing",
+                    );
+
+                    // Terminate old pool
+                    workerPool.terminate();
+
+                    try {
+                        // Create new pool with updated settings
+                        workerPool = new WorkerPool({
+                            maxWorkers: threadCount,
+                            progressUpdateInterval: 500,
+                        });
+                        await workerPool.initialize();
+
+                        updateWorkerStatus(
+                            `Worker Pool ready with ${workerPool.getWorkerCount()} workers!`,
+                            "ready",
+                        );
+                        updateStatus(
+                            `Settings applied: ${threadCount} worker${threadCount > 1 ? "s" : ""}`,
+                            "is-success",
+                        );
+
+                        document.getElementById("startBtn").disabled = false;
+                    } catch (error) {
+                        updateStatus(
+                            `Error restarting Worker Pool: ${error.message}`,
+                            "is-danger",
+                        );
+                        updateWorkerStatus(
+                            "Failed to restart Worker Pool",
+                            "error",
+                        );
+                    }
+                }
+            }
+        </script>
+    </body>
+</html>

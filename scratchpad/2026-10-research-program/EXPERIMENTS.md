@@ -29,6 +29,21 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L23.1 Browser CPU detailed mode on finite differences (2026-10-31, agent; `L23/RESULTS.md`, `L23/raw/`, `L23/harness/`; PR #227, branch `pr/wasm-detailed-finite-diff` fe38c7e on #221's 7019653)
+
+`process_chunk_wasm` → `process_range_detailed_fd` (2 files, 7 lines). Exactness: old wasm (d1ff798)
+vs new, same `wasm-pack` command as CI, headless Chromium 151 (Playwright 1.62 image via rootless
+podman on ivory): 141 windows, 36.4M numbers, raw JSON byte-identical (benchmark windows in three
+chunkings, the 10M offline field, six windows per base 40–64, full ranges of bases 10–24 with 27
+near misses, the e2e's b49 near miss above 2^53, 20M around the first b40 near miss). CI's e2e
+`run.sh` passes locally; its CPU-vs-WebGPU histogram check agrees.
+Speed (page suite, 60 s, 3 workers, interleaved ×3, M n/s): b40 3.564 → 36.571 (×10.3); b50 4.715
+→ 31.127 (×6.6); b50_1t 1.782 → 8.776 (×4.9); NiceMark 246 → 1711 (×7.0); spreads ≤1.8 %. Per
+number: wasm 683 → 58 ns (b40), 508 → 70 (b50), 655 → 72 (b60); native on the same box 266/43,
+414/49, 541/50. The page + worker pool adds ~45–55 ms fixed per suite window (why `_1t` gains less).
+Note: wasm32 clippy without `--no-deps` fails on a pre-existing lint at cubecl_web.rs:63 on main too
+(CI never runs it); left alone.
+
 ## L3.7 Verification of the fixed FD branch on CUDA and lavapipe (2026-10-30, agent; `L3/verify/VERIFY-297a969.md`)
 
 RTX 3080 (58428313, KR; host-capped at 150 W, 1545 MHz), 297a969: fmt, both lint clippy lines +
