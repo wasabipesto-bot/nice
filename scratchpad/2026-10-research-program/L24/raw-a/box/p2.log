@@ -1,0 +1,106 @@
+=== 16:18:34 head
+215952d GPU detailed mode: the finite-difference seed in one u32 function
+699b21a26d1bd0b2cf5c304bd7ec8faa8a7d432908a4ebaff6363b2bd4a03f59  /root/bin/nice_client_main
+559aa6cad54cfe339fd38c296f7ed43bd15cea641607d58b7d1b6c59ff483a7b  /root/bin/nice_client_pr
+14742f8101d26a4fb0d91cac496c190866a9b3ba7118b1cea0de7bedbea0367b  /root/bin/test_main
+4838b72f1f0a409453914936bcaf7fdd248fce5a0dca3a4527878e4de1e08e81  /root/bin/test_pr
+name, driver_version, power.limit [W], clocks.max.sm [MHz]
+NVIDIA GeForce RTX 3080, 580.159.03, 180.00 W, 2115 MHz
+=== 16:18:34 tests-cuda
+cuda-fd: cubecl_detailed_fd::tests::cubecl_cuda_fd_matches_cpu_detailed rc=0 secs=133 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 132.42s
+cuda-detailed: cubecl_backend::tests::cubecl_cuda_matches_cpu_detailed rc=0 secs=4 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 4.21s
+cuda-nearmiss: cubecl_backend::tests::cubecl_cuda_reads_back_every_near_miss rc=0 secs=60 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 59.45s
+=== 16:21:51 tests-cuda-split16
+cuda16-fd: cubecl_detailed_fd::tests::cubecl_cuda_fd_matches_cpu_detailed rc=0 secs=142 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 142.48s
+=== 16:24:13 tests-lavapipe
+	apiVersion         = 1.4.318
+	deviceName         = llvmpipe (LLVM 20.1.2, 256 bits)
+	driverName         = llvmpipe
+lvp-seed: cubecl_detailed_fd::tests::cubecl_fd_seed_matches_cpu rc=0 secs=24 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 23.52s
+seed windows exact: 131 of 131
+lvp-fd: cubecl_detailed_fd::tests::cubecl_fd_matches_cpu_detailed rc=0 secs=8 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 8.35s
+lvp-nearmiss: cubecl_backend::tests::cubecl_reads_back_every_near_miss rc=0 secs=3 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 3.10s
+lvp-detailed: cubecl_backend::tests::cubecl_matches_cpu_detailed rc=0 secs=4 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 3.92s
+=== 16:24:52 dumps
+dump wgsl fd main rc 0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 10.39s
+dump wgsl seed main rc 0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 31.86s
+dump cuda wide main rc 0
+dump cuda split16 main rc 0
+dump wgsl fd pr rc 0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 10.36s
+dump wgsl seed pr rc 0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 260 filtered out; finished in 31.88s
+dump cuda wide pr rc 0
+dump cuda split16 pr rc 0
+-rw-r--r-- 1 root root  452153 Oct 31 16:25 /root/v/dump-cuda-split16-main.log
+-rw-r--r-- 1 root root  445321 Oct 31 16:26 /root/v/dump-cuda-split16-pr.log
+-rw-r--r-- 1 root root  316077 Oct 31 16:25 /root/v/dump-cuda-wide-main.log
+-rw-r--r-- 1 root root  316077 Oct 31 16:26 /root/v/dump-cuda-wide-pr.log
+-rw-r--r-- 1 root root  758885 Oct 31 16:25 /root/v/dump-wgsl-fd-main.log
+-rw-r--r-- 1 root root  760086 Oct 31 16:25 /root/v/dump-wgsl-fd-pr.log
+-rw-r--r-- 1 root root 4385047 Oct 31 16:25 /root/v/dump-wgsl-seed-main.log
+-rw-r--r-- 1 root root 4393030 Oct 31 16:26 /root/v/dump-wgsl-seed-pr.log
+=== 16:26:42 bench
+=== 16:26:42 bench 1 wide main
+rc 0
+[2026-10-31T16:26:42Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+b40_detailed           40 uniform              4      2.0e8   3772   27.006     2.793e10        -
+b50_detailed           50 uniform              4      2.0e8   3315   27.001     2.455e10        -
+NiceMark: 13804 (v3.4.7-dev, Detailed gpu)
+loaded samples 56 pwr median 177
+pclk median 1725
+=== 16:27:38 bench 2 wide pr
+rc 0
+[2026-10-31T16:27:38Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+b40_detailed           40 uniform              4      2.0e8   3676   27.005     2.722e10        -
+b50_detailed           50 uniform              4      2.0e8   3325   27.002     2.463e10        -
+NiceMark: 13647 (v3.4.7-dev, Detailed gpu)
+loaded samples 56 pwr median 178
+pclk median 1695
+=== 16:28:34 bench 3 wide main
+rc 0
+[2026-10-31T16:28:35Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+b40_detailed           40 uniform              4      2.0e8   3715   27.002     2.752e10        -
+b50_detailed           50 uniform              4      2.0e8   3270   27.007     2.422e10        -
+NiceMark: 13605 (v3.4.7-dev, Detailed gpu)
+loaded samples 56 pwr median 178
+pclk median 1680
+=== 16:29:30 bench 4 wide pr
+rc 0
+[2026-10-31T16:29:31Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+b40_detailed           40 uniform              4      2.0e8   3681   27.005     2.726e10        -
+b50_detailed           50 uniform              4      2.0e8   3240   27.006     2.399e10        -
+NiceMark: 13480 (v3.4.7-dev, Detailed gpu)
+loaded samples 56 pwr median 178
+pclk median 1680
+=== 16:30:26 bench 5 split16 main
+rc 0
+[2026-10-31T16:30:27Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+b40_detailed           40 uniform              4      2.0e8   3626   27.001     2.686e10        -
+b50_detailed           50 uniform              4      2.0e8   3216   27.006     2.382e10        -
+NiceMark: 13330 (v3.4.7-dev, Detailed gpu)
+loaded samples 57 pwr median 178
+pclk median 1680
+=== 16:31:23 bench 6 split16 pr
+rc 0
+[2026-10-31T16:31:24Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+b40_detailed           40 uniform              4      2.0e8   3625   27.001     2.685e10        -
+b50_detailed           50 uniform              4      2.0e8   3228   27.006     2.391e10        -
+NiceMark: 13353 (v3.4.7-dev, Detailed gpu)
+loaded samples 57 pwr median 178
+pclk median 1680
+=== 16:32:20 bench 7 split16 main
+rc 0
+[2026-10-31T16:32:21Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+b40_detailed           40 uniform              4      2.0e8   3581   27.001     2.653e10        -
+b50_detailed           50 uniform              4      2.0e8   3235   27.000     2.396e10        -
+NiceMark: 13288 (v3.4.7-dev, Detailed gpu)
+loaded samples 57 pwr median 178
+pclk median 1665
+=== 16:33:17 bench 8 split16 pr
+rc 0
+[2026-10-31T16:33:17Z INFO  nice_client] GPU initialized: CubeCL CUDA device 0, batch size 50000000
+b40_detailed           40 uniform              4      2.0e8   3621   27.005     2.682e10        -
+b50_detailed           50 uniform              4      2.0e8   3178   27.000     2.354e10        -
+NiceMark: 13242 (v3.4.7-dev, Detailed gpu)
+loaded samples 57 pwr median 178
+pclk median 1665
+=== 16:34:14 done-p2

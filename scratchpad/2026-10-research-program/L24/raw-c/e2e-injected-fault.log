@@ -1,0 +1,32 @@
+web/vendor/d3.min.js: OK
+web/vendor/plot.umd.min.js: OK
+serving /repo/web/search at http://127.0.0.1:44531/
+browser: chromium 151.0.7922.34, adapter: pinned software
+=== WebGPU adapter ===
+adapter: vendor="google" architecture="swiftshader" device="" description="" fallback=true gpu_init=" (BrowserWebGpu, wgpu<wgsl>)"
+build: 3.4.7-dev 806caec80e0fc13c082225b695bcb7b1241f91bb; {"near_miss_capacity":8192,"batch_size":32000000,"miss_buffer_bytes":163840}
+adapter check passed (software, as pinned)
+=== submit payload shape ===
+=== GPU/CPU parity (ci) ===
+same b10/[47,200)                       b10  n=      153 near= 2 gpu=0.403s cpu=0.002s
+same b23/full                           b23  n=   546240 near= 8 gpu=1.151s cpu=0.238s
+same b40/start                          b40  n=   100000 near= 0 gpu=1.051s cpu=0.009s
+same b40/straddle-start                 b40  n=   100000 near= 0 gpu=0.211s cpu=0.006s
+same b40/dS-k8@3276800000000            b40  n=   100000 near= 0 gpu=0.206s cpu=0.006s
+same b40/len1                           b40  n=        1 near= 0 gpu=0.003s cpu=0.000s
+FAIL b40/len61                          b40  n=       61 near= 0 gpu=0.003s cpu=0.000s
+  window [1916284264916, 1916284264977) at base 40
+  results differ, first at distribution[num_uniques=1].count: gpu 1, cpu 0
+same b40/len129                         b40  n=      129 near= 0 gpu=0.003s cpu=0.000s
+FAIL b49/nearmiss                       b49  n=   100000 near= 1 gpu=1.212s cpu=0.029s
+  window [20363742218551559, 20363742218651559) at base 49
+  results differ, first at distribution[num_uniques=44].count: gpu 1, cpu 0
+    also distribution[num_uniques=45].count: gpu absent, cpu 1
+same b50/dC-k20@56381862225549391       b50  n=   100000 near= 0 gpu=1.191s cpu=0.025s
+same b57/start-2e4                      b57  n=    20000 near= 0 gpu=1.287s cpu=0.004s
+same b64/start-2e4                      b64  n=    20000 near= 0 gpu=1.327s cpu=0.003s
+same b80/start-2e4                      b80  n=    20000 near= 0 gpu=2.007s cpu=0.036s
+PARITY FAILED: parity (ci): 13 windows, 1106584 numbers, 11 near misses, 2 failed, 10.5 s on google/swiftshader (fallback)
+  b40/len61 [1916284264916, 1916284264977) base 40: results differ, first at distribution[num_uniques=1].count: gpu 1, cpu 0
+  b49/nearmiss [20363742218551559, 20363742218651559) base 49: results differ, first at distribution[num_uniques=44].count: gpu 1, cpu 0
+rc=1 wall=13 s

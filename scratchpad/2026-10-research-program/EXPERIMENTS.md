@@ -29,6 +29,24 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L24.1 Headless WebGPU bring-up on the M4 and PR #230 (seed refactor) (2026-10-31, agents; `L24/BRINGUP-M4.md`, `L24/RESULTS-A.md`)
+
+**Bring-up (22 min of Mac time):** Playwright 1.62 `channel: "chromium"` (Chrome for Testing 151),
+macOS 26.3, over SSH, no GUI: adapter `apple`/`metal-3`, `isFallbackAdapter` false, warm 2e8 b40
+call 6.56e8 n/s with **no flags**; `--enable-webgpu-developer-features` unmasks "Apple M4";
+SwiftShader (CI pin) reports google/swiftshader, fallback true, 1.77e7 n/s. **Today's browser GPU
+kernel is exact on Apple through Chrome's Tint:** 201 windows (§3.3 + both 2e8 benchmark windows),
+4.25e8 numbers, 46 bases, 50 near misses, 0 differences; repeat identical; extra seeded sweep 440
+windows 0 differences; CI subset on SwiftShader ~11 s. Rates: b40 6.58e8, b50 3.83e8, browser GPU
+NiceMark 263–265. Harness: fork `exp/browser-gpu-harness` 5eeed09 (`wasm-client/e2e/hw/`).
+**PR #230 (`pr/fd-seed-split16` 215952d):** `fd_seed_split16(nw: &Array<u32>, …)`; step helpers,
+`fd_to_digits`, `NO_CARRY` pub(crate); CUDA/HIP branch untouched. 3080: fmt, 3 clippy runs, 220
+lib tests, 3 CUDA tests (+ `NICE_CUBECL_WIDE=0` exercising the shared fn on the GPU); lavapipe seed
+132/132 + FD/near-miss/detailed; **M4 seed 132/132 on Metal**, FD + near-miss pass; the half-shift
+reproducer still fails there (control). WGSL: same code up to renaming at 14 bases + the seed
+probe at 44 bases; only n's words go through an `array<u32, limbs>`. NiceMark split16 path
++0.2 % / −0.3 % (drift ~1 %). M4 34 min wall (~2 min compute).
+
 ## L26.1 Stride prefilter defensive fix (2026-10-31, agent; `L26/RESULTS.md`, `L26/raw/`; PR #229, branch `pr/metal-halfshift-prefilter`)
 
 `candidate_check`'s low-digit prefilter (b ≤ 40 only). The #228 "top pair as one u32" construction

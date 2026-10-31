@@ -1,0 +1,37 @@
+web/vendor/d3.min.js: OK
+web/vendor/plot.umd.min.js: OK
+serving /repo/web/search at http://127.0.0.1:34813/
+browser: chromium 151.0.7922.34, adapter: pinned software
+=== WebGPU adapter ===
+adapter: vendor="google" architecture="swiftshader" device="" description="" fallback=true gpu_init=" (BrowserWebGpu, wgpu<wgsl>)"
+build: 3.4.7-dev 806caec80e0fc13c082225b695bcb7b1241f91bb; {"near_miss_capacity":8192,"batch_size":32000000,"miss_buffer_bytes":163840}
+adapter check passed (software, as pinned)
+=== CPU backend ===
+[cpu] rate: 3.33e+7 numbers/second
+Benchmark processing completed!
+=== GPU backend ===
+[gpu] rate: 4.52e+5 numbers/second
+[gpu] adapter: GPU — google swiftshader
+Benchmark processing completed!
+CPU and GPU histograms agree exactly
+=== submit payload shape ===
+[submit:cpu] ok — 6 submissions answering 9 claims (prefetch live), claim_id numeric, 49 bins, near miss 20363742218601559 exact, 1 wasm fetch, client_version 3.4.7-dev-wasm-worker
+[submit:gpu] ok — 4 submissions answering 8 claims (prefetch live), claim_id numeric, 49 bins, near miss 20363742218601559 exact, 1 wasm fetch, client_version 3.4.7-dev-wasm-webgpu
+=== benchmark suite (cpu) ===
+[suite] ok — NiceMark 1541, 3 scenarios uploaded (platform browser, 3.4.7-dev-wasm-worker)
+=== GPU/CPU parity (ci) ===
+same b10/[47,200)                       b10  n=      153 near= 2 gpu=0.420s cpu=0.003s
+same b23/full                           b23  n=   546240 near= 8 gpu=1.122s cpu=0.264s
+same b40/start                          b40  n=   100000 near= 0 gpu=1.067s cpu=0.009s
+same b40/straddle-start                 b40  n=   100000 near= 0 gpu=0.259s cpu=0.010s
+same b40/dS-k8@3276800000000            b40  n=   100000 near= 0 gpu=0.238s cpu=0.006s
+same b40/len1                           b40  n=        1 near= 0 gpu=0.003s cpu=0.000s
+same b40/len61                          b40  n=       61 near= 0 gpu=0.003s cpu=0.000s
+same b40/len129                         b40  n=      129 near= 0 gpu=0.003s cpu=0.000s
+same b49/nearmiss                       b49  n=   100000 near= 1 gpu=1.167s cpu=0.012s
+same b50/dC-k20@56381862225549391       b50  n=   100000 near= 0 gpu=1.155s cpu=0.028s
+same b57/start-2e4                      b57  n=    20000 near= 0 gpu=1.304s cpu=0.003s
+same b64/start-2e4                      b64  n=    20000 near= 0 gpu=1.308s cpu=0.005s
+same b80/start-2e4                      b80  n=    20000 near= 0 gpu=2.024s cpu=0.042s
+GPU and CPU agree on every window: parity (ci): 13 windows, 1106584 numbers, 11 near misses, 0 failed, 10.5 s on google/swiftshader (fallback)
+rc=0 wall= s

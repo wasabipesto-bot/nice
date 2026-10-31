@@ -31,7 +31,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   flags needed, adapter apple/metal-3, today's browser kernel exact on Apple via Chrome's Tint on
   201 windows (`L24/BRINGUP-M4.md`, harness `exp/browser-gpu-harness` 5eeed09); 22 min of Mac
   time. L24 (c) parity-step PR agent launched.
-- Today so far: 9 agents (all Opus), boxes: 3060 ×2, 3080 ×1.
+- **PR #230 opened** (L24 (a) seed refactor; verified CUDA/lavapipe/M4, L24.1). **PR (b) web FD
+  kernel agent launched** (stacked on #230; 3080 box 6 h; M4 parity + speed within the window).
+  (c) parity-step agent still running. #227 was merged by the user meanwhile.
+- Today so far: 10 agents (all Opus), boxes: 3060 ×2, 3080 ×3.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
   path on finite differences (ivory build + Playwright docker parity + web NiceMark) — kill

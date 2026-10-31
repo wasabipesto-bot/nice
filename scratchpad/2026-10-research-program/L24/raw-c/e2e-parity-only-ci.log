@@ -1,0 +1,24 @@
+web/vendor/d3.min.js: OK
+web/vendor/plot.umd.min.js: OK
+serving /repo/web/search at http://127.0.0.1:39461/
+browser: chromium 151.0.7922.34, adapter: pinned software
+=== WebGPU adapter ===
+adapter: vendor="google" architecture="swiftshader" device="" description="" fallback=true gpu_init=" (BrowserWebGpu, wgpu<wgsl>)"
+build: 3.4.7-dev 0f87771f7e24234bce467bc85607eea8a166078b; {"near_miss_capacity":8192,"batch_size":32000000,"miss_buffer_bytes":163840}
+adapter check passed (software, as pinned)
+=== GPU/CPU parity (ci) ===
+same b10/[47,200)                       b10  n=      153 near= 2 gpu=0.443s cpu=0.004s
+same b23/full                           b23  n=   546240 near= 8 gpu=1.077s cpu=0.248s
+same b40/start                          b40  n=   100000 near= 0 gpu=1.095s cpu=0.009s
+same b40/straddle-start                 b40  n=   100000 near= 0 gpu=0.267s cpu=0.010s
+same b40/dS-k8@3276800000000            b40  n=   100000 near= 0 gpu=0.248s cpu=0.006s
+same b40/len1                           b40  n=        1 near= 0 gpu=0.004s cpu=0.000s
+same b40/len61                          b40  n=       61 near= 0 gpu=0.004s cpu=0.000s
+same b40/len129                         b40  n=      129 near= 0 gpu=0.006s cpu=0.000s
+same b49/nearmiss                       b49  n=   100000 near= 1 gpu=1.145s cpu=0.029s
+same b50/dC-k20@56381862225549391       b50  n=   100000 near= 0 gpu=1.131s cpu=0.022s
+same b57/start-2e4                      b57  n=    20000 near= 0 gpu=1.323s cpu=0.004s
+same b64/start-2e4                      b64  n=    20000 near= 0 gpu=1.305s cpu=0.007s
+same b80/start-2e4                      b80  n=    20000 near= 0 gpu=1.974s cpu=0.056s
+GPU and CPU agree on every window: parity (ci): 13 windows, 1106584 numbers, 11 near misses, 0 failed, 10.5 s on google/swiftshader (fallback)
+rc=0 wall=14 s

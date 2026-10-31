@@ -6,7 +6,7 @@
 
 Normalisation renames the generated SSA names (l_N, l_mut_N, a_N) in order of
 first appearance, per family, so a change that adds or moves a few statements
-does not renumber the rest of the kernel.
+does not renumber the rest of the kernel; declarations are sorted.
 """
 import difflib, glob, os, re, sys
 
@@ -35,15 +35,40 @@ def extract(log, out):
     n = sum(len(v) for v in seen.values())
     print(f"{log}: {n} distinct kernels -> {out}")
 
+DECL = re.compile(r"^(?:var (?:l_mut|a)_\d+: .*;|\w+ (?:l_mut|l_arr)_\d+(?:\[\d+\])?;)$")
+NAME = re.compile(r"\b(l_mut|l_arr|l|a)_(\d+)\b")
+
 def normalise(src):
+    """Rename SSA names by first use in the body. The compilers list the
+    mutable-variable declarations grouped by type in an order that varies
+    from run to run, so declarations are left out of the numbering and
+    emitted sorted, as one block where the first one stood."""
+    lines = src.splitlines()
+    decl = [i for i, l in enumerate(lines) if DECL.match(l.strip())]
+    dset = set(decl)
     maps = {}
-    def sub(m):
-        fam, idx = m.group(1), m.group(2)
+    def name(fam, idx):
         d = maps.setdefault(fam, {})
         if idx not in d:
             d[idx] = str(len(d))
         return f"{fam}_{d[idx]}"
-    return re.sub(r"\b(l_mut|l|a)_(\d+)\b", sub, src)
+    body = [l for i, l in enumerate(lines) if i not in dset]
+    for l in body:
+        for m in NAME.finditer(l):
+            name(m.group(1), m.group(2))
+    for i in sorted(decl, key=lambda i: [(m.group(1), int(m.group(2))) for m in NAME.finditer(lines[i])]):
+        for m in NAME.finditer(lines[i]):
+            name(m.group(1), m.group(2))
+    ren = lambda l: NAME.sub(lambda m: name(m.group(1), m.group(2)), l)
+    out, placed = [], False
+    for i, l in enumerate(lines):
+        if i in dset:
+            if not placed:
+                out.extend(sorted(ren(lines[j]) for j in decl))
+                placed = True
+            continue
+        out.append(ren(l))
+    return "\n".join(out)
 
 def diff(a, b, pat="*"):
     total = 0
@@ -62,8 +87,11 @@ def diff(a, b, pat="*"):
         minus = sum(1 for l in d if l.startswith("-") and not l.startswith("---"))
         print(f"== {os.path.basename(fa)}: {len(na)} -> {len(nb)} lines, -{minus} +{plus}")
         total += plus + minus
-        for l in d:
-            print(l)
+        try:
+            for l in d:
+                print(l)
+        except BrokenPipeError:
+            sys.exit(0)
     for fb in sorted(glob.glob(os.path.join(b, pat))):
         if not fb.endswith(".info") and not os.path.exists(os.path.join(a, os.path.basename(fb))):
             print(f"== {os.path.basename(fb)}: only in {b}")
