@@ -1,0 +1,5 @@
+D="$HOME/claude-exp-2026-11-01-webfd"
+export PATH="$D/node/bin:$PATH"
+export npm_config_cache="$D/npm-cache"
+export PLAYWRIGHT_BROWSERS_PATH="$D/pw-browsers"
+export TMPDIR="$D/tmp/"

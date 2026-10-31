@@ -38,6 +38,8 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   parity 199 windows identical). User asked about a red NVRTC check on main that went green on
   rerun: diagnosed as the adaptive-MSD-floor timing dependence in the threaded-pipeline test (L24.2);
   fix agent launched (L27). Stray tracked `oom` file on main since #226 (rootless podman artefact).
+- **PR #232 opened** (pin the MSD floor in the threaded-pipeline test; L27). #231 has one red
+  check from that flake and cannot be rerun by me (no admin rights); rebase after #232 merges.
 - Today so far: 12 agents (all Opus), boxes: 3060 ×2, 3080 ×3.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
