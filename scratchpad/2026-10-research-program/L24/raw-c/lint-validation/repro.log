@@ -1,0 +1,12 @@
+wgsl-lint: self-test passed (18 cases)
+repro_v0_k3.wgsl: 1 constant divisions, 1 flagged
+  /home/claude/projects/nice/scratchpad/2026-10-research-program/L3/metalfix/repro/repro_v0_k3.wgsl:39 [repro_v0_k3.wgsl] divides a HI32 dividend by 3: let l_11 = l_10 / u32(3);
+repro_v3_k3.wgsl: 1 constant divisions, 1 flagged
+  /home/claude/projects/nice/scratchpad/2026-10-research-program/L3/metalfix/repro/repro_v3_k3.wgsl:35 [repro_v3_k3.wgsl] divides a HALF dividend by 3: let l_7 = l_6 / u32(3);
+repro_v0_k3.metal: 1 constant divisions, 1 flagged
+  /home/claude/projects/nice/scratchpad/2026-10-research-program/L3/metalfix/repro/repro_v0_k3.metal:53 [repro_v0_k3.metal] divides a HI32 dividend by 3: uint l_11_ = naga_div(l_10_, 3u);
+repro_v3_k3.metal: 1 constant divisions, 1 flagged
+  /home/claude/projects/nice/scratchpad/2026-10-research-program/L3/metalfix/repro/repro_v3_k3.metal:49 [repro_v3_k3.metal] divides a HALF dividend by 3: uint l_7_ = naga_div(l_6_, 3u);
+wgsl-lint: 4 shaders (repro_v0_k3.metal, repro_v0_k3.wgsl, repro_v3_k3.metal, repro_v3_k3.wgsl), 4 flagged sites
+FAILED: a constant division of a half-width shift; Apple's Metal compiler miscompiles it (see the notes at the top of scripts/wgsl-lint.py)
+rc=1

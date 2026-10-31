@@ -34,7 +34,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **PR #230 opened** (L24 (a) seed refactor; verified CUDA/lavapipe/M4, L24.1). **PR (b) web FD
   kernel agent launched** (stacked on #230; 3080 box 6 h; M4 parity + speed within the window).
   (c) parity-step agent still running. #227 was merged by the user meanwhile.
-- Today so far: 10 agents (all Opus), boxes: 3060 ×2, 3080 ×3.
+- **PR #231 opened** (L24 (c): parity step + adapter check + WGSL lint as a CI step; M4 `--hw`
+  parity 199 windows identical). User asked about a red NVRTC check on main that went green on
+  rerun: diagnosed as the adaptive-MSD-floor timing dependence in the threaded-pipeline test (L24.2);
+  fix agent launched (L27). Stray tracked `oom` file on main since #226 (rootless podman artefact).
+- Today so far: 12 agents (all Opus), boxes: 3060 ×2, 3080 ×3.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
   path on finite differences (ivory build + Playwright docker parity + web NiceMark) — kill

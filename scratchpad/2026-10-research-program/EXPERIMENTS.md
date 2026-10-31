@@ -29,6 +29,27 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L24.2 Parity step, adapter check and WGSL lint (PR #231) and the CI flake (2026-10-31)
+
+**PR #231** (`pr/browser-parity-step` 0f87771 on 2a1caf2): `web/search/parity.html` + `parity.js`
+compare `process_chunk_gpu` vs `process_chunk_wasm` as raw JSON byte for byte and show adapter info;
+the e2e drives the same page (CI: 13 windows, 9.3 s; `--parity hw`: 199 windows, 2.5e7 numbers);
+a difference fails with the window and first differing field; a hung window fails and continues;
+no adapter → `PARITY SKIPPED`; `--hw` requires a real non-fallback adapter matching
+`--expect-vendor` and a warm 2e8 b40 call > 1e8 n/s. `scripts/wgsl-lint.py` + ignored test
+`wgsl_dump_for_lint` (browser, detailed, stride, join kernels) in the lavapipe job: 8 s, 14 shaders,
+0 flagged on main; flags the pre-#225/#228/#229 shaders and the reproducers. CI e2e 64 s vs 50–53 s
+on main. M4 headless: `--hw --parity hw` passes in 26 s (199 windows, 50 near misses identical);
+`--parity-random 10`: 639 windows identical; `--expect-vendor amd` fails as designed. Side note:
+rootless podman on ivory leaves an empty `oom` file in the cwd; **upstream main has a tracked
+`oom` at the repo root since #226** (same cause, the user's commit).
+**CI flake diagnosed:** run 41219859643 attempt 1 (main 2a1caf27, NVRTC job) failed
+`gpu_niceonly::tests::threaded_pipeline_matches_the_one_field_form_field_by_field` at
+gpu_niceonly.rs:1730: left = 250000-wide descriptors, right = 500000-wide; the log shows the
+adaptive MSD floor firing under load ("250000 → 270856, cpu waited 33 %"). The same test failed 3×
+on the boxes under `--test-threads 8`, always passing alone (L25/L26). Timing-dependent test →
+fix = pin the floor in the test (L27, agent running).
+
 ## L24.1 Headless WebGPU bring-up on the M4 and PR #230 (seed refactor) (2026-10-31, agents; `L24/BRINGUP-M4.md`, `L24/RESULTS-A.md`)
 
 **Bring-up (22 min of Mac time):** Playwright 1.62 `channel: "chromium"` (Chrome for Testing 151),
