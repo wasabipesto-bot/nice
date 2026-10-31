@@ -7,8 +7,9 @@
 //! - [`detailed_fd_kernel_u32`], the finite-difference kernel of
 //!   [`crate::cubecl_detailed_fd`] in u32 arithmetic, for every candidate
 //!   inside a base's [`fd_plan`] interval (bases 10-64). It shares the seed
-//!   ([`fd_seed_split16`]) and the digit-array steps with the native kernel;
-//!   only its prologue, mask and near-miss record differ, below.
+//!   ([`fd_seed_split16`]), the digit-array steps and the u32-pair digit mask
+//!   ([`fd_mask_u32`]) with the native kernel on wgpu; only its prologue and
+//!   near-miss record differ, below.
 //! - [`detailed_kernel_u32`], the per-number kernel, for bases above 64, for
 //!   any part of a range outside the plan's interval, and as the reference
 //!   the finite-difference kernel is tested against.
@@ -30,7 +31,6 @@
 //! - The run start, count, offset and stride are u32 (the host keeps
 //!   `count + stride` below 2^32), and n is built as four u32 words by a
 //!   carry chain, which is the form [`fd_seed_split16`] takes.
-//! - The digit mask is a u32 pair ([`fd_mask_u32`]) instead of one u64.
 //! - A near miss's n is rebuilt over four words, on the rare path.
 //!
 //! Apple's Metal compiler miscompiles an unsigned division by a constant whose
@@ -56,7 +56,8 @@
 use crate::client_process::process_range_detailed;
 use crate::cubecl_backend::{CubeclContext, HIST_COPIES, MISS_STRIDE, WORKGROUP_SIZE};
 use crate::cubecl_detailed_fd::{
-    FD_RUN_LEN, NO_CARRY, fd_add_const_top, fd_add_top, fd_plan, fd_ripple, fd_seed_split16,
+    FD_RUN_LEN, NO_CARRY, fd_add_const_top, fd_add_top, fd_mask_u32, fd_plan, fd_ripple,
+    fd_seed_split16,
 };
 use crate::gpu_config::{chunk_constants_u16, gpu_supports_base, n_limbs};
 use crate::number_stats::get_near_miss_cutoff;
@@ -429,37 +430,6 @@ fn detailed_kernel_u32(
         }
         b += CUBE_DIM_X;
     }
-}
-
-/// OR `1 << d` into the mask (`lo`, `hi`) for packed digits `from..ndig` of
-/// `x`: the native kernel's u64 mask as a u32 pair. Branch-free: `sel` is all
-/// ones for a digit below 32 and zero for one in 32..64 (the kernel serves
-/// bases up to 64), and the shift amount is masked to 0..31 explicitly.
-#[cube]
-fn fd_mask_u32(
-    x: &Array<u32>,
-    lo: u32,
-    hi: u32,
-    #[comptime] from: u32,
-    #[comptime] ndig: u32,
-) -> (u32, u32) {
-    let mut mask_lo = lo;
-    let mut mask_hi = hi;
-    #[unroll]
-    for j in from..ndig {
-        let w = comptime!(j / 4);
-        let sh = comptime!(8 * (j % 4));
-        let d = if comptime!(j % 4 == 3) {
-            x[w as usize] >> 24u32
-        } else {
-            (x[w as usize] >> sh) & 0xFFu32
-        };
-        let bit = 1u32 << (d & 31u32);
-        let sel = (d >> 5u32) - 1u32;
-        mask_lo |= bit & sel;
-        mask_hi |= bit & !sel;
-    }
-    (mask_lo, mask_hi)
 }
 
 /// The finite-difference detailed kernel in u32 arithmetic: the native

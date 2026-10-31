@@ -33,14 +33,16 @@
 //!
 //! Portability: the kernel needs what the per-number kernel needs (u64 add,
 //! multiply and shift; a u64 division only in the CUDA and HIP seed, the
-//! split16 division on wgpu). It is exact on CUDA, on Vulkan (lavapipe,
-//! through naga's WGSL and through `CubeCL`'s SPIR-V compiler) and on an
-//! Apple M4 (macOS 26.3) through Metal, whose compiler miscompiled the
-//! seed's first form (see [`fd_to_digits`]).
+//! split16 division on wgpu). On wgpu the u64 is confined to each run's
+//! prologue and the rare near-miss record: the digit mask, built at every
+//! step, is a u32 pair there (see [`fd_mask_sc`]). It is exact on CUDA, on
+//! Vulkan (lavapipe, through naga's WGSL and through `CubeCL`'s SPIR-V
+//! compiler) and on an Apple M4 (macOS 26.3) through Metal, whose compiler
+//! miscompiled the seed's first form (see [`fd_to_digits`]).
 //!
-//! The wgpu seed, [`fd_seed_split16`], and the step helpers use u32 only, so
-//! that a kernel without u64, as on WebGPU in the browser, can share them;
-//! they are `pub(crate)` for that.
+//! The wgpu seed, [`fd_seed_split16`], the step helpers and the u32-pair mask
+//! use u32 only, so that a kernel without u64, as on WebGPU in the browser,
+//! can share them; they are `pub(crate)` for that.
 
 #![cfg(feature = "cubecl")]
 // The cube macro evaluates comptime! expressions host-side, where fn-level
@@ -64,7 +66,7 @@ use malachite::natural::Natural;
 /// fill the device at one batch per dispatch).
 pub const FD_RUN_LEN: u32 = 128;
 
-/// Highest base the kernel serves: the digit mask is one u64. (The biased add
+/// Highest base the kernel serves: the digit mask is 64 bits. (The biased add
 /// itself holds to base 128.)
 pub const FD_MAX_BASE: u32 = 64;
 
@@ -601,6 +603,70 @@ fn fd_mask(x: &Array<u32>, m: u64, #[comptime] from: u32, #[comptime] ndig: u32)
     mm
 }
 
+/// [`fd_mask`] with the mask held as a u32 pair: OR `1 << d` into (`lo`,
+/// `hi`), the mask's bits 0-31 and 32-63, for packed digits `from..ndig` of
+/// `x`. Branch-free and without u64: `sel` is all ones for a digit below 32
+/// and zero for one in 32..64 (the kernel serves bases up to 64), and the
+/// shift amount is masked to 0..31 explicitly.
+#[cube]
+pub(crate) fn fd_mask_u32(
+    x: &Array<u32>,
+    lo: u32,
+    hi: u32,
+    #[comptime] from: u32,
+    #[comptime] ndig: u32,
+) -> (u32, u32) {
+    let mut mask_lo = lo;
+    let mut mask_hi = hi;
+    #[unroll]
+    for j in from..ndig {
+        let w = comptime!(j / 4);
+        let sh = comptime!(8 * (j % 4));
+        let d = if comptime!(j % 4 == 3) {
+            x[w as usize] >> 24u32
+        } else {
+            (x[w as usize] >> sh) & 0xFFu32
+        };
+        let bit = 1u32 << (d & 31u32);
+        let sel = (d >> 5u32) - 1u32;
+        mask_lo |= bit & sel;
+        mask_hi |= bit & !sel;
+    }
+    (mask_lo, mask_hi)
+}
+
+/// The digit mask (`lo`, `hi`) with the bits of S's packed digits
+/// `s_from..s_to` of `sd` and C's `c_from..c_to` of `cd` set. With `wide`
+/// (CUDA, HIP) it is built as one u64 by [`fd_mask`]: u64 is native there,
+/// and on an RTX 3060 under CUDA the u32 pair measured about 24 % slower in
+/// detailed mode. Otherwise (wgpu) it is built as a u32 pair by
+/// [`fd_mask_u32`], because a wgpu target may emulate u64 (Apple's GPUs do)
+/// and the mask is built at every step. Either way the mask, and so the
+/// popcount, is the same.
+#[cube]
+#[allow(clippy::too_many_arguments)]
+fn fd_mask_sc(
+    sd: &Array<u32>,
+    cd: &Array<u32>,
+    lo: u32,
+    hi: u32,
+    #[comptime] s_from: u32,
+    #[comptime] s_to: u32,
+    #[comptime] c_from: u32,
+    #[comptime] c_to: u32,
+    #[comptime] wide: bool,
+) -> (u32, u32) {
+    if wide {
+        let mut m = (u64::cast_from(hi) << 32u64) | u64::cast_from(lo);
+        m = fd_mask(sd, m, s_from, s_to);
+        m = fd_mask(cd, m, c_from, c_to);
+        (u32::cast_from(m), u32::cast_from(m >> 32u64))
+    } else {
+        let m = fd_mask_u32(sd, lo, hi, s_from, s_to);
+        fd_mask_u32(cd, m.0, m.1, c_from, c_to)
+    }
+}
+
 /// The finite-difference detailed kernel: thread `t` takes the run of
 /// `run_len` consecutive candidates from `start + t * run_len` (grid-stride
 /// over runs), seeds its digit arrays from the run's first n and steps
@@ -711,13 +777,15 @@ pub(crate) fn detailed_fd_kernel(
         // kc_dig up). It must be refreshed whenever a ripple reaches them,
         // which the rare branch below does; everything else reads only the
         // fast words.
-        let mut ms = fd_mask(&sd, 0u64, ks_dig, ls);
-        ms = fd_mask(&cd, ms, kc_dig, lc);
+        let ms = fd_mask_sc(&sd, &cd, 0u32, 0u32, ks_dig, ls, kc_dig, lc, wide_chunk);
+        let mut ms_lo = ms.0;
+        let mut ms_hi = ms.1;
         let mut i = 0u32;
         while i < len {
-            let mut m = fd_mask(&sd, ms, 0u32, ks_dig);
-            m = fd_mask(&cd, m, 0u32, kc_dig);
-            let u = u32::cast_from(m).count_ones() + u32::cast_from(m >> 32u64).count_ones();
+            let m = fd_mask_sc(
+                &sd, &cd, ms_lo, ms_hi, 0u32, ks_dig, 0u32, kc_dig, wide_chunk,
+            );
+            let u = u32::count_ones(m.0) + u32::count_ones(m.1);
             hist_s[(copy * hist_bins + u) as usize].fetch_add(1u32);
             if u > cutoff {
                 let pos = miss_count[0].fetch_add(1u32);
@@ -796,8 +864,9 @@ pub(crate) fn detailed_fd_kernel(
                 // A ripple changed a slow word of S or C: its cached mask is
                 // stale.
                 if refresh != 0u32 {
-                    ms = fd_mask(&sd, 0u64, ks_dig, ls);
-                    ms = fd_mask(&cd, ms, kc_dig, lc);
+                    let r = fd_mask_sc(&sd, &cd, 0u32, 0u32, ks_dig, ls, kc_dig, lc, wide_chunk);
+                    ms_lo = r.0;
+                    ms_hi = r.1;
                 }
             }
             i += 1u32;

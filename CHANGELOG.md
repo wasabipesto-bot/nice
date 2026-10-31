@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Build GPU detailed mode's digit mask from two 32-bit words instead of one 64-bit word on wgpu (Vulkan, Metal, DirectX), where some GPUs emulate 64-bit integers. Results are unchanged, and CUDA and HIP keep the 64-bit mask.
 
 ## Nice v3.4.7
 
