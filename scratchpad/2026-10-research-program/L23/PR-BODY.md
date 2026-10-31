@@ -1,6 +1,6 @@
 # Browser client: CPU detailed mode through the finite-difference dispatch
 
-Stacked on #221; review that first. This PR is the last commit only (2 files).
+One commit on `main` (2 files); #221, which added the dispatch this uses, is merged.
 
 ## What and why
 

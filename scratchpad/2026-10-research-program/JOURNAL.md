@@ -22,7 +22,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   defensive → small PR, L26). L24 detailed proposal written (`L24/PROPOSAL.md`, ~6 days, PR split
   (a) seed refactor → (c) parity step → (b) kernel; headless Playwright on real GPUs; 10 open
   questions). Stride-prefilter detail answered in chat.
-- Today: 6 agents (all Opus), one $0.056/h box; Vast $0.07. Credit $62.57.
+- **Evening (user):** #221, #225, #228 merged by the user; #227 rebased (CHANGELOG conflict
+  resolved, one commit 33120f0). All ten L24 questions agreed; **mayalaran authorised 16 h from
+  ~16:30 UTC or until the web GPU runner is complete.** Started L24 (a) seed-refactor PR (3080 box
+  + M4 seed test) and the headless WebGPU bring-up on the M4 in parallel; L26 prefilter PR agent
+  still running (3060 box). Stale agent pins stopped at the user's request.
+- Today so far: 8 agents (all Opus), boxes: 3060 ×2, 3080 ×1.
 - **Leads today:** L25 kernel audit for the Apple half-shift-divide pattern (desk + WGSL
   dumps on a $0.056/h 3060, lavapipe) — kill criterion: none, it is an audit; L23 wasm CPU
   path on finite differences (ivory build + Playwright docker parity + web NiceMark) — kill

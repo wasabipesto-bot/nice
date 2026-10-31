@@ -211,3 +211,20 @@ Run length 1 and the seed words stay native-only unless a test export is added (
 8. CI time the SwiftShader parity subset may add (proposed: ≤ 2 min)?
 9. A Windows (D3D12) machine or a Safari user to open `parity.html` once?
 10. `"detailed_kernel":"fd"` in `gpu_build_info`? (A URL-parameter kill switch to the per-number kernel would be a new feature needing its own yes.)
+
+## 7. Decisions (maintainer, 2026-10-31)
+
+All ten open questions were answered by the director and agreed by the maintainer:
+
+1. (a) is its own PR after #225 (merged 2026-10-31); one M4 seed-test cycle for it alone.
+2. Merge order (a) → (c) → (b).
+3. Do not wait for #227; the division reference lives in the native lavapipe tests.
+4. Add the test-only wasm export, `#[doc(hidden)]`.
+5. Run length 128 by default; measure 64 on the M4 and the 9070 XT in the tuning half-day; switch only if ≥ 3 % better on both.
+6. No GUI session on mayalaran; plan on headless Metal; ask only if the first half-day finds it missing.
+7. The WGSL lint becomes a CI step.
+8. SwiftShader parity subset capped at 2 minutes of CI time.
+9. Windows and Safari skipped unless a machine turns up; gap noted in the PR.
+10. `"detailed_kernel":"fd"` in `gpu_build_info`; no kill switch.
+
+Authorisation: mayalaran for 16 hours from 2026-10-31 ~16:30 UTC, or until the web GPU runner is complete; demoux by request. Start: (a) and the headless bring-up in parallel.
