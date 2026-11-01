@@ -29,6 +29,26 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L1.7 Join profile at b62 1e17 (the live size) on main 9bde4a8 (2026-11-01, agent; `L1/PROFILE-3.md`, `L1/profile3-raw/`; branch `rp/gpu-profile-3` bddf20f)
+
+RTX 3080 10 GB **host-capped at 180 W** (1430–1510 MHz; absolute seconds ~1.22× PROFILE-2's card;
+shares and the fit carry over). **b62 1e17: 223 s device per field = 7.28 µs per prefix, the same
+as b62 1e16.** Profiled shares (probe excluded, +7.2 % overhead): top certification **37.8 %**, join
+45.7 % (survivor handling 26 % of the field, real AND lanes 12 %, per-top chunk cost 4 %, padding
+3 %), check 3–4 % unprofiled (7.9 % profiled), bucket 3.3 %, other 5.3 %. Stage-overrun extra
+checks 0.014 % (1.1e-4 of survivors). Layout 11 slices, 6,439 batches of 5–8 partitions, 30.6M
+prefixes; host setup 19 s CPU per field, overlapped except the first slice.
+**Refit (1e16 + 1e17, 12 runs, rms 1.6 %):** join = 1.18 ps × real lane-pair + 0.49 ps × empty lane
++ 60.8 ps × AND survivor + 238 ps × top; fitted on 1e16 alone it predicts 1e17 within 4 %: **1e17
+adds no new cost term.**
+**Levers at b62 1e17:** (1) top certification: 12 % faster = 5 % win, 25 % = 10 %; it costs 0.77 ns
+per (prefix, partition) and only 32 % of those pairs certify; (2) survivor handling: 18 % cheaper
+per survivor (or 18 % fewer survivors) = 5 %; (3) AND lanes: 37 % per lane-pair = 5 %; nothing else
+reaches 5 % (padding 3 %, per-top 4 %, per-check 2.4 %). **Batches/slices are not levers
+(measured):** halving the survivor bound (38 % fewer batches) ×0.994; 11 → 4 slices ×0.991 (wider
+slices prune 9.4 % less). Notes: the first unchecked b62 field has no top-layer prefixes (empty);
+at b64 #228's top kernel reads ~12 % slower than clock-scaled (b64 not live; card confounded).
+
 ## L28.1 Two-word digit mask in the native FD kernel on wgpu (2026-11-01, agent; `L28/RESULTS.md`, `L28/raw/`; branch `pr/fd-u32-mask` 2b8d524, NOT opened)
 
 `fd_mask_u32` moved from cubecl_web.rs into cubecl_detailed_fd.rs and shared; `fd_mask_sc` picks

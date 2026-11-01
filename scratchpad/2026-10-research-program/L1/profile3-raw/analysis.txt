@@ -9,6 +9,8 @@
 
 Other, split (s/field): 1e17 b62: upload 2.840, inputs 2.715, read 0.587, unattributed 6.595; 1e16 b60: upload 0.496, inputs 0.732, read 0.143, unattributed 1.450; 1e16 b62: upload 0.241, inputs 0.251, read 0.046, unattributed 0.602; 1e16 b64: upload 0.268, inputs 0.317, read 0.064, unattributed 0.847
 
+SM clock / power / temperature under load per run: e16_b60_noprof_r1 1468 MHz 178 W 69 C; e16_b60_noprof_r2 1462 MHz 178 W 69 C; e16_b60_prof_r1 1598 MHz 179 W 68 C; e16_b60_prof_r2 1496 MHz 178 W 69 C; e16_b62_noprof_r1 1478 MHz 179 W 68 C; e16_b62_noprof_r2 1446 MHz 179 W 68 C; e16_b62_prof_r1 1530 MHz 179 W 68 C; e16_b62_prof_r2 1500 MHz 178 W 68 C; e16_b64_noprof_r1 1454 MHz 180 W 68 C; e16_b64_noprof_r2 1432 MHz 180 W 68 C; e16_b64_prof_r1 1496 MHz 179 W 68 C; e16_b64_prof_r2 1539 MHz 179 W 68 C; e17_b62_noprof_r1 1464 MHz 178 W 60 C; e17_b62_noprof_r2 1444 MHz 180 W 70 C; e17_b62_prof_r1 1478 MHz 179 W 69 C; e17_b62_prof_r2 1456 MHz 178 W 70 C
+
 Per field (profiled rows):
 
 | size | base | run | start | ntlay | slices | batches | slots | device (probe excl.) | top | bucket | join | check | upload | inputs | setup |
@@ -167,9 +169,32 @@ Same with the 3-term join fit (padded + surv + tops): 1e17 b62: padded 10.8%, su
 
 ### 8. Frontier field and lever runs at b62 1e17
 
-| run | binary | knobs | device s | host setup s | slices | batches | first-plan partitions/launch | plan MiB | AND survivors | full checks | overran | vs control |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| x17_ctl_r1.log | incomplete |
-| e17f_b62_noprof_r1 | 7330147f | unset | 0.00 | 0.07 | - | 0 | 16 | 1322 | 0 | 0 | 0 |  |
-| e17f_b62_prof_r1 | 7330147f | unset | 0.00 | 0.07 | 11 | 0 | 16 | 1322 | 0 | 0 | 0 |  |
-|  ↳ profile | | | 0.00 (probe excl.) | | 11 | 0 | | | ntlay 0, tops 0, pairs 0, padded 0 | top 0.00, bucket 0.00, join 0.00, check 0.00, upload 0.00, inputs 0.00, read 0.00, unattr. 0.00 | work items 0 | |
+| run | binary | knobs | device s | SM MHz under load | device s × MHz / 1500 | host setup s | slices | batches | first-plan partitions/launch | plan MiB | AND survivors | full checks | overran | survivors + overran |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| e17_b62_noprof_r1 | 7330147f | unset | 220.90 | 1464 | 215.62 | 17.42 | - | 6439 | 5 | 1667 | 1020728272645 | 62692812867 | 1.157e+08 | 1020844021499 |
+| e17_b62_noprof_r2 | 7330147f | unset | 225.31 | 1444 | 216.93 | 19.67 | - | 6439 | 5 | 1667 | 1020728363335 | 62692726291 | 1.157e+08 | 1020844021499 |
+| x17_ctl_r1 | b81cd953 | unset | 228.55 | 1468 | 223.68 | 20.84 | - | 6439 | 5 | 1667 | 1020728350623 | 62692739891 | 1.157e+08 | 1020844021499 |
+| x17_ctl_r2 | b81cd953 | unset | 229.45 | 1436 | 219.70 | 18.10 | - | 6439 | 5 | 1667 | 1020728261527 | 62692822509 | 1.158e+08 | 1020844021499 |
+| x17_ctl_r3 | b81cd953 | unset | 224.17 | 1423 | 212.66 | 16.46 | - | 6439 | 5 | 1667 | 1020728289332 | 62692800085 | 1.157e+08 | 1020844021499 |
+| x17_ctl_r4 | b81cd953 | unset | 224.60 | 1424 | 213.22 | 15.81 | - | 6439 | 5 | 1667 | 1020728320963 | 62692771048 | 1.157e+08 | 1020844021499 |
+| x17_mult2_r1 | b81cd953 | NICE_EXP_SLICE_MULT=2 | 226.03 | 1462 | 220.25 | 18.07 | - | 7178 | 3 | 1494 | 1020721602896 | 62699075646 | 1.224e+08 | 1020844021499 |
+| x17_mult3spp1_prof_r1 | b81cd953 | NICE_EXP_SURV_PER_PREFIX=1 NICE_EXP_SLICE_MULT=3 | 237.82 | 1436 | 227.63 | 18.08 | 4 | 3652 | 4 | 2183 | 1020718114362 | 62702343536 | 1.259e+08 | 1020844021499 |
+|  ↳ profile | | | 231.39 (probe excl.) | | | | 4 | 3652 | | | ntlay 30636533, tops 3.816e+10, pairs 2.771e+13, padded 3.907e+13 | top 94.57, bucket 5.61, join 110.47, check 13.81, upload 2.82, inputs 1.30, read 0.43, unattr. 2.38 | work items 5.815e+07 | |
+| x17_mult3spp1_r1 | b81cd953 | NICE_EXP_SURV_PER_PREFIX=1 NICE_EXP_SLICE_MULT=3 | 224.54 | 1431 | 214.24 | 18.02 | - | 3652 | 4 | 2183 | 1020718182402 | 62702279325 | 1.258e+08 | 1020844021499 |
+| x17_mult3spp1_r2 | b81cd953 | NICE_EXP_SURV_PER_PREFIX=1 NICE_EXP_SLICE_MULT=3 | 227.04 | 1420 | 214.91 | 18.10 | - | 3652 | 4 | 2183 | 1020718143416 | 62702314822 | 1.259e+08 | 1020844021499 |
+| x17_mult3spp1_r3 | b81cd953 | NICE_EXP_SURV_PER_PREFIX=1 NICE_EXP_SLICE_MULT=3 | 224.15 | 1430 | 213.74 | 15.71 | - | 3652 | 4 | 2183 | 1020718141431 | 62702318218 | 1.259e+08 | 1020844021499 |
+| x17_spp1_r1 | b81cd953 | NICE_EXP_SURV_PER_PREFIX=1 | 223.58 | 1432 | 213.52 | 19.88 | - | 3974 | 9 | 2451 | 1020728311895 | 62692783965 | 1.157e+08 | 1020844021499 |
+| x17_spp1_r2 | b81cd953 | NICE_EXP_SURV_PER_PREFIX=1 | 226.67 | 1423 | 215.04 | 18.02 | - | 3974 | 9 | 2451 | 1020728380686 | 62692707615 | 1.156e+08 | 1020844021499 |
+| x17_spp1_r3 | b81cd953 | NICE_EXP_SURV_PER_PREFIX=1 | 226.33 | 1432 | 216.07 | 16.43 | - | 3974 | 9 | 2451 | 1020728383020 | 62692709952 | 1.156e+08 | 1020844021499 |
+| e17f_b62_noprof_r1 | 7330147f | unset | 0.00 | nan | nan | 0.07 | - | 0 | 16 | 1322 | 0 | 0 | 0 | 0 |
+| e17f_b62_prof_r1 | 7330147f | unset | 0.00 | nan | nan | 0.07 | 11 | 0 | 16 | 1322 | 0 | 0 | 0 | 0 |
+|  ↳ profile | | | 0.00 (probe excl.) | | | | 11 | 0 | | | ntlay 0, tops 0, pairs 0, padded 0 | top 0.00, bucket 0.00, join 0.00, check 0.00, upload 0.00, inputs 0.00, read 0.00, unattr. 0.00 | work items 0 | |
+
+### 9. Lever summary (unprofiled, device s × SM MHz / 1500; controls = knob binary unset and the main runs' unprofiled 1e17 rounds)
+
+| configuration | runs (normalised s) | median | vs control median | raw device s | batches |
+|---|---|---|---|---|---|
+| control | x17_ctl_r1 223.7, x17_ctl_r2 219.7, x17_ctl_r3 212.7, x17_ctl_r4 213.2, e17_b62_noprof_r1 215.6, e17_b62_noprof_r2 216.9 | 216.3 | ×1.000 | 228.6, 229.5, 224.2, 224.6, 220.9, 225.3 | 6439 |
+| mult2 | x17_mult2_r1 220.3 | 220.3 | ×1.018 | 226.0 | 7178 |
+| mult3spp1 | x17_mult3spp1_r1 214.2, x17_mult3spp1_r2 214.9, x17_mult3spp1_r3 213.7 | 214.2 | ×0.991 | 224.5, 227.0, 224.1 | 3652 |
+| spp1 | x17_spp1_r1 213.5, x17_spp1_r2 215.0, x17_spp1_r3 216.1 | 215.0 | ×0.994 | 223.6, 226.7, 226.3 | 3974 |

@@ -1,15 +1,15 @@
-# PROFILE-3: the overlap join at the live field sizes (b62 1e17, b60 1e16) on main 9bde4a8 (RTX 3080 10 GB at 180 W, 2026-10-31)
+# PROFILE-3: the overlap join at the live field sizes (b62 1e17, b60 1e16) on main 9bde4a8 (RTX 3080 10 GB at 180 W, 2026-10-31/11-01)
 
 PROFILE-2 profiled d1ff798 at 1e14 and 1e16. Production now runs base 60 at 1e16 and base 62 at **1e17** (`data.nicenumbers.net/fields`). This is the first profile at 1e17, on current upstream main (with #228's 16-bit-limb top kernel and #222's stage-count barrier).
 
 **Summary**
 - **b62 1e17: 223 s of device time per field** (220.9, 225.3), **7.28 µs per top-layer prefix**: the same as b62 1e16 on this card (7.28). Nothing new switches on at 1e17. The phase shares are those of b62 1e16 to within a point:
-  - top certification **38 %**, join **46 %**, check **8 %**, bucket **3 %**, other 5 %.
+  - top certification **38 %**, join **46 %**, check **8 %** (3–4 % unprofiled: most of its profiled time is per-batch sync latency), bucket **3 %**, other 5 %.
   - Inside the join, AND-survivor handling is **26 %** of the field, real AND lanes 12 %, the per-top chunk cost 4 %, wave padding 3 %.
-- **What 1e17 adds is count, not kind.** On a 10 GB card the field is cut into **11 slices** (3,844 partitions each), run in **6,439 batches** of 5–8 partitions. Per-slice work (upload, the bucket build's per-partition part, the join's per-work-item floor) and per-batch work (the check kernel's fixed part, bucket launches, inputs) are each a few percent. The slices are cut by prefix *blocks*, of which only 28 % are top-layer prefixes, so the slice count is 3–4× what memory needs. Section 6 measures the two knobs.
+- **What 1e17 adds is count, not kind.** On a 10 GB card the field is cut into **11 slices** (3,844 partitions each), run in **6,439 batches** of 5–8 partitions. Per-slice work (the bucket build's per-partition part, the join's per-work-item floor) and per-batch work look like a few percent each in the profile, but **measured unprofiled neither is a lever**: 38 % fewer batches gave ×0.994, and 11 → 4 slices on top ×0.991, inside the ±2.5 % run-to-run spread. Slices are cut by prefix *blocks*, of which only 28 % are top-layer prefixes, so there are 3–4× more of them than memory needs; but the field-certificate prune works per slice, and 4 wide slices carry 9.4 % more real AND pairs, which repays the fixed work saved.
 - **Refit** (6 distinct fields, 12 profiled runs, 1e16 + 1e17): `join = 1.18 ps × real lane-pair + 0.49 ps × empty lane-pair + 60.8 ps × AND survivor + 238 ps × top`, rms 1.6 %, max 3.2 %. Fitted on 1e16 alone it predicts the 1e17 join to −4.0 % / −0.4 % (the two 1e17 rounds differ by 3.7 %). The two-term form `0.654 ps × padded + 79.2 ps × survivor` has rms 4.4 % and again over-predicts b64 (+7–8 %).
-- **Top certification is the largest phase at b62 (38 %) and b60 (32 %)**: 0.77 ns per (prefix, partition), only 32 % of which certify. A 5 % win at b62 1e17 needs the top kernel 13 % faster, or survivor handling 19 % cheaper.
-- **The stage overrun is 5× more frequent at 1e17 (1.1e-4 of survivors) than at b62 1e16 (2.1e-5) and still worth 0.01 % of the field**: 1.2e8 extra full checks at 300 ps. b60 1e16 is unchanged at 3.9e-3 (0.4 %).
+- **Top certification is the largest phase at b62 (38 %) and b60 (32 %)**: 0.77 ns per (prefix, partition), only 32 % of which certify. A 5 % win at b62 1e17 needs the top kernel 12 % faster, or survivor handling 18 % cheaper; 10 % needs both.
+- **The stage overrun is 5× more frequent at 1e17 (1.1e-4 of survivors) than at b62 1e16 (2.1e-5) and still worth 0.01 % of the field**: 1.1e8 extra full checks at 300 ps. b60 1e16 is unchanged at 3.9e-3 (0.4 %).
 - **This card is power-capped at 180 W** (default 340 W): 1,460–1,510 MHz under load against PROFILE-2's 1,810–1,830 MHz at 320 W. 1e16 device times are ×1.25–1.28 PROFILE-2's (×1.22 from the clock, the rest from the 10 GB card's layouts). Shares, counts and the fit's relative terms carry over; absolute seconds do not.
 
 ## 0. Setup
@@ -109,7 +109,7 @@ Weighted least squares on relative error over the 12 profiled field-runs: 6 dist
 
 - **The coefficients agree with PROFILE-2's once the clock is divided out** (×1.22): its 1e16 fits were 0.874 ps per padded lane-pair + 44.5 ps per survivor + 406 ps per top, and 1.11 ps per real pair + 58.4 ps per survivor. As there, an empty lane costs less than a filled one (0.49 against 1.18 ps), and the AND-lane and survivor terms are nearly collinear (survivors are 4.0–4.5 % of pairs at every base), so individual coefficients move by ±20 % between forms while the predicted totals do not.
 - **The 1e17 join fits the 1e16 model.** A per-work-item term (the join's per-(partition, bucket) cube floor, 15.6 ns at 1e14 in PROFILE-2, ×1.22 = 19 ns) would be 3.0 s at 1e17. That is about the 4-term fit's residual on the first 1e17 round (+3.5 s) but not the second (−0.4 s), so it is not resolved here; the 5-term fit puts it at 35 ns with the other coefficients shifting to match.
-- **Per-field fixed cost** at 1e16–1e17 is per slice and per batch, not per field (section 5): upload 0.22–0.26 s and bucket build 0.20 s per slice, plus the floors per batch.
+- **Per-field fixed cost** at 1e16–1e17 is per slice and per batch, not per field (section 5): the bucket build's per-partition part (0.20 s per slice) and the join's per-work-item floor per slice, plus the floors per batch. The upload is per prefix (93 ns), not per slice.
 
 ## 5. Where the time goes
 
@@ -125,31 +125,62 @@ Model terms on the profiled means (probe excluded; the join split by the 4-term 
 With the 3-term join fit (padded + surv + tops) instead, b62 1e17 reads padded lanes 10.8 %, survivors 28.9 %, tops 5.9 %: the split between lanes and survivors is the uncertain part, ±3 points.
 
 - **Survivor handling** (the set-bit walk, the shared stage, `mid_pass`, the flush): 61 ps per AND survivor, 1.02e12 survivors at b62 1e17. Against PROFILE-2's 44.5–64 ps (×1.22 for the clock: 54–78), unchanged.
-- **The check kernel has a fixed part per batch:** about 1.9 ms profiled, whatever the base (b64's 35 M checks per batch take 5.1 ms, b62's 9.7 M take 2.9 ms). Per check, 86.5 ps. At b62 1e17, two thirds of the check phase is per batch. Some of the 1.9 ms is the profile's own sync; section 6 measures what is left of it unprofiled.
+- **The check phase has a fixed part per batch in the profile:** about 1.9 ms, whatever the base (b64's 35 M checks per batch take 5.1 ms, b62's 9.7 M take 2.9 ms); per check, 86.5 ps. At b62 1e17 that is two thirds of the profiled check phase. **Unprofiled it mostly vanishes:** 38 % fewer batches saved 0.6 % (section 6), i.e. about 0.5 ms per batch for everything per batch together. So unprofiled the check kernel is about 5.4 s + a share of the 3 s per-batch total, 3–4 % of the field, not 8 %.
 - **The stage overrun's extra full checks** (overrun × (1 − prefilter keep) × per-check cost) are 0.014 % at b62 1e17 and 0.43 % at b60 1e16. At 1e17 the overrun is 5× more frequent per survivor than at b62 1e16, but survivors there are still almost all staged.
 - **Where the 7 % profiling excess sits** (16.1 s at b62 1e17, 2.5 ms per batch): mostly inputs + unattributed (9.3 s, which are host-side gaps between synchronised kernels) and the check's and bucket's per-batch intercepts. The kernel-throughput terms (top, the join's four terms, per-check, per-bpre) are not inflated: the top phase is 0.767 ns per certification profiled at 14 ms per batch, where a 0.5 ms sync is 3 %.
 
 ## 6. Levers measured at b62 1e17
 
-Unprofiled, knob binary `b81cd953`, interleaved with knob-unset controls (`chain3.sh`–`chain5.sh`). The card's clock drifts 1,430–1,470 MHz with temperature under its power cap, so device seconds are also given clock-normalised (× SM MHz under load / 1,500). **Even so, the controls spread 3.7 %** (LEVER_CONTROLS), which is the resolution of this section.
+Unprofiled, knob binary `b81cd953`, interleaved with knob-unset controls (`chain3.sh`–`chain5.sh`). The card's clock drifts 1,430–1,470 MHz with temperature under its power cap, so device seconds are also given clock-normalised (× SM MHz under load / 1,500). **Even so, the controls spread 5 %** (212.7–223.7 s normalised over 6 runs; 220.9–229.5 s raw, 4 %), so ±2.5 % is the resolution of this section.
 
-LEVER_TABLE
+| configuration | slices | batches | partitions/launch (first plan) | plan MiB | runs: device s (clock-normalised) | median, normalised | vs control | median, raw | vs control |
+|---|---|---|---|---|---|---|---|---|---|
+| control (knob unset ×4, main-profile binary ×2) | 11 | 6,439 | 5 | 1,667 | 228.6 (223.7), 229.5 (219.7), 224.2 (212.7), 224.6 (213.2); 220.9 (215.6), 225.3 (216.9) | 216.3 | 1 | 224.9 | 1 |
+| `SURV_PER_PREFIX=1` | 11 | 3,974 | 9 | 2,451 | 223.6 (213.5), 226.7 (215.0), 226.3 (216.1) | 215.0 | **×0.994** | 226.3 | ×1.006 |
+| `SLICE_MULT=3` + `SURV_PER_PREFIX=1` | 4 | 3,652 | 4 | 2,183 | 224.5 (214.2), 227.0 (214.9), 224.1 (213.7) | 214.2 | **×0.991** | 224.5 | ×0.998 |
+| `SLICE_MULT=2` | 6 | 7,178 | 3 | 1,494 | 226.0 (220.3) | 220.3 | ×1.018 | 226.0 | ×1.005 |
 
-- **Partitions per launch (`NICE_EXP_SURV_PER_PREFIX=1`)**: the survivor bound halves, partitions per launch go 5–8 → 9 (first plan), plan 1,667 → 2,451 MiB of 2,560, batches 6,439 → 3,974 (−38 %). LEVER_SPP1
-- **Fewer slices (`NICE_EXP_SLICE_MULT=3`, with the bound at 1 so that batches stay few)**: 11 → 4 slices, 3,652 batches at 4 partitions per launch. LEVER_MULT3
+Counted AND survivors plus overruns are 1,020,844,021,499 in every run of every configuration; no hits.
+
+- **Partitions per launch (`NICE_EXP_SURV_PER_PREFIX=1`)**: the survivor bound halves, partitions per launch go 5–8 → 9 (first plan), plan 1,667 → 2,451 MiB of 2,560, batches 6,439 → 3,974 (−38 %). **×0.994 normalised, ×1.006 raw: no gain outside the noise.** Unprofiled, a batch's fixed cost is therefore about 0.5 ms (at most about 1.8 ms, the controls' spread over the 2,465 batches saved), not the 2.8 ms that the profile's per-batch intercepts (check 1.9 ms, bucket 0.86 ms) suggest: most of those are the profile's own host latency at each sync.
+- **Fewer slices (`NICE_EXP_SLICE_MULT=3`, with the bound at 1 so that batches stay few)**: 11 → 4 slices, 3,652 batches at 4 partitions per launch. **×0.991 normalised, ×0.998 raw: nothing either.**
   - **Wider slices prune less.** The field-certificate prune (#215) is per slice: at 4 slices bpre is 102.8 k per slice against 99.0 k, listed entries +8 % per slice, and **real AND pairs +9.4 %** (2.77e13 against 2.53e13). The wave-padded lane-pairs are identical to the last digit (3.907e13): every bucket still fits the same 512-lane waves, so the extra real pairs fill lanes that were empty. At the 4-term fit's 1.18 − 0.49 ps that costs +1.6 s, against the 7 slices' fixed work saved (bucket per-slice part 7 × 0.20 s, the join's per-work-item floor on 1.0e8 fewer work items, 2–5 s).
   - Its profile (`x17_mult3spp1_prof_r1`, 231.4 s against the control's 239.3 s profiled): check −5.1 s and bucket −2.4 s (1.8 and 0.85 ms per batch fewer, the per-batch intercepts of section 5), inputs + read + unattributed −5.8 s (profiling gaps), top +4.2 s (+4.6 %, of which 2.2 points are the run's lower clock), join +1.2 s (the extra real pairs).
-- **`NICE_EXP_SLICE_MULT=2` alone** (6 slices) keeps the bound at 2, so a 5.1 M-prefix slice gets 3 partitions per launch: batches rise to 7,178 and the run is no faster (LEVER_MULT2).
-- **What the per-batch cost is, unprofiled:** LEVER_PERBATCH
+- **`NICE_EXP_SLICE_MULT=2` alone** (6 slices) keeps the bound at 2, so a 5.1 M-prefix slice gets 3 partitions per launch: batches rise to 7,178 and the run is no faster (×1.018 normalised, one run).
+- **What the per-batch cost is, unprofiled:** about 0.5 ms (≤ 1.8 ms) × 6,439 batches = about 3 s (≤ 12 s), 1.5 % (≤ 5 %) of the field; and the per-slice saving is repaid by the prune. **At b62 1e17 on a 10 GB card the batch and slice structure is not a lever.**
 
 
 ## 7. What a 5 % and a 10 % win at b62 1e17 would need
 
-RANKING_PLACEHOLDER
+Target: 5 % of 223 s is **11.2 s**, 10 % is **22.3 s**. Terms in seconds from section 5 (profiled; the throughput terms are not inflated by the profile, so as shares of the unprofiled field they are about 1.07× the table's).
+
+| term at b62 1e17 | s | share of the field | for 5 % | for 10 % |
+|---|---|---|---|---|
+| **top certification** (0.77 ns per (prefix, partition), 1.18e11 of them, 32 % certify) | 90 | 38–40 % | **−12 %** of the top kernel | −25 % |
+| **survivor handling** (61 ps per AND survivor, 1.02e12) | 62 | 26–28 % (±3 by fit form) | **−18 %** per survivor, or 18 % fewer AND survivors at equal lanes | −36 % |
+| AND lanes, real pairs (1.18 ps, 2.53e13) | 30 | 12–13 % | −37 % per lane-pair | −75 % |
+| per-batch fixed cost (6,439 batches) | about 3 unprofiled (≤ 12) | about 1.5 % (≤ 5 %); −38 % batches measured ×0.994 | not reachable | — |
+| per-top chunk cost in the join (238 ps per top) | 9 | 4 % | not reachable alone | — |
+| wave padding (0.49 ps per empty lane, 1.37e13) | 7 | 3 % | not reachable | — |
+| check kernel, per check (86 ps, 6.27e10) | 5 | 2.4 % | not reachable | — |
+| per-slice fixed work (11 slices) | 3–5, mostly repaid by the per-slice prune | ≤ 1 % net (measured) | not reachable | — |
+| stage overrun's extra full checks | 0.03 | 0.014 % | — | — |
+
+- **A 5 % win needs one of the two big terms:** the top kernel 12 % faster, or survivor handling 18 % cheaper (the set-bit walk, the shared stage, `mid_pass`, the flush; or an AND filter that passes 18 % fewer survivors without adding that much in lanes: the AND passes 4.0 % of pairs, and `mid_pass` then rejects 94 % of what it passed). A split works too, e.g. top −7 % and survivors −8 %.
+- **A 10 % win needs both, or one of them twice over:** top −25 %, survivors −36 %, or top −12 % with survivors −18 %. Nothing else is large enough to contribute more than a point or two.
+- **The top kernel is the single biggest lever at b62.** It certifies every (prefix, partition) pair, and two thirds of them fail. What it would take: rejecting most failures before the full digit scan of n² and n³, or a digit scan that does not divide per pair (the detailed mode's #221/#225 replaced division with finite differences over consecutive n; the certificate's n differ by partition, so whether that carries over is untested).
+- **Batch and slice structure is not a lever here.** Measured on this card: 38 % fewer batches ×0.994, and 11 → 4 slices on top of that ×0.991, both inside the controls' ±2.5 %. The profile's per-batch intercepts are mostly its own sync latency, and narrow slices prune the bottom list better, which repays most of their fixed work. (A 10 GB card is also at its memory budget at 9 partitions per launch: 2,451 of 2,560 MiB.)
+- **At b60 1e16** (the other live size) the order is the same with survivor handling first: survivors 31 %, top 32 %, lanes 14 %, check 8 % in the profile (most of it per-batch profile latency), overrun 0.4 %. 5 % there needs the top kernel −15 % or survivor handling −15 %.
 
 ## 8. What differs from the 1e16 picture
 
-DIFF_PLACEHOLDER
+- **Per prefix, nothing changes.** b62 costs 7.28 µs per top-layer prefix at 1e16 and at 1e17; every phase share is within a point; top certification is the largest phase at both sizes. A 1e17 field is about 12 dense 1e16 fields.
+- **Batches per prefix are the same at both sizes** (2.10e-4 at 1e17, 2.07e-4 at 1e16). Partitions per launch are bound by expected survivors everywhere, so a slice with more prefixes gets fewer partitions per launch; the per-batch costs are a fixed share of the work at any field size.
+- **What 1e17 adds is slices.** 11 on a 10 GB card (1 for b62 1e16, 2 for b60 1e16), because a slice is cut by prefix blocks (28 % of which are prefixes) rather than by prefixes. Each slice repeats the bucket build's per-partition part (0.20 s) and the join's per-work-item floor (14.5 M work items). That is 2–3 % of the field, but narrow slices also prune the bottom list better (real AND pairs +9.4 % at 4 slices), and measured, 11 → 4 slices saves nothing. On a 16 GB+ card (4 GiB budget, 1 GiB list) a 1e17 b62 field would be about 7 slices.
+- **Upload is not per slice:** 2.84 s at 1e17 against 0.24 s for b62 1e16, i.e. per prefix the same (93 ns per prefix).
+- **The stage overrun is 5× more frequent** (1.1e-4 of AND survivors against 2.1e-5 at b62 1e16), still 0.014 % of the time. b60 1e16's 3.9e-3 (0.4 %) remains the largest.
+- **Host setup:** 19 s of CPU per field (11 slices × 1.7 s). Only the first slice's precedes the device; each later slice is prepared during the previous one, and the field's wall time equals its device time to 0.1 s, so no slice waited for its setup on this 9.6-CPU box. In production the first slice's 1.7 s also overlaps the previous field.
+- **Live b62 fields vary from empty to this dense.** The first unchecked field of the list has no top-layer prefixes at all, so a mean b62 1e17 field costs less than this one; this profile is per prefix, which is what carries over.
 
 ## Raw data and scripts
 
@@ -159,4 +190,4 @@ All in `L1/profile3-raw/`:
 - **Frontier field:** `box/e17f_b62_{prof,noprof}_r1.log` (empty top layer).
 - **Lever runs:** `box/x17_*.log`.
 - **Box metadata:** `box/power.txt`, `clocks.txt`, `nvidia-smi.txt`, `nproc.txt`; build logs `testbuild.log`, `testbuild_x.log`; `setup.log`.
-- **Scripts:** `setup.sh`, `setup_x.sh` (builds), `run.sh` / `run2.sh` (one pass), `chain.sh` (main runs), `chain2.sh` (frontier field), `chain3.sh` (levers); `analyze.py` (all tables and fits; output `analysis.txt`). Run it with `uv run --with numpy python3 analyze.py box`.
+- **Scripts:** `setup.sh`, `setup_x.sh` (builds), `run.sh` / `run2.sh` (one pass), `chain.sh` (main runs), `chain2.sh` (frontier field), `chain3.sh`–`chain5.sh` (levers; `box/wait*.sh` queued them); `analyze.py` (all tables and fits; output `analysis.txt`, sections 1–9). Run it with `uv run --with numpy python3 analyze.py box`.

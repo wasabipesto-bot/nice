@@ -17,7 +17,7 @@ def runs(prefix):
                     batches=int(m[6]), slots=int(m[7]), mib=int(m[8]), surv=int(m[9]), chk=int(m[10]), found=int(m[11])))
     return out
 sp = lambda xs: (max(xs) - min(xs)) / st.median(xs) * 100
-for prefix, label in (("e17", "1e17, 1 field"), ("e16", "1e16, 2 fields")):
+for prefix, label in (("e17", "1e17, 1 field"), ("e16", "1e16, 2 fields"), ("e14", "1e14, 2 fields (counts check)")):
     data = runs(prefix)
     if not data["main"]:
         continue
