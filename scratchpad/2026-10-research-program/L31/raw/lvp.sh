@@ -27,7 +27,7 @@ T=cubecl_join::tests::top_certificates_match_the_lockstep_scan_and_the_cpu
 ( date -u; env $(flags dn) timeout 1500 $NB --ignored --exact $T --nocapture --test-threads 1; echo "exit $?"; date -u ) > $L/cert_naga_dn.log 2>&1
 touch /root/logs/lvp2.done
 rm -f $L/par_all_spv.dump
-( date -u; env $(flags all) CUBECL_DEBUG_LOG=$L/par_all_spv.dump timeout 900 $SB --ignored --exact cubecl_join::tests::cubecl_join_matches_the_cpu_reference --nocapture --test-threads 1; echo "exit $?"; date -u ) > $L/par_all_spv.log 2>&1
+( date -u; env $(flags all) CUBECL_DEBUG_LOG=$L/par_all_spv.dump timeout 420 $SB --ignored --exact cubecl_join::tests::cubecl_join_matches_the_cpu_reference --nocapture --test-threads 1; echo "exit $?"; date -u ) > $L/par_all_spv.log 2>&1
 python3 /root/blocks.py $L/par_all_spv.dump --name TopKernel --top 40 > $L/blocks_par_all.txt 2>&1
 gzip -f $L/par_all_spv.dump
 touch /root/logs/lvp.done

@@ -1,6 +1,6 @@
 #!/bin/bash
 # CUDA exactness of the exp2 binary's new switches (after the 1e17 A/B, beside the lavapipe builds).
-while [ ! -f /root/logs/ab17.done ]; do sleep 10; done
+# (started by chain3 after the timing runs)
 B=/root/bin/exp2/nice_common_gpu
 L=/root/logs/x2; mkdir -p $L
 export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH NICE_BUILD_SHA=test

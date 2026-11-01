@@ -108,3 +108,43 @@ if 'main' in nm and 'both' in nm:
             if ja[0]:
                 cnt = f" survivors A {sorted(set(j.get('survivors') for j in ja))} B {sorted(set(j.get('survivors') for j in jb))} checked A {sorted(set(j.get('checked') for j in ja))} B {sorted(set(j.get('checked') for j in jb))}"
             print(f'  {k} b{s0.get("base")} route={s0.get("route")}: rate median A {med(ra):.4g} ({min(ra):.4g}-{max(ra):.4g}) B {med(rb):.4g} ({min(rb):.4g}-{max(rb):.4g}) x{med(rb)/med(ra):.3f}{cnt}')
+
+print()
+print('b62 1e17, each PR alone (chain_single: p235 / p236 interleaved after the main/both A/B), device= and per_field')
+var = {'main': 'ab_m_e17_b62', '#235': 'ab_a_e17_b62', '#236': 'ab_b_e17_b62', 'both': 'ab_p_e17_b62'}
+vals = {}
+for name, pre in var.items():
+    rs = [tp(f)[0] for f in sorted(glob.glob(f'{D}/{pre}_r*.log')) if tp(f)]
+    if rs:
+        vals[name] = rs
+for metric in ['device', 'per_field']:
+    if len(vals) < 4:
+        print('  incomplete:', list(vals)); break
+    m = {k: med([r[metric] for r in v]) for k, v in vals.items()}
+    for k, v in vals.items():
+        x = [r[metric] for r in v]
+        print(f'  {metric} {k}: {", ".join(f"{y:.2f}" for y in x)} median {m[k]:.2f} spread {spread(x):.1f} % speed-up x{m["main"]/m[k]:.3f} saving {m["main"]-m[k]:.2f} s')
+    s235, s236 = m['main'] - m['#235'], m['main'] - m['#236']
+    prod = (m['main'] / m['#235']) * (m['main'] / m['#236'])
+    add = m['main'] / (m['main'] - s235 - s236)
+    print(f'  {metric}: product of single speed-ups x{prod:.3f}; additive (savings add) x{add:.3f} -> predicted {m["main"]-s235-s236:.2f} s; '
+          f'measured both x{m["main"]/m["both"]:.3f} ({m["both"]:.2f} s); interaction {m["both"]-(m["main"]-s235-s236):+.2f} s')
+for name in ['#235', '#236']:
+    if name in vals:
+        print(f'  counts {name}: {sorted(set((r["survivors"], r["checked"], r["found"]) for r in vals[name]))}')
+
+print()
+print('Profile after both (NICE_EXP_GPU_PROFILE=1, prof tree), shares of profiled device time excl. probe; other = upload+inputs+read+unattributed')
+for f in sorted(glob.glob(f'{D}/prof_*.log')):
+    for line in open(f, errors='replace'):
+        if not line.startswith('GPU_PROFILE'):
+            continue
+        d = dict(re.findall(r'(\w+)=([0-9.e+-]+)', line))
+        g = {k: float(v) for k, v in d.items()}
+        tot = g['device_wall'] - g['probe']
+        other = g['upload'] + g['inputs'] + g['read'] + g['unattributed']
+        print(f'  {os.path.basename(f)} b{d["base"]} size={d["size"]}: device_wall {g["device_wall"]:.2f} s (probe {g["probe"]:.2f}), host setup {g["setup"]:.2f} s; '
+              f'top {100*g["top"]/tot:.1f} % ({g["top"]:.2f} s), bucket {100*g["bucket"]/tot:.1f} % ({g["bucket"]:.2f}), join {100*g["join"]/tot:.1f} % ({g["join"]:.2f}), '
+              f'check {100*g["check"]/tot:.1f} % ({g["check"]:.2f}), other {100*other/tot:.1f} % ({other:.2f}: upload {g["upload"]:.2f} inputs {g["inputs"]:.2f} read {g["read"]:.2f} unattributed {g["unattributed"]:.2f})')
+        print(f'     slices={d["slices"]} partitions={d["partitions"]} batches={d["batches"]} slots={d["slots"]} ntlay={d["ntlay"]} tops={d["tops"]} listed={d["listed"]} '
+              f'pairs={d["pairs"]} padded={d["padded_pairs"]} live_buckets={d["live_buckets"]}/{d["buckets"]} survivors={d["survivors"]} checked={d["checked"]} spilled={d.get("spilled")} hits={d["hits"]}')

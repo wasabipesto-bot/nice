@@ -2,10 +2,10 @@
 """A/B tables: python3 ab.py LOGDIR (the box's logs/ab)."""
 import glob, os, re, statistics as st, sys
 D = sys.argv[1]
-V = ("base", "diff", "bar", "ndig", "both", "all")
+V = ("base", "diff", "bar", "ndig", "dn", "both", "all")
 pat = re.compile(r"JOIN THROUGHPUT .*?base=(\d+) fields=(\d+).*?per_field=([\d.]+).*?setup=([\d.]+)s device=([\d.]+)s.*?batches=(\d+) slots=(\d+) plan_mib=(\d+).*?survivors=(\d+) checked=(\d+) found=(\d+)")
 sp = lambda xs: (max(xs) - min(xs)) / st.median(xs) * 100
-for pre, lab in (("e16b62", "b62 1e16, 2 fields"), ("e16b60", "b60 1e16, 2 fields"), ("e17b62", "b62 1e17, 1 field")):
+for pre, lab in (("e16b62", "b62 1e16, 2 fields: all six variants"), ("x16b62", "b62 1e16, 2 fields: base, dn, all (second set)"), ("e16b60", "b60 1e16, 2 fields: all six variants"), ("x16b60", "b60 1e16, 2 fields: base, dn"), ("e17b62", "b62 1e17, 1 field")):
     data = {}
     for v in V:
         for r in (1, 2, 3):
@@ -20,14 +20,15 @@ for pre, lab in (("e16b62", "b62 1e16, 2 fields"), ("e16b60", "b60 1e16, 2 field
         continue
     b = st.median(x["per"] for x in data["base"])
     print(f"\n### {lab}\n")
-    print("| variant | s/field (rounds, in run order) | spread | median | / base | speed-up |")
-    print("|---|---|---|---|---|---|")
+    print("| variant | s/field (rounds, in run order) | spread | median | / base | speed-up (medians) | speed-up per round |")
+    print("|---|---|---|---|---|---|---|")
     for v in V:
         if v not in data:
             continue
         xs = [x["per"] for x in data[v]]
         m = st.median(xs)
-        print(f"| {v} | {', '.join(f'{x:.3f}' for x in xs)} | {sp(xs):.1f} % | **{m:.3f}** | ×{m / b:.3f} | ×{b / m:.3f} |")
+        pr = [data["base"][i]["per"] / x["per"] for i, x in enumerate(data[v]) if i < len(data["base"])]
+        print(f"| {v} | {', '.join(f'{x:.3f}' for x in xs)} | {sp(xs):.1f} % | **{m:.3f}** | ×{m / b:.3f} | **×{b / m:.3f}** | {', '.join(f'×{x:.3f}' for x in pr)} |")
     print()
     for v in V:
         if v in data:

@@ -71,6 +71,21 @@ do not help. The join's memory budget stops at 4 GiB (join_plan.rs) so 46/80 GB 
 were measured not to be a lever in L1.7, so no action). **Fleet guidance:** never buy H100 at
 market; L40S only under ~$0.35/h.
 
+## L31.1 Top kernel part 2 scoping (2026-11-01, agent; `L31/SCOPING.md`, `L31/raw/`; branch `exp/top-cert-2` 3eb8e5e, switches `NICE_EXP_TOP_*`)
+
+Top kernel time at b62 1e16 (on #235): long division of a^j 33 %, digit extraction/bookkeeping 22 %,
+binary search for ndig(d) 14 %, computing a^j/e^j 10 %, in-kernel bookkeeping 8 %, launch + a/e 6 %,
+closure 5 %, carry test 4 %; scan + fill kernels another 16 %. Whole-field (180 W 3080, interleaved,
+spreads 1–4 %): (a) e^j − a^j from e − a ×1.020 (b62 1e16) / ×1.016 (b60); (b) Barrett digit step
+×1.011 / ×0.995 (CUDA already turns the constant division into a multiply); (c) ndig from the bit
+length + one compare ×1.042 / ×1.039 (top kernel −14 %); (a)+(c) ×1.062 / ×1.031, **b62 1e17 ×1.021**;
+**all three ×1.056 / ×1.047, b62 1e17 ×1.053.** Certificates identical to #235's everywhere; tests pass
+on CUDA and lavapipe (WGSL and SPIR-V); SPIR-V blocks b57 478 → 366 ((a)+(c)) → 258 (all), b64 270
+(#235: 496); lint 0 flagged; no constant division in the new code. A PR needs: an M4 run of (b)
+(`mul_hi` = 64-bit product >> 32, never divided; unproven on Apple), switches removed, host tests for
+the precomputed constants, b64 + NiceMark + an uncapped card. **Parked at ~5 %: marginal; revisit
+after #235/#236 land and the combined profile shows the new split.** (c) alone is worth keeping.
+
 ## L30.2 Prefilter in the walk, PR #236 (2026-11-01, agent; `L30/RESULTS.md`, `L30/pr-raw/`; branch `pr/join-prefilter-in-walk` dd4a0eb on fae7398)
 
 One commit; the prefilter runs in the set-bit walk before staging and is the only path (no switch);
