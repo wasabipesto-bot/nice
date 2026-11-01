@@ -9,6 +9,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - #235 CI: naga lavapipe + lint pass, but the **CubeCL direct-SPIR-V step aborts with a compiler-thread
   stack overflow** (the bigger `cert_power`); hold comment posted; fix agent on a 3060 (L29/SPIRV-FIX.md).
 - L7 sweep 2 done (nothing new; Barrett candidate L31); Apple Feedback draft written (L3/APPLE-FEEDBACK-DRAFT.md).
+- **Done so far in the run:** #235 SPIR-V fix (6e7475e; CI green; L29.2); L9 H100/L40S (not worth
+  renting; L9.1, $2.7); L8 tail test (model fits to 3 missing digits; headline best guess ~4.7 %;
+  L8.1); L7 sweep 2; Apple Feedback draft; hand-CUDA retirement proposal (PROPOSALS/). L30 scoping
+  → prototype ×0.833 at b62 1e17 → PR agent running (box `l30-pr`); top-kernel part-2 scoping
+  running (box `topcert2`). Boxes destroyed: survivors, profile-1e17, topcert, fd-u32mask,
+  l9-h100, l9-l40s, topcert-spirv.
 - Plan: finish L30 scoping (→ PR if ≥ 5 %); #235 CI; L9 H100 + L40S rates (two boxes, ~$2);
   weekly literature sweep (L7); an Apple Feedback draft for the user; the top kernel's e^j
   follow-up if L30 yields nothing; worktree/disk hygiene; final report before 14:00 UTC. The
