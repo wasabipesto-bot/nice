@@ -71,6 +71,23 @@ do not help. The join's memory budget stops at 4 GiB (join_plan.rs) so 46/80 GB 
 were measured not to be a lever in L1.7, so no action). **Fleet guidance:** never buy H100 at
 market; L40S only under ~$0.35/h.
 
+## L33.2 Top kernel part 2 as a PR: limb skip + (a) + (c) on #235 (2026-11-01, agent; `L33/PR-RESULTS.md`, `L33/pr-raw/`; PR #237, branch `pr/join-top-cert-2` 252e69e on 6e7475e)
+
+RTX 3080 180 W (1406–1474 MHz), A = #235, interleaved, medians (every round faster):
+| field | vs #235 | per round | implied vs main |
+|---|---|---|---|
+| b62 1e17 (5 rounds) | ×1.100 | 1.089–1.122 | ×1.210 |
+| b62 1e16 | ×1.098 | 1.098–1.113 | ×1.196 |
+| b60 1e16 | ×1.092 | 1.077–1.110 | ×1.150 |
+| b64 1e16 (2 rounds) | ×1.019 | 1.015–1.023 | ×1.015 |
+| NiceMark 4048 → 4484 | ×1.108 | 1.094–1.124 | ×1.186 |
+Exact: certificate test with #235's counts (102,365 / 33,582 / 69,824) on CUDA, lavapipe naga and
+SPIR-V (word-for-word difference check kept); join parity incl. b50/b54 on CUDA and lavapipe SPIR-V;
+both dense fields; whole b42; COMPARE 1e14 counts = #235 at b57/60/62/64; digit-count host test;
+fmt/clippy ×3; lint 0 flagged; TopKernel constant divisions 539 → 270; SPIR-V blocks 478 → 366
+(b57), 496 → 384 (b64). Not run on Metal (M4) — stated in the body. Stacked on #235, independent of
+#236. With #236 the three join PRs together project to ≈ ×1.50 at b62 1e17 vs main.
+
 ## L33.1 Early reject in top certification: no-go, and the limb-skip side finding (2026-11-01, agent; `L33/SCOPING.md`, `L33/raw/`; branch `exp/top-early-reject` f409f51)
 
 150.7 G pairs counted (one field each at b60 1e16, b62 1e16, b62 1e17). At b62 67.6 % of pairs fail:

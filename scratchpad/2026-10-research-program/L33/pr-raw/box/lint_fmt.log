@@ -1,0 +1,12 @@
+Diff in /root/l33p/src/B/common/src/cubecl_join.rs:757:
+             // Only the limbs that can be nonzero: x < b^(sp - pass·cd) here,
+             // so its limbs from that power's limb count up are zero. The top
+             // two of them as one u32 (see above), then one limb a step.
+-            let lp = comptime!(
+-                (pow_limbs16(base, sp - pass * chunk_digits).len() as u32).clamp(2, nh)
+-            );
++            let lp =
++                comptime!((pow_limbs16(base, sp - pass * chunk_digits).len() as u32).clamp(2, nh));
+             let top = comptime!(lp - 1);
+             let next = comptime!(lp - 2);
+             let cx = (x[top as usize] << 16u32) | x[next as usize];
