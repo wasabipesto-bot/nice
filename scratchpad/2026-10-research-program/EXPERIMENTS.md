@@ -71,6 +71,22 @@ do not help. The join's memory budget stops at 4 GiB (join_plan.rs) so 46/80 GB 
 were measured not to be a lever in L1.7, so no action). **Fleet guidance:** never buy H100 at
 market; L40S only under ~$0.35/h.
 
+## L30.3 #235 + #236 combined vs main, and the profile after both (2026-11-01, agent; `L30/COMBINED.md`, `L30/combined-raw/`; merge branch `exp/join-235-236` e9cdac4)
+
+Merge: cubecl_join.rs and join_plan.rs merged on their own; only the CHANGELOG line conflicted.
+Exactness: CUDA certificate test (L29 counts), join parity incl. b50/b54, both dense fields; 1e14
+counts = main at b57/60/62/64; 1e16/1e17 counts = #236's exact counts every run; fmt/clippy/lint clean.
+RTX 3080 (m139250, 180 W), interleaved, medians, spreads ≤ 2.2 %, every combined round faster:
+**b62 1e17 ×1.365 (226.8 → 166.2 s); b62 1e16 ×1.350; b60 1e16 ×1.379; b64 1e16 ×1.305; NiceMark
+3676 → 4871 (×1.325).** Each PR alone on the same box at b62 1e17: #235 saves 20.7 s (×1.100, up
+from ×1.075 thanks to its SPIR-V fix), #236 saves 39.4 s (×1.210); product ×1.332, additive 166.65 s
+vs measured 166.16 s: **they compound** (each shortens only its own kernel). At b64 #235 does nothing
+(×0.996); the combined b64 gain is #236's. **Profile after both:** b62 1e17 top 43.3 %, join 45.9 %,
+check 5.7 %, other 5.2 % (main: top 41.3 %, join 50.7 %); b60 1e16 top 36.6 %, join 50.4 %. The stage
+never overflows now. **35 % of the join's lanes are padding at b62 1e17** → next levers: the top
+kernel (L31's (a)+(c), no Apple risk, ~18 % off the top kernel ≈ 7–8 % whole-field at this share) and
+wave padding (L32: bucket-sized tail wave / EPT 1 at 1e17).
+
 ## L31.1 Top kernel part 2 scoping (2026-11-01, agent; `L31/SCOPING.md`, `L31/raw/`; branch `exp/top-cert-2` 3eb8e5e, switches `NICE_EXP_TOP_*`)
 
 Top kernel time at b62 1e16 (on #235): long division of a^j 33 %, digit extraction/bookkeeping 22 %,

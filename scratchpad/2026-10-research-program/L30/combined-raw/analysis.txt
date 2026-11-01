@@ -1,0 +1,90 @@
+A/B, A = main fae7398, B = both (#235 + #236, e9cdac4; same tree as 0971c6e). Rounds interleaved A B.
+b62 1e17 (1 field):
+  device: A 223.987, 226.755, 228.971 (median 226.755, spread 2.2 %) | B 167.356, 165.996, 166.162 (median 166.162, spread 0.8 %)
+     B/A x0.733 = speed-up x1.365; per-round speed-up 1.338, 1.366, 1.378; saving 60.59 s/field
+  per_field: A 225.946, 228.767, 230.903 (median 228.767, spread 2.2 %) | B 169.366, 167.881, 168.029 (median 168.029, spread 0.9 %)
+     B/A x0.734 = speed-up x1.361; per-round speed-up 1.334, 1.363, 1.374; saving 60.74 s/field
+  clocks A 1432 MHz 179 W, B 1449 MHz 179 W; clock-normalised speed-up x1.349
+  individual: #235 x1.075, #236 x1.215, product x1.306; combined (device) x1.365 = 104.5 % of the product
+  counts (survivors, checked, found) A [(1020728334927, 62692755408, 0), (1020728362133, 62692726684, 0), (1020728427608, 62692669005, 0)]
+                                     B [(1020844021499, 62584252554, 0)]
+  layout A slots=5 plan_mib=1667 B slots=5 plan_mib=1671
+b62 1e16 (2 fields):
+  device: A 18.789, 18.964, 19.048 (median 18.964, spread 1.4 %) | B 14.041, 14.051, 14.070 (median 14.051, spread 0.2 %)
+     B/A x0.741 = speed-up x1.350; per-round speed-up 1.338, 1.350, 1.354; saving 4.91 s/field
+  per_field: A 19.723, 19.906, 19.952 (median 19.906, spread 1.2 %) | B 14.971, 14.966, 15.029 (median 14.971, spread 0.4 %)
+     B/A x0.752 = speed-up x1.330; per-round speed-up 1.317, 1.330, 1.328; saving 4.93 s/field
+  clocks A 1422 MHz 180 W, B 1429 MHz 179 W; clock-normalised speed-up x1.343
+  individual: #235 x1.089, #236 x1.182, product x1.287; combined (device) x1.350 = 104.8 % of the product
+  counts (survivors, checked, found) A [(163510208975, 10030877809, 0), (163510227735, 10030860048, 0), (163510234916, 10030853514, 0)]
+                                     B [(163513599082, 10027698695, 0)]
+  layout A slots=13 plan_mib=2041 B slots=13 plan_mib=2050
+b60 1e16 (2 fields):
+  device: A 43.589, 42.862, 42.791 (median 42.862, spread 1.9 %) | B 31.090, 30.872, 31.249 (median 31.090, spread 1.2 %)
+     B/A x0.725 = speed-up x1.379; per-round speed-up 1.402, 1.388, 1.369; saving 11.77 s/field
+  per_field: A 44.616, 43.828, 43.743 (median 43.828, spread 2.0 %) | B 32.044, 31.835, 32.197 (median 32.044, spread 1.1 %)
+     B/A x0.731 = speed-up x1.368; per-round speed-up 1.392, 1.377, 1.359; saving 11.78 s/field
+  clocks A 1428 MHz 180 W, B 1442 MHz 180 W; clock-normalised speed-up x1.366
+  individual: #235 x1.053, #236 x1.241, product x1.306; combined (device) x1.379 = 105.5 % of the product
+  counts (survivors, checked, found) A [(459052080464, 32547272522, 0), (459052312898, 32547082326, 0), (459052509778, 32546874791, 0)]
+                                     B [(460847952346, 30871838404, 0)]
+  layout A slots=4 plan_mib=1564 B slots=4 plan_mib=1566
+b64 1e16 (2 fields):
+  device: A 53.681, 52.555 (median 53.118, spread 2.1 %) | B 40.963, 40.439 (median 40.701, spread 1.3 %)
+     B/A x0.766 = speed-up x1.305; per-round speed-up 1.310, 1.300; saving 12.42 s/field
+  per_field: A 54.507, 53.390 (median 53.948, spread 2.1 %) | B 41.793, 41.434 (median 41.614, spread 0.9 %)
+     B/A x0.771 = speed-up x1.296; per-round speed-up 1.304, 1.289; saving 12.33 s/field
+  clocks A 1419 MHz 179 W, B 1431 MHz 180 W; clock-normalised speed-up x1.295
+  individual: #235 x1.040, #236 x1.300, product x1.352; combined (device) x1.305 = 96.5 % of the product
+  counts (survivors, checked, found) A [(787562321607, 47922095327, 0), (787562346980, 47922071413, 0)]
+                                     B [(787584956227, 47900853327, 0)]
+  layout A slots=6 plan_mib=2147 B slots=6 plan_mib=2151
+
+1e14 compare runs (one field per base; JOIN THROUGHPUT + STRIDE)
+  main_cmp_e14 b57: survivors=4850227888 checked=268123373 found=0 device=1.072 plan_mib=1185
+  main_cmp_e14 b60: survivors=2694700282 checked=180517288 found=0 device=0.76 plan_mib=1192
+  main_cmp_e14 b62: survivors=1439469648 checked=88159810 found=0 device=0.689 plan_mib=1359
+  main_cmp_e14 b64: survivors=5702041796 checked=346647759 found=0 device=1.032 plan_mib=1402
+    ['STRIDE base=57 fields=1 secs=49.26 per_field=49.258 (one at a time) found=0', 'STRIDE base=60 fields=1 secs=19.43 per_field=19.429 (one at a time) found=0', 'STRIDE base=62 fields=1 secs=27.52 per_field=27.522 (one at a time) found=0', 'STRIDE base=64 fields=1 secs=41.96 per_field=41.963 (one at a time) found=0', 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 264 filtered out; finished in 159.27s']
+  both_cmp_e14 b57: survivors=4850227888 checked=268123373 found=0 device=0.774 plan_mib=1193
+  both_cmp_e14 b60: survivors=2694700282 checked=180517288 found=0 device=0.585 plan_mib=1201
+  both_cmp_e14 b62: survivors=1439469648 checked=88159810 found=0 device=0.555 plan_mib=1369
+  both_cmp_e14 b64: survivors=5702041796 checked=346647759 found=0 device=0.766 plan_mib=1413
+    ['STRIDE base=57 fields=1 secs=46.35 per_field=46.353 (one at a time) found=0', 'STRIDE base=60 fields=1 secs=19.61 per_field=19.608 (one at a time) found=0', 'STRIDE base=62 fields=1 secs=22.71 per_field=22.706 (one at a time) found=0', 'STRIDE base=64 fields=1 secs=40.54 per_field=40.543 (one at a time) found=0', 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 266 filtered out; finished in 146.45s']
+
+NiceMark nice-only (--benchmark-secs 150)
+  nm_main_r1.json score=3676.4
+  nm_main_r2.json score=3672.4
+  nm_main_r3.json score=3741.1
+  nm_both_r1.json score=4871.2
+  nm_both_r2.json score=4854.4
+  nm_both_r3.json score=4929.5
+  score median main 3676.4 (spread 1.9 %), both 4871.2 (spread 1.5 %), x1.325; per-round 1.325, 1.322, 1.318; product of the PRs x1.279
+  b58_msd_weak b58 route=join: rate median A 1.585e+14 (1.582e+14-1.625e+14) B 2.182e+14 (2.179e+14-2.22e+14) x1.377 survivors A [33590315049, 33590315077, 33590315101] B [33590315220] checked A [1894592973, 1894592996, 1894593018] B [1894592860]
+  b58_msd_strong b58 route=join: rate median A 9.677e+14 (9.496e+14-9.839e+14) B 1.239e+15 (1.215e+15-1.241e+15) x1.280 survivors A [4027773430] B [4027773430] checked A [226773299] B [226773299]
+  b60_msd_weak b60 route=join: rate median A 3.211e+14 (3.168e+14-3.23e+14) B 4.148e+14 (4.127e+14-4.193e+14) x1.292 survivors A [13692050565, 14362998731, 14630895975] B [13959924122, 14630895975, 14899837081] checked A [870031541, 912665087, 929690455] B [887055961, 929690455, 946784918]
+  b62_msd_weak b62 route=join: rate median A 4.045e+14 (4.014e+14-4.058e+14) B 5.409e+14 (5.401e+14-5.468e+14) x1.337 survivors A [16639386703, 18000634322, 18151677658] B [18605643277, 18756712838, 19210264579] checked A [990526446, 1071555011, 1080542084] B [1107561021, 1116555228, 1143551105]
+
+b62 1e17, each PR alone (chain_single: p235 / p236 interleaved after the main/both A/B), device= and per_field
+  device main: 223.99, 226.75, 228.97 median 226.75 spread 2.2 % speed-up x1.000 saving 0.00 s
+  device #235: 205.32, 206.37, 206.05 median 206.05 spread 0.5 % speed-up x1.100 saving 20.71 s
+  device #236: 188.69, 187.08, 187.36 median 187.36 spread 0.9 % speed-up x1.210 saving 39.40 s
+  device both: 167.36, 166.00, 166.16 median 166.16 spread 0.8 % speed-up x1.365 saving 60.59 s
+  device: product of single speed-ups x1.332; additive (savings add) x1.361 -> predicted 166.65 s; measured both x1.365 (166.16 s); interaction -0.49 s
+  per_field main: 225.95, 228.77, 230.90 median 228.77 spread 2.2 % speed-up x1.000 saving 0.00 s
+  per_field #235: 207.22, 208.25, 207.90 median 207.90 spread 0.5 % speed-up x1.100 saving 20.87 s
+  per_field #236: 190.74, 188.95, 189.22 median 189.22 spread 0.9 % speed-up x1.209 saving 39.54 s
+  per_field both: 169.37, 167.88, 168.03 median 168.03 spread 0.9 % speed-up x1.361 saving 60.74 s
+  per_field: product of single speed-ups x1.330; additive (savings add) x1.359 -> predicted 168.36 s; measured both x1.361 (168.03 s); interaction -0.33 s
+  counts #235: [(1020728341464, 62692749003, 0), (1020728348091, 62692745616, 0), (1020728399025, 62692694287, 0)]
+  counts #236: [(1020844021499, 62584252554, 0)]
+
+Profile: mprof_* = main + 2ab1694, prof_* = both + 2ab1694 + 32b84af (NICE_EXP_GPU_PROFILE=1), shares of profiled device time excl. probe; other = upload+inputs+read+unattributed
+  mprof_b60_1e16.log b60 size=10000000000000000: device_wall 43.21 s (probe 0.32), host setup 2.37 s; top 34.5 % (14.81 s), bucket 1.0 % (0.41), join 56.0 % (24.03), check 5.5 % (2.34), other 3.0 % (1.29: upload 0.54 inputs 0.42 read 0.15 unattributed 0.17)
+     slices=2 partitions=3600 batches=1350 slots=4 ntlay=5281726 tops=6869484234 listed=8835185993 pairs=5436910783809 padded=7034358163968 live_buckets=25488000/25488000 survivors=226494253505 checked=16077212986 spilled=None hits=0
+  mprof_b62_1e17.log b62 size=100000000000000000: device_wall 225.71 s (probe 1.81), host setup 15.41 s; top 41.3 % (92.48 s), bucket 1.0 % (2.32), join 50.7 % (113.58), check 4.2 % (9.32), other 2.8 % (6.20: upload 2.62 inputs 2.03 read 0.67 unattributed 0.88)
+     slices=11 partitions=3844 batches=6439 slots=5 ntlay=30636533 tops=38155658259 listed=53672786098 pairs=25315274314727 padded=39071394057216 live_buckets=159918088/159918088 survivors=1020728419138 checked=62692673782 spilled=None hits=0
+  prof_b60_1e16.log b60 size=10000000000000000: device_wall 31.34 s (probe 0.38), host setup 2.28 s; top 36.6 % (11.34 s), bucket 1.4 % (0.43), join 50.4 % (15.61), check 7.2 % (2.23), other 4.4 % (1.35: upload 0.55 inputs 0.47 read 0.17 unattributed 0.16)
+     slices=2 partitions=3600 batches=1350 slots=4 ntlay=5281726 tops=6869484234 listed=8835185993 pairs=5436910783809 padded=7034358163968 live_buckets=25488000/25488000 survivors=227399051187 checked=15233090013 spilled=0 hits=0
+  prof_b62_1e17.log b62 size=100000000000000000: device_wall 168.04 s (probe 1.89), host setup 15.69 s; top 43.3 % (71.87 s), bucket 1.5 % (2.41), join 45.9 % (76.24), check 5.7 % (9.48), other 3.7 % (6.14: upload 2.57 inputs 2.04 read 0.68 unattributed 0.85)
+     slices=11 partitions=3844 batches=6439 slots=5 ntlay=30636533 tops=38155658259 listed=53672786098 pairs=25315274314727 padded=39071394057216 live_buckets=159918088/159918088 survivors=1020844021499 checked=62584252554 spilled=0 hits=0

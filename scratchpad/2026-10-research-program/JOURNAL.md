@@ -11,6 +11,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   changelog links merged). Live boxes: `topcert2` (running) and `combined` (created); my `tail` had hidden one line.
 - L31 top-kernel part 2 scoped: all three changes ×1.053 at b62 1e17 (marginal; Barrett step
   unproven on Apple) → parked behind switches (`exp/top-cert-2`). Box topcert2 destroyed (2.45 h).
+- **Combined #235+#236 (L30.3): ×1.365 at b62 1e17, ×1.38 b60, NiceMark ×1.325, exact, compounding
+  confirmed; profile after both: top 43 %, join 46 %, 35 % of join lanes are padding.** Comments
+  posted on both PRs. New lead L32 (wave padding). L31 (a)+(c) re-measured on the combined tree
+  (box `topcert2b`) for a possible stacked PR. Box combined2 destroyed (2.06 h).
 - 4090 second-card run launched (main / #235 / #236 / both; box `second-card`, GB, $0.31/h).
 - 04:55: the `combined` box (m146575, PL) never left `created` (ssh refused for an hour); destroyed,
   machine excluded, replaced by `combined2` (KR, 58618524), reachable in 3 min; the agent's merge

@@ -39,7 +39,7 @@ med = st.median
 def spread(x):
     return 100 * (max(x) - min(x)) / med(x)
 
-print('A/B, A = main fae7398, B = both (#235 + #236, 0971c6e). Rounds interleaved A B.')
+print('A/B, A = main fae7398, B = both (#235 + #236, e9cdac4; same tree as 0971c6e). Rounds interleaved A B.')
 for prefix, label in [('e17_b62', 'b62 1e17 (1 field)'), ('e16_b62', 'b62 1e16 (2 fields)'), ('e16_b60', 'b60 1e16 (2 fields)'), ('e16_b64', 'b64 1e16 (2 fields)')]:
     rows = {}
     for side in ['m', 'p']:
@@ -134,11 +134,12 @@ for name in ['#235', '#236']:
         print(f'  counts {name}: {sorted(set((r["survivors"], r["checked"], r["found"]) for r in vals[name]))}')
 
 print()
-print('Profile after both (NICE_EXP_GPU_PROFILE=1, prof tree), shares of profiled device time excl. probe; other = upload+inputs+read+unattributed')
-for f in sorted(glob.glob(f'{D}/prof_*.log')):
+print('Profile: mprof_* = main + 2ab1694, prof_* = both + 2ab1694 + 32b84af (NICE_EXP_GPU_PROFILE=1), shares of profiled device time excl. probe; other = upload+inputs+read+unattributed')
+for f in sorted(glob.glob(f'{D}/mprof_*.log')) + sorted(glob.glob(f'{D}/prof_*.log')):
     for line in open(f, errors='replace'):
-        if not line.startswith('GPU_PROFILE'):
+        if 'GPU_PROFILE' not in line or 'size=100000000000000 ' in line:
             continue
+        line = line[line.index('GPU_PROFILE'):]
         d = dict(re.findall(r'(\w+)=([0-9.e+-]+)', line))
         g = {k: float(v) for k, v in d.items()}
         tot = g['device_wall'] - g['probe']
