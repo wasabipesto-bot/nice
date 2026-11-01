@@ -47,6 +47,11 @@ verdict missed (user, 2026-10-28).
 | L18 | Bit-sliced bucket scan: 64 per-digit bitmaps over each ~300-entry bucket, OR-ed over a top's ~17 known digits instead of ~300 ANDs (L7 sweep 1) | compute | counting experiment first; L1.5: real AND lanes are 13–26 % at 1e16 and less at 1e14, so the ceiling is ~10 % end to end; low priority |
 | L19 | Static rare-bit bucket partitioning (2–3 levels) to skip 30–45 % of a bucket (L7 sweep 1) | compute | overlaps the signature-bucketing counts of L1.1 (21–42 % for low digits); low priority |
 
+## Proposals for the user (not research)
+
+- `PROPOSALS/hand-cuda-detailed.md` (2026-11-01): retire the hand-CUDA detailed kernel now (strictly dominated by the CubeCL FD kernel, no CI execution coverage lost, the one documented fleet CUDA failure broke both CUDA paths alike); hold the whole hand-CUDA backend until CubeCL-CUDA's stride kernel is measured against hand-CUDA's outside the join's range (the comparison the Vulkan removal had).
+- `L3/APPLE-FEEDBACK-DRAFT.md` (2026-11-01): ready-to-file Metal compiler bug report.
+
 ## Watch list (report, do not act)
 
 - BACKLOG 13: detailed mode runs out of fields after base 50 (has a deadline; server side).
