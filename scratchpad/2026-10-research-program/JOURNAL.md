@@ -4,6 +4,18 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-10-31 (late evening, user: "continue with those tasks as though you were doing the next run now")
+
+- The user bumped the version (8bd154b "Update changelog, bump version"; 9bde4a8 dev bump) to ship
+  the detailed FD changes (#221/#225/#227/#233). main = 9bde4a8. Credit $61.59; research MTD $4.62.
+- Boxes: 3080 `profile-1e17` (3 h), 3080 `topcert` (6 h), 3060 `fd-u32mask` (4 h).
+- Agents: P = join profile at b62 1e17 + 1e16 refit (L1/PROFILE-3.md); T = GPU top certificate from
+  one endpoint's digits + carry (port of #204's CPU form) → `pr/join-top-cert-fast`, A/B at b62
+  1e17/1e16, b60, b64 + NiceMark (L29); M = u32-pair mask in the native FD kernel on wgpu →
+  `pr/fd-u32-mask` (L28), exactness on CUDA/lavapipe; Apple/AMD speed needs a machine window.
+- Kill criteria: T must be bit-identical by hour 3 or write up the divergence; M is exactness-only
+  here (speed is the M4/AMD question).
+
 ## 2026-10-31 (day 4; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; October research invoiced $4.24 (yesterday's $2.36

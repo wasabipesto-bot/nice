@@ -1,0 +1,175 @@
+### 1. Device seconds per field and phase shares
+
+| size | base | **device s/field, unprofiled** (rounds) | profiled, probe excluded (rounds incl. probe) | overhead incl. probe | excl. probe | host setup s/field | top | bucket | **join** | check | other | slices (with prefixes) | partitions | batches | partitions/launch: mean (first plan per field) | plan MiB |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1e17 | 62 | **223.11** (220.90, 225.31) | 239.25 (254.65, 252.43) | +13.6% | +7.2% | 18.96 | 37.8% | 3.3% | **45.7%** | 7.9% | 5.3% | 11 (11) | 3844 | 6439 | 6.57 (5) | 1667 |
+| 1e16 | 60 | **42.97** (42.87, 43.07) | 45.22 (49.09, 46.83) | +11.6% | +5.2% | 2.85 | 31.6% | 3.3% | **50.5%** | 8.3% | 6.2% | 2 (2) | 3600 | 1350 | 5.33 (4) | 1564 |
+| 1e16 | 62 | **18.66** (18.85, 18.48) | 19.63 (21.33, 20.44) | +11.9% | +5.2% | 1.53 | 38.3% | 3.5% | **44.7%** | 7.8% | 5.8% | 2 (1) | 3844 | 532 | 7.22 (13, 5) | 2041 |
+| 1e16 | 64 | **53.55** (53.57, 53.53) | 53.03 (54.75, 53.84) | +1.4% | -1.0% | 1.92 | 16.2% | 1.5% | **72.8%** | 6.6% | 2.8% | 1 (1) | 4096 | 683 | 6.00 (6) | 2142 |
+
+Other, split (s/field): 1e17 b62: upload 2.840, inputs 2.715, read 0.587, unattributed 6.595; 1e16 b60: upload 0.496, inputs 0.732, read 0.143, unattributed 1.450; 1e16 b62: upload 0.241, inputs 0.251, read 0.046, unattributed 0.602; 1e16 b64: upload 0.268, inputs 0.317, read 0.064, unattributed 0.847
+
+Per field (profiled rows):
+
+| size | base | run | start | ntlay | slices | batches | slots | device (probe excl.) | top | bucket | join | check | upload | inputs | setup |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1e17 | 62 | e17_b62_prof_r1.log | 7997740455941656911841 | 30636533 | 11 | 6439 | 5 | 240.56 | 90.35 | 8.131 | 111.23 | 18.83 | 2.811 | 2.566 | 19.19 |
+| 1e17 | 62 | e17_b62_prof_r2.log | 7997740455941656911841 | 30636533 | 11 | 6439 | 5 | 237.95 | 90.41 | 7.800 | 107.25 | 19.02 | 2.869 | 2.864 | 18.73 |
+| 1e16 | 60 | e16_b60_prof_r1.log | 1366406074057412100454 | 5281726 | 2 | 1350 | 4 | 46.01 | 14.11 | 1.684 | 21.95 | 4.37 | 0.509 | 1.010 | 2.78 |
+| 1e16 | 60 | e16_b60_prof_r1.log | 1366416074057412100454 | 5313472 | 2 | 1350 | 4 | 45.43 | 14.34 | 1.520 | 22.85 | 3.80 | 0.511 | 0.740 | 2.91 |
+| 1e16 | 60 | e16_b60_prof_r2.log | 1366406074057412100454 | 5281726 | 2 | 1350 | 4 | 44.60 | 14.33 | 1.317 | 22.86 | 3.50 | 0.492 | 0.693 | 2.83 |
+| 1e16 | 60 | e16_b60_prof_r2.log | 1366416074057412100454 | 5313472 | 2 | 1350 | 4 | 44.81 | 14.43 | 1.463 | 23.71 | 3.36 | 0.471 | 0.483 | 2.87 |
+| 1e16 | 62 | e16_b62_prof_r1.log | 7997740455941656911841 | 3620628 | 2 | 769 | 5 | 27.89 | 10.60 | 1.038 | 12.24 | 2.29 | 0.330 | 0.411 | 2.09 |
+| 1e16 | 62 | e16_b62_prof_r1.log | 7997750455941656911841 | 1507500 | 2 | 296 | 13 | 11.86 | 4.37 | 0.500 | 5.19 | 0.95 | 0.164 | 0.211 | 0.90 |
+| 1e16 | 62 | e16_b62_prof_r2.log | 7997740455941656911841 | 3620628 | 2 | 769 | 5 | 27.45 | 10.62 | 0.743 | 12.33 | 2.08 | 0.335 | 0.327 | 2.21 |
+| 1e16 | 62 | e16_b62_prof_r2.log | 7997750455941656911841 | 1507500 | 2 | 296 | 13 | 11.31 | 4.45 | 0.435 | 5.31 | 0.81 | 0.137 | 0.054 | 0.92 |
+| 1e16 | 64 | e16_b64_prof_r1.log | 41242006262957161709568 | 3053841 | 1 | 683 | 6 | 53.26 | 8.63 | 0.879 | 38.51 | 3.56 | 0.267 | 0.375 | 1.95 |
+| 1e16 | 64 | e16_b64_prof_r2.log | 41242006262957161709568 | 3053841 | 1 | 683 | 6 | 52.79 | 8.58 | 0.754 | 38.73 | 3.43 | 0.270 | 0.258 | 1.90 |
+
+Unprofiled per run (JOIN THROUGHPUT): 1e17 b62: dev 220.90 batches 6439 slots 5 plan 1667 MiB surv 1.02073e+12 checked 6.26928e+10, dev 225.31 batches 6439 slots 5 plan 1667 MiB surv 1.02073e+12 checked 6.26927e+10; 1e16 b60: dev 42.87 batches 1350 slots 4 plan 1564 MiB surv 4.59048e+11 checked 3.25513e+10, dev 43.07 batches 1350 slots 4 plan 1564 MiB surv 4.59048e+11 checked 3.25507e+10; 1e16 b62: dev 18.85 batches 532 slots 13 plan 2041 MiB surv 1.6351e+11 checked 1.00309e+10, dev 18.48 batches 532 slots 13 plan 2041 MiB surv 1.6351e+11 checked 1.00309e+10; 1e16 b64: dev 53.57 batches 683 slots 6 plan 2142 MiB surv 3.94049e+11 checked 2.39804e+10, dev 53.53 batches 683 slots 6 plan 2142 MiB surv 3.94049e+11 checked 2.39805e+10
+Profiled per run (JOIN THROUGHPUT): 1e17 b62: dev 254.65 surv 1.02073e+12 checked 6.26928e+10, dev 252.43 surv 1.02073e+12 checked 6.26927e+10; 1e16 b60: dev 49.09 surv 4.59049e+11 checked 3.25497e+10, dev 46.83 surv 4.59049e+11 checked 3.25501e+10; 1e16 b62: dev 21.33 surv 1.6351e+11 checked 1.00309e+10, dev 20.44 surv 1.6351e+11 checked 1.00309e+10; 1e16 b64: dev 54.75 surv 3.94049e+11 checked 2.39804e+10, dev 53.84 surv 3.94048e+11 checked 2.39805e+10
+
+### 2. µs per top-layer prefix
+
+| size | base | prefixes/field | **µs/prefix unprofiled** | profiled | top | bucket | join | check | other |
+|---|---|---|---|---|---|---|---|---|---|
+| 1e17 | 62 | 3.064e+07 | **7.282** | 7.809 | 2.950 | 0.260 | 3.566 | 0.618 | 0.416 |
+| 1e16 | 60 | 5.298e+06 | **8.112** | 8.535 | 2.699 | 0.282 | 4.312 | 0.709 | 0.533 |
+| 1e16 | 62 | 2.564e+06 | **7.279** | 7.655 | 2.929 | 0.265 | 3.419 | 0.598 | 0.445 |
+| 1e16 | 64 | 3.054e+06 | **17.536** | 17.364 | 2.817 | 0.267 | 12.646 | 1.144 | 0.490 |
+
+### 3. Counts per field
+
+| size | base | tops/field | tops/prefix | bpre (bottoms) per slice | listed/field | AND pairs/field | wave-padded lane-pairs/field | padded/pairs | entries per probed bucket | work items | AND survivors/field | prefilter survivors (full checks)/field | AND pass/pair | prefilter keeps | overran/field (share), per run |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1e17 | 62 | 3.816e+10 | 1245 | 9.903e+04 | 5.367e+10 | 2.532e+13 | 3.907e+13 | 1.54 | 332 | 1.599e+08 | 1.021e+12 | 6.269e+10 | 4.03% | 6.14% | 1.16e+08 (1.1e-04, noprof), 1.16e+08 (1.1e-04, noprof), 1.16e+08 (1.1e-04, prof), 1.16e+08 (1.1e-04, prof) |
+| 1e16 | 60 | 6.891e+09 | 1301 | 9.493e+04 | 9.279e+09 | 5.52e+12 | 7.057e+12 | 1.28 | 401 | 2.549e+07 | 2.295e+11 | 1.627e+10 | 4.16% | 7.09% | 9e+08 (3.9e-03, noprof), 9e+08 (3.9e-03, noprof), 8.99e+08 (3.9e-03, prof), 8.99e+08 (3.9e-03, prof) |
+| 1e16 | 62 | 3.194e+09 | 1246 | 1.016e+05 | 5.223e+09 | 2.173e+12 | 3.27e+12 | 1.50 | 340 | 1.454e+07 | 8.176e+10 | 5.015e+09 | 3.76% | 6.13% | 1.69e+06 (2.1e-05, noprof), 1.69e+06 (2.1e-05, noprof), 1.69e+06 (2.1e-05, prof), 1.69e+06 (2.1e-05, prof) |
+| 1e16 | 64 | 3.867e+09 | 1266 | 9.385e+04 | 4.641e+09 | 8.694e+12 | 1.584e+13 | 1.82 | 281 | 1.652e+07 | 3.94e+11 | 2.398e+10 | 4.53% | 6.09% | 1.44e+07 (3.6e-05, noprof), 1.44e+07 (3.6e-05, noprof), 1.44e+07 (3.6e-05, prof), 1.44e+07 (3.7e-05, prof) |
+
+### 4. Join fits (weighted least squares on relative error)
+
+12 profiled field-runs (6 distinct fields)
+- 1e16 only padded+surv: 0.609 ps/padded, 80.324 ps/surv | in-fit rms 4.6%, max 7.7% | out of fit: 1e17 b62 -4.9%, 1e17 b62 -1.3%
+- 1e16+1e17 padded+surv: 0.654 ps/padded, 79.204 ps/surv | in-fit rms 4.4%, max 8.0%
+- 1e16 only pairs+surv: 1.398 ps/pairs, 67.369 ps/surv | in-fit rms 2.3%, max 4.1% | out of fit: 1e17 b62 -6.4%, 1e17 b62 -2.9%
+- 1e16+1e17 pairs+surv: 1.382 ps/pairs, 68.541 ps/surv | in-fit rms 2.8%, max 5.7%
+- 1e16 only padded+surv+tops: 0.663 ps/padded, 67.753 ps/surv, 367.549 ps/tops | in-fit rms 2.3%, max 3.8% | out of fit: 1e17 b62 -1.9%, 1e17 b62 +1.7%
+- 1e16+1e17 padded+surv+tops: 0.664 ps/padded, 67.695 ps/surv, 368.435 ps/tops | in-fit rms 2.3%, max 3.8%
+- 1e16 only pairs+surv+tops: 1.202 ps/pairs, 69.446 ps/surv, 97.751 ps/tops | in-fit rms 2.2%, max 4.5% | out of fit: 1e17 b62 -5.6%, 1e17 b62 -2.1%
+- 1e16+1e17 pairs+surv+tops: 1.054 ps/pairs, 71.715 ps/surv, 166.089 ps/tops | in-fit rms 2.5%, max 5.3%
+- 1e16 only pairs+empty+surv: 1.547 ps/pairs, 0.281 ps/empty, 60.483 ps/surv | in-fit rms 2.0%, max 3.0% | out of fit: 1e17 b62 -5.8%, 1e17 b62 -2.3%
+- 1e16+1e17 pairs+empty+surv: 1.570 ps/pairs, 0.351 ps/empty, 59.763 ps/surv | in-fit rms 2.5%, max 5.1%
+- 1e16 only pairs+empty+surv+tops: 1.244 ps/pairs, 0.425 ps/empty, 61.002 ps/surv, 189.595 ps/tops | in-fit rms 1.4%, max 2.8% | out of fit: 1e17 b62 -4.0%, 1e17 b62 -0.4%
+- 1e16+1e17 pairs+empty+surv+tops: 1.176 ps/pairs, 0.490 ps/empty, 60.837 ps/surv, 238.055 ps/tops | in-fit rms 1.6%, max 3.2%
+- 1e16 only padded+surv+work: 0.324 ps/padded, 83.710 ps/surv, 53.003 ns/work | in-fit rms 1.7%, max 2.9% | out of fit: 1e17 b62 -4.2%, 1e17 b62 -0.6%
+- 1e16+1e17 padded+surv+work: 0.354 ps/padded, 82.897 ps/surv, 53.805 ns/work | in-fit rms 1.9%, max 3.8%
+- 1e16 only padded+surv+tops+work: 0.423 ps/padded, 78.019 ps/surv, 138.782 ps/tops, 38.220 ns/work | in-fit rms 1.4%, max 2.8% | out of fit: 1e17 b62 -3.3%, 1e17 b62 +0.3%
+- 1e16+1e17 padded+surv+tops+work: 0.463 ps/padded, 76.251 ps/surv, 171.706 ps/tops, 35.124 ns/work | in-fit rms 1.6%, max 3.0%
+- 1e16 only pairs+surv+tops+work: 2.029 ps/pairs, 52.308 ps/surv, 149.938 ps/tops, -38.744 ns/work | in-fit rms 2.2%, max 4.4% | out of fit: 1e17 b62 -6.3%, 1e17 b62 -2.8%
+- 1e16+1e17 pairs+surv+tops+work: -3.062 ps/pairs, 157.802 ps/surv, -168.138 ps/tops, 199.526 ns/work | in-fit rms 2.2%, max 4.9%
+
+**Two-term form, all fields:**
+- 1e16+1e17 padded+surv: 0.654 ps/padded, 79.204 ps/surv | in-fit rms 4.4%, max 8.0%
+
+| base | size | run | join s | predicted | residual | padded term s (share) | surv term s (share) |
+|---|---|---|---|---|---|---|---|
+| 62 | 1e17 | e17_b62_prof_r1.log | 111.234 | 106.404 | -4.3% | 25.559 (23%) | 80.846 (73%) |
+| 62 | 1e17 | e17_b62_prof_r2.log | 107.250 | 106.404 | -0.8% | 25.559 (24%) | 80.846 (75%) |
+| 60 | 1e16 | e16_b60_prof_r1.log | 21.951 | 22.541 | +2.7% | 4.602 (21%) | 17.939 (82%) |
+| 60 | 1e16 | e16_b60_prof_r1.log | 22.847 | 23.050 | +0.9% | 4.631 (20%) | 18.420 (81%) |
+| 60 | 1e16 | e16_b60_prof_r2.log | 22.861 | 22.541 | -1.4% | 4.602 (20%) | 17.939 (78%) |
+| 60 | 1e16 | e16_b60_prof_r2.log | 23.706 | 23.050 | -2.8% | 4.631 (20%) | 18.420 (78%) |
+| 62 | 1e16 | e16_b62_prof_r1.log | 12.236 | 12.298 | +0.5% | 3.020 (25%) | 9.278 (76%) |
+| 62 | 1e16 | e16_b62_prof_r1.log | 5.193 | 4.931 | -5.0% | 1.258 (24%) | 3.673 (71%) |
+| 62 | 1e16 | e16_b62_prof_r2.log | 12.328 | 12.298 | -0.2% | 3.020 (24%) | 9.278 (75%) |
+| 62 | 1e16 | e16_b62_prof_r2.log | 5.308 | 4.931 | -7.1% | 1.258 (24%) | 3.673 (69%) |
+| 64 | 1e16 | e16_b64_prof_r1.log | 38.508 | 41.571 | +8.0% | 10.361 (27%) | 31.210 (81%) |
+| 64 | 1e16 | e16_b64_prof_r2.log | 38.728 | 41.571 | +7.3% | 10.361 (27%) | 31.210 (81%) |
+
+**With tops, all fields:**
+- 1e16+1e17 padded+surv+tops: 0.664 ps/padded, 67.695 ps/surv, 368.435 ps/tops | in-fit rms 2.3%, max 3.8%
+
+| base | size | run | join s | predicted | residual | padded term s (share) | surv term s (share) | tops term s (share) |
+|---|---|---|---|---|---|---|---|---|
+| 62 | 1e17 | e17_b62_prof_r1.log | 111.234 | 109.102 | -1.9% | 25.946 (23%) | 69.098 (62%) | 14.058 (13%) |
+| 62 | 1e17 | e17_b62_prof_r2.log | 107.250 | 109.102 | +1.7% | 25.946 (24%) | 69.098 (64%) | 14.058 (13%) |
+| 60 | 1e16 | e16_b60_prof_r1.log | 21.951 | 22.535 | +2.7% | 4.671 (21%) | 15.332 (70%) | 2.531 (12%) |
+| 60 | 1e16 | e16_b60_prof_r1.log | 22.847 | 22.991 | +0.6% | 4.701 (21%) | 15.743 (69%) | 2.547 (11%) |
+| 60 | 1e16 | e16_b60_prof_r2.log | 22.861 | 22.535 | -1.4% | 4.671 (20%) | 15.332 (67%) | 2.531 (11%) |
+| 60 | 1e16 | e16_b60_prof_r2.log | 23.706 | 22.991 | -3.0% | 4.701 (20%) | 15.743 (66%) | 2.547 (11%) |
+| 62 | 1e16 | e16_b62_prof_r1.log | 12.236 | 12.657 | +3.4% | 3.066 (25%) | 7.930 (65%) | 1.661 (14%) |
+| 62 | 1e16 | e16_b62_prof_r1.log | 5.193 | 5.109 | -1.6% | 1.278 (25%) | 3.139 (60%) | 0.692 (13%) |
+| 62 | 1e16 | e16_b62_prof_r2.log | 12.328 | 12.657 | +2.7% | 3.066 (25%) | 7.930 (64%) | 1.661 (13%) |
+| 62 | 1e16 | e16_b62_prof_r2.log | 5.308 | 5.109 | -3.8% | 1.278 (24%) | 3.139 (59%) | 0.692 (13%) |
+| 64 | 1e16 | e16_b64_prof_r1.log | 38.508 | 38.617 | +0.3% | 10.518 (27%) | 26.675 (69%) | 1.425 (4%) |
+| 64 | 1e16 | e16_b64_prof_r2.log | 38.728 | 38.617 | -0.3% | 10.518 (27%) | 26.675 (69%) | 1.425 (4%) |
+
+**pairs + empty + surv + tops, all fields:**
+- 1e16+1e17 pairs+empty+surv+tops: 1.176 ps/pairs, 0.490 ps/empty, 60.837 ps/surv, 238.055 ps/tops | in-fit rms 1.6%, max 3.2%
+
+| base | size | run | join s | predicted | residual | pairs term s (share) | empty term s (share) | surv term s (share) | tops term s (share) |
+|---|---|---|---|---|---|---|---|---|---|
+| 62 | 1e17 | e17_b62_prof_r1.log | 111.234 | 107.689 | -3.2% | 29.765 (27%) | 6.744 (6%) | 62.098 (56%) | 9.083 (8%) |
+| 62 | 1e17 | e17_b62_prof_r2.log | 107.250 | 107.689 | +0.4% | 29.765 (28%) | 6.744 (6%) | 62.098 (58%) | 9.083 (8%) |
+| 60 | 1e16 | e16_b60_prof_r1.log | 21.951 | 22.590 | +2.9% | 6.392 (29%) | 0.783 (4%) | 13.779 (63%) | 1.635 (7%) |
+| 60 | 1e16 | e16_b60_prof_r1.log | 22.847 | 23.106 | +1.1% | 6.589 (29%) | 0.723 (3%) | 14.148 (62%) | 1.646 (7%) |
+| 60 | 1e16 | e16_b60_prof_r2.log | 22.861 | 22.590 | -1.2% | 6.392 (28%) | 0.783 (3%) | 13.779 (60%) | 1.635 (7%) |
+| 60 | 1e16 | e16_b60_prof_r2.log | 23.706 | 23.106 | -2.5% | 6.589 (28%) | 0.723 (3%) | 14.148 (60%) | 1.646 (7%) |
+| 62 | 1e16 | e16_b62_prof_r1.log | 12.236 | 12.398 | +1.3% | 3.319 (27%) | 0.879 (7%) | 7.126 (58%) | 1.073 (9%) |
+| 62 | 1e16 | e16_b62_prof_r1.log | 5.193 | 5.256 | +1.2% | 1.791 (34%) | 0.196 (4%) | 2.821 (54%) | 0.447 (9%) |
+| 62 | 1e16 | e16_b62_prof_r2.log | 12.328 | 12.398 | +0.6% | 3.319 (27%) | 0.879 (7%) | 7.126 (58%) | 1.073 (9%) |
+| 62 | 1e16 | e16_b62_prof_r2.log | 5.308 | 5.256 | -1.0% | 1.791 (34%) | 0.196 (4%) | 2.821 (53%) | 0.447 (8%) |
+| 64 | 1e16 | e16_b64_prof_r1.log | 38.508 | 38.617 | +0.3% | 10.222 (27%) | 3.502 (9%) | 23.973 (62%) | 0.921 (2%) |
+| 64 | 1e16 | e16_b64_prof_r2.log | 38.728 | 38.617 | -0.3% | 10.222 (26%) | 3.502 (9%) | 23.973 (62%) | 0.921 (2%) |
+
+
+### 5. Other phases per unit
+
+| size | base | top: ps per (prefix, partition) | top: ns per certified top | bucket: ps per (bpre, partition) | check: ps per full check | upload s | inputs µs/batch | per-slice fixed (upload+bucket) s |
+|---|---|---|---|---|---|---|---|---|
+| 1e17 | 62 | 767.5 | 2.37 | 1902.3 | 301.9 | 2.840 | 422 | 0.982 |
+| 1e16 | 60 | 749.8 | 2.08 | 2188.3 | 230.8 | 0.496 | 542 | 0.996 |
+| 1e16 | 62 | 762.0 | 2.35 | 1739.1 | 305.5 | 0.241 | 471 | 0.460 |
+| 1e16 | 64 | 687.7 | 2.22 | 2124.4 | 145.7 | 0.268 | 463 | 1.085 |
+
+### 6. Per-phase fits with a per-batch term (1e16 + 1e17 profiled fields; the 1e14 warm-ups hold the kernels' JIT compile, so they are left out)
+
+- top (all, 12 rows) ~ 744.236 ps/certs: rms 3.9%, max 8.5%
+- top (all, 12 rows) ~ 724.013 ps/certs + 339.991 µs/batches: rms 3.9%, max 8.3%
+- top (all, 12 rows) ~ 43.400 ps/certs + 3538.392 ps/tops + -8051.176 µs/batches: rms 1.8%, max 3.2%
+- bucket (all, 12 rows) ~ 1688.655 ps/bpre_parts: rms 29.9%, max 61.7%
+- bucket (all, 12 rows) ~ 514.278 ps/bpre_parts + 857.039 µs/batches: rms 9.7%, max 18.5%
+- bucket (all, 12 rows) ~ 1174.793 µs/batches: rms 15.0%, max 30.5%
+- check (all, 12 rows) ~ 215.205 ps/checked: rms 29.3%, max 50.7%
+- check (all, 12 rows) ~ 86.459 ps/checked + 1916.524 µs/batches: rms 9.4%, max 19.4%
+- inputs (all, 12 rows) ~ 355.872 µs/batches: rms 40.4%, max 94.7%
+- upload (all, 12 rows) ~ 0.219 s/slices: rms 27.1%, max 60.3%
+- unattributed (all, 12 rows) ~ 709.465 µs/batches: rms 47.9%, max 100.0%
+  top per batch (ms): 1e17 b62 14.03, 1e17 b62 14.04, 1e16 b60 10.45, 1e16 b60 10.62, 1e16 b60 10.61, 1e16 b60 10.69, 1e16 b62 13.78, 1e16 b62 14.78, 1e16 b62 13.81, 1e16 b62 15.03, 1e16 b64 12.63, 1e16 b64 12.56
+  bucket per batch (ms): 1e17 b62 1.26, 1e17 b62 1.21, 1e16 b60 1.25, 1e16 b60 1.13, 1e16 b60 0.98, 1e16 b60 1.08, 1e16 b62 1.35, 1e16 b62 1.69, 1e16 b62 0.97, 1e16 b62 1.47, 1e16 b64 1.29, 1e16 b64 1.10
+  check per batch (ms): 1e17 b62 2.92, 1e17 b62 2.95, 1e16 b60 3.23, 1e16 b60 2.81, 1e16 b60 2.59, 1e16 b60 2.49, 1e16 b62 2.98, 1e16 b62 3.21, 1e16 b62 2.70, 1e16 b62 2.74, 1e16 b64 5.22, 1e16 b64 5.02
+  join per batch (ms): 1e17 b62 17.28, 1e17 b62 16.66, 1e16 b60 16.26, 1e16 b60 16.92, 1e16 b60 16.93, 1e16 b60 17.56, 1e16 b62 15.91, 1e16 b62 17.54, 1e16 b62 16.03, 1e16 b62 17.93, 1e16 b64 56.38, 1e16 b64 56.70
+  inputs per batch (ms): 1e17 b62 0.40, 1e17 b62 0.44, 1e16 b60 0.75, 1e16 b60 0.55, 1e16 b60 0.51, 1e16 b60 0.36, 1e16 b62 0.53, 1e16 b62 0.71, 1e16 b62 0.43, 1e16 b62 0.18, 1e16 b64 0.55, 1e16 b64 0.38
+
+### 7. Where the time goes, per size and base (model terms on the profiled means; shares of profiled time, probe excluded)
+
+Join terms: 1.176 ps per real lane-pair, 0.490 ps per empty (padding) lane-pair, 60.8 ps per AND survivor, 238 ps per top. Check: 86.5 ps per full check + 1917 µs per batch. Bucket: 514 ps per (bpre, partition) + 857 µs per batch.
+
+| size | base | device s (profiled, probe excl.) | unprofiled s | top cert. | AND lanes (real pairs) | padding (empty lanes) | survivor handling | per-top chunk cost | join residual | check kernel | of which per-batch part | overrun's extra checks | bucket | upload | inputs+read+unattributed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1e17 | 62 | 239.25 | 223.11 | 90.38 s (37.8%) | 29.76 s (12.4%) | 6.74 s (2.8%) | 62.10 s (26.0%) | 9.08 s (3.8%) | 1.55 s (0.6%) | 18.93 s (7.9%) | 12.34 s (5.2%) | 0.033 s (0.014%) | 7.97 s (3.3%) | 2.84 s (1.2%) | 9.90 s (4.1%) |
+| 1e16 | 60 | 45.22 | 42.97 | 14.30 s (31.6%) | 6.49 s (14.4%) | 0.75 s (1.7%) | 13.96 s (30.9%) | 1.64 s (3.6%) | -0.01 s (-0.0%) | 3.76 s (8.3%) | 2.59 s (5.7%) | 0.193 s (0.427%) | 1.50 s (3.3%) | 0.50 s (1.1%) | 2.33 s (5.1%) |
+| 1e16 | 62 | 19.63 | 18.66 | 7.51 s (38.3%) | 2.56 s (13.0%) | 0.54 s (2.7%) | 4.97 s (25.3%) | 0.76 s (3.9%) | -0.06 s (-0.3%) | 1.53 s (7.8%) | 1.02 s (5.2%) | 0.000 s (0.002%) | 0.68 s (3.5%) | 0.24 s (1.2%) | 0.90 s (4.6%) |
+| 1e16 | 64 | 53.03 | 53.55 | 8.60 s (16.2%) | 10.22 s (19.3%) | 3.50 s (6.6%) | 23.97 s (45.2%) | 0.92 s (1.7%) | 0.00 s (0.0%) | 3.49 s (6.6%) | 1.31 s (2.5%) | 0.002 s (0.004%) | 0.82 s (1.5%) | 0.27 s (0.5%) | 1.23 s (2.3%) |
+
+Same with the 3-term join fit (padded + surv + tops): 1e17 b62: padded 10.8%, surv 28.9%, tops 5.9%; 1e16 b60: padded 10.4%, surv 34.4%, tops 5.6%; 1e16 b62: padded 11.1%, surv 28.2%, tops 6.0%; 1e16 b64: padded 19.8%, surv 50.3%, tops 2.7%
+
+### 8. Frontier field and lever runs at b62 1e17
+
+| run | binary | knobs | device s | host setup s | slices | batches | first-plan partitions/launch | plan MiB | AND survivors | full checks | overran | vs control |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| x17_ctl_r1.log | incomplete |
+| e17f_b62_noprof_r1 | 7330147f | unset | 0.00 | 0.07 | - | 0 | 16 | 1322 | 0 | 0 | 0 |  |
+| e17f_b62_prof_r1 | 7330147f | unset | 0.00 | 0.07 | 11 | 0 | 16 | 1322 | 0 | 0 | 0 |  |
+|  ↳ profile | | | 0.00 (probe excl.) | | 11 | 0 | | | ntlay 0, tops 0, pairs 0, padded 0 | top 0.00, bucket 0.00, join 0.00, check 0.00, upload 0.00, inputs 0.00, read 0.00, unattr. 0.00 | work items 0 | |

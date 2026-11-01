@@ -1,0 +1,12 @@
+START e16_b64_prof_r1 23:44:22 base=64 n=1 size=1e16 prof=1 bin=/root/nice_common_test bin_md5=7330147f exp_env= commit=406ca28
+
+running 1 test
+test cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields ... GPU_PROFILE base=64 start=41242006162957161709568 end=41242006262957161709568 size=100000000000000 slices=1 partitions=4096 batches=256 slots=16 min_slots=16 retried=0 splits=0 | setup=0.0703 device_wall=4.8888 upload=0.0108 inputs=0.0604 top=2.5902 bucket=0.2898 join=1.1791 check=0.4053 read=0.0070 probe=0.2732 unattributed=0.0731 | ntlay=37001 nbp=78784 tops=46799075 listed=3026376240 pairs=68607924621 padded_pairs=191689011200 live_buckets=16515070 buckets=16515072 survivors=5001575651 checked=304016264 hits=0
+GPU_PROFILE base=64 start=41242006262957161709568 end=41242016262957161709568 size=10000000000000000 slices=1 partitions=4096 batches=683 slots=6 min_slots=6 retried=0 splits=0 | setup=1.9484 device_wall=54.7488 upload=0.2667 inputs=0.3747 top=8.6251 bucket=0.8789 join=38.5083 check=3.5633 read=0.0700 probe=1.4891 unattributed=0.9728 | ntlay=3053841 nbp=93846 tops=3866773495 listed=4641455308 pairs=8693854368859 padded_pairs=15838304235520 live_buckets=16515072 buckets=16515072 survivors=394048539948 checked=23980444702 hits=0
+EXP_OVERRAN base=64 flush_at=512 overran=14370713 survivors=394048539948 share=3.647e-5
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=64 fields=1 in_flight=2 secs=56.70 per_field=56.698 rate=1.764e14 n/s | setup=1.948s device=54.749s wall=54.749s batches=683 slots=6 plan_mib=2142 | empty_top=0 retried=0 splits=0 survivors=394048539948 checked=23980444702 found=0 | peak_in_use_mib=0 peak_reserved_mib=9
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 264 filtered out; finished in 62.13s
+
+END e16_b64_prof_r1 23:45:25 rc=0

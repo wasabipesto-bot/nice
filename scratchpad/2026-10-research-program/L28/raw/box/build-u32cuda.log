@@ -1,0 +1,20 @@
+Sat Oct 31 23:55:35 UTC 2026
+66dd23f GPU detailed mode: a two-word digit mask on wgpu
+patched: sed -i "s/, wide_chunk);$/, false);/; s/0u32, kc_dig, wide_chunk,/0u32, kc_dig, false,/" common/src/cubecl_detailed_fd.rs
+ common/src/cubecl_detailed_fd.rs | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+-        let ms = fd_mask_sc(&sd, &cd, 0u32, 0u32, ks_dig, ls, kc_dig, lc, wide_chunk);
++        let ms = fd_mask_sc(&sd, &cd, 0u32, 0u32, ks_dig, ls, kc_dig, lc, false);
+-                &sd, &cd, ms_lo, ms_hi, 0u32, ks_dig, 0u32, kc_dig, wide_chunk,
++                &sd, &cd, ms_lo, ms_hi, 0u32, ks_dig, 0u32, kc_dig, false,
+-                    let r = fd_mask_sc(&sd, &cd, 0u32, 0u32, ks_dig, ls, kc_dig, lc, wide_chunk);
++                    let r = fd_mask_sc(&sd, &cd, 0u32, 0u32, ks_dig, ls, kc_dig, lc, false);
+    Finished `release` profile [optimized] target(s) in 5m 49s
+  Executable unittests src/lib.rs (target/release/deps/nice_common-cbd4e892b0124d04)
+test: target/release/deps/nice_common-cbd4e892b0124d04 -> /root/bin/u32cuda-test (350 s); label hits: 2
+    Finished `release` profile [optimized] target(s) in 5m 26s
+client -> /root/bin/u32cuda-client (326 s)
+de6693fcfd3946c2bd3fcac9abc38e4c88d520d593bf30fdb561bd02cd1e4113  /root/bin/u32cuda-test
+3d2fce1fb60af189a60ed09302ade25a7203df61a8a7e44bd32d5482db35a6e5  /root/bin/u32cuda-client
+Sun Nov  1 00:06:55 UTC 2026
+BUILD_DONE u32cuda

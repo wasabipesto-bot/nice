@@ -29,6 +29,20 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L28.1 Two-word digit mask in the native FD kernel on wgpu (2026-11-01, agent; `L28/RESULTS.md`, `L28/raw/`; branch `pr/fd-u32-mask` 2b8d524, NOT opened)
+
+`fd_mask_u32` moved from cubecl_web.rs into cubecl_detailed_fd.rs and shared; `fd_mask_sc` picks
+u64 on CUDA/HIP and the u32 pair on wgpu (switched on `wide_chunk`); no divisions. RTX 3060:
+CUDA 3 FD tests + 44-base sweep (132 windows, 9.6e8 numbers, 180 near misses) exact; lavapipe via
+naga and via CubeCL SPIR-V: FD tests + browser FD tests + sweep exact; host 221; fmt/clippy clean;
+WGSL lint 0 flagged; u64-naming lines in the native FD kernel's WGSL 135 → 32 at b40 (prologue,
+seed word split, near-miss record remain); browser kernels' WGSL byte-identical to main.
+**Speed:** CUDA PR vs main 0.992 / 1.001 / NiceMark 0.996 (unchanged). **The pair forced on CUDA is
+24 % slower** (0.766 / 0.763), so CUDA/HIP keep u64. lavapipe PR 0.91–0.94× main on a noisy shared
+host → Vulkan on native-u64 cards (AMD, NVIDIA-wgpu) may lose. **Apple M4 and AMD unmeasured.**
+Decision: hold the branch; measure on the M4 and on AMD before opening; if AMD loses, gate the pair
+to Metal adapters only (the wgpu backend enum is already read for the earlier Metal gate).
+
 ## L24.4 AMD parity for #233, run by the user (2026-10-31; `parity-demoux-1031.json`)
 
 demoux, RX 9070 XT, LibreWolf (Firefox 155, wgpu → naga → Vulkan), `parity.html` served from
