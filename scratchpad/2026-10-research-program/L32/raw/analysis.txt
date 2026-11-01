@@ -1,0 +1,79 @@
+== A/B (device s per field; run = last JOIN THROUGHPUT line, the timed one)
+-- e16_b60
+  base      median 30.578  spread 1.4%  [r1 30.558 (1471 MHz), r2 30.599 (1500 MHz), r3 30.663 (1508 MHz), r4 30.231 (1480 MHz)]  x1.0000 vs base  counts {(460847952346, 30871838404, 0)}  batches 1350 slots 4 plan 1566
+  tail      median 29.747  spread 1.4%  [r1 29.903 (1478 MHz), r2 29.512 (1488 MHz), r3 29.914 (1452 MHz), r4 29.591 (1571 MHz)]  x1.0280 vs base  counts {(460847952346, 30871838404, 0)}  batches 1350 slots 4 plan 1566
+  ept1      median 32.873  spread 6.0%  [r1 32.946 (1473 MHz), r2 32.873 (1490 MHz), r3 30.959 (1509 MHz)]  x0.9302 vs base  counts {(460847952346, 30871838404, 0)}  batches 1350 slots 4 plan 1566
+  per-round base/tail: r1 x1.0219, r2 x1.0368, r3 x1.0250, r4 x1.0216
+  clock-normalised (dev x MHz): base/tail r1 x1.0170, r2 x1.0455, r3 x1.0644, r4 x0.9628
+-- e16_b62
+  base      median 13.739  spread 1.3%  [r1 13.702 (1476 MHz), r2 13.633 (1525 MHz), r3 13.810 (1465 MHz), r4 13.775 (1482 MHz)]  x1.0000 vs base  counts {(163513599082, 10027698695, 0)}  batches 532 slots 13 plan 2050
+  tail      median 13.078  spread 1.8%  [r1 13.187 (1512 MHz), r2 13.174 (1472 MHz), r3 12.981 (1472 MHz), r4 12.952 (1562 MHz)]  x1.0505 vs base  counts {(163513599082, 10027698695, 0)}  batches 532 slots 13 plan 2050
+  ept1      median 14.481  spread 5.7%  [r1 14.008 (1462 MHz), r2 14.481 (1475 MHz), r3 14.834 (1468 MHz)]  x0.9487 vs base  counts {(163513599082, 10027698695, 0)}  batches 532 slots 13 plan 2050
+  ept1tail  median 13.683  spread 0.0%  [r1 13.683 (1412 MHz)]  x1.0041 vs base  counts {(163513599082, 10027698695, 0)}  batches 532 slots 13 plan 2050
+  ept3tail  median 13.156  spread 0.0%  [r1 13.156 (1494 MHz)]  x1.0443 vs base  counts {(163513599082, 10027698695, 0)}  batches 532 slots 13 plan 2050
+  ept4tail  median 14.124  spread 0.0%  [r1 14.124 (1508 MHz)]  x0.9727 vs base  counts {(163513599082, 10027698695, 0)}  batches 532 slots 13 plan 2050
+  off       median 13.642  spread 0.0%  [r1 13.642 (1412 MHz)]  x1.0071 vs base  counts {(163513599082, 10027698695, 0)}  batches 532 slots 13 plan 2050
+  per-round base/tail: r1 x1.0391, r2 x1.0348, r3 x1.0639, r4 x1.0635
+  clock-normalised (dev x MHz): base/tail r1 x1.0140, r2 x1.0717, r3 x1.0584, r4 x1.0087
+-- e17_b62
+  base      median 164.687  spread 1.0%  [r1 163.137 (1494 MHz), r2 164.753 (1473 MHz), r3 164.687 (1463 MHz)]  x1.0000 vs base  counts {(1020844021499, 62584252554, 0)}  batches 6439 slots 5 plan 1671
+  tail      median 157.053  spread 0.2%  [r1 157.053 (1479 MHz), r2 157.173 (1470 MHz), r3 156.840 (1457 MHz)]  x1.0486 vs base  counts {(1020844021499, 62584252554, 0)}  batches 6439 slots 5 plan 1671
+  ept1      median 178.420  spread 0.0%  [r1 178.420 (1455 MHz)]  x0.9230 vs base  counts {(1020844021499, 62584252554, 0)}  batches 6439 slots 5 plan 1671
+  per-round base/tail: r1 x1.0387, r2 x1.0482, r3 x1.0500
+  clock-normalised (dev x MHz): base/tail r1 x1.0495, r2 x1.0505, r3 x1.0541
+-- pad2 e16_b60
+  t2        median 30.069  spread 0.0%  [r1 30.069 (1481 MHz)]  counts {(460847952346, 30871838404, 0)}  batches 1350 slots 4 plan 1566
+-- pad2 e17_b62
+  base      median 163.156  spread 0.2%  [r1 163.351 (1464 MHz), r2 162.961 (1473 MHz)]  x1.0000 vs base  counts {(1020844021499, 62584252554, 0)}  batches 6439 slots 5 plan 1671
+  t1        median 157.111  spread 0.3%  [r1 156.877 (1463 MHz), r2 157.345 (1455 MHz)]  x1.0385 vs base  counts {(1020844021499, 62584252554, 0)}  batches 6439 slots 5 plan 1671
+  t2        median 157.343  spread 1.3%  [r1 156.289 (1456 MHz), r2 158.397 (1467 MHz)]  x1.0369 vs base  counts {(1020844021499, 62584252554, 0)}  batches 6439 slots 5 plan 1671
+
+== profile runs (timed fields only; the first line of a process is its 1e14 warm-up)
+-- p_off_e16_b60 start=1366406074057412100454 dev=31.50 join=15.15 (48.1%) top=10.95 check=2.16 tops=6.8695e+09 surv=2.2740e+11 checked=1.5233e+10 spilled=0
+   pairs=5.4369e+12 padded=7.0344e+12 (x1.294, empty 22.7%) | tail slots 5.6501e+12 (x1.039) | stride-256 per-plane 5.6501e+12 (x1.039) | EPT1 lanes 6.9234e+12 (x1.273) | EPT4+tail 6.6407e+12 (x1.221)
+   top-waves EPT2 1.3739e+10  EPT1 2.7045e+10 (x1.968)  EPT4 1.3739e+10 | plane-tops now 1.0991e+11  tail 9.1590e+10 (x0.833)
+   ne bins (work items% / tops%): 160-191:0.0%/0.0% 192-223:0.0%/0.0% 224-255:8.0%/2.8% 256-287:35.0%/12.4% 288-319:6.9%/2.4% 320-351:0.1%/0.0% 352-383:0.8%/1.4% 384-415:16.8%/27.7% 416-447:27.9%/45.9% 448-479:4.4%/7.3% 480-511:0.1%/0.1% 512-543:0.0%/0.0%
+-- p_off_e16_b60 start=1366416074057412100454 dev=32.01 join=15.48 (48.4%) top=11.03 check=2.22 tops=6.9133e+09 surv=2.3345e+11 checked=1.5639e+10 spilled=0
+   pairs=5.6037e+12 padded=7.0793e+12 (x1.263, empty 20.8%) | tail slots 5.8181e+12 (x1.038) | stride-256 per-plane 5.8181e+12 (x1.038) | EPT1 lanes 7.0793e+12 (x1.263) | EPT4+tail 6.6823e+12 (x1.192)
+   top-waves EPT2 1.3827e+10  EPT1 2.7653e+10 (x2.000)  EPT4 1.3827e+10 | plane-tops now 1.1061e+11  tail 9.4229e+10 (x0.852)
+   ne bins (work items% / tops%): 224-255:0.0%/0.0% 256-287:0.0%/0.0% 288-319:5.3%/2.2% 320-351:31.9%/13.4% 352-383:13.3%/6.5% 384-415:17.1%/26.7% 416-447:27.9%/44.0% 448-479:4.4%/7.0% 480-511:0.1%/0.1% 512-543:0.0%/0.0%
+-- p_off_e16_b62 start=7997740455941656911841 dev=19.80 join=8.80 (44.4%) top=8.22 check=1.06 tops=4.5088e+09 surv=1.1714e+11 checked=7.1810e+09 spilled=0
+   pairs=2.8231e+12 padded=4.6170e+12 (x1.635, empty 38.9%) | tail slots 2.9621e+12 (x1.049) | stride-256 per-plane 2.9621e+12 (x1.049) | EPT1 lanes 4.6165e+12 (x1.635) | EPT4+tail 3.4625e+12 (x1.227)
+   top-waves EPT2 9.0175e+09  EPT1 1.8033e+10 (x2.000)  EPT4 9.0175e+09 | plane-tops now 7.2140e+10  tail 4.7965e+10 (x0.665)
+   ne bins (work items% / tops%): 160-191:0.0%/0.0% 192-223:0.0%/0.0% 224-255:0.0%/0.0% 256-287:5.4%/5.4% 288-319:60.4%/60.4% 320-351:33.3%/33.3% 352-383:0.9%/0.9% 384-415:0.0%/0.0%
+-- p_off_e16_b62 start=7997750455941656911841 dev=8.85 join=3.91 (44.2%) top=3.39 check=0.41 tops=1.8788e+09 surv=4.6370e+10 checked=2.8467e+09 spilled=0
+   pairs=1.5236e+12 padded=1.9239e+12 (x1.263, empty 20.8%) | tail slots 1.5818e+12 (x1.038) | stride-256 per-plane 1.5818e+12 (x1.038) | EPT1 lanes 1.9239e+12 (x1.263) | EPT4+tail 1.8655e+12 (x1.224)
+   top-waves EPT2 3.7576e+09  EPT1 7.5151e+09 (x2.000)  EPT4 3.7576e+09 | plane-tops now 3.0060e+10  tail 2.5880e+10 (x0.861)
+   ne bins (work items% / tops%): 224-255:0.0%/0.0% 256-287:0.0%/0.0% 288-319:0.0%/0.0% 320-351:0.1%/0.1% 352-383:10.9%/10.9% 384-415:60.2%/60.2% 416-447:27.7%/27.7% 448-479:1.0%/1.0% 480-511:0.0%/0.0%
+-- p_off_e16_b64 start=41242006262957161709568 dev=40.12 join=27.74 (69.2%) top=8.25 check=2.65 tops=3.8668e+09 surv=3.9406e+11 checked=2.3967e+10 spilled=0
+   pairs=8.6939e+12 padded=1.5838e+13 (x1.822, empty 45.1%) | tail slots 9.1703e+12 (x1.055) | stride-256 per-plane 9.1703e+12 (x1.055) | EPT1 lanes 1.5394e+13 (x1.771) | EPT4+tail 1.1657e+13 (x1.341)
+   top-waves EPT2 3.0934e+10  EPT1 6.0134e+10 (x1.944)  EPT4 3.0934e+10 | plane-tops now 2.4747e+11  tail 1.5313e+11 (x0.619)
+   ne bins (work items% / tops%): 160-191:0.0%/0.0% 192-223:0.0%/0.0% 224-255:4.9%/4.9% 256-287:61.4%/61.4% 288-319:32.9%/32.9% 320-351:0.7%/0.7% 352-383:0.0%/0.0%
+-- p_off_e17_b62 start=7997740455941656911841 dev=170.70 join=75.52 (44.2%) top=69.30 check=9.20 tops=3.8156e+10 surv=1.0208e+12 checked=6.2584e+10 spilled=0
+   pairs=2.5315e+13 padded=3.9071e+13 (x1.543, empty 35.2%) | tail slots 2.6497e+13 (x1.047) | stride-256 per-plane 2.6497e+13 (x1.047) | EPT1 lanes 3.9068e+13 (x1.543) | EPT4+tail 3.0460e+13 (x1.203)
+   top-waves EPT2 7.6311e+10  EPT1 1.5261e+11 (x2.000)  EPT4 7.6311e+10 | plane-tops now 6.1049e+11  tail 4.3314e+11 (x0.709)
+   ne bins (work items% / tops%): 160-191:0.0%/0.0% 192-223:0.0%/0.0% 224-255:0.0%/0.0% 256-287:3.3%/3.4% 288-319:37.3%/39.2% 320-351:36.8%/39.2% 352-383:6.4%/6.2% 384-415:11.0%/8.1% 416-447:5.0%/3.7% 448-479:0.2%/0.1% 480-511:0.0%/0.0%
+-- p_tail_e16_b60 start=1366406074057412100454 dev=31.11 join=14.69 (47.2%) top=10.99 check=2.15 tops=6.8695e+09 surv=2.2740e+11 checked=1.5233e+10 spilled=0
+   pairs=5.4369e+12 padded=7.0344e+12 (x1.294, empty 22.7%) | tail slots 5.6501e+12 (x1.039) | stride-256 per-plane 5.6501e+12 (x1.039) | EPT1 lanes 6.9234e+12 (x1.273) | EPT4+tail 6.6407e+12 (x1.221)
+   top-waves EPT2 1.3739e+10  EPT1 2.7045e+10 (x1.968)  EPT4 1.3739e+10 | plane-tops now 1.0991e+11  tail 9.1590e+10 (x0.833)
+   ne bins (work items% / tops%): 160-191:0.0%/0.0% 192-223:0.0%/0.0% 224-255:8.0%/2.8% 256-287:35.0%/12.4% 288-319:6.9%/2.4% 320-351:0.1%/0.0% 352-383:0.8%/1.4% 384-415:16.8%/27.7% 416-447:27.9%/45.9% 448-479:4.4%/7.3% 480-511:0.1%/0.1% 512-543:0.0%/0.0%
+-- p_tail_e16_b60 start=1366416074057412100454 dev=31.60 join=15.04 (47.6%) top=11.09 check=2.22 tops=6.9133e+09 surv=2.3345e+11 checked=1.5639e+10 spilled=0
+   pairs=5.6037e+12 padded=7.0793e+12 (x1.263, empty 20.8%) | tail slots 5.8181e+12 (x1.038) | stride-256 per-plane 5.8181e+12 (x1.038) | EPT1 lanes 7.0793e+12 (x1.263) | EPT4+tail 6.6823e+12 (x1.192)
+   top-waves EPT2 1.3827e+10  EPT1 2.7653e+10 (x2.000)  EPT4 1.3827e+10 | plane-tops now 1.1061e+11  tail 9.4229e+10 (x0.852)
+   ne bins (work items% / tops%): 224-255:0.0%/0.0% 256-287:0.0%/0.0% 288-319:5.3%/2.2% 320-351:31.9%/13.4% 352-383:13.3%/6.5% 384-415:17.1%/26.7% 416-447:27.9%/44.0% 448-479:4.4%/7.0% 480-511:0.1%/0.1% 512-543:0.0%/0.0%
+-- p_tail_e16_b62 start=7997740455941656911841 dev=18.76 join=7.83 (41.8%) top=8.19 check=1.05 tops=4.5088e+09 surv=1.1714e+11 checked=7.1810e+09 spilled=0
+   pairs=2.8231e+12 padded=4.6170e+12 (x1.635, empty 38.9%) | tail slots 2.9621e+12 (x1.049) | stride-256 per-plane 2.9621e+12 (x1.049) | EPT1 lanes 4.6165e+12 (x1.635) | EPT4+tail 3.4625e+12 (x1.227)
+   top-waves EPT2 9.0175e+09  EPT1 1.8033e+10 (x2.000)  EPT4 9.0175e+09 | plane-tops now 7.2140e+10  tail 4.7965e+10 (x0.665)
+   ne bins (work items% / tops%): 160-191:0.0%/0.0% 192-223:0.0%/0.0% 224-255:0.0%/0.0% 256-287:5.4%/5.4% 288-319:60.4%/60.4% 320-351:33.3%/33.3% 352-383:0.9%/0.9% 384-415:0.0%/0.0%
+-- p_tail_e16_b62 start=7997750455941656911841 dev=8.66 join=3.74 (43.1%) top=3.38 check=0.41 tops=1.8788e+09 surv=4.6370e+10 checked=2.8467e+09 spilled=0
+   pairs=1.5236e+12 padded=1.9239e+12 (x1.263, empty 20.8%) | tail slots 1.5818e+12 (x1.038) | stride-256 per-plane 1.5818e+12 (x1.038) | EPT1 lanes 1.9239e+12 (x1.263) | EPT4+tail 1.8655e+12 (x1.224)
+   top-waves EPT2 3.7576e+09  EPT1 7.5151e+09 (x2.000)  EPT4 3.7576e+09 | plane-tops now 3.0060e+10  tail 2.5880e+10 (x0.861)
+   ne bins (work items% / tops%): 224-255:0.0%/0.0% 256-287:0.0%/0.0% 288-319:0.0%/0.0% 320-351:0.1%/0.1% 352-383:10.9%/10.9% 384-415:60.2%/60.2% 416-447:27.7%/27.7% 448-479:1.0%/1.0% 480-511:0.0%/0.0%
+-- p_tail_e16_b64 start=41242006262957161709568 dev=35.53 join=23.26 (65.5%) top=8.14 check=2.65 tops=3.8668e+09 surv=3.9406e+11 checked=2.3967e+10 spilled=0
+   pairs=8.6939e+12 padded=1.5838e+13 (x1.822, empty 45.1%) | tail slots 9.1703e+12 (x1.055) | stride-256 per-plane 9.1703e+12 (x1.055) | EPT1 lanes 1.5394e+13 (x1.771) | EPT4+tail 1.1657e+13 (x1.341)
+   top-waves EPT2 3.0934e+10  EPT1 6.0134e+10 (x1.944)  EPT4 3.0934e+10 | plane-tops now 2.4747e+11  tail 1.5313e+11 (x0.619)
+   ne bins (work items% / tops%): 160-191:0.0%/0.0% 192-223:0.0%/0.0% 224-255:4.9%/4.9% 256-287:61.4%/61.4% 288-319:32.9%/32.9% 320-351:0.7%/0.7% 352-383:0.0%/0.0%
+-- p_tail_e17_b62 start=7997740455941656911841 dev=161.92 join=66.73 (41.2%) top=69.57 check=9.19 tops=3.8156e+10 surv=1.0208e+12 checked=6.2584e+10 spilled=0
+   pairs=2.5315e+13 padded=3.9071e+13 (x1.543, empty 35.2%) | tail slots 2.6497e+13 (x1.047) | stride-256 per-plane 2.6497e+13 (x1.047) | EPT1 lanes 3.9068e+13 (x1.543) | EPT4+tail 3.0460e+13 (x1.203)
+   top-waves EPT2 7.6311e+10  EPT1 1.5261e+11 (x2.000)  EPT4 7.6311e+10 | plane-tops now 6.1049e+11  tail 4.3314e+11 (x0.709)
+   ne bins (work items% / tops%): 160-191:0.0%/0.0% 192-223:0.0%/0.0% 224-255:0.0%/0.0% 256-287:3.3%/3.4% 288-319:37.3%/39.2% 320-351:36.8%/39.2% 352-383:6.4%/6.2% 384-415:11.0%/8.1% 416-447:5.0%/3.7% 448-479:0.2%/0.1% 480-511:0.0%/0.0%

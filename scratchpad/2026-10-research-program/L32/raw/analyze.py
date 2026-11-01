@@ -39,9 +39,17 @@ def thr(path):
 # ---- A/B
 print('== A/B (device s per field; run = last JOIN THROUGHPUT line, the timed one)')
 rows = {}
-for p in sorted(glob.glob(os.path.join(D, 'ab_*.log'))):
+for p in sorted(glob.glob(os.path.join(D, 'ab*_*.log'))):
     name = os.path.basename(p)[:-4]
-    m = re.match(r'ab_(\w+?)_(e1\d_b\d+)_r(\d)', name)
+    m = re.match(r'ab_(\w+?)_(e1\d_b\d+)_r(\d)', name) or re.match(r'ab2_(\w+?)_(e1\d_b\d+)_r(\d)', name)
+    if name.startswith('ab2_') and m:
+        m = re.match(r'ab2_(\w+?)_(e1\d_b\d+)_r(\d)', name)
+        arm, fld, r = m.groups()
+        t = thr(p)
+        if t:
+            mhz, w = clock(name)
+            rows.setdefault('pad2 ' + fld, {}).setdefault(arm, []).append((int(r), t[-1]['device'], mhz, t[-1]))
+        continue
     if not m:
         continue
     arm, fld, r = m.groups()
@@ -50,13 +58,13 @@ for p in sorted(glob.glob(os.path.join(D, 'ab_*.log'))):
         print('  (no result)', name); continue
     x = t[-1]
     mhz, w = clock(name)
-    dev = x['device'] / x['fields']
+    dev = x['device']  # device= is already the mean per field
     rows.setdefault(fld, {}).setdefault(arm, []).append((int(r), dev, mhz, x))
 for fld in sorted(rows):
     print(f'-- {fld}')
     base = rows[fld].get('base')
     bmed = statistics.median([d for _, d, _, _ in base]) if base else None
-    for arm in ['base', 'tail', 'ept1', 'ept1tail', 'ept4tail', 'off']:
+    for arm in ['base', 'tail', 't1', 't2', 'ept1', 'ept1tail', 'ept3tail', 'ept4tail', 'off']:
         if arm not in rows[fld]:
             continue
         v = sorted(rows[fld][arm])
@@ -82,8 +90,8 @@ for fld in sorted(rows):
 print('\n== profile runs (timed fields only; the first line of a process is its 1e14 warm-up)')
 for p in sorted(glob.glob(os.path.join(D, 'p_*.log'))):
     name = os.path.basename(p)[:-4]
-    gp = [kv(l) for l in open(p, errors='replace') if 'GPU_PROFILE' in l]
-    pa = [l for l in open(p, errors='replace') if 'PAD_ACCT' in l]
+    gp = [kv(l) for l in open(p, errors='replace') if 'GPU_PROFILE base=' in l]
+    pa = [l for l in open(p, errors='replace') if 'PAD_ACCT base=' in l]
     for g, a in list(zip(gp, pa))[1:]:
         k = kv(a)
         pad = [int(x) for x in k['pad'].split(',')]

@@ -1,0 +1,62 @@
+A/B, A = e9cdac4 (#235 + #236), B = pr/join-top-cert-2 ((a) + (c) on A). Rounds interleaved A B.
+b62 1e17 (1 field):
+  device: A 161.926, 168.426, 166.919, 167.830, 165.744 (median 166.919, spread 3.9 %) | B 158.293, 159.726, 157.938, 160.348, 160.226 (median 159.726, spread 1.5 %)
+     speed-up x1.045; per-round 1.023, 1.054, 1.057, 1.047, 1.034; saving 7.19 s/field
+  per_field: A 163.814, 170.304, 168.789, 169.739, 167.683 (median 168.789, spread 3.8 %) | B 160.188, 161.719, 159.885, 162.213, 162.141 (median 161.719, spread 1.4 %)
+     speed-up x1.044; per-round 1.023, 1.053, 1.056, 1.046, 1.034; saving 7.07 s/field
+  clocks A 1441 MHz 179 W max 67 C, B 1440 MHz 179 W max 67 C; clock-normalised x1.045
+  counts (survivors, checked, found) A [(1020844021499, 62584252554, 0)]
+                                     B [(1020844021499, 62584252554, 0)]
+  layout A slots=5 plan_mib=1671 B slots=5 plan_mib=1671; setup A 16.27 B 16.27
+b62 1e16 (2 fields):
+  device: A 13.928, 13.872, 14.075, 13.702, 13.978, 13.779 (median 13.900, spread 2.7 %) | B 13.444, 13.474, 13.411, 13.215, 13.298, 13.371 (median 13.391, spread 1.9 %)
+     speed-up x1.038; per-round 1.036, 1.030, 1.050, 1.037, 1.051, 1.031; saving 0.51 s/field
+  per_field: A 14.832, 14.786, 15.052, 14.603, 14.900, 14.739 (median 14.809, spread 3.0 %) | B 14.356, 14.458, 14.320, 14.216, 14.205, 14.300 (median 14.310, spread 1.8 %)
+     speed-up x1.035; per-round 1.033, 1.023, 1.051, 1.027, 1.049, 1.031; saving 0.50 s/field
+  clocks A 1441 MHz 179 W max 66 C, B 1457 MHz 178 W max 66 C; clock-normalised x1.027
+  counts (survivors, checked, found) A [(163513599082, 10027698695, 0)]
+                                     B [(163513599082, 10027698695, 0)]
+  layout A slots=13 plan_mib=2050 B slots=13 plan_mib=2050; setup A 1.31 B 1.36
+b60 1e16 (2 fields):
+  device: A 31.303, 31.381, 30.914 (median 31.303, spread 1.5 %) | B 29.561, 29.551, 29.560 (median 29.560, spread 0.0 %)
+     speed-up x1.059; per-round 1.059, 1.062, 1.046; saving 1.74 s/field
+  per_field: A 32.269, 32.356, 31.874 (median 32.269, spread 1.5 %) | B 30.519, 30.511, 30.548 (median 30.519, spread 0.1 %)
+     speed-up x1.057; per-round 1.057, 1.060, 1.043; saving 1.75 s/field
+  clocks A 1441 MHz 180 W max 66 C, B 1448 MHz 178 W max 66 C; clock-normalised x1.054
+  counts (survivors, checked, found) A [(460847952346, 30871838404, 0)]
+                                     B [(460847952346, 30871838404, 0)]
+  layout A slots=4 plan_mib=1566 B slots=4 plan_mib=1566; setup A 2.40 B 2.53
+b64 1e16 (2 fields):
+  device: A 41.054, 40.176, 40.200 (median 40.200, spread 2.2 %) | B 39.338, 39.866, 39.025 (median 39.338, spread 2.1 %)
+     speed-up x1.022; per-round 1.044, 1.008, 1.030; saving 0.86 s/field
+  per_field: A 41.881, 41.004, 41.165 (median 41.165, spread 2.1 %) | B 40.168, 40.690, 39.871 (median 40.168, spread 2.0 %)
+     speed-up x1.025; per-round 1.043, 1.008, 1.032; saving 1.00 s/field
+  clocks A 1438 MHz 180 W max 66 C, B 1424 MHz 179 W max 66 C; clock-normalised x1.032
+  counts (survivors, checked, found) A [(787584956227, 47900853327, 0)]
+                                     B [(787584956227, 47900853327, 0)]
+  layout A slots=6 plan_mib=2151 B slots=6 plan_mib=2151; setup A 1.71 B 1.65
+
+1e14 compare runs (one field per base; JOIN THROUGHPUT + STRIDE)
+  A_cmp_e14 b57: survivors=4850227888 checked=268123373 found=0 device=0.821 plan_mib=1193
+  A_cmp_e14 b60: survivors=2694700282 checked=180517288 found=0 device=0.591 plan_mib=1201
+  A_cmp_e14 b62: survivors=1439469648 checked=88159810 found=0 device=0.543 plan_mib=1369
+  A_cmp_e14 b64: survivors=5702041796 checked=346647759 found=0 device=0.797 plan_mib=1413
+    ['STRIDE base=57 fields=1 secs=49.31 per_field=49.315 (one at a time) found=0', 'STRIDE base=60 fields=1 secs=21.48 per_field=21.480 (one at a time) found=0', 'STRIDE base=62 fields=1 secs=25.94 per_field=25.938 (one at a time) found=0', 'STRIDE base=64 fields=1 secs=42.58 per_field=42.584 (one at a time) found=0', 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 266 filtered out; finished in 157.03s']
+  B_cmp_e14 b57: survivors=4850227888 checked=268123373 found=0 device=0.788 plan_mib=1193
+  B_cmp_e14 b60: survivors=2694700282 checked=180517288 found=0 device=0.556 plan_mib=1201
+  B_cmp_e14 b62: survivors=1439469648 checked=88159810 found=0 device=0.549 plan_mib=1369
+  B_cmp_e14 b64: survivors=5702041796 checked=346647759 found=0 device=0.778 plan_mib=1413
+    ['STRIDE base=57 fields=1 secs=42.56 per_field=42.559 (one at a time) found=0', 'STRIDE base=60 fields=1 secs=19.55 per_field=19.554 (one at a time) found=0', 'STRIDE base=62 fields=1 secs=23.19 per_field=23.188 (one at a time) found=0', 'STRIDE base=64 fields=1 secs=40.35 per_field=40.355 (one at a time) found=0', 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 267 filtered out; finished in 142.94s']
+
+NiceMark nice-only (--benchmark-secs 150)
+  nm_A_r1.json score=4836.7
+  nm_A_r2.json score=4886.8
+  nm_A_r3.json score=4895.8
+  nm_B_r1.json score=5091.9
+  nm_B_r2.json score=5084.8
+  nm_B_r3.json score=5086.7
+  score median A 4886.8 (spread 1.2 %), B 5086.7 (spread 0.1 %), x1.041; per-round 1.053, 1.041, 1.039
+  b58_msd_weak b58 route=join: rate median A 2.18e+14 (2.156e+14-2.192e+14) B 2.269e+14 (2.257e+14-2.289e+14) x1.041 survivors A [33590315220] B [33590315220] checked A [1894592860] B [1894592860]
+  b58_msd_strong b58 route=join: rate median A 1.24e+15 (1.205e+15-1.244e+15) B 1.264e+15 (1.259e+15-1.279e+15) x1.019 survivors A [4027773430] B [4027773430] checked A [226773299] B [226773299]
+  b60_msd_weak b60 route=join: rate median A 4.172e+14 (4.16e+14-4.2e+14) B 4.404e+14 (4.355e+14-4.428e+14) x1.056 survivors A [13826096747, 14093881640, 14630895975] B [13423017383, 14093881640, 14899837081] checked A [878552308, 895562470, 929690455] B [852943293, 895562470, 946784918]
+  b62_msd_weak b62 route=join: rate median A 5.383e+14 (5.367e+14-5.45e+14) B 5.675e+14 (5.641e+14-5.685e+14) x1.054 survivors A [18756712838, 19361249919, 19512983295] B [18302962821, 18908359922] checked A [1116555228, 1152543334, 1161575604] B [1089546726, 1125579424]

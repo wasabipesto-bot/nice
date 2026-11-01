@@ -71,6 +71,23 @@ do not help. The join's memory budget stops at 4 GiB (join_plan.rs) so 46/80 GB 
 were measured not to be a lever in L1.7, so no action). **Fleet guidance:** never buy H100 at
 market; L40S only under ~$0.35/h.
 
+## L32.1 Wave padding after #236: bucket-sized tail wave (2026-11-01, agent; `L32/SCOPING.md`, `L32/raw/`; branch `exp/join-padding` ed8bc8c, switch `NICE_EXP_JOIN_TAIL=1`)
+
+Combined tree (e9cdac4), RTX 3080. Accounting: at b62 1e17 every bucket fits one 512-lane wave
+(256–479 entries; 78 % of pairs in 288–351); waves use 64.8 % of lanes (35 % empty); b60 1e16 uses
+77–79 % (buckets 384–447); buckets under half a wave 0–3 % of pairs. Re-fit over 12 profiled runs:
+1.64 ps per real lane-pair, 0.64 ps per empty lane, **21 ps per survivor (61 before #236)**, 104 ps per
+top; empty lanes cost 8.7 s per b62 1e17 field (5.1 %), 1.0 s per b60 1e16 field (3.2 %). Candidates:
+EPT 1 ×0.92–0.95 (same lanes, twice the waves); packing two small buckets: nothing to pack; EPT 3/4 +
+tail ×1.044/×0.973. **Prototype: a partial wave uses only the planes its entries need, planes skip
+the AND for slots they don't hold**: removes 87–93 % of empty lanes; exact (join parity incl.
+b50/b54, dense fields, COMPARE 1e14; counts = base); WGSL lint clean; SPIR-V blocks 109 → 123;
+registers 40 → 41 (likely one fewer resident cube per SM; a 40-register bound would need a spill
+CubeCL can't emit). **A/B: b62 1e17 ×1.040 (5 rounds), b62 1e16 ×1.051, b60 1e16 ×1.028, NiceMark
+×1.078 (5016 → 5406).** Verdict: below 5 % at the live sizes; NiceMark alone clears it. Not run on
+lavapipe or Metal (plane skipping inside the wave must be checked for barrier uniformity there).
+**Parked**; `2a681f6` is the measured commit (fails fmt/clippy), head ed8bc8c is clean.
+
 ## L30.4 Second card: #235, #236 and both on an RTX 4090 (2026-11-01, agent; `L30/second-card/RESULTS-4090.md`)
 
 RTX 4090 (58626188, GB, $0.309/h; power limit set to 300 W of 450; 2,360–2,470 MHz; no thermal

@@ -1,0 +1,13 @@
+START p_tail_e16_b64 08:13:44 bases=64 n=1 size=1e16 cmp=0 bin=prof md5=cc3f21f8 env=NICE_EXP_GPU_PROFILE=1 NICE_EXP_JOIN_TAIL=1
+
+running 1 test
+test cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields ... GPU_PROFILE base=64 start=41242006162957161709568 end=41242006262957161709568 size=100000000000000 slices=1 partitions=4096 batches=256 slots=16 min_slots=16 retried=0 splits=0 | setup=0.1046 device_wall=4.0203 upload=0.0113 inputs=0.0719 top=1.8993 bucket=0.2412 join=0.6608 check=0.2537 read=0.0102 probe=0.8639 unattributed=0.0079 | ntlay=37001 nbp=78784 tops=46799075 listed=3026376240 pairs=68607924621 padded_pairs=191689011200 live_buckets=16515070 buckets=16515072 survivors=5001575651 checked=304016264 spilled=0 hits=0
+PAD_ACCT base=64 start=41242006162957161709568 ept=2 pairs=68607924621 padded=191689011200 pad=74259792832,74259792832,95844522496,374392600,374392666,2995140800,1210458657,95844073856,374392600 hist=96:115:2637,128:490603:11120397,160:11774921:266913441,192:4231368:95946400,224:18059:409636,256:4:89
+GPU_PROFILE base=64 start=41242006262957161709568 end=41242016262957161709568 size=10000000000000000 slices=1 partitions=4096 batches=683 slots=6 min_slots=6 retried=0 splits=0 | setup=1.7334 device_wall=35.5338 upload=0.2486 inputs=0.1719 top=8.1383 bucket=0.2272 join=23.2627 check=2.6506 read=0.0725 probe=0.6936 unattributed=0.0684 | ntlay=3053841 nbp=93846 tops=3866773495 listed=4641455308 pairs=8693854368859 padded_pairs=15838304235520 live_buckets=16515072 buckets=16515072 survivors=394062910661 checked=23966959270 spilled=0 hits=0
+PAD_ACCT base=64 start=41242006262957161709568 ept=2 pairs=8693854368859 padded=15838304235520 pad=9170287604064,9170287604064,15394413426176,30934187960,60134427446,247473503680,153130767078,11656782771968,30934187960 hist=160:54:101469,192:1721:3224823,224:807724:1512956199,256:10141848:18996569680,288:5440780:10191032342,320:122811:230051919,352:134:251528
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=64 fields=1 in_flight=2 secs=37.27 per_field=37.268 rate=2.683e14 n/s | setup=1.733s device=35.534s wall=35.534s batches=683 slots=6 plan_mib=2146 | empty_top=0 retried=0 splits=0 survivors=394062910661 checked=23966959270 found=0 | peak_in_use_mib=0 peak_reserved_mib=9
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 266 filtered out; finished in 41.75s
+
+END p_tail_e16_b64 08:14:26 rc=0

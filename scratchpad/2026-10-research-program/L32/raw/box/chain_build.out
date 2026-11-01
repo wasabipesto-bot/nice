@@ -1,0 +1,49 @@
+1302e3d3c31d92be9e9e3552a334229a  /root/pad/pad
+built pad in 193 s from /root/tgt/release/deps/nice_common-cbd4e892b0124d04 src=padsrc feat=gpu
+BUILD_DONE pad 07:16:00
+BUILD FAILED prof
+   Compiling nice_common v3.4.8-dev (/root/padprof/common)
+error[E0277]: the trait bound `[u64; 48]: std::default::Default` is not satisfied
+    --> common/src/cubecl_join.rs:1772:5
+     |
+1725 | #[derive(Clone, Copy, Debug, Default)]
+     |                              ------- in this derive macro expansion
+...
+1772 |     pub hist_n: [u64; 48],
+     |     ^^^^^^^^^^^^^^^^^^^^^ the trait `std::default::Default` is not implemented for `[u64; 48]`
+     |
+     = help: the following other types implement trait `std::default::Default`:
+               &[T]
+               &mut [T]
+               [T; 0]
+               [T; 1]
+               [T; 2]
+               [T; 3]
+               [T; 4]
+               [T; 5]
+             and 27 others
+
+error[E0277]: the trait bound `[u64; 48]: std::default::Default` is not satisfied
+    --> common/src/cubecl_join.rs:1773:5
+     |
+1725 | #[derive(Clone, Copy, Debug, Default)]
+     |                              ------- in this derive macro expansion
+...
+1773 |     pub hist_t: [u64; 48],
+     |     ^^^^^^^^^^^^^^^^^^^^^ the trait `std::default::Default` is not implemented for `[u64; 48]`
+     |
+     = help: the following other types implement trait `std::default::Default`:
+               &[T]
+               &mut [T]
+               [T; 0]
+               [T; 1]
+               [T; 2]
+               [T; 3]
+               [T; 4]
+               [T; 5]
+             and 27 others
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `nice_common` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nice_common` (lib test) due to 2 previous errors

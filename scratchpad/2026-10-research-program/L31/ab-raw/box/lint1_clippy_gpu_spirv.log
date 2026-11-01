@@ -1,0 +1,84 @@
+   Compiling syn v1.0.109
+    Checking cubecl-opt v0.10.0
+    Checking tracel-rspirv v0.12.1+sdk-1.4.341.0
+   Compiling cubecl-wgpu v0.10.0
+   Compiling cubecl v0.10.0
+   Compiling nice_common v3.4.8-dev (/root/l31b/src/B/common)
+    Checking cubecl-cpp v0.10.0
+    Checking cubecl-cuda v0.10.0
+   Compiling c2rust-bitfields-derive v0.20.0
+    Checking c2rust-bitfields v0.20.0
+    Checking tracel-ash v0.39.5+sdk1.4.357
+    Checking cubecl-spirv v0.10.0
+error: item in documentation is missing backticks
+   --> common/src/cubecl_join.rs:746:43
+    |
+746 |     /// (m, s, a) with ((L·m + a) >> s) = ceil(L·log_b 2), the smallest i
+    |                                           ^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_markdown
+    = note: `-D clippy::doc-markdown` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::doc_markdown)]`
+help: try
+    |
+746 -     /// (m, s, a) with ((L·m + a) >> s) = ceil(L·log_b 2), the smallest i
+746 +     /// (m, s, a) with ((L·m + a) >> s) = `ceil(L·log_b` 2), the smallest i
+    |
+
+error: item in documentation is missing backticks
+   --> common/src/cubecl_join.rs:749:18
+    |
+749 |     /// near m = 2^s·log_b 2 and checked against the powers' bit lengths;
+    |                  ^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_markdown
+help: try
+    |
+749 -     /// near m = 2^s·log_b 2 and checked against the powers' bit lengths;
+749 +     /// near m = `2^s·log_b` 2 and checked against the powers' bit lengths;
+    |
+
+error: item in documentation is missing backticks
+   --> common/src/cubecl_join.rs:789:23
+    |
+789 |     /// c + 1 for c = ceil(L·log_b 2) - 1, and it is c iff d < b^c. c is
+    |                       ^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_markdown
+help: try
+    |
+789 -     /// c + 1 for c = ceil(L·log_b 2) - 1, and it is c iff d < b^c. c is
+789 +     /// c + 1 for c = `ceil(L·log_b` 2) - 1, and it is c iff d < b^c. c is
+    |
+
+error: could not compile `nice_common` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: item in documentation is missing backticks
+    --> common/src/cubecl_join.rs:4529:62
+     |
+4529 |     /// width the kernels use (1-9 words), and its rule (c = ceil(L·log_b 2)
+     |                                                              ^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_markdown
+help: try
+     |
+4529 -     /// width the kernels use (1-9 words), and its rule (c = ceil(L·log_b 2)
+4529 +     /// width the kernels use (1-9 words), and its rule (c = `ceil(L·log_b` 2)
+     |
+
+error: doc list item without indentation
+    --> common/src/cubecl_join.rs:4531:9
+     |
+4531 |     /// at both ends of every bit length and next to every power of the base.
+     |         ^
+     |
+     = help: if this is supposed to be its own paragraph, add a blank line
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_lazy_continuation
+     = note: `-D clippy::doc-lazy-continuation` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::doc_lazy_continuation)]`
+help: indent this line
+     |
+4531 |     ///   at both ends of every bit length and next to every power of the base.
+     |         ++
+
+error: could not compile `nice_common` (lib test) due to 5 previous errors
