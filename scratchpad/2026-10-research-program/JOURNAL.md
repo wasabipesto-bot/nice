@@ -4,6 +4,12 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-01 (routine fired 04:41 UTC, inside the extended run)
+
+- Reconcile: November research invoiced $2.13 (the H100/L40S hour is most of it); credit $59.03;
+  disk 19 GB free; #235 green, #236 24 pass + 1 runner-side rustup failure; main fae7398 (#234
+  changelog links merged). Live boxes: `topcert2` (running) and `combined` (created); my `tail` had hidden one line.
+
 ## 2026-11-01 (extended autonomous run, 02:00 → 14:00 UTC at the user's request; weekly cap resets 14:00)
 
 - #235 CI: naga lavapipe + lint pass, but the **CubeCL direct-SPIR-V step aborts with a compiler-thread
