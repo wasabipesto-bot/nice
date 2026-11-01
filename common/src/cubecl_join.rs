@@ -202,6 +202,10 @@ mod kernels {
     /// The prefilter in the walk, affine form (`cpu_join::prefilter`):
     /// only survivors that pass it are staged; the flush only compacts.
     pub const X_WALKPF: u32 = 256;
+    /// With `X_WALKPF`: run the walk prefilter but stage nothing.
+    pub const X_PFNOSTAGE: u32 = 512;
+    /// With `X_WALKPF`: the prefilter's digit tests on 32-bit words.
+    pub const X_PF32: u32 = 1024;
 
     /// Count the cube in `ran[stage]` once every unit of it is done (see
     /// `JoinDevice::ensure_ran`). Every unit must reach it.
@@ -436,8 +440,10 @@ mod kernels {
         let x_nowalk = comptime!(xm & X_NOWALK != 0);
         let x_atom2 = comptime!(xm & X_ATOM2 != 0);
         let x_pf = comptime!(xm & X_WALKPF != 0);
+        let x_pfns = comptime!(xm & X_PFNOSTAGE != 0);
+        let x_pf32 = comptime!(xm & X_PF32 != 0);
         let x_cnt = comptime!(xm & (X_NOSTAGE | X_WALKPF) != 0);
-        let x_dummy = comptime!(xm & (X_NOSTAGE | X_NOWALK) != 0);
+        let x_dummy = comptime!(xm & (X_NOSTAGE | X_NOWALK | X_PFNOSTAGE) != 0);
         let bb2 = comptime!(base * base);
         let bb3 = comptime!(base * base * base);
         let dmdiv = comptime!(base.pow(k2 - 2 - f0));
@@ -446,7 +452,7 @@ mod kernels {
         } else {
             1usize
         }));
-        let mut s_dummy = SharedMemory::<Atomic<u32>>::new(1usize);
+        let s_dummy = SharedMemory::<Atomic<u32>>::new(1usize);
         let mut nand = 0u32;
         let mut xacc = 0u32;
         let mut wrounds = 0u32;
@@ -637,26 +643,47 @@ mod kernels {
                                             xacc += r0;
                                         } else {
                                             if x_pf {
-                                                if walk_pf(
-                                                    ac[j as usize],
-                                                    pc[j as usize],
-                                                    t_dm[jt2 as usize],
-                                                    mlo[j as usize],
-                                                    mhi[j as usize],
-                                                    t_lo[jt2 as usize],
-                                                    t_hi[jt2 as usize],
-                                                    base,
-                                                ) {
-                                                    stage_one(
-                                                        &mut s_cnt,
-                                                        &mut s_t,
-                                                        &mut s_r,
-                                                        surv,
-                                                        surv_count,
-                                                        surv_cap,
-                                                        t_id[jt2 as usize],
-                                                        r0,
+                                                let mut pfok = false;
+                                                if x_pf32 {
+                                                    pfok = walk_pf32(
+                                                        ac[j as usize],
+                                                        pc[j as usize],
+                                                        t_dm[jt2 as usize],
+                                                        mlo[j as usize],
+                                                        mhi[j as usize],
+                                                        t_lo[jt2 as usize],
+                                                        t_hi[jt2 as usize],
+                                                        base,
                                                     );
+                                                } else {
+                                                    pfok = walk_pf(
+                                                        ac[j as usize],
+                                                        pc[j as usize],
+                                                        t_dm[jt2 as usize],
+                                                        mlo[j as usize],
+                                                        mhi[j as usize],
+                                                        t_lo[jt2 as usize],
+                                                        t_hi[jt2 as usize],
+                                                        base,
+                                                    );
+                                                }
+                                                if x_pfns {
+                                                    if pfok {
+                                                        xacc += 1u32;
+                                                    }
+                                                } else {
+                                                    if pfok {
+                                                        stage_one(
+                                                            &mut s_cnt,
+                                                            &mut s_t,
+                                                            &mut s_r,
+                                                            surv,
+                                                            surv_count,
+                                                            surv_cap,
+                                                            t_id[jt2 as usize],
+                                                            r0,
+                                                        );
+                                                    }
                                                 }
                                             } else {
                                                 if x_atom2 {
@@ -1484,6 +1511,44 @@ mod kernels {
         let b7 = (1u64 << u64::cast_from(c2)) | (1u64 << u64::cast_from(c3));
         let mut ok = true;
         if a2 == a3 || c2 == c3 || (seen & b6) != 0u64 || ((seen | b6) & b7) != 0u64 {
+            ok = false;
+        }
+        ok
+    }
+
+    /// 1 if digit `g`'s bit is set in the mask `lo | hi << 32`.
+    #[cube]
+    fn bit_in(lo: u32, hi: u32, g: u32) -> u32 {
+        let w = select(g < 32u32, lo, hi);
+        (w >> (g & 31u32)) & 1u32
+    }
+
+    /// [`walk_pf`] with the digit tests on 32-bit words.
+    #[cube]
+    fn walk_pf32(
+        ac: u32,
+        pc: u32,
+        dmv: u32,
+        mlo: u32,
+        mhi: u32,
+        tlo: u32,
+        thi: u32,
+        #[comptime] base: u32,
+    ) -> bool {
+        let bb2 = comptime!(base * base);
+        let dm = dmv & 0xFFFFu32;
+        let sm = select((dmv >> 16u32) != 0u32, 0xFFFF_FFFFu32, 0u32);
+        let lo = mlo | (tlo & sm);
+        let hi = mhi | (thi & sm);
+        let x2 = ((ac & 0xFFFFu32) + (pc & 0xFFFFu32) * dm) % bb2;
+        let x3 = ((ac >> 16u32) + (pc >> 16u32) * dm) % bb2;
+        let a2 = x2 % base;
+        let a3 = x3 % base;
+        let c2 = x2 / base;
+        let c3 = x3 / base;
+        let hit = bit_in(lo, hi, a2) | bit_in(lo, hi, a3) | bit_in(lo, hi, c2) | bit_in(lo, hi, c3);
+        let mut ok = true;
+        if hit != 0u32 || a2 == a3 || c2 == c3 || a2 == c2 || a2 == c3 || a3 == c2 || a3 == c3 {
             ok = false;
         }
         ok
