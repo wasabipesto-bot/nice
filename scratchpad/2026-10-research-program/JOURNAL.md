@@ -15,7 +15,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   → prototype ×0.833 at b62 1e17 → PR agent running (box `l30-pr`); top-kernel part-2 scoping
   running (box `topcert2`). Boxes destroyed: survivors, profile-1e17, topcert, fd-u32mask,
   l9-h100, l9-l40s, topcert-spirv.
-- **PR #236 opened** (prefilter in the walk: ×1.215 b62 1e17, NiceMark ×1.194; L30.2); CI watching.
+- **PR #236 opened** (prefilter in the walk: ×1.215 b62 1e17, NiceMark ×1.194; L30.2). CI: 24 pass,
+  1 red = the NVRTC job's rustup component-install conflict on the runner (not the code); comment
+  posted asking for a rerun (I cannot rerun upstream workflows).
   Combined #235+#236 A/B vs main running (box `combined`, PL); top-kernel part-2 scoping running
   (box `topcert2`). Live boxes: topcert2, combined.
 - Plan: finish L30 scoping (→ PR if ≥ 5 %); #235 CI; L9 H100 + L40S rates (two boxes, ~$2);
