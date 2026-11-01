@@ -95,8 +95,9 @@ const _: () = assert!(STAGES == 6, "the top kernel's histograms start at word 6"
 const HIST_N: usize = 352;
 /// The top kernel's histograms, summed over batches (`NICE_EXP_TOP_HIST=1`).
 pub static TOP_HIST: std::sync::Mutex<Vec<u64>> = std::sync::Mutex::new(Vec::new());
-/// The early-reject mode of the top kernel (`NICE_EXP_TOP_ER`: 0 off, 1
-/// skip the cube of a dead square, 2 that and compaction).
+/// The early-reject mode of the top kernel (`NICE_EXP_TOP_ER`, bits: 1 skip
+/// the cube of a dead square, 2 that and compaction within the cube; + 4
+/// trims the long division to the limbs that can be nonzero).
 pub fn top_er() -> u32 {
     std::env::var("NICE_EXP_TOP_ER")
         .ok()
@@ -817,6 +818,7 @@ mod kernels {
         #[comptime] chunk_digits: u32,
         #[comptime] chunk_div: u32,
         #[comptime] hist: bool,
+        #[comptime] trim: bool,
     ) -> u64 {
         let nh = comptime!(2 * nl);
         // d = y - x (y >= x), over u32 words packed from the limb pairs.
@@ -892,16 +894,23 @@ mod kernels {
         #[unroll]
         for pass in 0..passes {
             // The top two limbs as one u32 (see above), then one limb a step.
-            let top = comptime!(nh - 1);
-            let next = comptime!(nh - 2);
+            // With `trim`, only the limbs that can be nonzero: x has at most
+            // sp - pass·cd digits here (x < b^sp before pass 0).
+            let lp = comptime!(if trim {
+                (pow_limbs16(base, sp - pass * chunk_digits).len() as u32).clamp(2, nh)
+            } else {
+                nh
+            });
+            let top = comptime!(lp - 1);
+            let next = comptime!(lp - 2);
             let cx = (x[top as usize] << 16u32) | x[next as usize];
             let qx = cx / chunk_div;
             let mut rx = cx - qx * chunk_div;
             x[top as usize] = qx >> 16u32;
             x[next as usize] = qx & 0xFFFFu32;
             #[unroll]
-            for jj in 2..nh {
-                let j = comptime!(nh - 1 - jj);
+            for jj in 2..lp {
+                let j = comptime!(lp - 1 - jj);
                 let c1 = (rx << 16u32) | x[j as usize];
                 let q1 = c1 / chunk_div;
                 rx = c1 - q1 * chunk_div;
@@ -1201,11 +1210,12 @@ mod kernels {
             chunk_digits,
             chunk_div,
             hist,
+            comptime!(er & 4 != 0),
         );
         // Early reject: a dead square certificate (`dupa`) rejects the
         // interval whatever the cube holds, so the cube is skipped.
         let mut alive = dupa[0] == 0u32;
-        if comptime!(er == 0) {
+        if comptime!(er & 3 == 0) {
             alive = true;
         }
         let mut mask = msq;
@@ -1230,6 +1240,7 @@ mod kernels {
                 chunk_digits,
                 chunk_div,
                 hist,
+                comptime!(er & 4 != 0),
             );
 
             c0bv = c0b[0];
@@ -1522,8 +1533,8 @@ mod kernels {
         let mut ie = i;
         let mut s_n = SharedMemory::<Atomic<u32>>::new(1usize);
         let mut s_q =
-            SharedMemory::<u32>::new(comptime!(if er == 2 { 6 * JOIN_WG } else { 1 }) as usize);
-        if comptime!(er == 2) {
+            SharedMemory::<u32>::new(comptime!(if er & 3 == 2 { 6 * JOIN_WG } else { 1 }) as usize);
+        if comptime!(er & 3 == 2) {
             if UNIT_POS_X == 0u32 {
                 s_n[0].store(0u32);
             }
@@ -1532,7 +1543,7 @@ mod kernels {
         if i < ntlay {
             let inr = top_ae(i, slot, tlay, vs, fb, w, pdiv, &mut a, &mut e, &mut st, limbs);
             if inr {
-                if comptime!(er == 2) {
+                if comptime!(er & 3 == 2) {
                     // Phase 1: the square's certificate only; the intervals
                     // it does not reject queue for phase 2.
                     let nl2 = comptime!(2 * limbs);
@@ -1563,6 +1574,7 @@ mod kernels {
                         chunk_digits,
                         chunk_div,
                         false,
+                        comptime!(er & 4 != 0),
                     );
                     if dupa[0] == 0u32 {
                         let at = s_n[0].fetch_add(1u32);
@@ -1619,7 +1631,7 @@ mod kernels {
                 }
             }
         }
-        if comptime!(er == 2) {
+        if comptime!(er & 3 == 2) {
             // Phase 2: the queued intervals, one per unit from unit 0, so
             // the planes past the queue's end have nothing to do.
             sync_cube();
@@ -1657,6 +1669,7 @@ mod kernels {
                     chunk_digits,
                     chunk_div,
                     false,
+                    comptime!(er & 4 != 0),
                 );
                 let mut kp = Array::<u32>::new(1usize);
                 mask = top_close(
@@ -4383,6 +4396,7 @@ mod tests {
                             chunk_digits,
                             chunk_div,
                             false,
+                            comptime!(er & 4 != 0),
                         );
                         put_power(out, o, m, &c0, &dup, &dom);
                         let m = cert_power(
@@ -4402,6 +4416,7 @@ mod tests {
                             chunk_digits,
                             chunk_div,
                             false,
+                            comptime!(er & 4 != 0),
                         );
                         put_power(out, o + 6u32, m, &c0, &dup, &dom);
                     } else {
@@ -4570,7 +4585,7 @@ mod tests {
                     "{at}: against Base::cert_floor"
                 );
             } else {
-                assert!(o[24] == 0 && super::top_er() != 0, "{at}: no cube floor");
+                assert!(o[24] == 0 && super::top_er() & 3 != 0, "{at}: no cube floor");
                 tally.skipped += 1;
             }
             tally.intervals += 1;
