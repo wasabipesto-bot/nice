@@ -664,11 +664,17 @@ mod kernels {
         #[comptime] chunk_digits: u32,
         #[comptime] chunk_div: u32,
         #[comptime] stage: u32,
+        #[comptime] fastndig: bool,
     ) -> u64 {
         let nh = comptime!(2 * nl);
         // ndig(d): smallest i with b^i > d, binary search over the power table.
         let mut lo = 0u32;
         let mut hi = sp.runtime();
+        if comptime!(fastndig) {
+            lo = ndig_fast(d, pw, nl, nl3, sp, base);
+            hi = lo;
+        }
+        if comptime!(!fastndig) {
         while lo < hi {
             let mid = (lo + hi) >> 1u32;
             // d < b^mid ?
@@ -696,6 +702,7 @@ mod kernels {
             } else {
                 lo = mid + 1u32;
             }
+        }
         }
         let mut c0 = lo;
         if c0 < cap {
@@ -1025,6 +1032,77 @@ mod kernels {
         v
     }
 
+    /// Candidate (c): (m, s, a) with ((L·m + a) >> s) = ceil(L·log_b 2), the
+    /// smallest i with b^i >= 2^L, for every bit length L in 0..=lmax.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    pub(super) fn ndig_magic(base: u32, lmax: u32) -> (u32, u32, u32) {
+        let bits = |i: u32| {
+            let w = pow_words32(base, i);
+            32 * (w.len() as u32 - 1) + (32 - w[w.len() - 1].leading_zeros())
+        };
+        let want: Vec<u32> = (0..=lmax)
+            .map(|l| (0..).find(|&i| bits(i) > l).unwrap())
+            .collect();
+        let lg = std::f64::consts::LN_2 / f64::from(base).ln();
+        for sh in 12..=24u32 {
+            let m0 = ((1u64 << sh) as f64 * lg) as i64;
+            for m in (m0 - 3).max(1)..=m0 + 3 {
+                for t in 0..64u64 {
+                    let a = (1u64 << sh) - 1 - t;
+                    if u64::from(lmax) * m as u64 + a >= 1 << 32 {
+                        continue;
+                    }
+                    if (0..=lmax).all(|l| ((u64::from(l) * m as u64 + a) >> sh) as u32 == want[l as usize]) {
+                        return (m as u32, sh, a as u32);
+                    }
+                }
+            }
+        }
+        panic!("b{base}: no ndig magic up to {lmax} bits");
+    }
+
+    /// Candidate (c): min(ndig(d), sp) from d's bit length and one compare
+    /// with the power table, instead of the binary search. ndig(d) is c or
+    /// c + 1 for c = ceil(L·log_b 2) - 1 (2^(L-1) <= d < 2^L, and at most
+    /// one power of b lies in (2^(L-1), 2^L]).
+    #[cube]
+    pub(super) fn ndig_fast(
+        d: &Array<u32>,
+        pw: &Array<u32>,
+        #[comptime] nl: u32,
+        #[comptime] nl3: u32,
+        #[comptime] sp: u32,
+        #[comptime] base: u32,
+    ) -> u32 {
+        let mut bl = 0u32;
+        #[unroll]
+        for j in 0..nl {
+            let w = d[j as usize];
+            bl = select(w != 0u32, comptime!(32 * (j + 1)) - w.leading_zeros(), bl);
+        }
+        let m = comptime!(ndig_magic(base, 32 * nl).0);
+        let sh = comptime!(ndig_magic(base, 32 * nl).1);
+        let a = comptime!(ndig_magic(base, 32 * nl).2);
+        let ce = (bl * m + a) >> sh;
+        let mut c = select(ce > 0u32, ce - 1u32, 0u32);
+        c = select(c > sp, sp.runtime(), c);
+        let mut lt = false;
+        let mut eq = true;
+        #[unroll]
+        for jj in 0..nl3 {
+            let j = comptime!(nl3 - 1 - jj);
+            let pj = pw[(c * nl3 + j) as usize];
+            let mut dj = 0u32;
+            if comptime!(j < nl) {
+                dj = d[j as usize];
+            }
+            lt = lt || (eq && dj < pj);
+            eq = eq && dj == pj;
+        }
+        let nd = select(lt, c, c + 1u32);
+        select(nd > sp, sp.runtime(), nd)
+    }
+
     /// 16-bit limbs (one to a u32) packed into `nl` u32 words.
     #[cube]
     pub(super) fn pack16(x: &Array<u32>, w: &mut Array<u32>, #[comptime] nl: u32) {
@@ -1232,10 +1310,16 @@ mod kernels {
         #[comptime] sp: u32,
         #[comptime] cap: u32,
         #[comptime] base: u32,
+        #[comptime] fastndig: bool,
     ) -> u64 {
         // ndig(d): smallest i with b^i > d, binary search over the power table.
         let mut lo = 0u32;
         let mut hi = sp.runtime();
+        if comptime!(fastndig) {
+            lo = ndig_fast(d, pw, nl, nl3, sp, base);
+            hi = lo;
+        }
+        if comptime!(!fastndig) {
         while lo < hi {
             let mid = (lo + hi) >> 1u32;
             let mut lt = false;
@@ -1262,6 +1346,7 @@ mod kernels {
             } else {
                 lo = mid + 1u32;
             }
+        }
         }
         let mut c0 = lo;
         if c0 < cap {
@@ -1453,6 +1538,7 @@ mod kernels {
         #[comptime] diffpow: bool,
         #[comptime] dw: u32,
         #[comptime] barrett: bool,
+        #[comptime] fastndig: bool,
     ) -> u64 {
         let nl2 = comptime!(2 * limbs);
         let nl3 = comptime!(3 * limbs);
@@ -1508,9 +1594,11 @@ mod kernels {
                 pack16(&a3, &mut x3, nl3);
                 msq = cert_power32(
                     &mut x2, &d2, pw, &mut c0a, &mut dupa, &mut doma, nl2, nl3, s2, cap, base,
+                    fastndig,
                 );
                 mcu = cert_power32(
                     &mut x3, &d3, pw, &mut c0b, &mut dupb, &mut domb, nl3, nl3, s3, cap, base,
+                    fastndig,
                 );
             } else {
                 msq = cert_power(
@@ -1528,6 +1616,7 @@ mod kernels {
                     chunk_digits,
                     chunk_div,
                     stage,
+                    fastndig,
                 );
                 mcu = cert_power(
                     &mut a3,
@@ -1544,6 +1633,7 @@ mod kernels {
                     chunk_digits,
                     chunk_div,
                     stage,
+                    fastndig,
                 );
             }
         }
@@ -1649,6 +1739,7 @@ mod kernels {
         #[comptime] stage: u32,
         #[comptime] diffpow: bool,
         #[comptime] barrett: bool,
+        #[comptime] fastndig: bool,
     ) {
         let m1 = comptime!(base - 1);
         let i = ABSOLUTE_POS_X;
@@ -1746,6 +1837,7 @@ mod kernels {
                     diffpow,
                     1u32,
                     barrett,
+                    fastndig,
                 );
                 if res[0] != 0u32 {
                     let mut floor = res[1];
@@ -2626,6 +2718,7 @@ impl<R: Runtime> JoinDevice<R> {
                 exp_top_stage(),
                 exp_flag("NICE_EXP_TOP_DIFF"),
                 exp_flag("NICE_EXP_TOP_BARRETT"),
+                exp_flag("NICE_EXP_TOP_NDIG"),
             );
             if let Some(t) = pt {
                 pt = Some(self.prof_mark(t, |p, s| {
@@ -4623,6 +4716,7 @@ mod tests {
             #[comptime] diffpow: bool,
             #[comptime] barrett: bool,
             #[comptime] dw: u32,
+            #[comptime] fastndig: bool,
         ) {
             let i = ABSOLUTE_POS_X;
             if i < n {
@@ -4656,6 +4750,7 @@ mod tests {
                         diffpow,
                         dw,
                         barrett,
+                        fastndig,
                     );
                     out[(o + 24u32) as usize] = res[0];
                     out[(o + 25u32) as usize] = u32::cast_from(mask);
@@ -4718,12 +4813,12 @@ mod tests {
                             pack16(&a3, &mut x3, nl3);
                             let m = cert_power32(
                                 &mut x2, &d2, pw, &mut c0, &mut dup, &mut dom, nl2, nl3, s2, cap,
-                                base,
+                                base, fastndig,
                             );
                             put_power(out, o, m, &c0, &dup, &dom);
                             let m = cert_power32(
                                 &mut x3, &d3, pw, &mut c0, &mut dup, &mut dom, nl3, nl3, s3, cap,
-                                base,
+                                base, fastndig,
                             );
                             put_power(out, o + 6u32, m, &c0, &dup, &dom);
                         } else {
@@ -4742,6 +4837,7 @@ mod tests {
                                 chunk_digits,
                                 chunk_div,
                                 0u32,
+                                fastndig,
                             );
                             put_power(out, o, m, &c0, &dup, &dom);
                             let m = cert_power(
@@ -4759,6 +4855,7 @@ mod tests {
                                 chunk_digits,
                                 chunk_div,
                                 0u32,
+                                fastndig,
                             );
                             put_power(out, o + 6u32, m, &c0, &dup, &dom);
                         }
@@ -4852,6 +4949,7 @@ mod tests {
         }
         let diffpow = super::exp_flag("NICE_EXP_TOP_DIFF");
         let barrett = super::exp_flag("NICE_EXP_TOP_BARRETT");
+        let fastndig = super::exp_flag("NICE_EXP_TOP_NDIG");
         if dw < limbs {
             assert!(
                 iv.iter().all(|&(a, e)| e - a < 1u128 << (32 * dw)),
@@ -4910,6 +5008,7 @@ mod tests {
                     diffpow,
                     barrett,
                     dw,
+                    fastndig,
                 );
             }
         }
