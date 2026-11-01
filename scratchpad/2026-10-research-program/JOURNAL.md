@@ -6,6 +6,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
 ## 2026-11-01 (extended autonomous run, 02:00 → 14:00 UTC at the user's request; weekly cap resets 14:00)
 
+- #235 CI: naga lavapipe + lint pass, but the **CubeCL direct-SPIR-V step aborts with a compiler-thread
+  stack overflow** (the bigger `cert_power`); hold comment posted; fix agent on a 3060 (L29/SPIRV-FIX.md).
+- L7 sweep 2 done (nothing new; Barrett candidate L31); Apple Feedback draft written (L3/APPLE-FEEDBACK-DRAFT.md).
 - Plan: finish L30 scoping (→ PR if ≥ 5 %); #235 CI; L9 H100 + L40S rates (two boxes, ~$2);
   weekly literature sweep (L7); an Apple Feedback draft for the user; the top kernel's e^j
   follow-up if L30 yields nothing; worktree/disk hygiene; final report before 14:00 UTC. The
