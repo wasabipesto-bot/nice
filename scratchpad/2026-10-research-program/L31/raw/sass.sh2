@@ -1,0 +1,19 @@
+#!/bin/bash
+# exp2 binary: TopKernel CUDA source per variant -> nvcc sm_86 -> registers and SASS counts.
+L=/root/logs/sass2; mkdir -p $L; cd $L
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH NICE_BUILD_SHA=test
+B=/root/bin/exp2/nice_common_gpu
+for V in base diff bar ndig dn both all; do
+  case $V in base) F="";; diff) F="NICE_EXP_TOP_DIFF=1";; bar) F="NICE_EXP_TOP_BARRETT=1";; ndig) F="NICE_EXP_TOP_NDIG=1";;
+    dn) F="NICE_EXP_TOP_DIFF=1 NICE_EXP_TOP_NDIG=1";; both) F="NICE_EXP_TOP_DIFF=1 NICE_EXP_TOP_BARRETT=1";;
+    all) F="NICE_EXP_TOP_DIFF=1 NICE_EXP_TOP_BARRETT=1 NICE_EXP_TOP_NDIG=1";; esac
+  rm -f $V.dump
+  env $F CUBECL_DEBUG_LOG=$L/$V.dump NICE_TEST_JOIN_FIELDS=0 NICE_TEST_JOIN_SIZE=1e14 NICE_TEST_JOIN_BASES=62 \
+    $B --ignored --exact cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields --nocapture --test-threads 1 > $V.log 2>&1
+  awk '/^name: .*TopKernel</{f=1} f&&/^```cpp/{g=1;next} g&&/^```/{exit} g{print}' $V.dump > top_$V.cu
+  /usr/local/cuda/bin/nvcc -arch=sm_86 -cubin -O3 --resource-usage -o top_$V.cubin top_$V.cu > res_$V.txt 2>&1
+  /usr/local/cuda/bin/cuobjdump -sass top_$V.cubin > top_$V.sass 2>&1
+  { echo "== $V: $(grep -cE '^\s+/\*[0-9a-f]{4,6}\*/' top_$V.sass) SASS instructions; $(grep -E 'registers' res_$V.txt | sed 's/ptxas info    : //')"
+    for op in IMAD.HI IMAD.WIDE IMAD IADD3 LOP3 SHF SEL ISETP LDG BRA; do printf "%s=%s " $op $(grep -cE "^\s+/\*[0-9a-f]{4,6}\*/\s+(@!?P[0-9] )?$op[ .]" top_$V.sass); done; echo; } >> summary.txt
+  rm -f $V.dump top_$V.cubin
+done

@@ -2,7 +2,7 @@
 """A/B tables: python3 ab.py LOGDIR (the box's logs/ab)."""
 import glob, os, re, statistics as st, sys
 D = sys.argv[1]
-V = ("base", "diff", "bar", "both")
+V = ("base", "diff", "bar", "ndig", "both", "all")
 pat = re.compile(r"JOIN THROUGHPUT .*?base=(\d+) fields=(\d+).*?per_field=([\d.]+).*?setup=([\d.]+)s device=([\d.]+)s.*?batches=(\d+) slots=(\d+) plan_mib=(\d+).*?survivors=(\d+) checked=(\d+) found=(\d+)")
 sp = lambda xs: (max(xs) - min(xs)) / st.median(xs) * 100
 for pre, lab in (("e16b62", "b62 1e16, 2 fields"), ("e16b60", "b60 1e16, 2 fields"), ("e17b62", "b62 1e17, 1 field")):

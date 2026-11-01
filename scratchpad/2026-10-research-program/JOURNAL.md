@@ -9,6 +9,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - Reconcile: November research invoiced $2.13 (the H100/L40S hour is most of it); credit $59.03;
   disk 19 GB free; #235 green, #236 24 pass + 1 runner-side rustup failure; main fae7398 (#234
   changelog links merged). Live boxes: `topcert2` (running) and `combined` (created); my `tail` had hidden one line.
+- 04:55: the `combined` box (m146575, PL) never left `created` (ssh refused for an hour); destroyed,
+  machine excluded, replaced by `combined2` (KR, 58618524), reachable in 3 min; the agent's merge
+  `exp/join-235-236` (e9cdac4) and scripts were ready, so it resumed there (~90 min run).
 
 ## 2026-11-01 (extended autonomous run, 02:00 → 14:00 UTC at the user's request; weekly cap resets 14:00)
 
