@@ -1,0 +1,746 @@
+From 5d780548b6f87a62e6e29e9f84d4d312b897d50a Mon Sep 17 00:00:00 2001
+From: Claude <claude@example.com>
+Date: Sun, 1 Nov 2026 09:07:08 +0000
+Subject: [PATCH 3/6] Top kernel: early reject of a dead square certificate
+ (NICE_EXP_TOP_ER=1 skip, =2 skip + compaction)
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ common/src/cubecl_join.rs | 623 ++++++++++++++++++++++++++------------
+ 1 file changed, 421 insertions(+), 202 deletions(-)
+
+diff --git a/common/src/cubecl_join.rs b/common/src/cubecl_join.rs
+index dfae1fa..0336ec5 100644
+--- a/common/src/cubecl_join.rs
++++ b/common/src/cubecl_join.rs
+@@ -95,6 +95,14 @@ const _: () = assert!(STAGES == 6, "the top kernel's histograms start at word 6"
+ const HIST_N: usize = 352;
+ /// The top kernel's histograms, summed over batches (`NICE_EXP_TOP_HIST=1`).
+ pub static TOP_HIST: std::sync::Mutex<Vec<u64>> = std::sync::Mutex::new(Vec::new());
++/// The early-reject mode of the top kernel (`NICE_EXP_TOP_ER`: 0 off, 1
++/// skip the cube of a dead square, 2 that and compaction).
++pub fn top_er() -> u32 {
++    std::env::var("NICE_EXP_TOP_ER")
++        .ok()
++        .and_then(|v| v.parse().ok())
++        .unwrap_or(0)
++}
+ /// Takes (and clears) the summed histograms.
+ pub fn take_top_hist() -> Vec<u64> {
+     std::mem::take(&mut *TOP_HIST.lock().expect("hist lock"))
+@@ -1157,6 +1165,7 @@ mod kernels {
+         #[comptime] chunk_digits: u32,
+         #[comptime] chunk_div: u32,
+         #[comptime] hist: bool,
++        #[comptime] er: u32,
+     ) -> u64 {
+         let nl2 = comptime!(2 * limbs);
+         let nl3 = comptime!(3 * limbs);
+@@ -1193,60 +1202,42 @@ mod kernels {
+             chunk_div,
+             hist,
+         );
+-        let mcu = cert_power(
+-            &mut a3,
+-            &e3,
+-            pw,
+-            &mut c0b,
+-            &mut dupb,
+-            &mut domb,
+-            msq,
+-            &mut icu,
+-            nl3,
+-            nl3,
+-            s3,
+-            cap,
+-            base,
+-            chunk_digits,
+-            chunk_div,
+-            hist,
+-        );
+-        let mut mask = msq | mcu;
+-        let mut keep = dupa[0] == 0u32 && dupb[0] == 0u32 && (msq & mcu) == 0u64;
+-        // `close_certificate` over the two powers' first-disagreement
+-        // intervals: an interval with no free digit rejects, and one with a
+-        // single free digit forces it. Forcing the cube's digit can only
+-        // shrink the square's free set, so one recheck of the square reaches
+-        // the same fixed point.
+-        let d0 = dom_mask(doma[0], doma[1]);
+-        let d1 = dom_mask(domb[0], domb[1]);
+-        let mut f0 = false;
+-        let mut f1 = false;
+-        if keep && d0 != 0u64 {
+-            let fr = d0 & !mask;
+-            if fr == 0u64 {
+-                keep = false;
+-            } else if (fr & (fr - 1u64)) == 0u64 {
+-                mask |= fr;
+-                f0 = true;
+-            }
++        // Early reject: a dead square certificate (`dupa`) rejects the
++        // interval whatever the cube holds, so the cube is skipped.
++        let mut alive = dupa[0] == 0u32;
++        if comptime!(er == 0) {
++            alive = true;
+         }
+-        if keep && d1 != 0u64 {
+-            let fr = d1 & !mask;
+-            if fr == 0u64 {
+-                keep = false;
+-            } else if (fr & (fr - 1u64)) == 0u64 {
+-                mask |= fr;
+-                f1 = true;
+-            }
+-        }
+-        if keep && d0 != 0u64 && !f0 && f1 {
+-            let fr = d0 & !mask;
+-            if fr == 0u64 {
+-                keep = false;
+-            } else if (fr & (fr - 1u64)) == 0u64 {
+-                mask |= fr;
+-            }
++        let mut mask = msq;
++        let mut keep = false;
++        let mut mcu = 0u64;
++        let mut c0bv = 0xFFFF_FFFFu32;
++        if alive {
++            mcu = cert_power(
++                &mut a3,
++                &e3,
++                pw,
++                &mut c0b,
++                &mut dupb,
++                &mut domb,
++                msq,
++                &mut icu,
++                nl3,
++                nl3,
++                s3,
++                cap,
++                base,
++                chunk_digits,
++                chunk_div,
++                hist,
++            );
++
++            c0bv = c0b[0];
++            let mut kp = Array::<u32>::new(1usize);
++            mask = top_close(
++                msq, mcu, dupa[0], dupb[0], doma[0], doma[1], domb[0], domb[1], &mut kp,
++            );
++            keep = kp[0] != 0u32;
+         }
+         let mut kept = 0u32;
+         if keep {
+@@ -1303,10 +1294,170 @@ mod kernels {
+         }
+         res[0] = kept;
+         res[1] = c0a[0];
+-        res[2] = c0b[0];
++        res[2] = c0bv;
+         mask
+     }
+ 
++    /// The end of `top_cert`: the duplicate and cross tests of the two
++    /// powers' certificates and `close_certificate` over their
++    /// first-disagreement intervals. Returns the mask; `kp[0]` = kept.
++    #[cube]
++    pub(super) fn top_close(
++        msq: u64,
++        mcu: u64,
++        dupa: u32,
++        dupb: u32,
++        da0: u32,
++        da1: u32,
++        db0: u32,
++        db1: u32,
++        kp: &mut Array<u32>,
++    ) -> u64 {
++        let mut mask = msq | mcu;
++        let mut keep = dupa == 0u32 && dupb == 0u32 && (msq & mcu) == 0u64;
++        // `close_certificate` over the two powers' first-disagreement
++        // intervals: an interval with no free digit rejects, and one with a
++        // single free digit forces it. Forcing the cube's digit can only
++        // shrink the square's free set, so one recheck of the square reaches
++        // the same fixed point.
++        let d0 = dom_mask(da0, da1);
++        let d1 = dom_mask(db0, db1);
++        let mut f0 = false;
++        let mut f1 = false;
++        if keep && d0 != 0u64 {
++            let fr = d0 & !mask;
++            if fr == 0u64 {
++                keep = false;
++            } else if (fr & (fr - 1u64)) == 0u64 {
++                mask |= fr;
++                f0 = true;
++            }
++        }
++        if keep && d1 != 0u64 {
++            let fr = d1 & !mask;
++            if fr == 0u64 {
++                keep = false;
++            } else if (fr & (fr - 1u64)) == 0u64 {
++                mask |= fr;
++                f1 = true;
++            }
++        }
++        if keep && d0 != 0u64 && !f0 && f1 {
++            let fr = d0 & !mask;
++            if fr == 0u64 {
++                keep = false;
++            } else if (fr & (fr - 1u64)) == 0u64 {
++                mask |= fr;
++            }
++        }
++        kp[0] = select(keep, 1u32, 0u32);
++        mask
++    }
++
++    /// The interval of top pair (`i`, `slot`): a = p·w and e = a + w − 1,
++    /// clipped to [s, e − 1], into `a` and `e`; `st` = [a was below s, e was
++    /// above e − 1, the low word of p·w, p (2 words), v]. Returns whether the
++    /// prefix block meets the field (`a`, `e` and `st` are set only then).
++    #[cube]
++    #[allow(clippy::too_many_arguments)]
++    fn top_ae(
++        i: u32,
++        slot: u32,
++        tlay: &Array<u32>,
++        vs: &Array<u32>,
++        fb: &Array<u32>,
++        w: u32,
++        pdiv: u32,
++        a: &mut Array<u32>,
++        e: &mut Array<u32>,
++        st: &mut Array<u32>,
++        #[comptime] limbs: u32,
++    ) -> bool {
++        let p0 = (u64::cast_from(tlay[(5u32 * i + 1u32) as usize]) << 32u64)
++            | u64::cast_from(tlay[(5u32 * i) as usize]);
++        let v = vs[slot as usize];
++        let p = p0 * u64::cast_from(pdiv) + u64::cast_from(v);
++        let plo = (u64::cast_from(fb[7]) << 32u64) | u64::cast_from(fb[6]);
++        let phi = (u64::cast_from(fb[9]) << 32u64) | u64::cast_from(fb[8]);
++        let mut inr = false;
++        if p >= plo && p <= phi {
++            inr = true;
++            // a = p*w (< 2^96, 3 limbs), e = a + w - 1, clipped to [s, e-1].
++            let t0 = (p & 0xFFFF_FFFFu64) * u64::cast_from(w);
++            let t1 = (p >> 32u64) * u64::cast_from(w) + (t0 >> 32u64);
++            let pw0 = u32::cast_from(t0);
++            #[unroll]
++            for j in 0..limbs {
++                if comptime!(j == 0) {
++                    a[j as usize] = pw0;
++                } else if comptime!(j == 1) {
++                    a[j as usize] = u32::cast_from(t1);
++                } else if comptime!(j == 2) {
++                    a[j as usize] = u32::cast_from(t1 >> 32u64);
++                } else {
++                    a[j as usize] = 0u32;
++                }
++            }
++            let mut carry = w - 1u32;
++            #[unroll]
++            for j in 0..limbs {
++                let t = a[j as usize] + carry;
++                let mut c = 0u32;
++                if t < carry {
++                    c = 1u32;
++                }
++                e[j as usize] = t;
++                carry = c;
++            }
++            // a = max(a, s); e = min(e, e_incl) (limbs <= 3: fb words 0..2, 3..5)
++            let mut a_lt_s = false;
++            let mut e_gt_e = false;
++            let mut eq_a = true;
++            let mut eq_e = true;
++            #[unroll]
++            for jj in 0..limbs {
++                let j = comptime!(limbs - 1 - jj);
++                let sj = fb[j as usize];
++                let ej = fb[comptime!(3 + j) as usize];
++                if eq_a {
++                    if a[j as usize] < sj {
++                        a_lt_s = true;
++                        eq_a = false;
++                    } else if a[j as usize] > sj {
++                        eq_a = false;
++                    }
++                }
++                if eq_e {
++                    if e[j as usize] > ej {
++                        e_gt_e = true;
++                        eq_e = false;
++                    } else if e[j as usize] < ej {
++                        eq_e = false;
++                    }
++                }
++            }
++            if a_lt_s {
++                #[unroll]
++                for j in 0..limbs {
++                    a[j as usize] = fb[j as usize];
++                }
++            }
++            if e_gt_e {
++                #[unroll]
++                for j in 0..limbs {
++                    e[j as usize] = fb[comptime!(3 + j) as usize];
++                }
++            }
++            st[0] = select(a_lt_s, 1u32, 0u32);
++            st[1] = select(e_gt_e, 1u32, 0u32);
++            st[2] = pw0;
++            st[3] = u32::cast_from(p);
++            st[4] = u32::cast_from(p >> 32u64);
++            st[5] = v;
++        }
++        inr
++    }
++
+     /// Stage 0a: certify every top prefix of every slot's partition. Grid: x
+     /// over the field's top layer (depth t - pp, host-built once per field),
+     /// y over slots. Per tlay entry (5 words): P0 lo, hi, P0 mod (b-1),
+@@ -1345,6 +1496,7 @@ mod kernels {
+         #[comptime] key_level: bool,
+         #[comptime] nb: u32,
+         #[comptime] hist: bool,
++        #[comptime] er: u32,
+     ) {
+         let m1 = comptime!(base - 1);
+         let i = ABSOLUTE_POS_X;
+@@ -1360,157 +1512,205 @@ mod kernels {
+         let mut h_sqd = 0u32;
+         let mut h_sqdp = 0u32;
+         let mut h_kept = 0u32;
++        let mut a = Array::<u32>::new(limbs as usize);
++        let mut e = Array::<u32>::new(limbs as usize);
++        let mut st = Array::<u32>::new(6usize);
++        let mut kept = false;
++        let mut mask = 0u64;
++        let mut r1 = 0u32;
++        let mut r2 = 0u32;
++        let mut ie = i;
++        let mut s_n = SharedMemory::<Atomic<u32>>::new(1usize);
++        let mut s_q =
++            SharedMemory::<u32>::new(comptime!(if er == 2 { 6 * JOIN_WG } else { 1 }) as usize);
++        if comptime!(er == 2) {
++            if UNIT_POS_X == 0u32 {
++                s_n[0].store(0u32);
++            }
++            sync_cube();
++        }
+         if i < ntlay {
+-            let p0 = (u64::cast_from(tlay[(5u32 * i + 1u32) as usize]) << 32u64)
+-                | u64::cast_from(tlay[(5u32 * i) as usize]);
+-            let v = vs[slot as usize];
+-            let p = p0 * u64::cast_from(pdiv) + u64::cast_from(v);
+-            let plo = (u64::cast_from(fb[7]) << 32u64) | u64::cast_from(fb[6]);
+-            let phi = (u64::cast_from(fb[9]) << 32u64) | u64::cast_from(fb[8]);
+-            if p >= plo && p <= phi {
+-                // a = p*w (< 2^96, 3 limbs), e = a + w - 1, clipped to [s, e-1].
+-                let t0 = (p & 0xFFFF_FFFFu64) * u64::cast_from(w);
+-                let t1 = (p >> 32u64) * u64::cast_from(w) + (t0 >> 32u64);
+-                let pw0 = u32::cast_from(t0);
+-                let mut a = Array::<u32>::new(limbs as usize);
+-                let mut e = Array::<u32>::new(limbs as usize);
+-                #[unroll]
+-                for j in 0..limbs {
+-                    if comptime!(j == 0) {
+-                        a[j as usize] = pw0;
+-                    } else if comptime!(j == 1) {
+-                        a[j as usize] = u32::cast_from(t1);
+-                    } else if comptime!(j == 2) {
+-                        a[j as usize] = u32::cast_from(t1 >> 32u64);
+-                    } else {
+-                        a[j as usize] = 0u32;
+-                    }
+-                }
+-                let mut carry = w - 1u32;
+-                #[unroll]
+-                for j in 0..limbs {
+-                    let t = a[j as usize] + carry;
+-                    let mut c = 0u32;
+-                    if t < carry {
+-                        c = 1u32;
+-                    }
+-                    e[j as usize] = t;
+-                    carry = c;
+-                }
+-                // a = max(a, s); e = min(e, e_incl) (limbs <= 3: fb words 0..2, 3..5)
+-                let mut a_lt_s = false;
+-                let mut e_gt_e = false;
+-                let mut eq_a = true;
+-                let mut eq_e = true;
+-                #[unroll]
+-                for jj in 0..limbs {
+-                    let j = comptime!(limbs - 1 - jj);
+-                    let sj = fb[j as usize];
+-                    let ej = fb[comptime!(3 + j) as usize];
+-                    if eq_a {
+-                        if a[j as usize] < sj {
+-                            a_lt_s = true;
+-                            eq_a = false;
+-                        } else if a[j as usize] > sj {
+-                            eq_a = false;
+-                        }
+-                    }
+-                    if eq_e {
+-                        if e[j as usize] > ej {
+-                            e_gt_e = true;
+-                            eq_e = false;
+-                        } else if e[j as usize] < ej {
+-                            eq_e = false;
+-                        }
++            let inr = top_ae(i, slot, tlay, vs, fb, w, pdiv, &mut a, &mut e, &mut st, limbs);
++            if inr {
++                if comptime!(er == 2) {
++                    // Phase 1: the square's certificate only; the intervals
++                    // it does not reject queue for phase 2.
++                    let nl2 = comptime!(2 * limbs);
++                    let nl3 = comptime!(3 * limbs);
++                    let mut a2 = Array::<u32>::new(comptime!(4 * limbs) as usize);
++                    let mut e2 = Array::<u32>::new(comptime!(4 * limbs) as usize);
++                    let mut a3 = Array::<u32>::new(comptime!(6 * limbs) as usize);
++                    let mut e3 = Array::<u32>::new(comptime!(6 * limbs) as usize);
++                    powers16(&a, &e, &mut a2, &mut e2, &mut a3, &mut e3, limbs);
++                    let mut c0a = Array::<u32>::new(1usize);
++                    let mut dupa = Array::<u32>::new(1usize);
++                    let mut doma = Array::<u32>::new(2usize);
++                    let mut isq = Array::<u32>::new(1usize);
++                    let msq = cert_power(
++                        &mut a2,
++                        &e2,
++                        pw,
++                        &mut c0a,
++                        &mut dupa,
++                        &mut doma,
++                        0u64,
++                        &mut isq,
++                        nl2,
++                        nl3,
++                        s2,
++                        cap,
++                        base,
++                        chunk_digits,
++                        chunk_div,
++                        false,
++                    );
++                    if dupa[0] == 0u32 {
++                        let at = s_n[0].fetch_add(1u32);
++                        let q = 6u32 * at;
++                        s_q[q as usize] = i;
++                        s_q[(q + 1u32) as usize] = u32::cast_from(msq);
++                        s_q[(q + 2u32) as usize] = u32::cast_from(msq >> 32u64);
++                        s_q[(q + 3u32) as usize] = c0a[0];
++                        s_q[(q + 4u32) as usize] = doma[0];
++                        s_q[(q + 5u32) as usize] = doma[1];
+                     }
+-                }
+-                if a_lt_s {
+-                    #[unroll]
+-                    for j in 0..limbs {
+-                        a[j as usize] = fb[j as usize];
++                } else {
++                    let mut res = Array::<u32>::new(3usize);
++                    let mut info = Array::<u32>::new(16usize);
++                    let mut pcube = 0u64;
++                    if comptime!(hist) {
++                        pcube = (u64::cast_from(tlay[(5u32 * ntlay + 2u32 * i + 1u32) as usize])
++                            << 32u64)
++                            | u64::cast_from(tlay[(5u32 * ntlay + 2u32 * i) as usize]);
+                     }
+-                }
+-                if e_gt_e {
+-                    #[unroll]
+-                    for j in 0..limbs {
+-                        e[j as usize] = fb[comptime!(3 + j) as usize];
++                    mask = top_cert(
++                        &a,
++                        &e,
++                        pw,
++                        &mut res,
++                        pcube,
++                        &mut info,
++                        base,
++                        limbs,
++                        cap,
++                        s2,
++                        s3,
++                        chunk_digits,
++                        chunk_div,
++                        hist,
++                        er,
++                    );
++                    if comptime!(hist) {
++                        h_act = 1u32;
++                        h_cat = info[0];
++                        h_g = info[1];
++                        h_gp = info[2];
++                        h_td2 = select((info[0] & 1u32) != 0u32, info[3], 0xFFFFu32);
++                        h_td3 = select((info[0] & 2u32) != 0u32, info[4], 0xFFFFu32);
++                        h_n2 = info[5];
++                        h_n3 = info[6];
++                        h_sqd = info[7];
++                        h_sqdp = info[8];
++                        h_kept = res[0];
+                     }
++                    kept = res[0] != 0u32;
++                    r1 = res[1];
++                    r2 = res[2];
+                 }
+-                let mut res = Array::<u32>::new(3usize);
+-                let mut info = Array::<u32>::new(16usize);
+-                let mut pcube = 0u64;
+-                if comptime!(hist) {
+-                    pcube = (u64::cast_from(tlay[(5u32 * ntlay + 2u32 * i + 1u32) as usize])
+-                        << 32u64)
+-                        | u64::cast_from(tlay[(5u32 * ntlay + 2u32 * i) as usize]);
+-                }
+-                let mask = top_cert(
+-                    &a,
+-                    &e,
++            }
++        }
++        if comptime!(er == 2) {
++            // Phase 2: the queued intervals, one per unit from unit 0, so
++            // the planes past the queue's end have nothing to do.
++            sync_cube();
++            let n = s_n[0].load();
++            if UNIT_POS_X < n {
++                let q = 6u32 * UNIT_POS_X;
++                ie = s_q[q as usize];
++                let _inr = top_ae(ie, slot, tlay, vs, fb, w, pdiv, &mut a, &mut e, &mut st, limbs);
++                let msq = (u64::cast_from(s_q[(q + 2u32) as usize]) << 32u64)
++                    | u64::cast_from(s_q[(q + 1u32) as usize]);
++                let nl3 = comptime!(3 * limbs);
++                let mut a2 = Array::<u32>::new(comptime!(4 * limbs) as usize);
++                let mut e2 = Array::<u32>::new(comptime!(4 * limbs) as usize);
++                let mut a3 = Array::<u32>::new(comptime!(6 * limbs) as usize);
++                let mut e3 = Array::<u32>::new(comptime!(6 * limbs) as usize);
++                powers16(&a, &e, &mut a2, &mut e2, &mut a3, &mut e3, limbs);
++                let mut c0b = Array::<u32>::new(1usize);
++                let mut dupb = Array::<u32>::new(1usize);
++                let mut domb = Array::<u32>::new(2usize);
++                let mut icu = Array::<u32>::new(1usize);
++                let mcu = cert_power(
++                    &mut a3,
++                    &e3,
+                     pw,
+-                    &mut res,
+-                    pcube,
+-                    &mut info,
+-                    base,
+-                    limbs,
+-                    cap,
+-                    s2,
++                    &mut c0b,
++                    &mut dupb,
++                    &mut domb,
++                    msq,
++                    &mut icu,
++                    nl3,
++                    nl3,
+                     s3,
++                    cap,
++                    base,
+                     chunk_digits,
+                     chunk_div,
+-                    hist,
++                    false,
+                 );
+-                if comptime!(hist) {
+-                    h_act = 1u32;
+-                    h_cat = info[0];
+-                    h_g = info[1];
+-                    h_gp = info[2];
+-                    h_td2 = select((info[0] & 1u32) != 0u32, info[3], 0xFFFFu32);
+-                    h_td3 = select((info[0] & 2u32) != 0u32, info[4], 0xFFFFu32);
+-                    h_n2 = info[5];
+-                    h_n3 = info[6];
+-                    h_sqd = info[7];
+-                    h_sqdp = info[8];
+-                    h_kept = res[0];
+-                }
+-                if res[0] != 0u32 {
+-                    let mut floor = res[1];
+-                    if res[2] < floor {
+-                        floor = res[2];
+-                    }
+-                    // Same seed rule as the host: an unclipped block uses the
+-                    // field bound (a lower bound of its exact floor).
+-                    if !a_lt_s && !e_gt_e {
+-                        floor = full_floor;
+-                    }
+-                    let idx = top_count[slot as usize].fetch_add(1u32);
+-                    let g = slot * ntlay + idx;
+-                    top_p[(2u32 * g) as usize] = u32::cast_from(p);
+-                    top_p[(2u32 * g + 1u32) as usize] = u32::cast_from(p >> 32u64);
+-                    top_m[(2u32 * g) as usize] = u32::cast_from(mask);
+-                    top_m[(2u32 * g + 1u32) as usize] = u32::cast_from(mask >> 32u64);
+-                    top_r[(2u32 * g) as usize] = a[0] - pw0;
+-                    top_r[(2u32 * g + 1u32) as usize] = e[0] - pw0 + 1u32;
+-                    let pmod = tlay[(5u32 * i + 4u32) as usize] * pdiv + v;
+-                    top_x[(2u32 * g) as usize] = pmod;
+-                    let mut seed = 0u32;
+-                    if floor >= k2 {
+-                        seed = 1u32;
+-                    }
+-                    top_x[(2u32 * g + 1u32) as usize] = seed;
+-                    let pc = (tlay[(5u32 * i + 2u32) as usize] * pdiv_m1 + v) % m1;
+-                    let mut key = 0u32;
+-                    if key_level {
+-                        key = tlay[(5u32 * i + 3u32) as usize];
+-                    }
+-                    top_b[g as usize] = pc | (key << 8u32);
+-                    let mut r = 0u32;
+-                    while r < nroots {
+-                        let cls = (roots[r as usize] + m1 - pc) % m1;
+-                        bucket_cnt[(slot * nb + key * m1 + cls) as usize].fetch_add(1u32);
+-                        r += 1u32;
+-                    }
+-                }
++                let mut kp = Array::<u32>::new(1usize);
++                mask = top_close(
++                    msq,
++                    mcu,
++                    0u32,
++                    dupb[0],
++                    s_q[(q + 4u32) as usize],
++                    s_q[(q + 5u32) as usize],
++                    domb[0],
++                    domb[1],
++                    &mut kp,
++                );
++                kept = kp[0] != 0u32;
++                r1 = s_q[(q + 3u32) as usize];
++                r2 = c0b[0];
++            }
++        }
++        if kept {
++            let mut floor = r1;
++            if r2 < floor {
++                floor = r2;
++            }
++            // Same seed rule as the host: an unclipped block uses the
++            // field bound (a lower bound of its exact floor).
++            if st[0] == 0u32 && st[1] == 0u32 {
++                floor = full_floor;
++            }
++            let idx = top_count[slot as usize].fetch_add(1u32);
++            let g = slot * ntlay + idx;
++            top_p[(2u32 * g) as usize] = st[3];
++            top_p[(2u32 * g + 1u32) as usize] = st[4];
++            top_m[(2u32 * g) as usize] = u32::cast_from(mask);
++            top_m[(2u32 * g + 1u32) as usize] = u32::cast_from(mask >> 32u64);
++            top_r[(2u32 * g) as usize] = a[0] - st[2];
++            top_r[(2u32 * g + 1u32) as usize] = e[0] - st[2] + 1u32;
++            let pmod = tlay[(5u32 * ie + 4u32) as usize] * pdiv + st[5];
++            top_x[(2u32 * g) as usize] = pmod;
++            let mut seed = 0u32;
++            if floor >= k2 {
++                seed = 1u32;
++            }
++            top_x[(2u32 * g + 1u32) as usize] = seed;
++            let pc = (tlay[(5u32 * ie + 2u32) as usize] * pdiv_m1 + st[5]) % m1;
++            let mut key = 0u32;
++            if key_level {
++                key = tlay[(5u32 * ie + 3u32) as usize];
++            }
++            top_b[g as usize] = pc | (key << 8u32);
++            let mut r = 0u32;
++            while r < nroots {
++                let cls = (roots[r as usize] + m1 - pc) % m1;
++                bucket_cnt[(slot * nb + key * m1 + cls) as usize].fetch_add(1u32);
++                r += 1u32;
+             }
+         }
+         if comptime!(hist) {
+@@ -2219,6 +2419,7 @@ impl<R: Runtime> JoinDevice<R> {
+                 self.key_level,
+                 self.nb,
+                 self.hist,
++                top_er(),
+             );
+             top_scan_kernel::launch_unchecked::<R>(
+                 c,
+@@ -4113,6 +4314,7 @@ mod tests {
+             #[comptime] chunk_digits: u32,
+             #[comptime] chunk_div: u32,
+             #[comptime] part: u32,
++            #[comptime] er: u32,
+         ) {
+             let i = ABSOLUTE_POS_X;
+             if i < n {
+@@ -4146,6 +4348,7 @@ mod tests {
+                         chunk_digits,
+                         chunk_div,
+                         false,
++                        er,
+                     );
+                     out[(o + 24u32) as usize] = res[0];
+                     out[(o + 25u32) as usize] = u32::cast_from(mask);
+@@ -4269,6 +4472,8 @@ mod tests {
+         carried: u64,
+         /// Powers with a digit at or above c0 (c0 below the digit count).
+         scanned: u64,
++        /// Rejected intervals whose cube the early reject skipped.
++        skipped: u64,
+     }
+ 
+     /// Runs `iv` (one comptime shape: base, `limbs`, `cap` and the digit
+@@ -4337,6 +4542,7 @@ mod tests {
+                     cd,
+                     cdiv,
+                     part,
++                    super::top_er(),
+                 );
+             }
+         }
+@@ -4354,11 +4560,19 @@ mod tests {
+                 want,
+                 "{at}: against Base::cert"
+             );
+-            assert_eq!(
+-                o[27].min(o[28]),
+-                base.cert_floor(a, e, cap),
+-                "{at}: against Base::cert_floor"
+-            );
++            // With the early reject, a rejected interval whose square was
++            // already dead has no cube floor (u32::MAX); the floor only
++            // matters for kept intervals.
++            if o[28] != u32::MAX {
++                assert_eq!(
++                    o[27].min(o[28]),
++                    base.cert_floor(a, e, cap),
++                    "{at}: against Base::cert_floor"
++                );
++            } else {
++                assert!(o[24] == 0 && super::top_er() != 0, "{at}: no cube floor");
++                tally.skipped += 1;
++            }
+             tally.intervals += 1;
+             tally.kept += u64::from(want.is_some());
+             for (p, sp) in [(&o[0..6], base.s2), (&o[6..12], base.s3)] {
+@@ -4455,8 +4669,13 @@ mod tests {
+         }
+         println!(
+             "{name}: {} intervals, {} kept; {} of the powers scanned above c0, {} of them \
+-             with the carry",
+-            tally.intervals, tally.kept, tally.scanned, tally.carried
++             with the carry; early reject {} skipped {} cubes",
++            tally.intervals,
++            tally.kept,
++            tally.scanned,
++            tally.carried,
++            super::top_er(),
++            tally.skipped
+         );
+         assert!(
+             tally.kept > per && tally.carried > per,
+-- 
+2.47.3
+

@@ -1,0 +1,44 @@
+#### b62 1e17, 1 field
+
+| variant | device s/field (rounds) | median | spread | speed-up (medians) | per round | MHz / W / max °C |
+|---|---|---|---|---|---|---|
+| A (e9cdac4) | 168.450, 172.186, 169.256 | **169.256** | 2.2 % | **×1.000** | 1.000, 1.000, 1.000 | 1398 / 179 / 69 |
+| ER=2 compaction | 170.423, 167.118, 169.295 | **169.295** | 2.0 % | **×1.000** | 0.988, 1.030, 1.000 | 1372 / 179 / 69 |
+| ER=4 trimmed division | 160.182, 162.292, 162.119 | **162.119** | 1.3 % | **×1.044** | 1.052, 1.061, 1.044 | 1387 / 179 / 68 |
+| ER=6 compaction + trim | 160.871, 160.328, 160.954 | **160.871** | 0.4 % | **×1.052** | 1.047, 1.074, 1.052 | 1377 / 179 / 68 |
+
+- A (e9cdac4) counts (survivors / checked / found): 1,020,844,021,499 / 62,584,252,554 / 0; slots 5, plan MiB 1671
+- ER=2 compaction counts (survivors / checked / found): 1,020,844,021,499 / 62,584,252,554 / 0; slots 5, plan MiB 1671
+- ER=4 trimmed division counts (survivors / checked / found): 1,020,844,021,499 / 62,584,252,554 / 0; slots 5, plan MiB 1671
+- ER=6 compaction + trim counts (survivors / checked / found): 1,020,844,021,499 / 62,584,252,554 / 0; slots 5, plan MiB 1671
+
+#### b62 1e16, 2 fields
+
+| variant | device s/field (rounds) | median | spread | speed-up (medians) | per round | MHz / W / max °C |
+|---|---|---|---|---|---|---|
+| A (e9cdac4) | 14.358, 14.402, 14.430 | **14.402** | 0.5 % | **×1.000** | 1.000, 1.000, 1.000 | 1389 / 180 / 68 |
+| ER=1 in-place skip | 14.259, 14.256, 14.413 | **14.259** | 1.1 % | **×1.010** | 1.007, 1.010, 1.001 | 1400 / 180 / 68 |
+| ER=2 compaction | 14.143, 14.262, 14.029 | **14.143** | 1.6 % | **×1.018** | 1.015, 1.010, 1.029 | 1382 / 180 / 68 |
+| ER=4 trimmed division | 13.389, 13.450, 13.596 | **13.450** | 1.5 % | **×1.071** | 1.072, 1.071, 1.061 | 1400 / 179 / 68 |
+| ER=6 compaction + trim | 13.443, 13.538, 13.219 | **13.443** | 2.4 % | **×1.071** | 1.068, 1.064, 1.092 | 1372 / 179 / 68 |
+
+- A (e9cdac4) counts (survivors / checked / found): 163,513,599,082 / 10,027,698,695 / 0; slots 13, plan MiB 2050
+- ER=1 in-place skip counts (survivors / checked / found): 163,513,599,082 / 10,027,698,695 / 0; slots 13, plan MiB 2050
+- ER=2 compaction counts (survivors / checked / found): 163,513,599,082 / 10,027,698,695 / 0; slots 13, plan MiB 2050
+- ER=4 trimmed division counts (survivors / checked / found): 163,513,599,082 / 10,027,698,695 / 0; slots 13, plan MiB 2050
+- ER=6 compaction + trim counts (survivors / checked / found): 163,513,599,082 / 10,027,698,695 / 0; slots 13, plan MiB 2050
+
+#### b60 1e16, 2 fields
+
+| variant | device s/field (rounds) | median | spread | speed-up (medians) | per round | MHz / W / max °C |
+|---|---|---|---|---|---|---|
+| A (e9cdac4) | 31.837, 32.042, 32.081 | **32.042** | 0.8 % | **×1.000** | 1.000, 1.000, 1.000 | 1401 / 180 / 68 |
+| ER=2 compaction | 31.509, 31.181, 31.472 | **31.472** | 1.0 % | **×1.018** | 1.010, 1.028, 1.019 | 1403 / 180 / 68 |
+| ER=4 trimmed division | 30.301, 29.971, 30.368 | **30.301** | 1.3 % | **×1.057** | 1.051, 1.069, 1.056 | 1390 / 179 / 68 |
+| ER=6 compaction + trim | 30.109, 30.161, 30.313 | **30.161** | 0.7 % | **×1.062** | 1.057, 1.062, 1.058 | 1393 / 179 / 69 |
+
+- A (e9cdac4) counts (survivors / checked / found): 460,847,952,346 / 30,871,838,404 / 0; slots 4, plan MiB 1566
+- ER=2 compaction counts (survivors / checked / found): 460,847,952,346 / 30,871,838,404 / 0; slots 4, plan MiB 1566
+- ER=4 trimmed division counts (survivors / checked / found): 460,847,952,346 / 30,871,838,404 / 0; slots 4, plan MiB 1566
+- ER=6 compaction + trim counts (survivors / checked / found): 460,847,952,346 / 30,871,838,404 / 0; slots 4, plan MiB 1566
+

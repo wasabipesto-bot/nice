@@ -1,0 +1,323 @@
+## b60 1e+16: 19,014,213,600 (prefix, partition) pairs in range, 6,869,484,234 kept (36.1 %), 12,144,729,366 fail (63.9 %)
+square passes P2 = 12 (s2 = 24), cube passes P3 = 18 (s3 = 36), 2 digits a pass
+
+### Failure categories (final certificate; A = repeat within a², B = within a³, C = a² and a³ share a digit, D = closure only)
+| category | pairs | % of failures | % of pairs |
+|---|---|---|---|
+| A only | 2,093,046,282 | 17.2 | 11.0 |
+| B only | 2,094,762,697 | 17.2 | 11.0 |
+| C only | 5,149,962,280 | 42.4 | 27.1 |
+| A + B | 621,273,164 | 5.1 | 3.3 |
+| A + C | 997,217,389 | 8.2 | 5.2 |
+| B + C | 996,595,689 | 8.2 | 5.2 |
+| A + B + C | 172,004,799 | 1.4 | 0.9 |
+| D (closure) only | 19,867,066 | 0.2 | 0.1 |
+| any A (square dead on its own) | 3,883,541,634 | 32.0 | 20.4 |
+| any B | 3,884,636,349 | 32.0 | 20.4 |
+| any C | 7,315,780,157 | 60.2 | 38.5 |
+
+- square dead after the square (A): 3,883,541,634 = 20.4 % of pairs, 32.0 % of failures
+- square dead with the parent's cube digits (A or a² ∩ parent's a³ digits): 7,065,932,348 = 37.2 % of pairs, 58.2 % of failures; violations (dead but kept): 0
+- warps (32 lanes) with an in-range pair: 594,198,000; all in-range lanes square-dead: 0 (0.000 %); with the parent: 0 (0.000 %); mean in-range lanes per warp 32.0
+
+### Per pair: earliest sound detection, production order (a² low digits first, then a³), no parent information
+| passes done when the pair is known dead | stage | pairs | % | cum % |
+|---|---|---|---|---|
+| 10 | square pass 10 of 12 | 630,331,038 | 3.32 | 3.32 |
+| 11 | square pass 11 of 12 | 635,392,336 | 3.34 | 6.66 |
+| 12 | end of square | 2,617,818,260 | 13.77 | 20.42 |
+| 27 | cube pass 15 of 18 | 1,976,171,196 | 10.39 | 30.82 |
+| 28 | cube pass 16 of 18 | 1,451,841,396 | 7.64 | 38.45 |
+| 29 | cube pass 17 of 18 | 1,320,062,085 | 6.94 | 45.40 |
+| 30 | end of cube (incl. closure) | 3,513,113,055 | 18.48 | 63.87 |
+| 31 | kept (full work) | 6,869,484,234 | 36.13 | 100.00 |
+
+### Per pair: the same, with the parent's cube digits
+| passes done when the pair is known dead | stage | pairs | % | cum % |
+|---|---|---|---|---|
+| 9 | square pass 9 of 12 | 1,858,442,115 | 9.77 | 9.77 |
+| 10 | square pass 10 of 12 | 667,884,986 | 3.51 | 13.29 |
+| 11 | square pass 11 of 12 | 633,921,825 | 3.33 | 16.62 |
+| 12 | end of square | 3,905,683,422 | 20.54 | 37.16 |
+| 27 | cube pass 15 of 18 | 1,559,825,714 | 8.20 | 45.36 |
+| 28 | cube pass 16 of 18 | 427,115,799 | 2.25 | 47.61 |
+| 29 | cube pass 17 of 18 | 397,859,082 | 2.09 | 49.70 |
+| 30 | end of cube (incl. closure) | 2,693,996,423 | 14.17 | 63.87 |
+| 31 | kept (full work) | 6,869,484,234 | 36.13 | 100.00 |
+
+### Per warp: the last lane's detection point (what an in-place early exit could skip)
+| passes done when the pair is known dead | stage | warps | % | cum % |
+|---|---|---|---|---|
+| 30 | end of cube (incl. closure) | 3,256 | 0.00 | 0.00 |
+| 31 | kept (full work) | 594,194,744 | 100.00 | 100.00 |
+
+### Per warp, with the parent's cube digits
+| passes done when the pair is known dead | stage | warps | % | cum % |
+|---|---|---|---|---|
+| 29 | cube pass 17 of 18 | 19 | 0.00 | 0.00 |
+| 30 | end of cube (incl. closure) | 3,237 | 0.00 | 0.00 |
+| 31 | kept (full work) | 594,194,744 | 100.00 | 100.00 |
+
+### Square, pairs with a repeat (A): index from the top of the first certified digit that repeats one above it (n = 3,883,541,634)
+| index from top (0 = top digit) | pairs | % | cum % |
+|---|---|---|---|
+| 3 | 9,061 | 0.00 | 0.00 |
+| 4 | 552,054 | 0.01 | 0.01 |
+| 5 | 35,544,918 | 0.92 | 0.93 |
+| 6 | 1,895,803,177 | 48.82 | 49.75 |
+| 7 | 1,951,632,424 | 50.25 | 100.00 |
+
+### Cube, pairs with a repeat (B): index from the top of the first repeating certified digit (n = 3,884,636,349)
+| index from top | pairs | % | cum % |
+|---|---|---|---|
+| 3 | 3,801 | 0.00 | 0.00 |
+| 4 | 538,066 | 0.01 | 0.01 |
+| 5 | 33,347,011 | 0.86 | 0.87 |
+| 6 | 1,896,466,267 | 48.82 | 49.69 |
+| 7 | 1,954,281,204 | 50.31 | 100.00 |
+
+### Certified digits of a² (every in-range pair) (n = 19,014,213,600)
+| digits | pairs | % | cum % |
+|---|---|---|---|
+| 2 | 1 | 0.00 | 0.00 |
+| 3 | 50 | 0.00 | 0.00 |
+| 4 | 2,615 | 0.00 | 0.00 |
+| 5 | 129,293 | 0.00 | 0.00 |
+| 6 | 6,502,218 | 0.03 | 0.03 |
+| 7 | 391,217,894 | 2.06 | 2.09 |
+| 8 | 18,616,361,529 | 97.91 | 100.00 |
+
+### Certified digits of a³ (every in-range pair) (n = 19,014,213,600)
+| digits | pairs | % | cum % |
+|---|---|---|---|
+| 3 | 44 | 0.00 | 0.00 |
+| 4 | 2,466 | 0.00 | 0.00 |
+| 5 | 121,782 | 0.00 | 0.00 |
+| 6 | 6,121,695 | 0.03 | 0.03 |
+| 7 | 368,363,819 | 1.94 | 1.97 |
+| 8 | 18,639,603,794 | 98.03 | 100.00 |
+
+
+## b62 1e+16: 13,917,692,863 (prefix, partition) pairs in range, 4,508,762,994 kept (32.4 %), 9,408,929,869 fail (67.6 %)
+square passes P2 = 13 (s2 = 25), cube passes P3 = 19 (s3 = 37), 2 digits a pass
+
+### Failure categories (final certificate; A = repeat within a², B = within a³, C = a² and a³ share a digit, D = closure only)
+| category | pairs | % of failures | % of pairs |
+|---|---|---|---|
+| A only | 1,608,624,929 | 17.1 | 11.6 |
+| B only | 1,455,922,369 | 15.5 | 10.5 |
+| C only | 3,809,282,455 | 40.5 | 27.4 |
+| A + B | 491,522,175 | 5.2 | 3.5 |
+| A + C | 861,920,869 | 9.2 | 6.2 |
+| B + C | 841,775,270 | 8.9 | 6.0 |
+| A + B + C | 177,914,364 | 1.9 | 1.3 |
+| D (closure) only | 161,967,438 | 1.7 | 1.2 |
+| any A (square dead on its own) | 3,139,982,337 | 33.4 | 22.6 |
+| any B | 2,967,134,178 | 31.5 | 21.3 |
+| any C | 5,690,892,958 | 60.5 | 40.9 |
+
+- square dead after the square (A): 3,139,982,337 = 22.6 % of pairs, 33.4 % of failures
+- square dead with the parent's cube digits (A or a² ∩ parent's a³ digits): 5,558,575,534 = 39.9 % of pairs, 59.1 % of failures; violations (dead but kept): 0
+- warps (32 lanes) with an in-range pair: 434,929,380; all in-range lanes square-dead: 0 (0.000 %); with the parent: 0 (0.000 %); mean in-range lanes per warp 32.0
+
+### Per pair: earliest sound detection, production order (a² low digits first, then a³), no parent information
+| passes done when the pair is known dead | stage | pairs | % | cum % |
+|---|---|---|---|---|
+| 10 | square pass 10 of 13 | 463,339,981 | 3.33 | 3.33 |
+| 11 | square pass 11 of 13 | 477,954,421 | 3.43 | 6.76 |
+| 12 | square pass 12 of 13 | 492,441,995 | 3.54 | 10.30 |
+| 13 | end of square | 1,706,245,940 | 12.26 | 22.56 |
+| 28 | cube pass 15 of 19 | 1,576,703,648 | 11.33 | 33.89 |
+| 29 | cube pass 16 of 19 | 1,256,498,610 | 9.03 | 42.92 |
+| 30 | cube pass 17 of 19 | 932,406,464 | 6.70 | 49.62 |
+| 31 | cube pass 18 of 19 | 829,840,695 | 5.96 | 55.58 |
+| 32 | end of cube (incl. closure) | 1,673,498,115 | 12.02 | 67.60 |
+| 33 | kept (full work) | 4,508,762,994 | 32.40 | 100.00 |
+
+### Per pair: the same, with the parent's cube digits
+| passes done when the pair is known dead | stage | pairs | % | cum % |
+|---|---|---|---|---|
+| 9 | square pass 9 of 13 | 1,456,862,667 | 10.47 | 10.47 |
+| 10 | square pass 10 of 13 | 564,526,957 | 4.06 | 14.52 |
+| 11 | square pass 11 of 13 | 470,886,183 | 3.38 | 17.91 |
+| 12 | square pass 12 of 13 | 470,172,636 | 3.38 | 21.29 |
+| 13 | end of square | 2,596,127,091 | 18.65 | 39.94 |
+| 28 | cube pass 15 of 19 | 1,230,764,697 | 8.84 | 48.78 |
+| 29 | cube pass 16 of 19 | 584,668,821 | 4.20 | 52.98 |
+| 30 | cube pass 17 of 19 | 313,417,305 | 2.25 | 55.23 |
+| 31 | cube pass 18 of 19 | 291,423,413 | 2.09 | 57.33 |
+| 32 | end of cube (incl. closure) | 1,430,080,099 | 10.28 | 67.60 |
+| 33 | kept (full work) | 4,508,762,994 | 32.40 | 100.00 |
+
+### Per warp: the last lane's detection point (what an in-place early exit could skip)
+| passes done when the pair is known dead | stage | warps | % | cum % |
+|---|---|---|---|---|
+| 31 | cube pass 18 of 19 | 3 | 0.00 | 0.00 |
+| 32 | end of cube (incl. closure) | 1,367 | 0.00 | 0.00 |
+| 33 | kept (full work) | 434,928,010 | 100.00 | 100.00 |
+
+### Per warp, with the parent's cube digits
+| passes done when the pair is known dead | stage | warps | % | cum % |
+|---|---|---|---|---|
+| 30 | cube pass 17 of 19 | 3 | 0.00 | 0.00 |
+| 32 | end of cube (incl. closure) | 1,367 | 0.00 | 0.00 |
+| 33 | kept (full work) | 434,928,010 | 100.00 | 100.00 |
+
+### Square, pairs with a repeat (A): index from the top of the first certified digit that repeats one above it (n = 3,139,982,337)
+| index from top (0 = top digit) | pairs | % | cum % |
+|---|---|---|---|
+| 3 | 1,935 | 0.00 | 0.00 |
+| 4 | 35,034 | 0.00 | 0.00 |
+| 5 | 1,910,856 | 0.06 | 0.06 |
+| 6 | 114,149,078 | 3.64 | 3.70 |
+| 7 | 1,572,276,788 | 50.07 | 53.77 |
+| 8 | 1,451,608,646 | 46.23 | 100.00 |
+
+### Cube, pairs with a repeat (B): index from the top of the first repeating certified digit (n = 2,967,134,178)
+| index from top | pairs | % | cum % |
+|---|---|---|---|
+| 4 | 98,250 | 0.00 | 0.00 |
+| 5 | 5,629,934 | 0.19 | 0.19 |
+| 6 | 348,186,876 | 11.73 | 11.93 |
+| 7 | 1,521,955,157 | 51.29 | 63.22 |
+| 8 | 1,091,263,961 | 36.78 | 100.00 |
+
+### Certified digits of a² (every in-range pair) (n = 13,917,692,863)
+| digits | pairs | % | cum % |
+|---|---|---|---|
+| 3 | 3 | 0.00 | 0.00 |
+| 4 | 138 | 0.00 | 0.00 |
+| 5 | 6,726 | 0.00 | 0.00 |
+| 6 | 337,036 | 0.00 | 0.00 |
+| 7 | 17,607,040 | 0.13 | 0.13 |
+| 8 | 1,094,987,172 | 7.87 | 8.00 |
+| 9 | 12,804,754,748 | 92.00 | 100.00 |
+
+### Certified digits of a³ (every in-range pair) (n = 13,917,692,863)
+| digits | pairs | % | cum % |
+|---|---|---|---|
+| 3 | 8 | 0.00 | 0.00 |
+| 4 | 464 | 0.00 | 0.00 |
+| 5 | 24,127 | 0.00 | 0.00 |
+| 6 | 1,202,656 | 0.01 | 0.01 |
+| 7 | 65,523,682 | 0.47 | 0.48 |
+| 8 | 4,071,621,286 | 29.26 | 29.73 |
+| 9 | 9,779,320,640 | 70.27 | 100.00 |
+
+
+## b62 1e+17: 117,766,831,683 (prefix, partition) pairs in range, 38,155,658,259 kept (32.4 %), 79,611,173,424 fail (67.6 %)
+square passes P2 = 13 (s2 = 25), cube passes P3 = 19 (s3 = 37), 2 digits a pass
+
+### Failure categories (final certificate; A = repeat within a², B = within a³, C = a² and a³ share a digit, D = closure only)
+| category | pairs | % of failures | % of pairs |
+|---|---|---|---|
+| A only | 13,621,995,152 | 17.1 | 11.6 |
+| B only | 12,332,255,423 | 15.5 | 10.5 |
+| C only | 32,322,886,111 | 40.6 | 27.4 |
+| A + B | 4,163,980,742 | 5.2 | 3.5 |
+| A + C | 7,293,885,827 | 9.2 | 6.2 |
+| B + C | 7,018,642,691 | 8.8 | 6.0 |
+| A + B + C | 1,467,513,429 | 1.8 | 1.2 |
+| D (closure) only | 1,390,014,049 | 1.7 | 1.2 |
+| any A (square dead on its own) | 26,547,375,150 | 33.3 | 22.5 |
+| any B | 24,982,392,285 | 31.4 | 21.2 |
+| any C | 48,102,928,058 | 60.4 | 40.8 |
+
+- square dead after the square (A): 26,547,375,150 = 22.5 % of pairs, 33.3 % of failures
+- square dead with the parent's cube digits (A or a² ∩ parent's a³ digits): 47,022,928,909 = 39.9 % of pairs, 59.1 % of failures; violations (dead but kept): 0
+- warps (32 lanes) with an in-range pair: 3,680,234,068; all in-range lanes square-dead: 42 (0.000 %); with the parent: 169 (0.000 %); mean in-range lanes per warp 32.0
+
+### Per pair: earliest sound detection, production order (a² low digits first, then a³), no parent information
+| passes done when the pair is known dead | stage | pairs | % | cum % |
+|---|---|---|---|---|
+| 10 | square pass 10 of 13 | 3,914,231,618 | 3.32 | 3.32 |
+| 11 | square pass 11 of 13 | 4,003,815,616 | 3.40 | 6.72 |
+| 12 | square pass 12 of 13 | 4,175,972,007 | 3.55 | 10.27 |
+| 13 | end of square | 14,453,355,909 | 12.27 | 22.54 |
+| 28 | cube pass 15 of 19 | 13,183,102,274 | 11.19 | 33.74 |
+| 29 | cube pass 16 of 19 | 10,773,680,929 | 9.15 | 42.88 |
+| 30 | cube pass 17 of 19 | 7,891,865,385 | 6.70 | 49.59 |
+| 31 | cube pass 18 of 19 | 7,033,383,800 | 5.97 | 55.56 |
+| 32 | end of cube (incl. closure) | 14,181,765,886 | 12.04 | 67.60 |
+| 33 | kept (full work) | 38,155,658,259 | 32.40 | 100.00 |
+
+### Per pair: the same, with the parent's cube digits
+| passes done when the pair is known dead | stage | pairs | % | cum % |
+|---|---|---|---|---|
+| 9 | square pass 9 of 13 | 12,330,746,043 | 10.47 | 10.47 |
+| 10 | square pass 10 of 13 | 4,745,246,672 | 4.03 | 14.50 |
+| 11 | square pass 11 of 13 | 3,970,915,628 | 3.37 | 17.87 |
+| 12 | square pass 12 of 13 | 3,992,825,715 | 3.39 | 21.26 |
+| 13 | end of square | 21,983,194,851 | 18.67 | 39.93 |
+| 28 | cube pass 15 of 19 | 10,265,550,381 | 8.72 | 48.65 |
+| 29 | cube pass 16 of 19 | 5,074,618,258 | 4.31 | 52.95 |
+| 30 | cube pass 17 of 19 | 2,649,862,898 | 2.25 | 55.20 |
+| 31 | cube pass 18 of 19 | 2,474,735,744 | 2.10 | 57.31 |
+| 32 | end of cube (incl. closure) | 12,123,477,234 | 10.29 | 67.60 |
+| 33 | kept (full work) | 38,155,658,259 | 32.40 | 100.00 |
+
+### Per warp: the last lane's detection point (what an in-place early exit could skip)
+| passes done when the pair is known dead | stage | warps | % | cum % |
+|---|---|---|---|---|
+| 13 | end of square | 42 | 0.00 | 0.00 |
+| 28 | cube pass 15 of 19 | 97 | 0.00 | 0.00 |
+| 29 | cube pass 16 of 19 | 104 | 0.00 | 0.00 |
+| 30 | cube pass 17 of 19 | 189 | 0.00 | 0.00 |
+| 31 | cube pass 18 of 19 | 259 | 0.00 | 0.00 |
+| 32 | end of cube (incl. closure) | 7,919 | 0.00 | 0.00 |
+| 33 | kept (full work) | 3,680,225,458 | 100.00 | 100.00 |
+
+### Per warp, with the parent's cube digits
+| passes done when the pair is known dead | stage | warps | % | cum % |
+|---|---|---|---|---|
+| 13 | end of square | 169 | 0.00 | 0.00 |
+| 28 | cube pass 15 of 19 | 202 | 0.00 | 0.00 |
+| 29 | cube pass 16 of 19 | 87 | 0.00 | 0.00 |
+| 30 | cube pass 17 of 19 | 102 | 0.00 | 0.00 |
+| 31 | cube pass 18 of 19 | 201 | 0.00 | 0.00 |
+| 32 | end of cube (incl. closure) | 7,849 | 0.00 | 0.00 |
+| 33 | kept (full work) | 3,680,225,458 | 100.00 | 100.00 |
+
+### Square, pairs with a repeat (A): index from the top of the first certified digit that repeats one above it (n = 26,547,375,150)
+| index from top (0 = top digit) | pairs | % | cum % |
+|---|---|---|---|
+| 3 | 3,640 | 0.00 | 0.00 |
+| 4 | 282,431 | 0.00 | 0.00 |
+| 5 | 16,366,351 | 0.06 | 0.06 |
+| 6 | 975,829,609 | 3.68 | 3.74 |
+| 7 | 13,268,074,940 | 49.98 | 53.72 |
+| 8 | 12,286,818,179 | 46.28 | 100.00 |
+
+### Cube, pairs with a repeat (B): index from the top of the first repeating certified digit (n = 24,982,392,285)
+| index from top | pairs | % | cum % |
+|---|---|---|---|
+| 3 | 8,209 | 0.00 | 0.00 |
+| 4 | 696,002 | 0.00 | 0.00 |
+| 5 | 46,530,241 | 0.19 | 0.19 |
+| 6 | 2,855,181,014 | 11.43 | 11.62 |
+| 7 | 12,833,765,357 | 51.37 | 62.99 |
+| 8 | 9,246,211,462 | 37.01 | 100.00 |
+
+### Certified digits of a² (every in-range pair) (n = 117,766,831,683)
+| digits | pairs | % | cum % |
+|---|---|---|---|
+| 3 | 20 | 0.00 | 0.00 |
+| 4 | 1,112 | 0.00 | 0.00 |
+| 5 | 57,141 | 0.00 | 0.00 |
+| 6 | 2,848,450 | 0.00 | 0.00 |
+| 7 | 148,990,481 | 0.13 | 0.13 |
+| 8 | 9,265,467,022 | 7.87 | 8.00 |
+| 9 | 108,349,467,457 | 92.00 | 100.00 |
+
+### Certified digits of a³ (every in-range pair) (n = 117,766,831,683)
+| digits | pairs | % | cum % |
+|---|---|---|---|
+| 3 | 77 | 0.00 | 0.00 |
+| 4 | 3,997 | 0.00 | 0.00 |
+| 5 | 204,344 | 0.00 | 0.00 |
+| 6 | 10,167,161 | 0.01 | 0.01 |
+| 7 | 554,454,061 | 0.47 | 0.48 |
+| 8 | 34,453,108,252 | 29.26 | 29.73 |
+| 9 | 82,748,893,791 | 70.27 | 100.00 |
+
+

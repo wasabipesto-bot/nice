@@ -1,0 +1,87 @@
+From f409f51368b5f3e64b43d1f417b8361f79214808 Mon Sep 17 00:00:00 2001
+From: Claude <claude@example.com>
+Date: Sun, 1 Nov 2026 09:35:11 +0000
+Subject: [PATCH 6/6] Top kernel: compaction queues a, e and the clip state
+ (NICE_EXP_TOP_ER bit 16)
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ common/src/cubecl_join.rs | 38 +++++++++++++++++++++++++++++++++-----
+ 1 file changed, 33 insertions(+), 5 deletions(-)
+
+diff --git a/common/src/cubecl_join.rs b/common/src/cubecl_join.rs
+index 0972deb..1c7ba87 100644
+--- a/common/src/cubecl_join.rs
++++ b/common/src/cubecl_join.rs
+@@ -99,7 +99,8 @@ pub static TOP_HIST: std::sync::Mutex<Vec<u64>> = std::sync::Mutex::new(Vec::new
+ /// the cube of a dead square, 2 that and compaction within the cube; + 4
+ /// trims the long division to the limbs that can be nonzero; + 8, with 2,
+ /// also rejects a square digit among the parent prefix's cube digits, which
+-/// the host adds to `tlay`).
++/// the host adds to `tlay`; + 16, with 2, queues a, e and the clip state
++/// instead of recomputing them).
+ pub fn top_er() -> u32 {
+     std::env::var("NICE_EXP_TOP_ER")
+         .ok()
+@@ -1533,9 +1534,12 @@ mod kernels {
+         let mut r1 = 0u32;
+         let mut r2 = 0u32;
+         let mut ie = i;
++        // Words a queued interval takes: index, square mask (2), c0, dom (2);
++        // with bit 16 also a, e (3 each) and `st` (6).
++        let qw = comptime!(if er & 16 != 0 { 18u32 } else { 6u32 });
+         let mut s_n = SharedMemory::<Atomic<u32>>::new(1usize);
+         let mut s_q =
+-            SharedMemory::<u32>::new(comptime!(if er & 3 == 2 { 6 * JOIN_WG } else { 1 }) as usize);
++            SharedMemory::<u32>::new(comptime!(if er & 3 == 2 { qw * JOIN_WG } else { 1 }) as usize);
+         if comptime!(er & 3 == 2) {
+             if UNIT_POS_X == 0u32 {
+                 s_n[0].store(0u32);
+@@ -1591,7 +1595,18 @@ mod kernels {
+                     }
+                     if !dead {
+                         let at = s_n[0].fetch_add(1u32);
+-                        let q = 6u32 * at;
++                        let q = comptime!(qw).runtime() * at;
++                        if comptime!(er & 16 != 0) {
++                            #[unroll]
++                            for j in 0..limbs {
++                                s_q[(q + comptime!(6 + j).runtime()) as usize] = a[j as usize];
++                                s_q[(q + comptime!(9 + j).runtime()) as usize] = e[j as usize];
++                            }
++                            #[unroll]
++                            for j in 0..6u32 {
++                                s_q[(q + comptime!(12 + j).runtime()) as usize] = st[j as usize];
++                            }
++                        }
+                         s_q[q as usize] = i;
+                         s_q[(q + 1u32) as usize] = u32::cast_from(msq);
+                         s_q[(q + 2u32) as usize] = u32::cast_from(msq >> 32u64);
+@@ -1650,9 +1665,22 @@ mod kernels {
+             sync_cube();
+             let n = s_n[0].load();
+             if UNIT_POS_X < n {
+-                let q = 6u32 * UNIT_POS_X;
++                let q = comptime!(qw).runtime() * UNIT_POS_X;
+                 ie = s_q[q as usize];
+-                let _inr = top_ae(ie, slot, tlay, vs, fb, w, pdiv, &mut a, &mut e, &mut st, limbs);
++                if comptime!(er & 16 != 0) {
++                    #[unroll]
++                    for j in 0..limbs {
++                        a[j as usize] = s_q[(q + comptime!(6 + j).runtime()) as usize];
++                        e[j as usize] = s_q[(q + comptime!(9 + j).runtime()) as usize];
++                    }
++                    #[unroll]
++                    for j in 0..6u32 {
++                        st[j as usize] = s_q[(q + comptime!(12 + j).runtime()) as usize];
++                    }
++                } else {
++                    let _inr =
++                        top_ae(ie, slot, tlay, vs, fb, w, pdiv, &mut a, &mut e, &mut st, limbs);
++                }
+                 let msq = (u64::cast_from(s_q[(q + 2u32) as usize]) << 32u64)
+                     | u64::cast_from(s_q[(q + 1u32) as usize]);
+                 let nl3 = comptime!(3 * limbs);
+-- 
+2.47.3
+

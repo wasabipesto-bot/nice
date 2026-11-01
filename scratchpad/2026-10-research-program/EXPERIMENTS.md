@@ -71,6 +71,24 @@ do not help. The join's memory budget stops at 4 GiB (join_plan.rs) so 46/80 GB 
 were measured not to be a lever in L1.7, so no action). **Fleet guidance:** never buy H100 at
 market; L40S only under ~$0.35/h.
 
+## L33.1 Early reject in top certification: no-go, and the limb-skip side finding (2026-11-01, agent; `L33/SCOPING.md`, `L33/raw/`; branch `exp/top-early-reject` f409f51)
+
+150.7 G pairs counted (one field each at b60 1e16, b62 1e16, b62 1e17). At b62 67.6 % of pairs fail:
+60 % share a digit between a² and a³, 33 % repeat within a², 31 % within a³ (overlapping), 1.7 %
+closure only; carry/ndig never reject alone. The first repeat is always among the two lowest
+certified digits of a power (the parent certified the higher ones); digits come out low first, but
+partners come later, often in the other power; nothing is known before the square's 10th pass of
+13; 22.5 % of pairs are dead after the square (39.9 % with the parent's cube digits on the device,
++2 words per `tlay` entry; sound on all 150.7 G). **An in-place exit cannot fire (99.9998 % of 32-lane
+planes hold a kept pair): ×1.010; block-level compaction ×1.000 (1e17) / ×1.018 (1e16); parent-digit
+version ×1.036 (≈ ×1.045–1.053 without its host pass) → the early reject fails the bar.**
+**Side finding, clears the bar:** the long division ran all 12 or 18 limbs every pass though the top
+ones are known zero; skipping them (~8 lines) cuts 60 % of division steps: exact (certificate test
+with #235's counts, join parity, counts identical), no SPIR-V blocks added, lint clean; **×1.051 at
+b62 1e17 (6 rounds), ×1.058–1.071 b62 1e16, ×1.057 b60, NiceMark ×1.066**; with the parent-digit
+compaction ×1.092–1.099 at b62. PR candidate: limb skip + L31's (a)+(c) (≈ ×1.10 together), needs an
+M4 run and a combined measurement.
+
 ## L31.2 (a)+(c) on the combined tree (2026-11-01, agent; `L31/AB-COMBINED.md`, `L31/ab-raw/`; branch `exp/top-cert-2b` eb3d7e6 on e9cdac4)
 
 RTX 3080 180 W (m139250), A = combined e9cdac4, interleaved: **b62 1e17 ×1.045 (5 rounds, 1.023–1.057;
