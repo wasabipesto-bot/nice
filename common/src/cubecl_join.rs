@@ -97,7 +97,9 @@ const HIST_N: usize = 352;
 pub static TOP_HIST: std::sync::Mutex<Vec<u64>> = std::sync::Mutex::new(Vec::new());
 /// The early-reject mode of the top kernel (`NICE_EXP_TOP_ER`, bits: 1 skip
 /// the cube of a dead square, 2 that and compaction within the cube; + 4
-/// trims the long division to the limbs that can be nonzero).
+/// trims the long division to the limbs that can be nonzero; + 8, with 2,
+/// also rejects a square digit among the parent prefix's cube digits, which
+/// the host adds to `tlay`).
 pub fn top_er() -> u32 {
     std::env::var("NICE_EXP_TOP_ER")
         .ok()
@@ -1576,7 +1578,18 @@ mod kernels {
                         false,
                         comptime!(er & 4 != 0),
                     );
-                    if dupa[0] == 0u32 {
+                    let mut dead = dupa[0] != 0u32;
+                    if comptime!(er & 8 != 0) {
+                        // The parent's cube digits are the child's too (a
+                        // sub-interval keeps its parent's common digits), so a
+                        // square digit among them is a repeat across powers.
+                        let pcube = (u64::cast_from(
+                            tlay[(5u32 * ntlay + 2u32 * i + 1u32) as usize],
+                        ) << 32u64)
+                            | u64::cast_from(tlay[(5u32 * ntlay + 2u32 * i) as usize]);
+                        dead = dead || (msq & pcube) != 0u64;
+                    }
+                    if !dead {
                         let at = s_n[0].fetch_add(1u32);
                         let q = 6u32 * at;
                         s_q[q as usize] = i;
@@ -2087,6 +2100,8 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// The field's certificate (`FieldSetup::fc`), low and high words.
     fc: [u32; 2],
     hist: bool,
+    /// `tlay` carries the parents' cube digits (2 words an entry after the 5-word entries).
+    pcm_on: bool,
     max_slots: usize,
     /// The layout's bytes, and its largest buffer (for errors).
     bytes: usize,
@@ -2200,7 +2215,8 @@ impl<R: Runtime> JoinDevice<R> {
             ]);
         }
         let hist = std::env::var("NICE_EXP_TOP_HIST").is_ok_and(|v| v == "1");
-        if hist {
+        let pcm_on = hist || top_er() & 8 != 0;
+        if pcm_on {
             // The parent's pure cube digits (no closure), 2 words per entry.
             let big_w = fs.w * u128::from(fs.nparts);
             let (s, ei) = (fs.s, fs.e - 1);
@@ -2288,6 +2304,7 @@ impl<R: Runtime> JoinDevice<R> {
                 [w[0], w[1]]
             },
             hist,
+            pcm_on,
             max_slots,
             bytes: plan.bytes,
             largest: (max_slots * fp.largest_per_slot())
@@ -2402,7 +2419,7 @@ impl<R: Runtime> JoinDevice<R> {
                 c,
                 CubeCount::Static(top_cubes, nslots_u32, 1),
                 CubeDim::new_1d(JOIN_WG),
-                ArrayArg::from_raw_parts(self.tlay.clone(), if self.hist { 7 } else { 5 } * ntl),
+                ArrayArg::from_raw_parts(self.tlay.clone(), if self.pcm_on { 7 } else { 5 } * ntl),
                 ArrayArg::from_raw_parts(vs_h.clone(), nslots),
                 ArrayArg::from_raw_parts(self.fb.clone(), 10),
                 ArrayArg::from_raw_parts(self.pw.clone(), self.pw_len),
