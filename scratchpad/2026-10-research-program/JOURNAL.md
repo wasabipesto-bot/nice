@@ -4,6 +4,12 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-01 13:05 UTC: run closing
+
+- **PR #237 opened** (top kernel part 2: limb skip + (a) + (c) on #235; ×1.100 vs #235 at b62 1e17,
+  ×1.21 vs main; L33.2). All boxes destroyed; November research $3.82. Report sent. Open program
+  PRs: #235, #236, #237. Fallback reminder deleted.
+
 ## 2026-11-01 (routine fired 04:41 UTC, inside the extended run)
 
 - Reconcile: November research invoiced $2.13 (the H100/L40S hour is most of it); credit $59.03;
