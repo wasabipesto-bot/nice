@@ -1,0 +1,86 @@
+== h100
+-- niceonly: backends ['CubeCL CUDA device 0, batch size 50000000']
+  b58_msd_strong   median 2.171e+15  runs 2.201e+15, 2.171e+15, 2.168e+15  spread 1.5 %
+  b58_msd_weak     median 3.724e+14  runs 3.749e+14, 3.688e+14, 3.724e+14  spread 1.6 %
+  b60_msd_weak     median 7.082e+14  runs 7.082e+14, 7.050e+14, 7.118e+14  spread 1.0 %
+  b62_msd_weak     median 9.077e+14  runs 9.137e+14, 9.077e+14, 9.045e+14  spread 1.0 %
+  score median 8349  runs [8405, 8318, 8349]  spread 1.0 %
+    niceonly_1.log {'b58_msd_weak': ('join', '3364/3364', 3.023), 'b58_msd_strong': ('join', '3364/3364', 0.514), 'b60_msd_weak': ('join', '984/3600', 6.495), 'b62_msd_weak': ('join', '1944/3844', 7.466)}
+    niceonly_2.log {'b58_msd_weak': ('join', '3364/3364', 3.068), 'b58_msd_strong': ('join', '3364/3364', 0.519), 'b60_msd_weak': ('join', '966/3600', 6.44), 'b62_msd_weak': ('join', '1971/3844', 7.569)}
+    niceonly_3.log {'b58_msd_weak': ('join', '3364/3364', 3.043), 'b58_msd_strong': ('join', '3364/3364', 0.521), 'b60_msd_weak': ('join', '978/3600', 6.447), 'b62_msd_weak': ('join', '1971/3844', 7.586)}
+-- detailed: backends ['CubeCL CUDA device 0, batch size 50000000']
+  b40_detailed     median 6.654e+10  runs 6.702e+10, 6.605e+10  spread 1.5 %
+  b50_detailed     median 5.912e+10  runs 5.945e+10, 5.879e+10  spread 1.1 %
+  score median 33055.5  runs [33268, 32843]  spread 1.3 %
+    detailed_1.log {'b40_detailed': (None, None, 53.998), 'b50_detailed': (None, None, 54.001)}
+    detailed_2.log {'b40_detailed': (None, None, 54.0), 'b50_detailed': (None, None, 54.002)}
+-- join_b60_1e16.log: device=NVIDIA H100 80GB HBM3 base=60 fields=1 in_flight=2 secs=20.10 per_field=20.095 rate=4.976e14 n/s | setup=1.127s device=18.968s wall=18.968s batches=600 slots=6 plan_mib=2655 | empty_top=0 retried=0 splits=0 survivors=226717051590 checked=15869342739 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+     debug b60: setup 0.020 device 1.976 slices 1 partitions 3600 batches 225 slots 16 (min 16) 1577 MiB surv 1258753764 checked 84325537 rerun 0 splits 0 total 1.976
+     debug b60: setup 1.127 device 18.968 slices 1 partitions 3600 batches 600 slots 6 (min 6) 2655 MiB surv 226717051590 checked 15869342739 rerun 0 splits 0 total 18.968
+-- join_b62_1e16_r1.log: device=NVIDIA H100 80GB HBM3 base=62 fields=1 in_flight=2 secs=12.71 per_field=12.713 rate=7.866e14 n/s | setup=0.858s device=11.856s wall=11.856s batches=428 slots=9 plan_mib=2858 | empty_top=0 retried=0 splits=0 survivors=117141275114 checked=7182748404 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+     debug b62: setup 0.026 device 2.051 slices 1 partitions 3844 batches 241 slots 16 (min 16) 1754 MiB surv 1059648924 checked 64945737 rerun 0 splits 0 total 2.052
+     debug b62: setup 0.858 device 11.856 slices 1 partitions 3844 batches 428 slots 9 (min 9) 2858 MiB surv 117141275114 checked 7182748404 rerun 0 splits 0 total 11.856
+-- join_b62_1e16_r2.log: device=NVIDIA H100 80GB HBM3 base=62 fields=1 in_flight=2 secs=12.72 per_field=12.718 rate=7.863e14 n/s | setup=0.856s device=11.862s wall=11.862s batches=428 slots=9 plan_mib=2858 | empty_top=0 retried=0 splits=0 survivors=117141269157 checked=7182754292 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+     debug b62: setup 0.027 device 2.058 slices 1 partitions 3844 batches 241 slots 16 (min 16) 1754 MiB surv 1059648924 checked 64945737 rerun 0 splits 0 total 2.058
+     debug b62: setup 0.856 device 11.862 slices 1 partitions 3844 batches 428 slots 9 (min 9) 2858 MiB surv 117141269157 checked 7182754292 rerun 0 splits 0 total 11.862
+-- join_b62_1e17.log: device=NVIDIA H100 80GB HBM3 base=62 fields=1 in_flight=2 secs=103.84 per_field=103.835 rate=9.631e14 n/s | setup=7.150s device=102.634s wall=102.696s batches=3785 slots=6 plan_mib=2594 | empty_top=0 retried=0 splits=0 survivors=1020747882005 checked=62674418502 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+     debug b62: setup 0.026 device 2.347 slices 1 partitions 3844 batches 241 slots 16 (min 16) 1754 MiB surv 1059648924 checked 64945737 rerun 0 splits 0 total 2.347
+     debug b62: setup 7.150 device 102.634 slices 7 partitions 3844 batches 3785 slots 6 (min 6) 2594 MiB surv 1020747882005 checked 62674418502 rerun 0 splits 0 total 102.696
+-- xjoin_b60_1e16_f2.log: device=NVIDIA H100 80GB HBM3 base=60 fields=2 in_flight=2 secs=39.39 per_field=19.693 rate=5.078e14 n/s | setup=1.127s device=19.119s wall=28.030s batches=600 slots=6 plan_mib=2664 | empty_top=0 retried=0 splits=0 survivors=459470366429 checked=32157016735 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+     debug b60: setup 0.019 device 2.293 slices 1 partitions 3600 batches 225 slots 16 (min 16) 1577 MiB surv 1258753764 checked 84325537 rerun 0 splits 0 total 2.294
+     debug b60: setup 1.133 device 18.929 slices 1 partitions 3600 batches 600 slots 6 (min 6) 2655 MiB surv 226716952955 checked 15869437987 rerun 0 splits 0 total 18.929
+     debug b60: setup 1.120 device 19.310 slices 1 partitions 3600 batches 600 slots 6 (min 6) 2664 MiB surv 232753413474 checked 16287578748 rerun 0 splits 0 total 37.132
+-- xjoin_b62_1e16_f2.log: device=NVIDIA H100 80GB HBM3 base=62 fields=2 in_flight=2 secs=17.74 per_field=8.871 rate=1.127e15 n/s | setup=0.613s device=8.436s wall=14.204s batches=334 slots=16 plan_mib=2858 | empty_top=0 retried=0 splits=0 survivors=163511682745 checked=10029495532 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+     debug b62: setup 0.026 device 2.064 slices 1 partitions 3844 batches 241 slots 16 (min 16) 1754 MiB surv 1059648924 checked 64945737 rerun 0 splits 0 total 2.064
+     debug b62: setup 0.859 device 11.892 slices 1 partitions 3844 batches 428 slots 9 (min 9) 2858 MiB surv 117141282508 checked 7182741433 rerun 0 splits 0 total 11.892
+     debug b62: setup 0.367 device 4.981 slices 1 partitions 3844 batches 241 slots 16 (min 16) 2770 MiB surv 46370400237 checked 2846754099 rerun 0 splits 0 total 16.516
+-- xjoin_b62_1e17.log: device=NVIDIA H100 80GB HBM3 base=62 fields=1 in_flight=2 secs=103.52 per_field=103.523 rate=9.660e14 n/s | setup=7.171s device=102.323s wall=102.386s batches=3785 slots=6 plan_mib=2594 | empty_top=0 retried=0 splits=0 survivors=1020747723727 checked=62674569351 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+     debug b62: setup 0.026 device 2.058 slices 1 partitions 3844 batches 241 slots 16 (min 16) 1754 MiB surv 1059648924 checked 64945737 rerun 0 splits 0 total 2.059
+     debug b62: setup 7.171 device 102.323 slices 7 partitions 3844 batches 3785 slots 6 (min 6) 2594 MiB surv 1020747723727 checked 62674569351 rerun 0 splits 0 total 102.386
+-- xjoin_b64_1e16_f2.log: device=NVIDIA H100 80GB HBM3 base=64 fields=2 in_flight=2 secs=45.02 per_field=22.508 rate=4.443e14 n/s | setup=0.795s device=22.106s wall=32.733s batches=410 slots=10 plan_mib=3533 | empty_top=0 retried=0 splits=0 survivors=787571963774 checked=47913046984 found=0 | peak_in_use_mib=0 peak_reserved_mib=19
+     debug b64: setup 0.026 device 2.262 slices 1 partitions 4096 batches 256 slots 16 (min 16) 1803 MiB surv 5001575651 checked 304016264 rerun 0 splits 0 total 2.263
+     debug b64: setup 0.796 device 22.041 slices 1 partitions 4096 batches 410 slots 10 (min 10) 3526 MiB surv 394055106065 checked 23974284502 rerun 0 splits 0 total 22.041
+     debug b64: setup 0.795 device 22.171 slices 1 partitions 4096 batches 410 slots 10 (min 10) 3533 MiB surv 393516857709 checked 23938762482 rerun 0 splits 0 total 43.425
+== l40s
+-- niceonly: backends ['CubeCL CUDA device 0, batch size 50000000']
+  b58_msd_strong   median 2.378e+15  runs 2.472e+15, 2.378e+15, 2.360e+15  spread 4.7 %
+  b58_msd_weak     median 4.465e+14  runs 4.514e+14, 4.454e+14, 4.465e+14  spread 1.3 %
+  b60_msd_weak     median 9.226e+14  runs 9.195e+14, 9.507e+14, 9.226e+14  spread 3.4 %
+  b62_msd_weak     median 1.185e+15  runs 1.185e+15, 1.171e+15, 1.198e+15  spread 2.3 %
+  score median 10245  runs [10325, 10245, 10213]  spread 1.1 %
+    niceonly_1.log {'b58_msd_weak': ('join', '3364/3364', 2.877), 'b58_msd_strong': ('join', '3364/3364', 0.518), 'b60_msd_weak': ('join', '900/3600', 5.856), 'b62_msd_weak': ('join', '1863/3844', 6.006)}
+    niceonly_2.log {'b58_msd_weak': ('join', '3364/3364', 2.934), 'b58_msd_strong': ('join', '3364/3364', 0.534), 'b60_msd_weak': ('join', '648/3600', 5.711), 'b62_msd_weak': ('join', '1845/3844', 5.991)}
+    niceonly_3.log {'b58_msd_weak': ('join', '3364/3364', 2.94), 'b58_msd_strong': ('join', '3364/3364', 0.537), 'b60_msd_weak': ('join', '744/3600', 5.028), 'b62_msd_weak': ('join', '1161/3844', 5.725)}
+-- detailed: backends ['CubeCL CUDA device 0, batch size 50000000']
+  b40_detailed     median 8.826e+10  runs 8.851e+10, 8.802e+10  spread 0.6 %
+  b50_detailed     median 7.746e+10  runs 7.807e+10, 7.685e+10  spread 1.6 %
+  score median 43579.0  runs [43810, 43348]  spread 1.1 %
+    detailed_1.log {'b40_detailed': (None, None, 53.994), 'b50_detailed': (None, None, 53.996)}
+    detailed_2.log {'b40_detailed': (None, None, 53.993), 'b50_detailed': (None, None, 53.994)}
+-- join_b60_1e16.log: device=NVIDIA L40S base=60 fields=1 in_flight=2 secs=16.42 per_field=16.419 rate=6.091e14 n/s | setup=1.589s device=14.829s wall=14.829s batches=600 slots=6 plan_mib=2655 | empty_top=0 retried=0 splits=0 survivors=226707509476 checked=15878255180 found=0 | peak_in_use_mib=0 peak_reserved_mib=11
+     debug b60: setup 0.038 device 2.417 slices 1 partitions 3600 batches 225 slots 16 (min 16) 1577 MiB surv 1258753764 checked 84325537 rerun 0 splits 0 total 2.417
+     debug b60: setup 1.589 device 14.829 slices 1 partitions 3600 batches 600 slots 6 (min 6) 2655 MiB surv 226707509476 checked 15878255180 rerun 0 splits 0 total 14.829
+-- join_b62_1e16_r1.log: device=NVIDIA L40S base=62 fields=1 in_flight=2 secs=10.56 per_field=10.560 rate=9.470e14 n/s | setup=1.315s device=9.244s wall=9.244s batches=428 slots=9 plan_mib=2858 | empty_top=0 retried=0 splits=0 survivors=117140694350 checked=7183293005 found=0 | peak_in_use_mib=0 peak_reserved_mib=11
+     debug b62: setup 0.050 device 2.847 slices 1 partitions 3844 batches 241 slots 16 (min 16) 1754 MiB surv 1059648924 checked 64945737 rerun 0 splits 0 total 2.847
+     debug b62: setup 1.315 device 9.244 slices 1 partitions 3844 batches 428 slots 9 (min 9) 2858 MiB surv 117140694350 checked 7183293005 rerun 0 splits 0 total 9.244
+-- join_b62_1e16_r2.log: device=NVIDIA L40S base=62 fields=1 in_flight=2 secs=10.57 per_field=10.575 rate=9.457e14 n/s | setup=1.383s device=9.192s wall=9.192s batches=428 slots=9 plan_mib=2858 | empty_top=0 retried=0 splits=0 survivors=117140690293 checked=7183296772 found=0 | peak_in_use_mib=0 peak_reserved_mib=11
+     debug b62: setup 0.051 device 2.816 slices 1 partitions 3844 batches 241 slots 16 (min 16) 1754 MiB surv 1059648924 checked 64945737 rerun 0 splits 0 total 2.816
+     debug b62: setup 1.383 device 9.192 slices 1 partitions 3844 batches 428 slots 9 (min 9) 2858 MiB surv 117140690293 checked 7183296772 rerun 0 splits 0 total 9.192
+-- xjoin_b60_1e16_f2.log: device=NVIDIA L40S base=60 fields=2 in_flight=2 secs=31.38 per_field=15.689 rate=6.374e14 n/s | setup=1.297s device=14.938s wall=21.824s batches=600 slots=6 plan_mib=2664 | empty_top=0 retried=0 splits=0 survivors=459445465017 checked=32180262259 found=0 | peak_in_use_mib=0 peak_reserved_mib=11
+     debug b60: setup 0.039 device 2.170 slices 1 partitions 3600 batches 225 slots 16 (min 16) 1577 MiB surv 1258753764 checked 84325537 rerun 0 splits 0 total 2.170
+     debug b60: setup 1.487 device 14.865 slices 1 partitions 3600 batches 600 slots 6 (min 6) 2655 MiB surv 226707345984 checked 15878403230 rerun 0 splits 0 total 14.866
+     debug b60: setup 1.107 device 15.010 slices 1 partitions 3600 batches 600 slots 6 (min 6) 2664 MiB surv 232738119033 checked 16301859029 rerun 0 splits 0 total 28.783
+-- xjoin_b62_1e16_f2.log: device=NVIDIA L40S base=62 fields=2 in_flight=2 secs=14.73 per_field=7.365 rate=1.358e15 n/s | setup=0.940s device=6.611s wall=11.072s batches=334 slots=16 plan_mib=2858 | empty_top=0 retried=0 splits=0 survivors=163511046339 checked=10030092536 found=0 | peak_in_use_mib=0 peak_reserved_mib=11
+     debug b62: setup 0.050 device 2.532 slices 1 partitions 3844 batches 241 slots 16 (min 16) 1754 MiB surv 1059648924 checked 64945737 rerun 0 splits 0 total 2.533
+     debug b62: setup 1.496 device 9.293 slices 1 partitions 3844 batches 428 slots 9 (min 9) 2858 MiB surv 117140693071 checked 7183294390 rerun 0 splits 0 total 9.293
+     debug b62: setup 0.383 device 3.929 slices 1 partitions 3844 batches 241 slots 16 (min 16) 2770 MiB surv 46370353268 checked 2846798146 rerun 0 splits 0 total 12.851
+-- xjoin_b62_1e17.log: device=NVIDIA L40S base=62 fields=1 in_flight=2 secs=81.40 per_field=81.399 rate=1.229e15 n/s | setup=11.754s device=79.760s wall=79.834s batches=3785 slots=6 plan_mib=2594 | empty_top=0 retried=0 splits=0 survivors=1020737015457 checked=62684605394 found=0 | peak_in_use_mib=0 peak_reserved_mib=11
+     debug b62: setup 0.051 device 2.755 slices 1 partitions 3844 batches 241 slots 16 (min 16) 1754 MiB surv 1059648924 checked 64945737 rerun 0 splits 0 total 2.756
+     debug b62: setup 11.754 device 79.760 slices 7 partitions 3844 batches 3785 slots 6 (min 6) 2594 MiB surv 1020737015457 checked 62684605394 rerun 0 splits 0 total 79.834
+-- xjoin_b62_1e17_r2.log: device=NVIDIA L40S base=62 fields=1 in_flight=2 secs=79.52 per_field=79.525 rate=1.257e15 n/s | setup=10.853s device=77.897s wall=77.960s batches=3785 slots=6 plan_mib=2594 | empty_top=0 retried=0 splits=0 survivors=1020736994995 checked=62684630456 found=0 | peak_in_use_mib=0 peak_reserved_mib=11
+     debug b62: setup 0.050 device 2.520 slices 1 partitions 3844 batches 241 slots 16 (min 16) 1754 MiB surv 1059648924 checked 64945737 rerun 0 splits 0 total 2.520
+     debug b62: setup 10.853 device 77.897 slices 7 partitions 3844 batches 3785 slots 6 (min 6) 2594 MiB surv 1020736994995 checked 62684630456 rerun 0 splits 0 total 77.960
+-- xjoin_b64_1e16_f2.log: device=NVIDIA L40S base=64 fields=2 in_flight=2 secs=37.19 per_field=18.597 rate=5.377e14 n/s | setup=1.111s device=17.872s wall=26.421s batches=410 slots=10 plan_mib=3533 | empty_top=0 retried=0 splits=0 survivors=787569030950 checked=47915796667 found=0 | peak_in_use_mib=0 peak_reserved_mib=11
+     debug b64: setup 0.050 device 3.054 slices 1 partitions 4096 batches 256 slots 16 (min 16) 1803 MiB surv 5001575651 checked 304016264 rerun 0 splits 0 total 3.055
+     debug b64: setup 1.440 device 17.870 slices 1 partitions 4096 batches 410 slots 10 (min 10) 3526 MiB surv 394053103790 checked 23976161781 rerun 0 splits 0 total 17.870
+     debug b64: setup 0.782 device 17.874 slices 1 partitions 4096 batches 410 slots 10 (min 10) 3533 MiB surv 393515927160 checked 23939634886 rerun 0 splits 0 total 34.972

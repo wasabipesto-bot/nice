@@ -18,7 +18,7 @@ verdict missed (user, 2026-10-28).
 | L5 | Join wave size: 2 entries per thread with the prune, best at every base on two cards (L1.3/L1.4, EPT2-3080.md); **PR #216 open (2026-10-29)**, stacked on #215; also BACKLOG 19's occupancy hint | compute | PR open | 0–5 % | 1 day, $0.50 | no scenario moves 2 % | 2026-10-28 |
 | L7 | Weekly literature sweep: arXiv math.NT / cs.DS / cs.DC; join inner-loop techniques | math+compute | recurring (weekly); sweeps 1–2 done (`L7/2026-10-29.md`, `L7/2026-11-01.md`): no new papers either week; sweep 2 points at cost/rejection-ratio filter ordering (arXiv:2606.07589), warp-aggregated atomics for survivor staging, Barrett reduction for division-free digit extraction (L31), and arXiv:2608.13696's instruction-bound GPU DB profiling split | leads | 2 h/week | none | 2026-10-29 |
 | L8 | Near-miss tail test (BACKLOG 39) | science | queued | model validation | 2 days | none | 2026-10-28 |
-| L9 | H100 / L40S on the join (BACKLOG 59) | sourcing | queued | fleet pricing data | $1 | none | 2026-10-28 |
+| L9 | H100 / L40S on the join (BACKLOG 59) | sourcing | **done 2026-11-01 (L9.1, ~$2.7)**: H100 0.11–0.15× a 3080 per $, L40S 0.58–0.79×; break-even $0.24–0.33 / $0.31–0.43 per hour | fleet pricing data | $1 | none | 2026-11-01 |
 | L10 | Join past 64 (BACKLOG 31, `exp/join-wide`) | compute | held by the user until b64 is close | b65 $27–49K vs $1.0M | large | — | 2026-10-28 |
 
 ## Candidate pool (not yet scoped)

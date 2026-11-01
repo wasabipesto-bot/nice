@@ -29,6 +29,29 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L9.1 H100 SXM and L40S on the join and detailed mode (2026-11-01, agent; `L9/RESULTS.md`, `L9/raw/`)
+
+Upstream main fae7398, `auto` = CubeCL CUDA; nothing uploaded. Both host-capped (H100 500 of 700 W,
+~1.6 GHz; L40S 300 of 350 W, ~2.15 GHz), no thermal limits.
+
+| | H100 SXM ($2.14/h) | L40S ($0.54/h) | RTX 3080 180 W ($0.11–0.15/h) |
+|---|---|---|---|
+| NiceMark nice-only (median of 3) | 8,349 | 10,245 | 3,711 |
+| NiceMark detailed (2 runs) | 33,056 | 43,579 | 16,624 (320 W) |
+| b60 1e16 s/field | 20.1 | 16.4 | — |
+| b62 1e16 s/field | 12.7 | 10.6 | — |
+| b62 1e17 s/field | 103.8 / 103.5 | 81.4 / 79.5 | 229 |
+| numbers per $ at b62 1e17 | 1.6e18 | 8.3e18 | 1.05–1.43e19 |
+| per $ vs the 3080 | 0.11–0.15× | 0.58–0.79× | 1 |
+| break-even $/h | 0.24–0.33 | 0.31–0.43 | — |
+
+vs the 4090 (21.6–25.7k NiceMark per $/h): L40S 19.0k (0.74–0.88×), H100 3.9k. Join layout identical
+on both (b62 1e17: 7 slices × 3,844 partitions, 3,785 batches of 6, 2,594 MiB); survivor and check
+counts match the 3080 to 4–5 figures. The work is integer-bound: the H100's clock cap and bandwidth
+do not help. The join's memory budget stops at 4 GiB (join_plan.rs) so 46/80 GB sit idle (slices
+were measured not to be a lever in L1.7, so no action). **Fleet guidance:** never buy H100 at
+market; L40S only under ~$0.35/h.
+
 ## L30.1 Survivor handling in the join kernel: breakdown and the prefilter-in-the-walk prototype (2026-11-01, agent; `L30/SCOPING.md`, `L30/raw/`; branch `exp/join-survivors` 655f953)
 
 RTX 3080, b62 1e16, profiled join phase, runtime switches removing one piece at a time (2 rounds):

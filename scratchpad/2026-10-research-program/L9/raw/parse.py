@@ -31,7 +31,7 @@ def summary(runs):
 
 def joins(card):
     out = []
-    for f in sorted(glob.glob(f"{HERE}/{card}/join_*.log")):
+    for f in sorted(glob.glob(f"{HERE}/{card}/join_*.log") + glob.glob(f"{HERE}/{card}/xjoin_*.log")):
         txt = open(f).read()
         m = re.search(r"JOIN THROUGHPUT (.*)", txt)
         dbg = re.findall(r"overlap join (b\d+) .*?: setup ([\d.]+)s, device ([\d.]+)s \((\d+) slices of (\d+) partitions, (\d+) batches of (\d+) \(at least (\d+)\), (\d+) MiB\), (\d+) survivors, (\d+) checked, (\d+) re-run, (\d+) splits, total ([\d.]+)s", txt)

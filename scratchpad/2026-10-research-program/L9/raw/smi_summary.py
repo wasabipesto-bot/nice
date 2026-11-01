@@ -35,7 +35,7 @@ def load_dmon(path, day):
             rows.append(dict(t=t, w=float(f[2]), c=float(f[3]), smpct=float(f[5]), pclk=float(f[12])))
         except Exception: pass
     return rows
-smi = load_smi(f"{D}/smi.csv") + load_smi(f"{D}/smi_x.csv")
+smi = load_smi(f"{D}/smi.csv") + load_smi(f"{D}/smi_x.csv") + load_smi(f"{D}/smi_x2.csv")
 day = ph[0][0].date()
 dmon = load_dmon(f"{D}/dmon.log", day) + load_dmon(f"{D}/dmon_x.log", day)
 print(f"| phase | secs | smi samples (util>=50) | median SM MHz | median W | max W | max °C | throttle flags | dmon samples (sm>=50 %) | dmon median W / pclk / sm % |")
