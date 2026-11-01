@@ -4,6 +4,7 @@
 
 - Speed up the GPU overlap join's top certificates by turning only the low endpoint's powers into digits and deciding the high endpoint's from a carry test, as the CPU join does since [#204](https://github.com/wasabipesto/nice/pull/204).
 - Speed up the GPU overlap join by running its middle-digit prefilter on each pair as the join finds it, in the cheaper form the CPU join uses, so that only the few pairs that pass are staged and written out.
+- Speed up the GPU overlap join's top certificates by computing the difference of the endpoints' powers from the endpoints' difference, and its digit count from its bit length instead of a search.
 
 ## Nice v3.4.7
 
