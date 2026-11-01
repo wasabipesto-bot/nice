@@ -206,6 +206,9 @@ mod kernels {
     pub const X_PFNOSTAGE: u32 = 512;
     /// With `X_WALKPF`: the prefilter's digit tests on 32-bit words.
     pub const X_PF32: u32 = 1024;
+    /// 6 KiB of unused shared memory per cube: at most 4 cubes per SM
+    /// (main's occupancy at 62 registers), to separate the occupancy gain.
+    pub const X_OCC4: u32 = 2048;
 
     /// Count the cube in `ran[stage]` once every unit of it is done (see
     /// `JoinDevice::ensure_ran`). Every unit must reach it.
@@ -453,6 +456,14 @@ mod kernels {
             1usize
         }));
         let s_dummy = SharedMemory::<Atomic<u32>>::new(1usize);
+        let mut s_pad = SharedMemory::<u32>::new(comptime!(if xm & X_OCC4 != 0 {
+            1536usize
+        } else {
+            1usize
+        }));
+        if comptime!(xm & X_OCC4 != 0) {
+            s_pad[UNIT_POS_X as usize] = UNIT_POS_X;
+        }
         let mut nand = 0u32;
         let mut xacc = 0u32;
         let mut wrounds = 0u32;
@@ -802,6 +813,12 @@ mod kernels {
         }
         if x_dummy {
             if xacc == 0xDEAD_BEEFu32 {
+                staged[15].fetch_add(1u32);
+            }
+        }
+        if comptime!(xm & X_OCC4 != 0) {
+            sync_cube();
+            if s_pad[(UNIT_POS_X + 7u32) as usize] == 0xDEAD_BEEFu32 {
                 staged[15].fetch_add(1u32);
             }
         }
