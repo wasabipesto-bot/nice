@@ -29,6 +29,26 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L30.1 Survivor handling in the join kernel: breakdown and the prefilter-in-the-walk prototype (2026-11-01, agent; `L30/SCOPING.md`, `L30/raw/`; branch `exp/join-survivors` 655f953)
+
+RTX 3080, b62 1e16, profiled join phase, runtime switches removing one piece at a time (2 rounds):
+survivor handling = **81 ps per AND survivor** (73 % of the join, 35 % of the field; the fit's 61 ps
+understated it because survivors and AND lanes co-vary): prefilter arithmetic 35.5 ps (~290
+instructions, rebuilds all 8 digit columns though only positions 6–7 are new); staging + flush
+barriers/scans 17.7 ps (the shared atomic ~1 ps); set-bit walk 14.9 ps (23 % lane use); list writes
++ global atomic per flush round 11.9 ps. Prefilter keeps 6.13 / 6.13 / 6.70 % (b62 1e16 / 1e17 / b60
+1e16); position 6 alone ~26 %, n²'s digit at 6 alone ~52 %; a third position would leave 20–21 %
+(≤ 1.9 % gross, ~1–1.5 % net). Ballot compaction of the atomic ~1 ps (not worth it).
+**Prototype (`NICE_EXP_L30=256`, ~110 lines): the prefilter runs in the walk, before the stage,
+hoisted as the CPU join does (per-top part, per-entry part, ~50 instructions per pair).** Speed:
+**b62 1e17 ×0.833 (225.7 → 188.0 s)**, b62 1e16 ×0.839 (3 rounds; ×0.850 vs main's own binary), b60
+1e16 ×0.803; clock-normalised ×0.847 / 0.860 / 0.819. Exact: AND survivors = PROFILE-3's counts to
+the last digit at all three sizes; the stage overrun disappears; CPU-join comparison on 4 partitions
+equal. Registers 62 → 44 (occupancy is not the source: capping it back costs 1.3 %). Before a PR:
+the per-entry buffer in the memory plan; the Metal rule on the new `(ac >> 16) + …` division (a sum
+dividend; the lint decides). Unprototyped follow-ups: plane-compacting survivors before the
+prefilter (est. 5–10 % more), the third prefilter digit (~1–1.5 %).
+
 ## L29.1 GPU top certificate from one endpoint's digits and a carry test (2026-11-01, agent; `L29/RESULTS.md`, `L29/raw/`; PR #235, branch `pr/join-top-cert-fast` d6cc9da on 9bde4a8)
 
 `cert_power` divides only a^j into digits, keeps both candidate answers while scanning, and picks
