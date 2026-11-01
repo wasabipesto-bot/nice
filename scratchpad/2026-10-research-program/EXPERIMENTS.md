@@ -71,6 +71,19 @@ do not help. The join's memory budget stops at 4 GiB (join_plan.rs) so 46/80 GB 
 were measured not to be a lever in L1.7, so no action). **Fleet guidance:** never buy H100 at
 market; L40S only under ~$0.35/h.
 
+## L31.2 (a)+(c) on the combined tree (2026-11-01, agent; `L31/AB-COMBINED.md`, `L31/ab-raw/`; branch `exp/top-cert-2b` eb3d7e6 on e9cdac4)
+
+RTX 3080 180 W (m139250), A = combined e9cdac4, interleaved: **b62 1e17 ×1.045 (5 rounds, 1.023–1.057;
+A's spread 3.9 %), b62 1e16 ×1.038 (6 rounds), b60 1e16 ×1.059, b64 1e16 ×1.022, NiceMark ×1.041**
+(b60 ×1.056, b62 ×1.054, b58 weak ×1.041, strong ×1.019). The ~7 % projection came out at 4–6 %
+(top kernel not profiled; gap unexplained). Exact: certificate test with #235's counts on CUDA,
+lavapipe naga and SPIR-V (now also checks the power differences word for word; the old binary
+search stays in the reference scan); join parity incl. b50/b54, dense fields, whole b42; 1e14
+counts = A; new host test for the digit-count constants at bases 10–64; fmt/clippy ×3 clean; lint 0
+flagged. SPIR-V TopKernel blocks 478 → 366 (b57), 496 → 384 (b64). **Verdict: no-go narrowly** (b60
+clears 5 %, b62 does not). Options for the user: ship as an exact ×1.04–1.06 kernel shrink; add the
+Barrett step after an M4 run; fold into the next cert_power change.
+
 ## L32.1 Wave padding after #236: bucket-sized tail wave (2026-11-01, agent; `L32/SCOPING.md`, `L32/raw/`; branch `exp/join-padding` ed8bc8c, switch `NICE_EXP_JOIN_TAIL=1`)
 
 Combined tree (e9cdac4), RTX 3080. Accounting: at b62 1e17 every bucket fits one 512-lane wave
