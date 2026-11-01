@@ -15,6 +15,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   → prototype ×0.833 at b62 1e17 → PR agent running (box `l30-pr`); top-kernel part-2 scoping
   running (box `topcert2`). Boxes destroyed: survivors, profile-1e17, topcert, fd-u32mask,
   l9-h100, l9-l40s, topcert-spirv.
+- **PR #236 opened** (prefilter in the walk: ×1.215 b62 1e17, NiceMark ×1.194; L30.2); CI watching.
+  Combined #235+#236 A/B vs main running (box `combined`, PL); top-kernel part-2 scoping running
+  (box `topcert2`). Live boxes: topcert2, combined.
 - Plan: finish L30 scoping (→ PR if ≥ 5 %); #235 CI; L9 H100 + L40S rates (two boxes, ~$2);
   weekly literature sweep (L7); an Apple Feedback draft for the user; the top kernel's e^j
   follow-up if L30 yields nothing; worktree/disk hygiene; final report before 14:00 UTC. The
