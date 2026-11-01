@@ -97,6 +97,10 @@ The other phases stay within their round-to-round variation (up to 5 % for the j
 - **Hits:** none anywhere.
 - **Host suite:** `nice_common`, 221 passed. fmt and clippy are clean with default features, `nice_client/gpu` and `nice_client/gpu,nice_client/cubecl-spirv`.
 
+## Compiler note
+
+CubeCL's direct SPIR-V compiler recurses about one stack frame per two code blocks (roughly 1.1 kB each) on CubeCL's device thread, which has a 2 MiB stack. The first version of this change made the certificate test's kernel (four power scans plus `top_cert` in one kernel, up to 2,101 blocks) overflow that stack on lavapipe, while naga's WGSL path compiled it. The second commit makes `cert_power` branch once per chunk instead of once per digit (a chunk wholly below `c0` is used as its value; other chunks fold in their digits with selects), which cuts the base-64 top kernel from 778 blocks to 496, below `main`'s 580 (peak compiler stack 512 kB against 620 kB on `main`), and splits the certificate test's kernel into three launches (largest 548 blocks). Both lavapipe steps pass (SPIR-V 24 tests, naga 29), the certificate test keeps its exact counts (102,365 intervals, 33,582 kept), and the join is slightly faster again: on an RTX 3060 at base 62, 1e16, main 35.18 s, first version 32.84 s (×1.071), this version 32.09 s (×1.096), two interleaved rounds.
+
 ## Not in this PR
 
 - e^j is still computed by schoolbook, though it is now only used for e^j − a^j. With δ = e − a < 2^32 that difference is δ(2a + δ) and δ(3a² + 3aδ + δ²), which would replace e's two products. By operation count that is an estimated tenth or less of the certificate's arithmetic.

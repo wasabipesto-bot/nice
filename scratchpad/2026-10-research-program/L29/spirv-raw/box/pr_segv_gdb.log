@@ -1,1 +1,80 @@
 Sun Nov  1 02:46:26 UTC 2026
+warning: Error disabling address space randomization: Operation not permitted
+
+running 1 test
+test cubecl_join::tests::top_certificates_match_the_lockstep_scan_and_the_cpu ... 
+Thread 71 "DSD-4-0" received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 0x72880c2ee6c0 (LWP 13454)]
+0x00005e689bdfed91 in <cubecl_spirv::compiler::SpirvCompiler>::compile_arithmetic ()
+STACKHW segv thread=DSD-4-0 lwp=13812 map=2048kB rss=16kB sp_depth=6kB
+FRAMES segv thread=DSD-4-0 depth=7
+       2 
+       1 syscall
+       1 std::thread::functions::park
+       1 std::sys::backtrace::__rust_begin_short_backtrace::
+       1 start_thread
+       1 clone
+STACKHW segv thread=DSD-4-0 lwp=13454 map=4kB rss=0kB sp_depth=0kB
+FRAMES segv thread=DSD-4-0 depth=1093
+    1088 
+       2 std::panicking::catch_unwind::do_call::
+       1 std::sys::backtrace::__rust_begin_short_backtrace::
+       1 start_thread
+       1 clone
+#0  0x00005e689bdfed91 in <cubecl_spirv::compiler::SpirvCompiler>::compile_arithmetic ()
+#1  0x00005e689bdf3e15 in <cubecl_spirv::compiler::SpirvCompiler>::compile_operation ()
+#2  0x00005e689bdecc22 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#3  0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#4  0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#5  0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#6  0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#7  0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#8  0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#9  0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#10 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#11 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#12 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#13 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#14 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#15 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#16 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#17 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#18 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#19 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#20 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#21 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#22 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#23 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#24 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#25 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#26 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#27 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#28 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#29 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1068 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1069 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1070 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1071 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1072 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1073 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1074 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1075 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1076 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1077 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1078 0x00005e689bdedd34 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1079 0x00005e689bded7b9 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1080 0x00005e689bdee010 in <cubecl_spirv::compiler::SpirvCompiler>::compile_block ()
+#1081 0x00005e689bdd453e in <cubecl_spirv::compiler::SpirvCompiler>::compile_kernel ()
+#1082 0x00005e689bdc9d15 in <cubecl_wgpu::compiler::base::AutoCompiler as cubecl_runtime::compiler::Compiler>::compile ()
+#1083 0x00005e689baae1f7 in <cubecl_runtime::kernel::KernelTask<cubecl_wgpu::compiler::base::AutoCompiler, nice_common::cubecl_join::tests::cert_kernels::cert_test_kernel::CertTestKernel<cubecl_wgpu::runtime::WgpuRuntime>> as cubecl_runtime::compiler::CubeTask<cubecl_wgpu::compiler::base::AutoCompiler>>::compile ()
+#1084 0x00005e689bda3447 in <cubecl_wgpu::compute::server::WgpuServer as cubecl_runtime::server::base::ComputeServer>::launch ()
+#1085 0x00005e689b8418de in std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<<cubecl_common::device::handle::channel::ChannelDeviceHandle<_>>::run_scoped::create_shim<<cubecl_common::device::handle::channel::ChannelDeviceHandle<cubecl_wgpu::compute::server::WgpuServer>>::run_scoped<(), <cubecl_common::device::handle::channel::ChannelDeviceHandle<cubecl_wgpu::compute::server::WgpuServer> as cubecl_common::device::handle::base::DeviceHandleSpec<cubecl_wgpu::compute::server::WgpuServer>>::submit_blocking<(), <cubecl_runtime::client::ComputeClient<cubecl_wgpu::runtime::WgpuRuntime>>::launch_inner::{closure#1}::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>, ()> ()
+#1086 0x00005e689b83c954 in std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<<cubecl_common::device::handle::channel::ChannelDeviceHandle<_>>::run_scoped::create_shim<<cubecl_common::device::handle::channel::ChannelDeviceHandle<cubecl_wgpu::compute::server::WgpuServer>>::run_scoped<core::result::Result<core::result::Result<((), cubecl_common::profile::ProfileDuration), cubecl_runtime::server::base::ProfileError>, cubecl_runtime::server::base::ServerError>, <cubecl_common::device::handle::channel::ChannelDeviceHandle<cubecl_wgpu::compute::server::WgpuServer> as cubecl_common::device::handle::base::DeviceHandleSpec<cubecl_wgpu::compute::server::WgpuServer>>::exclusive<core::result::Result<core::result::Result<((), cubecl_common::profile::ProfileDuration), cubecl_runtime::server::base::ProfileError>, cubecl_runtime::server::base::ServerError>, <cubecl_runtime::client::ComputeClient<cubecl_wgpu::runtime::WgpuRuntime>>::profile<(), <cubecl_runtime::client::ComputeClient<cubecl_wgpu::runtime::WgpuRuntime>>::launch_inner::{closure#1}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>, ()> ()
+#1087 0x00005e689bab6334 in <<cubecl_common::device::handle::channel::task::Task>::init<<cubecl_common::device::handle::channel::ChannelDeviceHandle<_>>::run_scoped::create_shim<<cubecl_common::device::handle::channel::ChannelDeviceHandle<cubecl_wgpu::compute::server::WgpuServer>>::run_scoped<core::result::Result<core::result::Result<((), cubecl_common::profile::ProfileDuration), cubecl_runtime::server::base::ProfileError>, cubecl_runtime::server::base::ServerError>, <cubecl_common::device::handle::channel::ChannelDeviceHandle<cubecl_wgpu::compute::server::WgpuServer> as cubecl_common::device::handle::base::DeviceHandleSpec<cubecl_wgpu::compute::server::WgpuServer>>::exclusive<core::result::Result<core::result::Result<((), cubecl_common::profile::ProfileDuration), cubecl_runtime::server::base::ProfileError>, cubecl_runtime::server::base::ServerError>, <cubecl_runtime::client::ComputeClient<cubecl_wgpu::runtime::WgpuRuntime>>::profile<(), <cubecl_runtime::client::ComputeClient<cubecl_wgpu::runtime::WgpuRuntime>>::launch_inner::{closure#1}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0} as core::ops::function::FnOnce<(&mut cubecl_common::device::handle::channel::task::Task,)>>::call_once ()
+#1088 0x00005e689bb47f17 in std::sys::backtrace::__rust_begin_short_backtrace::<<cubecl_common::device::handle::channel::custom_channel::DeviceClient>::new<<cubecl_common::device::handle::channel::DeviceRunner>::start::{closure#0}>::{closure#0}, ()> ()
+#1089 0x00005e689bb4aaa9 in <std::thread::lifecycle::spawn_unchecked<<cubecl_common::device::handle::channel::custom_channel::DeviceClient>::new<<cubecl_common::device::handle::channel::DeviceRunner>::start::{closure#0}>::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0} ()
+#1090 0x00005e689c165d72 in <std::sys::thread::unix::Thread>::new::thread_start ()
+#1091 0x0000728815401b84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#1092 0x000072881548ecc4 in clone () at ../sysdeps/unix/sysv/linux/x86_64/clone.S:100
+[Inferior 1 (process 13232) killed]
+Sun Nov  1 02:57:58 UTC 2026

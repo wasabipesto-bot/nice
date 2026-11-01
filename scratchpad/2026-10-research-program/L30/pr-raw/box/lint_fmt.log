@@ -1,0 +1,13 @@
+Diff in /root/src-pr/common/src/cubecl_join.rs:1310:
+         let bm = comptime!(base.pow(k2 - k));
+         // b^k and b^2k mod b^mid: zero unless k < mid.
+         let bk = comptime!(if k < k2 - k { base.pow(k) } else { 0 });
+-        let b2k = comptime!(if 2 * k < k2 - k {
+-            base.pow(2 * k)
+-        } else {
+-            0
+-        });
++        let b2k = comptime!(if 2 * k < k2 - k { base.pow(2 * k) } else { 0 });
+         let dm = dmv & 0xFFFFu32;
+         let mut seen = (u64::cast_from(mhi) << 32u64) | u64::cast_from(mlo);
+         if (dmv >> 16u32) != 0u32 {

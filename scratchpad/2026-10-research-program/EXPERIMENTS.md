@@ -91,6 +91,20 @@ the per-entry buffer in the memory plan; the Metal rule on the new `(ac >> 16) +
 dividend; the lint decides). Unprototyped follow-ups: plane-compacting survivors before the
 prefilter (est. 5–10 % more), the third prefilter digit (~1–1.5 %).
 
+## L29.2 #235 SPIR-V compiler stack overflow, cause and fix (2026-11-01, agent; `L29/SPIRV-FIX.md`, `L29/spirv-raw/`; head 6e7475e)
+
+CubeCL's SPIR-V compiler nests ~1 `compile_block` frame per 2 code blocks (~1.1 kB each) on the
+device thread `DSD-4-0` (default 2 MiB stack); gdb showed 1,079 nested frames at the overflow. The
+PR's certificate test kernel (four power scans + `top_cert`, up to 2,101 blocks; b47 with 3 words
+failed first; b50 needs 2.26 MB) overflowed; production kernels did not, but the PR had grown the
+b64 top kernel 580 → 778 blocks (peak 620 → 868 kB in the join parity test). naga's WGSL path
+compiles differently. **Fix:** `cert_power` branches once per chunk (a chunk wholly below c0 is used
+as its value; other chunks fold digits with selects): b64 top kernel 496 blocks (< main's 580),
+512 kB peak; the test launches in three parts (largest 548 blocks). Verified on the box (Mesa 25.2.8,
+rustc 1.99.1): both lavapipe steps (SPIR-V 24, naga 29), lint 0/15, CUDA parity + certificate test
+with L29's exact counts, fmt/clippy clean. Speed RTX 3060 b62 1e16, 2 rounds: main 35.18 s, PR
+32.84 (×1.071), fix 32.09 (×1.096 over main). **#235 CI green (25 pass).**
+
 ## L29.1 GPU top certificate from one endpoint's digits and a carry test (2026-11-01, agent; `L29/RESULTS.md`, `L29/raw/`; PR #235, branch `pr/join-top-cert-fast` d6cc9da on 9bde4a8)
 
 `cert_power` divides only a^j into digits, keeps both candidate answers while scanning, and picks

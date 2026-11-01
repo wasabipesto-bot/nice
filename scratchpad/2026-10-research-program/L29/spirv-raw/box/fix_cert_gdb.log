@@ -1,1 +1,100 @@
 Sun Nov  1 02:46:26 UTC 2026
+Catchpoint 1 (syscall 'exit_group' [231])
+warning: Error disabling address space randomization: Operation not permitted
+
+running 1 test
+test cubecl_join::tests::top_certificates_match_the_lockstep_scan_and_the_cpu ... llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): 1047 intervals, 340 kept; 2080 of the powers scanned above c0, 721 of them with the carry
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 235 filtered out; finished in 375.94s
+
+
+Thread 1 "bin_fix_spirv" hit Catchpoint 1 (call to syscall exit_group), __GI__exit (status=status@entry=0) at ../sysdeps/unix/sysv/linux/_exit.c:30
+warning: 30	../sysdeps/unix/sysv/linux/_exit.c: No such file or directory
+STACKHW exit thread=DSD-4-0 lwp=13815 map=262144kB rss=16kB sp_depth=6kB
+FRAMES exit thread=DSD-4-0 depth=7
+       2 
+       1 syscall
+       1 std::thread::functions::park
+       1 std::sys::backtrace::__rust_begin_short_backtrace::
+       1 start_thread
+       1 clone
+STACKHW exit thread=DSD-4-0 lwp=13813 map=262144kB rss=584kB sp_depth=6kB
+FRAMES exit thread=DSD-4-0 depth=6
+       2 
+       1 __GI___clock_nanosleep
+       1 std::sys::backtrace::__rust_begin_short_backtrace::
+       1 start_thread
+       1 clone
+  Id   Target Id                                           Frame 
+  1    Thread 0x7cf56e7ba040 (LWP 13231) "bin_fix_spirv"   __GI__exit (status=status@entry=0) at ../sysdeps/unix/sysv/linux/_exit.c:30
+  4    Thread 0x7cf55d2ab6c0 (LWP 13499) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=1365880524, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c08c0) at ./nptl/futex-internal.c:57
+  5    Thread 0x7cf55caaa6c0 (LWP 13517) "llvmpipe-0"      0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c39b8) at ./nptl/futex-internal.c:57
+  6    Thread 0x7cf54629e6c0 (LWP 13523) "llvmpipe-1"      0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c3b1c) at ./nptl/futex-internal.c:57
+  7    Thread 0x7cf545a9d6c0 (LWP 13530) "llvmpipe-2"      0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c3c7c) at ./nptl/futex-internal.c:57
+  8    Thread 0x7cf54529c6c0 (LWP 13536) "llvmpipe-3"      0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c3ddc) at ./nptl/futex-internal.c:57
+  9    Thread 0x7cf544a9b6c0 (LWP 13542) "llvmpipe-4"      0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c3f3c) at ./nptl/futex-internal.c:57
+  10   Thread 0x7cf5376716c0 (LWP 13547) "llvmpipe-5"      0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c409c) at ./nptl/futex-internal.c:57
+  11   Thread 0x7cf536e706c0 (LWP 13553) "llvmpipe-6"      0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c41fc) at ./nptl/futex-internal.c:57
+  12   Thread 0x7cf53666f6c0 (LWP 13559) "llvmpipe-7"      0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c435c) at ./nptl/futex-internal.c:57
+  13   Thread 0x7cf535e6e6c0 (LWP 13567) "llvmpipe-8"      0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c44bc) at ./nptl/futex-internal.c:57
+  14   Thread 0x7cf53566d6c0 (LWP 13571) "llvmpipe-9"      0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c461c) at ./nptl/futex-internal.c:57
+  15   Thread 0x7cf534e6c6c0 (LWP 13577) "llvmpipe-10"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c477c) at ./nptl/futex-internal.c:57
+  16   Thread 0x7cf50ffff6c0 (LWP 13583) "llvmpipe-11"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c48dc) at ./nptl/futex-internal.c:57
+  17   Thread 0x7cf50f7fe6c0 (LWP 13589) "llvmpipe-12"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c4a3c) at ./nptl/futex-internal.c:57
+  18   Thread 0x7cf50effd6c0 (LWP 13595) "llvmpipe-13"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c4b9c) at ./nptl/futex-internal.c:57
+  19   Thread 0x7cf50e7fc6c0 (LWP 13598) "llvmpipe-14"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c4cfc) at ./nptl/futex-internal.c:57
+  20   Thread 0x7cf50dffb6c0 (LWP 13603) "llvmpipe-15"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c4e5c) at ./nptl/futex-internal.c:57
+  21   Thread 0x7cf50d7fa6c0 (LWP 13609) "llvmpipe-16"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c4fbc) at ./nptl/futex-internal.c:57
+  22   Thread 0x7cf50cff96c0 (LWP 13614) "llvmpipe-17"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c511c) at ./nptl/futex-internal.c:57
+  23   Thread 0x7cf4e3fff6c0 (LWP 13620) "llvmpipe-18"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c527c) at ./nptl/futex-internal.c:57
+  24   Thread 0x7cf4e37fe6c0 (LWP 13625) "llvmpipe-19"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c53dc) at ./nptl/futex-internal.c:57
+  25   Thread 0x7cf4e2ffd6c0 (LWP 13633) "llvmpipe-20"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c553c) at ./nptl/futex-internal.c:57
+  26   Thread 0x7cf4e27fc6c0 (LWP 13643) "llvmpipe-21"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c569c) at ./nptl/futex-internal.c:57
+  27   Thread 0x7cf4e1ffb6c0 (LWP 13650) "llvmpipe-22"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c57f8) at ./nptl/futex-internal.c:57
+  28   Thread 0x7cf4e17fa6c0 (LWP 13655) "llvmpipe-23"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c5958) at ./nptl/futex-internal.c:57
+  29   Thread 0x7cf4e0ff96c0 (LWP 13659) "llvmpipe-24"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c5ab8) at ./nptl/futex-internal.c:57
+  30   Thread 0x7cf4c3fff6c0 (LWP 13669) "llvmpipe-25"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c5c18) at ./nptl/futex-internal.c:57
+  31   Thread 0x7cf4c37fe6c0 (LWP 13673) "llvmpipe-26"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c5d78) at ./nptl/futex-internal.c:57
+  32   Thread 0x7cf4c2ffd6c0 (LWP 13676) "llvmpipe-27"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c5ed8) at ./nptl/futex-internal.c:57
+  33   Thread 0x7cf4c27fc6c0 (LWP 13679) "llvmpipe-28"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c6038) at ./nptl/futex-internal.c:57
+  34   Thread 0x7cf4c1ffb6c0 (LWP 13681) "llvmpipe-29"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c6198) at ./nptl/futex-internal.c:57
+  35   Thread 0x7cf4c17fa6c0 (LWP 13683) "llvmpipe-30"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c62f8) at ./nptl/futex-internal.c:57
+  36   Thread 0x7cf4c0ff96c0 (LWP 13685) "llvmpipe-31"     0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5580c6458) at ./nptl/futex-internal.c:57
+  37   Thread 0x7cf4abfff6c0 (LWP 13688) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  38   Thread 0x7cf4ab7fe6c0 (LWP 13692) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  39   Thread 0x7cf4aaffd6c0 (LWP 13697) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  40   Thread 0x7cf4aa7fc6c0 (LWP 13702) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  41   Thread 0x7cf4a9ffb6c0 (LWP 13722) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  42   Thread 0x7cf4a97fa6c0 (LWP 13726) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  43   Thread 0x7cf4a8ff96c0 (LWP 13729) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  44   Thread 0x7cf487fff6c0 (LWP 13732) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  45   Thread 0x7cf47f5ff6c0 (LWP 13735) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  46   Thread 0x7cf4877fe6c0 (LWP 13738) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  47   Thread 0x7cf486ffd6c0 (LWP 13747) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  48   Thread 0x7cf4867fc6c0 (LWP 13750) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  49   Thread 0x7cf485ffb6c0 (LWP 13753) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  50   Thread 0x7cf4857fa6c0 (LWP 13759) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  51   Thread 0x7cf484ff96c0 (LWP 13762) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  52   Thread 0x7cf47ffff6c0 (LWP 13766) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  53   Thread 0x7cf47edfe6c0 (LWP 13769) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  54   Thread 0x7cf47e5fd6c0 (LWP 13771) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  55   Thread 0x7cf47ddfc6c0 (LWP 13773) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  56   Thread 0x7cf47d5fb6c0 (LWP 13777) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  57   Thread 0x7cf47cdfa6c0 (LWP 13779) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  58   Thread 0x7cf447fff6c0 (LWP 13782) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  59   Thread 0x7cf43f5ff6c0 (LWP 13784) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  60   Thread 0x7cf4477fe6c0 (LWP 13786) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  61   Thread 0x7cf446ffd6c0 (LWP 13787) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  62   Thread 0x7cf4467fc6c0 (LWP 13788) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  63   Thread 0x7cf445ffb6c0 (LWP 13789) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  64   Thread 0x7cf4457fa6c0 (LWP 13790) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  65   Thread 0x7cf444ff96c0 (LWP 13791) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  66   Thread 0x7cf43ffff6c0 (LWP 13792) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31988, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  67   Thread 0x7cf43edfe6c0 (LWP 13793) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  68   Thread 0x7cf43e5fd6c0 (LWP 13795) "cubecl_join::te" 0x00007cf56e853e51 in __futex_abstimed_wait_common64 (private=31989, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7cf5581111c0) at ./nptl/futex-internal.c:57
+  70   Thread 0x7cf557fff6c0 (LWP 13811) "cubecl_join::te" syscall () at ../sysdeps/unix/sysv/linux/x86_64/syscall.S:38
+* 71   Thread 0x7cf407fff6c0 (LWP 13813) "DSD-4-0"         0x00007cf56e8a7bdf in __GI___clock_nanosleep (clock_id=1, flags=0, req=0x7cf407ffe740, rem=0x7cf407ffe740) at ../sysdeps/unix/sysv/linux/clock_nanosleep.c:78
+  72   Thread 0x7cf3f6ffd6c0 (LWP 13815) "DSD-4-0"         syscall () at ../sysdeps/unix/sysv/linux/x86_64/syscall.S:38
+[Inferior 1 (process 13231) killed]
+Sun Nov  1 02:52:42 UTC 2026
