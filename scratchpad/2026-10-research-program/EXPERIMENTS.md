@@ -29,6 +29,25 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L8.1 Near-miss tail test of the probability model (2026-11-01, agent; `L8/RESULTS.md`, `L8/models.py` etc., `L8/data/`)
+
+Exact detailed histograms for bases 12–49 + base 50's 24 % sample (~1.1e9 numbers in the top 7
+bins; brute-force recount of b20/22/24 matches the API). **Near tail (3–6 missing digits): the
+project's model applied at every depth fits within 2–3 % (pooled 0.97–0.98); the plain iid model is
+13 % high** (so dropping August's ×0.846 was right). **A leading-digit factor is missing from λ**:
+the top digits of n² and n³ are both set by n's top digits; adding the top digit of each power
+brings depths 3–6 to 0.99–1.00 and explains the per-base scatter (χ² 3,890 → 156 over 25 bases;
+correlation 0.91); at k = b it is 0.86–1.06 per base; folding it in moves today's 5.45 % to 5.34 %
+(ahead: b60 ×0.99, b62 ×0.91, b64 ×1.02). **Two missing digits: 512 observed vs 582 expected, ratio
+0.88 [0.81–0.96]**, even across bases but mostly from the bases that flagged it in August; the bases
+added since give 0.96 [0.82–1.12]; no arithmetic cause found. One/zero missing: 7 vs 5.7, 0 vs 0.05.
+**For the cost model:** the correction at k = b is ~0.67–1.0 (0.53–1.14 with CIs); today's 5.45 %
+→ **~4.7 % best guess (3.7–5.3 %)**; nothing shows under-prediction; costs and search order
+unchanged; METHODOLOGY's "the tail is untested" → "tested to two missing digits; may be up to
+~1.5× optimistic"; 77 % of today's odds come from bases 12–25. Per-base factors: `L8/data/top_factor.csv`.
+Proposed (needs the user's OK: it changes the published headline): add the leading-digit factor to
+`scratchpad/2026-08-cost-probability/build.py` and the METHODOLOGY note.
+
 ## L9.1 H100 SXM and L40S on the join and detailed mode (2026-11-01, agent; `L9/RESULTS.md`, `L9/raw/`)
 
 Upstream main fae7398, `auto` = CubeCL CUDA; nothing uploaded. Both host-capped (H100 500 of 700 W,
