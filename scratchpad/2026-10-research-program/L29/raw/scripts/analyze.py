@@ -75,3 +75,46 @@ for p in sorted(glob.glob(f"{D}/*.smi")):
             rows.append((mhz, w, t, f[4]))
     if rows:
         print(f"| {os.path.basename(p)[:-4]} | {len(rows)} | {st.median(r[0] for r in rows):.0f} | {st.median(r[1] for r in rows):.1f} | {max(r[2] for r in rows):.0f} | {', '.join(sorted({r[3] for r in rows}))} |")
+
+# Per-phase profile (NICE_EXP_GPU_PROFILE=1; synchronised after each kernel group, so device time
+# is longer than unprofiled), the 1e16 field of each base, 2 rounds.
+ppat = re.compile(r"GPU_PROFILE base=(\d+) .*?size=(\d+) .*?device_wall=([\d.]+) upload=([\d.]+) inputs=([\d.]+) top=([\d.]+) bucket=([\d.]+) join=([\d.]+) check=([\d.]+) read=([\d.]+).*?tops=(\d+)")
+prof = {}
+for t in ("mprof", "pprof"):
+    for r in (1, 2):
+        p = f"{D}/prof_{t}_r{r}.log"
+        if not os.path.exists(p):
+            continue
+        for m in ppat.finditer(open(p).read()):
+            if int(m[2]) != 10**16:
+                continue
+            prof.setdefault((t, int(m[1])), []).append(dict(dev=float(m[3]), top=float(m[6]), join=float(m[8]), tops=int(m[11])))
+if prof:
+    print("\n### Per-phase profile, 1e16 (2 rounds each; medians of 2 = means)\n")
+    print("| base | main: device s / top s (share) | PR: device s / top s (share) | top phase PR / main | certified tops (both) |")
+    print("|---|---|---|---|---|")
+    for b in (62, 60, 64):
+        m, p = prof.get(("mprof", b)), prof.get(("pprof", b))
+        if not m or not p:
+            continue
+        md, mt = st.median(x["dev"] for x in m), st.median(x["top"] for x in m)
+        pd, pt = st.median(x["dev"] for x in p), st.median(x["top"] for x in p)
+        tops = sorted({x["tops"] for x in m + p})
+        print(f"| {b} | {md:.2f} / {mt:.2f} ({mt/md*100:.1f} %; rounds {', '.join(f'{x['top']:.2f}' for x in m)}) | {pd:.2f} / {pt:.2f} ({pt/pd*100:.1f} %; rounds {', '.join(f'{x['top']:.2f}' for x in p)}) | **×{pt/mt:.3f}** (×{mt/pt:.2f} faster) | {tops} |")
+
+# EXPERIMENT (not in the PR): the PR against the PR plus the division trim, 1e16, 2 rounds.
+tr = {"pr": {}, "trim": {}}
+for r in (1, 2):
+    for t in ("pr", "trim"):
+        p = f"{D}/t16_{t}_r{r}.log"
+        if os.path.exists(p):
+            for m in pat.finditer(open(p).read()):
+                tr[t].setdefault(int(m[1]), []).append(dict(per=float(m[3]), surv=int(m[9]), chk=int(m[10])))
+if tr["pr"] and tr["trim"]:
+    print("\n### Experiment: PR + division trim against the PR, 1e16 (2 rounds)\n")
+    print("| base | PR s/field (rounds) | PR + trim s/field (rounds) | trim / PR | speed-up |")
+    print("|---|---|---|---|---|")
+    for b in sorted(tr["pr"]):
+        a = [x["per"] for x in tr["pr"][b]]; c = [x["per"] for x in tr["trim"].get(b, [])]
+        if c:
+            print(f"| {b} | {st.median(a):.3f} ({', '.join(f'{x:.3f}' for x in a)}) | {st.median(c):.3f} ({', '.join(f'{x:.3f}' for x in c)}) | ×{st.median(c)/st.median(a):.3f} | ×{st.median(a)/st.median(c):.3f} |")

@@ -29,6 +29,24 @@ a 32-bit split seed (no u64 in WGSL); lavapipe passes via naga WGSL and CubeCL S
 (`common/src/cubecl_detailed_fd.rs`, FD_RUN_LEN 128, all of bases 10–64's legal ranges;
 division kernel kept above 64 and as reference). 4090 numbers pending (agent running).
 
+## L29.1 GPU top certificate from one endpoint's digits and a carry test (2026-11-01, agent; `L29/RESULTS.md`, `L29/raw/`; PR #235, branch `pr/join-top-cert-fast` d6cc9da on 9bde4a8)
+
+`cert_power` divides only a^j into digits, keeps both candidate answers while scanning, and picks
+with (a^j mod b^c0) + (e^j − a^j) ≥ b^c0; the remainder is built in 16-bit limbs from the digits
+below c0 by compile-time-constant multiplies; the long division is #228's; no new division.
+Exactness: new test `top_certificates_match_the_lockstep_scan_and_the_cpu` (wgpu + CUDA): 102,365
+intervals, 33,582 kept, 69,824 powers taking the carry, word-for-word vs the old lockstep scan and
+vs the CPU `Base::cert`/`cert_floor`; all existing join parity tests (b50/b54 windows, dense fields,
+whole b42, join = stride), host 221; lint clean; WGSL lint 0 flagged (incl. the test kernel at bases
+10–64). Certified-top counts = main at 1e16; survivors/checks = main to the last digit at 1e14 (at
+1e16/1e17 they vary run to run on main too, via the stage overrun, by the same amount).
+RTX 3080 host-capped 180 W, interleaved, medians of 3 (spreads ≤ 2.7 %, every PR round beat the main
+round before it): **b62 1e17 229.3 → 213.3 s (×1.075); b62 1e16 ×1.089; b60 1e16 ×1.053; b64 1e16
+×1.040**; NiceMark 3711 → 3976 (×1.071), scenarios ×1.049–1.106, none slower; 1e14 ×1.007–1.055 (2
+rounds). Top kernel alone ×1.24 (b62), ×1.22 (b60), ×1.08 (b64: its chunk divisor 2^12 was already
+a shift). Not done: e^j still computed in full (only e^j − a^j is needed); a limb-bounded division
+variant was bit-identical with no clear gain (patch saved); AMD/Apple not run.
+
 ## L1.7 Join profile at b62 1e17 (the live size) on main 9bde4a8 (2026-11-01, agent; `L1/PROFILE-3.md`, `L1/profile3-raw/`; branch `rp/gpu-profile-3` bddf20f)
 
 RTX 3080 10 GB **host-capped at 180 W** (1430–1510 MHz; absolute seconds ~1.22× PROFILE-2's card;

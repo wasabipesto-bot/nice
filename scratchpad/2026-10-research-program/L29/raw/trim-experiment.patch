@@ -1,0 +1,29 @@
+--- common/src/cubecl_join.rs	2026-10-31 23:57:51.746140498 +0000
++++ /tmp/topcert/trim/cubecl_join.rs	2026-11-01 01:13:35.511758668 +0000
+@@ -709,17 +709,22 @@
+         let passes = comptime!(sp.div_ceil(chunk_digits));
+         #[unroll]
+         for pass in 0..passes {
++            // EXPERIMENT (not in the PR): x / B^pass < b^(sp - pass·cd), so
++            // only that power's limbs can be non-zero; divide those.
++            let live = comptime!(
++                (pow_limbs16(base, sp - pass * chunk_digits).len() as u32).clamp(2, nh)
++            );
+             // The top two limbs as one u32 (see above), then one limb a step.
+-            let top = comptime!(nh - 1);
+-            let next = comptime!(nh - 2);
++            let top = comptime!(live - 1);
++            let next = comptime!(live - 2);
+             let cx = (x[top as usize] << 16u32) | x[next as usize];
+             let qx = cx / chunk_div;
+             let mut rx = cx - qx * chunk_div;
+             x[top as usize] = qx >> 16u32;
+             x[next as usize] = qx & 0xFFFFu32;
+             #[unroll]
+-            for jj in 2..nh {
+-                let j = comptime!(nh - 1 - jj);
++            for jj in 2..live {
++                let j = comptime!(live - 1 - jj);
+                 let c1 = (rx << 16u32) | x[j as usize];
+                 let q1 = c1 / chunk_div;
+                 rx = c1 - q1 * chunk_div;

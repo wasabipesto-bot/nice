@@ -13,8 +13,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   one endpoint's digits + carry (port of #204's CPU form) → `pr/join-top-cert-fast`, A/B at b62
   1e17/1e16, b60, b64 + NiceMark (L29); M = u32-pair mask in the native FD kernel on wgpu →
   `pr/fd-u32-mask` (L28), exactness on CUDA/lavapipe; Apple/AMD speed needs a machine window.
-- Kill criteria: T must be bit-identical by hour 3 or write up the divergence; M is exactness-only
-  here (speed is the M4/AMD question).
+- **Results:** P: b62 1e17 profiled (top cert 38 %, survivors 26 %; 1e17 adds no cost term; L1.7).
+  **T: PR #235 opened** (top certificate from one endpoint + carry; ×1.075 at b62 1e17, NiceMark
+  ×1.071, bit-identical; L29.1). M: `pr/fd-u32-mask` exact but **held** (gain unmeasured; pair on
+  CUDA −24 %; needs M4/AMD; L28.1). S (survivor scoping, L30) running on a fourth box.
+- Boxes destroyed: profile-1e17 1.52 h, topcert, fd-u32mask 1.19 h.
 
 ## 2026-10-31 (day 4; routine fired 04:41 UTC)
 
