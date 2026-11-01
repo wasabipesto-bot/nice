@@ -91,9 +91,14 @@ fn exp_join_ept() -> u32 {
         .unwrap_or(ENTRIES_PER_THREAD)
 }
 /// Experimental: `NICE_EXP_JOIN_TAIL=1` sizes the join's last, partial wave
-/// to its entries (whole planes), see `join_kernel`.
-fn exp_join_tail() -> bool {
-    std::env::var("NICE_EXP_JOIN_TAIL").is_ok_and(|v| !v.is_empty() && v != "0")
+/// to its entries (whole planes), see `join_kernel`; `=2` takes the planes'
+/// slot votes per 32-top chunk instead of per wave.
+fn exp_join_tail() -> u32 {
+    match std::env::var("NICE_EXP_JOIN_TAIL").as_deref() {
+        Ok("1") => 1,
+        Ok("2") => 2,
+        _ => 0,
+    }
 }
 /// Cubes for the prefilter and check kernels (grid-stride loops).
 const CHECK_CUBES: u32 = 1024;
@@ -422,7 +427,7 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
-        #[comptime] tail: bool,
+        #[comptime] tail: u32,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -518,7 +523,7 @@ mod kernels {
                     // whole 32-lane planes that hold them, so the planes
                     // above it have no entries and skip the AND below.
                     let mut stride = ne - ws;
-                    if comptime!(tail) {
+                    if comptime!(tail > 0) {
                         if stride < wave {
                             stride = ((stride + comptime!(ept - 1)) / ept + 31u32) & 0xFFFF_FFE0u32;
                         } else {
@@ -538,7 +543,7 @@ mod kernels {
                     for j in 0..ept {
                         let mut sl = ws + UNIT_POS_X + comptime!(j * JOIN_WG);
                         let mut lim = ne;
-                        if comptime!(tail) {
+                        if comptime!(tail > 0) {
                             sl = ws + UNIT_POS_X + stride * comptime!(j);
                             if UNIT_POS_X >= stride {
                                 lim = 0u32;
@@ -618,7 +623,7 @@ mod kernels {
                     // uses: all, the first, or none.
                     let mut multi = false;
                     let mut some = false;
-                    if comptime!(tail) {
+                    if comptime!(tail == 1) {
                         some = plane_any(vv[0] != 0u32);
                         if comptime!(ept > 1) {
                             multi = plane_any(vv[1] != 0u32);
@@ -639,9 +644,17 @@ mod kernels {
                         for j in 0..ept {
                             pm[j as usize] = 0u32;
                         }
+                        // `tail` 2: the same votes, taken per chunk so that
+                        // they are not live across the walk.
+                        if comptime!(tail == 2) {
+                            some = plane_any(vv[0] != 0u32);
+                            if comptime!(ept > 1) {
+                                multi = plane_any(vv[1] != 0u32);
+                            }
+                        }
                         let mut jt = jc;
                         let mut bit = 1u32;
-                        if comptime!(tail) {
+                        if comptime!(tail > 0) {
                             if multi {
                                 while jt < cend {
                                     let tlo = t_lo[jt as usize];
@@ -656,7 +669,8 @@ mod kernels {
                                 }
                             } else if some {
                                 while jt < cend {
-                                    let z = (mlo[0] & t_lo[jt as usize]) | (mhi[0] & t_hi[jt as usize]);
+                                    let z =
+                                        (mlo[0] & t_lo[jt as usize]) | (mhi[0] & t_hi[jt as usize]);
                                     pm[0] |= select(z == 0u32, bit, 0u32);
                                     bit <<= 1u32;
                                     jt += 1u32;
@@ -1737,7 +1751,7 @@ pub(crate) struct JoinDevice<R: Runtime> {
     walk_sync: bool,
     /// `NICE_EXP_JOIN_EPT` / `NICE_EXP_JOIN_TAIL`.
     ept: u32,
-    tail: bool,
+    tail: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
