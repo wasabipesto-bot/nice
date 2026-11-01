@@ -15,6 +15,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   confirmed; profile after both: top 43 %, join 46 %, 35 % of join lanes are padding.** Comments
   posted on both PRs. New lead L32 (wave padding). L31 (a)+(c) re-measured on the combined tree
   (box `topcert2b`) for a possible stacked PR. Box combined2 destroyed (2.06 h).
+- **4090 second card (L30.4):** #235 ×1.08–1.12, #236 ×1.18–1.31, both ×1.34–1.36, NiceMark ×1.26; compounding
+  within ±1.2 %; PR bodies updated. **L31 (a)+(c) on the combined tree (L31.2): ×1.045 b62 1e17, ×1.059
+  b60, NiceMark ×1.041 → parked narrowly.** **L32 tail wave (L32.1): ×1.040 b62 1e17, ×1.028 b60,
+  NiceMark ×1.078, +1 register, wgpu/Metal unchecked → parked.** L33 early-reject scoping launched
+  (box `earlyreject`, hard stop 12:45 UTC). Boxes second-card, topcert2b, padding destroyed.
 - L32 wave-padding scoping launched on the combined tree (box `padding`, KR). Live boxes at 07:00:
   second-card (4090, GB), topcert2b (3080, KR), padding (3080, KR).
 - 4090 second-card run launched (main / #235 / #236 / both; box `second-card`, GB, $0.31/h).
