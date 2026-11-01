@@ -84,6 +84,37 @@ fn exp_flush_at() -> u32 {
 /// Experimental: survivors that overran the join kernel's stage (went to
 /// the list unprefiltered and uncounted), over every counted batch.
 pub(crate) static EXP_OVERRAN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// Experiment L30 (`NICE_EXP_L30=xm`): comptime mode bits of the join kernel
+/// (`kernels::X_*`). 0 (unset) is main's kernel.
+pub(crate) fn exp_l30() -> u32 {
+    static X: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *X.get_or_init(|| {
+        std::env::var("NICE_EXP_L30")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(0)
+    })
+}
+/// Experiment L30 counters: words 2..16 of each batch's survivor buffer, summed.
+pub(crate) static EXP_L30_STATS: [std::sync::atomic::AtomicU64; 16] =
+    [const { std::sync::atomic::AtomicU64::new(0) }; 16];
+fn exp_l30_add(survs: &[u32]) {
+    for (i, &x) in survs.iter().enumerate().skip(2).take(14) {
+        EXP_L30_STATS[i].fetch_add(u64::from(x), std::sync::atomic::Ordering::Relaxed);
+    }
+}
+fn exp_l30_reset() {
+    for x in &EXP_L30_STATS {
+        x.store(0, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+fn exp_l30_line() -> String {
+    let v: Vec<String> = EXP_L30_STATS
+        .iter()
+        .map(|x| x.load(std::sync::atomic::Ordering::Relaxed).to_string())
+        .collect();
+    format!("EXP_L30 xm={} stats=[{}]", exp_l30(), v.join(","))
+}
 /// Sentinel mask of an extended entry that failed its fixed positions.
 pub const DEAD_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 /// Bottom entries each thread holds in registers in [`join_kernel`]: a wave
@@ -121,6 +152,7 @@ const STAGES: usize = 6;
 pub use kernels::{
     bucket_kernel, check_kernel, join_kernel, top_fill_kernel, top_kernel, top_scan_kernel,
 };
+use kernels::{X_STATS, X_WALKPF};
 
 /// The kernels. The cube macro evaluates `comptime!` expressions host-side,
 /// where fn-level allows do not reach, and the bodies are ported integer
@@ -152,6 +184,25 @@ mod kernels {
     use crate::cubecl_backend::candidate_check;
     use cubecl::prelude::*;
 
+    // Experiment L30 mode bits (comptime `xm` of the join kernel).
+    /// Count prefilter variants per staged survivor (and walk rounds, flushes).
+    pub const X_STATS: u32 = 1;
+    /// Run `mid_pass` twice per staged survivor (result unchanged).
+    pub const X_MID2: u32 = 2;
+    /// Walk the set bits but stage nothing (survivors only counted).
+    pub const X_NOSTAGE: u32 = 4;
+    /// Flush without `mid_pass` and without list writes (pass = 0).
+    pub const X_NOMID: u32 = 8;
+    /// Flush with `mid_pass` but without list writes.
+    pub const X_NOWRITE: u32 = 16;
+    /// No set-bit walk at all (AND only).
+    pub const X_NOWALK: u32 = 32;
+    /// A second (dummy) shared atomic per staged survivor.
+    pub const X_ATOM2: u32 = 64;
+    /// The prefilter in the walk, affine form (`cpu_join::prefilter`):
+    /// only survivors that pass it are staged; the flush only compacts.
+    pub const X_WALKPF: u32 = 256;
+
     /// Count the cube in `ran[stage]` once every unit of it is done (see
     /// `JoinDevice::ensure_ran`). Every unit must reach it.
     #[cube]
@@ -181,6 +232,7 @@ mod kernels {
         vs: &Array<u32>,
         ext_m: &mut Array<u32>,
         ext_pk: &mut Array<u32>,
+        ext_q: &mut Array<u32>,
         lists: &mut Array<u32>,
         counts: &mut Array<u32>,
         ran: &mut Array<Atomic<u32>>,
@@ -193,7 +245,9 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] key_level: bool,
         #[comptime] key_at_zero: bool,
+        #[comptime] xq: bool,
     ) {
+        let kk = comptime!(if xq { k + 2 } else { k });
         let m1 = comptime!(base - 1);
         let fc = (u64::cast_from(fc_hi) << 32u64) | u64::cast_from(fc_lo);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -214,7 +268,7 @@ mod kernels {
             let r0 = bp_r[i as usize];
             let mut m = (u64::cast_from(bp_m[(2u32 * i + 1u32) as usize]) << 32u64)
                 | u64::cast_from(bp_m[(2u32 * i) as usize]);
-            let mut d = Array::<u32>::new(k as usize);
+            let mut d = Array::<u32>::new(kk as usize);
             let mut x = r0;
             #[unroll]
             for j in 0..f0 {
@@ -228,13 +282,13 @@ mod kernels {
                 y /= base;
             }
             #[unroll]
-            for j in comptime!(f0 + pp)..k {
+            for j in comptime!(f0 + pp)..kk {
                 d[j as usize] = 0u32;
             }
-            let mut sq = Array::<u32>::new(k as usize);
+            let mut sq = Array::<u32>::new(kk as usize);
             let mut carry = 0u32;
             #[unroll]
-            for pos in 0..k {
+            for pos in 0..kk {
                 let mut col = carry;
                 #[unroll]
                 for i2 in 0..comptime!(pos + 1) {
@@ -243,10 +297,10 @@ mod kernels {
                 sq[pos as usize] = col % base;
                 carry = col / base;
             }
-            let mut cu = Array::<u32>::new(k as usize);
+            let mut cu = Array::<u32>::new(kk as usize);
             carry = 0u32;
             #[unroll]
-            for pos in 0..k {
+            for pos in 0..kk {
                 let mut col = carry;
                 #[unroll]
                 for i2 in 0..comptime!(pos + 1) {
@@ -282,6 +336,19 @@ mod kernels {
                 let s2 = (2u32 * d0) % base;
                 let s3 = (3u32 * ((d0 * d0) % base)) % base;
                 ext_pk[idx as usize] = u2 | (u3 << 8u32) | (s2 << 16u32) | (s3 << 24u32);
+                if xq {
+                    // Digits k-1..k+1 of R'^2 and R'^3 (R' = the entry with
+                    // key digit 0) as numbers mod b^3, and 3 r0^2 mod b^3.
+                    let bb3 = comptime!(base * base * base);
+                    let q2 = u2
+                        + base * (sq[comptime!(k) as usize] + base * sq[comptime!(k + 1) as usize]);
+                    let q3 = u3
+                        + base * (cu[comptime!(k) as usize] + base * cu[comptime!(k + 1) as usize]);
+                    let lo3 = sq[0] + base * (sq[1] + base * sq[2]);
+                    let c3 = (3u32 * lo3) % bb3;
+                    ext_q[(2u32 * idx) as usize] = q2 | ((c3 & 0x3FFFu32) << 18u32);
+                    ext_q[(2u32 * idx + 1u32) as usize] = q3 | ((c3 >> 14u32) << 18u32);
+                }
                 if ok {
                     // Key digit dk: (u2 + dk s2, u3 + dk s3) mod b, stepped.
                     let mut g2 = u2;
@@ -348,10 +415,13 @@ mod kernels {
         top_x: &Array<u32>,
         staged: &mut Array<Atomic<u32>>,
         ran: &mut Array<Atomic<u32>>,
+        top_p: &Array<u32>,
+        ext_q: &Array<u32>,
         nwork: u32,
         nbp: u32,
         surv_cap: u32,
         flush_at: u32,
+        xzero: u32,
         #[comptime] base: u32,
         #[comptime] key_level: bool,
         #[comptime] key_at_zero: bool,
@@ -359,7 +429,27 @@ mod kernels {
         #[comptime] f0: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] xm: u32,
     ) {
+        let x_stats = comptime!(xm & X_STATS != 0);
+        let x_nostage = comptime!(xm & X_NOSTAGE != 0);
+        let x_nowalk = comptime!(xm & X_NOWALK != 0);
+        let x_atom2 = comptime!(xm & X_ATOM2 != 0);
+        let x_pf = comptime!(xm & X_WALKPF != 0);
+        let x_cnt = comptime!(xm & (X_NOSTAGE | X_WALKPF) != 0);
+        let x_dummy = comptime!(xm & (X_NOSTAGE | X_NOWALK) != 0);
+        let bb2 = comptime!(base * base);
+        let bb3 = comptime!(base * base * base);
+        let dmdiv = comptime!(base.pow(k2 - 2 - f0));
+        let mut t_dm = SharedMemory::<u32>::new(comptime!(if xm & X_WALKPF != 0 {
+            TOP_CAP as usize
+        } else {
+            1usize
+        }));
+        let mut s_dummy = SharedMemory::<Atomic<u32>>::new(1usize);
+        let mut nand = 0u32;
+        let mut xacc = 0u32;
+        let mut wrounds = 0u32;
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
         let wave = comptime!(ept * JOIN_WG);
@@ -406,6 +496,11 @@ mod kernels {
                     t_rlo[UNIT_POS_X as usize] = top_r[(2u32 * t) as usize];
                     t_rhi[UNIT_POS_X as usize] = top_r[(2u32 * t + 1u32) as usize];
                     t_id[UNIT_POS_X as usize] = t;
+                    if x_pf {
+                        let px = top_x[(2u32 * t) as usize];
+                        let sd = top_x[(2u32 * t + 1u32) as usize] & 1u32;
+                        t_dm[UNIT_POS_X as usize] = (px / dmdiv) | (sd << 16u32);
+                    }
                 }
                 sync_cube();
 
@@ -417,6 +512,8 @@ mod kernels {
                     // Per-slot validity: an empty slot must never pass, whatever
                     // the top's mask (a top may certify nothing at small t).
                     let mut vv = Array::<u32>::new(ept as usize);
+                    let mut ac = Array::<u32>::new(ept as usize);
+                    let mut pc = Array::<u32>::new(ept as usize);
                     #[unroll]
                     for j in 0..ept {
                         let sl = ws + UNIT_POS_X + comptime!(j * JOIN_WG);
@@ -432,16 +529,45 @@ mod kernels {
                                 << 32u64)
                                 | u64::cast_from(ext_m[(2u32 * gi) as usize]);
                             if key_level {
-                                let pk = ext_pk[gi as usize];
-                                let mut g2 =
-                                    ((pk & 255u32) + dkey * ((pk >> 16u32) & 255u32)) % base;
-                                let mut g3 =
-                                    (((pk >> 8u32) & 255u32) + dkey * (pk >> 24u32)) % base;
-                                if key_at_zero {
-                                    g2 = (dkey * dkey) % base;
-                                    g3 = (g2 * dkey) % base;
+                                if x_pf {
+                                    // Digits k-1..k+1 of R^2, R^3 mod b^3 for this
+                                    // key digit: the key digit's (low) and the
+                                    // prefilter's carries (high two).
+                                    let r0v = bp_r[e as usize];
+                                    let q0 = ext_q[(2u32 * gi) as usize];
+                                    let q1 = ext_q[(2u32 * gi + 1u32) as usize];
+                                    let cc3 = (q0 >> 18u32) | ((q1 >> 18u32) << 14u32);
+                                    let mut cc2 = 2u32 * r0v;
+                                    if cc2 >= bb3 {
+                                        cc2 -= bb3;
+                                    }
+                                    let t2 = ((q0 & 0x3FFFFu32) + dkey * cc2) % bb3;
+                                    let t3 = ((q1 & 0x3FFFFu32) + dkey * cc3) % bb3;
+                                    let g2 = t2 % base;
+                                    let g3 = t3 % base;
+                                    ac[j as usize] = (t2 / base) | ((t3 / base) << 16u32);
+                                    let rho = r0v % bb2;
+                                    let mut p2 = 2u32 * rho;
+                                    if p2 >= bb2 {
+                                        p2 -= bb2;
+                                    }
+                                    let p3 = (3u32 * ((rho * rho) % bb2)) % bb2;
+                                    pc[j as usize] = p2 | (p3 << 16u32);
+                                    m |= (1u64 << u64::cast_from(g2))
+                                        | (1u64 << u64::cast_from(g3));
+                                } else {
+                                    let pk = ext_pk[gi as usize];
+                                    let mut g2 =
+                                        ((pk & 255u32) + dkey * ((pk >> 16u32) & 255u32)) % base;
+                                    let mut g3 =
+                                        (((pk >> 8u32) & 255u32) + dkey * (pk >> 24u32)) % base;
+                                    if key_at_zero {
+                                        g2 = (dkey * dkey) % base;
+                                        g3 = (g2 * dkey) % base;
+                                    }
+                                    m |= (1u64 << u64::cast_from(g2))
+                                        | (1u64 << u64::cast_from(g3));
                                 }
-                                m |= (1u64 << u64::cast_from(g2)) | (1u64 << u64::cast_from(g3));
                             }
                             mlo[j as usize] = u32::cast_from(m);
                             mhi[j as usize] = u32::cast_from(m >> 32u64);
@@ -489,21 +615,63 @@ mod kernels {
                         #[unroll]
                         for j in 0..ept {
                             let mut x = pm[j as usize] & vv[j as usize];
+                            if x_nowalk {
+                                xacc ^= x;
+                                x = 0u32;
+                            }
                             let r0 = rr[j as usize];
                             while plane_any(x != 0u32) {
+                                if x_stats {
+                                    if UNIT_POS_PLANE == 0u32 {
+                                        wrounds += 1u32;
+                                    }
+                                }
                                 if x != 0u32 {
                                     let jt2 = jc + x.trailing_zeros();
                                     x &= x - 1u32;
                                     if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
-                                        let at = s_cnt[0].fetch_add(1u32);
-                                        if at < SURV_SH_CAP {
-                                            s_t[at as usize] = t_id[jt2 as usize];
-                                            s_r[at as usize] = r0;
+                                        if x_cnt {
+                                            nand += 1u32;
+                                        }
+                                        if x_nostage {
+                                            xacc += r0;
                                         } else {
-                                            let g = surv_count[0].fetch_add(1u32);
-                                            if g < surv_cap {
-                                                surv[(2u32 * g) as usize] = t_id[jt2 as usize];
-                                                surv[(2u32 * g + 1u32) as usize] = r0;
+                                            if x_pf {
+                                                if walk_pf(
+                                                    ac[j as usize],
+                                                    pc[j as usize],
+                                                    t_dm[jt2 as usize],
+                                                    mlo[j as usize],
+                                                    mhi[j as usize],
+                                                    t_lo[jt2 as usize],
+                                                    t_hi[jt2 as usize],
+                                                    base,
+                                                ) {
+                                                    stage_one(
+                                                        &mut s_cnt,
+                                                        &mut s_t,
+                                                        &mut s_r,
+                                                        surv,
+                                                        surv_count,
+                                                        surv_cap,
+                                                        t_id[jt2 as usize],
+                                                        r0,
+                                                    );
+                                                }
+                                            } else {
+                                                if x_atom2 {
+                                                    s_dummy[0].fetch_add(1u32);
+                                                }
+                                                stage_one(
+                                                    &mut s_cnt,
+                                                    &mut s_t,
+                                                    &mut s_r,
+                                                    surv,
+                                                    surv_count,
+                                                    surv_cap,
+                                                    t_id[jt2 as usize],
+                                                    r0,
+                                                );
                                             }
                                         }
                                     }
@@ -550,11 +718,14 @@ mod kernels {
                                 surv,
                                 surv_count,
                                 staged,
+                                top_p,
                                 surv_cap,
                                 sc,
+                                xzero,
                                 base,
                                 f0,
                                 k2,
+                                xm,
                             );
                             sync_cube();
                         }
@@ -581,12 +752,38 @@ mod kernels {
                 surv,
                 surv_count,
                 staged,
+                top_p,
                 surv_cap,
                 sc,
+                xzero,
                 base,
                 f0,
                 k2,
+                xm,
             );
+        }
+        if x_cnt {
+            let s = plane_sum(nand);
+            if UNIT_POS_PLANE == 0u32 {
+                staged[0].fetch_add(s);
+            }
+        }
+        if x_stats {
+            if UNIT_POS_PLANE == 0u32 {
+                staged[12].fetch_add(wrounds);
+            }
+        }
+        if x_dummy {
+            if xacc == 0xDEAD_BEEFu32 {
+                staged[15].fetch_add(1u32);
+            }
+        }
+        if x_atom2 {
+            if UNIT_POS_X == 0u32 {
+                if s_dummy[0].load() == 0xDEAD_BEEFu32 {
+                    staged[15].fetch_add(1u32);
+                }
+            }
         }
         cube_done(ran, 4u32);
     }
@@ -803,6 +1000,7 @@ mod kernels {
         #[comptime] chunk_div: u32,
         #[comptime] key_level: bool,
         #[comptime] nb: u32,
+        #[comptime] xstats: bool,
     ) {
         let m1 = comptime!(base - 1);
         let nl2 = comptime!(2 * limbs);
@@ -1046,6 +1244,9 @@ mod kernels {
                     if floor >= k2 {
                         seed = 1u32;
                     }
+                    if xstats {
+                        seed |= floor << 8u32;
+                    }
                     top_x[(2u32 * g + 1u32) as usize] = seed;
                     let pc = (tlay[(5u32 * i + 2u32) as usize] * pdiv_m1 + v) % m1;
                     let mut key = 0u32;
@@ -1165,10 +1366,15 @@ mod kernels {
         #[comptime] base: u32,
         #[comptime] f0: u32,
         #[comptime] k2: u32,
+        #[comptime] xs: bool,
     ) -> bool {
         let pm = top_x[(2u32 * t) as usize];
         let mut m = 0u64;
-        if top_x[(2u32 * t + 1u32) as usize] != 0u32 {
+        let mut sx = top_x[(2u32 * t + 1u32) as usize];
+        if xs {
+            sx &= 1u32;
+        }
+        if sx != 0u32 {
             m = (u64::cast_from(top_m[(2u32 * t + 1u32) as usize]) << 32u64)
                 | u64::cast_from(top_m[(2u32 * t) as usize]);
         }
@@ -1218,6 +1424,202 @@ mod kernels {
         ok
     }
 
+
+    /// Stage one survivor `(tid, r0)` in shared memory, or (stage full)
+    /// write it to the list unfiltered.
+    #[cube]
+    fn stage_one(
+        s_cnt: &mut SharedMemory<Atomic<u32>>,
+        s_t: &mut SharedMemory<u32>,
+        s_r: &mut SharedMemory<u32>,
+        surv: &mut Array<u32>,
+        surv_count: &mut Array<Atomic<u32>>,
+        surv_cap: u32,
+        tid: u32,
+        r0: u32,
+    ) {
+        let at = s_cnt[0].fetch_add(1u32);
+        if at < SURV_SH_CAP {
+            s_t[at as usize] = tid;
+            s_r[at as usize] = r0;
+        } else {
+            let g = surv_count[0].fetch_add(1u32);
+            if g < surv_cap {
+                surv[(2u32 * g) as usize] = tid;
+                surv[(2u32 * g + 1u32) as usize] = r0;
+            }
+        }
+    }
+
+    /// Experiment L30: `mid_pass` in the affine form of
+    /// `cpu_join::prefilter` (production shape: mid = 2, f0 >= 2). `ac` =
+    /// the bottom's carries `floor(R^2/b^k) | floor(R^3/b^k) << 16` (mod b^2),
+    /// `pc` = `2R | 3R^2 << 16` (mod b^2), `dmv` = the top's digits k..k+2 as
+    /// a number, with its seed flag in bit 16; `mlo`/`mhi` the bottom's mask
+    /// (positions 0..k), `tlo`/`thi` the top's certificate.
+    #[cube]
+    fn walk_pf(
+        ac: u32,
+        pc: u32,
+        dmv: u32,
+        mlo: u32,
+        mhi: u32,
+        tlo: u32,
+        thi: u32,
+        #[comptime] base: u32,
+    ) -> bool {
+        let bb2 = comptime!(base * base);
+        let dm = dmv & 0xFFFFu32;
+        let mut seen = (u64::cast_from(mhi) << 32u64) | u64::cast_from(mlo);
+        if (dmv >> 16u32) != 0u32 {
+            seen |= (u64::cast_from(thi) << 32u64) | u64::cast_from(tlo);
+        }
+        let x2 = ((ac & 0xFFFFu32) + (pc & 0xFFFFu32) * dm) % bb2;
+        let x3 = ((ac >> 16u32) + (pc >> 16u32) * dm) % bb2;
+        let a2 = x2 % base;
+        let a3 = x3 % base;
+        let c2 = x2 / base;
+        let c3 = x3 / base;
+        let b6 = (1u64 << u64::cast_from(a2)) | (1u64 << u64::cast_from(a3));
+        let b7 = (1u64 << u64::cast_from(c2)) | (1u64 << u64::cast_from(c3));
+        let mut ok = true;
+        if a2 == a3 || c2 == c3 || (seen & b6) != 0u64 || ((seen | b6) & b7) != 0u64 {
+            ok = false;
+        }
+        ok
+    }
+
+    /// Experiment L30 statistics for one staged survivor: digits 0..k2+1 of
+    /// n^2 and n^3 from n's low k2+1 digits (r0 and P's low digits, P < 2^64),
+    /// the top's floor in bits 8.. of `top_x` word 1. Flags:
+    /// 0 main's mid_pass; 1 position k only (certificate iff floor > k);
+    /// 2 position k, n^2 only; 3 positions k, k+1 (certificate per position,
+    /// iff floor > position); 4 positions k..k+2 (same); 5 floor >= k2;
+    /// 6 floor >= k2+1; 7 floor == k+1; 8 position k, main's rule;
+    /// 9 main's mid_pass and position k+2.
+    #[cube]
+    fn mid_stats(
+        t: u32,
+        r0: u32,
+        top_m: &Array<u32>,
+        top_x: &Array<u32>,
+        top_p: &Array<u32>,
+        #[comptime] base: u32,
+        #[comptime] f0: u32,
+        #[comptime] k2: u32,
+    ) -> u32 {
+        let kk = comptime!(k2 + 1);
+        let k = comptime!(k2 - 2);
+        let floor = top_x[(2u32 * t + 1u32) as usize] >> 8u32;
+        let tm = (u64::cast_from(top_m[(2u32 * t + 1u32) as usize]) << 32u64)
+            | u64::cast_from(top_m[(2u32 * t) as usize]);
+        let p = (u64::cast_from(top_p[(2u32 * t + 1u32) as usize]) << 32u64)
+            | u64::cast_from(top_p[(2u32 * t) as usize]);
+        let b64 = u64::cast_from(base);
+        let mut d = Array::<u32>::new(kk as usize);
+        let mut x = r0;
+        #[unroll]
+        for j in 0..f0 {
+            d[j as usize] = x % base;
+            x /= base;
+        }
+        let mut y = p;
+        #[unroll]
+        for j in f0..kk {
+            let q = y / b64;
+            d[j as usize] = u32::cast_from(y - q * b64);
+            y = q;
+        }
+        let mut sq = Array::<u32>::new(kk as usize);
+        let mut carry = 0u32;
+        #[unroll]
+        for pos in 0..kk {
+            let mut col = carry;
+            #[unroll]
+            for i2 in 0..comptime!(pos + 1) {
+                col += d[i2 as usize] * d[comptime!(pos - i2) as usize];
+            }
+            sq[pos as usize] = col % base;
+            carry = col / base;
+        }
+        let mut cu = Array::<u32>::new(kk as usize);
+        carry = 0u32;
+        #[unroll]
+        for pos in 0..kk {
+            let mut col = carry;
+            #[unroll]
+            for i2 in 0..comptime!(pos + 1) {
+                col += sq[i2 as usize] * d[comptime!(pos - i2) as usize];
+            }
+            cu[pos as usize] = col % base;
+            carry = col / base;
+        }
+        let mut lowm = 0u64;
+        #[unroll]
+        for pos in 0..k {
+            lowm |= (1u64 << u64::cast_from(sq[pos as usize]))
+                | (1u64 << u64::cast_from(cu[pos as usize]));
+        }
+        let g6a = sq[k as usize];
+        let g6b = cu[k as usize];
+        let g7a = sq[comptime!(k + 1) as usize];
+        let g7b = cu[comptime!(k + 1) as usize];
+        let g8a = sq[comptime!(k + 2) as usize];
+        let g8b = cu[comptime!(k + 2) as usize];
+        let bt6 = (1u64 << u64::cast_from(g6a)) | (1u64 << u64::cast_from(g6b));
+        let bt7 = (1u64 << u64::cast_from(g7a)) | (1u64 << u64::cast_from(g7b));
+        let bt8 = (1u64 << u64::cast_from(g8a)) | (1u64 << u64::cast_from(g8b));
+        let mut m6 = 0u64;
+        if floor > k {
+            m6 = tm;
+        }
+        let mut m7 = 0u64;
+        if floor > comptime!(k + 1) {
+            m7 = tm;
+        }
+        let mut m8 = 0u64;
+        if floor > comptime!(k + 2) {
+            m8 = tm;
+        }
+        let mut f = 0u32;
+        let ok6c = g6a != g6b && ((lowm | m7) & bt6) == 0u64;
+        let ok7c = g7a != g7b && ((lowm | m7 | bt6) & bt7) == 0u64;
+        let ok6f = g6a != g6b && ((lowm | m6) & bt6) == 0u64;
+        let ok6s = ((lowm | m6) & (1u64 << u64::cast_from(g6a))) == 0u64;
+        let ok8 = g8a != g8b && ((lowm | m8 | bt6 | bt7) & bt8) == 0u64;
+        if ok6c && ok7c {
+            f |= 1u32;
+        }
+        if ok6f {
+            f |= 2u32;
+        }
+        if ok6s {
+            f |= 4u32;
+        }
+        if ok6f && ok7c {
+            f |= 8u32;
+        }
+        if ok6f && ok7c && ok8 {
+            f |= 16u32;
+        }
+        if floor >= k2 {
+            f |= 32u32;
+        }
+        if floor > k2 {
+            f |= 64u32;
+        }
+        if floor == comptime!(k + 1) {
+            f |= 128u32;
+        }
+        if ok6c {
+            f |= 256u32;
+        }
+        if ok6c && ok7c && ok8 {
+            f |= 512u32;
+        }
+        f
+    }
+
     /// Flush the shared survivor stage through the middle-digit prefilter:
     /// the whole cube tests the staged survivors and only those that pass go
     /// to `out`, compacted per plane with one atomic per round. `staged`
@@ -1236,20 +1638,34 @@ mod kernels {
         out: &mut Array<u32>,
         out_count: &mut Array<Atomic<u32>>,
         staged: &mut Array<Atomic<u32>>,
+        top_p: &Array<u32>,
         out_cap: u32,
         sc: u32,
+        xzero: u32,
         #[comptime] base: u32,
         #[comptime] f0: u32,
         #[comptime] k2: u32,
+        #[comptime] xm: u32,
     ) {
+        let x_stats = comptime!(xm & X_STATS != 0);
+        let x_mid2 = comptime!(xm & X_MID2 != 0);
+        let x_nomid = comptime!(xm & X_NOMID != 0);
+        let x_nowrite = comptime!(xm & X_NOWRITE != 0);
+        let x_pf = comptime!(xm & X_WALKPF != 0);
+        let mut xacc = 0u32;
         let mut n = sc;
         if n > SURV_SH_CAP {
             n = SURV_SH_CAP; // the rest went straight to `out`, untested
         }
         if UNIT_POS_X == 0u32 {
-            staged[0].fetch_add(n);
+            if !x_pf {
+                staged[0].fetch_add(n);
+            }
             if sc > SURV_SH_CAP {
                 staged[1].fetch_add(sc - SURV_SH_CAP);
+            }
+            if x_stats {
+                staged[13].fetch_add(1u32);
             }
         }
         let my_plane = UNIT_POS_X / PLANE_DIM;
@@ -1260,11 +1676,47 @@ mod kernels {
             let mut pass = 0u32;
             let mut t = 0u32;
             let mut r0 = 0u32;
+            let mut fl = 0u32;
             if i < n {
                 t = s_t[i as usize];
                 r0 = s_r[i as usize];
-                if mid_pass(t, r0, top_m, top_x, base, f0, k2) {
+                if x_pf {
                     pass = 1u32;
+                } else {
+                    if x_nomid {
+                        xacc += r0;
+                    } else {
+                        let mp = mid_pass(t, r0, top_m, top_x, base, f0, k2, x_stats);
+                        if x_nowrite {
+                            if mp {
+                                xacc += 1u32;
+                            }
+                        } else {
+                            if mp {
+                                pass = 1u32;
+                            }
+                        }
+                        if x_mid2 {
+                            if !mid_pass(t ^ xzero, r0 ^ xzero, top_m, top_x, base, f0, k2, x_stats) {
+                                pass = 0u32;
+                            }
+                        }
+                    }
+                }
+                if x_stats {
+                    fl = mid_stats(t, r0, top_m, top_x, top_p, base, f0, k2);
+                }
+            }
+            if x_stats {
+                #[unroll]
+                for q in 0..10u32 {
+                    let sfl = plane_sum((fl >> q) & 1u32);
+                    if UNIT_POS_PLANE == 0u32 {
+                        staged[comptime!(q + 2) as usize].fetch_add(sfl);
+                    }
+                }
+                if UNIT_POS_X == 0u32 {
+                    staged[14].fetch_add(1u32);
                 }
             }
             let idx = plane_exclusive_sum(pass);
@@ -1296,6 +1748,11 @@ mod kernels {
                 }
             }
             rb += CUBE_DIM_X;
+        }
+        if comptime!(xm & (X_NOMID | X_NOWRITE) != 0) {
+            if xacc == 0xDEAD_BEEFu32 {
+                staged[15].fetch_add(1u32);
+            }
         }
         sync_cube();
         if UNIT_POS_X == 0u32 {
@@ -1501,6 +1958,10 @@ pub(crate) struct JoinDevice<R: Runtime> {
     seg: Handle,
     ext_m: Handle,
     ext_pk: Handle,
+    /// Experiment L30 (`X_WALKPF`): the prefilter's per-entry terms.
+    ext_q: Handle,
+    ext_q_len: usize,
+    xm: u32,
     lists: Handle,
     counts: Handle,
     nkeys: u32,
@@ -1683,6 +2144,17 @@ impl<R: Runtime> JoinDevice<R> {
             seg: client.create(cubecl::bytes::Bytes::from_elems(fs.seg.clone())),
             ext_m: client.empty(max_slots * fp.ext_m),
             ext_pk: client.empty(max_slots * fp.ext_pk),
+            ext_q: client.empty(if exp_l30() & X_WALKPF != 0 {
+                2 * max_slots * fp.ext_pk
+            } else {
+                4
+            }),
+            ext_q_len: if exp_l30() & X_WALKPF != 0 {
+                (2 * nbp * max_slots).max(1)
+            } else {
+                1
+            },
+            xm: exp_l30(),
             lists: client.empty(max_slots * fp.lists),
             counts: client.empty(max_slots * fp.counts),
             nkeys,
@@ -1814,7 +2286,12 @@ impl<R: Runtime> JoinDevice<R> {
         let bucket_cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots * nb]));
         // The join kernel counts its survivors and writes only those that
         // pass the prefilter to the list, which it counts too.
-        let survivors = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 2]));
+        let survivors = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 16]));
+        ensure!(
+            self.xm & X_WALKPF == 0
+                || (self.f0 == 3 && self.k == 6 && self.k2 == 8 && self.key_level),
+            "NICE_EXP_L30 walk prefilter needs the production shape"
+        );
         let checked = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
         // Every kernel counts its cubes as they finish, against the cubes
         // it was launched with. A device that drops a dispatch without an
@@ -1881,6 +2358,7 @@ impl<R: Runtime> JoinDevice<R> {
                 cdiv16,
                 self.key_level,
                 self.nb,
+                self.xm & X_STATS != 0,
             );
             top_scan_kernel::launch_unchecked::<R>(
                 c,
@@ -1921,6 +2399,7 @@ impl<R: Runtime> JoinDevice<R> {
                 ArrayArg::from_raw_parts(vs_h, nslots),
                 ArrayArg::from_raw_parts(self.ext_m.clone(), 2 * nbp * max_slots),
                 ArrayArg::from_raw_parts(self.ext_pk.clone(), (nbp * max_slots).max(1)),
+                ArrayArg::from_raw_parts(self.ext_q.clone(), self.ext_q_len),
                 ArrayArg::from_raw_parts(self.lists.clone(), nbp * max_slots * self.b as usize),
                 ArrayArg::from_raw_parts(
                     self.counts.clone(),
@@ -1936,6 +2415,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k,
                 self.key_level,
                 self.key_level && self.k == 1,
+                self.xm & X_WALKPF != 0,
             );
             if let Some(t) = pt {
                 self.prof_mark(t, |p, s| p.bucket_secs += s)?;
@@ -1962,12 +2442,15 @@ impl<R: Runtime> JoinDevice<R> {
                 ArrayArg::from_raw_parts(self.list.clone(), 2 * self.list_cap as usize),
                 ArrayArg::from_raw_parts(checked.clone(), 1),
                 ArrayArg::from_raw_parts(self.top_x.clone(), 2 * max_slots * ntl),
-                ArrayArg::from_raw_parts(survivors.clone(), 2),
+                ArrayArg::from_raw_parts(survivors.clone(), 16),
                 ArrayArg::from_raw_parts(ran.clone(), nran),
+                ArrayArg::from_raw_parts(self.top_p.clone(), 2 * max_slots * ntl),
+                ArrayArg::from_raw_parts(self.ext_q.clone(), self.ext_q_len),
                 nwork_u32,
                 self.nbp,
                 self.list_cap,
                 exp_flush_at(),
+                0u32,
                 self.b,
                 self.key_level,
                 self.key_level && self.k == 1,
@@ -1975,6 +2458,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.f0,
                 self.k2,
                 self.walk_sync,
+                self.xm,
             );
             if let Some(t) = pt {
                 pt = Some(self.prof_mark(t, |p, s| p.join_secs += s)?);
@@ -2527,6 +3011,7 @@ fn run_pass<R: Runtime>(
             left.overflowed.extend_from_slice(batch);
         } else {
             EXP_OVERRAN.fetch_add(u64::from(survs[1]), std::sync::atomic::Ordering::Relaxed);
+            exp_l30_add(&survs);
             st.survivors += u64::from(surv);
             st.checked += u64::from(checked);
         }
@@ -2639,6 +3124,7 @@ fn run_partition<R: Runtime>(
     let checked = dev.read_u32(&rec.checked)?[0];
     if !dev.overflowed(checked) {
         EXP_OVERRAN.fetch_add(u64::from(survs[1]), std::sync::atomic::Ordering::Relaxed);
+        exp_l30_add(&survs);
         st.survivors += u64::from(surv);
         st.checked += u64::from(checked);
         hits.extend(dev.read_hits()?);
@@ -3305,9 +3791,11 @@ mod tests {
         let parts: Vec<u32> = (0..n).map(|i| i * total / n.max(1)).collect();
         let t0 = Instant::now();
         EXP_OVERRAN.store(0, std::sync::atomic::Ordering::Relaxed);
+        exp_l30_reset();
         let (hits, st) =
             run_slices(&client, &field, 1, &parts, &JoinCeiling::default()).expect("device run");
         let gpu_secs = t0.elapsed().as_secs_f64();
+        println!("  {}", exp_l30_line());
         println!(
             "  EXP_OVERRAN flush_at={} counted {}",
             exp_flush_at(),
@@ -3577,6 +4065,7 @@ mod tests {
             let warm = FieldSize::new(start - warm_size, start);
             run_routed(ctx, base, &warm);
             EXP_OVERRAN.store(0, std::sync::atomic::Ordering::Relaxed);
+            exp_l30_reset();
             let fields: Vec<FieldSize> = (0..n)
                 .map(|i| FieldSize::new(start + i * size, start + (i + 1) * size))
                 .collect();
@@ -3617,6 +4106,7 @@ mod tests {
                 |f: &dyn Fn(&JoinFieldStats) -> u64| per_field.iter().map(|x| f(&x.1)).sum::<u64>();
             let (in_use, reserved) = peak;
             let overran = EXP_OVERRAN.load(std::sync::atomic::Ordering::Relaxed);
+            eprintln!("{} base={base}", exp_l30_line());
             eprintln!(
                 "EXP_OVERRAN base={base} flush_at={} overran={overran} survivors={} share={:.3e}",
                 exp_flush_at(),
