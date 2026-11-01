@@ -90,6 +90,7 @@ const MAX_SPLITS: u32 = 32;
 /// Kernels a batch launches (top, top scan, top fill, bucket, join, check),
 /// each counting its finished cubes.
 const STAGES: usize = 6;
+const _: () = assert!(STAGES == 6, "the top kernel's histograms start at word 6");
 /// Histogram words after the stage counters (`NICE_EXP_TOP_HIST=1`).
 const HIST_N: usize = 352;
 /// The top kernel's histograms, summed over batches (`NICE_EXP_TOP_HIST=1`).
@@ -1262,7 +1263,7 @@ mod kernels {
                 | select(cb, 2u32, 0u32)
                 | select(cc, 4u32, 0u32)
                 | select(cd, 8u32, 0u32);
-            let cu = Min::min(icu[0], icu[1]);
+            let cu = select(icu[0] < icu[1], icu[0], icu[1]);
             // Without the parent: earliest sound detection, in passes done.
             let mut g = comptime!(p2 + p3 + 1).runtime();
             let mut gp = comptime!(p2 + p3 + 1).runtime();
@@ -1283,7 +1284,7 @@ mod kernels {
                 if isq[0] != 0xFFFFu32 {
                     g = isq[0];
                 }
-                let sm = Min::min(isq[0], isq[1]);
+                let sm = select(isq[0] < isq[1], isq[0], isq[1]);
                 if sm != 0xFFFFu32 {
                     gp = sm;
                 }
@@ -1513,7 +1514,7 @@ mod kernels {
             }
         }
         if comptime!(hist) {
-            let o = comptime!(STAGES as u32);
+            let o = comptime!(6u32); // STAGES
             hist_add(ran, h_cat, o, 16u32);
             hist_add(ran, h_g, comptime!(o + 16), 40u32);
             hist_add(ran, h_gp, comptime!(o + 56), 40u32);
