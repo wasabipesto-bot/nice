@@ -82,6 +82,19 @@ pub const DEAD_MASK: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 /// waves of 1,024 or 1,536 entries (4 below base 62 and 6 from it before)
 /// ran mostly empty lanes. Two are the fastest at every base measured.
 const ENTRIES_PER_THREAD: u32 = 2;
+/// Experimental: `NICE_EXP_JOIN_EPT` (1-4) overrides [`ENTRIES_PER_THREAD`].
+fn exp_join_ept() -> u32 {
+    std::env::var("NICE_EXP_JOIN_EPT")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .filter(|e| (1..=4).contains(e))
+        .unwrap_or(ENTRIES_PER_THREAD)
+}
+/// Experimental: `NICE_EXP_JOIN_TAIL=1` sizes the join's last, partial wave
+/// to its entries (whole planes), see `join_kernel`.
+fn exp_join_tail() -> bool {
+    std::env::var("NICE_EXP_JOIN_TAIL").is_ok_and(|v| !v.is_empty() && v != "0")
+}
 /// Cubes for the prefilter and check kernels (grid-stride loops).
 const CHECK_CUBES: u32 = 1024;
 /// How deep the halving of an overflowing partition's top layer may go: a
@@ -409,6 +422,7 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] tail: bool,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -499,6 +513,18 @@ mod kernels {
 
                 let mut ws = 0u32;
                 while ws < ne {
+                    // `tail` (NICE_EXP_JOIN_TAIL): a partial last wave puts a
+                    // thread's entries `stride` apart, `stride` the fewest
+                    // whole 32-lane planes that hold them, so the planes
+                    // above it have no entries and skip the AND below.
+                    let mut stride = ne - ws;
+                    if comptime!(tail) {
+                        if stride < wave {
+                            stride = ((stride + comptime!(ept - 1)) / ept + 31u32) & 0xFFFF_FFE0u32;
+                        } else {
+                            stride = JOIN_WG;
+                        }
+                    }
                     let mut mlo = Array::<u32>::new(ept as usize);
                     let mut mhi = Array::<u32>::new(ept as usize);
                     let mut rr = Array::<u32>::new(ept as usize);
@@ -510,14 +536,21 @@ mod kernels {
                     let mut pc = Array::<u32>::new(ept as usize);
                     #[unroll]
                     for j in 0..ept {
-                        let sl = ws + UNIT_POS_X + comptime!(j * JOIN_WG);
+                        let mut sl = ws + UNIT_POS_X + comptime!(j * JOIN_WG);
+                        let mut lim = ne;
+                        if comptime!(tail) {
+                            sl = ws + UNIT_POS_X + stride * comptime!(j);
+                            if UNIT_POS_X >= stride {
+                                lim = 0u32;
+                            }
+                        }
                         mlo[j as usize] = 0xFFFF_FFFFu32;
                         mhi[j as usize] = 0xFFFF_FFFFu32;
                         rr[j as usize] = 0u32;
                         vv[j as usize] = 0u32;
                         ac[j as usize] = 0u32;
                         pc[j as usize] = 0u32;
-                        if sl < ne {
+                        if sl < lim {
                             vv[j as usize] = 0xFFFF_FFFFu32;
                             let e = lists[(lbase + sl) as usize];
                             let gi = ebase + e;
@@ -579,6 +612,18 @@ mod kernels {
                             rr[j as usize] = r0;
                         }
                     }
+                    // `tail`: whether any lane of this plane holds a second
+                    // entry, or any entry (a thread's entries fill its slots
+                    // in order), so that the AND runs on the slots the plane
+                    // uses: all, the first, or none.
+                    let mut multi = false;
+                    let mut some = false;
+                    if comptime!(tail) {
+                        some = plane_any(vv[0] != 0u32);
+                        if comptime!(ept > 1) {
+                            multi = plane_any(vv[1] != 0u32);
+                        }
+                    }
                     // Branch-free AND over a chunk of up to 32 tops into a pass
                     // bitmask per entry, then only the (rare) set bits are
                     // walked: the survivor path diverges once per chunk, not
@@ -596,16 +641,39 @@ mod kernels {
                         }
                         let mut jt = jc;
                         let mut bit = 1u32;
-                        while jt < cend {
-                            let tlo = t_lo[jt as usize];
-                            let thi = t_hi[jt as usize];
-                            #[unroll]
-                            for j in 0..ept {
-                                let z = (mlo[j as usize] & tlo) | (mhi[j as usize] & thi);
-                                pm[j as usize] |= select(z == 0u32, bit, 0u32);
+                        if comptime!(tail) {
+                            if multi {
+                                while jt < cend {
+                                    let tlo = t_lo[jt as usize];
+                                    let thi = t_hi[jt as usize];
+                                    #[unroll]
+                                    for j in 0..ept {
+                                        let z = (mlo[j as usize] & tlo) | (mhi[j as usize] & thi);
+                                        pm[j as usize] |= select(z == 0u32, bit, 0u32);
+                                    }
+                                    bit <<= 1u32;
+                                    jt += 1u32;
+                                }
+                            } else if some {
+                                while jt < cend {
+                                    let z = (mlo[0] & t_lo[jt as usize]) | (mhi[0] & t_hi[jt as usize]);
+                                    pm[0] |= select(z == 0u32, bit, 0u32);
+                                    bit <<= 1u32;
+                                    jt += 1u32;
+                                }
                             }
-                            bit <<= 1u32;
-                            jt += 1u32;
+                        } else {
+                            while jt < cend {
+                                let tlo = t_lo[jt as usize];
+                                let thi = t_hi[jt as usize];
+                                #[unroll]
+                                for j in 0..ept {
+                                    let z = (mlo[j as usize] & tlo) | (mhi[j as usize] & thi);
+                                    pm[j as usize] |= select(z == 0u32, bit, 0u32);
+                                }
+                                bit <<= 1u32;
+                                jt += 1u32;
+                            }
                         }
                         // Each lane walks its set bits, one per round while any
                         // lane of the plane has one left. With an exit that
@@ -1667,6 +1735,9 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
+    /// `NICE_EXP_JOIN_EPT` / `NICE_EXP_JOIN_TAIL`.
+    ept: u32,
+    tail: bool,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -1837,6 +1908,8 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
+            ept: exp_join_ept(),
+            tail: exp_join_tail(),
             limbs,
             chunk_digits,
             chunk_div,
@@ -2070,11 +2143,12 @@ impl<R: Runtime> JoinDevice<R> {
                 self.list_cap,
                 self.b,
                 self.key_level,
-                ENTRIES_PER_THREAD,
+                self.ept,
                 self.f0,
                 self.k,
                 self.k2,
                 self.walk_sync,
+                self.tail,
             );
         }
         unsafe {
