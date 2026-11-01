@@ -839,6 +839,39 @@ impl Base {
         close_certificate(mask, doms)
     }
 
+    /// The cube's certified digits of `[a, e]` as a mask, before the
+    /// closure and without the duplicate check (instrumentation).
+    // Digits are below b <= 64.
+    #[allow(clippy::cast_possible_truncation)]
+    #[must_use]
+    pub fn cert_cube_digits(&self, a: u128, e: u128, cap: u32) -> u64 {
+        let x = W4::mul_u128_u128(a, a).mul_u128(a);
+        let y = W4::mul_u128_u128(e, e).mul_u128(e);
+        let top = (self.b - 1) as u8;
+        let sp = self.s3;
+        let d = y.sub(&x);
+        let c0 = cap.max(self.ndig_w(&d));
+        if c0 >= sp {
+            return 0;
+        }
+        let mut dx = [0u8; DIGIT_BUF];
+        let (qx, rem) = self.shift_down_rem(x, c0);
+        let one_more = !rem.add(&d).lt(&self.poww[c0 as usize]);
+        self.digits_w(qx, sp - c0, &mut dx);
+        let mut from = 0usize;
+        if one_more {
+            while dx[from] == top {
+                from += 1;
+            }
+            from += 1;
+        }
+        let mut m = 0u64;
+        for &digit in &dx[from..(sp - c0) as usize] {
+            m |= 1u64 << digit;
+        }
+        m
+    }
+
     /// Lowest output position the certificate of `[a, e]` (cap `cap`) can
     /// cover, over both powers: every certified digit of n² (n³) sits at a
     /// position `>= max(cap, ndig(e² − a²))` (resp. the cube).
