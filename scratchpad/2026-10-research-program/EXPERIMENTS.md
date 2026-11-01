@@ -71,6 +71,24 @@ do not help. The join's memory budget stops at 4 GiB (join_plan.rs) so 46/80 GB 
 were measured not to be a lever in L1.7, so no action). **Fleet guidance:** never buy H100 at
 market; L40S only under ~$0.35/h.
 
+## L30.2 Prefilter in the walk, PR #236 (2026-11-01, agent; `L30/RESULTS.md`, `L30/pr-raw/`; branch `pr/join-prefilter-in-walk` dd4a0eb on fae7398)
+
+One commit; the prefilter runs in the set-bit walk before staging and is the only path (no switch);
+handles every join shape the host accepts (old test windows b10–64, k = 1–5, with/without key level
+run the new code); compile-time zero terms as in `cpu_join`; `mid_pass`, the flush-time prefilter,
+its plane compaction and `ext_pk` deleted; the flush is one atomic + a plain copy; join kernel
+registers 62 → 39. Memory plan: `ext_q` 8 B per entry×slot (was `ext_pk` 4 B), counted by `Footprint`;
+plans +2–11 MiB, partitions per launch unchanged.
+RTX 3080 (180 W), interleaved ×3, median device s/field: **b62 1e17 225.9 → 186.0 (×0.823)**, b62
+1e16 ×0.846, b60 1e16 ×0.806, b64 1e16 ×0.769; **NiceMark nice-only 3768 → 4500 (×1.194)**; every
+round faster; spreads main ≤ 3.1 %, PR ≤ 1.6 %. Exactness: counts identical run to run and to the
+prototype; at 1e14 survivors/prefilter survivors/hits = main; larger fields differ from main only
+by main's stage overrun; CPU-reference test (CUDA), both dense-field tests now assert exact equality
+with the CPU join and pass, whole b42 matches; lavapipe join tests pass via naga and CubeCL SPIR-V
+(no RUST_MIN_STACK); lint 0 flagged with JoinKernel@57/BucketKernel@57 met; fmt/clippy ×3/host
+suites clean. Not run on Apple (lint is the Metal check). Merges cleanly with #235 except a
+one-line CHANGELOG conflict (whichever lands second rebases).
+
 ## L30.1 Survivor handling in the join kernel: breakdown and the prefilter-in-the-walk prototype (2026-11-01, agent; `L30/SCOPING.md`, `L30/raw/`; branch `exp/join-survivors` 655f953)
 
 RTX 3080, b62 1e16, profiled join phase, runtime switches removing one piece at a time (2 rounds):

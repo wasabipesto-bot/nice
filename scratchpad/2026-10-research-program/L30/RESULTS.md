@@ -4,7 +4,12 @@ Branch `pr/join-prefilter-in-walk` on the fork, one commit on upstream main `fae
 
 ## Summary
 
-TBD
+- **Branch `pr/join-prefilter-in-walk` = `dd4a0eb`** on upstream main `fae7398`, one commit, pushed to the fork; PR text in `PR-BODY.md` (not opened).
+- **Speed (A/B, interleaved ×3, device s per field):** b62 1e17 **×0.823** (225.9 → 186.0 s, −39.9 s), b62 1e16 ×0.846, b60 1e16 ×0.806, b64 1e16 ×0.769. Control spreads ≤ 3.1 %, PR spreads ≤ 1.6 %, every round faster. NiceMark nice-only **3768 → 4500 (×1.194)**, scenarios ×1.15-1.26.
+- **Exact.** PR counts are run-to-run identical and equal the prototype's/PROFILE-3's exact counts; 1e14 at b57/60/62/64 identical to main's; CPU reference on every test shape on CUDA, naga and the direct SPIR-V compiler (no `RUST_MIN_STACK`, no stack overflow); dense b58/b62 tests now assert equality; whole b42 equal. Main's 1e16/1e17 counts differ from them by its stage overrun alone (1.1e-4 of survivors at b62 1e17, 3.9e-3 at b60), and its extra full checks are that overrun minus the field's keep rate.
+- **Production code:** no switch; general for every host-accepted shape (test windows b10-b64 run the new path); `mid_pass`, flush prefilter, plane compaction and `ext_pk` deleted; `ext_q` (+4 B per entry-slot) in `Footprint` (+2-11 MiB per plan, slots unchanged). Join kernel 62 → 39 registers, SASS 1,672 → 784.
+- **Metal:** WGSL lint 0 flagged, JoinKernel@57 and BucketKernel@57 found. Clippy ×3, fmt, host suites clean.
+- **Not done:** no run on Apple hardware (lint only); on lavapipe only the `cubecl_join::` ignored tests and the lint dump, not CI's whole ignored suite; CHANGELOG conflicts with #235 (one line).
 
 ## 0. Setup
 
@@ -70,16 +75,48 @@ The PR's counts are the same in every run, and equal to the prototype's exact co
 
 | field | PR join survivors | PR checked (= prefilter survivors = full checks) | main: overrun (PR − main survivors), per run | main checked − PR checked | of which would have passed (overrun − difference) | hits |
 |---|---|---|---|---|---|---|
-| b62 1e17 | 1,020,844,021,499 | 62,584,252,554 | 115,730,119; 115,702,770; 115,686,592 (**1.13e-4**) | 108,548,196 (largest-overrun run) | 7,181,923 (6.2 %) | 0 |
+| b62 1e17 | 1,020,844,021,499 | 62,584,252,554 | 115,730,119; 115,702,770; 115,686,592 (**1.13e-4**) | 108,548,196 (run with the largest overrun) | 7,181,923 (6.2 %) | 0 |
 | b62 1e16 ×2 | 163,513,599,082 | 10,027,698,695 | 3,393,617; 3,381,213; 3,370,311 (2.1e-5) | 3,183,152 | 210,465 (6.2 %) | 0 |
 | b60 1e16 ×2 | 460,847,952,346 | 30,871,838,404 | 1,800,612,705; 1,800,528,749; 1,800,430,107 (**3.9e-3**) | 1,679,853,275 | 120,759,430 (6.7 %) | 0 |
 | b64 1e16 ×2 | 787,584,956,227 | 47,900,853,327 | 22,677,365; 22,641,440; 22,625,753 (2.9e-5) | 21,281,689 | 1,395,676 (6.2 %) | 0 |
 
-So main's list = the PR's list − (the overrun's own prefilter survivors) + the overrun, to the pair, and the keep rate of the overrun pairs is the field's keep rate (6.1-6.7 %). At b60 main ran 5.4 % more full checks than needed.
+Per run (all 12 main runs, table below), main's extra full checks are its overflow minus 6.15-6.71 % of it, which is each field's own keep rate (6.13 % at b62, 6.70 % at b60, 6.08 % at b64): exactly what an unfiltered overflow gives, with nothing else differing. At b60 main ran 5.4 % more full checks than needed.
 
-## 3. NiceMark nice-only
+Main's runs one by one:
 
-TBD
+| main run | overrun (PR − main survivors) | extra checks (main − PR checked) | overflow pairs that pass (difference) |
+|---|---|---|---|
+| e17_b62 r1 | 115,702,770 | 108,518,150 | 7,184,620 (6.21%) |
+| e17_b62 r2 | 115,730,119 | 108,548,196 | 7,181,923 (6.21%) |
+| e17_b62 r3 | 115,686,592 | 108,504,127 | 7,182,465 (6.21%) |
+| e16_b62 r1 | 3,370,311 | 3,160,360 | 209,951 (6.23%) |
+| e16_b62 r2 | 3,381,213 | 3,171,172 | 210,041 (6.21%) |
+| e16_b62 r3 | 3,393,617 | 3,183,152 | 210,465 (6.20%) |
+| e16_b60 r1 | 1,800,430,107 | 1,679,705,409 | 120,724,698 (6.71%) |
+| e16_b60 r2 | 1,800,528,749 | 1,679,783,779 | 120,744,970 (6.71%) |
+| e16_b60 r3 | 1,800,612,705 | 1,679,853,275 | 120,759,430 (6.71%) |
+| e16_b64 r1 | 22,677,365 | 21,281,689 | 1,395,676 (6.15%) |
+| e16_b64 r2 | 22,625,753 | 21,234,003 | 1,391,750 (6.15%) |
+| e16_b64 r3 | 22,641,440 | 21,248,547 | 1,392,893 (6.15%) |
+
+## 3. NiceMark nice-only (`scripts/chainD.sh`, right after the A/B)
+
+`client_{main,pr} niceonly --gpu --benchmark --benchmark-secs 150 --benchmark-json`, A B A B A B (each sweep takes about 45 s; its four nice-only scenarios are all join fields). JSON in `pr-raw/box/nm_*.json`.
+
+| | main | PR | B/A |
+|---|---|---|---|
+| **NiceMark** | 3767.8, 3790.4, 3743.3 (median 3767.8, spread 1.3 %) | 4509.9, 4470.4, 4499.6 (4499.6, 0.9 %) | **×1.194** |
+| b58 MSD-weak (whole field, 3,364 partitions), n/s | 1.636e14 (1.617-1.646) | 2.055e14 (2.020-2.056) | ×1.256 |
+| b58 MSD-strong (whole field) | 9.922e14 (9.858-9.948) | 1.183e15 (1.178-1.185) | ×1.193 |
+| b60 MSD-weak (sampled, 445-525 partitions) | 3.259e14 (3.245-3.283) | 3.730e14 (3.722-3.734) | ×1.145 |
+| b62 MSD-weak (sampled, 714-738 partitions) | 4.077e14 (4.061-4.108) | 4.824e14 (4.812-4.890) | ×1.183 |
+
+Counts where the scenario runs a whole field: b58 MSD-strong identical (4,027,773,430 / 226,773,299, no overrun in main); b58 MSD-weak PR 33,590,315,220 / 1,894,592,860 in every run, main 33,590,315,049-053 / 1,894,593,013-022 (167-171 pairs overran, ~9 of them would have passed). The b60/b62 scenarios sample a time-dependent number of partitions, so their counts are not comparable.
+
+## 5. Final checks on the committed tree
+
+- The pushed commit `dd4a0eb` differs from the A/B binary's source only by the rustfmt line break in `walk_pf` and the CHANGELOG line (`diff -r` on the box). `cargo fmt --all --check` on `git archive dd4a0eb`: clean.
+- `git merge-tree` with `fork/pr/join-top-cert-fast` (3eb6e72): `cubecl_join.rs` auto-merges; CHANGELOG.md conflicts (one line each under Unreleased).
 
 ## 4. Code: what changed against the prototype (`exp/join-survivors` `xm = 256`)
 
