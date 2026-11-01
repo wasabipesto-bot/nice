@@ -15,6 +15,8 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   confirmed; profile after both: top 43 %, join 46 %, 35 % of join lanes are padding.** Comments
   posted on both PRs. New lead L32 (wave padding). L31 (a)+(c) re-measured on the combined tree
   (box `topcert2b`) for a possible stacked PR. Box combined2 destroyed (2.06 h).
+- L32 wave-padding scoping launched on the combined tree (box `padding`, KR). Live boxes at 07:00:
+  second-card (4090, GB), topcert2b (3080, KR), padding (3080, KR).
 - 4090 second-card run launched (main / #235 / #236 / both; box `second-card`, GB, $0.31/h).
 - 04:55: the `combined` box (m146575, PL) never left `created` (ssh refused for an hour); destroyed,
   machine excluded, replaced by `combined2` (KR, 58618524), reachable in 3 min; the agent's merge
