@@ -81,6 +81,8 @@ On the larger fields this PR's counts are the same in every run; main's are not,
 
 In every run, main's extra full checks are its overflowing pairs minus 6.2-6.7 % of them, which is the field's own keep rate: what an unfiltered overflow gives, with nothing else differing. No hits in any field.
 
+**A second card.** RTX 4090 (power limit set to 300 W, default 450 W; 2,360–2,470 MHz, no thermal throttling), same harness and starts, interleaved with `main`, medians of 3 (spreads ≤ 2.9 %): base 62, 1e17 ×1.181; base 62, 1e16 ×1.182; base 60, 1e16 ×1.235; base 64, 1e16 ×1.309; NiceMark nice-only ×1.167. Together with #235 on the same card: ×1.341 / ×1.339 / ×1.361 / ×1.331 and NiceMark 10,093 → 12,718 (×1.260); the time savings of the two PRs add, within ±1.2 % of the additive prediction. Exactness on the combined tree there: the CPU-reference test passes; at 1e14 (bases 57/60/62/64) join matches stride and counts equal `main`'s to the digit; at 1e16/1e17 the counts are the same in every run and equal this PR's.
+
 ## Exactness
 
 On the RTX 3080, through CubeCL's CUDA runtime:

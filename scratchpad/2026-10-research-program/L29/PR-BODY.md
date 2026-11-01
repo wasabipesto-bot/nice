@@ -84,6 +84,8 @@ The other phases stay within their round-to-round variation (up to 5 % for the j
 | b62 | 0.691 (0.696, 0.685) | 0.661 (0.668, 0.653) | ×1.045 |
 | b64 | 1.047 (1.044, 1.051) | 1.040 (1.035, 1.046) | ×1.007 |
 
+**A second card.** RTX 4090 (power limit set to 300 W, default 450 W; 2,360–2,470 MHz, no thermal throttling), same harness and starts, interleaved with `main`, medians of 3 (spreads ≤ 2.9 %): base 62, 1e17 ×1.101; base 62, 1e16 ×1.116; base 60, 1e16 ×1.084; base 64, 1e16 ×1.002 (nothing to gain there: its chunk divisor is a power of two); NiceMark nice-only ×1.076. Together with #236 on the same card: ×1.341 / ×1.339 / ×1.361 / ×1.331 and NiceMark 10,093 → 12,718 (×1.260); the two PRs' time savings add (each shortens only its own kernel), within ±1.2 % of the additive prediction.
+
 ## Exactness
 
 - **Certified tops** (profile counters) are identical to main's: 4,508,762,994, 6,869,484,234 and 3,866,773,495 at b62, b60 and b64 1e16.

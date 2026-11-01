@@ -45,11 +45,11 @@ def smi(path):
         return None
     return dict(mhz=st.mean(mhz), w=st.mean(w), t=max(t), n=len(mhz), thr=thr)
 
-def runs(prefix):
-    """{tree: [(round, tp dict, smi dict)]} for ff_<tree>_<prefix>_r*.log"""
+def runs(prefix, kind='ff'):
+    """{tree: [(round, tp dict, smi dict)]} for <kind>_<tree>_<prefix>_r*.log"""
     res = {}
     for t in TREES:
-        for f in sorted(glob.glob(f'{D}/ff_{t}_{prefix}_r*.log')):
+        for f in sorted(glob.glob(f'{D}/{kind}_{t}_{prefix}_r*.log')):
             x = tp(f)
             if x:
                 res.setdefault(t, []).append((int(f.rsplit('_r', 1)[1][:-4]), x[0], smi(f[:-4] + '.smi')))
@@ -59,8 +59,9 @@ THR = {'0x0000000000000004': 'SW power cap', '0x0000000000000000': 'none', '0x00
        '0x0000000000000020': 'SW thermal', '0x0000000000000040': 'HW thermal', '0x0000000000000080': 'HW power brake'}
 
 summary = {}
-for prefix, label in [('e17_b62', 'b62 1e17 (1 field)'), ('e16_b62', 'b62 1e16 (2 fields)'), ('e16_b60', 'b60 1e16 (2 fields)'), ('e16_b64', 'b64 1e16 (2 fields)')]:
-    R = runs(prefix)
+for prefix, label, kind in [('e17_b62', 'b62 1e17 (1 field)', 'ff'), ('e16_b62', 'b62 1e16 (2 fields)', 'ff'), ('e16_b60', 'b60 1e16 (2 fields)', 'ff'),
+                            ('e16_b64', 'b64 1e16 (2 fields)', 'ff'), ('e16_b64', 'EXTRA b64 1e16 (2 fields), four-way x4_*', 'x4')]:
+    R = runs(prefix, kind)
     if 'main' not in R:
         print(label, 'missing'); continue
     print(f'== {label}')
@@ -73,7 +74,7 @@ for prefix, label in [('e17_b62', 'b62 1e17 (1 field)'), ('e16_b62', 'b62 1e16 (
             pr = [a[1][metric] / b[1][metric] for a, b in zip(R['main'], R[t])]
             print(f'  {metric:9} {LBL[t]:5}: {", ".join(f"{y:.3f}" for y in x)} | median {m[t]:.3f} spread {spread(x):.1f} % | '
                   f'speed-up x{m["main"]/m[t]:.3f} (per-round {", ".join(f"{p:.3f}" for p in pr)}) saving {m["main"]-m[t]:.2f} s')
-        summary.setdefault(prefix, {})[metric] = m
+        summary.setdefault(kind + prefix, {})[metric] = m
         if all(t in m for t in TREES):
             s235, s236, sb = m['main'] / m['p235'], m['main'] / m['p236'], m['main'] / m['both']
             add = m['main'] / (m['p235'] + m['p236'] - m['main'])

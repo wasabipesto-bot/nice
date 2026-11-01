@@ -71,6 +71,25 @@ do not help. The join's memory budget stops at 4 GiB (join_plan.rs) so 46/80 GB 
 were measured not to be a lever in L1.7, so no action). **Fleet guidance:** never buy H100 at
 market; L40S only under ~$0.35/h.
 
+## L30.4 Second card: #235, #236 and both on an RTX 4090 (2026-11-01, agent; `L30/second-card/RESULTS-4090.md`)
+
+RTX 4090 (58626188, GB, $0.309/h; power limit set to 300 W of 450; 2,360–2,470 MHz; no thermal
+throttling), interleaved main/#235/#236/both, medians of 3, spreads ≤ 2.9 %:
+
+| | #235 | #236 | both |
+|---|---|---|---|
+| b62 1e17 | ×1.101 | ×1.181 | ×1.341 |
+| b62 1e16 | ×1.116 | ×1.182 | ×1.339 |
+| b60 1e16 | ×1.084 | ×1.235 | ×1.361 |
+| b64 1e16 | ×1.002 | ×1.309 | ×1.331 |
+| NiceMark nice-only | ×1.076 | ×1.167 | ×1.260 (10,093 → 12,718) |
+
+The savings add: `both` within ±1.2 % of the additive prediction (100.4–103.1 % of the product); #235
+gains nothing at b64 on one card (the 3080's apparent shortfall came from cross-box comparison).
+Exactness on `both`: CPU-reference test passes; 1e14 join = stride and counts = main to the digit;
+1e16/1e17 counts identical every run and equal to the 3080's. PR bodies #235/#236 updated with the
+second card.
+
 ## L30.3 #235 + #236 combined vs main, and the profile after both (2026-11-01, agent; `L30/COMBINED.md`, `L30/combined-raw/`; merge branch `exp/join-235-236` e9cdac4)
 
 Merge: cubecl_join.rs and join_plan.rs merged on their own; only the CHANGELOG line conflicted.
