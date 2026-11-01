@@ -20,6 +20,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   b60, NiceMark ×1.041 → parked narrowly.** **L32 tail wave (L32.1): ×1.040 b62 1e17, ×1.028 b60,
   NiceMark ×1.078, +1 register, wgpu/Metal unchecked → parked.** L33 early-reject scoping launched
   (box `earlyreject`, hard stop 12:45 UTC). Boxes second-card, topcert2b, padding destroyed.
+- **L33 (L33.1): the early reject cannot fire (×1.01), but the scoping found that the long division
+  runs all limbs though the top ones are known zero; skipping them is exact and ×1.051 at b62 1e17,
+  NiceMark ×1.066.** PR agent assembling limb skip + L31's (a)+(c) on #235 (box `topcert3`, hard stop
+  13:35 UTC); together ≈ ×1.10 expected. Box earlyreject destroyed (2.60 h).
 - L32 wave-padding scoping launched on the combined tree (box `padding`, KR). Live boxes at 07:00:
   second-card (4090, GB), topcert2b (3080, KR), padding (3080, KR).
 - 4090 second-card run launched (main / #235 / #236 / both; box `second-card`, GB, $0.31/h).
