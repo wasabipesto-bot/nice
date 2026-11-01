@@ -4,6 +4,13 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-01 (extended autonomous run, 02:00 → 14:00 UTC at the user's request; weekly cap resets 14:00)
+
+- Plan: finish L30 scoping (→ PR if ≥ 5 %); #235 CI; L9 H100 + L40S rates (two boxes, ~$2);
+  weekly literature sweep (L7); an Apple Feedback draft for the user; the top kernel's e^j
+  follow-up if L30 yields nothing; worktree/disk hygiene; final report before 14:00 UTC. The
+  04:41 routine folds in. November budget: $30 fresh; credit $60.85.
+
 ## 2026-10-31 (late evening, user: "continue with those tasks as though you were doing the next run now")
 
 - The user bumped the version (8bd154b "Update changelog, bump version"; 9bde4a8 dev bump) to ship
