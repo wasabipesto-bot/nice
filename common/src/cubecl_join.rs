@@ -410,14 +410,17 @@ mod kernels {
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
         #[comptime] tgroup: u32,
+        #[comptime] tid_global: bool,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
         let wave = comptime!(ept * JOIN_WG);
         // Experimental (NICE_EXP_JOIN_TRANSPOSE): the AND from a digit-major
         // copy of the batch's top masks, `tgroup` chunks of 32 tops per pass
-        // over an entry's digits (0 = the per-top AND).
-        let tg = comptime!(if tgroup > 0 { tgroup } else { 1 });
+        // over an entry's digits (0 = the per-top AND; 16 = build the copy
+        // but AND per top, a diagnostic).
+        let tg = comptime!(if tgroup > 0 && tgroup < 16 { tgroup } else { 1 });
+        let tand = comptime!(tgroup > 0 && tgroup < 16);
         let mid = comptime!(k2 - k);
         let bm = comptime!(base.pow(k2 - k));
         // M = b^(mid + 1): the key digit's output digit and the carries above.
@@ -447,7 +450,13 @@ mod kernels {
         let mut t_hi = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
         let mut t_rlo = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
         let mut t_rhi = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
-        let mut t_id = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
+        // With `tid_global` the walk reads a survivor's top id from `tl`
+        // instead (1 KiB less shared memory per cube).
+        let mut t_id = SharedMemory::<u32>::new(comptime!(if tid_global {
+            1usize
+        } else {
+            TOP_CAP as usize
+        }));
         let mut t_dm = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
         // T[c·64 + d]: bit i set iff top 32c + i of the batch has digit d.
         let mut t_tr = SharedMemory::<u32>::new(comptime!(if tgroup > 0 {
@@ -501,7 +510,9 @@ mod kernels {
                     t_hi[UNIT_POS_X as usize] = top_m[(2u32 * t + 1u32) as usize];
                     t_rlo[UNIT_POS_X as usize] = top_r[(2u32 * t) as usize];
                     t_rhi[UNIT_POS_X as usize] = top_r[(2u32 * t + 1u32) as usize];
-                    t_id[UNIT_POS_X as usize] = t;
+                    if comptime!(!tid_global) {
+                        t_id[UNIT_POS_X as usize] = t;
+                    }
                     // D (below b^mid <= 2^12) and the seed flag.
                     t_dm[UNIT_POS_X as usize] = (top_x[(2u32 * t) as usize] / dm_div)
                         | (top_x[(2u32 * t + 1u32) as usize] << 16u32);
@@ -632,7 +643,7 @@ mod kernels {
                             cend = nt;
                         }
                         let mut pm = Array::<u32>::new(ept as usize);
-                        if comptime!(tgroup > 0) {
+                        if comptime!(tand) {
                             let cb = jc / 32u32;
                             if cb % tg == 0u32 {
                                 #[unroll]
@@ -648,7 +659,8 @@ mod kernels {
                                     while (x | y) != 0u32 {
                                         let lo = x != 0u32;
                                         let v = select(lo, x, y);
-                                        let d = v.trailing_zeros() + select(lo, 0u32, 32u32);
+                                        // v != 0: its lowest set bit.
+                                        let d = (v.find_first_set() - 1u32) + select(lo, 0u32, 32u32);
                                         let v1 = v & (v - 1u32);
                                         x = select(lo, v1, x);
                                         y = select(lo, y, v1);
@@ -726,14 +738,20 @@ mod kernels {
                                             k,
                                             k2,
                                         ) {
+                                            let mut tid = 0u32;
+                                            if comptime!(tid_global) {
+                                                tid = tl[(tc + jt2) as usize];
+                                            } else {
+                                                tid = t_id[jt2 as usize];
+                                            }
                                             let at = s_cnt[0].fetch_add(1u32);
                                             if at < SURV_SH_CAP {
-                                                s_t[at as usize] = t_id[jt2 as usize];
+                                                s_t[at as usize] = tid;
                                                 s_r[at as usize] = r0;
                                             } else {
                                                 let g = surv_count[0].fetch_add(1u32);
                                                 if g < surv_cap {
-                                                    surv[(2u32 * g) as usize] = t_id[jt2 as usize];
+                                                    surv[(2u32 * g) as usize] = tid;
                                                     surv[(2u32 * g + 1u32) as usize] = r0;
                                                 }
                                             }
@@ -1918,7 +1936,8 @@ pub(crate) fn limits_of<R: Runtime>(client: &ComputeClient<R>) -> JoinLimits {
 /// Experimental switch for the join kernel's transposed AND (research L34,
 /// not for merge): `NICE_EXP_JOIN_TRANSPOSE=1` turns it on, with
 /// `NICE_EXP_JOIN_TRANSPOSE_G` chunks of 32 tops per pass over an entry's
-/// digits (1, 2, 4 or 8; default 8). Unset or 0: the per-top AND.
+/// digits (1, 2, 4 or 8; default 8; 16 builds the copy but keeps the
+/// per-top AND, a diagnostic). Unset or 0: the per-top AND.
 fn exp_join_tgroup() -> u32 {
     match std::env::var("NICE_EXP_JOIN_TRANSPOSE").ok().as_deref() {
         None | Some("" | "0") => 0,
@@ -1928,8 +1947,8 @@ fn exp_join_tgroup() -> u32 {
                 .and_then(|v| v.trim().parse::<u32>().ok())
                 .unwrap_or(8);
             assert!(
-                matches!(g, 1 | 2 | 4 | 8),
-                "NICE_EXP_JOIN_TRANSPOSE_G must be 1, 2, 4 or 8"
+                matches!(g, 1 | 2 | 4 | 8 | 16),
+                "NICE_EXP_JOIN_TRANSPOSE_G must be 1, 2, 4, 8 or 16 (diagnostic: build only)"
             );
             g
         }
@@ -1955,6 +1974,9 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// Experimental: the join kernel's transposed AND, chunks per group
     /// (`NICE_EXP_JOIN_TRANSPOSE`, 0 = off).
     tgroup: u32,
+    /// Experimental: survivors' top ids from global memory, not shared
+    /// (`NICE_EXP_JOIN_TRANSPOSE_TID=1`).
+    tid_global: bool,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -2126,6 +2148,7 @@ impl<R: Runtime> JoinDevice<R> {
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
             tgroup: exp_join_tgroup(),
+            tid_global: std::env::var("NICE_EXP_JOIN_TRANSPOSE_TID").is_ok_and(|v| v == "1"),
             limbs,
             chunk_digits,
             chunk_div,
@@ -2365,6 +2388,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k2,
                 self.walk_sync,
                 self.tgroup,
+                self.tid_global,
             );
         }
         unsafe {
