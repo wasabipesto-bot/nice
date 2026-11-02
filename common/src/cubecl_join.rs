@@ -2964,7 +2964,7 @@ impl<R: Runtime> JoinDevice<R> {
         let ntlay = fs.tlay.len();
         let nb = fs.nb;
         let pdiv = fs.nparts;
-        Ok(Self {
+        let dev = Self {
             client: client.clone(),
             b: fs.b,
             f0: fs.f0,
@@ -3060,7 +3060,26 @@ impl<R: Runtime> JoinDevice<R> {
             tl: client.empty(max_slots * fp.tl),
             work: client.empty(max_slots * fp.work),
             cursor: client.empty(max_slots * fp.cursor),
-        })
+        };
+        // The FD top stage takes `top_kernel` (only_clipped) beside it on a
+        // batch with a clipped block. Compile that now, on this slice's first
+        // clipped partition, rather than inside whichever batch first holds
+        // one (NiceMark's warm-up runs partition 0 only).
+        if let Some(&v) = dev.clip_vs.first().filter(|_| dev.top_fd != 0) {
+            dev.warm_top(v);
+        }
+        Ok(dev)
+    }
+
+    /// Run the top stage once on partition `v` into scratch counters, so
+    /// its kernels are compiled (see [`Self::new`]).
+    fn warm_top(&self, v: u32) {
+        let c = &self.client;
+        let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vec![v]));
+        let tc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
+        let bc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; self.nb as usize]));
+        let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; STAGES]));
+        self.launch_top(&[v], &vs_h, &tc, &bc, &ran, self.top_fd);
     }
 
     /// Whether batch `vs` holds a clipped block (see `clip_vs`).
