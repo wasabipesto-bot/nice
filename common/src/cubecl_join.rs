@@ -3077,7 +3077,10 @@ impl<R: Runtime> JoinDevice<R> {
         let c = &self.client;
         let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vec![v]));
         let tc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
-        let bc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; self.nb as usize]));
+        let bc = c.create(cubecl::bytes::Bytes::from_elems(vec![
+            0u32;
+            self.nb as usize
+        ]));
         let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; STAGES]));
         self.launch_top(&[v], &vs_h, &tc, &bc, &ran, self.top_fd);
     }
