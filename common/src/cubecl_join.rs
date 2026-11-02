@@ -5850,11 +5850,11 @@ mod tests {
                 for (mode, min) in [(1, 0), (2, 0), (2, dev.ntlay.max(1) * 3)] {
                     dev.top_fd_min = min;
                     let f = dev.run_tops(vs, mode);
-                    let g = dev.top_fd_groups(u32::try_from(vs.len()).unwrap());
-                    let m = format!("mode {mode}, groups {g:?}");
-                    assert_eq!(a.0, f.0, "{label} {vs:?} {m}: top counts differ");
-                    assert_eq!(a.1, f.1, "{label} {vs:?} {m}: bucket counts differ");
-                    assert!(a.2 == f.2, "{label} {vs:?} {m}: top entries differ");
+                    let groups = dev.top_fd_groups(u32::try_from(vs.len()).unwrap());
+                    let how = format!("mode {mode}, groups {groups:?}");
+                    assert_eq!(a.0, f.0, "{label} {vs:?} {how}: top counts differ");
+                    assert_eq!(a.1, f.1, "{label} {vs:?} {how}: bucket counts differ");
+                    assert!(a.2 == f.2, "{label} {vs:?} {how}: top entries differ");
                 }
                 ntops += a.0.iter().map(|&x| u64::from(x)).sum::<u64>();
                 nfix += usize::from(dev.top_fix(vs));
