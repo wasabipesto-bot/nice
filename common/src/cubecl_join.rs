@@ -1661,7 +1661,7 @@ mod kernels {
     }
 
     /// Seed the finite-difference state at P (< 2^64; the block's P^k below
-    /// b^(q_k), P below b^`tq`): packed digits of P² (`sq`), P³ (`cu`),
+    /// `b^(q_k)`, P below b^`tq`): packed digits of P² (`sq`), P³ (`cu`),
     /// 2P + 1 (`ds`), 3P² + 3P + 1 (`dc`) and 6P + 6 (`ddc`). P, P², P³ by
     /// schoolbook in 16-bit limbs and [`fd_digits_trim`]; the three
     /// differences from those digits by biased adds.
@@ -2081,8 +2081,6 @@ mod kernels {
         #[comptime] limbs: u32,
         #[comptime] s2: u32,
         #[comptime] s3: u32,
-        #[comptime] chunk_digits: u32,
-        #[comptime] chunk_div: u32,
         #[comptime] f0: u32,
         #[comptime] abl: u32,
     ) -> u64 {
@@ -2420,8 +2418,6 @@ mod kernels {
                                 limbs,
                                 s2,
                                 s3,
-                                chunk_digits,
-                                chunk_div,
                                 f0,
                                 abl,
                             );
