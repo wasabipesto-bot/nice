@@ -46,6 +46,8 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   neutral; ×1.143 with #236 underneath. Large diff (+1495/−169). Box l35-topfd destroyed (5.16 h).
   **Open program PRs now 5 (#235 → #237 → #240; #236 → #239): at the cap, nothing more opens until
   merges.** November research spend $4.99.
+- 12:03 UTC: **#240 CI fully green (25 pass, 3 skipped) at c7ef3c8.** All five open program PRs
+  green. No user comments yet. Report sent 11:10 UTC.
 - Worktree hygiene: nothing crosses the 7-day line yet (oldest checkouts 10-28); 64 worktrees,
   all but two under 30 MB. `rb-1102` (scratch for the rebases) to be removed at day end.
 
