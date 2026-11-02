@@ -10,6 +10,17 @@ The main A/B binary `F` was built from `73cda4c`, the hybrid binary `H` from `fc
 
 ## Summary
 
+**Follow-up (§11–12):**
+- **Chosen gate: `TRANSPOSE_MIN = 192`.**
+  - Gate screen on #235–#237, 2 rounds: b62 1e17 ×1.074, b62 1e16 ×1.063, b60 ×1.078, b64 ×1.173, NiceMark ×1.107, b58 MSD-strong ×1.023.
+  - MIN=256 keeps the large-field gain too (×1.065–1.149) but does no better on small buckets.
+  - **No MIN removes the 1e14 loss** (b62 1e14 ×0.93–0.95 at 128, 192 and 256, including 256, which transposes nothing there). It is the kernel's fixed footprint: 5 cubes per SM instead of 6.
+- **PR branch `pr/join-transpose-and` at `1298ce7`:** one commit on #236's head, `TRANSPOSE_MIN`/`AND_GROUP` constants and no env knobs.
+  - Everything passes at the head: fmt, clippy ×2, WGSL lint, CUDA parity incl. b50/b54, dense ×2, whole b42 (also with the gate at 0), 1e14 compare, lavapipe naga + SPIR-V.
+  - A/B on #236: b62 1e17 ×1.055, b62 1e16 ×1.050, b60 ×1.062, b64 ×1.176, NiceMark ×1.075 (MSD-strong ×1.017), 1e14 ×0.96–0.98. 40 registers, 5 cubes/SM.
+
+**Original task:**
+
 - **Exact, and a modest win on the large fields.** The transposed AND (G=4, `73cda4c`), A/B against the switch off in the same binary, RTX 3080 at 180 W, 3 interleaved rounds, medians (§6):
 
   | field | speed-up | device s/field off → on |
@@ -238,4 +249,82 @@ NiceMark (`client_H`, off/hybrid × 2, `hnm_*.json`): **score 5549.0, 5594.7 →
   - Chains: `chain_prof.sh` (baseline profile), `chain_screen.sh`, `chain_tprof.sh`, `chain_screen2.sh`, `chain_screen3.sh`, `chain_screen4.sh`, `chain_h.sh` (screens), `chain_x.sh` (CUDA exactness), `chain_lvp.sh` (lavapipe), `chain_ab.sh` (A/B + NiceMark), `chain_post.sh` (profile after), `chain_hx.sh` (hybrid exactness, lavapipe, short A/B, NiceMark).
   - Analysis: `analyze.py` (output `raw/analysis.txt`), `prof.py` (GPU_PROFILE phase shares; output for every profile log in `raw/profiles.txt`), `blocks.py` (SPIR-V blocks, from L33).
   - Lint: `clippy.sh` (on `fcd6581`), `clippy2.sh` (on `432b795`).
+  - Follow-up (§11–12): `chain_min.sh` (gate screen), `chain_prbuild.sh`, `chain_prcpu.sh` (P256 builds and checks, superseded), `chain_pr192.sh` (P192 builds, then `chain_prx.sh` checks and `chain_prab.sh` A/B), `chain_p192t.sh` → `chain_fix.sh` (top-id diagnostic build; SPIR-V rebuild after the `cargo clean` race), `chain_p0.sh` (parity with `TRANSPOSE_MIN = 0`), `analyze2.py` (output `raw/analysis2.txt`).
 - `raw/box/`: every log, `.smi` trace and NiceMark JSON; `sass/` (CUDA sources of the join kernel per variant, the CubeCL logs they came from, and `registers.txt`); the lint's WGSL dumps (`wgsl_g4.log.gz`, `wgsl_h.log.gz`) and the SPIR-V parity dumps (`pardump_spv_*.log.gz`); `power.txt`, `nvidia-smi.txt`, `box-info.txt`.
+
+## 11. Follow-up: a stricter gate, MIN = 192 and 256 (`chain_min.sh`, 08:49–09:27 box UTC, nothing else on the box but niced builds)
+
+`H` (`fcd6581`) with G=4 and `NICE_EXP_JOIN_TRANSPOSE_MIN` = 192 or 256, and 128 on the cheap fields, against the switch off in the same binary. Two rounds, interleaved per round. Device s/field; the ratio is of medians (two rounds), and at 1e14 of means. `raw/analysis2.txt` (`analyze2.py`). Counts were identical across all configurations in every run. While the large fields ran, the PR builds of §12 ran at `nice -n 19` with 4 jobs. The harness ran at normal priority, so they only used idle CPU.
+
+| field | off | MIN=128 | **MIN=192** | MIN=256 |
+|---|---|---|---|---|
+| b62 1e17, 1 field | 140.80, 144.32 | — | 132.59, 132.85: **×1.074** | 134.45, 133.28: ×1.065 |
+| b62 1e16, 2 fields | 12.053, 12.105 | 11.028, 11.100: ×1.092 | 11.357, 11.362: ×1.063 | 11.243, 11.130: ×1.080 |
+| b60 1e16, 2 fields | 27.302, 27.151 | — | 24.974, 25.540: **×1.078** | 25.445, 25.683: ×1.065 |
+| b64 1e16, 2 fields | 38.913, 38.844 | — | 33.146, 33.145: **×1.173** | 34.013, 33.644: ×1.149 |
+| b60 1e14, 3 fields | 0.635, 0.601 | 0.631, 0.619: ×0.989 | 0.624, 0.638: ×0.979 | 0.637, 0.647: ×0.963 |
+| b62 1e14, 3 fields | 0.501, 0.491 | 0.527, 0.514: ×0.953 | 0.525, 0.537: **×0.934** | 0.524, 0.532: ×0.939 |
+| b64 1e14, 3 fields | 0.692, 0.720 | 0.736, 0.719: ×0.970 | 0.754, 0.742: ×0.944 | 0.727, 0.728: ×0.970 |
+| NiceMark score (`client_H`, 2 rounds, `mnm_*.json`) | 5486.4, 5582.3 | 5996.4, 6008.2: ×1.085 | 6151.8, 6104.0: **×1.107** | 5897.1, 6006.7: ×1.075 |
+| NiceMark b58 MSD-strong | 1.310e15, 1.358e15 | ×0.992 | **×1.023** | ×0.999 |
+| NiceMark b58 / b60 / b62 MSD-weak | | ×1.116 / ×1.138 / ×1.098 | ×1.161 / ×1.142 / ×1.108 | ×1.116 / ×1.103 / ×1.088 |
+
+- **MIN=256 keeps most of the large-field gain** (×1.065–1.149), but MIN=192 keeps more at b62 1e17, b60 and b64, and in NiceMark. Between 128, 192 and 256 the large-field differences are 1–3 %, about the noise of two rounds (b62 1e16 put 128 first, b62 1e17 / b60 / b64 put 192 first).
+- **NiceMark's small-bucket scenario is fixed by any gate:** b58 MSD-strong ×0.99–1.02 against ×0.90 ungated (§6).
+- **No gate removes the 1e14 loss.** b62 1e14 is ×0.93–0.95 and b64 1e14 ×0.94–0.97 at every MIN, including 256, which transposes no batch at 1e14 (3.2 tops per bucket).
+  - So the residual loss is a fixed cost of carrying the path, not of using it. The kernel has 44 registers (5 cubes per SM against the base's 6), 16.4 KiB of shared memory per cube (also 5), and one extra barrier per batch.
+  - Closing it would need the base kernel's footprint for small fields. One option is a per-field choice between two compiled variants, from the host's estimate of tops per bucket (top-layer prefixes per slice over buckets); this was not tried.
+  - Alternatively, ≤ 40 registers and 1 KiB less shared memory (survivors' top ids from `tl`, which the TID knob showed costs nothing) would give 6 cubes. That is not reachable from CubeCL without a register cap.
+- **Chosen: MIN = 192.** It is the best large-field and NiceMark result of the three. The criterion "no scenario below ×0.99" is met by NiceMark (all scenarios ≥ ×1.02) but **not by the 1e14 fields** at any MIN.
+
+## 12. Follow-up: the PR branch `pr/join-transpose-and` (fork, **`1298ce7`**, one commit on #236's head `fb05597`; PR not opened; body in `PR-BODY.md`)
+
+- **Branch construction.**
+  - The seven `exp/join-transpose` commits (`5814422` … `432b795`) cherry-picked onto `fb05597` without conflicts. Their diff equals `0f1a8a7..432b795` line for line, and every hunk is in `join_kernel`, the kernels' allow-list or the host's `JoinDevice` (`top_kernel` untouched).
+  - They were then squashed and rewritten without the experiment switches:
+    - `pub const TRANSPOSE_MIN: u32 = 192` and `const AND_GROUP: u32 = 4`, used in the kernel directly (no new kernel parameters, no host change).
+    - No TID or diagnostic knobs.
+    - `clippy::manual_is_multiple_of` joins the kernels' allow-list.
+    - A const assert ties `JOIN_WG = TOP_CAP`, `TOP_CAP % (32·AND_GROUP) = 0` and `TRANSPOSE_MIN ≤ TOP_CAP`.
+    - Kernel and module docs updated, and a CHANGELOG line under Unreleased ending `([#NNN](…/pull/NNN))`.
+  - +132/−18 over 2 files. The commit also applies to `cubecl_join.rs` on `exp/join-all3` without conflict; only the CHANGELOG conflicts, as usual.
+- **Binaries** (box, toolchain 1.99.1):
+
+  | binary | md5 |
+  |---|---|
+  | `P192` (`1298ce7`, CUDA test) | 7ac6f472 |
+  | `client_P192` | fb1d72eb |
+  | `P192_naga` | 60bea832 |
+  | `P192_spv` | fbb9ac6e |
+  | `B236` (`fb05597`, the same md5 as L30's `p236`) | 4db573d2 |
+  | `client_B236` | 24976c49 |
+  | `P0` (`1298ce7` with `TRANSPOSE_MIN = 0`) | 45ac7ad5 |
+
+  The first `P192_spv` was deleted by a concurrent build's `cargo clean` before its install, and was rebuilt alone (`chain_fix.sh`).
+- **Checks at the head, all pass:**
+  - CUDA (`prx192_*.log`): `cubecl_cuda_join_matches_the_cpu_reference` (incl. b50/b54); dense b58 254,938,965 / 14,396,829 and dense b62 120,013,475 / 7,355,827, both equal to the CPU join; whole b42 (417,789,835 / 16,879,877).
+  - 1e14 compare at b57/60/62/64 (`prcmp192_e14.log`): identical to `B236`'s (`b236cmp_e14.log`).
+  - The same CUDA tests with `TRANSPOSE_MIN = 0` (`p0_*.log`, every batch transposed, because the small test windows mostly stay below 192): all pass with the same counts.
+  - Lavapipe join parity: naga (`pr192_lvp_par_naga.log`, 90 s) and direct SPIR-V (`pr192_lvp_par_spv.log`, 117 s); JoinKernel 133–136 SPIR-V blocks.
+  - CI's WGSL lint: 15 shaders, 0 flagged (`pr192_wgsl_lint.log`).
+  - `cargo fmt --check` and clippy default + `nice_client/gpu` `-D warnings` (`pr192_fmt.log`, `pr192_clippy_*.log`).
+- **Registers:** 40 (= `fb05597`'s 40), 0 spills, 1,088 SASS instructions (784). Shared memory 16,392 B per cube against 14,344, so **5 cubes per SM by shared memory** against 6. The exp tree's `H` had 44 registers. With the knobs gone, ptxas allocates the same code in 40.
+- **A/B on #236** (`chain_prab.sh`, 09:48–10:25 box UTC, nothing else on the box; `B236` vs `P192`, interleaved; 2 rounds at 1e17 and NiceMark, 3 at 1e16 and 1e14; `raw/analysis2.txt`):
+
+  | field | #236 | PR | speed-up |
+  |---|---|---|---|
+  | b62 1e17 | 180.54, 187.32 | 174.02, 174.57 | **×1.055** (1.037, 1.073) |
+  | b62 1e16 | 15.598, 15.742, 15.723 | 14.646, 14.973, 14.981 | **×1.050** |
+  | b60 1e16 | 34.162, 34.431, 34.165 | 32.165, 32.022, 32.771 | **×1.062** |
+  | b64 1e16 | 41.080, 41.136, 40.488 | 34.937, 35.023, 34.932 | **×1.176** |
+  | b60 / b62 / b64 1e14 (3 fields, means) | 0.707 / 0.572 / 0.739 | 0.723 / 0.596 / 0.758 | ×0.978 / **×0.959** / ×0.975 |
+  | NiceMark score | 4404.0, 4394.2 | 4692.7, 4764.2 | **×1.075** |
+  | NiceMark b58 MSD-weak / MSD-strong / b60 / b62 | | | ×1.106 / **×1.017** / ×1.093 / ×1.085 |
+
+  - Clocks within 1.3 % per field, all at 178–180 W.
+  - Counts identical on every field and in NiceMark's whole-field scenarios.
+  - The saving per b62 1e17 field is 9.6 s, about the same as on #235–#237 (§11: 9.8 s). The ratio is lower here only because the base is slower.
+- **Top ids from the list (diagnostic, `exp/join-transpose-and-tid` `1252ea5`, local only; 1e14 only, `pab_prt_*`):**
+  - It frees the 1 KiB `t_id` (15,368 B, under the 6-cube line), but ptxas then uses 45 registers, so it is still 5 cubes per SM.
+  - At 1e14 (means of 3 rounds): ×0.994 / ×0.974 / ×0.991 against the PR's ×0.978 / ×0.959 / ×0.975. Its round 2 sat at the base's level, and rounds 1 and 3 at the PR's, so this is inconclusive.
+  - Not taken.

@@ -31,6 +31,16 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   buckets ×0.96–0.99. Shared-memory bound (bank conflicts on the digit gathers), so the AND only
   got ×1.3 cheaper. Post-#237 profile: top 34.6 %, join 52.8 %. Agent sent on to screen a
   full-batch-only gate (MIN=256/192) and to prepare `pr/join-transpose-and` on #236 (no PR yet).
+- **L35 result (09:40 UTC, L35.1): ×1.143 at b62 1e17, ×1.136 b62 1e16, ×1.084–1.10 b60, exact;
+  b64 neutral → FD off at power-of-two bases; NiceMark ×1.00 because its bit-reversed partition
+  samples seed every slot (production runs partitions consecutively).** Endorsed for a PR on the
+  whole-field production measurements; agent sent on to prepare `pr/top-fd` on #237 (51410e7)
+  with a final A/B incl. b58 1e16 and a body that explains the NiceMark neutrality. That would
+  make 5 open program PRs (the cap): #235 → #237 → top-fd, and #236 → transpose.
+- **PR #239 opened (10:40 UTC, L34.2):** transposed AND gated at 192 tops per batch, on #236:
+  ×1.055 b62 1e17, ×1.062 b60, ×1.176 b64, NiceMark ×1.075 (MSD-strong ×1.017), exact; the 1e14
+  loss (×0.93–0.98) is the kernel's footprint (5 cubes/SM), not the transposed path, and is stated
+  in the body. Box l34-transpose destroyed (4.63 h).
 - Worktree hygiene: nothing crosses the 7-day line yet (oldest checkouts 10-28); 64 worktrees,
   all but two under 30 MB. `rb-1102` (scratch for the rebases) to be removed at day end.
 

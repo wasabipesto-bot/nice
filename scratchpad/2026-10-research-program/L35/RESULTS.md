@@ -4,7 +4,58 @@ Branch **`exp/top-fd`** on the fork (base `exp/join-all3` 0f1a8a7 = main 04693ac
 Raw logs: `raw/box/` (the box's `/root/l35/logs`), scripts: `raw/scripts/`. Design: `DESIGN.md` (plan, then
 "As built"). No PR.
 
-__SUMMARY__
+## Summary
+
+- **Built:** `top_fd_kernel`, switchable with `NICE_EXP_TOP_FD`, on the fork as **`exp/top-fd`**
+  (head `fd58370`, fmt and clippy clean). One thread per top-layer prefix walks the batch's slots.
+  - a² and a³ of a block a = P·b^f0 are P², P³ shifted by 2f0 and 3f0 digits.
+  - Their packed digits step from partition to partition with the detailed FD's additions.
+  - Mode 2 (the one measured) steps d2 = e² − a² and d3 = e³ − a³ in binary too.
+  - Division happens only in the batch's first slot (the seed) and in `top_kernel` (`only_clipped`)
+    for the two clipped partitions of a slice.
+  - Kept tops are appended with one atomic per plane.
+- **A/B** (binary F = `3574f0f`, one binary, FD off against FD=2, RTX 3080 at 180 W, interleaved,
+  medians):
+
+  | field | speed-up | per round | rounds | seconds per field, off → on |
+  |---|---|---|---|---|
+  | **b62 1e17** | **×1.143** | 1.134–1.154 | 5 | 146.1 → 127.8 |
+  | **b62 1e16** | **×1.136** | 1.127–1.143 | 3 | 12.23 → 10.76 |
+  | **b60 1e16** | **×1.084** | 1.084–1.095 | 3 | 27.40 → 25.27 |
+  | **b64 1e16** | **×0.985** | 0.972–1.011 | 3 | (FD now off at power-of-two bases) |
+
+  On H (= F plus the three host-side fixes of §7): b62 1e17 ×1.129 (3 rounds), b62 1e16 ×1.135,
+  b60 ×1.101, b64 ×1.02 (same kernel both sides).
+- **NiceMark:** ×0.930 on F, from a JIT compile of the clipped-block kernel inside b58's timed sample
+  (×0.72 there). **×1.000 on H** (1.015, 0.999, 1.014). NiceMark samples partitions in bit-reversed
+  order, so every FD slot is a seed there and it cannot show the stepping gain.
+- **Exact:**
+  - The new device test (both kernels, same batches, per-slot counts, bucket counts and sorted entries)
+    passes on CUDA on 26 fields and 279 batches (gaps, a backwards step, 23 batches with a clipped
+    block), 237.9 M tops, for both modes and (G, H) slot groups. Its light form passes on lavapipe
+    naga and direct SPIR-V (21 fields, 142 batches; binary F).
+  - The certificate test gives #235's counts.
+  - Join parity passes with FD=1 and FD=2 (and on SPIR-V).
+  - Dense b58/b62, the whole b42 field and the 1e14 COMPARE at b57/60/62/64 give counts identical to
+    the base binary.
+  - Every 1e16/1e17 A/B round has identical survivors / checked / found on both sides.
+  - The WGSL lint flags nothing (TopFdKernel b57: 196 constant divisions).
+- **Kernel alone** (§4, ns per (prefix, slot)): b62 1e17 0.363 → **0.229 (×1.59)**, b60 1e16 0.333 →
+  **0.226 (×1.47)**.
+  - **A stepped partition costs 0.198 ns per prefix (b62; 0.192 at b60), against 0.363 for
+    `top_kernel` (×1.83).** A seeded one costs 0.350.
+  - The step's additions themselves are too small to measure. What a stepped slot pays for is the two
+    certificate scans, x mod b^c0, the carry tests and the append.
+  - The top kernel was ~34 % of b62 1e17's device time and ~24 % of b60 1e16's.
+- **Registers** (offline ptxas, sm_86): `top_kernel` 80. FD mode 2 109–111 (2 blocks of 256 per SM, no
+  spills). FD mode 1 80. The cube size (64–256) made no difference. Lavapipe SPIR-V blocks: TopFdKernel
+  304–316 against TopKernel 368–386.
+- **Persistence across batches** (not built) would turn every slot into a stepped one. Estimate:
+  **b62 1e17 ≈ ×1.18**, b60 1e16 ≈ ×1.11 (instead of ×1.14 / ×1.08), for 192 B per prefix of device
+  memory (≈ 695 MB for b62 1e17's 3.62 M-prefix slices; mode 1: ≈ 348 MB). That needs plan budgeting.
+- **Not done:** no Metal (M4) run. The seed uses #237's split16 trimmed division (Apple-safe form), and
+  the step and certificate scan only add, shift and mask. No 1e16 run at b57/b58 beyond NiceMark.
+- **The box (58776353) can be destroyed**: all logs are copied to `raw/box/`.
 
 ## 1. What was built
 
@@ -44,10 +95,17 @@ __SUMMARY__
 - `cube_done(ran, 0)` once per cube. `expect[0]` = top cubes, plus top cubes × slots when the
   `only_clipped` launch runs (`top_expect`).
 
-Commits: `3574f0f` (the kernel, tests, timing test), `e702a85` (rustfmt), `5d93d35` (clippy: two unused
-comptime parameters removed, a doc line), `3892d9c` (rustfmt), **`34e45c0`** (clippy: an allow on the
-timing test). Every binary measured below was built from **`3574f0f`**. The later commits are
-whitespace, an unused comptime parameter pair and lint attributes, with the same kernels.
+Commits on `exp/top-fd` (head **`fd58370`**, fmt and clippy clean):
+
+| commit | what | binaries built from it |
+|---|---|---|
+| `3574f0f` | the kernel, the switch, the device test, the timing test | **F**, `client_F`, `F_naga`, `F_spv`: all exactness of §3, the A/B of §5, NiceMark of §6, §4's final row, §8, §9 |
+| `e702a85`, `5d93d35`, `3892d9c`, `34e45c0` | rustfmt; clippy (two unused comptime parameters of `top_cert_fd`, a doc line, a test's allow) | none (same kernels) |
+| `2111f09` | FD off at power-of-two bases; slot groups below 2^17 prefixes | **G**, `client_G` (§7) |
+| `6c8db87` | each FD device compiles the clipped-block kernel up front (`warm_top`) | **H**, `client_H` (§7) |
+| `e586598`, `fd58370` | rustfmt; clippy (test binding names) | none |
+
+The iteration binaries B…B8 of §4 were built from uncommitted work trees on the box.
 
 **Host facts checked first** (as the brief asked):
 - Production batches are consecutive. `run_field` passes `parts = 0..nparts` (`cubecl_join.rs` ~3529),
@@ -72,10 +130,12 @@ whitespace, an unused comptime parameter pair and lint attributes, with the same
   | binary | tree | features | md5 | used for |
   |---|---|---|---|---|
   | `A` | 0f1a8a7 | gpu | caf200d3 | base 1e14 compare, base b62 1e16 run, base registers |
-  | `B`…`B8` | iterations (§4) | gpu | (logs) | kernel-level timings, FD test per iteration |
+  | `B`…`B8` | iterations (§4) | gpu | 5017aaa2 … 11ba847e | kernel-level timings, FD test per iteration |
   | **`F`** | **3574f0f** | gpu | **8ea24743** | all CUDA exactness, **both sides of the A/B** (env), timings, registers |
   | `client_F` | 3574f0f | `nice_client --features gpu` | 723ed864 | NiceMark (both sides, env) |
-  | `F_naga`, `F_spv` | 3574f0f | cubecl / cubecl-spirv | (build logs) | lavapipe |
+  | `F_naga`, `F_spv` | 3574f0f | cubecl / cubecl-spirv | d2a93ab7, 0e606eef | lavapipe |
+  | `G`, `client_G` | 2111f09 | gpu / client | fd5ba319, 1d294f52 | §7 |
+  | `H`, `client_H` | 6c8db87 | gpu / client | 0b0cf11a, bbd973b3 | §7 |
 
 - **Harness** as L30/L33: `cubecl_cuda_join_throughput_fixed_fields` at L30's starts (b60
   1366406074057412100454, b62 7997740455941656911841, b64 41242006262957161709568; b57 frontier for the
@@ -90,6 +150,7 @@ whitespace, an unused comptime parameter pair and lint attributes, with the same
 |---|---|
 | **`cubecl_cuda_top_fd_matches_the_top_kernel`** (new; F, `xf_fd.log`): both kernels on the same `JoinDevice` and batch, per slot `top_count`, every `bucket_cnt`, and the sorted (top_p, top_m, top_r, top_x, top_b) entries equal, for **mode 1 and mode 2** | **ok**: 26 fields (17 test windows b20–b64, clipped at both ends, every partition; b57/b60/b62/b64 1e14 production plans; b60/b62/b64 1e16 first and last slices), **279 batches** (consecutive: first three, middle, last; the thinned live partitions = gaps; a batch [3, 2, 4, 5, 7, 8, …] stepping back and skipping), **23 with a clipped block**, **237,907,266 tops** |
 | the same on every iteration binary (B, B3, B4, B6, B8) | ok each time (`x_fd*.log`) |
+| the same test on **G** and **H**, which also run mode 2 in about three slot groups per batch | ok, ok (`xg_fd.log`, `xh_fd.log`); join parity with FD=2 on G and H: ok, ok |
 | `cubecl_cuda_top_certificates_match_the_lockstep_scan_and_the_cpu` (F; `top_cert`'s end moved into `close_cert`) | ok: **102,365 intervals, 33,582 kept, 203,413 powers above c0, 69,824 with the carry** (#235's counts) |
 | `cubecl_cuda_join_matches_the_cpu_reference` with **`NICE_EXP_TOP_FD=2`** and **`=1`** (b10's 69, windows b20–b64 incl. b50/b54, b57 frontier, tight layouts with re-runs and splits, refused layouts, production shape) | **ok / ok** (`xf_ref2.log`, `xf_ref1.log`) |
 | dense b58 1e15, 32 partitions, FD=2 | ok: **254,938,965 / 14,396,829**, asserted equal to the CPU join (= L30/L33) |
@@ -102,8 +163,8 @@ whitespace, an unused comptime parameter pair and lint attributes, with the same
 | lavapipe, direct SPIR-V: `cubecl_join_matches_the_cpu_reference` with FD=2 | ok, 125 s |
 | CI's WGSL lint (`wgsl_dump_for_lint` on lavapipe naga + `scripts/wgsl-lint.py` with CI's 13 `--require`s) with FD off | 15 shaders, **0 flagged**, rc 0; TopKernel b57: 270 constant divisions (= L33) |
 | the same dump with `NICE_EXP_TOP_FD=2` (`--require TopFdKernel@57` instead of TopKernel@57) | 15 shaders, **0 flagged**, rc 0; **TopFdKernel b57: 196 constant divisions** (the seed's trimmed split16 division and digit extraction, and the buckets' `% (b − 1)` as in `top_kernel`; a stepped slot has no long division) |
-| `cargo fmt --all --check` | on 3574f0f: reflows only (`fmt.log`), fixed in `e702a85`/`3892d9c`; **clean on the head 34e45c0** (`fmt_head.log`) |
-| `cargo clippy -p "*" --all-targets --features nice_client/gpu -- -D warnings` (rustc 1.99.1) | **clean** on the head (`clippy_gpu.log`; the first run found two unused comptime parameters, a doc nit and a test's single-letter names, fixed in `5d93d35`, `34e45c0`) |
+| `cargo fmt --all --check` | on 3574f0f: reflows only (`fmt.log`), fixed in `e702a85`, `3892d9c`, `e586598`; **clean on the head `fd58370`** (`fmt_head2.log`, file md5 fcf6c9e0) |
+| `cargo clippy -p "*" --all-targets --features nice_client/gpu -- -D warnings` (rustc 1.99.1; the `gpu` umbrella builds the CUDA and wgpu code) | **clean on the head `fd58370`** (`clippy_gpu.log`). Earlier runs found two unused comptime parameters, a doc nit and single-letter test bindings, fixed in `5d93d35`, `34e45c0`, `fd58370` |
 
 Coverage: the dense fields spread their partitions (i·total/n), so they exercise seeds and overflow
 re-runs; stepping is exercised by the FD test's consecutive batches and by every whole-field run (1e14
@@ -188,14 +249,14 @@ gives `raw/analysis_F.txt`.
   plain ratio is the conservative one here.
 - **The base binary against F with FD off**, b62 1e16, single runs: 11.90 against 12.09 s, identical
   counts. That is within one round's spread, and the FD-off kernel compiles to the same 80 registers at
-  b62 (§7).
+  b62 (§8).
 - **b64 is slower with FD** (×0.985; clock-normalised ×0.959).
   - At b64 = 2^6 `top_kernel`'s chunk divisor is 2^12, so its "division" is shifts and masks (L30 §4
     found #235 null there for the same reason). The FD kernel removes nothing there.
   - It adds a seed, which at b64 costs 0.51 ns per (prefix, slot) against `top_kernel`'s 0.31 slot.
   - At the kernel level FD is ×0.93 (mode 2) / ×0.79 (mode 1), and even its stepped slots cost about what
     `top_kernel`'s do.
-  - Fixed in `2111f09`: FD stays off at power-of-two bases (§8).
+  - Fixed in `2111f09`: FD stays off at power-of-two bases (§7).
 
 ## 6. NiceMark (binary `client_F`, A = FD off, B = FD=2, 3 rounds, ~33 s each)
 
@@ -211,16 +272,75 @@ round 0.957, 0.928, 0.927.
 
 - The b58 scenarios run every partition, and their survivors / checked are identical A = B. The b60/b62
   ones sample partitions within the time budget, so their counts vary in both A and B.
-- **b58 msd weak is the regression.**
-  - The FD grid is one unit per top-layer prefix, against prefixes × slots for `top_kernel`.
-  - On a field with a small top layer and many slots (this one: 1e15, 16 slots) it underfills the GPU,
-    and each unit walks 16 slots in series.
-  - The b60/b62 scenarios measure only short samples (~2.6–3.2 s of run time), so their large-field gain
-    shows up only partly.
-- The fix is in `2111f09` (§8): when the top layer is below 2^17 prefixes, the FD kernel splits the
-  batch's slots into groups along y (each group seeds once), so it always has at least 2^17 units.
+- **b58 msd weak is the regression.** It is a JIT compile inside the timed sample, not kernel speed
+  (§7, item 3). My first guess was an underfilled grid on a small top layer. That led to the slot groups
+  of `2111f09`, which are worth having for 1e14-size fields (§7) but left NiceMark unchanged. The field
+  has 660,348 prefixes, where the FD kernel is ×1.72 faster.
+- NiceMark samples partitions in bit-reversed order (`sample_order`), so no batch has two consecutive
+  partitions and every FD slot seeds. The b58-strong, b60 and b62 scenarios, at ×1.02, are the
+  all-seed path (§4: ×1.03), not production's stepping.
 
-## 7. Registers, SASS, occupancy
+## 7. After the A/B: power-of-two bases, slot groups, the clipped-block kernel's compile (`2111f09`, `6c8db87`)
+
+Three host-side or launch-shape changes. Nothing in the kernels' arithmetic changed.
+
+1. **No FD at power-of-two bases** (`2111f09`). `JoinDevice::new` keeps `top_kernel` when b is a power
+   of two (b64 here; §5). The FD test still forces both modes at b64, so the kernel stays tested there.
+2. **Slot groups** (`2111f09`). If the top layer has fewer than `TOP_FD_MIN_UNITS` = 2^17 prefixes
+   (`NICE_EXP_TOP_FD_MIN_UNITS`), the FD kernel's y splits the batch's slots into groups, each walked by
+   its own units and seeding once. The kernel's slot loop runs from `CUBE_POS_Y·slot_k` (one more
+   runtime argument), and `top_expect` counts top cubes × groups.
+   - The FD test now also runs mode 2 in about three groups per batch: 279 batches, 23 with a clipped
+     block, all equal (`xg_fd.log`). Join parity with FD=2 also passes (`xg_ref2.log`).
+   - Kernel timings over the threshold (`tg_groups.log`, consecutive batches, mode 2, ×top_kernel):
+
+     | field (prefixes, slots) | one group | 2^16 | **2^17** | 2^18 | 2^19 |
+     |---|---|---|---|---|---|
+     | b62 1e14 (53,067, 16) | ×1.163 | ×1.257 | **×1.328** (3 groups) | ×1.250 | ×1.171 |
+     | b57 1e14 (80,906, 16) | ×1.379 | ×1.365 | **×1.419** (2 groups) | ×1.370 | ×1.274 |
+     | b58 1e15 (660,348, 16) | ×1.716 | ×1.728 | ×1.729 | ×1.730 | ×1.714 |
+     | b62 1e17 (3,620,628, 5) | ×1.578 | ×1.559 | ×1.584 | ×1.593 | ×1.579 |
+
+     2^17 is the best or tied on every field. The big top layers never split, and the 1e14 fields
+     gain 4–14 %.
+   - `2111f09`'s commit message blames NiceMark's b58 ×0.72 on one group. That is wrong: see item 3 and
+     `6c8db87`.
+3. **The clipped-block kernel's compile** (`6c8db87`).
+   - Slot groups were not NiceMark's problem: b58 MSD-weak's top layer has 660,348 prefixes, and there
+     the FD kernel is ×1.72 faster consecutive and ×1.07 faster all-seed. NiceMark samples partitions in
+     bit-reversed order (`sample_order`), so every FD slot seeds, and at b60/b62 that is the ≈ ×1.02
+     those scenarios showed.
+   - b58 MSD-weak's B side lost 1.5 s of run time in every round (4.17 → 5.7 s) while its warm-up
+     stayed the same.
+   - NiceMark's untimed warm-up runs partition 0 only. With FD, `top_kernel(only_clipped)` is first
+     needed in whichever timed batch holds the slice's first or last P, so its NVRTC compile landed
+     inside the timed sample. FD off compiles its single top kernel in the warm-up. (b58 MSD-strong
+     follows in the same process with the same kernels cached, and showed ×1.02.)
+   - Each FD `JoinDevice` now runs its top stage once on its first clipped partition into scratch
+     counters (`warm_top`). That is one extra one-slot launch per slice.
+
+**Results of G (`2111f09`) and H (`6c8db87`).** Same box; FD off against FD=2 on one binary each;
+`raw/box/{nmg,nmh,abg,abh}_*`.
+
+| | G | H |
+|---|---|---|
+| FD test (modes 1, 2; mode 2 also in about three slot groups), 26 fields, 279 batches | ok | ok |
+| join parity, `NICE_EXP_TOP_FD=2` | ok | ok |
+| NiceMark score, FD off → FD=2 (3 rounds) | 5439 → 5081, ×0.934 (b58 MSD-weak ×0.72) | **5579 → 5577, ×1.000** (rounds 1.015, 0.999, 1.014) |
+| NiceMark b58 MSD-weak / MSD-strong / b60 / b62 | ×0.724 / ×1.034 / ×1.011 / ×0.998 | **×1.004** / ×0.999 / ×1.032 / ×1.011 |
+| b58 MSD-weak run seconds, FD off / FD=2 (B's warm-up) | 4.17 / 5.7 (2.3–2.8 s) | **4.03 / 4.02** (warm-up **3.8–4.3 s**: the compile moved there) |
+| b62 1e17 (A → B s) | one round: 144.64 → 129.03, ×1.121 | **three rounds**: 145.35 → 128.78 (A 143.87, 145.35, 146.14; B 128.93, 128.78, 128.76), **×1.129** (1.116, 1.129, 1.135) |
+| b62 1e16, 2 fields | 12.13 → 10.67, ×1.137 | 12.29 → 10.82, ×1.135 |
+| b60 1e16, 2 fields | 27.33 → 24.96, ×1.095 | 27.29 → 24.79, ×1.101 |
+| b64 1e16, 2 fields (FD now off: the same kernel on both sides) | 38.63 → 38.74, ×0.997 | 39.29 → 38.47, ×1.021 |
+
+Counts were identical on both sides in every G and H run.
+- H's b62 1e17 ratio (×1.129) sits at the low end of F's five rounds (1.134–1.154). The B side ran
+  0.8 % slower than F's median, at the same 109 registers (+16 SASS instructions for the slot range).
+  So the b62 1e17 gain is **×1.13–1.14**.
+- H's b62 1e16 and b60 1e16 rounds match F's (×1.135 vs ×1.136; ×1.101 vs ×1.084).
+
+## 8. Registers, SASS, occupancy
 
 CubeCL's CUDA source from `CUBECL_DEBUG_LOG` (a 1e14 field per base), compiled offline with
 `nvcc -cubin -arch=sm_86 -O3 -Xptxas -v` (CUDA 12.8; `raw/scripts/regs.sh`, `raw/box/regs_*.log`). The
@@ -286,8 +406,54 @@ c = consecutive and g = all-seed ns per (prefix, slot):
 - **More slots per batch** would do part of the same without new memory. The plan's slot count, which
   memory bounds, now also sets the seed share: one slot in 5 seeds at b62 1e17, one in 13 at b62 1e16.
 
-__REST__
+## 10. Surprises
 
+- **The append, not the arithmetic, capped the first FD kernels.** nvcc warp-aggregates
+  `top_kernel`'s `top_count[slot]` atomic because the slot is `CUBE_POS_Y`. Once the slot became a loop
+  counter, every kept lane hit the same address. For three iterations, removing instructions (the
+  scan's remainder updates, `powers_diff`) bought nothing, until the SASS showed `ATOMG` without
+  `VOTEU`.
+- **Stepping d in binary first made things worse** (B3: 160 registers, ×1.18), while `top_cert`'s
+  division path still lived in the same kernel. After the division path left (B4) and the append was
+  fixed (B8), the same mode is the faster one (×1.59 against ×1.46).
+- **b64 gets nothing.** b64 = 2^6, so the division FD removes is already shifts there (as L30 found for
+  #235).
+  The seed is expensive at b64 (0.51 ns per seeded prefix-slot against 0.31 for a whole `top_kernel`
+  slot), and the stepped slot only matches `top_kernel`. FD is off at power-of-two bases from `2111f09`.
+- **NiceMark measures FD's worst case.** It samples a field's partitions in bit-reversed order, so no
+  batch has two consecutive partitions and every FD slot seeds. FD is about neutral there (×1.00 with
+  `6c8db87`), whatever it does on production's consecutive batches.
+- **NiceMark's ×0.93 was a JIT compile, not speed.** The clipped-block `top_kernel` variant compiled
+  inside the timed sample. A long-running client compiles it once, but any benchmark with a short timed
+  window after a one-partition warm-up pays it. Fixed by warming it per device.
+- **The 1e16/1e17 counts are now deterministic** (identical in every field run, F, G and H, on both
+  sides), unlike L33's #235-only tree. That makes the field runs an exactness check as well as a timing.
+- **Higher clocks on the FD side** at the same 180 W: the clock-normalised ratios are lower than the
+  plain ones, the reverse of L33.
 
+## 11. Commands and files
 
-
+- Box layout: `/root/l35/{src/A,src/B,src/Cfmt,bin,logs,sass}`. Scripts (`raw/scripts/`):
+  - `build.sh`, `buildclient.sh`, `test.sh`, `run.sh`: L33's, retargeted.
+  - `run2.sh`: `run.sh` plus the FD mode in the START line.
+  - `regs.sh`: CubeCL CUDA source → `nvcc -Xptxas -v`, FD 0/1/2, `BASES`.
+  - `chain_x.sh`: per-iteration FD test, registers and timings.
+  - `abl.sh`, `abl01.sh`, `wg.sh`: ablation and cube-size timings.
+  - `chain_final.sh`: fmt, build F, CUDA exactness, client / naga / spv builds, lavapipe.
+  - `chain_ab.sh`: the A/B and NiceMark.
+  - `post.sh`, `post2.sh`: kernel timings per base, registers, the base's registers.
+  - `extra.sh`: b62 1e17 rounds 4–5.
+  - `chain_g.sh`, `chain_h.sh`: G and H.
+  - `clippy.sh`.
+  - `analyze.py` (L33's, relabelled): `python3 raw/scripts/analyze.py raw/box` → `raw/analysis_F.txt`.
+  - `iter.py`: kernel timing medians.
+  - `blocks.py`: L33's SPIR-V block counter.
+- New knobs on the branch:
+  - `NICE_EXP_TOP_FD` = 0 / 1 / 2;
+  - `NICE_EXP_TOP_FD_MIN_UNITS` (2^17);
+  - `NICE_EXP_TOP_FD_ABL` (timing only, wrong tops);
+  - the tests `cubecl_cuda_top_fd_matches_the_top_kernel` / `top_fd_matches_the_top_kernel` and
+    `cubecl_cuda_top_fd_timing` (`NICE_TEST_TOPFD_TIMING=b:start:size`, `NICE_TEST_TOPFD_BATCHES`,
+    `NICE_TEST_TOPFD_SLOTS`).
+- Raw logs: `raw/box/` (everything from `/root/l35/logs` that the report cites, the `sass/` sources as
+  `raw/box/sass.tgz`).

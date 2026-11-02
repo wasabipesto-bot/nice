@@ -105,3 +105,10 @@ seed; d2/d3 could also be stepped in binary (d2 += 2δW, d3 += Δ3, Δ3 += 6δW�
 6. **Timing-only knobs**: `NICE_EXP_TOP_FD_ABL` (comptime bitmask dropping parts of the FD kernel;
    its tops are wrong when set) and the `cubecl_cuda_top_fd_timing` test (`NICE_TEST_TOPFD_TIMING`,
    `NICE_TEST_TOPFD_BATCHES`, `NICE_TEST_TOPFD_SLOTS`).
+7. **After the A/B** (`2111f09`, `6c8db87`; RESULTS §7):
+   - FD stays off at power-of-two bases. At b64 the top kernel's division is shifts, and FD measured
+     ×0.985.
+   - Top layers below 2^17 prefixes split the batch's slots into groups along y, each seeding once
+     (`NICE_EXP_TOP_FD_MIN_UNITS`).
+   - Each FD `JoinDevice` runs its top stage once on its first clipped partition, so the
+     `only_clipped` kernel compiles at setup, not inside a timed batch.

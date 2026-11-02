@@ -1,0 +1,23 @@
+Diff in /root/l34/src/P256/common/src/cubecl_join.rs:142:
+     clippy::manual_is_multiple_of
+ )]
+ mod kernels {
+-    use super::{
+-        AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TRANSPOSE_MIN,
+-    };
++    use super::{AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TRANSPOSE_MIN};
+     use crate::cubecl_backend::candidate_check;
+     use cubecl::prelude::*;
+ 
+Diff in /root/l34/src/P256/common/src/cubecl_join.rs:675:
+                                         let lo = x != 0u32;
+                                         let v = select(lo, x, y);
+                                         // v != 0: its lowest set bit.
+-                                        let d = (v.find_first_set() - 1u32)
+-                                            + select(lo, 0u32, 32u32);
++                                        let d =
++                                            (v.find_first_set() - 1u32) + select(lo, 0u32, 32u32);
+                                         let v1 = v & (v - 1u32);
+                                         x = select(lo, v1, x);
+                                         y = select(lo, y, v1);
+fmt rc=1

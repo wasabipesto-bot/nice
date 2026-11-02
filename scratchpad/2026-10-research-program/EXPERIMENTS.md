@@ -5,6 +5,62 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L34.2 Gate screen and PR #239 (2026-11-02, agent; `L34/RESULTS.md` §11–12, `L34/PR-BODY.md`, `L34/raw/`; branch `pr/join-transpose-and` 775b6d9 on #236 fb05597)
+
+Gate screen on #235–#237 (hybrid fcd6581, G=4, 2 interleaved rounds): MIN=128 / **192** / 256 →
+b62 1e17 — / ×1.074 / ×1.065; b62 1e16 ×1.092 / ×1.063 / ×1.080; b60 1e16 — / ×1.078 / ×1.065;
+b64 1e16 — / ×1.173 / ×1.149; 1e14 b60/b62/b64 ×0.989/0.953/0.970 / ×0.979/0.934/0.944 /
+×0.963/0.939/0.970; NiceMark ×1.085 / ×1.107 / ×1.075; b58 MSD-strong ×0.992 / ×1.023 / ×0.999.
+Any gate fixes the NiceMark small-bucket case; **no gate fixes 1e14 (×0.93–0.98), even 256 which
+transposes nothing there: the cost is the kernel's footprint** (2 KiB shared → 5 cubes/SM instead
+of 6, plus one barrier per batch). PR branch: one commit on fb05597, `TRANSPOSE_MIN = 192`,
+`AND_GROUP = 4`, no knobs; cherry-picks clean, applies on exp/join-all3 too (CHANGELOG only).
+**A/B on #236 alone:** b62 1e17 ×1.055 (183.9 → 174.3 s), b62 1e16 ×1.050, b60 ×1.062, b64 ×1.176,
+1e14 b60/b62/b64 ×0.978/0.959/0.975, NiceMark ×1.075 (MSD-strong ×1.017); counts identical;
+clocks within 1.3 % at 178–180 W. Registers 40 (= base), 0 spills, SASS 784 → 1,088, shared
+14,344 → 16,392 B. Exact at the head: parity incl. b50/b54, dense fields, whole b42 (also all with
+`TRANSPOSE_MIN = 0`), 1e14 COMPARE = #236, lavapipe naga + SPIR-V (133–136 blocks), lint 0
+flagged, fmt/clippy clean. **PR #239 opened 10:40 UTC** (stacked on #236; the 1e14 caveat is in
+the body). Not taken: survivors' top ids from `tl` frees 1 KiB shared but costs 45 registers
+(still 5 cubes/SM; 1e14 results mixed).
+
+## L35.1 Top kernel by finite differences across a batch's partitions: prototype A/B (2026-11-02, agent; `L35/DESIGN.md`, `L35/RESULTS.md`, `L35/raw/`; branch `exp/top-fd` fd58370 on `exp/join-all3` 0f1a8a7; switch `NICE_EXP_TOP_FD` = 0/1/2)
+
+An unclipped block a = P·b^f0 has a^k = P^k·b^(k·f0): a², a³ are P², P³ shifted with zeros
+below, and consecutive partitions are consecutive P, so the kernel keeps the detailed FD's five
+packed digit arrays for n = P (23 words at b62 1e17) and steps them by additions; long division
+only when a slot seeds (first slot of a batch, or after a gap); the two clipped partitions per
+slice go to the old `top_kernel` (`only_clipped`). Production batches are `chunks(0..nparts)`:
+consecutive; only P = plo / phi clip. Mode 2 (measured) also steps d2/d3 in binary.
+RTX 3080 180 W, interleaved, medians, FD off → FD=2 (binary F 3574f0f):
+| field | ratio | per round | s/field |
+|---|---|---|---|
+| b62 1e17 (5 rounds) | **×1.143** | 1.134–1.154 | 146.1 → 127.8 |
+| b62 1e16 (3) | **×1.136** | 1.127–1.143 | 12.23 → 10.76 |
+| b60 1e16 (3) | **×1.084** | 1.084–1.095 | 27.40 → 25.27 |
+| b64 1e16 (3) | ×0.985 | 0.972–1.011 | → FD off at power-of-two bases (2111f09) |
+Head H (post-A/B fixes): b62 1e17 ×1.129 (3 rounds), b62 1e16 ×1.135, b60 ×1.101. Kernel alone:
+b62 1e17 0.363 → 0.229 ns per prefix-slot (×1.59), b60 0.333 → 0.226 (×1.47); a stepped slot
+0.198 ns at b62 (×1.83 vs top_kernel), a seeded slot 0.350 (the seed is 31–36 % of the FD kernel);
+the step's additions are unmeasurably small — what remains is the two certificate scans, the
+remainder, the carry tests and the append (one atomic per plane). **NiceMark ×1.000** (rounds
+1.015/0.999/1.014) after 6c8db87 compiles the clipped-block kernel at setup (before: ×0.93, all
+from b58 MSD-weak ×0.72 = JIT compile inside the timed sample); NiceMark samples partitions in
+bit-reversed order, so every slot seeds there and it cannot see the stepping gain. 2111f09 also
+splits a batch's slots into groups when the top layer is under 2^17 prefixes: b62 1e14 ×1.16 →
+×1.33, b57 1e14 ×1.38 → ×1.42. Registers (ptxas sm_86, no spills): top_kernel 80, FD mode 1 80,
+mode 2 109–111 (2 blocks of 256 per SM instead of 3); cube size 64–256 no difference; direct
+SPIR-V TopFdKernel 304–316 blocks vs TopKernel 368–386. **Exact:** new device test (both kernels
+on the same batches: per-slot counts, bucket counts, sorted entries equal; 26 fields, 279 batches
+incl. gaps, a backwards step, 23 clipped, 237.9 M tops on CUDA; lighter on lavapipe naga +
+SPIR-V); certificate test = #235's counts; join parity FD=1/2 incl. SPIR-V; dense b58/b62,
+whole b42, 1e14 COMPARE b57/60/62/64 identical; lint 0 flagged. Not run on Metal (seed = #237's
+trimmed division; step/scan only add, shift, mask). Persistence across batches (not built):
+≈ ×1.18 b62 1e17 / ×1.11 b60 at 192 B per prefix (~695 MB per b62 1e17 slice; plan budgeting).
+Dead end on the way: binary-d stepping at 160 registers was slower; the real cap was a
+same-address atomic the compiler only aggregates in `top_kernel`. Follow-up L35.2: PR branch
+`pr/top-fd` on #237, final A/B incl. b58 1e16.
+
 ## L34.1 Digit-transposed AND in the join kernel: prototype A/B (2026-11-02, agent; `L34/RESULTS.md`, `L34/raw/`; branch `exp/join-transpose` 432b795 on `exp/join-all3` 0f1a8a7; switch `NICE_EXP_JOIN_TRANSPOSE=1`, `_G` chunks per digit pass, hybrid gate `_MIN`)
 
 RTX 3080 (180 W cap), 3 interleaved rounds, medians, every round faster; A = `exp/join-all3`
