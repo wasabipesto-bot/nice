@@ -1335,7 +1335,9 @@ mod kernels {
             chunk_digits,
             chunk_div,
         );
-        close_cert(msq, mcu, dupa[0], dupb[0], &doma, &domb, c0a[0], c0b[0], res)
+        close_cert(
+            msq, mcu, dupa[0], dupb[0], &doma, &domb, c0a[0], c0b[0], res,
+        )
     }
 
     /// The end of a top certificate, shared by [`top_cert`] and
@@ -1805,7 +1807,6 @@ mod kernels {
         fd_add_small(ddc, 6u32, wq1, base);
     }
 
-
     /// `x += y` over `nx` u32 words (`y` has `ny` <= `nx`), the carry out of
     /// the top word dropped (the caller's values fit).
     #[cube]
@@ -1849,7 +1850,13 @@ mod kernels {
     /// Δ3 = d3(P + 1) - d3(P) = 3wδ·(2a + 2w - 1) for the unclipped block
     /// a = P·w (`limbs` <= 3 words), into `del` (`nl3` words, zeroed here).
     #[cube]
-    fn top_fd_del3(a: &Array<u32>, w: u32, del: &mut Array<u32>, #[comptime] limbs: u32, #[comptime] nl3: u32) {
+    fn top_fd_del3(
+        a: &Array<u32>,
+        w: u32,
+        del: &mut Array<u32>,
+        #[comptime] limbs: u32,
+        #[comptime] nl3: u32,
+    ) {
         // X = 2a + 2w - 1 (4 words).
         let mut x = Array::<u32>::new(4usize);
         let mut c = u64::cast_from(w) * 2u64 - 1u64;
@@ -1951,7 +1958,8 @@ mod kernels {
                     + comptime!(base)
                         * (((word >> 8u32) & 0xFFu32)
                             + comptime!(base)
-                                * (((word >> 16u32) & 0xFFu32) + comptime!(base) * (word >> 24u32)));
+                                * (((word >> 16u32) & 0xFFu32)
+                                    + comptime!(base) * (word >> 24u32)));
             } else {
                 #[unroll]
                 for i in 0..4u32 {
@@ -2093,34 +2101,34 @@ mod kernels {
         let mut msq = u64::cast_from(sq[0]);
         let mut mcu = u64::cast_from(cu[0]);
         if comptime!(abl & 4 == 0) {
-        msq = cert_power_fd(
-            sq,
-            d2,
-            pw,
-            c0a,
-            &mut dupa,
-            &mut doma,
-            nl2,
-            nl3,
-            s2,
-            base,
-            comptime!(2 * f0),
-        );
+            msq = cert_power_fd(
+                sq,
+                d2,
+                pw,
+                c0a,
+                &mut dupa,
+                &mut doma,
+                nl2,
+                nl3,
+                s2,
+                base,
+                comptime!(2 * f0),
+            );
         }
         if comptime!(abl & 2 == 0) {
-        mcu = cert_power_fd(
-            cu,
-            d3,
-            pw,
-            c0b,
-            &mut dupb,
-            &mut domb,
-            nl3,
-            nl3,
-            s3,
-            base,
-            comptime!(3 * f0),
-        );
+            mcu = cert_power_fd(
+                cu,
+                d3,
+                pw,
+                c0b,
+                &mut dupb,
+                &mut domb,
+                nl3,
+                nl3,
+                s3,
+                base,
+                comptime!(3 * f0),
+            );
         }
         close_cert(msq, mcu, dupa[0], dupb[0], &doma, &domb, c0a, c0b, res)
     }
@@ -2330,14 +2338,26 @@ mod kernels {
                         let step = valid && v == prev_v + 1u32;
                         if step {
                             if comptime!(abl & 16 == 0) {
-                                top_fd_step(&mut sq, &mut cu, &mut ds, &mut dc, &mut ddc, base, tq, q2, q3);
+                                top_fd_step(
+                                    &mut sq, &mut cu, &mut ds, &mut dc, &mut ddc, base, tq, q2, q3,
+                                );
                             }
                         }
                         if comptime!(bin_d) {
                             if step {
-                                add_words(&mut d2, &c2, comptime!(if nl2 < 3 { nl2 } else { 3 }), nl2);
+                                add_words(
+                                    &mut d2,
+                                    &c2,
+                                    comptime!(if nl2 < 3 { nl2 } else { 3 }),
+                                    nl2,
+                                );
                                 add_words(&mut d3, &del3, nl3, nl3);
-                                add_words(&mut del3, &k3, comptime!(if nl3 < 4 { nl3 } else { 4 }), nl3);
+                                add_words(
+                                    &mut del3,
+                                    &k3,
+                                    comptime!(if nl3 < 4 { nl3 } else { 4 }),
+                                    nl3,
+                                );
                             } else {
                                 let mut a2 = Array::<u32>::new(nh2 as usize);
                                 let mut a3 = Array::<u32>::new(nh3 as usize);
@@ -3203,11 +3223,11 @@ impl<R: Runtime> JoinDevice<R> {
         let join_cubes = nwork_u32.min(65_535);
         let expect: [u32; STAGES] = [
             self.top_expect(vs, self.top_fd), // top
-            nslots_u32,                // top scan
-            top_cubes * nslots_u32,    // top fill
-            (self.b - 1) * nslots_u32, // bucket
-            join_cubes,                // join
-            CHECK_CUBES,               // check
+            nslots_u32,                       // top scan
+            top_cubes * nslots_u32,           // top fill
+            (self.b - 1) * nslots_u32,        // bucket
+            join_cubes,                       // join
+            CHECK_CUBES,                      // check
         ];
         let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; expect.len()]));
         let nran = expect.len();
@@ -5664,8 +5684,14 @@ mod tests {
             let buckets = self.read_u32(&bucket_cnt).expect("bucket counts");
             let want = self.top_expect(vs, fd);
             assert_eq!(self.read_u32(&ran).expect("ran")[0], want, "top cubes run");
-            let (tp, tm) = (self.read_u32(&self.top_p).unwrap(), self.read_u32(&self.top_m).unwrap());
-            let (tr, tx) = (self.read_u32(&self.top_r).unwrap(), self.read_u32(&self.top_x).unwrap());
+            let (tp, tm) = (
+                self.read_u32(&self.top_p).unwrap(),
+                self.read_u32(&self.top_m).unwrap(),
+            );
+            let (tr, tx) = (
+                self.read_u32(&self.top_r).unwrap(),
+                self.read_u32(&self.top_x).unwrap(),
+            );
             let tb = self.read_u32(&self.top_b).unwrap();
             let ntl = self.ntlay as usize;
             let entries = (0..nslots)
@@ -5725,7 +5751,11 @@ mod tests {
             let range = FieldSize::new(start, start + size);
             let field = crate::join_plan::plan_join(b, &range, lim).expect("a join field");
             let label = format!("b{b} {size:e} at {start}");
-            fields.push((format!("{label}, first slice"), field.fs.clone(), field.plan));
+            fields.push((
+                format!("{label}, first slice"),
+                field.fs.clone(),
+                field.plan,
+            ));
             if let Some(last) = field.slices.last().filter(|_| field.slices.len() > 1) {
                 let fs = field.fs.sub_range(last.start(), last.end()).expect("slice");
                 let plan = JoinPlan::for_field(&fs, lim).expect("the slice fits").0;
@@ -5791,7 +5821,10 @@ mod tests {
             "{name}: top_fd (modes 1, 2) = top_kernel on {nfields} fields, {nbatches} batches \
              ({nfix} with a clipped block), {ntops} tops"
         );
-        assert!(nfields > 10 && ntops > 0 && nfix > 0, "the FD comparison ran");
+        assert!(
+            nfields > 10 && ntops > 0 && nfix > 0,
+            "the FD comparison ran"
+        );
     }
 
     #[test]
@@ -5821,7 +5854,11 @@ mod tests {
     #[test]
     #[cfg(feature = "cubecl-cuda")]
     #[ignore = "requires an NVIDIA device; prints timings"]
-    #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::cast_possible_truncation
+    )]
     fn cubecl_cuda_top_fd_timing() {
         let Ok(spec) = std::env::var("NICE_TEST_TOPFD_TIMING") else {
             eprintln!("skipping: set NICE_TEST_TOPFD_TIMING=b:start:size");
@@ -5846,7 +5883,10 @@ mod tests {
         let fs = &field.fs;
         // NICE_TEST_TOPFD_SLOTS: batches of that many slots instead of the
         // plan's (what keeping the FD state across batches would approach).
-        let plan = match std::env::var("NICE_TEST_TOPFD_SLOTS").ok().and_then(|v| v.parse().ok()) {
+        let plan = match std::env::var("NICE_TEST_TOPFD_SLOTS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+        {
             Some(k) => test_plan(fs, lim, k),
             None => field.plan,
         };
