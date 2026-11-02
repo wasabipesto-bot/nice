@@ -411,6 +411,7 @@ mod kernels {
         #[comptime] walk_sync: bool,
         #[comptime] tgroup: u32,
         #[comptime] tid_global: bool,
+        #[comptime] tmin: u32,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -421,6 +422,8 @@ mod kernels {
         // but AND per top, a diagnostic).
         let tg = comptime!(if tgroup > 0 && tgroup < 16 { tgroup } else { 1 });
         let tand = comptime!(tgroup > 0 && tgroup < 16);
+        // Batches of fewer than `tmin` tops keep the per-top AND (the copy
+        // costs more than it saves on a few tops).
         let mid = comptime!(k2 - k);
         let bm = comptime!(base.pow(k2 - k));
         // M = b^(mid + 1): the key digit's output digit and the carries above.
@@ -529,7 +532,7 @@ mod kernels {
                     let t0 = cc * 32u32;
                     let mut w0 = 0u32;
                     let mut w1 = 0u32;
-                    if t0 < nt {
+                    if t0 < nt && nt >= tmin {
                         #[unroll]
                         for i in 0..32u32 {
                             let lo = t_lo[(t0 + i) as usize];
@@ -544,8 +547,10 @@ mod kernels {
                             w1 &= vm;
                         }
                     }
-                    t_tr[(cc * 64u32 + dl) as usize] = w0;
-                    t_tr[(cc * 64u32 + 32u32 + dl) as usize] = w1;
+                    if nt >= tmin {
+                        t_tr[(cc * 64u32 + dl) as usize] = w0;
+                        t_tr[(cc * 64u32 + 32u32 + dl) as usize] = w1;
+                    }
                     sync_cube();
                 }
 
@@ -647,46 +652,69 @@ mod kernels {
                         }
                         let mut pm = Array::<u32>::new(ept as usize);
                         if comptime!(tand) {
-                            let cb = jc / 32u32;
-                            if cb % tg == 0u32 {
-                                #[unroll]
-                                for i in 0..comptime!(tg * ept) {
-                                    acc[i as usize] = 0u32;
-                                }
-                                let ab = cb * 64u32;
-                                #[unroll]
-                                for j in 0..ept {
-                                    // Padding lanes have no digits.
-                                    let mut x = mlo[j as usize] & vv[j as usize];
-                                    let mut y = mhi[j as usize] & vv[j as usize];
-                                    while (x | y) != 0u32 {
-                                        let lo = x != 0u32;
-                                        let v = select(lo, x, y);
-                                        // v != 0: its lowest set bit.
-                                        let d =
-                                            (v.find_first_set() - 1u32) + select(lo, 0u32, 32u32);
-                                        let v1 = v & (v - 1u32);
-                                        x = select(lo, v1, x);
-                                        y = select(lo, y, v1);
-                                        let a = ab + d;
-                                        #[unroll]
-                                        for c in 0..tg {
-                                            acc[comptime!(c * ept + j) as usize] |=
-                                                t_tr[(a + comptime!(c * 64)) as usize];
+                            if nt >= tmin {
+                                let cb = jc / 32u32;
+                                if cb % tg == 0u32 {
+                                    #[unroll]
+                                    for i in 0..comptime!(tg * ept) {
+                                        acc[i as usize] = 0u32;
+                                    }
+                                    let ab = cb * 64u32;
+                                    #[unroll]
+                                    for j in 0..ept {
+                                        // Padding lanes have no digits.
+                                        let mut x = mlo[j as usize] & vv[j as usize];
+                                        let mut y = mhi[j as usize] & vv[j as usize];
+                                        while (x | y) != 0u32 {
+                                            let lo = x != 0u32;
+                                            let v = select(lo, x, y);
+                                            // v != 0: its lowest set bit.
+                                            let d = (v.find_first_set() - 1u32)
+                                                + select(lo, 0u32, 32u32);
+                                            let v1 = v & (v - 1u32);
+                                            x = select(lo, v1, x);
+                                            y = select(lo, y, v1);
+                                            let a = ab + d;
+                                            #[unroll]
+                                            for c in 0..tg {
+                                                acc[comptime!(c * ept + j) as usize] |=
+                                                    t_tr[(a + comptime!(c * 64)) as usize];
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            let nb = cend - jc;
-                            let cm =
-                                select(nb >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nb & 31u32)) - 1u32);
-                            #[unroll]
-                            for j in 0..ept {
-                                pm[j as usize] = (acc[j as usize] ^ cm) & cm;
-                            }
-                            #[unroll]
-                            for i in 0..comptime!((tg - 1) * ept) {
-                                acc[i as usize] = acc[comptime!(i + ept) as usize];
+                                let nb = cend - jc;
+                                let cm = select(
+                                    nb >= 32u32,
+                                    0xFFFF_FFFFu32,
+                                    (1u32 << (nb & 31u32)) - 1u32,
+                                );
+                                #[unroll]
+                                for j in 0..ept {
+                                    pm[j as usize] = (acc[j as usize] ^ cm) & cm;
+                                }
+                                #[unroll]
+                                for i in 0..comptime!((tg - 1) * ept) {
+                                    acc[i as usize] = acc[comptime!(i + ept) as usize];
+                                }
+                            } else {
+                                #[unroll]
+                                for j in 0..ept {
+                                    pm[j as usize] = 0u32;
+                                }
+                                let mut jt = jc;
+                                let mut bit = 1u32;
+                                while jt < cend {
+                                    let tlo = t_lo[jt as usize];
+                                    let thi = t_hi[jt as usize];
+                                    #[unroll]
+                                    for j in 0..ept {
+                                        let z = (mlo[j as usize] & tlo) | (mhi[j as usize] & thi);
+                                        pm[j as usize] |= select(z == 0u32, bit, 0u32);
+                                    }
+                                    bit <<= 1u32;
+                                    jt += 1u32;
+                                }
                             }
                         } else {
                             #[unroll]
@@ -1978,6 +2006,9 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// Experimental: survivors' top ids from global memory, not shared
     /// (`NICE_EXP_JOIN_TRANSPOSE_TID=1`).
     tid_global: bool,
+    /// Experimental: batches of fewer tops keep the per-top AND
+    /// (`NICE_EXP_JOIN_TRANSPOSE_MIN`, default 0).
+    tmin: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -2150,6 +2181,10 @@ impl<R: Runtime> JoinDevice<R> {
                     .contains(cubecl::ir::features::Plane::Sync),
             tgroup: exp_join_tgroup(),
             tid_global: std::env::var("NICE_EXP_JOIN_TRANSPOSE_TID").is_ok_and(|v| v == "1"),
+            tmin: std::env::var("NICE_EXP_JOIN_TRANSPOSE_MIN")
+                .ok()
+                .and_then(|v| v.trim().parse::<u32>().ok())
+                .unwrap_or(0),
             limbs,
             chunk_digits,
             chunk_div,
@@ -2390,6 +2425,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.walk_sync,
                 self.tgroup,
                 self.tid_global,
+                self.tmin,
             );
         }
         unsafe {
