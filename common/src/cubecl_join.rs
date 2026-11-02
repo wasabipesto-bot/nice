@@ -116,6 +116,8 @@ pub use kernels::{
     clippy::fn_params_excessive_bools,
     clippy::needless_range_loop,
     clippy::unreadable_literal,
+    // `is_multiple_of` is not a CubeCL kernel intrinsic.
+    clippy::manual_is_multiple_of,
     // Shared memory is passed by reference, the comptime `if` must stay
     // separate from the runtime one, and the integer helpers clippy suggests
     // (midpoint, is_power_of_two) are not cube intrinsics.
@@ -1985,10 +1987,11 @@ fn exp_join_tgroup() -> u32 {
 }
 
 // The transposed AND's build maps thread u to chunk u / 32 of the batch.
-const _: () = assert!(JOIN_WG == TOP_CAP && TOP_CAP % 32 == 0);
+const _: () = assert!(JOIN_WG == TOP_CAP && TOP_CAP.is_multiple_of(32));
 
 /// Device buffers for one field: the field's tables, the per-slot scratch
 /// the kernels fill, and the survivor and output lists.
+#[allow(clippy::struct_excessive_bools)] // the experimental knobs (L34)
 pub(crate) struct JoinDevice<R: Runtime> {
     client: ComputeClient<R>,
     b: u32,
