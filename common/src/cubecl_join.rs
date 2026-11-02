@@ -91,6 +91,9 @@ const MAX_SPLITS: u32 = 32;
 /// Kernels a batch launches (top, top scan, top fill, bucket, join, check),
 /// each counting its finished cubes.
 const STAGES: usize = 6;
+/// Units [`top_fd_kernel`] should have at least before it walks a batch's
+/// slots in one group (see `JoinDevice::top_fd_groups`).
+const TOP_FD_MIN_UNITS: u32 = 1 << 17;
 
 // ---------------------------------------------------------------------------
 // Device kernels
@@ -2162,6 +2165,7 @@ mod kernels {
         pdiv_m1: u32,
         full_floor: u32,
         nslots: u32,
+        slot_k: u32,
         #[comptime] base: u32,
         #[comptime] limbs: u32,
         #[comptime] cap: u32,
@@ -2253,8 +2257,14 @@ mod kernels {
             }
             let mut valid = false;
             let mut prev_v = 0u32;
-            let mut slot = 0u32;
-            while slot < nslots {
+            // This cube's group of slots (`slot_k` of them; one group, all
+            // the slots, when the top layer alone fills the device).
+            let mut slot = CUBE_POS_Y * slot_k;
+            let mut slot_end = slot + slot_k;
+            if slot_end > nslots {
+                slot_end = nslots;
+            }
+            while slot < slot_end {
                 let v = vs[slot as usize];
                 let p = p0 * u64::cast_from(pdiv) + u64::cast_from(v);
                 let mut kept = false;
@@ -2776,6 +2786,10 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// certificate, 4 the square's, 8 the digit counts of d, 16 the digit
     /// step, 32 the differences (mode 1).
     top_fd_abl: u32,
+    /// Units the FD kernel should have at least (`NICE_EXP_TOP_FD_MIN_UNITS`,
+    /// default [`TOP_FD_MIN_UNITS`]): a top layer smaller than that splits
+    /// the batch's slots into groups along y, each seeding once.
+    top_fd_min: u32,
     w_f0: u32,
     nbp: u32,
     /// The field's certificate (`FieldSetup::fc`), low and high words.
@@ -2970,8 +2984,18 @@ impl<R: Runtime> JoinDevice<R> {
             chunk_digits,
             chunk_div,
             wide,
-            top_fd: if top_fd_fits(fs) { top_fd_wanted() } else { 0 },
+            // At a power-of-two base the top kernel's division is shifts and
+            // masks, and the FD kernel measured slower (b64).
+            top_fd: if top_fd_fits(fs) && !fs.b.is_power_of_two() {
+                top_fd_wanted()
+            } else {
+                0
+            },
             tq: fs.base.l - fs.f0,
+            top_fd_min: std::env::var("NICE_EXP_TOP_FD_MIN_UNITS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(TOP_FD_MIN_UNITS),
             top_fd_abl: std::env::var("NICE_EXP_TOP_FD_ABL")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -3044,15 +3068,28 @@ impl<R: Runtime> JoinDevice<R> {
         vs.iter().any(|v| self.clip_vs.contains(v))
     }
 
+    /// [`top_fd_kernel`]'s slots per group and groups for a batch of
+    /// `nslots`: as few groups as give at least `top_fd_min` units.
+    fn top_fd_groups(&self, nslots: u32) -> (u32, u32) {
+        let want = self
+            .top_fd_min
+            .div_ceil(self.ntlay.max(1))
+            .clamp(1, nslots.max(1));
+        let k = nslots.div_ceil(want).max(1);
+        (k, nslots.div_ceil(k).max(1))
+    }
+
     /// The top stage's cubes for batch `vs` in mode `fd` (see
     /// [`Self::launch_top`]).
     fn top_expect(&self, vs: &[u32], fd: u32) -> u32 {
         let top_cubes = self.ntlay.div_ceil(JOIN_WG).max(1);
-        let per_slot = top_cubes * u32::try_from(vs.len()).expect("a batch fits u32");
+        let nslots = u32::try_from(vs.len()).expect("a batch fits u32");
+        let per_slot = top_cubes * nslots;
+        let fd_cubes = top_cubes * self.top_fd_groups(nslots).1;
         match (fd, self.top_fix(vs)) {
             (0, _) => per_slot,
-            (_, true) => top_cubes + per_slot,
-            (_, false) => top_cubes,
+            (_, true) => fd_cubes + per_slot,
+            (_, false) => fd_cubes,
         }
     }
 
@@ -3085,9 +3122,10 @@ impl<R: Runtime> JoinDevice<R> {
         let ran = ran.clone();
         unsafe {
             if fd != 0 {
+                let (slot_k, groups) = self.top_fd_groups(nslots_u32);
                 top_fd_kernel::launch_unchecked::<R>(
                     c,
-                    CubeCount::Static(top_cubes, 1, 1),
+                    CubeCount::Static(top_cubes, groups, 1),
                     CubeDim::new_1d(JOIN_WG),
                     ArrayArg::from_raw_parts(self.tlay.clone(), 5 * ntl),
                     ArrayArg::from_raw_parts(vs_h.clone(), nslots),
@@ -3109,6 +3147,7 @@ impl<R: Runtime> JoinDevice<R> {
                     self.pdiv_m1,
                     self.full_floor,
                     nslots_u32,
+                    slot_k,
                     self.b,
                     self.limbs,
                     self.k,
@@ -5752,7 +5791,7 @@ mod tests {
                 println!("{name}: {label}: the FD state does not fit, skipped");
                 continue;
             }
-            let dev = JoinDevice::new(client, &fs, &plan).expect("device");
+            let mut dev = JoinDevice::new(client, &fs, &plan).expect("device");
             let n = u32::try_from(fs.nparts).expect("b^p < 2^32");
             let ms = dev.max_slots;
             let all: Vec<u32> = (0..n).collect();
@@ -5784,11 +5823,16 @@ mod tests {
             }
             for vs in &batches {
                 let a = dev.run_tops(vs, 0);
-                for mode in [1, 2] {
+                // One group of slots, and groups of about a third (and of
+                // one slot each where the batch is short).
+                for (mode, min) in [(1, 0), (2, 0), (2, dev.ntlay.max(1) * 3)] {
+                    dev.top_fd_min = min;
                     let f = dev.run_tops(vs, mode);
-                    assert_eq!(a.0, f.0, "{label} {vs:?} mode {mode}: top counts differ");
-                    assert_eq!(a.1, f.1, "{label} {vs:?} mode {mode}: bucket counts differ");
-                    assert!(a.2 == f.2, "{label} {vs:?} mode {mode}: top entries differ");
+                    let g = dev.top_fd_groups(u32::try_from(vs.len()).unwrap());
+                    let m = format!("mode {mode}, groups {g:?}");
+                    assert_eq!(a.0, f.0, "{label} {vs:?} {m}: top counts differ");
+                    assert_eq!(a.1, f.1, "{label} {vs:?} {m}: bucket counts differ");
+                    assert!(a.2 == f.2, "{label} {vs:?} {m}: top entries differ");
                 }
                 ntops += a.0.iter().map(|&x| u64::from(x)).sum::<u64>();
                 nfix += usize::from(dev.top_fix(vs));
@@ -5802,8 +5846,8 @@ mod tests {
             );
         }
         println!(
-            "{name}: top_fd (modes 1, 2) = top_kernel on {nfields} fields, {nbatches} batches \
-             ({nfix} with a clipped block), {ntops} tops"
+            "{name}: top_fd (modes 1, 2; mode 2 also in slot groups) = top_kernel on {nfields} \
+             fields, {nbatches} batches ({nfix} with a clipped block), {ntops} tops"
         );
         assert!(
             nfields > 10 && ntops > 0 && nfix > 0,
