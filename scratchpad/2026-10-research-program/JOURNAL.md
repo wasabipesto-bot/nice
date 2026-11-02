@@ -26,6 +26,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   which is ~39 % of a b62 1e17 field after #237. Brief in `L35/BRIEF.md`; second agent (Opus)
   on box `l35-topfd` (3080, KR, instance 58776353, 7 h TTL); hard stop 11:45 UTC. Batches may
   have gaps (tests thin partitions) → re-seed by division on a gap.
+- **L34 result (08:46 UTC, L34.1):** exact; plain ×1.063 b62 1e17 but ×0.90 on b58 MSD-strong;
+  hybrid (per-top AND below 128 tops) ×1.075 / ×1.065 b60 / ×1.129 b64, NiceMark ×1.085, small
+  buckets ×0.96–0.99. Shared-memory bound (bank conflicts on the digit gathers), so the AND only
+  got ×1.3 cheaper. Post-#237 profile: top 34.6 %, join 52.8 %. Agent sent on to screen a
+  full-batch-only gate (MIN=256/192) and to prepare `pr/join-transpose-and` on #236 (no PR yet).
 - Worktree hygiene: nothing crosses the 7-day line yet (oldest checkouts 10-28); 64 worktrees,
   all but two under 30 MB. `rb-1102` (scratch for the rebases) to be removed at day end.
 

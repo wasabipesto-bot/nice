@@ -1,0 +1,19 @@
+   Compiling nice_common v3.4.8-dev (/root/l34/src/T3/common)
+warning: value assigned to `tid` is never read
+   --> common/src/cubecl_join.rs:744:59
+    |
+385 |     #[cube(launch_unchecked)]
+    |     ------------------------- `tid` is overwritten here before the previous value is read
+...
+744 |                                             let mut tid = 0u32;
+    |                                                           ^^^^ this value is reassigned later and never used
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `nice_common` (lib) generated 1 warning
+warning: `nice_common` (lib test) generated 1 warning (1 duplicate)
+    Finished `release` profile [optimized] target(s) in 3m 08s
+  Executable unittests src/lib.rs (/root/tgt/release/deps/nice_common-cbd4e892b0124d04)
+  Executable tests/claim_queries.rs (/root/tgt/release/deps/claim_queries-9619899b5292cb1b)
+  Executable tests/notable_numbers_cache.rs (/root/tgt/release/deps/notable_numbers_cache-dc272e6b3d6cd38c)
+  Executable tests/search_caches.rs (/root/tgt/release/deps/search_caches-1e7a68d619f6c564)

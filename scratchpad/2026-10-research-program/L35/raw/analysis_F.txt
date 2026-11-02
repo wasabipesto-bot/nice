@@ -1,0 +1,71 @@
+A/B, one binary F (exp/top-fd 3574f0f): A = NICE_EXP_TOP_FD=0, B = NICE_EXP_TOP_FD=2. Rounds interleaved A B.
+b62 1e17 (1 field):
+  device: A 146.220, 146.208, 146.084, 146.034, 145.384 (median 146.084, spread 0.6 %) | B 128.815, 126.701, 127.770, 128.803, 126.938 (median 127.770, spread 1.7 %)
+     speed-up x1.143; per-round 1.135, 1.154, 1.143, 1.134, 1.145; saving 18.31 s/field
+  per_field: A 148.085, 148.093, 147.956, 148.079, 147.259 (median 148.079, spread 0.6 %) | B 130.727, 128.672, 129.704, 130.673, 128.820 (median 129.704, spread 1.6 %)
+     speed-up x1.142; per-round 1.133, 1.151, 1.141, 1.133, 1.143; saving 18.38 s/field
+  clocks A 1432 MHz 179 W max 71 C, B 1453 MHz 179 W max 71 C; clock-normalised x1.127
+  counts (survivors, checked, found) A [(1020844021499, 62584252554, 0)]
+                                     B [(1020844021499, 62584252554, 0)]
+  layout A slots=5 plan_mib=1671 B slots=5 plan_mib=1671; setup A 15.54 B 15.87
+b62 1e16 (2 fields):
+  device: A 12.253, 12.229, 12.185 (median 12.229, spread 0.6 %) | B 10.762, 10.698, 10.813 (median 10.762, spread 1.1 %)
+     speed-up x1.136; per-round 1.139, 1.143, 1.127; saving 1.47 s/field
+  per_field: A 13.212, 13.148, 13.089 (median 13.148, spread 0.9 %) | B 11.681, 11.607, 11.722 (median 11.681, spread 1.0 %)
+     speed-up x1.126; per-round 1.131, 1.133, 1.117; saving 1.47 s/field
+  clocks A 1453 MHz 180 W max 70 C, B 1450 MHz 179 W max 70 C; clock-normalised x1.139
+  counts (survivors, checked, found) A [(163513599082, 10027698695, 0)]
+                                     B [(163513599082, 10027698695, 0)]
+  layout A slots=13 plan_mib=2050 B slots=13 plan_mib=2050; setup A 1.30 B 1.31
+b60 1e16 (2 fields):
+  device: A 27.602, 27.403, 27.330 (median 27.403, spread 1.0 %) | B 25.411, 25.268, 24.957 (median 25.268, spread 1.8 %)
+     speed-up x1.084; per-round 1.086, 1.084, 1.095; saving 2.13 s/field
+  per_field: A 28.556, 28.357, 28.281 (median 28.357, spread 1.0 %) | B 26.373, 26.272, 25.910 (median 26.272, spread 1.8 %)
+     speed-up x1.079; per-round 1.083, 1.079, 1.092; saving 2.09 s/field
+  clocks A 1451 MHz 179 W max 71 C, B 1468 MHz 180 W max 71 C; clock-normalised x1.072
+  counts (survivors, checked, found) A [(460847952346, 30871838404, 0)]
+                                     B [(460847952346, 30871838404, 0)]
+  layout A slots=4 plan_mib=1566 B slots=4 plan_mib=1566; setup A 2.31 B 2.37
+b64 1e16 (2 fields):
+  device: A 38.485, 38.524, 39.230 (median 38.524, spread 1.9 %) | B 39.126, 39.624, 38.795 (median 39.126, spread 2.1 %)
+     speed-up x0.985; per-round 0.984, 0.972, 1.011; saving -0.60 s/field
+  per_field: A 39.308, 39.352, 40.057 (median 39.352, spread 1.9 %) | B 39.949, 40.452, 39.620 (median 39.949, spread 2.1 %)
+     speed-up x0.985; per-round 0.984, 0.973, 1.011; saving -0.60 s/field
+  clocks A 1436 MHz 179 W max 70 C, B 1473 MHz 179 W max 70 C; clock-normalised x0.959
+  counts (survivors, checked, found) A [(787584956227, 47900853327, 0)]
+                                     B [(787584956227, 47900853327, 0)]
+  layout A slots=6 plan_mib=2151 B slots=6 plan_mib=2151; setup A 1.65 B 1.65
+
+1e14 compare runs (one field per base; JOIN THROUGHPUT + STRIDE)
+  A_cmp_e14 b57: survivors=4850227888 checked=268123373 found=0 device=0.717 plan_mib=1193
+  A_cmp_e14 b60: survivors=2694700282 checked=180517288 found=0 device=0.56 plan_mib=1201
+  A_cmp_e14 b62: survivors=1439469648 checked=88159810 found=0 device=0.524 plan_mib=1369
+  A_cmp_e14 b64: survivors=5702041796 checked=346647759 found=0 device=0.78 plan_mib=1413
+    ['STRIDE base=57 fields=1 secs=45.57 per_field=45.573 (one at a time) found=0', 'STRIDE base=60 fields=1 secs=17.23 per_field=17.235 (one at a time) found=0', 'STRIDE base=62 fields=1 secs=20.16 per_field=20.163 (one at a time) found=0', 'STRIDE base=64 fields=1 secs=39.11 per_field=39.112 (one at a time) found=0', 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 267 filtered out; finished in 138.03s']
+  F0_cmp_e14 b57: survivors=4850227888 checked=268123373 found=0 device=0.759 plan_mib=1193
+  F0_cmp_e14 b60: survivors=2694700282 checked=180517288 found=0 device=0.556 plan_mib=1201
+  F0_cmp_e14 b62: survivors=1439469648 checked=88159810 found=0 device=0.544 plan_mib=1369
+  F0_cmp_e14 b64: survivors=5702041796 checked=346647759 found=0 device=0.767 plan_mib=1413
+    ['STRIDE base=57 fields=1 secs=47.23 per_field=47.234 (one at a time) found=0', 'STRIDE base=60 fields=1 secs=19.96 per_field=19.965 (one at a time) found=0', 'STRIDE base=62 fields=1 secs=22.83 per_field=22.828 (one at a time) found=0', 'STRIDE base=64 fields=1 secs=39.73 per_field=39.732 (one at a time) found=0', 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 270 filtered out; finished in 144.57s']
+  F2_cmp_e14 b57: survivors=4850227888 checked=268123373 found=0 device=0.687 plan_mib=1193
+  F2_cmp_e14 b60: survivors=2694700282 checked=180517288 found=0 device=0.539 plan_mib=1201
+  F2_cmp_e14 b62: survivors=1439469648 checked=88159810 found=0 device=0.469 plan_mib=1369
+  F2_cmp_e14 b64: survivors=5702041796 checked=346647759 found=0 device=0.794 plan_mib=1413
+    ['STRIDE base=57 fields=1 secs=46.26 per_field=46.262 (one at a time) found=0', 'STRIDE base=60 fields=1 secs=19.04 per_field=19.039 (one at a time) found=0', 'STRIDE base=62 fields=1 secs=22.41 per_field=22.410 (one at a time) found=0', 'STRIDE base=64 fields=1 secs=40.02 per_field=40.017 (one at a time) found=0', 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 270 filtered out; finished in 147.92s']
+  base_e16_b62 b62: survivors=163513599082 checked=10027698695 found=0 device=11.9 plan_mib=2050
+    ['test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 267 filtered out; finished in 29.02s']
+  F0_e16_b62 b62: survivors=163513599082 checked=10027698695 found=0 device=12.092 plan_mib=2050
+    ['test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 270 filtered out; finished in 29.27s']
+
+NiceMark nice-only (--benchmark-secs 150)
+  nm_A_r1.json score=5362.8
+  nm_A_r2.json score=5478.4
+  nm_A_r3.json score=5496.3
+  nm_B_r1.json score=5130.1
+  nm_B_r2.json score=5084.4
+  nm_B_r3.json score=5096.9
+  score median A 5478.4 (spread 2.4 %), B 5096.9 (spread 0.9 %), x0.930; per-round 0.957, 0.928, 0.927
+  b58_msd_weak b58 route=join: rate median A 2.419e+14 (2.386e+14-2.451e+14) B 1.739e+14 (1.732e+14-1.746e+14) x0.719 survivors A [33590315220] B [33590315220] checked A [1894592860] B [1894592860]
+  b58_msd_strong b58 route=join: rate median A 1.329e+15 (1.278e+15-1.338e+15) B 1.356e+15 (1.351e+15-1.358e+15) x1.020 survivors A [4027773430] B [4027773430] checked A [226773299] B [226773299]
+  b60_msd_weak b60 route=join: rate median A 4.772e+14 (4.764e+14-4.861e+14) B 4.846e+14 (4.841e+14-4.917e+14) x1.016 survivors A [13826096747, 13959924122, 14362998731] B [13826096747, 13959924122, 14093881640] checked A [878552308, 887055961, 912665087] B [878552308, 887055961, 895562470]
+  b62_msd_weak b62 route=join: rate median A 6.201e+14 (6.092e+14-6.207e+14) B 6.337e+14 (6.286e+14-6.365e+14) x1.022 survivors A [18908359922] B [16941356381, 18908359922, 19059185110] checked A [1125579424] B [1008495882, 1125579424, 1134558844]

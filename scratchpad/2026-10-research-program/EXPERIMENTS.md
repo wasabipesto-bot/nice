@@ -5,6 +5,31 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L34.1 Digit-transposed AND in the join kernel: prototype A/B (2026-11-02, agent; `L34/RESULTS.md`, `L34/raw/`; branch `exp/join-transpose` 432b795 on `exp/join-all3` 0f1a8a7; switch `NICE_EXP_JOIN_TRANSPOSE=1`, `_G` chunks per digit pass, hybrid gate `_MIN`)
+
+RTX 3080 (180 W cap), 3 interleaved rounds, medians, every round faster; A = `exp/join-all3`
+(main 04693ac + #235 + #236 + #237), B = switch on, G = 4.
+| field | plain, G=4 | hybrid MIN=128 (2 rounds) |
+|---|---|---|
+| b62 1e17 | ×1.063 (143.17 → 134.73 s) | ×1.075 |
+| b62 1e16 | ×1.075 (12.16 → 11.32) | ×1.086 |
+| b60 1e16 | ×1.064 (27.08 → 25.46) | ×1.065 |
+| b64 1e16 | ×1.140 (38.44 → 33.72) | ×1.129 |
+| 1e14 fields | ×0.83–0.92 (3.2 tops per bucket at b62) | ×0.96–0.99 |
+| NiceMark | ×1.049 (5538.6 → 5810.8); b58 MSD-strong ×0.90 | ×1.085; b58 MSD-strong ×0.98 |
+Join phase −12.5 % at b62 1e17 (75.3 → 65.9 s), −11.9 % at b60; no other phase moved. Against
+L1.7's split the AND got only ~×1.3 cheaper, not 2–4×: each digit load is a gather with ~2-way
+bank conflicts (d and d+32), so shared-memory wavefronts drop ~25 % (64 → ~48 per warp per 32
+tops) while ALU work drops ~3× — the per-top AND is bound by shared loads, not ALU. Building the
+transposed copy costs 1.4 % of the field on its own. G=4 beat G=8 (brief's order A) by 0.5–3.4 %
+and G=1 (order B) gained nothing. Registers: base 40 (6 cubes/SM); G=4 56 (4/SM; +2 KiB shared
+alone caps at 5); hybrid 44 (5/SM). Direct-SPIR-V JoinKernel 109–112 → 123–126 blocks, no
+overflow. **Exact everywhere:** CPU-reference parity incl. b50/b54, both dense fields, whole b42,
+1e14 counts at b57/60/62/64 identical, every A/B count identical, lavapipe naga + SPIR-V, lint
+0 flagged, fmt/clippy clean. **Baseline profile after #237** (b62 1e17, 140.1 s profiled): top
+34.6 %, bucket 1.7 %, join 52.8 %, check 6.5 %, other 4.4 %; b60 1e16 join 57.7 %.
+Follow-up (L34.2): gate at MIN=256 (full top batches only) / 192, then a PR branch on #236.
+
 ## L3.2 GPU detailed finite differences and the readback fix, protocol on a default-power 3080 (2026-10-30, agent; `L3/PR-RESULTS-3080.md`, `L3/pr-raw/3080/`; PRs #224 readback, #225 FD)
 
 RTX 3080 20 GB (58401551, US), power limit 320 W = default = enforced = max; both kernels hit
