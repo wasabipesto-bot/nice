@@ -2406,20 +2406,8 @@ mod kernels {
                             res[2] = c0b;
                         } else {
                             mask = top_cert_fd(
-                                &sq,
-                                &cu,
-                                &d2,
-                                &d3,
-                                c0a,
-                                c0b,
-                                pw,
-                                &mut res,
-                                base,
-                                limbs,
-                                s2,
-                                s3,
-                                f0,
-                                abl,
+                                &sq, &cu, &d2, &d3, c0a, c0b, pw, &mut res, base, limbs, s2, s3,
+                                f0, abl,
                             );
                         }
                     }
