@@ -663,7 +663,8 @@ mod kernels {
                                         let lo = x != 0u32;
                                         let v = select(lo, x, y);
                                         // v != 0: its lowest set bit.
-                                        let d = (v.find_first_set() - 1u32) + select(lo, 0u32, 32u32);
+                                        let d =
+                                            (v.find_first_set() - 1u32) + select(lo, 0u32, 32u32);
                                         let v1 = v & (v - 1u32);
                                         x = select(lo, v1, x);
                                         y = select(lo, y, v1);
@@ -677,11 +678,8 @@ mod kernels {
                                 }
                             }
                             let nb = cend - jc;
-                            let cm = select(
-                                nb >= 32u32,
-                                0xFFFF_FFFFu32,
-                                (1u32 << (nb & 31u32)) - 1u32,
-                            );
+                            let cm =
+                                select(nb >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nb & 31u32)) - 1u32);
                             #[unroll]
                             for j in 0..ept {
                                 pm[j as usize] = (acc[j as usize] ^ cm) & cm;
