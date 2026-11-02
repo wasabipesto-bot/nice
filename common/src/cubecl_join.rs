@@ -520,25 +520,28 @@ mod kernels {
                 sync_cube();
                 if comptime!(tgroup > 0) {
                     // Thread u builds chunk u / 32's words for digits u % 32
-                    // and u % 32 + 32 (JOIN_WG = TOP_CAP: 8 chunks x 32).
-                    // Chunks past the batch's tops get zero words.
+                    // and u % 32 + 32 (JOIN_WG = TOP_CAP: 8 chunks x 32),
+                    // unrolled over the chunk's 32 tops (the loads pipeline);
+                    // bits past the batch's tops are masked off, and chunks
+                    // past them get zero words.
                     let cc = UNIT_POS_X / 32u32;
                     let dl = UNIT_POS_X % 32u32;
                     let t0 = cc * 32u32;
                     let mut w0 = 0u32;
                     let mut w1 = 0u32;
                     if t0 < nt {
-                        let mut n = nt - t0;
-                        if n > 32u32 {
-                            n = 32u32;
-                        }
-                        let mut i = 0u32;
-                        while i < n {
+                        #[unroll]
+                        for i in 0..32u32 {
                             let lo = t_lo[(t0 + i) as usize];
                             let hi = t_hi[(t0 + i) as usize];
                             w0 |= ((lo >> dl) & 1u32) << i;
                             w1 |= ((hi >> dl) & 1u32) << i;
-                            i += 1u32;
+                        }
+                        let n = nt - t0;
+                        if n < 32u32 {
+                            let vm = (1u32 << n) - 1u32;
+                            w0 &= vm;
+                            w1 &= vm;
                         }
                     }
                     t_tr[(cc * 64u32 + dl) as usize] = w0;
