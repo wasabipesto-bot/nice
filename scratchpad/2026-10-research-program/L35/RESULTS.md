@@ -457,3 +457,87 @@ c = consecutive and g = all-seed ns per (prefix, slot):
     `NICE_TEST_TOPFD_SLOTS`).
 - Raw logs: `raw/box/` (everything from `/root/l35/logs` that the report cites, the `sass/` sources as
   `raw/box/sass.tgz`).
+
+## 12. The PR branch `pr/top-fd` and its final A/B against #237 (09:46–11:06)
+
+**Branch.** `pr/top-fd` on the fork, **head `88605a9`**: one commit on #237's head `51410e7` (on #235,
+not on #236).
+- `git diff 0f1a8a7 fd58370` (this report's work) applied to 51410e7 without conflict, so it is
+  independent of #236.
+- Then cleaned for review:
+  - mode 2 is the only FD path;
+  - no env knobs and no ablation;
+  - `NICE_EXP_TOP_FD` is replaced by `JoinDevice::top_fd = top_fd_fits(fs) && (TOP_FD_AT_POW2_BASES ||
+    !b.is_power_of_two())`, with named constants `TOP_FD_MIN_UNITS = 1 << 17` (slot groups) and
+    `TOP_FD_AT_POW2_BASES = false`, each with a one-line comment;
+  - the device test compares `top_kernel` with the FD kernel in one slot group and in several;
+  - `cubecl_cuda_top_fd_timing` stays as an ignored test (`NICE_TEST_TOPFD_TIMING`, the
+    `NICE_TEST_JOIN_*` harness style), old vs FD only;
+  - the docs no longer say "experiment".
+- The commit message states the clipped-block compile fix correctly. The CHANGELOG line under
+  Unreleased ends with `([#NNN](https://github.com/wasabipesto/nice/pull/NNN))`.
+- Amends after the first build (`7cba238` → `ab4c7d7` rustfmt → **`88605a9`**:
+  `#[allow(clippy::struct_excessive_bools)]` on `JoinDevice`, which now has four independent bools).
+  The binaries `P` (CUDA), `P_naga`, `P_spv` and `client_P` are from 7cba238, token-identical to the
+  head apart from those two. `PH` is a rebuild of the head for the re-runs below.
+
+**Checks at the head** (`raw/pr-box/`):
+
+| check | result |
+|---|---|
+| `cargo fmt --all --check`, clippy `-D warnings` default and `--features nice_client/gpu` (on 88605a9) | clean, clean, clean (`p_head_checks.log`). The first clippy, on 7cba238, flagged `struct_excessive_bools`, which is fixed |
+| `cubecl_cuda_top_fd_matches_the_top_kernel` (P) | ok: 26 fields, 279 batches (23 with a clipped block), 237,907,266 tops, one slot group and several |
+| `cubecl_cuda_top_certificates_match_the_lockstep_scan_and_the_cpu` (P) | ok, 102,365 / 33,582 / 203,413 / 69,824 |
+| `cubecl_cuda_join_matches_the_cpu_reference` (P; FD on by default at every non-power-of-two base) | ok |
+| dense b58 1e15 / b62 1e16 (P) | ok: 254,938,965 / 14,396,829; 120,011,361 / 7,357,804 (2,114 overran the stage, as on #235's tree) |
+| whole b42 field (P) | ok: 417,789,835 / 16,879,877, no hits |
+| 1e14 COMPARE b57/60/62/64, P and the base P0 | all pass, counts identical P = P0 (= every earlier tree) |
+| lavapipe naga and direct SPIR-V: the FD test (light) and join parity | ok ×4; SPIR-V blocks TopFdKernel 298–310, TopKernel 368–386 |
+| CI's WGSL lint, CI's exact requirements | 16 shaders, 0 flagged. TopKernel@57 is still present (the device compiles the `only_clipped` variant), so the workflow needs no change. TopFdKernel b57: 196 constant divisions |
+| rebuild at the head (PH, 88605a9): FD test, certificate test, 1e14 compare | ok (279 batches, 237,907,266 tops); ok (#235's counts); ok, counts identical to P and P0 |
+
+**Final A/B**: base P0 = 51410e7, B = P (pr/top-fd), interleaved, 2 rounds each, nothing else on the box,
+10:15–10:53. Every run at the 180 W cap; mean SM clock A 1399–1434 MHz, B 1417–1442 MHz; ≤ 72 °C.
+`python3 raw/scripts/analyze_pr.py raw/pr-box` gives `raw/analysis_pr.txt`.
+
+| field | #237 s/field (rounds) | PR s/field (rounds) | speed-up | per round | clock-normalised |
+|---|---|---|---|---|---|
+| b62 1e17, 1 field, 5 slots | 182.32 (181.72, 182.93) | 168.84 (168.04, 169.64) | **×1.080** | 1.081, 1.078 | ×1.059 |
+| b62 1e16, 2 fields, 13 slots | 15.31 (15.50, 15.12) | 13.72 (13.84, 13.60) | **×1.116** | 1.120, 1.112 | ×1.102 |
+| b60 1e16, 2 fields, 4 slots | 36.01 (36.29, 35.72) | 33.82 (34.21, 33.44) | **×1.065** | 1.061, 1.068 | ×1.048 |
+| b58 1e16, 2 fields, 5 slots | 57.42 (58.06, 56.78) | 55.03 (54.87, 55.18) | **×1.043** | 1.058, 1.029 | ×1.030 |
+| b64 1e16, 2 fields (FD off) | 51.23 (52.20, 50.25) | 51.14 (50.40, 51.88) | ×1.002 | 1.036, 0.968 | ×1.002 |
+| NiceMark score (2 rounds) | 4415 (4420, 4409) | 4431 (4484, 4378) | ×1.004 | 1.014, 0.993 | |
+
+- NiceMark per scenario: b58 weak ×1.023, b58 strong ×0.991, b60 ×1.005, b62 ×0.996.
+- **Counts.** found = 0 in every run. The coordinator asked for counts identical on both sides, and on
+  this base that is not possible at 1e16/1e17. Survivors and checked vary from run to run on both
+  sides, #237's included: its b62 1e17 rounds gave 1,020,728,411,080 and 1,020,728,315,123 survivors,
+  and its b60 rounds 459,055,772,056 and 459,055,457,445. The cause is #235's timing-dependent stage
+  overrun, which #236 removes, as L33 found. The PR's counts vary by the same few ppm. The exact checks
+  on this base are the 1e14 compare (identical to the last digit), the dense fields, the whole b42
+  field and the device test. On the #236 tree (§5, §7) every field count was identical between the
+  two kernels.
+- **Smaller ratios than on the #236 tree** (§5: b62 1e17 ×1.143, b62 1e16 ×1.136, b60 ×1.084). Without
+  #236 the join kernel is slower, so the top kernel is a smaller share. The absolute saving at b62 1e17
+  is also smaller (13.5 s/field against 18.3 s), although the top kernel is the same code. On #237
+  alone some of its time is evidently not on the critical path; not profiled.
+- b58 1e16 (first field-level b58 run): ×1.043. Its kernel-alone ratio is the highest (×1.605), but
+  with 5 slots and a join-heavy field the top kernel's share is small.
+- b64 is neutral, as intended (`top_kernel` on both sides).
+
+**Kernel alone on the PR branch** (`p_timing.log`, medians of 3 rounds, ns per prefix-slot, the plan's
+slots):
+
+| field | top_kernel | FD | ratio | every other partition: top / FD |
+|---|---|---|---|---|
+| b62 1e17 (5) | 0.366 | 0.229 | ×1.585 | 0.358 / 0.353 |
+| b60 1e16 (4) | 0.342 | 0.225 | ×1.483 | 0.330 / 0.330 |
+| b58 1e16 (4) | 0.379 | 0.232 | ×1.605 | 0.357 / 0.339 |
+| b64 1e16 (6), FD forced | 0.311 | 0.339 | ×0.918 | 0.305 / 0.512 |
+
+The stepped cost comes out the same as on the #236 tree: 0.198 (b62), 0.190 (b60), 0.196 (b58) ns per
+prefix. Registers (`p_regs_b*.log`): `top_fd_kernel` 110 (b58), 108 (b60), 110 (b62), no spills;
+`top_kernel` 80 (95 at b64).
+
+**PR body:** `PR-BODY.md` (not opened).

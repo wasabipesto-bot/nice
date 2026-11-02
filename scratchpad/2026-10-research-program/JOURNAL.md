@@ -41,6 +41,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   ×1.055 b62 1e17, ×1.062 b60, ×1.176 b64, NiceMark ×1.075 (MSD-strong ×1.017), exact; the 1e14
   loss (×0.93–0.98) is the kernel's footprint (5 cubes/SM), not the transposed path, and is stated
   in the body. Box l34-transpose destroyed (4.63 h).
+- **PR #240 opened (11:55 UTC, L35.2):** top kernel by finite differences, one commit on #237:
+  vs #237 alone ×1.080 b62 1e17, ×1.116 b62 1e16, ×1.065 b60, ×1.043 b58, b64 and NiceMark
+  neutral; ×1.143 with #236 underneath. Large diff (+1495/−169). Box l35-topfd destroyed (5.16 h).
+  **Open program PRs now 5 (#235 → #237 → #240; #236 → #239): at the cap, nothing more opens until
+  merges.** November research spend $4.99.
 - Worktree hygiene: nothing crosses the 7-day line yet (oldest checkouts 10-28); 64 worktrees,
   all but two under 30 MB. `rb-1102` (scratch for the rebases) to be removed at day end.
 

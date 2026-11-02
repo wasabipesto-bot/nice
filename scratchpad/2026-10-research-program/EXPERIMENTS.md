@@ -5,6 +5,36 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L35.2 PR #240: `pr/top-fd` on #237 (2026-11-02, agent; `L35/RESULTS.md` §12, `L35/PR-BODY.md`, `L35/raw/pr-box/`, `raw/analysis_pr.txt`; head c7ef3c8 = one commit on 51410e7, +1495/−169 in cubecl_join.rs)
+
+One FD path (the measured mode, binary d2/d3 stepping); constants `TOP_FD_MIN_UNITS = 2^17`
+(slot grouping for small top layers), `TOP_FD_AT_POW2_BASES = false`; `top_kernel` kept for
+excluded bases and clipped blocks (`only_clipped`, compiled at device creation); ignored timing
+test `cubecl_cuda_top_fd_timing` (env `NICE_TEST_TOPFD_TIMING`, like the other test harnesses).
+**Final A/B vs #237 alone** (RTX 3080 180 W, interleaved, medians of 2 rounds; SM 1399–1434 MHz
+#237 / 1417–1442 PR):
+| field | #237 → PR s/field | ratio | per round |
+|---|---|---|---|
+| b62 1e17 | 182.3 → 168.8 | **×1.080** | 1.081, 1.078 |
+| b62 1e16 | 15.31 → 13.72 | **×1.116** | 1.120, 1.112 |
+| b60 1e16 | 36.01 → 33.82 | **×1.065** | 1.061, 1.068 |
+| b58 1e16 | 57.42 → 55.03 | ×1.043 | 1.058, 1.029 |
+| b64 1e16 (FD off) | 51.23 → 51.14 | ×1.002 | 1.036, 0.968 |
+| NiceMark | 4415 → 4431 | ×1.004 | 1.014, 0.993 |
+Clock-normalised b62 1e17 ×1.059. **Smaller than on the #235+#236+#237 tree (×1.143 / ×1.136 /
+×1.084): 13.5 s saved per b62 1e17 field vs 18.3 s there; the agent did not profile why** (part
+of the top kernel's time hides behind the slower join without #236?). Kernel alone on the PR
+branch: b62 0.366 → 0.229 ns per prefix-slot (×1.585), b60 ×1.483, b58 ×1.605; a stepped
+partition 0.190–0.198 ns. **Counts at 1e16/1e17 are not run-to-run identical on this base** (#235's
+timing-dependent stage overrun, removed by #236; both sides vary by a few ppm; found 0 everywhere;
+1e14 COMPARE identical to the digit; on the #236 tree every count identical). Exact: new device
+test (26 fields, 279 batches, 23 clipped, 237.9 M tops; lavapipe naga + SPIR-V 21 fields),
+certificate test = #235's counts, join parity CUDA + lavapipe ×2, dense b58/b62, whole b42, lint
+16 shaders 0 flagged (TopKernel@57 still compiled), fmt/clippy. Registers 108–110, no spills,
+2 blocks of 256 per SM; direct SPIR-V 298–310 blocks (< TopKernel's 368–386). **PR #240 opened
+11:55 UTC**, stacked on #237 (on #235); the body explains the NiceMark neutrality (bit-reversed
+partition samples seed every slot) and justifies on whole-field runs. Open program PRs = 5.
+
 ## L34.2 Gate screen and PR #239 (2026-11-02, agent; `L34/RESULTS.md` §11–12, `L34/PR-BODY.md`, `L34/raw/`; branch `pr/join-transpose-and` 775b6d9 on #236 fb05597)
 
 Gate screen on #235–#237 (hybrid fcd6581, G=4, 2 interleaved rounds): MIN=128 / **192** / 256 →
