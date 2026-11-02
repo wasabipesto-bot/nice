@@ -4,6 +4,31 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-02 (day 6; routine fired 04:41 UTC)
+
+- **Reconcile:** no research instances; November research invoiced $3.83 (fleet $2.51); credit
+  $55.02; ivory disk 16 GB free (79 %); no user messages since the day-5 report. #238 merged
+  (API), nothing of ours; main = 04693ac. All three program PRs (#235/#236/#237) were
+  CONFLICTING (changelog only: #234's links + #238's lines).
+- **Rebased #235 → c5fb040, #236 → fb05597, #237 → 51410e7** (on #235) onto main; code diffs
+  byte-identical to the previous heads (checked with `git diff` against the old base); each
+  entry now carries its own PR link as #234's convention does; one-line comments on the PRs.
+  Merge of all three for experiments: `exp/join-all3` 0f1a8a7 (fork).
+- **New lead L34** (digit-transposed AND in the join kernel; supersedes L18): the bottom mask
+  has exactly 12 digits, so the AND over a chunk of 32 tops becomes ≤ 14 ORs of per-digit
+  top bitmaps instead of 32 mask ANDs. The AND phase is ~27 % of a b62 1e17 field after
+  #235/#236 (L1.7's fit: real lanes 30 s, padding 6.7 s, per-top cost 9.1 s of 166 s).
+  Brief in `L34/BRIEF.md`; agent (Opus) on box `l34-transpose` (3080, KR, $0.108/h, 7 h TTL,
+  instance 58775886) for the post-#237 profile + prototype + A/B; hard stop 11:30 UTC.
+- **New lead L35** (top kernel by finite differences across a batch's partitions): consecutive
+  slots step the interval by w = b^(L−t), a digit shift, so the next slot's a², a³ digit arrays
+  are additions of shifted arrays (no division). The conversion is ~half of the top kernel,
+  which is ~39 % of a b62 1e17 field after #237. Brief in `L35/BRIEF.md`; second agent (Opus)
+  on box `l35-topfd` (3080, KR, instance 58776353, 7 h TTL); hard stop 11:45 UTC. Batches may
+  have gaps (tests thin partitions) → re-seed by division on a gap.
+- Worktree hygiene: nothing crosses the 7-day line yet (oldest checkouts 10-28); 64 worktrees,
+  all but two under 30 MB. `rb-1102` (scratch for the rebases) to be removed at day end.
+
 ## 2026-11-01 13:05 UTC: run closing
 
 - **PR #237 opened** (top kernel part 2: limb skip + (a) + (c) on #235; ×1.100 vs #235 at b62 1e17,
