@@ -741,12 +741,11 @@ mod kernels {
                                             k,
                                             k2,
                                         ) {
-                                            let mut tid = 0u32;
-                                            if comptime!(tid_global) {
-                                                tid = tl[(tc + jt2) as usize];
+                                            let tid = if comptime!(tid_global) {
+                                                tl[(tc + jt2) as usize]
                                             } else {
-                                                tid = t_id[jt2 as usize];
-                                            }
+                                                t_id[jt2 as usize]
+                                            };
                                             let at = s_cnt[0].fetch_add(1u32);
                                             if at < SURV_SH_CAP {
                                                 s_t[at as usize] = tid;
@@ -1939,8 +1938,9 @@ pub(crate) fn limits_of<R: Runtime>(client: &ComputeClient<R>) -> JoinLimits {
 /// Experimental switch for the join kernel's transposed AND (research L34,
 /// not for merge): `NICE_EXP_JOIN_TRANSPOSE=1` turns it on, with
 /// `NICE_EXP_JOIN_TRANSPOSE_G` chunks of 32 tops per pass over an entry's
-/// digits (1, 2, 4 or 8; default 8; 16 builds the copy but keeps the
-/// per-top AND, a diagnostic). Unset or 0: the per-top AND.
+/// digits (1, 2, 4 or 8; default 4, the fastest at b62 on an RTX 3080;
+/// 16 builds the copy but keeps the per-top AND, a diagnostic). Unset or 0:
+/// the per-top AND.
 fn exp_join_tgroup() -> u32 {
     match std::env::var("NICE_EXP_JOIN_TRANSPOSE").ok().as_deref() {
         None | Some("" | "0") => 0,
@@ -1948,7 +1948,7 @@ fn exp_join_tgroup() -> u32 {
             let g = std::env::var("NICE_EXP_JOIN_TRANSPOSE_G")
                 .ok()
                 .and_then(|v| v.trim().parse::<u32>().ok())
-                .unwrap_or(8);
+                .unwrap_or(4);
             assert!(
                 matches!(g, 1 | 2 | 4 | 8 | 16),
                 "NICE_EXP_JOIN_TRANSPOSE_G must be 1, 2, 4, 8 or 16 (diagnostic: build only)"
