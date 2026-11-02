@@ -409,10 +409,15 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] tgroup: u32,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
         let wave = comptime!(ept * JOIN_WG);
+        // Experimental (NICE_EXP_JOIN_TRANSPOSE): the AND from a digit-major
+        // copy of the batch's top masks, `tgroup` chunks of 32 tops per pass
+        // over an entry's digits (0 = the per-top AND).
+        let tg = comptime!(if tgroup > 0 { tgroup } else { 1 });
         let mid = comptime!(k2 - k);
         let bm = comptime!(base.pow(k2 - k));
         // M = b^(mid + 1): the key digit's output digit and the carries above.
@@ -444,6 +449,12 @@ mod kernels {
         let mut t_rhi = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
         let mut t_id = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
         let mut t_dm = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
+        // T[c·64 + d]: bit i set iff top 32c + i of the batch has digit d.
+        let mut t_tr = SharedMemory::<u32>::new(comptime!(if tgroup > 0 {
+            (TOP_CAP / 32 * 64) as usize
+        } else {
+            1usize
+        }));
         let mut s_t = SharedMemory::<u32>::new(comptime!(SURV_SH_CAP as usize));
         let mut s_r = SharedMemory::<u32>::new(comptime!(SURV_SH_CAP as usize));
         let mut s_cnt = SharedMemory::<Atomic<u32>>::new(1usize);
@@ -496,6 +507,33 @@ mod kernels {
                         | (top_x[(2u32 * t + 1u32) as usize] << 16u32);
                 }
                 sync_cube();
+                if comptime!(tgroup > 0) {
+                    // Thread u builds chunk u / 32's words for digits u % 32
+                    // and u % 32 + 32 (JOIN_WG = TOP_CAP: 8 chunks x 32).
+                    // Chunks past the batch's tops get zero words.
+                    let cc = UNIT_POS_X / 32u32;
+                    let dl = UNIT_POS_X % 32u32;
+                    let t0 = cc * 32u32;
+                    let mut w0 = 0u32;
+                    let mut w1 = 0u32;
+                    if t0 < nt {
+                        let mut n = nt - t0;
+                        if n > 32u32 {
+                            n = 32u32;
+                        }
+                        let mut i = 0u32;
+                        while i < n {
+                            let lo = t_lo[(t0 + i) as usize];
+                            let hi = t_hi[(t0 + i) as usize];
+                            w0 |= ((lo >> dl) & 1u32) << i;
+                            w1 |= ((hi >> dl) & 1u32) << i;
+                            i += 1u32;
+                        }
+                    }
+                    t_tr[(cc * 64u32 + dl) as usize] = w0;
+                    t_tr[(cc * 64u32 + 32u32 + dl) as usize] = w1;
+                    sync_cube();
+                }
 
                 let mut ws = 0u32;
                 while ws < ne {
@@ -583,6 +621,10 @@ mod kernels {
                     // bitmask per entry, then only the (rare) set bits are
                     // walked: the survivor path diverges once per chunk, not
                     // once per top.
+                    // Transposed AND: per group of `tg` chunks, OR the
+                    // words of the entry's digits; a pair passes iff no
+                    // digit of the entry is set in the top.
+                    let mut acc = Array::<u32>::new(comptime!((tg * ept) as usize));
                     let mut jc = 0u32;
                     while jc < nt {
                         let mut cend = jc + 32u32;
@@ -590,22 +632,67 @@ mod kernels {
                             cend = nt;
                         }
                         let mut pm = Array::<u32>::new(ept as usize);
-                        #[unroll]
-                        for j in 0..ept {
-                            pm[j as usize] = 0u32;
-                        }
-                        let mut jt = jc;
-                        let mut bit = 1u32;
-                        while jt < cend {
-                            let tlo = t_lo[jt as usize];
-                            let thi = t_hi[jt as usize];
+                        if comptime!(tgroup > 0) {
+                            let cb = jc / 32u32;
+                            if cb % tg == 0u32 {
+                                #[unroll]
+                                for i in 0..comptime!(tg * ept) {
+                                    acc[i as usize] = 0u32;
+                                }
+                                let ab = cb * 64u32;
+                                #[unroll]
+                                for j in 0..ept {
+                                    // Padding lanes have no digits.
+                                    let mut x = mlo[j as usize] & vv[j as usize];
+                                    let mut y = mhi[j as usize] & vv[j as usize];
+                                    while (x | y) != 0u32 {
+                                        let lo = x != 0u32;
+                                        let v = select(lo, x, y);
+                                        let d = v.trailing_zeros() + select(lo, 0u32, 32u32);
+                                        let v1 = v & (v - 1u32);
+                                        x = select(lo, v1, x);
+                                        y = select(lo, y, v1);
+                                        let a = ab + d;
+                                        #[unroll]
+                                        for c in 0..tg {
+                                            acc[comptime!(c * ept + j) as usize] |=
+                                                t_tr[(a + comptime!(c * 64)) as usize];
+                                        }
+                                    }
+                                }
+                            }
+                            let nb = cend - jc;
+                            let cm = select(
+                                nb >= 32u32,
+                                0xFFFF_FFFFu32,
+                                (1u32 << (nb & 31u32)) - 1u32,
+                            );
                             #[unroll]
                             for j in 0..ept {
-                                let z = (mlo[j as usize] & tlo) | (mhi[j as usize] & thi);
-                                pm[j as usize] |= select(z == 0u32, bit, 0u32);
+                                pm[j as usize] = (acc[j as usize] ^ cm) & cm;
                             }
-                            bit <<= 1u32;
-                            jt += 1u32;
+                            #[unroll]
+                            for i in 0..comptime!((tg - 1) * ept) {
+                                acc[i as usize] = acc[comptime!(i + ept) as usize];
+                            }
+                        } else {
+                            #[unroll]
+                            for j in 0..ept {
+                                pm[j as usize] = 0u32;
+                            }
+                            let mut jt = jc;
+                            let mut bit = 1u32;
+                            while jt < cend {
+                                let tlo = t_lo[jt as usize];
+                                let thi = t_hi[jt as usize];
+                                #[unroll]
+                                for j in 0..ept {
+                                    let z = (mlo[j as usize] & tlo) | (mhi[j as usize] & thi);
+                                    pm[j as usize] |= select(z == 0u32, bit, 0u32);
+                                }
+                                bit <<= 1u32;
+                                jt += 1u32;
+                            }
                         }
                         // Each lane walks its set bits, one per round while any
                         // lane of the plane has one left. With an exit that
@@ -1828,6 +1915,30 @@ pub(crate) fn limits_of<R: Runtime>(client: &ComputeClient<R>) -> JoinLimits {
     JoinLimits::for_buffer(client.properties().memory.max_page_size)
 }
 
+/// Experimental switch for the join kernel's transposed AND (research L34,
+/// not for merge): `NICE_EXP_JOIN_TRANSPOSE=1` turns it on, with
+/// `NICE_EXP_JOIN_TRANSPOSE_G` chunks of 32 tops per pass over an entry's
+/// digits (1, 2, 4 or 8; default 8). Unset or 0: the per-top AND.
+fn exp_join_tgroup() -> u32 {
+    match std::env::var("NICE_EXP_JOIN_TRANSPOSE").ok().as_deref() {
+        None | Some("" | "0") => 0,
+        Some(_) => {
+            let g = std::env::var("NICE_EXP_JOIN_TRANSPOSE_G")
+                .ok()
+                .and_then(|v| v.trim().parse::<u32>().ok())
+                .unwrap_or(8);
+            assert!(
+                matches!(g, 1 | 2 | 4 | 8),
+                "NICE_EXP_JOIN_TRANSPOSE_G must be 1, 2, 4 or 8"
+            );
+            g
+        }
+    }
+}
+
+// The transposed AND's build maps thread u to chunk u / 32 of the batch.
+const _: () = assert!(JOIN_WG == TOP_CAP && TOP_CAP % 32 == 0);
+
 /// Device buffers for one field: the field's tables, the per-slot scratch
 /// the kernels fill, and the survivor and output lists.
 pub(crate) struct JoinDevice<R: Runtime> {
@@ -1841,6 +1952,9 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
+    /// Experimental: the join kernel's transposed AND, chunks per group
+    /// (`NICE_EXP_JOIN_TRANSPOSE`, 0 = off).
+    tgroup: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -2011,6 +2125,7 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
+            tgroup: exp_join_tgroup(),
             limbs,
             chunk_digits,
             chunk_div,
@@ -2249,6 +2364,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k,
                 self.k2,
                 self.walk_sync,
+                self.tgroup,
             );
         }
         unsafe {
