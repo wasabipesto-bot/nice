@@ -125,6 +125,12 @@ const ABL_NDIG: u32 = 32;
 const ABL_DIAG: u32 = 64;
 const ABL_INRUN: u32 = 128;
 const ABL_ABOVE: u32 = 256;
+/// Prototype (exact): a word whose digits all lie above c0 after x's run of
+/// (b - 1)s has ended goes through a short path (bits only).
+const ABL_LSCAN: u32 = 512;
+/// Prototype (exact): c0 and b^c0 - d kept across stepped slots; the carry
+/// test compares x mod b^c0 with b^c0 - d (no power-table reads).
+const ABL_LC0: u32 = 1024;
 
 // ---------------------------------------------------------------------------
 // Device kernels
@@ -163,8 +169,8 @@ pub use kernels::{
 )]
 mod kernels {
     use super::{
-        ABL_ABOVE, ABL_APPEND, ABL_CARRY, ABL_DIAG, ABL_INRUN, ABL_NDIG, ABL_REM, ABL_SCAN, ABL_STEP,
-        AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TRANSPOSE_MIN,
+        ABL_ABOVE, ABL_APPEND, ABL_CARRY, ABL_DIAG, ABL_INRUN, ABL_LC0, ABL_LSCAN, ABL_NDIG, ABL_REM,
+        ABL_SCAN, ABL_STEP, AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TRANSPOSE_MIN,
     };
     use crate::cubecl_backend::candidate_check;
     use crate::cubecl_detailed_fd::fd_add_top;
@@ -1980,6 +1986,73 @@ mod kernels {
         }
     }
 
+    /// `x -= y` over `nx` u32 words (`y` has `ny` <= `nx`); returns the borrow
+    /// out of the top word (prototype `ABL_LC0`).
+    #[cube]
+    fn sub_words_b(
+        x: &mut Array<u32>,
+        y: &Array<u32>,
+        #[comptime] ny: u32,
+        #[comptime] nx: u32,
+    ) -> u32 {
+        let mut br = 0u32;
+        #[unroll]
+        for j in 0..nx {
+            let xj = x[j as usize];
+            let mut yj = 0u32;
+            if comptime!(j < ny) {
+                yj = y[j as usize];
+            }
+            let t = xj - yj;
+            let t2 = t - br;
+            let mut nb = 0u32;
+            if xj < yj || t < br {
+                nb = 1u32;
+            }
+            x[j as usize] = t2;
+            br = nb;
+        }
+        br
+    }
+
+    /// `out = b^c0 - d` over `nl` words (mod 2^(32·nl)), b^c0 from the power
+    /// table `pw` (`nl3` words a power) (prototype `ABL_LC0`).
+    #[cube]
+    fn pw_minus(
+        pw: &Array<u32>,
+        c0: u32,
+        d: &Array<u32>,
+        out: &mut Array<u32>,
+        #[comptime] nl: u32,
+        #[comptime] nl3: u32,
+    ) {
+        let mut br = 0u32;
+        #[unroll]
+        for j in 0..nl {
+            let pj = pw[(c0 * nl3 + j) as usize];
+            let dj = d[j as usize];
+            let t = pj - dj;
+            let t2 = t - br;
+            let mut nb = 0u32;
+            if pj < dj || t < br {
+                nb = 1u32;
+            }
+            out[j as usize] = t2;
+            br = nb;
+        }
+    }
+
+    /// Whether `x` (`nl` words) is zero (prototype `ABL_LC0`).
+    #[cube]
+    fn words_zero(x: &Array<u32>, #[comptime] nl: u32) -> bool {
+        let mut o = 0u32;
+        #[unroll]
+        for j in 0..nl {
+            o |= x[j as usize];
+        }
+        o == 0u32
+    }
+
     /// The binary differences' constants for blocks of width w (δ = w - 1):
     /// `c2` = 2wδ (3 words), the step of d2 = e² - a², and `k3` = 6w²δ (4
     /// words), the second difference of d3 = e³ - a³.
@@ -2134,6 +2207,25 @@ mod kernels {
                     low = word & 0xFFu32;
                 }
                 } else {
+                let mut slow = true;
+                if comptime!((abl & ABL_LSCAN) != 0) {
+                    // Once the run has ended (in a lower word, or before
+                    // the scan when c0 < z) every digit here is above c0.
+                    slow = in_run;
+                }
+                if !slow {
+                    let mut wb = 0u64;
+                    #[unroll]
+                    for i in 0..4u32 {
+                        let pos = comptime!(p0 + i);
+                        if comptime!(pos < sp) {
+                            let dx = (word >> comptime!(8 * i)) & 0xFFu32;
+                            wb |= 1u64 << u64::cast_from(dx);
+                        }
+                    }
+                    run |= wb;
+                    runc |= wb;
+                } else {
                 #[unroll]
                 for i in 0..4u32 {
                     let pos = comptime!(p0 + i);
@@ -2163,6 +2255,7 @@ mod kernels {
                     dlo = select(in_run, word & 0xFFu32, dlo);
                     qend = select(in_run, p0.runtime(), qend);
                     in_run = false;
+                }
                 }
                 }
             }
@@ -2208,6 +2301,27 @@ mod kernels {
         if comptime!((abl & ABL_CARRY) != 0) {
             if c0 < sp {
                 one_more = ((rem[0] ^ d[0]) & 1u32) != 0u32;
+            }
+        } else if comptime!((abl & ABL_LC0) != 0) {
+            // `d` holds b^c0 - (y - x) here: one more iff x mod b^c0 >= it.
+            if c0 < sp {
+                let mut ge = true;
+                let mut eq = true;
+                #[unroll]
+                for jj in 0..nl {
+                    let j = comptime!(nl - 1 - jj);
+                    let rj = rem[j as usize];
+                    let dj = d[j as usize];
+                    if eq {
+                        if rj < dj {
+                            ge = false;
+                            eq = false;
+                        } else if rj > dj {
+                            eq = false;
+                        }
+                    }
+                }
+                one_more = ge;
             }
         } else {
             if c0 < sp {
@@ -2468,6 +2582,20 @@ mod kernels {
             }
             let mut pc0a = 0u32;
             let mut pc0b = 0u32;
+            // Prototype ABL_LC0: c0 of each power and dp = b^c0 - d, carried.
+            let lc0 = comptime!((abl & ABL_LC0) != 0);
+            let mut lc0a = 0u32;
+            let mut lc0b = 0u32;
+            let mut dp2 = Array::<u32>::new(nl2 as usize);
+            let mut dp3 = Array::<u32>::new(nl3 as usize);
+            #[unroll]
+            for j in 0..nl2 {
+                dp2[j as usize] = 0u32;
+            }
+            #[unroll]
+            for j in 0..nl3 {
+                dp3[j as usize] = 0u32;
+            }
             // This cube's group of slots (`slot_k` of them; one group, all
             // the slots, when the top layer alone fills the device).
             let mut slot = CUBE_POS_Y * slot_k;
@@ -2563,7 +2691,46 @@ mod kernels {
                         // or out-of-range slot) seed from P by division.
                         let step = valid && v == prev_v + 1u32;
                         if step {
-                            if comptime!((abl & ABL_STEP) == 0) {
+                            if comptime!(lc0) {
+                                top_fd_step(
+                                    &mut sq, &mut cu, &mut ds, &mut dc, &mut ddc, base, tq, q2, q3,
+                                );
+                                // dp -= the step of d; c0 moves up (rarely)
+                                // when d reaches b^c0: then d = b^c0 - dp.
+                                let br2 = sub_words_b(
+                                    &mut dp2,
+                                    &c2,
+                                    comptime!(if nl2 < 3 { nl2 } else { 3 }),
+                                    nl2,
+                                );
+                                let br3 = sub_words_b(&mut dp3, &del3, nl3, nl3);
+                                add_words(
+                                    &mut del3,
+                                    &k3,
+                                    comptime!(if nl3 < 4 { nl3 } else { 4 }),
+                                    nl3,
+                                );
+                                if lc0a < s2 && (br2 != 0u32 || words_zero(&dp2, nl2)) {
+                                    let mut dd = Array::<u32>::new(nl2 as usize);
+                                    pw_minus(pw, lc0a, &dp2, &mut dd, nl2, nl3);
+                                    let mut nc = ndig_fast(&dd, pw, nl2, nl3, s2, base);
+                                    if nc < cap {
+                                        nc = cap.runtime();
+                                    }
+                                    lc0a = nc;
+                                    pw_minus(pw, lc0a, &dd, &mut dp2, nl2, nl3);
+                                }
+                                if lc0b < s3 && (br3 != 0u32 || words_zero(&dp3, nl3)) {
+                                    let mut dd = Array::<u32>::new(nl3 as usize);
+                                    pw_minus(pw, lc0b, &dp3, &mut dd, nl3, nl3);
+                                    let mut nc = ndig_fast(&dd, pw, nl3, nl3, s3, base);
+                                    if nc < cap {
+                                        nc = cap.runtime();
+                                    }
+                                    lc0b = nc;
+                                    pw_minus(pw, lc0b, &dd, &mut dp3, nl3, nl3);
+                                }
+                            } else if comptime!((abl & ABL_STEP) == 0) {
                                 top_fd_step(
                                     &mut sq, &mut cu, &mut ds, &mut dc, &mut ddc, base, tq, q2, q3,
                                 );
@@ -2608,10 +2775,27 @@ mod kernels {
                                 chunk_digits,
                                 chunk_div,
                             );
+                            if comptime!(lc0) {
+                                let mut n2 = ndig_fast(&d2, pw, nl2, nl3, s2, base);
+                                if n2 < cap {
+                                    n2 = cap.runtime();
+                                }
+                                lc0a = n2;
+                                let mut n3 = ndig_fast(&d3, pw, nl3, nl3, s3, base);
+                                if n3 < cap {
+                                    n3 = cap.runtime();
+                                }
+                                lc0b = n3;
+                                pw_minus(pw, lc0a, &d2, &mut dp2, nl2, nl3);
+                                pw_minus(pw, lc0b, &d3, &mut dp3, nl3, nl3);
+                            }
                         }
                         let mut c0a = 0u32;
                         let mut c0b = 0u32;
-                        if comptime!((abl & ABL_NDIG) == 0) {
+                        if comptime!(lc0) {
+                            c0a = lc0a;
+                            c0b = lc0b;
+                        } else if comptime!((abl & ABL_NDIG) == 0) {
                             c0a = ndig_fast(&d2, pw, nl2, nl3, s2, base);
                             c0b = ndig_fast(&d3, pw, nl3, nl3, s3, base);
                         } else {
@@ -2666,10 +2850,17 @@ mod kernels {
                             pc0a = c0a;
                             pc0b = c0b;
                         }
-                        mask = top_cert_fd(
-                            &sq, &cu, &d2, &d3, c0a, c0b, pw, &mut res, base, limbs, s2, s3, f0,
-                            abl,
-                        );
+                        if comptime!(lc0) {
+                            mask = top_cert_fd(
+                                &sq, &cu, &dp2, &dp3, c0a, c0b, pw, &mut res, base, limbs, s2, s3,
+                                f0, abl,
+                            );
+                        } else {
+                            mask = top_cert_fd(
+                                &sq, &cu, &d2, &d3, c0a, c0b, pw, &mut res, base, limbs, s2, s3,
+                                f0, abl,
+                            );
+                        }
                     }
                     valid = !clipped;
                     prev_v = v;
