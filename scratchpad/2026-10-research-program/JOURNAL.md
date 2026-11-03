@@ -34,6 +34,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **15:40 UTC: the user merged #237 (39dbe92) and #239 (5cfd1c7)** with the macOS runner jobs still
   pending (they have been flaking). **#240 rebased → 0e9b1391441dff6e9edfb2f5074bf320311c5c64** on main; code byte-identical to
   `exp/join-all5`. main now carries four of the five; only #240 is open (one program PR open).
+- **15:45 UTC, user:** "Looking good, running on demoux now with telemetry on. Iff it would be
+  helpful you can check the telemetry submissions during the next scheduled run." → tomorrow:
+  read demoux's telemetry submissions (read-only, public API/data site): version string, claims
+  accepted, counts/hits sane, per-field rate vs demoux's earlier submissions at the previous
+  version. First non-NVIDIA (RDNA4, wgpu/SPIR-V) run of the merged stack.
 - Worktrees: `exp-join-all5`, `exp-top-fd-ablate` kept (tomorrow's base); two profiling scratch
   worktrees removed. 69 worktrees; the 10-28 checkouts cross the 7-day line tomorrow.
 
