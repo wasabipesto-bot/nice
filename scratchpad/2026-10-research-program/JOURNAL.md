@@ -39,7 +39,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   read demoux's telemetry submissions (read-only, public API/data site): version string, claims
   accepted, counts/hits sane, per-field rate vs demoux's earlier submissions at the previous
   version. First non-NVIDIA (RDNA4, wgpu/SPIR-V) run of the merged stack.
-- Worktrees: `exp-join-all5`, `exp-top-fd-ablate` kept (tomorrow's base); two profiling scratch
+- **16:34 UTC: #240 merged (CI 25 green).** All five program join PRs are in main; main's code
+  equals `exp/join-all5` (the ×1.88 tree). Open program PRs: 0. Worktree `exp-join-all5` removed.
+- Worktrees: `exp-top-fd-ablate` kept (tomorrow's base); two profiling scratch
   worktrees removed. 69 worktrees; the 10-28 checkouts cross the 7-day line tomorrow.
 
 ## 2026-11-02 (day 6; routine fired 04:41 UTC)
