@@ -4,6 +4,17 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-03 (day 7; routine fired 04:41 UTC)
+
+- **Reconcile:** no research instances; November research $4.99 (fleet $4.20); credit $52.16;
+  ivory 15 GB free (80 %). Nothing merged since #238; all five program PRs green (#235 c5fb040,
+  #236 fb05597, #237 51410e7, #239 775b6d9, #240 c7ef3c8); no user comments or session messages
+  since the day-6 report. main = 04693ac. **At the PR cap: nothing opens today.**
+- Leads today: **L36** (full open stack measured on one tree `exp/join-all5` + post-#240 profile +
+  top-kernel residual ablation; agent on box `l36-stack`, 3080, instance 58924168, 6 h TTL, hard
+  stop 10:45 UTC; kill: no term ≥ 25 % of the stepped slot removable) and **L7 sweep 3** (Sonnet;
+  bank-conflict-free gathers, SWAR digit distinctness, prior art on stepping digit arrays).
+
 ## 2026-11-02 (day 6; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; November research invoiced $3.83 (fleet $2.51); credit
