@@ -26,6 +26,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   17 %, carry/ndig 22 %); three exact trims give −22 % of the slot = ×1.04 field → parked
   (`exp/top-fd-ablate` 47c1b36). Box destroyed (3.52 h). Next target is the join (56 %): the
   warp-shuffle LUT for the AND and the walk/survivor path.
+- **14:40 UTC: the user merged #235 (d23d4a5) and #236 (b580214)** and asked for the other three to
+  be rebased. Done: #237 → f5dbeeb (on main), #240 → 8242231 (on the new #237), #239 → 169536a (on
+  main); changelog conflicts only, kernel code auto-merged; the three rebased branches merged
+  together are byte-identical in code to `exp/join-all5` (the ×1.88 tree). Comments posted; CI
+  check scheduled. Open program PRs: 3 (two slots free).
 - Worktrees: `exp-join-all5`, `exp-top-fd-ablate` kept (tomorrow's base); two profiling scratch
   worktrees removed. 69 worktrees; the 10-28 checkouts cross the 7-day line tomorrow.
 
