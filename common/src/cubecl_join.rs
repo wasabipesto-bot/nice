@@ -123,6 +123,8 @@ const ABL_APPEND: u32 = 8;
 const ABL_STEP: u32 = 16;
 const ABL_NDIG: u32 = 32;
 const ABL_DIAG: u32 = 64;
+const ABL_INRUN: u32 = 128;
+const ABL_ABOVE: u32 = 256;
 
 // ---------------------------------------------------------------------------
 // Device kernels
@@ -161,8 +163,8 @@ pub use kernels::{
 )]
 mod kernels {
     use super::{
-        ABL_APPEND, ABL_CARRY, ABL_DIAG, ABL_NDIG, ABL_REM, ABL_SCAN, ABL_STEP, AND_GROUP, DEAD_MASK,
-        JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TRANSPOSE_MIN,
+        ABL_ABOVE, ABL_APPEND, ABL_CARRY, ABL_DIAG, ABL_INRUN, ABL_NDIG, ABL_REM, ABL_SCAN, ABL_STEP,
+        AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TRANSPOSE_MIN,
     };
     use crate::cubecl_backend::candidate_check;
     use crate::cubecl_detailed_fd::fd_add_top;
@@ -2137,18 +2139,30 @@ mod kernels {
                     let pos = comptime!(p0 + i);
                     if comptime!(pos < sp) {
                         let dx = (word >> comptime!(8 * i)) & 0xFFu32;
-                        let above = c0 <= pos;
+                        let mut above = c0 <= pos;
+                        if comptime!((abl & ABL_ABOVE) != 0) {
+                            above = true;
+                        }
                         let bit = select(above, 1u64 << u64::cast_from(dx), 0u64);
                         run |= bit;
-                        runc |= select(in_run, 0u64, bit);
-                        let ends = above && in_run && dx != comptime!(base - 1);
-                        dlo = select(ends, dx, dlo);
-                        qend = select(ends, pos.runtime(), qend);
-                        in_run = in_run && !ends;
-                        if comptime!((abl & ABL_REM) == 0) {
+                        if comptime!((abl & ABL_INRUN) == 0) {
+                            runc |= select(in_run, 0u64, bit);
+                            let ends = above && in_run && dx != comptime!(base - 1);
+                            dlo = select(ends, dx, dlo);
+                            qend = select(ends, pos.runtime(), qend);
+                            in_run = in_run && !ends;
+                        }
+                        if comptime!((abl & (ABL_REM | ABL_ABOVE)) == 0) {
                             low += select(above, 0u32, dx * comptime!(base.pow(i)));
                         }
                     }
+                }
+                if comptime!((abl & ABL_INRUN) != 0) {
+                    // Ablation: the run bookkeeping once per word.
+                    runc ^= u64::cast_from(word);
+                    dlo = select(in_run, word & 0xFFu32, dlo);
+                    qend = select(in_run, p0.runtime(), qend);
+                    in_run = false;
                 }
                 }
             }
