@@ -114,6 +114,15 @@ const STAGES: usize = 6;
 const TOP_FD_MIN_UNITS: u32 = 1 << 17;
 /// FD at power-of-two bases too: no, `top_kernel`'s division is shifts there and FD measured slower.
 const TOP_FD_AT_POW2_BASES: bool = false;
+/// Experiment (L36): `NICE_EXP_TOP_FD_ABL` bits, each removing one part of
+/// `top_fd_kernel`'s per-slot work (the tops are wrong when any is set).
+const ABL_SCAN: u32 = 1;
+const ABL_REM: u32 = 2;
+const ABL_CARRY: u32 = 4;
+const ABL_APPEND: u32 = 8;
+const ABL_STEP: u32 = 16;
+const ABL_NDIG: u32 = 32;
+const ABL_DIAG: u32 = 64;
 
 // ---------------------------------------------------------------------------
 // Device kernels
@@ -151,7 +160,10 @@ pub use kernels::{
     clippy::manual_is_multiple_of
 )]
 mod kernels {
-    use super::{AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TRANSPOSE_MIN};
+    use super::{
+        ABL_APPEND, ABL_CARRY, ABL_DIAG, ABL_NDIG, ABL_REM, ABL_SCAN, ABL_STEP, AND_GROUP, DEAD_MASK,
+        JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TRANSPOSE_MIN,
+    };
     use crate::cubecl_backend::candidate_check;
     use crate::cubecl_detailed_fd::fd_add_top;
     use cubecl::prelude::*;
@@ -955,6 +967,28 @@ mod kernels {
         }
         let nd = select(lt, c, c + 1u32);
         select(nd > sp, sp.runtime(), nd)
+    }
+
+    /// Ablation stand-in for [`ndig_fast`]: the bit-length estimate without
+    /// the power-table compare (ndig or ndig + 1).
+    #[cube]
+    pub(super) fn ndig_approx(
+        d: &Array<u32>,
+        #[comptime] nl: u32,
+        #[comptime] sp: u32,
+        #[comptime] base: u32,
+    ) -> u32 {
+        let mut bl = 0u32;
+        #[unroll]
+        for j in 0..nl {
+            let w = d[j as usize];
+            bl = select(w != 0u32, comptime!(32 * (j + 1)) - w.leading_zeros(), bl);
+        }
+        let m = comptime!(ndig_magic(base, 32 * nl).0);
+        let sh = comptime!(ndig_magic(base, 32 * nl).1);
+        let a = comptime!(ndig_magic(base, 32 * nl).2);
+        let ce = (bl * m + a) >> sh;
+        select(ce > sp, sp.runtime(), ce)
     }
 
     /// One power's share of the top certificate, the device form of
@@ -2047,6 +2081,7 @@ mod kernels {
         #[comptime] sp: u32,
         #[comptime] base: u32,
         #[comptime] z: u32,
+        #[comptime] abl: u32,
     ) -> u64 {
         let mut rem = Array::<u32>::new(nl as usize);
         #[unroll]
@@ -2074,13 +2109,29 @@ mod kernels {
             let mut low = 0u32;
             if c0 >= wend {
                 // Every digit of the word below c0 (those at sp and up are 0).
-                low = (word & 0xFFu32)
-                    + comptime!(base)
-                        * (((word >> 8u32) & 0xFFu32)
-                            + comptime!(base)
-                                * (((word >> 16u32) & 0xFFu32)
-                                    + comptime!(base) * (word >> 24u32)));
+                if comptime!((abl & ABL_REM) == 0) {
+                    low = (word & 0xFFu32)
+                        + comptime!(base)
+                            * (((word >> 8u32) & 0xFFu32)
+                                + comptime!(base)
+                                    * (((word >> 16u32) & 0xFFu32)
+                                        + comptime!(base) * (word >> 24u32)));
+                } else {
+                    low = word;
+                }
             } else {
+                if comptime!((abl & ABL_SCAN) != 0) {
+                // Ablation: no digit scan; fold the word into the masks.
+                let wv = u64::cast_from(word);
+                run ^= wv;
+                runc ^= select(in_run, 0u64, wv);
+                dlo = select(in_run, word & 0xFFu32, dlo);
+                qend = select(in_run, p0.runtime(), qend);
+                in_run = false;
+                if comptime!((abl & ABL_REM) == 0) {
+                    low = word & 0xFFu32;
+                }
+                } else {
                 #[unroll]
                 for i in 0..4u32 {
                     let pos = comptime!(p0 + i);
@@ -2094,29 +2145,36 @@ mod kernels {
                         dlo = select(ends, dx, dlo);
                         qend = select(ends, pos.runtime(), qend);
                         in_run = in_run && !ends;
-                        low += select(above, 0u32, dx * comptime!(base.pow(i)));
+                        if comptime!((abl & ABL_REM) == 0) {
+                            low += select(above, 0u32, dx * comptime!(base.pow(i)));
+                        }
                     }
+                }
                 }
             }
             // rem += low · b^p0 (the sum is below b^(p0 + 4)).
             if p0 < c0 {
-                let len = comptime!((pow_words32(base, p0).len() as u32).min(nl));
-                let topk = comptime!((pow_words32(base, p0 + 4).len() as u32).min(nl));
-                let mut c = 0u64;
-                #[unroll]
-                for k in 0..len {
-                    let t = u64::cast_from(low)
-                        * comptime!(u64::from(pow_words32(base, p0)[k as usize]))
-                        + u64::cast_from(rem[k as usize])
-                        + c;
-                    rem[k as usize] = u32::cast_from(t);
-                    c = t >> 32u64;
-                }
-                #[unroll]
-                for k in len..topk {
-                    let t = u64::cast_from(rem[k as usize]) + c;
-                    rem[k as usize] = u32::cast_from(t);
-                    c = t >> 32u64;
+                if comptime!((abl & ABL_REM) == 0) {
+                    let len = comptime!((pow_words32(base, p0).len() as u32).min(nl));
+                    let topk = comptime!((pow_words32(base, p0 + 4).len() as u32).min(nl));
+                    let mut c = 0u64;
+                    #[unroll]
+                    for k in 0..len {
+                        let t = u64::cast_from(low)
+                            * comptime!(u64::from(pow_words32(base, p0)[k as usize]))
+                            + u64::cast_from(rem[k as usize])
+                            + c;
+                        rem[k as usize] = u32::cast_from(t);
+                        c = t >> 32u64;
+                    }
+                    #[unroll]
+                    for k in len..topk {
+                        let t = u64::cast_from(rem[k as usize]) + c;
+                        rem[k as usize] = u32::cast_from(t);
+                        c = t >> 32u64;
+                    }
+                } else {
+                    rem[0] ^= low;
                 }
             }
         }
@@ -2133,7 +2191,12 @@ mod kernels {
         let pruc = u32::cast_from(runc).count_ones() + u32::cast_from(runc >> 32u64).count_ones();
         let dupc = select(pruc != nc, 1u32, 0u32);
         let mut one_more = false;
-        if c0 < sp {
+        if comptime!((abl & ABL_CARRY) != 0) {
+            if c0 < sp {
+                one_more = ((rem[0] ^ d[0]) & 1u32) != 0u32;
+            }
+        } else {
+            if c0 < sp {
             let mut s = Array::<u32>::new(nl as usize);
             let mut carry = 0u32;
             #[unroll]
@@ -2168,6 +2231,7 @@ mod kernels {
                 }
             }
             one_more = carry != 0u32 || ge;
+            }
         }
         let mut dom_lo = 1u32;
         let mut dom_hi = 0u32;
@@ -2202,6 +2266,7 @@ mod kernels {
         #[comptime] s2: u32,
         #[comptime] s3: u32,
         #[comptime] f0: u32,
+        #[comptime] abl: u32,
     ) -> u64 {
         let nl2 = comptime!(2 * limbs);
         let nl3 = comptime!(3 * limbs);
@@ -2221,6 +2286,7 @@ mod kernels {
             s2,
             base,
             comptime!(2 * f0),
+            abl,
         );
         let mcu = cert_power_fd(
             cu,
@@ -2234,6 +2300,7 @@ mod kernels {
             s3,
             base,
             comptime!(3 * f0),
+            abl,
         );
         close_cert(msq, mcu, dupa[0], dupb[0], &doma, &domb, c0a, c0b, res)
     }
@@ -2286,8 +2353,20 @@ mod kernels {
         #[comptime] nb: u32,
         #[comptime] f0: u32,
         #[comptime] tq: u32,
+        #[comptime] abl: u32,
     ) {
         let m1 = comptime!(base - 1);
+        let diag = comptime!((abl & ABL_DIAG) != 0);
+        let count_only = comptime!((abl & (ABL_APPEND | ABL_DIAG)) != 0);
+        let dwq2 = comptime!(if (abl & ABL_DIAG) != 0 { (s2 - 2 * f0).div_ceil(4) } else { 1 });
+        let dwq3 = comptime!(if (abl & ABL_DIAG) != 0 { (s3 - 3 * f0).div_ceil(4) } else { 1 });
+        let mut acc_cnt = 0u32;
+        let mut acc_m = 0u64;
+        let mut dg = Array::<u32>::new(8usize);
+        #[unroll]
+        for j in 0..8u32 {
+            dg[j as usize] = 0u32;
+        }
         let nl2 = comptime!(2 * limbs);
         let nl3 = comptime!(3 * limbs);
         let nh2 = comptime!(4 * limbs);
@@ -2363,6 +2442,18 @@ mod kernels {
             }
             let mut valid = false;
             let mut prev_v = 0u32;
+            let mut psq = Array::<u32>::new(dwq2 as usize);
+            let mut pcu = Array::<u32>::new(dwq3 as usize);
+            #[unroll]
+            for j in 0..dwq2 {
+                psq[j as usize] = 0u32;
+            }
+            #[unroll]
+            for j in 0..dwq3 {
+                pcu[j as usize] = 0u32;
+            }
+            let mut pc0a = 0u32;
+            let mut pc0b = 0u32;
             // This cube's group of slots (`slot_k` of them; one group, all
             // the slots, when the top layer alone fills the device).
             let mut slot = CUBE_POS_Y * slot_k;
@@ -2375,6 +2466,10 @@ mod kernels {
                 let p = p0 * u64::cast_from(pdiv) + u64::cast_from(v);
                 let mut kept = false;
                 let mut mask = 0u64;
+                let mut dstep = false;
+                let mut chg_a = false;
+                let mut chg_b = false;
+                let mut chg_c0 = false;
                 if live && p >= plo && p <= phi {
                     // a = p*w (< 2^96, 3 limbs), e = a + w - 1, clipped to [s, e-1].
                     let t0 = (p & 0xFFFF_FFFFu64) * u64::cast_from(w);
@@ -2454,17 +2549,30 @@ mod kernels {
                         // or out-of-range slot) seed from P by division.
                         let step = valid && v == prev_v + 1u32;
                         if step {
-                            top_fd_step(
-                                &mut sq, &mut cu, &mut ds, &mut dc, &mut ddc, base, tq, q2, q3,
-                            );
-                            add_words(&mut d2, &c2, comptime!(if nl2 < 3 { nl2 } else { 3 }), nl2);
-                            add_words(&mut d3, &del3, nl3, nl3);
-                            add_words(
-                                &mut del3,
-                                &k3,
-                                comptime!(if nl3 < 4 { nl3 } else { 4 }),
-                                nl3,
-                            );
+                            if comptime!((abl & ABL_STEP) == 0) {
+                                top_fd_step(
+                                    &mut sq, &mut cu, &mut ds, &mut dc, &mut ddc, base, tq, q2, q3,
+                                );
+                                add_words(
+                                    &mut d2,
+                                    &c2,
+                                    comptime!(if nl2 < 3 { nl2 } else { 3 }),
+                                    nl2,
+                                );
+                                add_words(&mut d3, &del3, nl3, nl3);
+                                add_words(
+                                    &mut del3,
+                                    &k3,
+                                    comptime!(if nl3 < 4 { nl3 } else { 4 }),
+                                    nl3,
+                                );
+                            } else {
+                                // Ablation: no step; perturb the state cheaply.
+                                sq[0] ^= ds[0] & 1u32;
+                                cu[0] ^= dc[0] & 1u32;
+                                d2[0] ^= c2[0] & 1u32;
+                                d3[0] ^= del3[0] & 1u32;
+                            }
                         } else {
                             let mut a2 = Array::<u32>::new(nh2 as usize);
                             let mut a3 = Array::<u32>::new(nh3 as usize);
@@ -2487,16 +2595,66 @@ mod kernels {
                                 chunk_div,
                             );
                         }
-                        let mut c0a = ndig_fast(&d2, pw, nl2, nl3, s2, base);
+                        let mut c0a = 0u32;
+                        let mut c0b = 0u32;
+                        if comptime!((abl & ABL_NDIG) == 0) {
+                            c0a = ndig_fast(&d2, pw, nl2, nl3, s2, base);
+                            c0b = ndig_fast(&d3, pw, nl3, nl3, s3, base);
+                        } else {
+                            c0a = ndig_approx(&d2, nl2, s2, base);
+                            c0b = ndig_approx(&d3, nl3, s3, base);
+                        }
                         if c0a < cap {
                             c0a = cap.runtime();
                         }
-                        let mut c0b = ndig_fast(&d3, pw, nl3, nl3, s3, base);
                         if c0b < cap {
                             c0b = cap.runtime();
                         }
+                        if comptime!(diag) {
+                            // Did any digit from c0 up (or c0) change since
+                            // the previous slot? (stepped slots only)
+                            dstep = step;
+                            chg_c0 = c0a != pc0a || c0b != pc0b;
+                            chg_a = c0a != pc0a;
+                            chg_b = c0b != pc0b;
+                            #[unroll]
+                            for j in 0..dwq2 {
+                                let wp = comptime!(2 * f0 + 4 * j);
+                                let mut lm = 0u32;
+                                #[unroll]
+                                for ii in 0..4u32 {
+                                    let pos = comptime!(wp + ii);
+                                    lm |= select(
+                                        pos.runtime() >= c0a,
+                                        comptime!(0xFFu32 << (8 * ii)),
+                                        0u32,
+                                    );
+                                }
+                                chg_a = chg_a || ((sq[j as usize] ^ psq[j as usize]) & lm) != 0u32;
+                                psq[j as usize] = sq[j as usize];
+                            }
+                            #[unroll]
+                            for j in 0..dwq3 {
+                                let wp = comptime!(3 * f0 + 4 * j);
+                                let mut lm = 0u32;
+                                #[unroll]
+                                for ii in 0..4u32 {
+                                    let pos = comptime!(wp + ii);
+                                    lm |= select(
+                                        pos.runtime() >= c0b,
+                                        comptime!(0xFFu32 << (8 * ii)),
+                                        0u32,
+                                    );
+                                }
+                                chg_b = chg_b || ((cu[j as usize] ^ pcu[j as usize]) & lm) != 0u32;
+                                pcu[j as usize] = cu[j as usize];
+                            }
+                            pc0a = c0a;
+                            pc0b = c0b;
+                        }
                         mask = top_cert_fd(
                             &sq, &cu, &d2, &d3, c0a, c0b, pw, &mut res, base, limbs, s2, s3, f0,
+                            abl,
                         );
                     }
                     valid = !clipped;
@@ -2505,6 +2663,29 @@ mod kernels {
                 } else {
                     valid = false;
                 }
+                if comptime!(diag) {
+                    let st = select(dstep, 1u32, 0u32);
+                    let ca = select(dstep && chg_a, 1u32, 0u32);
+                    let cb = select(dstep && chg_b, 1u32, 0u32);
+                    let cab = select(dstep && (chg_a || chg_b), 1u32, 0u32);
+                    let cc = select(dstep && chg_c0, 1u32, 0u32);
+                    dg[0] += st;
+                    dg[1] += ca;
+                    dg[2] += cb;
+                    dg[3] += cab;
+                    dg[4] += cc;
+                    let ws = plane_sum(st);
+                    let wc = plane_sum(cab);
+                    if UNIT_POS_PLANE == 0u32 {
+                        dg[5] += select(ws > 0u32, 1u32, 0u32);
+                        dg[6] += select(wc > 0u32, 1u32, 0u32);
+                        dg[7] += select(ws > 0u32 && wc == 0u32, 1u32, 0u32);
+                    }
+                }
+                if comptime!(count_only) {
+                    acc_cnt += select(kept, 1u32, 0u32);
+                    acc_m ^= mask;
+                } else {
                 // Append the plane's kept tops with one atomic: `slot` is a
                 // loop counter, so the compiler does not aggregate it as it
                 // does `top_kernel`'s (whose slot is the cube's y).
@@ -2539,7 +2720,25 @@ mod kernels {
                         r += 1u32;
                     }
                 }
+                }
                 slot += 1u32;
+            }
+        }
+        if comptime!(count_only) {
+            // One store per thread keeps the certificates alive.
+            if live && (acc_cnt | u32::cast_from(acc_m)) != 0u32 {
+                top_x[i as usize] = acc_cnt ^ u32::cast_from(acc_m) ^ u32::cast_from(acc_m >> 32u64);
+            }
+        }
+        if comptime!(diag) {
+            // Counters at the end of `bucket_cnt` (diagnostic only).
+            let base_i = nslots * nb - 8u32;
+            #[unroll]
+            for j in 0..8u32 {
+                let t = plane_sum(dg[j as usize]);
+                if UNIT_POS_PLANE == 0u32 && t > 0u32 {
+                    bucket_cnt[(base_i + j) as usize].fetch_add(t);
+                }
             }
         }
         cube_done(ran, 0u32);
@@ -2860,6 +3059,8 @@ pub(crate) struct JoinDevice<R: Runtime> {
     clip_vs: Vec<u32>,
     /// [`TOP_FD_MIN_UNITS`] (the tests lower it to force slot groups).
     top_fd_min: u32,
+    /// `NICE_EXP_TOP_FD_ABL` (experiment; see `ABL_*`).
+    top_fd_abl: u32,
     w_f0: u32,
     nbp: u32,
     /// The field's certificate (`FieldSetup::fc`), low and high words.
@@ -3049,6 +3250,10 @@ impl<R: Runtime> JoinDevice<R> {
             top_fd: top_fd_fits(fs) && (TOP_FD_AT_POW2_BASES || !fs.b.is_power_of_two()),
             tq: fs.base.l - fs.f0,
             top_fd_min: TOP_FD_MIN_UNITS,
+            top_fd_abl: std::env::var("NICE_EXP_TOP_FD_ABL")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
             clip_vs: {
                 let mut c = Vec::new();
                 if fs.plo * fs.w < fs.s {
@@ -3229,6 +3434,7 @@ impl<R: Runtime> JoinDevice<R> {
                     self.nb,
                     self.f0,
                     self.tq,
+                    self.top_fd_abl,
                 );
             }
             if !fd || fix {
@@ -6016,6 +6222,30 @@ mod tests {
                 per(g0, gslots),
                 per(g1, gslots),
                 g0 / g1,
+            );
+        }
+        eprintln!("TOPFD ABL {}", dev.top_fd_abl);
+        if dev.top_fd_abl & ABL_DIAG != 0 {
+            // Counters the diagnostic leaves at the end of `bucket_cnt`.
+            let mut tot = [0u64; 8];
+            for vs in &cons {
+                let c = &dev.client;
+                let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vs.clone()));
+                let tc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; vs.len()]));
+                let bc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; vs.len() * nb]));
+                let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; STAGES]));
+                dev.launch_top(vs, &vs_h, &tc, &bc, &ran, true);
+                let v = dev.read_u32(&bc).expect("diag");
+                let n = v.len();
+                for (j, t) in tot.iter_mut().enumerate() {
+                    *t += u64::from(v[n - 8 + j]);
+                }
+            }
+            eprintln!(
+                "TOPFD DIAG b{b} {size:e} stepped_lanes={} sq_hi_changed={} cu_hi_changed={} \
+                 either_changed={} c0_changed={} warp_slots_stepped={} warp_slots_any_changed={} \
+                 warp_slots_none_changed={}",
+                tot[0], tot[1], tot[2], tot[3], tot[4], tot[5], tot[6], tot[7]
             );
         }
     }
