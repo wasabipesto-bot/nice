@@ -5,6 +5,48 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L36.1 The five open PRs on one tree vs main, and the profile after them (2026-11-03, agent; `L36/RESULTS.md`, `L36/raw/`; branch `exp/join-all5` 6ddab24 = exp/join-all3 + #240 c7ef3c8 + #239 775b6d9, CHANGELOG-only conflicts, cubecl_join.rs auto-merged = union of the two diffs)
+
+RTX 3080 on machine m137673 **capped at 150 W** (not the 180 W of L29–L35: absolute seconds
+not comparable, ratios are; clock wandered ~10 % per binary over the session). main 04693ac vs
+all5, 3 interleaved rounds, medians of device s/field:
+| field | main → all5 | ratio | product of per-PR ratios |
+|---|---|---|---|
+| **b62 1e17** | 280.24 → 148.92 | **×1.882** | ×1.843 |
+| b62 1e16 | 23.01 → 11.77 | ×1.955 | ×1.790 |
+| b60 1e16 | 52.65 → 29.22 | ×1.802 | ×1.760 |
+| b64 1e16 | 64.93 → 41.85 | ×1.552 | ×1.560 |
+| NiceMark | 3108.8 → 4991.8 | ×1.606 | ×1.625 |
+Every round of every field faster (×1.55–1.97); spreads all5 0.1–0.6 % (b60 5.3 %), main
+0.9–2.8 %. all5 ran at a lower clock than main (1074 vs 1162 MHz) → ×1.882 is conservative;
+clock-normalised ×2.04; a late pair at similar clocks ×1.962 (140.1 vs 274.9 s). #240 gains more
+at 150 W (top kernel ×1.70–1.74 vs ×1.585 at 180 W). **Exact:** CUDA parity incl. b50/b54, #240's
+device test, #235's certificate test, both dense fields, whole b42; 1e14 COMPARE = main = the PR
+bodies; whole-field counts = all3's exact counts every round; lavapipe naga + SPIR-V parity; lint
+16 shaders 0 flagged. **Profile all5 b62 1e17** (main on the same box in brackets): top 29.7 %
+(42.5; 116.5 → 40.6 s, ×2.87), bucket 1.9 % (0.9), **join 56.1 %** (50.4; 138.2 → 76.7 s, ×1.80),
+check 8.2 % (4.1), other 4.1 % (2.0). b60 1e16: top 24.3 % (34.7), join 59.7 % (56.6), check 9.8 %.
+The timers cannot split the join into AND and walk.
+
+## L36.2 What a stepped top-kernel slot still pays for, and three exact trims (2026-11-03, agent; `L36/SCOPING.md`, `L36/raw/abl_*.txt`; branch `exp/top-fd-ablate` 47c1b36 on all5)
+
+Stepped slot 0.219 ns per prefix at b62 1e17, 0.212 at b60 (150 W box). Ablation (9 rounds each),
+share of the slot (b62 / b60): digit scan 32.5 / 29.9 % (per-digit c0 test and selects 19, run-of-
+(b−1)s bookkeeping 14.5, the digit/bit work 6); append 17; carry test 14 (one cost with x mod
+b^c0: 13); step 13 (registers 110 → 80 without it); ndig_fast power-table compare 6; carry test +
+ndig together 22.5; floor with all six removed 30. In sequence without double counting: append 17,
+scan 22, carry+ndig 22, step 8, floor 31. **Skipping the scan when the digits above c0 did not
+change cannot work:** per lane they change on 35 % of steps at b62 (4 % at b60) and c0 never
+changed in 1.1e9 stepped lanes, but a warp must scan if any lane needs it: 99.6 % of warp-slots at
+b62 (85 % at b60). SWAR distinctness and fusing the two scans do not help (the cost is
+bookkeeping). **No single change reaches 25 %.** Three exact trims prototyped behind switches:
+carry c0 and b^c0 − d across steps (no power-table reads per step) −14.4 / −14.3 %; a
+bookkeeping-free path for scanned words wholly above c0 −6.7 / −5.5 %; stepping slots skip forming
+a, e and the clip test −2.5 / −1.8 %; **all three −22.3 / −22.9 % of the slot (0.218 → 0.170 ns)
+= ×1.041 at b62 1e17 (139.7 → 134.3 s), ~×1.04 b60, exact counts**; pass #240's device test on
+CUDA and lavapipe (naga + SPIR-V; blocks 298–310 → 325–343). **Parked: below the bar** (worth
+~2 % from the c0 carry alone); the FD kernel is now ~20 % of a b62 1e17 field, the join 56 %.
+
 ## L35.2 PR #240: `pr/top-fd` on #237 (2026-11-02, agent; `L35/RESULTS.md` §12, `L35/PR-BODY.md`, `L35/raw/pr-box/`, `raw/analysis_pr.txt`; head c7ef3c8 = one commit on 51410e7, +1495/−169 in cubecl_join.rs)
 
 One FD path (the measured mode, binary d2/d3 stepping); constants `TOP_FD_MIN_UNITS = 2^17`

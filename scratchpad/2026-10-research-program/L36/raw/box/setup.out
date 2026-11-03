@@ -1,0 +1,26 @@
++ L=/root/l36/logs
++ mkdir -p /root/l36/logs /root/l36/bin /root/l36/src
++ cd /root/nice
++ git remote add upstream https://github.com/wasabipesto/nice.git
++ git fetch -q upstream main
++ git fetch -q origin exp/join-all5 exp/top-fd-ablate
++ git worktree add -q --detach /root/l36/src/M 04693ac
++ git worktree add -q --detach /root/l36/src/S 6ddab24
++ git worktree add -q --detach /root/l36/src/X db32f95
++ for t in M S X
++ cd /root/l36/src/M
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'M 04693ac API: statement timeout on pooled connections; widen the Next cursor window (#238) 0ffbfcc36e990cc361edc4d0eda29f17  common/src/cubecl_join.rs'
++ for t in M S X
++ cd /root/l36/src/S
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'S 6ddab24 Merge pr/join-transpose-and (#239) into exp/join-all3 + #240 eb9e14628c259f3a201f3960ebadca7d  common/src/cubecl_join.rs'
++ for t in M S X
++ cd /root/l36/src/X
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'X db32f95 exp: NICE_EXP_TOP_FD_ABL ablation switches for top_fd_kernel (L36) dd39ec4405c529474e133b6b03a423e3  common/src/cubecl_join.rs'
++ nvidia-smi
++ nvidia-smi -q -d POWER,CLOCK

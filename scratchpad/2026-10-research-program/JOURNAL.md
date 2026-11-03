@@ -14,6 +14,20 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   top-kernel residual ablation; agent on box `l36-stack`, 3080, instance 58924168, 6 h TTL, hard
   stop 10:45 UTC; kill: no term ≥ 25 % of the stepped slot removable) and **L7 sweep 3** (Sonnet;
   bank-conflict-free gathers, SWAR digit distinctness, prior art on stepping digit arrays).
+- **L7 sweep 3 done (06:50 UTC):** third consecutive null on new papers (arXiv API rate-limited;
+  use the `list/<cat>/recent` pages next time). Targeted: (B1) warp-shuffle register LUT for
+  #239's gathers (2 registers per lane hold the chunk's 64 words; one shuffle per digit; no bank
+  conflicts, no shared table) is the one actionable idea; (B2) no SWAR distinctness trick, no
+  GPU PDEP; (B3) no prior art for stride-b^s digit stepping or interval certification.
+- **L36 done (09:13 UTC):** `exp/join-all5` (main + the five PRs) is **×1.88 at b62 1e17 vs main**
+  (×1.96 at matched clocks), ×1.96 b62 1e16, ×1.80 b60, ×1.55 b64, NiceMark ×1.61; exact everywhere
+  (whole-field counts = all3's). Box was a 150 W card (ratios only). Profile after the stack: top
+  30 %, join 56 %, check 8 %. The stepped top slot's residual is bookkeeping (scan 32 %, append
+  17 %, carry/ndig 22 %); three exact trims give −22 % of the slot = ×1.04 field → parked
+  (`exp/top-fd-ablate` 47c1b36). Box destroyed (3.52 h). Next target is the join (56 %): the
+  warp-shuffle LUT for the AND and the walk/survivor path.
+- Worktrees: `exp-join-all5`, `exp-top-fd-ablate` kept (tomorrow's base); two profiling scratch
+  worktrees removed. 69 worktrees; the 10-28 checkouts cross the 7-day line tomorrow.
 
 ## 2026-11-02 (day 6; routine fired 04:41 UTC)
 

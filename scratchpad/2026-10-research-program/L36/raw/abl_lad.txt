@@ -1,0 +1,40 @@
+b60: top_kernel consecutive median over all runs 0.4349 ns/slot; prefixes 4347381, k=4
+  config                     n  FD cons c all-seed g  stepped s  s (norm)         s range  top cons
+  none                       9     0.2607     0.4100     0.2112    0.2144  0.2063-0.2192    0.4284
+  append                     9     0.2212     0.3464     0.1799    0.1802  0.1769-0.1825    0.4308
+  scan+append                9     0.1793     0.3128     0.1348    0.1373  0.1312-0.1403    0.4280
+  scan+carry+append+ndig     9     0.1270     0.2427     0.0890    0.0883  0.0835-0.0937    0.4543
+  scan+rem+carry+append+ndig   9     0.1370     0.2537     0.0991    0.0971  0.0943-0.0995    0.4501
+  scan+rem+carry+append+step+ndig   9     0.1063     0.2174     0.0687    0.0700  0.0643-0.0728    0.4535
+  removed part (stepped slot, normalised): cost = s(none) - s(config), share of s(none) = 0.2144
+    append                   +0.0342 ns (+15.9 %)   seeded slot g: +0.0636
+    scan+append              +0.0771 ns (+35.9 %)   seeded slot g: +0.0972
+    scan+carry+append+ndig   +0.1261 ns (+58.8 %)   seeded slot g: +0.1673
+    scan+rem+carry+append+ndig +0.1173 ns (+54.7 %)   seeded slot g: +0.1563
+    scan+rem+carry+append+step+ndig +0.1444 ns (+67.4 %)   seeded slot g: +0.1926
+  on top of count-only append (config 8, s = 0.1802):
+    scan+append              +0.0429 ns (+20.0 % of s(none))
+    scan+carry+append+ndig   +0.0920 ns (+42.9 % of s(none))
+    scan+rem+carry+append+ndig +0.0831 ns (+38.8 % of s(none))
+    scan+rem+carry+append+step+ndig +0.1103 ns (+51.4 % of s(none))
+b62: top_kernel consecutive median over all runs 0.4546 ns/slot; prefixes 3620628, k=5
+  config                     n  FD cons c all-seed g  stepped s  s (norm)         s range  top cons
+  none                       9     0.2583     0.4065     0.2214    0.2230  0.2203-0.2478    0.4501
+  append                     9     0.2184     0.3581     0.1837    0.1845  0.1825-0.1865    0.4488
+  scan+append                9     0.1735     0.3227     0.1359    0.1357  0.1338-0.1368    0.4548
+  scan+carry+append+ndig     9     0.1230     0.2677     0.0868    0.0867  0.0784-0.0885    0.4574
+  scan+rem+carry+append+ndig   9     0.1311     0.2758     0.0946    0.0945  0.0892-0.0972    0.4553
+  scan+rem+carry+append+step+ndig   9     0.1016     0.2320     0.0690    0.0683  0.0618-0.0701    0.4558
+  removed part (stepped slot, normalised): cost = s(none) - s(config), share of s(none) = 0.2230
+    append                   +0.0385 ns (+17.3 %)   seeded slot g: +0.0484
+    scan+append              +0.0873 ns (+39.2 %)   seeded slot g: +0.0838
+    scan+carry+append+ndig   +0.1363 ns (+61.1 %)   seeded slot g: +0.1388
+    scan+rem+carry+append+ndig +0.1286 ns (+57.6 %)   seeded slot g: +0.1307
+    scan+rem+carry+append+step+ndig +0.1548 ns (+69.4 %)   seeded slot g: +0.1745
+  on top of count-only append (config 8, s = 0.1845):
+    scan+append              +0.0488 ns (+21.9 % of s(none))
+    scan+carry+append+ndig   +0.0978 ns (+43.9 % of s(none))
+    scan+rem+carry+append+ndig +0.0900 ns (+40.4 % of s(none))
+    scan+rem+carry+append+step+ndig +0.1163 ns (+52.1 % of s(none))
+diag_b60.log TOPFD DIAG b60 1e16 stepped_lanes=521685720 sq_hi_changed=10916414 cu_hi_changed=10277644 either_changed=20979187 c0_changed=0 warp_slots_stepped=16302720 warp_slots_any_changed=13810272 warp_slots_none_changed=2492448
+diag_b62.log TOPFD DIAG b62 1e17 stepped_lanes=579300320 sq_hi_changed=46315290 cu_hi_changed=172256337 either_changed=204799853 c0_changed=0 warp_slots_stepped=18103200 warp_slots_any_changed=18026778 warp_slots_none_changed=76422
