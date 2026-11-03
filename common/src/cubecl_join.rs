@@ -131,6 +131,9 @@ const ABL_LSCAN: u32 = 512;
 /// Prototype (exact): c0 and b^c0 - d kept across stepped slots; the carry
 /// test compares x mod b^c0 with b^c0 - d (no power-table reads).
 const ABL_LC0: u32 = 1024;
+/// Prototype (exact): a slot that steps (P - 1 was the previous, unclipped
+/// slot) and is neither plo nor phi skips forming a, e and the clip test.
+const ABL_LCLIP: u32 = 2048;
 
 // ---------------------------------------------------------------------------
 // Device kernels
@@ -169,7 +172,7 @@ pub use kernels::{
 )]
 mod kernels {
     use super::{
-        ABL_ABOVE, ABL_APPEND, ABL_CARRY, ABL_DIAG, ABL_INRUN, ABL_LC0, ABL_LSCAN, ABL_NDIG, ABL_REM,
+        ABL_ABOVE, ABL_APPEND, ABL_CARRY, ABL_DIAG, ABL_INRUN, ABL_LC0, ABL_LCLIP, ABL_LSCAN, ABL_NDIG, ABL_REM,
         ABL_SCAN, ABL_STEP, AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TRANSPOSE_MIN,
     };
     use crate::cubecl_backend::candidate_check;
@@ -2613,12 +2616,21 @@ mod kernels {
                 let mut chg_b = false;
                 let mut chg_c0 = false;
                 if live && p >= plo && p <= phi {
+                    let mut a = Array::<u32>::new(limbs as usize);
+                    let mut e = Array::<u32>::new(limbs as usize);
+                    let mut a_lt_s = false;
+                    let mut e_gt_e = false;
+                    // Only P = plo and P = phi can be clipped, and a stepping
+                    // slot needs neither a nor e (prototype ABL_LCLIP).
+                    let mut easy = false;
+                    if comptime!((abl & ABL_LCLIP) != 0) {
+                        easy = valid && v == prev_v + 1u32 && p != plo && p != phi;
+                    }
+                    if !easy {
                     // a = p*w (< 2^96, 3 limbs), e = a + w - 1, clipped to [s, e-1].
                     let t0 = (p & 0xFFFF_FFFFu64) * u64::cast_from(w);
                     let t1 = (p >> 32u64) * u64::cast_from(w) + (t0 >> 32u64);
                     let pw0 = u32::cast_from(t0);
-                    let mut a = Array::<u32>::new(limbs as usize);
-                    let mut e = Array::<u32>::new(limbs as usize);
                     #[unroll]
                     for j in 0..limbs {
                         if comptime!(j == 0) {
@@ -2642,8 +2654,6 @@ mod kernels {
                         e[j as usize] = t;
                         carry = c;
                     }
-                    let mut a_lt_s = false;
-                    let mut e_gt_e = false;
                     let mut eq_a = true;
                     let mut eq_e = true;
                     #[unroll]
@@ -2679,6 +2689,7 @@ mod kernels {
                         for j in 0..limbs {
                             e[j as usize] = fb[comptime!(3 + j) as usize];
                         }
+                    }
                     }
                     // Clipped blocks (P = plo, P = phi) are `top_kernel`'s
                     // (`only_clipped`), launched beside this one.
