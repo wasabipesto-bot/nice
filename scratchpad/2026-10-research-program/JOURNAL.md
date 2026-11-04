@@ -32,6 +32,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   l38-toprec destroyed (2.20 h). Agent incidents: GitHub SSH/HTTPS outage 09:47–09:57 (worked
   around with a bundle + gh token); one mistaken `git push --force` at upstream, refused by GitHub
   (the bot has no push access; upstream main untouched). Open program PRs: 1.
+- 12:18 UTC: **#241 CI fully green** (25 pass, 3 skipped) at af21136; no comments. GitHub SSH
+  auth from ivory was refused intermittently today (`sync.sh` and fetches); pushes went through
+  on retry — fallback is HTTPS with `gh auth token` via `http.extraheader`.
 
 ## 2026-11-03 (day 7; routine fired 04:41 UTC)
 
