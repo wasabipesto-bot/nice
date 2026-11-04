@@ -151,7 +151,7 @@ pub use kernels::{
     clippy::manual_is_multiple_of
 )]
 mod kernels {
-    use super::{AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TRANSPOSE_MIN};
+    use super::{AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP};
     use crate::cubecl_backend::candidate_check;
     use crate::cubecl_detailed_fd::fd_add_top;
     use cubecl::prelude::*;
@@ -395,7 +395,7 @@ mod kernels {
     ///
     /// A pair passes the AND iff the entry's and the top's digit masks are
     /// disjoint, i.e. iff no digit of the entry is a digit of the top. So for
-    /// a batch of at least [`TRANSPOSE_MIN`] tops the kernel first transposes
+    /// a batch of at least [`super::TRANSPOSE_MIN`] tops the kernel first transposes
     /// the tops' masks into `t_tr`, one word per (chunk of 32 tops, digit)
     /// with bit i set iff the chunk's top i has the digit, and an entry's
     /// pass mask for a chunk is the complement of the OR of the words of its
@@ -458,7 +458,7 @@ mod kernels {
         // pass mask 0); 6 full, `and_count` gets the walk's lane-rounds.
         // `tmin` replaces TRANSPOSE_MIN (`NICE_EXP_JOIN_TMIN`).
         let mut ck = 0u32;
-        let mut npf = 0u32;
+        let mut npf: u32 = 0u32;
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
         let wave = comptime!(ept * JOIN_WG);
