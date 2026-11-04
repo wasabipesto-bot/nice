@@ -437,7 +437,7 @@ mod kernels {
         counts: &Array<u32>,
         work: &Array<u32>,
         tl: &Array<u32>,
-        top_rec: &Array<u32>,
+        top_rec: &Array<Vector<u32, Const<4>>>,
         surv: &mut Array<u32>,
         surv_count: &mut Array<Atomic<u32>>,
         and_count: &mut Array<Atomic<u32>>,
@@ -519,8 +519,8 @@ mod kernels {
             if comptime!(v_digits > 0) {
                 if ts < te {
                     let t0 = tl[ts as usize];
-                    v_part = (top_rec[(8u32 * t0 + 6u32) as usize]
-                        % comptime!(base.pow(v_digits)))
+                    let x = top_rec[(2u32 * t0 + 1u32) as usize];
+                    v_part = (x[2] % comptime!(base.pow(v_digits)))
                         * comptime!(base.pow(f0));
                 }
             }
@@ -533,16 +533,16 @@ mod kernels {
                 }
                 if UNIT_POS_X < nt {
                     let t = tl[(tc + UNIT_POS_X) as usize];
-                    // Words 2-7 of the top's record ([`TOP_REC_WORDS`]).
-                    let r8 = 8u32 * t;
-                    t_lo[UNIT_POS_X as usize] = top_rec[(r8 + 2u32) as usize];
-                    t_hi[UNIT_POS_X as usize] = top_rec[(r8 + 3u32) as usize];
-                    t_rlo[UNIT_POS_X as usize] = top_rec[(r8 + 4u32) as usize];
-                    t_rhi[UNIT_POS_X as usize] = top_rec[(r8 + 5u32) as usize];
+                    // The top's record ([`TOP_REC_WORDS`]) as two 16-byte loads.
+                    let ra = top_rec[(2u32 * t) as usize];
+                    let rb = top_rec[(2u32 * t + 1u32) as usize];
+                    t_lo[UNIT_POS_X as usize] = ra[2];
+                    t_hi[UNIT_POS_X as usize] = ra[3];
+                    t_rlo[UNIT_POS_X as usize] = rb[0];
+                    t_rhi[UNIT_POS_X as usize] = rb[1];
                     t_id[UNIT_POS_X as usize] = t;
                     // D (below b^mid <= 2^12) and the seed flag.
-                    t_dm[UNIT_POS_X as usize] = (top_rec[(r8 + 6u32) as usize] / dm_div)
-                        | (top_rec[(r8 + 7u32) as usize] << 16u32);
+                    t_dm[UNIT_POS_X as usize] = (rb[2] / dm_div) | (rb[3] << 16u32);
                 }
                 sync_cube();
                 if nt >= TRANSPOSE_MIN {
@@ -3396,7 +3396,7 @@ impl<R: Runtime> JoinDevice<R> {
                 ),
                 ArrayArg::from_raw_parts(self.work.clone(), 4 * max_slots * nb),
                 ArrayArg::from_raw_parts(self.tl.clone(), tl_len),
-                ArrayArg::from_raw_parts(self.top_rec.clone(), rec_len),
+                ArrayArg::from_raw_parts(self.top_rec.clone(), rec_len / 4),
                 ArrayArg::from_raw_parts(self.list.clone(), 2 * self.list_cap as usize),
                 ArrayArg::from_raw_parts(checked.clone(), 1),
                 ArrayArg::from_raw_parts(survivors.clone(), 1),
