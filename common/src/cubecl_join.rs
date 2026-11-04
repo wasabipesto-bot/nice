@@ -757,7 +757,12 @@ mod kernels {
                                 let cnt = x.count_ones();
                                 let incl = plane_inclusive_sum(cnt);
                                 let excl = incl - cnt;
-                                let total = plane_broadcast(incl, PLANE_DIM - 1u32);
+                                let mut total = 0u32;
+                                if comptime!(pd > 0) {
+                                    total = plane_broadcast(incl, comptime!(pd.max(1) - 1));
+                                } else {
+                                    total = plane_shuffle(incl, PLANE_DIM - 1u32);
+                                }
                                 let mut ib = 0u32;
                                 while ib < total {
                                     let item = ib + UNIT_POS_PLANE;
@@ -765,8 +770,9 @@ mod kernels {
                                     // at most `item`.
                                     let mut o = 0u32;
                                     if comptime!(pd > 0) {
+                                        let nst = comptime!(pd.trailing_zeros());
                                         #[unroll]
-                                        for st in 0..comptime!(pd.trailing_zeros()) {
+                                        for st in 0..nst {
                                             let v = plane_shuffle(
                                                 incl,
                                                 o + comptime!((pd >> (st + 1)) - 1),
@@ -785,14 +791,25 @@ mod kernels {
                                     let mut rem = item - plane_shuffle(excl, o);
                                     // The rem-th set bit of xo.
                                     let mut bp = 0u32;
-                                    #[unroll]
-                                    for st in 0..5u32 {
-                                        let c = ((xo >> bp) & comptime!((1u32 << (16u32 >> st)) - 1u32))
-                                            .count_ones();
-                                        let skip = rem >= c;
-                                        rem = select(skip, rem - c, rem);
-                                        bp = select(skip, bp + comptime!(16u32 >> st), bp);
-                                    }
+                                    let c16 = ((xo >> bp) & 0xFFFFu32).count_ones();
+                                    let q16 = rem >= c16;
+                                    rem = select(q16, rem - c16, rem);
+                                    bp = select(q16, bp + 16u32, bp);
+                                    let c8 = ((xo >> bp) & 0xFFu32).count_ones();
+                                    let q8 = rem >= c8;
+                                    rem = select(q8, rem - c8, rem);
+                                    bp = select(q8, bp + 8u32, bp);
+                                    let c4 = ((xo >> bp) & 0xFu32).count_ones();
+                                    let q4 = rem >= c4;
+                                    rem = select(q4, rem - c4, rem);
+                                    bp = select(q4, bp + 4u32, bp);
+                                    let c2 = ((xo >> bp) & 0x3u32).count_ones();
+                                    let q2 = rem >= c2;
+                                    rem = select(q2, rem - c2, rem);
+                                    bp = select(q2, bp + 2u32, bp);
+                                    let c1 = ((xo >> bp) & 0x1u32).count_ones();
+                                    let q1 = rem >= c1;
+                                    bp = select(q1, bp + 1u32, bp);
                                     let r0 = plane_shuffle(rr[j as usize], o);
                                     let aco = plane_shuffle(ac[j as usize], o);
                                     let pco = plane_shuffle(pc[j as usize], o);
