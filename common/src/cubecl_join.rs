@@ -458,7 +458,9 @@ mod kernels {
         // pass mask 0); 6 full, `and_count` gets the walk's lane-rounds;
         // 5 = 4 without the per-chunk stage check (and its two barriers);
         // 7, 8 full with the stage check every 4 or 8 chunks (exact: a full
-        // stage spills to the list).
+        // stage spills to the list); 9 = 4 without the transposed copy;
+        // 10 = 9 without the entry loads (every slot empty); 11 = 10 without
+        // the waves (work items and top batches only).
         // `tmin` replaces TRANSPOSE_MIN (`NICE_EXP_JOIN_TMIN`).
         let mut ck = 0u32;
         let mut npf: u32 = 0u32;
@@ -551,7 +553,9 @@ mod kernels {
                         | (top_x[(2u32 * t + 1u32) as usize] << 16u32);
                 }
                 sync_cube();
-                if nt >= tmin {
+                // Modes 9-11 skip the transposed copy.
+                let tmin_copy = comptime!(if abl >= 9 && abl <= 11 { 0xFFFF_FFFFu32 } else { tmin });
+                if nt >= tmin_copy {
                     // Thread u writes chunk u / 32's words for digits u % 32
                     // and u % 32 + 32, over the chunk's 32 tops unrolled (the
                     // loads pipeline); bits past the batch's last top are
@@ -582,7 +586,16 @@ mod kernels {
                 sync_cube();
 
                 let mut ws = 0u32;
-                while ws < ne {
+                // Mode 11 runs no waves, mode 10 loads no entries.
+                let mut ne_w = ne;
+                if comptime!(abl == 11) {
+                    ne_w = 0u32;
+                }
+                let mut ne_e = ne;
+                if comptime!(abl == 10) {
+                    ne_e = 0u32;
+                }
+                while ws < ne_w {
                     let mut mlo = Array::<u32>::new(ept as usize);
                     let mut mhi = Array::<u32>::new(ept as usize);
                     let mut rr = Array::<u32>::new(ept as usize);
@@ -601,7 +614,7 @@ mod kernels {
                         vv[j as usize] = 0u32;
                         ac[j as usize] = 0u32;
                         pc[j as usize] = 0u32;
-                        if sl < ne {
+                        if sl < ne_e {
                             vv[j as usize] = 0xFFFF_FFFFu32;
                             let e = lists[(lbase + sl) as usize];
                             let gi = ebase + e;
@@ -663,7 +676,7 @@ mod kernels {
                             rr[j as usize] = r0;
                         }
                     }
-                    if comptime!(abl == 1 || abl == 2 || abl == 4 || abl == 5) {
+                    if comptime!(abl == 1 || abl == 2 || abl == 4 || abl == 5 || abl == 9) {
                         #[unroll]
                         for j in 0..ept {
                             ck ^= ac[j as usize] ^ pc[j as usize] ^ rr[j as usize] ^ mlo[j as usize]
@@ -685,7 +698,7 @@ mod kernels {
                             cend = nt;
                         }
                         let mut pm = Array::<u32>::new(ept as usize);
-                        if comptime!(abl == 4 || abl == 5) {
+                        if comptime!(abl == 4 || abl == 5 || abl == 9 || abl == 10) {
                             #[unroll]
                             for j in 0..ept {
                                 pm[j as usize] = 0u32;
@@ -764,7 +777,7 @@ mod kernels {
                         // barrier, which drops the YIELD ptxas otherwise puts in
                         // the loop and lets it keep fewer registers: another
                         // 2-11%.
-                        if comptime!(abl == 1 || abl == 4 || abl == 5) {
+                        if comptime!(abl == 1 || abl == 4 || abl == 5 || abl == 9 || abl == 10) {
                             #[unroll]
                             for j in 0..ept {
                                 nand += (pm[j as usize] & vv[j as usize]).count_ones();
@@ -918,7 +931,7 @@ mod kernels {
                 sc,
             );
         }
-        if comptime!(abl == 1 || abl == 2 || abl == 4 || abl == 5) {
+        if comptime!(abl == 1 || abl == 2 || abl == 4 || abl == 5 || abl == 9) {
             if ck == 0x9E37_79B9u32 {
                 nand += 1u32;
             }
