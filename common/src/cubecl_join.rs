@@ -448,7 +448,17 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] abl: u32,
+        #[comptime] tmin: u32,
     ) {
+        // Experimental ablation (L37, `NICE_EXP_JOIN_ABL`): 0 full; 1 AND only
+        // (the walk sees nothing; `and_count` gets the AND's pass bits);
+        // 2 walk with the residue test but no prefilter and no stage; 3 walk
+        // and prefilter, no stage; 4 no AND (entries and tops loaded, every
+        // pass mask 0); 6 full, `and_count` gets the walk's lane-rounds.
+        // `tmin` replaces TRANSPOSE_MIN (`NICE_EXP_JOIN_TMIN`).
+        let mut ck = 0u32;
+        let mut npf = 0u32;
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
         let wave = comptime!(ept * JOIN_WG);
@@ -538,7 +548,7 @@ mod kernels {
                         | (top_x[(2u32 * t + 1u32) as usize] << 16u32);
                 }
                 sync_cube();
-                if nt >= TRANSPOSE_MIN {
+                if nt >= tmin {
                     // Thread u writes chunk u / 32's words for digits u % 32
                     // and u % 32 + 32, over the chunk's 32 tops unrolled (the
                     // loads pipeline); bits past the batch's last top are
@@ -650,6 +660,13 @@ mod kernels {
                             rr[j as usize] = r0;
                         }
                     }
+                    if comptime!(abl == 1 || abl == 2 || abl == 4) {
+                        #[unroll]
+                        for j in 0..ept {
+                            ck ^= ac[j as usize] ^ pc[j as usize] ^ rr[j as usize] ^ mlo[j as usize]
+                                ^ mhi[j as usize];
+                        }
+                    }
                     // Branch-free AND over a chunk of up to 32 tops into a pass
                     // bitmask per entry, then only the (rare) set bits are
                     // walked: the survivor path diverges once per chunk, not
@@ -665,7 +682,12 @@ mod kernels {
                             cend = nt;
                         }
                         let mut pm = Array::<u32>::new(ept as usize);
-                        if nt >= TRANSPOSE_MIN {
+                        if comptime!(abl == 4) {
+                            #[unroll]
+                            for j in 0..ept {
+                                pm[j as usize] = 0u32;
+                            }
+                        } else if nt >= tmin {
                             let cb = jc / 32u32;
                             if cb % ag == 0u32 {
                                 #[unroll]
@@ -739,37 +761,68 @@ mod kernels {
                         // barrier, which drops the YIELD ptxas otherwise puts in
                         // the loop and lets it keep fewer registers: another
                         // 2-11%.
+                        if comptime!(abl == 1 || abl == 4) {
+                            #[unroll]
+                            for j in 0..ept {
+                                nand += (pm[j as usize] & vv[j as usize]).count_ones();
+                            }
+                        } else {
                         #[unroll]
                         for j in 0..ept {
                             let mut x = pm[j as usize] & vv[j as usize];
                             let r0 = rr[j as usize];
                             while plane_any(x != 0u32) {
+                                if comptime!(abl == 6) {
+                                    nand += 1u32;
+                                }
                                 if x != 0u32 {
                                     let jt2 = jc + x.trailing_zeros();
                                     x &= x - 1u32;
                                     if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
-                                        nand += 1u32;
-                                        if walk_pf(
-                                            ac[j as usize],
-                                            pc[j as usize],
-                                            t_dm[jt2 as usize],
-                                            mlo[j as usize],
-                                            mhi[j as usize],
-                                            t_lo[jt2 as usize],
-                                            t_hi[jt2 as usize],
-                                            base,
-                                            k,
-                                            k2,
-                                        ) {
-                                            let at = s_cnt[0].fetch_add(1u32);
-                                            if at < SURV_SH_CAP {
-                                                s_t[at as usize] = t_id[jt2 as usize];
-                                                s_r[at as usize] = r0;
-                                            } else {
-                                                let g = surv_count[0].fetch_add(1u32);
-                                                if g < surv_cap {
-                                                    surv[(2u32 * g) as usize] = t_id[jt2 as usize];
-                                                    surv[(2u32 * g + 1u32) as usize] = r0;
+                                        if comptime!(abl != 6) {
+                                            nand += 1u32;
+                                        }
+                                        if comptime!(abl == 2) {
+                                            // no prefilter, no stage
+                                        } else if comptime!(abl == 3) {
+                                            if walk_pf(
+                                                ac[j as usize],
+                                                pc[j as usize],
+                                                t_dm[jt2 as usize],
+                                                mlo[j as usize],
+                                                mhi[j as usize],
+                                                t_lo[jt2 as usize],
+                                                t_hi[jt2 as usize],
+                                                base,
+                                                k,
+                                                k2,
+                                            ) {
+                                                npf += 1u32;
+                                            }
+                                        } else {
+                                            if walk_pf(
+                                                ac[j as usize],
+                                                pc[j as usize],
+                                                t_dm[jt2 as usize],
+                                                mlo[j as usize],
+                                                mhi[j as usize],
+                                                t_lo[jt2 as usize],
+                                                t_hi[jt2 as usize],
+                                                base,
+                                                k,
+                                                k2,
+                                            ) {
+                                                let at = s_cnt[0].fetch_add(1u32);
+                                                if at < SURV_SH_CAP {
+                                                    s_t[at as usize] = t_id[jt2 as usize];
+                                                    s_r[at as usize] = r0;
+                                                } else {
+                                                    let g = surv_count[0].fetch_add(1u32);
+                                                    if g < surv_cap {
+                                                        surv[(2u32 * g) as usize] =
+                                                            t_id[jt2 as usize];
+                                                        surv[(2u32 * g + 1u32) as usize] = r0;
+                                                    }
                                                 }
                                             }
                                         }
@@ -779,6 +832,7 @@ mod kernels {
                                     sync_plane();
                                 }
                             }
+                        }
                         }
                         // Write the stage out once it is half full, after
                         // every chunk of 32 tops. A chunk that adds more than
@@ -835,6 +889,16 @@ mod kernels {
                 surv_cap,
                 sc,
             );
+        }
+        if comptime!(abl == 1 || abl == 2 || abl == 4) {
+            if ck == 0x9E37_79B9u32 {
+                nand += 1u32;
+            }
+        }
+        if comptime!(abl == 3) {
+            if npf == 0x9E37_79B9u32 {
+                nand += 1u32;
+            }
         }
         // One atomic per plane for the join survivors.
         let planes_and = plane_sum(nand);
@@ -2922,6 +2986,11 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
+    /// Experimental (L37): the join kernel's ablation mode
+    /// (`NICE_EXP_JOIN_ABL`, 0 = full) and transposed-AND gate
+    /// (`NICE_EXP_JOIN_TMIN`, default [`TRANSPOSE_MIN`]).
+    abl: u32,
+    tmin: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -3134,6 +3203,14 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
+            abl: std::env::var("NICE_EXP_JOIN_ABL")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            tmin: std::env::var("NICE_EXP_JOIN_TMIN")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(TRANSPOSE_MIN),
             limbs,
             chunk_digits,
             chunk_div,
@@ -3587,6 +3664,8 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k,
                 self.k2,
                 self.walk_sync,
+                self.abl,
+                self.tmin,
             );
             if let Some(t) = pt {
                 pt = Some(self.prof_mark(t, |p, s| p.join_secs += s)?);
