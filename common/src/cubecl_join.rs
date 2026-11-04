@@ -455,7 +455,10 @@ mod kernels {
         // (the walk sees nothing; `and_count` gets the AND's pass bits);
         // 2 walk with the residue test but no prefilter and no stage; 3 walk
         // and prefilter, no stage; 4 no AND (entries and tops loaded, every
-        // pass mask 0); 6 full, `and_count` gets the walk's lane-rounds.
+        // pass mask 0); 6 full, `and_count` gets the walk's lane-rounds;
+        // 5 = 4 without the per-chunk stage check (and its two barriers);
+        // 7, 8 full with the stage check every 4 or 8 chunks (exact: a full
+        // stage spills to the list).
         // `tmin` replaces TRANSPOSE_MIN (`NICE_EXP_JOIN_TMIN`).
         let mut ck = 0u32;
         let mut npf: u32 = 0u32;
@@ -660,7 +663,7 @@ mod kernels {
                             rr[j as usize] = r0;
                         }
                     }
-                    if comptime!(abl == 1 || abl == 2 || abl == 4) {
+                    if comptime!(abl == 1 || abl == 2 || abl == 4 || abl == 5) {
                         #[unroll]
                         for j in 0..ept {
                             ck ^= ac[j as usize] ^ pc[j as usize] ^ rr[j as usize] ^ mlo[j as usize]
@@ -682,7 +685,7 @@ mod kernels {
                             cend = nt;
                         }
                         let mut pm = Array::<u32>::new(ept as usize);
-                        if comptime!(abl == 4) {
+                        if comptime!(abl == 4 || abl == 5) {
                             #[unroll]
                             for j in 0..ept {
                                 pm[j as usize] = 0u32;
@@ -761,7 +764,7 @@ mod kernels {
                         // barrier, which drops the YIELD ptxas otherwise puts in
                         // the loop and lets it keep fewer registers: another
                         // 2-11%.
-                        if comptime!(abl == 1 || abl == 4) {
+                        if comptime!(abl == 1 || abl == 4 || abl == 5) {
                             #[unroll]
                             for j in 0..ept {
                                 nand += (pm[j as usize] & vv[j as usize]).count_ones();
@@ -851,21 +854,46 @@ mod kernels {
                         // reserved for it, which costs full checks of stale
                         // list entries and can overwrite ones another flush
                         // reserved.
-                        sync_cube();
-                        let sc = s_cnt[0].load();
-                        sync_cube();
-                        if sc >= SURV_FLUSH {
-                            flush_survivors(
-                                &s_t,
-                                &s_r,
-                                &mut s_cnt,
-                                &mut s_base,
-                                surv,
-                                surv_count,
-                                surv_cap,
-                                sc,
-                            );
+                        if comptime!(abl == 5) {
+                            // no per-chunk check (mode 4 without its barriers)
+                        } else if comptime!(abl == 7 || abl == 8) {
+                            // The check every fg chunks and after a batch's last.
+                            let fg = comptime!(if abl == 7 { 4u32 } else { 8u32 });
+                            if (jc / 32u32) % fg == comptime!(fg - 1) || jc + 32u32 >= nt {
+                                sync_cube();
+                                let sc = s_cnt[0].load();
+                                sync_cube();
+                                if sc >= SURV_FLUSH {
+                                    flush_survivors(
+                                        &s_t,
+                                        &s_r,
+                                        &mut s_cnt,
+                                        &mut s_base,
+                                        surv,
+                                        surv_count,
+                                        surv_cap,
+                                        sc,
+                                    );
+                                    sync_cube();
+                                }
+                            }
+                        } else {
                             sync_cube();
+                            let sc = s_cnt[0].load();
+                            sync_cube();
+                            if sc >= SURV_FLUSH {
+                                flush_survivors(
+                                    &s_t,
+                                    &s_r,
+                                    &mut s_cnt,
+                                    &mut s_base,
+                                    surv,
+                                    surv_count,
+                                    surv_cap,
+                                    sc,
+                                );
+                                sync_cube();
+                            }
                         }
                         jc += 32u32;
                     }
@@ -890,7 +918,7 @@ mod kernels {
                 sc,
             );
         }
-        if comptime!(abl == 1 || abl == 2 || abl == 4) {
+        if comptime!(abl == 1 || abl == 2 || abl == 4 || abl == 5) {
             if ck == 0x9E37_79B9u32 {
                 nand += 1u32;
             }
