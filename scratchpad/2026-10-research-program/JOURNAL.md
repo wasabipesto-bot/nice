@@ -27,6 +27,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **L38 launched (09:10 UTC):** one 32-byte record per top (same bytes, one sector per load);
   estimate 9–12 % at b62 1e17; agent on box `l38-toprec` (3080, instance 59082237, 6 h TTL, hard
   stop 13:30 UTC); PR branch `pr/join-top-record` prepared if ≥ 5 %, PR opened by the director.
+- **L38 done, PR #241 opened (11:20 UTC):** ×1.100 b62 1e17, ×1.060 b60, NiceMark ×1.050, exact;
+  part of it is clock under the power cap (cycles −4.3 % at b62 1e17), stated in the body. Box
+  l38-toprec destroyed (2.20 h). Agent incidents: GitHub SSH/HTTPS outage 09:47–09:57 (worked
+  around with a bundle + gh token); one mistaken `git push --force` at upstream, refused by GitHub
+  (the bot has no push access; upstream main untouched). Open program PRs: 1.
 
 ## 2026-11-03 (day 7; routine fired 04:41 UTC)
 

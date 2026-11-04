@@ -5,6 +5,30 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L38.1 One 32-byte record per top: PR #241 (2026-11-04, agent; `L38/RESULTS.md`, `L38/PR-BODY.md`, `L38/raw/`; branch `pr/join-top-record` af21136 = one commit on main 6f060a9, +64/−87 in cubecl_join.rs + join_plan.rs; prototypes `exp/join-top-record-scalar`, `exp/join-top-record-vec`)
+
+`top_p`/`top_m`/`top_r`/`top_x` → one `top_rec` of 8 u32 per top (`TOP_REC_WORDS`); both top kernels
+(incl. the clipped launch) write it; the join's batch load reads words 2–7 from one sector;
+`check_kernel`, `read_checked`, `v_part` and #240's device test read it; `top_b` and the shared
+layout unchanged; the footprint counts one buffer (largest per-slot buffer now, but cannot bind
+before the survivor bound: plans identical both sides). Scalar loads tied with `Vector<u32,4>`
+loads (kept scalar: 40 vs 44 registers). **A/B vs main, RTX 3080 at a 180 W cap, 3 interleaved
+rounds, medians:** b62 1e17 120.37 → 109.46 s **×1.100** (rounds 1.100/1.100/1.075; clock-
+normalised ×1.034); b62 1e16 ×1.076 (×1.057); b60 1e16 ×1.060 (×1.029); b64 1e16 ×1.091
+(×1.060); 1e14 b60/b62/b64 ×0.977/0.990/1.021 (noise ±3–7 %); **NiceMark ×1.050** (1.051, 1.049;
+b58 weak ×1.036, strong ×1.012, b60 ×1.070, b62 ×1.083). The PR side ran 35–75 MHz higher at the
+cap (fewer sectors → less power → more clock), so in cycles the saving is 4.3 % at b62 1e17 (10.9 s
+in time vs L37's 12–16 s estimate); on an uncapped card expect between the columns. Top kernels
+alone unchanged (±0.8 %). **Exact** on `a9495ec` and `6539b9e`: parity incl. b50/b54, #240's device
+test on the record (26 fields, 279 batches, 237.9 M tops), certificate test, dense fields, b42,
+1e14 COMPARE = main, every A/B field = main's exact counts, NiceMark whole-field scenarios;
+lavapipe naga + SPIR-V all `cubecl_join` wgpu tests; lint 16/0; fmt; clippy default, gpu, gpu +
+cubecl-spirv. Registers = main (join 40, top 80, top_fd 108/110, check 38/34; b64 variance is
+CubeCL's). **PR #241 opened 11:20 UTC.** Incidents: GitHub refused SSH pushes from ivory 09:47–
+09:57 (HTTPS 500s too; the commit travelled as a bundle and was pushed with gh's token); the agent
+once ran `git push --force` against upstream by mistake — refused (no push access), upstream main
+untouched (6f060a9, no push event).
+
 ## L37.1 Join kernel breakdown on main 6f060a9 by ablation (2026-11-04, agent; `L37/RESULTS.md` §1, `L37/raw/`; branch `exp/join-l37-ablate` 64f986c, switches `NICE_EXP_JOIN_ABL`, `NICE_EXP_JOIN_TMIN`)
 
 RTX 3080 at 150 W, each mode a separate profiled kernel, 3 interleaved rounds; each part = the

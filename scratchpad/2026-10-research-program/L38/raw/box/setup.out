@@ -1,0 +1,26 @@
++ L=/root/l38/logs
++ mkdir -p /root/l38/logs /root/l38/bin /root/l38/src /root/l38/sass
++ cd /root/nice
++ git remote add upstream https://github.com/wasabipesto/nice.git
++ git fetch -q upstream main
++ git fetch -q origin exp/join-top-record-scalar exp/join-top-record-vec
++ git worktree add -q --detach /root/l38/src/M 6f060a9
++ git worktree add -q --detach /root/l38/src/S origin/exp/join-top-record-scalar
++ git worktree add -q --detach /root/l38/src/V origin/exp/join-top-record-vec
++ for t in M S V
++ cd /root/l38/src/M
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'M 6f060a9 Overlap join: step the top certificates through a batch'\''s partitions (#240) eb9e14628c259f3a201f3960ebadca7d  common/src/cubecl_join.rs'
++ for t in M S V
++ cd /root/l38/src/S
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'S e7e014f Overlap join: one 32-byte record per top (scalar loads) [wip] 17be86506f2e770cc0c3be480d5db08e  common/src/cubecl_join.rs'
++ for t in M S V
++ cd /root/l38/src/V
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'V 88cd8a0 Overlap join: the join reads the top record as two vec4 loads [wip] 6ba2a91fa7e65d370777c3c6086ac8e3  common/src/cubecl_join.rs'
++ nvidia-smi
++ nvidia-smi -q -d POWER,CLOCK
