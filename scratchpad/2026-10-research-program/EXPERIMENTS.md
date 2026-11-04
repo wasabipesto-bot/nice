@@ -5,6 +5,30 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T1 Demoux telemetry on the merged stack (2026-11-04, director; data.nicenumbers.net PostgREST, read-only; raw JSON in `TELEMETRY/`)
+
+demoux (RX 9070 XT, RADV GFX1201, wgpu<spirv>; Ryzen 5 5600X, threads 4, 2 fields in flight) has run
+build 6f060a9 (3.4.8-dev = main with #235–#240) since 2026-11-03 10:47 -05:00; 1,842 b60 1e16
+fields with survivors by 00:47 -05:00 on 11-04, 0 disqualified, 0 numbers found. Per-field
+processing time (median, telemetry `processing_secs`; rate = 1e16 / proc):
+| build | n | proc s | elapsed s | numbers/s |
+|---|---|---|---|---|
+| 3.4.7-dev 8c088a2 (10-30) | 153 | 29.8 | 85.6 | 3.36e14 |
+| 3.4.7-dev 18cba8b (10-30) | 107 | 31.3 | 88.7 | 3.19e14 |
+| 3.4.8-dev 9bde4a8 (11-03, pre-stack main) | 97 | 32.2 | 92.7 | 3.10e14 |
+| **3.4.8-dev 6f060a9 (the stack)** | 1842 | **14.2** | **39.6** | **7.05e14** |
+**×2.27 per field on AMD** vs the pre-stack main (×2.1–2.3 vs the October builds), above the 3080's
+×1.80 at b60 1e16 (L36.1). Zero-work submissions: 160 of 1,000 recent (and 61 of 700 earlier)
+come in bursts of ~50 within two seconds (13:47, 22:15, 23:32, 00:33) with `launches 0`,
+`survivors 0`, `slots 16`, processing ~0.1 s. **Explained, not a defect:** 149/160 have a repeated
+digit in the field's own certificate (common leading digits of start^k and (end−1)^k, k = 2, 3;
+0/840 normal fields do); the other 11 are eliminated range by range — the per-range certificate
+leaves 0–2 of their 7,200 sub-ranges live (a normal field: 5,209), and the client's deeper MSD
+interval analysis takes the rest (one of them launched 225 times and found nothing). The same
+bursts appear on mayalaran (5/288), the fleet's 3.4.7 (3060 5/347, 4060 55/365) and demoux's 10-30
+build (80/233): they are consecutive impossible fields, pre-existing behaviour. The fields'
+`canon_submission_id` is None for new fields of both kinds (set later by the server).
+
 ## L36.1 The five open PRs on one tree vs main, and the profile after them (2026-11-03, agent; `L36/RESULTS.md`, `L36/raw/`; branch `exp/join-all5` 6ddab24 = exp/join-all3 + #240 c7ef3c8 + #239 775b6d9, CHANGELOG-only conflicts, cubecl_join.rs auto-merged = union of the two diffs)
 
 RTX 3080 on machine m137673 **capped at 150 W** (not the 180 W of L29–L35: absolute seconds

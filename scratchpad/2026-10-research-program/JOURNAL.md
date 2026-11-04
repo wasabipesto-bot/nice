@@ -4,6 +4,21 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-04 (day 8; routine fired 04:41 UTC)
+
+- **Reconcile:** no research instances; November research $5.40 (fleet $5.99); credit $49.96;
+  ivory 15 GB free (80 %). All five join PRs merged yesterday; main = 6f060a9 (= `exp/join-all5`);
+  no program PRs open; only the user's telemetry note since the report. Worktree `rp-prune` (7 d)
+  removed.
+- Leads today: **L37** (join kernel breakdown by ablation on main, then H1 walk compaction and H2
+  shuffle LUT; box `l37-shuffle` 3080, instance 59063596, 7 h TTL, hard stop 11:45 UTC) and the
+  **demoux telemetry check** the user invited (read-only via data.nicenumbers.net).
+- **Telemetry check done (T1, 07:30 UTC):** demoux on 6f060a9 = ×2.27 per b60 1e16 field vs the
+  pre-stack main (14.2 s vs 32.2 s processing; 7.05e14 numbers/s), 1,842 fields, 0 disqualified.
+  Bursts of ~50 zero-work submissions per hour looked alarming but are fields eliminated by the
+  field/range certificates (149/160 by the field certificate alone, the rest range by range);
+  same pattern on the fleet, mayalaran and old builds. Not a defect; worth a line in the report.
+
 ## 2026-11-03 (day 7; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; November research $4.99 (fleet $4.20); credit $52.16;
