@@ -448,6 +448,8 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] compact: u32,
+        #[comptime] pd: u32,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -739,6 +741,151 @@ mod kernels {
                         // barrier, which drops the YIELD ptxas otherwise puts in
                         // the loop and lets it keep fewer registers: another
                         // 2-11%.
+                        if comptime!(compact == 1) {
+                            // Experimental (L37, `NICE_EXP_JOIN_COMPACT=1`): the
+                            // plane's (lane, bit) pairs compacted before the
+                            // test. Lane l's pairs are items excl[l]..incl[l]
+                            // (a plane prefix sum of the popcounts); in round r
+                            // lane l takes item r·P + l, finds its owner by a
+                            // binary search over the prefix sums, fetches the
+                            // owner's entry by shuffles and selects the owner's
+                            // n-th set bit, so every lane of a round tests a
+                            // pair. The same pairs reach the stage.
+                            #[unroll]
+                            for j in 0..ept {
+                                let x = pm[j as usize] & vv[j as usize];
+                                let cnt = x.count_ones();
+                                let incl = plane_inclusive_sum(cnt);
+                                let excl = incl - cnt;
+                                let total = plane_broadcast(incl, PLANE_DIM - 1u32);
+                                let mut ib = 0u32;
+                                while ib < total {
+                                    let item = ib + UNIT_POS_PLANE;
+                                    // The owner: the lanes whose prefix sum is
+                                    // at most `item`.
+                                    let mut o = 0u32;
+                                    if comptime!(pd > 0) {
+                                        #[unroll]
+                                        for st in 0..comptime!(pd.trailing_zeros()) {
+                                            let v = plane_shuffle(
+                                                incl,
+                                                o + comptime!((pd >> (st + 1)) - 1),
+                                            );
+                                            o = select(v <= item, o + comptime!(pd >> (st + 1)), o);
+                                        }
+                                    } else {
+                                        let mut sp = PLANE_DIM / 2u32;
+                                        while sp > 0u32 {
+                                            let v = plane_shuffle(incl, o + sp - 1u32);
+                                            o = select(v <= item, o + sp, o);
+                                            sp /= 2u32;
+                                        }
+                                    }
+                                    let xo = plane_shuffle(x, o);
+                                    let mut rem = item - plane_shuffle(excl, o);
+                                    // The rem-th set bit of xo.
+                                    let mut bp = 0u32;
+                                    #[unroll]
+                                    for st in 0..5u32 {
+                                        let c = ((xo >> bp) & comptime!((1u32 << (16u32 >> st)) - 1u32))
+                                            .count_ones();
+                                        let skip = rem >= c;
+                                        rem = select(skip, rem - c, rem);
+                                        bp = select(skip, bp + comptime!(16u32 >> st), bp);
+                                    }
+                                    let r0 = plane_shuffle(rr[j as usize], o);
+                                    let aco = plane_shuffle(ac[j as usize], o);
+                                    let pco = plane_shuffle(pc[j as usize], o);
+                                    let mlo_o = plane_shuffle(mlo[j as usize], o);
+                                    let mhi_o = plane_shuffle(mhi[j as usize], o);
+                                    if item < total {
+                                        let jt2 = jc + bp;
+                                        if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
+                                            nand += 1u32;
+                                            if walk_pf(
+                                                aco,
+                                                pco,
+                                                t_dm[jt2 as usize],
+                                                mlo_o,
+                                                mhi_o,
+                                                t_lo[jt2 as usize],
+                                                t_hi[jt2 as usize],
+                                                base,
+                                                k,
+                                                k2,
+                                            ) {
+                                                let at = s_cnt[0].fetch_add(1u32);
+                                                if at < SURV_SH_CAP {
+                                                    s_t[at as usize] = t_id[jt2 as usize];
+                                                    s_r[at as usize] = r0;
+                                                } else {
+                                                    let g = surv_count[0].fetch_add(1u32);
+                                                    if g < surv_cap {
+                                                        surv[(2u32 * g) as usize] =
+                                                            t_id[jt2 as usize];
+                                                        surv[(2u32 * g + 1u32) as usize] = r0;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if walk_sync {
+                                        sync_plane();
+                                    }
+                                    ib += PLANE_DIM;
+                                }
+                            }
+                        } else if comptime!(compact == 2 && ept == 2) {
+                            // Experimental (`NICE_EXP_JOIN_COMPACT=2`): one walk
+                            // over both entry slots' bits, so a round tests one
+                            // of the lane's pairs while any is left (rounds =
+                            // the plane's max of the two popcounts' sum, not
+                            // the sum of the two maxima).
+                            let mut x0 = pm[0] & vv[0];
+                            let mut x1 = pm[1] & vv[1];
+                            while plane_any((x0 | x1) != 0u32) {
+                                if (x0 | x1) != 0u32 {
+                                    let lo = x0 != 0u32;
+                                    let x = select(lo, x0, x1);
+                                    let jt2 = jc + x.trailing_zeros();
+                                    let xn = x & (x - 1u32);
+                                    x0 = select(lo, xn, x0);
+                                    x1 = select(lo, x1, xn);
+                                    let r0 = select(lo, rr[0], rr[1]);
+                                    if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
+                                        nand += 1u32;
+                                        if walk_pf(
+                                            select(lo, ac[0], ac[1]),
+                                            select(lo, pc[0], pc[1]),
+                                            t_dm[jt2 as usize],
+                                            select(lo, mlo[0], mlo[1]),
+                                            select(lo, mhi[0], mhi[1]),
+                                            t_lo[jt2 as usize],
+                                            t_hi[jt2 as usize],
+                                            base,
+                                            k,
+                                            k2,
+                                        ) {
+                                            let at = s_cnt[0].fetch_add(1u32);
+                                            if at < SURV_SH_CAP {
+                                                s_t[at as usize] = t_id[jt2 as usize];
+                                                s_r[at as usize] = r0;
+                                            } else {
+                                                let g = surv_count[0].fetch_add(1u32);
+                                                if g < surv_cap {
+                                                    surv[(2u32 * g) as usize] =
+                                                        t_id[jt2 as usize];
+                                                    surv[(2u32 * g + 1u32) as usize] = r0;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if walk_sync {
+                                    sync_plane();
+                                }
+                            }
+                        } else {
                         #[unroll]
                         for j in 0..ept {
                             let mut x = pm[j as usize] & vv[j as usize];
@@ -779,6 +926,7 @@ mod kernels {
                                     sync_plane();
                                 }
                             }
+                        }
                         }
                         // Write the stage out once it is half full, after
                         // every chunk of 32 tops. A chunk that adds more than
@@ -2847,6 +2995,12 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
+    /// Experimental (L37): the join kernel's walk compaction
+    /// (`NICE_EXP_JOIN_COMPACT`: 0 off, 1 the plane's pairs compacted across
+    /// lanes, 2 one walk over both entry slots), and the plane size the
+    /// kernel may assume (32 on CUDA; 0 = read `PLANE_DIM`).
+    compact: u32,
+    pd: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -3040,6 +3194,15 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
+            compact: std::env::var("NICE_EXP_JOIN_COMPACT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            pd: if R::name(client).contains("cuda") {
+                32
+            } else {
+                0
+            },
             limbs,
             chunk_digits,
             chunk_div,
@@ -3418,6 +3581,8 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k,
                 self.k2,
                 self.walk_sync,
+                self.compact,
+                self.pd,
             );
         }
         unsafe {
