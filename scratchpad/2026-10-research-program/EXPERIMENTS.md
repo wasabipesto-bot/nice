@@ -5,6 +5,46 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L37.1 Join kernel breakdown on main 6f060a9 by ablation (2026-11-04, agent; `L37/RESULTS.md` §1, `L37/raw/`; branch `exp/join-l37-ablate` 64f986c, switches `NICE_EXP_JOIN_ABL`, `NICE_EXP_JOIN_TMIN`)
+
+RTX 3080 at 150 W, each mode a separate profiled kernel, 3 interleaved rounds; each part = the
+extra cost of adding it to the previous mode. b62 1e17 (129.7 s field, join 72.4 s), b60 1e16 in
+brackets (15.2 of 25.7 s):
+| part | s/field | % of join | % of field |
+|---|---|---|---|
+| base: top batch gather into shared, entry loads + prefilter terms, transposed copy, per-chunk checks | 29.7 (5.7) | 41.0 (37.9) | 22.9 (22.4) |
+| AND (transposed digit ORs) | 3.7 (0.7) | 5.1 (4.4) | 2.8 (2.6) |
+| walk (rounds, bit pops, residue test) | 11.3 (2.3) | 15.6 (15.5) | 8.7 (9.1) |
+| prefilter `walk_pf` | 24.2 (5.7) | 33.4 (37.6) | 18.6 (22.2) |
+| stage + flush | 3.6 (0.7) | 4.9 (4.7) | 2.7 (2.7) |
+**The AND is 5 % of the join (0–2 % clock-corrected); survivor handling is 54 % of the join = 30 %
+of the field.** Walk lane utilisation 24.8 % (b60 23.5 %): 1.28e11 plane-rounds per field, 3.36 per
+(plane, slot, chunk) (4.45 at b60); 0.84 pass bits per lane-chunk (1.29 per lane with an entry);
+`walk_pf` ≈ 52 SASS instructions ≈ 16 SM-cycles per round. **The residue test never rejects in
+production** (pass bits = in-range survivors to within 4 of 1.02e12). #239 on main: per-top AND
+back = +12.5 s of join → #239 is ×1.095 on the field (×1.072 b60). **Inside the base: gathering
+each batch's tops into shared is 18.6 s = 26 % of the join = 14 % of the field; `tl` 0.35 s, `top_m`
+2.5 s, `top_r` + `top_x` 15.7 s** (random 2-word reads from separate arrays: 3–4 sectors per top,
+7.6e10 top loads per field). Entry loads + prefilter terms 10.5 s (14 %); transposed copy, barriers,
+work items, atomics ~1 s; stage-check cadence (4 vs 8 chunks) no reliable difference.
+
+## L37.2 H1 walk compaction and H2 shuffle register LUT: exact, slower, killed (2026-11-04, agent; `L37/RESULTS.md` §2–3; branches `exp/join-walk-compact` 77241bc (`NICE_EXP_JOIN_COMPACT`), `exp/join-shfl-lut` 449f793 (`NICE_EXP_JOIN_SHFL`))
+
+H1 (`COMPACT=1`, warp prefix sums + shuffles, every lane tests a survivor): b62 1e17 ×0.940, b62
+1e16 ×0.937, b60 ×0.962, b64 ×0.912, NiceMark ×0.923 (MSD-strong ×0.834); 48 registers + 32 B
+spills, SASS 1480 vs 1088. Exact on the full list (CPU reference incl. b50/b54, dense, b42, 1e14
+COMPARE, every A/B field; lavapipe naga + SPIR-V with 8-lane subgroups; lint 0; wgpu supports the
+shuffles). Why: at this density compaction only cuts a plane-slot from ~4.1 rounds to ~1.9; the
+round body is 172 SASS vs 110 with 12 shuffles; ~50 instructions of CubeCL prefix-sum loop per
+slot-chunk even with no bits; ×1.01–1.08 in SM cycles but 70–135 MHz lower clock at 150 W → loses
+in wall time. **`COMPACT=2`** (one walk per lane over both entry slots, no shuffles, 45 registers):
+exact; b62 1e17 ×1.015, b62 1e16 ×1.014, b60 ×1.026, b64 ×1.012, NiceMark ×1.017 (b60 MSD-weak
+×0.982), 1e14 ×0.99–1.02 → real, under the bar, parked. H2 (register LUT, one shuffle per digit):
+b62 1e17 ×0.953, b60 ×0.969, b62 1e16 ×0.976; AND-only ablation ×0.909–0.919; 47 registers; same
+or higher clock; exact. Why: shuffles use the same pipeline as the shared loads at the same rate,
+the two plane-wide loops run more rounds than the per-lane loop, and the AND was 5 % of the join.
+**Next brief (L38): one 32-byte record per top** (est. 12–16 s per b62 1e17 field, 9–12 %).
+
 ## T1 Demoux telemetry on the merged stack (2026-11-04, director; data.nicenumbers.net PostgREST, read-only; raw JSON in `TELEMETRY/`)
 
 demoux (RX 9070 XT, RADV GFX1201, wgpu<spirv>; Ryzen 5 5600X, threads 4, 2 fields in flight) has run

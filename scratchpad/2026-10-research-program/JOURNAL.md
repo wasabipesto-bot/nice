@@ -18,6 +18,15 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   Bursts of ~50 zero-work submissions per hour looked alarming but are fields eliminated by the
   field/range certificates (149/160 by the field certificate alone, the rest range by range);
   same pattern on the fleet, mayalaran and old builds. Not a defect; worth a line in the report.
+- **L37 done (08:50 UTC):** both prototypes exact but slower (H1 ×0.94, H2 ×0.95) → killed;
+  `COMPACT=2` ×1.015–1.026 parked. The breakdown is the result: the AND is 5 % of the join after
+  #239 (so the shared-load story was wrong about what remained), survivor handling is 54 % (the
+  prefilter alone 33 %), and **gathering each batch's tops into shared memory is 26 % of the join,
+  15.7 s of 18.6 s on the two separate `top_r`/`top_x` arrays** — random 2-word reads touching
+  3–4 sectors per top. Box l37-shuffle destroyed (3.40 h).
+- **L38 launched (09:10 UTC):** one 32-byte record per top (same bytes, one sector per load);
+  estimate 9–12 % at b62 1e17; agent on box `l38-toprec` (3080, instance 59082237, 6 h TTL, hard
+  stop 13:30 UTC); PR branch `pr/join-top-record` prepared if ≥ 5 %, PR opened by the director.
 
 ## 2026-11-03 (day 7; routine fired 04:41 UTC)
 
