@@ -461,7 +461,8 @@ mod kernels {
         // stage spills to the list); 9 = 4 without the transposed copy;
         // 10 = 9 without the entry loads (every slot empty); 11 = 10 without
         // the waves (work items and top batches only); 12 = 11 without the top
-        // loads (work items, barriers and the cube's atomics only).
+        // loads (work items, barriers and the cube's atomics only); 13 / 14 =
+        // 11 gathering only `top_m` / reading only `tl`.
         // `tmin` replaces TRANSPOSE_MIN (`NICE_EXP_JOIN_TMIN`).
         let mut ck = 0u32;
         let mut npf: u32 = 0u32;
@@ -547,7 +548,23 @@ mod kernels {
                 if comptime!(abl == 12) {
                     nt_load = 0u32;
                 }
-                if UNIT_POS_X < nt_load {
+                if comptime!(abl == 13 || abl == 14) {
+                    // Mode 13 gathers only `top_m`, 14 only reads `tl`.
+                    if UNIT_POS_X < nt_load {
+                        let t = tl[(tc + UNIT_POS_X) as usize];
+                        if comptime!(abl == 13) {
+                            t_lo[UNIT_POS_X as usize] = top_m[(2u32 * t) as usize];
+                            t_hi[UNIT_POS_X as usize] = top_m[(2u32 * t + 1u32) as usize];
+                        } else {
+                            t_lo[UNIT_POS_X as usize] = t;
+                            t_hi[UNIT_POS_X as usize] = t;
+                        }
+                        t_rlo[UNIT_POS_X as usize] = t;
+                        t_rhi[UNIT_POS_X as usize] = t;
+                        t_id[UNIT_POS_X as usize] = t;
+                        t_dm[UNIT_POS_X as usize] = t;
+                    }
+                } else if UNIT_POS_X < nt_load {
                     let t = tl[(tc + UNIT_POS_X) as usize];
                     t_lo[UNIT_POS_X as usize] = top_m[(2u32 * t) as usize];
                     t_hi[UNIT_POS_X as usize] = top_m[(2u32 * t + 1u32) as usize];
@@ -560,7 +577,7 @@ mod kernels {
                 }
                 sync_cube();
                 // Modes 9-11 skip the transposed copy.
-                let tmin_copy = comptime!(if abl >= 9 && abl <= 12 { 0xFFFF_FFFFu32 } else { tmin });
+                let tmin_copy = comptime!(if abl >= 9 && abl <= 14 { 0xFFFF_FFFFu32 } else { tmin });
                 if nt >= tmin_copy {
                     // Thread u writes chunk u / 32's words for digits u % 32
                     // and u % 32 + 32, over the chunk's 32 tops unrolled (the
@@ -594,7 +611,7 @@ mod kernels {
                 let mut ws = 0u32;
                 // Mode 11 runs no waves, mode 10 loads no entries.
                 let mut ne_w = ne;
-                if comptime!(abl == 11 || abl == 12) {
+                if comptime!(abl >= 11 && abl <= 14) {
                     ne_w = 0u32;
                 }
                 let mut ne_e = ne;
