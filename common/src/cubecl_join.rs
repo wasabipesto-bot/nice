@@ -450,6 +450,7 @@ mod kernels {
         #[comptime] walk_sync: bool,
         #[comptime] abl: u32,
         #[comptime] tmin: u32,
+        #[comptime] shfl: bool,
     ) {
         // Experimental ablation (L37, `NICE_EXP_JOIN_ABL`): 0 full; 1 AND only
         // (the walk sees nothing; `and_count` gets the AND's pass bits);
@@ -695,6 +696,51 @@ mod kernels {
                                     acc[i as usize] = 0u32;
                                 }
                                 let ab = cb * 64u32;
+                                if comptime!(shfl) {
+                                    // Experimental (L37 H2, `NICE_EXP_JOIN_SHFL=1`,
+                                    // 32-lane planes only): lane l holds the
+                                    // group's words of digits l and 32 + l
+                                    // (conflict-free loads), and an entry's digit
+                                    // d reads them by a shuffle from lane d % 32:
+                                    // one loop over its low digits, one over its
+                                    // high digits, every lane in each round.
+                                    let mut rlo = Array::<u32>::new(ag as usize);
+                                    let mut rhi = Array::<u32>::new(ag as usize);
+                                    #[unroll]
+                                    for c in 0..ag {
+                                        rlo[c as usize] =
+                                            t_tr[(ab + comptime!(c * 64) + UNIT_POS_PLANE) as usize];
+                                        rhi[c as usize] = t_tr
+                                            [(ab + comptime!(c * 64 + 32) + UNIT_POS_PLANE) as usize];
+                                    }
+                                    #[unroll]
+                                    for j in 0..ept {
+                                        let mut x = mlo[j as usize] & vv[j as usize];
+                                        while plane_any(x != 0u32) {
+                                            let has = x != 0u32;
+                                            let d = select(has, x.find_first_set() - 1u32, 0u32);
+                                            x &= x - 1u32;
+                                            #[unroll]
+                                            for c in 0..ag {
+                                                let w = plane_shuffle(rlo[c as usize], d);
+                                                acc[comptime!(c * ept + j) as usize] |=
+                                                    select(has, w, 0u32);
+                                            }
+                                        }
+                                        let mut y = mhi[j as usize] & vv[j as usize];
+                                        while plane_any(y != 0u32) {
+                                            let has = y != 0u32;
+                                            let d = select(has, y.find_first_set() - 1u32, 0u32);
+                                            y &= y - 1u32;
+                                            #[unroll]
+                                            for c in 0..ag {
+                                                let w = plane_shuffle(rhi[c as usize], d);
+                                                acc[comptime!(c * ept + j) as usize] |=
+                                                    select(has, w, 0u32);
+                                            }
+                                        }
+                                    }
+                                } else {
                                 #[unroll]
                                 for j in 0..ept {
                                     // The entry's digits, low word first; an
@@ -717,6 +763,7 @@ mod kernels {
                                                 t_tr[(a + comptime!(c * 64)) as usize];
                                         }
                                     }
+                                }
                                 }
                             }
                             // Pass: no digit of the entry in the top, and a
@@ -2991,6 +3038,10 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// (`NICE_EXP_JOIN_TMIN`, default [`TRANSPOSE_MIN`]).
     abl: u32,
     tmin: u32,
+    /// Experimental (L37 H2): the transposed AND reads the table by plane
+    /// shuffles from registers (`NICE_EXP_JOIN_SHFL=1`; CUDA's 32-lane
+    /// planes only).
+    shfl: bool,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -3211,6 +3262,8 @@ impl<R: Runtime> JoinDevice<R> {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(TRANSPOSE_MIN),
+            shfl: std::env::var("NICE_EXP_JOIN_SHFL").is_ok_and(|v| v == "1")
+                && R::name(client).contains("cuda"),
             limbs,
             chunk_digits,
             chunk_div,
@@ -3666,6 +3719,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.walk_sync,
                 self.abl,
                 self.tmin,
+                self.shfl,
             );
             if let Some(t) = pt {
                 pt = Some(self.prof_mark(t, |p, s| p.join_secs += s)?);
