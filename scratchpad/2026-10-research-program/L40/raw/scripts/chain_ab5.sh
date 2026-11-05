@@ -1,0 +1,41 @@
+#!/bin/bash
+# chain_ab2.sh W (logs ab5_*, nm5_*): the A/B of the base (M = af21136) against W, interleaved, nothing else on the box (waits for ab_go):
+# Order here: the 1e14 set, NiceMark, then the fields. 3 rounds of b62 1e17 (1 field), b62/b60/b64 1e16 (2 fields each), the order alternating per round (M W, W M, M W);
+# 3 rounds of the 1e14 set (b57/b60/b62/b64, 3 fields each); NiceMark nice-only (150 s, 2 rounds, client_M / client_W).
+R=/root/l40/run.sh; L=/root/l40/logs; BIN=/root/l40/bin; W=$1
+until [ -e $L/ab5_go ]; do sleep 10; done
+echo AB_START $(date -u +%T)
+for r in 1 2 3; do
+  if [ $r = 2 ]; then O="$W M"; else O="M $W"; fi
+  for b in 57 60 62 64; do
+    for t in $O; do SRCD=$t $R ab5_${t}_e14_b${b}_r$r $t $b 3 1e14; done
+  done
+done
+echo AB_E14_DONE $(date -u +%T)
+(
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-} NICE_API_BASE=http://127.0.0.1:9 NICE_BUILD_SHA=test
+cd /root/l40
+for r in 1 2; do
+  if [ $r = 2 ]; then O="$W M"; else O="M $W"; fi
+  for t in $O; do
+    ( while true; do nvidia-smi --query-gpu=timestamp,clocks.sm,clocks.mem,power.draw,power.limit,temperature.gpu,utilization.gpu,clocks_throttle_reasons.active --format=csv,noheader; sleep 5; done ) > $L/nm5_${t}_r$r.smi 2>&1 &
+    SMI=$!
+    echo "START nm5_${t}_r$r $(date -u +%T) bin=client_$t md5=$(md5sum $BIN/client_$t | cut -c1-8)" > $L/nm5_${t}_r$r.err
+    $BIN/client_$t niceonly --gpu --benchmark --benchmark-secs 150 --benchmark-json < /dev/null > $L/nm5_${t}_r$r.json 2>> $L/nm5_${t}_r$r.err
+    echo "END nm5_${t}_r$r $(date -u +%T) rc=$?" >> $L/nm5_${t}_r$r.err
+    kill $SMI
+  done
+done
+)
+echo AB_NM_DONE $(date -u +%T)
+for r in 1 2 3; do
+  if [ $r = 2 ]; then O="$W M"; else O="M $W"; fi
+  for t in $O; do SRCD=$t $R ab5_${t}_e17_b62_r$r $t 62 1 1e17; done
+  for f in "62 e16_b62" "60 e16_b60" "64 e16_b64"; do
+    set -- $f
+    for t in $O; do SRCD=$t $R ab5_${t}_$2_r$r $t $1 2 1e16; done
+  done
+  echo AB_ROUND $r $(date -u +%T)
+done
+echo AB_FIELDS_DONE $(date -u +%T)
+echo AB_DONE $(date -u +%T) > $L/ab5.done

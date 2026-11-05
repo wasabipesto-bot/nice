@@ -5,6 +5,29 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L40.1 Group walk over the AND group's 8 pass words: ×1.056 at b62 1e17 but b58 MSD-strong ×0.963 → parked (2026-11-05, agent; `L40/RESULTS.md`, `L40/raw/`; branch `pr/join-group-walk` f8a27cc = one commit on af21136 (#241) with a `#NNN` CHANGELOG line; variants `exp/join-group-walk-{p1,linear,f,h,h2,f2}`, counters `exp/join-rounds-base`, `exp/join-group-walk-rounds`)
+
+Head kernel = H2 (first word picked before the walk). RTX 3080 at 150 W, 3 interleaved rounds vs
+af21136: **b62 1e17 ×1.056** (1.058/1.054/1.058; clock-normalised ×1.120), b62 1e16 ×1.065
+(×1.081), **b60 1e16 ×1.074** (×1.104), b64 ×1.050 (×1.059); **1e14 b57/60/62/64 ×0.955/0.970/
+0.969/0.963**; NiceMark (6 rounds) ×1.030: MSD-weak b58 ×1.062, b60 ×1.045, b62 ×1.051, **MSD-strong
+×0.963** → fails "no scenario < ×0.98". The PR side runs 40–60 MHz lower at the cap (more ALU work),
+hence the higher clock-normalised ratios. Counters: rounds per group 23.97 → 15.48 (×0.65) at b62
+1e17, 32.7 → 19–20 (×0.61) at b60; lane utilisation 24.9 → 38.5 % (23.5 → 38.5 %); less than the
+predicted half because lanes are uneven (a plane runs 2.4× a lane's mean bits; Poisson would give
+1.9×). Round body 139 SASS vs 110 (19 = the word pick, only when a lane needs a new word). The
+residue test stays (clipped tops' ranges are invisible to the AND; it rejects a few pairs per field
+at the edges). **Small batches (< 192 tops) save no rounds** (plane-rounds identical to the base at
+b57/b62 1e14), so the extra body cost is pure loss there; variants: P (group walk everywhere) MSD-
+strong ×0.959; F (base walk for small batches) 40 regs + 20 B spills, ×0.935; H (one chunk per pass)
+×0.975 screen; H2 ×0.991 screen / ×0.963 A/B; F2 (L37's mode-2 loop for small batches) ×1.020
+screen / ×0.964 over 6 A/B rounds, spills. MSD-strong swings ±4 % between sessions on one binary →
+only A/B rounds count. Exact everywhere (parity incl. b50/b54, #240's device test, certificate test,
+dense, b42, 1e14 COMPARE; lavapipe naga + SPIR-V 7 tests, no overflow; lint 16/0; fmt/clippy ×3;
+P and F2 too). Registers 46–47, no spills (base 40); 5 cubes/SM (shared-bound). **Parked:** next
+try = a higher gate for the group walk with MSD-strong measured over ≥ 6 rounds from the start, and
+a SASS look at the work-item/wave code rather than the walk. Box 4.6 h.
+
 ## L39.1 One record per bottom entry: neutral, closed (2026-11-05, agent; `L39/RESULTS.md`, `L39/raw/`; branches on af21136: `pr/join-bottom-record` 08c9d90 (= F), `exp/join-bottom-record-r8` 746a1fc (E), `exp/join-bottom-record-r4` 72d1b85 (F), `exp/join-entry-sectors` c27c3ce (sector-count test))
 
 E = 32-byte record per (slot, entry) with mask, q0, q1, r0 (+3 pad; `bp_r` leaves the join; +16 B

@@ -23,3 +23,9 @@ for f in exact:
         print(f'| {f} | {name} | {R:.4e} | {C:.4e} | {G:.4e} | {R / C:.2f} | {R / G:.2f} | {32 * R:.4e} | {exact[f]:.4e} | {100 * exact[f] / (32 * R):.1f} % |')
     a, b = rows[('MR', f)][1], rows[('GR', f)][1]
     if a and b: print(f'| {f} | group / base | ×{b / a:.3f} rounds | | | | | | | |')
+    import os
+    q = f'{D}/ctr_QR_m1_{f}.log'
+    if os.path.exists(q):
+        R = surv(q); C, G = rows[('MR', f)][2], rows[('MR', f)][3]
+        print(f'| {f} | the PR (QR; chunks and groups = the base\'s) | {R:.4e} | {C:.4e} | {G:.4e} | {R / C:.2f} | {R / G:.2f} | {32 * R:.4e} | {exact[f]:.4e} | {100 * exact[f] / (32 * R):.1f} % |')
+        print(f'| {f} | PR / base | ×{R / a:.3f} rounds | | | | | | | |')

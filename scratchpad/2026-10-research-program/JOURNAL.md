@@ -17,6 +17,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **L39 closed (07:20 UTC, L39.1):** neutral (×0.997 b62 1e17, ×1.006 b60) despite sectors per
   entry 2.5 → 1.0; the entry gather is latency-hidden, not sector-bound — L37's 10.5 s was a
   stripped-kernel artefact (lesson recorded). Exact. Box l39-botrec destroyed (2.0 h).
+- **L40 parked (10:40 UTC, L40.1):** ×1.056 b62 1e17 / ×1.074 b60 (×1.10–1.12 clock-normalised),
+  NiceMark ×1.030, exact, rounds per group ×0.65, lane utilisation 25 → 38 % — but b58 MSD-strong
+  ×0.963 and 1e14 −3–4.5 % (small batches save nothing and pay the bigger body; every gating
+  variant spilled or stayed < ×0.98). Branch `pr/join-group-walk` f8a27cc kept; question to the
+  user whether a production-weighted ×1.06–1.07 with that small-bucket cost is acceptable. Box
+  l40-groupwalk destroyed (4.6 h).
 
 ## 2026-11-04 (day 8; routine fired 04:41 UTC)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""add_rounds.py IN OUT {M|G}: add the test-only walk counter NICE_EXP_JOIN_ROUNDS to a join kernel source.
+"""add_rounds.py IN OUT {M|G|Q}: add the test-only walk counter NICE_EXP_JOIN_ROUNDS to a join kernel source.
 0 off (the kernel as is); 1: and_count = plane-rounds of the walk (lane 0 of each plane adds 1 per round);
 2: plane-chunks (32-top chunks of a batch the plane visits); 3: plane-groups (AND groups of 4 chunks)."""
 import sys
@@ -69,6 +69,36 @@ if kind == 'M':
                                         if comptime!(rounds == 0) {
                                             nand += 1u32;
                                         }""")
+elif kind == 'Q':
+    # the final form (the group walk for every batch, words formed per branch): modes 2/3 at the walk's comment
+    rep("""                        // Each lane walks the group's set bits as one set,
+""", """                        if comptime!(rounds == 2) {
+                            if %s {
+                                let nc = (nt - jc + 31u32) / 32u32;
+                                let gc = select(nt >= TRANSPOSE_MIN, comptime!(AND_GROUP), 1u32);
+                                nand += select(nc > gc, gc, nc);
+                            }
+                        }
+                        if comptime!(rounds == 3) {
+                            if %s && (jc / 32u32) %% comptime!(AND_GROUP) == 0u32 {
+                                nand += 1u32;
+                            }
+                        }
+                        // Each lane walks the group's set bits as one set,
+""" % (lane0, lane0))
+    rep("""                        while plane_any((x | nm) != 0u32) {
+                            if (x | nm) != 0u32 {""", """                        while plane_any((x | nm) != 0u32) {
+                            if comptime!(rounds == 1) {
+                                if %s {
+                                    nand += 1u32;
+                                }
+                            }
+                            if (x | nm) != 0u32 {""" % lane0)
+    rep("""                                if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
+                                    nand += 1u32;""", """                                if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
+                                    if comptime!(rounds == 0) {
+                                        nand += 1u32;
+                                    }""")
 else:
     rep("""                        let mut nm = 0u32;
                         #[unroll]
