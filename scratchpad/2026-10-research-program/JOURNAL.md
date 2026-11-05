@@ -27,6 +27,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   Vast budget unchanged). New posture **heavy+**: ~8 h director time, ≤20 subagents, three leads
   a day (two GPU prototypes + one scoping/review/analysis), a reviewer agent on every PR branch,
   A/B ≥ 3 rounds and NiceMark ≥ 4. PROPOSAL §4, README, ROUTINE.md and the trigger prompt updated.
+- **Evening (16:10 UTC), first use of the extra effort, no GPU:** three agents — an independent
+  review of PR #241's diff and body (→ `L38/REVIEW.md`), L41 scoping of the prefilter arithmetic
+  and the per-wave base from SASS (`L41/BRIEF.md` → `L41/SCOPING.md`; tomorrow's prototype
+  plan), and literature sweep 4 with widened terms (`L7/2026-11-05.md`).
 
 ## 2026-11-04 (day 8; routine fired 04:41 UTC)
 
