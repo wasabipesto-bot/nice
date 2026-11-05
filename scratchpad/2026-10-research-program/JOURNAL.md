@@ -52,6 +52,7 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   prototype**, with host exhaustive tests of the fixed-point step before any timing, a codegen
   gate, and ≥ 6 NiceMark rounds. Caveats: SASS from L40's M kernel (L37's tarball was already
   unpacked); plane-wave counts estimated from L39's entry-load count.
+- 17:22 UTC: **#241 CI fully green at 7832f89** (25 pass, 3 skipped); no comments.
 - Evening agents: 3 (2 Opus, 1 Sonnet); day total 5. Director time ~6.5 h.
 
 ## 2026-11-04 (day 8; routine fired 04:41 UTC)
