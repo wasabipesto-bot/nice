@@ -23,6 +23,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   variant spilled or stayed < ×0.98). Branch `pr/join-group-walk` f8a27cc kept; question to the
   user whether a production-weighted ×1.06–1.07 with that small-bucket cost is acceptable. Box
   l40-groupwalk destroyed (4.6 h).
+- **11:00 UTC, user: "update your effort targets to utilize 50–75 % more tokens"** (split up to me;
+  Vast budget unchanged). New posture **heavy+**: ~8 h director time, ≤20 subagents, three leads
+  a day (two GPU prototypes + one scoping/review/analysis), a reviewer agent on every PR branch,
+  A/B ≥ 3 rounds and NiceMark ≥ 4. PROPOSAL §4, README, ROUTINE.md and the trigger prompt updated.
 
 ## 2026-11-04 (day 8; routine fired 04:41 UTC)
 

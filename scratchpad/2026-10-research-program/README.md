@@ -18,7 +18,7 @@ director session can be replaced from it at any time.
 1. `python3 vast.py reconcile`; `gh pr list --repo wasabipesto/nice`; read the user's
    replies since the last report.
 2. Read the last two journal entries and the ledger; pick at most two active leads.
-3. Execute under the posture (heavy: ~5 h director time, ≤12 subagents on Opus/Sonnet,
+3. Execute under the posture (heavy+ since 2026-11-05: ~8 h director time, ≤20 subagents on Opus/Sonnet, three leads a day, a reviewer agent on every PR branch;
    no nested agents). Vast only via `vast.py create`. CPU work on ivory under
    `nice -n 19`; `df -h /` first (ivory has filled before; `/tmp` is a 3.8 GB tmpfs).
    Code in worktrees under `.worktrees/`; beware shared target-dir collisions between

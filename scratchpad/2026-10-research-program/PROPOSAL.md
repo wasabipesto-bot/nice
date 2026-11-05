@@ -93,6 +93,7 @@ never open-ended. You choose the size:
 | light | ~1 h | ≤3 | monitoring + one small experiment |
 | medium (recommended) | ~2–3 h | ≤6 | one lead advanced per day, one in the background |
 | heavy | ~5 h | ≤12 | two leads a day, literature sweeps weekly |
+| **heavy+ (current since 2026-11-05)** | ~8 h | ≤20 | three leads a day (two GPU prototypes + one scoping/review), an independent reviewer agent on every PR branch, A/B ≥ 3 rounds and NiceMark ≥ 4 rounds, literature sweeps weekly; Vast unchanged at $30/month |
 
 I cannot see your plan's limits, so I propose medium and will report the day's agent
 count each day so you can resize.
