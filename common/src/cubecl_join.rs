@@ -5917,6 +5917,143 @@ mod tests {
         check_top_fd(&client, &name, true);
     }
 
+    /// Experiment (not for main): the join's entry loads as 32-byte sectors.
+    /// For production fields (`NICE_TEST_ENTRY_SECTORS` = "b:start:size,..."),
+    /// a few batches of the first slice's live partitions are launched, and
+    /// every (slot, bucket) list is read back. Each warp of the join's wave
+    /// loads 32 consecutive list positions, once per batch of 256 of the
+    /// bucket's tops; per such warp load, count the distinct sectors that
+    /// `bp_r` (4 bytes per entry), `ext_m` and `ext_q` (8 each, at
+    /// slot·nbp + e) would touch, and the same for one 32-byte record per
+    /// entry (every lane its own sector) and a 16-byte record beside `bp_r`.
+    #[test]
+    #[cfg(feature = "cubecl-cuda")]
+    #[ignore = "requires an NVIDIA device; prints sector counts"]
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::too_many_lines
+    )]
+    fn cubecl_cuda_entry_sectors() {
+        use std::collections::HashSet;
+        let Ok(spec) = std::env::var("NICE_TEST_ENTRY_SECTORS") else {
+            eprintln!("skipping: set NICE_TEST_ENTRY_SECTORS=b:start:size,...");
+            return;
+        };
+        let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
+        let name = ctx.device_name();
+        let CubeclContext::Cuda { client, .. } = ctx else {
+            unreachable!("new_cuda is CUDA")
+        };
+        let lim = device_limits(&client, &name);
+        for one in spec.split(',').filter(|x| !x.trim().is_empty()) {
+            let f: Vec<&str> = one.trim().split(':').collect();
+            let b: u32 = f[0].parse().expect("base");
+            let start: u128 = f[1].parse().expect("start");
+            let size = f[2].parse::<f64>().expect("size") as u128;
+            let range = FieldSize::new(start, start + size);
+            let field = crate::join_plan::plan_join(b, &range, lim).expect("a join field");
+            let fs = &field.fs;
+            let mut dev = JoinDevice::new(&client, fs, &field.plan).expect("device");
+            let ms = dev.max_slots;
+            let live = live_partitions(fs);
+            let chunks: Vec<Vec<u32>> = live.chunks(ms).map(<[u32]>::to_vec).collect();
+            let picks: Vec<usize> = [0, 1, 2, chunks.len() / 2, chunks.len() - 1]
+                .into_iter()
+                .filter(|&i| i < chunks.len())
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
+            let nbp = dev.nbp as usize;
+            let bb = dev.b as usize;
+            let m1 = bb - 1;
+            let nkeys = dev.nkeys as usize;
+            let nb = dev.nb as usize;
+            let seg = dev.read_u32(&dev.seg).expect("seg");
+            // Weighted by top batches: warp loads, lanes, and sectors per layout
+            // (bp_r, ext_m, ext_q; 32-byte record; 16-byte record; lists).
+            let (mut loads, mut lanes) = (0u64, 0u64);
+            let (mut s_bp, mut s_m, mut s_r32, mut s_r16, mut s_l) = (0u64, 0u64, 0u64, 0u64, 0u64);
+            let (mut listed, mut class_len, mut asc, mut pairs, mut span) = (0u64, 0u64, 0u64, 0u64, 0u64);
+            for &ci in &picks {
+                let vs = &chunks[ci];
+                let rec = dev.launch_batch(vs, false).expect("launch");
+                let lists = dev.read_u32(&dev.lists).expect("lists");
+                let counts = dev.read_u32(&dev.counts).expect("counts");
+                let work = dev.read_u32(&dev.work).expect("work");
+                drop(rec);
+                for s in 0..vs.len() {
+                    for bx in 0..nb {
+                        let wi = s * nb + bx;
+                        let (ts, te) = (work[4 * wi + 2], work[4 * wi + 3]);
+                        let nbat = u64::from((te - ts).div_ceil(TOP_CAP));
+                        let (dkey, cls) = (bx / m1, bx % m1);
+                        let cs = seg[cls] as usize;
+                        let clen = seg[cls + 1] as usize - cs;
+                        let ne = counts[(s * nkeys + dkey) * m1 + cls] as usize;
+                        listed += ne as u64;
+                        class_len += clen as u64;
+                        if nbat == 0 {
+                            continue;
+                        }
+                        let lbase = s * bb * nbp + bb * cs + dkey * clen;
+                        for p in (0..ne).step_by(32) {
+                            let q = (p + 32).min(ne);
+                            let es = &lists[lbase + p..lbase + q];
+                            let g = |sh: u32| -> u64 {
+                                es.iter()
+                                    .map(|&e| (s * nbp + e as usize) >> sh)
+                                    .collect::<HashSet<_>>()
+                                    .len() as u64
+                            };
+                            let bp = es.iter().map(|&e| e >> 3).collect::<HashSet<_>>().len() as u64;
+                            let ls = ((lbase + p)..(lbase + q)).map(|a| a >> 3).collect::<HashSet<_>>().len() as u64;
+                            loads += nbat;
+                            lanes += nbat * es.len() as u64;
+                            s_bp += nbat * bp;
+                            s_m += nbat * g(2);
+                            s_r32 += nbat * es.len() as u64;
+                            s_r16 += nbat * g(1);
+                            s_l += nbat * ls;
+                            for w in es.windows(2) {
+                                pairs += nbat;
+                                if w[1] > w[0] {
+                                    asc += nbat;
+                                }
+                            }
+                            let (lo, hi) = (es.iter().min().unwrap(), es.iter().max().unwrap());
+                            span += nbat * u64::from(hi - lo + 1);
+                        }
+                    }
+                }
+            }
+            let per = |x: u64| x as f64 / lanes as f64;
+            eprintln!(
+                "ENTRY SECTORS b{b} {size:e}: slots={ms} nbp={nbp} batches={} warp_loads={loads} \
+                 lanes/load={:.2} listed/class_len={:.3} ascending_pairs={:.3} span/lane={:.2} \
+                 | sectors per entry: lists={:.3} bp_r={:.3} ext_m={:.3} ext_q={:.3} \
+                 base(bp_r+ext_m+ext_q)={:.3} rec32={:.3} rec16+bp_r={:.3} rec16={:.3} \
+                 | ext bytes per launch: base {} MiB, rec32 {} MiB; bp_r {} KiB",
+                picks.len(),
+                lanes as f64 / loads as f64,
+                listed as f64 / class_len as f64,
+                asc as f64 / pairs as f64,
+                span as f64 / lanes as f64,
+                per(s_l),
+                per(s_bp),
+                per(s_m),
+                per(s_m),
+                per(s_bp + 2 * s_m),
+                per(s_r32),
+                per(s_bp + s_r16),
+                per(s_r16),
+                (ms * nbp * 16) >> 20,
+                (ms * nbp * 32) >> 20,
+                (nbp * 4) >> 10,
+            );
+        }
+    }
+
     /// Device seconds of the two top kernels alone, on the first slice of a
     /// production plan (`NICE_TEST_TOPFD_TIMING` = "b:start:size"): its
     /// first 40 batches of consecutive partitions, and 40 of every other
