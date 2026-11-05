@@ -79,6 +79,10 @@ pub const TOP_CAP: u32 = 256;
 /// their ids, so a top's words are one sector of one array rather than one
 /// from each of three.
 pub const TOP_REC_WORDS: u32 = 8;
+/// Words per extended bottom entry in `ext_rec`, one 16-byte record per
+/// (slot, entry): the entry's digit mask (lo, hi) and the prefilter's two
+/// terms ([`bucket_kernel`]); the residue stays in `bp_r`.
+pub const EXT_REC_WORDS: u32 = 4;
 /// Top batches of at least this many tops get [`join_kernel`]'s transposed
 /// AND; smaller ones test each entry against each top, which is cheaper than
 /// the digit-major copy on a few tops (the fastest of 128, 192 and 256 on
@@ -174,7 +178,7 @@ mod kernels {
 
     /// Step 1+ (v3): extension fused with bucketization. One cube per
     /// (class c, slot): its bpre segment is extended by the slot's partition
-    /// digits (the extended entries are written to `ext_m`/`ext_q`, where the
+    /// digits (the extended entries go to `ext_rec`, one record each, where the
     /// join kernel reads them), and each surviving entry's two
     /// key-position digits are stepped through every key value d incrementally
     /// (+s2, +s3 mod b); the entry's index goes onto the (slot, d, c) list for
@@ -185,7 +189,7 @@ mod kernels {
     /// `slot*b*nbp + b*seg[c] + d*len(c) + i`; counts at `(slot*b + d)*m1 + c`.
     ///
     /// The digit columns run to `k2`, past the entry's `k` digits, for the
-    /// prefilter's terms in `ext_q` (two words per entry; see
+    /// prefilter's terms (words 2 and 3 of the entry's record; see
     /// [`join_kernel`]). With `mid = k2 - k`, `M = b^(mid + 1)` (at most
     /// `64^3 = 2^18`) and `R'` the entry with key digit 0:
     /// - key level: `⌊R'²/b^(k-1)⌋ mod M | c3 << 18` and
@@ -201,8 +205,7 @@ mod kernels {
         bp_m: &Array<u32>,
         seg: &Array<u32>,
         vs: &Array<u32>,
-        ext_m: &mut Array<u32>,
-        ext_q: &mut Array<u32>,
+        ext_rec: &mut Array<u32>,
         lists: &mut Array<u32>,
         counts: &mut Array<u32>,
         ran: &mut Array<Atomic<u32>>,
@@ -298,9 +301,11 @@ mod kernels {
             // What the key digit must miss: the entry's digits and the
             // field's.
             let mf = m | fc;
-            let idx = slot * nbp + i;
-            ext_m[(2u32 * idx) as usize] = u32::cast_from(m);
-            ext_m[(2u32 * idx + 1u32) as usize] = u32::cast_from(m >> 32u64);
+            // The entry's record ([`EXT_REC_WORDS`]): mask, then the
+            // prefilter's terms (below).
+            let r4 = 4u32 * (slot * nbp + i);
+            ext_rec[r4 as usize] = u32::cast_from(m);
+            ext_rec[(r4 + 1u32) as usize] = u32::cast_from(m >> 32u64);
             if key_level {
                 // Digits k-1..k2 of R'^2 and R'^3 as numbers, and R'^2 mod M
                 // from its low digits (k2 >= mid + 1 of them).
@@ -318,8 +323,8 @@ mod kernels {
                     lo2 = lo2 * base + sq[comptime!(mid - jj) as usize];
                 }
                 let c3 = (3u32 * lo2) % big_m;
-                ext_q[(2u32 * idx) as usize] = q2 | ((c3 & 0x3FFFu32) << 18u32);
-                ext_q[(2u32 * idx + 1u32) as usize] = q3 | ((c3 >> 14u32) << 18u32);
+                ext_rec[(r4 + 2u32) as usize] = q2 | ((c3 & 0x3FFFu32) << 18u32);
+                ext_rec[(r4 + 3u32) as usize] = q3 | ((c3 >> 14u32) << 18u32);
             } else {
                 // Digits k..k2 of R^2 and R^3 as numbers, and R mod b^mid.
                 let mut a2 = 0u32;
@@ -340,8 +345,8 @@ mod kernels {
                 if comptime!(k < mid) {
                     p2 = rho;
                 }
-                ext_q[(2u32 * idx) as usize] = a2 | (a3 << 16u32);
-                ext_q[(2u32 * idx + 1u32) as usize] = p2 | (p3 << 16u32);
+                ext_rec[(r4 + 2u32) as usize] = a2 | (a3 << 16u32);
+                ext_rec[(r4 + 3u32) as usize] = p2 | (p3 << 16u32);
             }
             if key_level {
                 let u2 = sq[comptime!(k - 1) as usize];
@@ -429,8 +434,7 @@ mod kernels {
     /// as this kernel used to when it flushed the stage, was about 290.
     #[cube(launch_unchecked)]
     pub fn join_kernel(
-        ext_m: &Array<u32>,
-        ext_q: &Array<u32>,
+        ext_rec: &Array<u32>,
         bp_r: &Array<u32>,
         seg: &Array<u32>,
         lists: &Array<u32>,
@@ -597,13 +601,13 @@ mod kernels {
                         if sl < ne {
                             vv[j as usize] = 0xFFFF_FFFFu32;
                             let e = lists[(lbase + sl) as usize];
-                            let gi = ebase + e;
+                            // The entry's record ([`EXT_REC_WORDS`]).
+                            let r4 = 4u32 * (ebase + e);
                             let r0 = bp_r[e as usize];
-                            let mut m = (u64::cast_from(ext_m[(2u32 * gi + 1u32) as usize])
-                                << 32u64)
-                                | u64::cast_from(ext_m[(2u32 * gi) as usize]);
-                            let q0 = ext_q[(2u32 * gi) as usize];
-                            let q1 = ext_q[(2u32 * gi + 1u32) as usize];
+                            let mut m = (u64::cast_from(ext_rec[(r4 + 1u32) as usize]) << 32u64)
+                                | u64::cast_from(ext_rec[r4 as usize]);
+                            let q0 = ext_rec[(r4 + 2u32) as usize];
+                            let q1 = ext_rec[(r4 + 3u32) as usize];
                             if key_level {
                                 // t2, t3 = ⌊R²/b^(k-1)⌋, ⌊R³/b^(k-1)⌋ mod M for
                                 // this key digit: q + d·c (+ d²·e1, ...) from
@@ -2875,9 +2879,8 @@ pub(crate) struct JoinDevice<R: Runtime> {
     bp_r: Handle,
     bp_m: Handle,
     seg: Handle,
-    ext_m: Handle,
-    /// The prefilter's terms per extended entry (see [`bucket_kernel`]).
-    ext_q: Handle,
+    /// One record per (slot, extended entry) ([`EXT_REC_WORDS`]).
+    ext_rec: Handle,
     lists: Handle,
     counts: Handle,
     nkeys: u32,
@@ -3074,8 +3077,7 @@ impl<R: Runtime> JoinDevice<R> {
             bp_r: client.create(cubecl::bytes::Bytes::from_elems(fs.bp_r.clone())),
             bp_m: client.create(cubecl::bytes::Bytes::from_elems(bp_m_words)),
             seg: client.create(cubecl::bytes::Bytes::from_elems(fs.seg.clone())),
-            ext_m: client.empty(max_slots * fp.ext_m),
-            ext_q: client.empty(max_slots * fp.ext_q),
+            ext_rec: client.empty(max_slots * fp.ext_rec),
             lists: client.empty(max_slots * fp.lists),
             counts: client.empty(max_slots * fp.counts),
             nkeys,
@@ -3290,6 +3292,7 @@ impl<R: Runtime> JoinDevice<R> {
         let max_slots = self.max_slots;
         let tl_len = max_slots * ntl * self.nroots as usize;
         let rec_len = TOP_REC_WORDS as usize * max_slots * ntl;
+        let ext_len = EXT_REC_WORDS as usize * max_slots * nbp.max(1);
         let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vs.to_vec()));
         let top_count = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots]));
         let bucket_cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots * nb]));
@@ -3361,8 +3364,7 @@ impl<R: Runtime> JoinDevice<R> {
                 ArrayArg::from_raw_parts(self.bp_m.clone(), 2 * nbp),
                 ArrayArg::from_raw_parts(self.seg.clone(), self.b as usize),
                 ArrayArg::from_raw_parts(vs_h, nslots),
-                ArrayArg::from_raw_parts(self.ext_m.clone(), 2 * nbp * max_slots),
-                ArrayArg::from_raw_parts(self.ext_q.clone(), 2 * nbp.max(1) * max_slots),
+                ArrayArg::from_raw_parts(self.ext_rec.clone(), ext_len),
                 ArrayArg::from_raw_parts(self.lists.clone(), nbp * max_slots * self.b as usize),
                 ArrayArg::from_raw_parts(
                     self.counts.clone(),
@@ -3384,8 +3386,7 @@ impl<R: Runtime> JoinDevice<R> {
                 c,
                 CubeCount::Static(join_cubes, 1, 1),
                 CubeDim::new_1d(JOIN_WG),
-                ArrayArg::from_raw_parts(self.ext_m.clone(), 2 * nbp * max_slots),
-                ArrayArg::from_raw_parts(self.ext_q.clone(), 2 * nbp.max(1) * max_slots),
+                ArrayArg::from_raw_parts(self.ext_rec.clone(), ext_len),
                 ArrayArg::from_raw_parts(self.bp_r.clone(), nbp),
                 ArrayArg::from_raw_parts(self.seg.clone(), self.b as usize),
                 ArrayArg::from_raw_parts(self.lists.clone(), nbp * max_slots * self.b as usize),
