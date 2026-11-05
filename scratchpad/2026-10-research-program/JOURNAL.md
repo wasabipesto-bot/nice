@@ -4,6 +4,17 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-05 (day 9; routine fired 04:41 UTC)
+
+- **Reconcile:** no research instances; November research $6.12 (fleet $7.80); credit $47.43;
+  ivory 16 GB free. #241 open, green, no comments; nothing merged; main = 6f060a9. No user
+  messages since the day-8 addendum. **15 worktrees past the 7-day line removed** (all clean,
+  branches kept): 52 remain.
+- Leads today (both stacked on #241, A/B vs af21136, kill < 5 % or a NiceMark scenario < ×0.98):
+  **L39** bottom-entry record (box `l39-botrec` 3080 CA, instance 59214557) and **L40** group
+  walk over the 8 pass words (box `l40-groupwalk` 3080 KR, instance 59214577); 6 h TTLs, hard
+  stops 11:00 UTC. L37's `COMPACT=2` is L40's starting point.
+
 ## 2026-11-04 (day 8; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; November research $5.40 (fleet $5.99); credit $49.96;
