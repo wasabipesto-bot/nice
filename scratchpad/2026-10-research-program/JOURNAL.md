@@ -31,6 +31,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   review of PR #241's diff and body (→ `L38/REVIEW.md`), L41 scoping of the prefilter arithmetic
   and the per-wave base from SASS (`L41/BRIEF.md` → `L41/SCOPING.md`; tomorrow's prototype
   plan), and literature sweep 4 with widened terms (`L7/2026-11-05.md`).
+- **Sweep 4 done (17:00 UTC):** fourth null with widened terms → the arXiv canvass is dropped;
+  weekly sweeps become targeted questions + occasional OEIS/repo spot-checks. GTaP (2604.05982,
+  divergence-aware queueing) noted for the walk; no nice-number news outside the project.
 
 ## 2026-11-04 (day 8; routine fired 04:41 UTC)
 
