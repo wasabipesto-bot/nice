@@ -397,7 +397,8 @@ mod kernels {
     /// built by [`bucket_kernel`]; `ept` entries per thread per wave, every
     /// thread runs every wave (uniform). A branch-free AND over 32 tops at a
     /// time gives each entry a bitmask of the tops it passes, and each lane
-    /// walks its set bits.
+    /// walks the set bits of a group of `AND_GROUP` chunks (one chunk in a
+    /// small batch) as one set.
     ///
     /// A pair passes the AND iff the entry's and the top's digit masks are
     /// disjoint, i.e. iff no digit of the entry is a digit of the top. So for
@@ -413,7 +414,8 @@ mod kernels {
     /// (counted in `and_count`) and goes through the middle-digit prefilter
     /// there and then ([`walk_pf`]); only the pairs that pass it, about 6% at
     /// bases 57-64, are staged in shared memory, and the stage goes to the
-    /// list once it is half full, checked after every 32 tops.
+    /// list once it is half full, checked after every group of 128 tops (32
+    /// in a small batch).
     ///
     /// The prefilter tests n's output digits at positions `k..k2` (`mid =
     /// k2 - k` of them). With `n = R + D·b^k` (`R` the entry's `k` digits,
@@ -656,70 +658,89 @@ mod kernels {
                             rr[j as usize] = r0;
                         }
                     }
-                    // Branch-free AND over a chunk of up to 32 tops into a pass
-                    // bitmask per entry, then only the (rare) set bits are
-                    // walked: the survivor path diverges once per chunk, not
-                    // once per top.
-                    // The transposed AND's ORs of the next AND_GROUP chunks,
-                    // per entry slot (chunk-major).
+                    // Branch-free AND into a pass bitmask per entry and chunk
+                    // of 32 tops, then only the (rare) set bits are walked:
+                    // the survivor path diverges once per group of
+                    // `AND_GROUP` chunks (once per chunk in a batch below
+                    // `TRANSPOSE_MIN`), not once per top.
+                    // The group's pass words, chunk-major: word c·ept + j is
+                    // entry slot j's mask over the group's chunk c.
                     let ag = comptime!(AND_GROUP);
-                    let mut acc = Array::<u32>::new(comptime!((ag * ept) as usize));
+                    let nw = comptime!(AND_GROUP * ept);
+                    let nw_pow2 = comptime!((AND_GROUP * ept).next_power_of_two());
+                    let nw_log2 = comptime!((AND_GROUP * ept).next_power_of_two().trailing_zeros());
+                    let mut pw = Array::<u32>::new(comptime!((AND_GROUP * ept) as usize));
+                    #[unroll]
+                    for i in 0..nw {
+                        pw[i as usize] = 0u32;
+                    }
                     let mut jc = 0u32;
                     while jc < nt {
-                        let mut cend = jc + 32u32;
-                        if cend > nt {
-                            cend = nt;
-                        }
-                        let mut pm = Array::<u32>::new(ept as usize);
+                        // The lane's non-empty words, one bit each.
+                        let mut nm = 0u32;
                         if nt >= TRANSPOSE_MIN {
-                            let cb = jc / 32u32;
-                            if cb % ag == 0u32 {
-                                #[unroll]
-                                for i in 0..comptime!(ag * ept) {
-                                    acc[i as usize] = 0u32;
-                                }
-                                let ab = cb * 64u32;
-                                #[unroll]
-                                for j in 0..ept {
-                                    // The entry's digits, low word first; an
-                                    // empty slot (vv = 0) has none.
-                                    let mut x = mlo[j as usize] & vv[j as usize];
-                                    let mut y = mhi[j as usize] & vv[j as usize];
-                                    while (x | y) != 0u32 {
-                                        let lo = x != 0u32;
-                                        let v = select(lo, x, y);
-                                        // v != 0: its lowest set bit.
-                                        let d =
-                                            (v.find_first_set() - 1u32) + select(lo, 0u32, 32u32);
-                                        let v1 = v & (v - 1u32);
-                                        x = select(lo, v1, x);
-                                        y = select(lo, y, v1);
-                                        let a = ab + d;
-                                        #[unroll]
-                                        for c in 0..ag {
-                                            acc[comptime!(c * ept + j) as usize] |=
-                                                t_tr[(a + comptime!(c * 64)) as usize];
-                                        }
+                            #[unroll]
+                            for i in 0..nw {
+                                pw[i as usize] = 0u32;
+                            }
+                            // The ORs of the group's chunks' words for the
+                            // entry's digits.
+                            let ab = (jc / 32u32) * 64u32;
+                            #[unroll]
+                            for j in 0..ept {
+                                // The entry's digits, low word first; an empty
+                                // slot (vv = 0) has none.
+                                let mut x = mlo[j as usize] & vv[j as usize];
+                                let mut y = mhi[j as usize] & vv[j as usize];
+                                while (x | y) != 0u32 {
+                                    let lo = x != 0u32;
+                                    let v = select(lo, x, y);
+                                    // v != 0: its lowest set bit.
+                                    let d = (v.find_first_set() - 1u32) + select(lo, 0u32, 32u32);
+                                    let v1 = v & (v - 1u32);
+                                    x = select(lo, v1, x);
+                                    y = select(lo, y, v1);
+                                    let a = ab + d;
+                                    #[unroll]
+                                    for c in 0..ag {
+                                        pw[comptime!(c * ept + j) as usize] |=
+                                            t_tr[(a + comptime!(c * 64)) as usize];
                                     }
                                 }
                             }
-                            // Pass: no digit of the entry in the top, and a
-                            // top of the batch.
-                            let nb = cend - jc;
-                            let cm =
-                                select(nb >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nb & 31u32)) - 1u32);
+                            // Pass: no digit of the entry in the top, a top of
+                            // the batch, and an entry in the slot.
                             #[unroll]
-                            for j in 0..ept {
-                                pm[j as usize] = (acc[j as usize] ^ cm) & cm;
+                            for c in 0..ag {
+                                let t0 = jc + comptime!(c * 32);
+                                let nb = select(nt > t0, nt - t0, 0u32);
+                                let cm = select(
+                                    nb >= 32u32,
+                                    0xFFFF_FFFFu32,
+                                    (1u32 << (nb & 31u32)) - 1u32,
+                                );
+                                #[unroll]
+                                for j in 0..ept {
+                                    let i = comptime!(c * ept + j);
+                                    pw[i as usize] = (pw[i as usize] ^ cm) & cm & vv[j as usize];
+                                }
                             }
                             #[unroll]
-                            for i in 0..comptime!((ag - 1) * ept) {
-                                acc[i as usize] = acc[comptime!(i + ept) as usize];
+                            for i in 0..nw {
+                                nm |= select(pw[i as usize] != 0u32, comptime!(1u32 << i), 0u32);
                             }
                         } else {
+                            // A batch of fewer than `TRANSPOSE_MIN` tops: each
+                            // top against each entry, one chunk of 32 per pass
+                            // (a group of one chunk, words 0..ept; the others
+                            // stay 0).
+                            let mut cend = jc + 32u32;
+                            if cend > nt {
+                                cend = nt;
+                            }
                             #[unroll]
                             for j in 0..ept {
-                                pm[j as usize] = 0u32;
+                                pw[j as usize] = 0u32;
                             }
                             let mut jt = jc;
                             let mut bit = 1u32;
@@ -729,73 +750,129 @@ mod kernels {
                                 #[unroll]
                                 for j in 0..ept {
                                     let z = (mlo[j as usize] & tlo) | (mhi[j as usize] & thi);
-                                    pm[j as usize] |= select(z == 0u32, bit, 0u32);
+                                    pw[j as usize] |= select(z == 0u32, bit, 0u32);
                                 }
                                 bit <<= 1u32;
                                 jt += 1u32;
                             }
+                            #[unroll]
+                            for j in 0..ept {
+                                pw[j as usize] &= vv[j as usize];
+                                nm |= select(pw[j as usize] != 0u32, comptime!(1u32 << j), 0u32);
+                            }
                         }
-                        // Each lane walks its set bits, one per round while any
-                        // lane of the plane has one left. With an exit that
-                        // diverged per lane, CUDA's independent thread
-                        // scheduling (sm_70+) let the lanes drift apart, and
-                        // the AND loop after the walk ran with the plane partly
-                        // idle: 1.6-1.7x on this kernel at base 57. On CUDA
-                        // (`walk_sync`) each round also ends with a plane
-                        // barrier, which drops the YIELD ptxas otherwise puts in
-                        // the loop and lets it keep fewer registers: another
-                        // 2-11%.
-                        #[unroll]
-                        for j in 0..ept {
-                            let mut x = pm[j as usize] & vv[j as usize];
-                            let r0 = rr[j as usize];
-                            while plane_any(x != 0u32) {
-                                if x != 0u32 {
-                                    let jt2 = jc + x.trailing_zeros();
-                                    x &= x - 1u32;
-                                    if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
-                                        nand += 1u32;
-                                        if walk_pf(
-                                            ac[j as usize],
-                                            pc[j as usize],
-                                            t_dm[jt2 as usize],
-                                            mlo[j as usize],
-                                            mhi[j as usize],
-                                            t_lo[jt2 as usize],
-                                            t_hi[jt2 as usize],
-                                            base,
-                                            k,
-                                            k2,
-                                        ) {
-                                            let at = s_cnt[0].fetch_add(1u32);
-                                            if at < SURV_SH_CAP {
-                                                s_t[at as usize] = t_id[jt2 as usize];
-                                                s_r[at as usize] = r0;
-                                            } else {
-                                                let g = surv_count[0].fetch_add(1u32);
-                                                if g < surv_cap {
-                                                    surv[(2u32 * g) as usize] = t_id[jt2 as usize];
-                                                    surv[(2u32 * g + 1u32) as usize] = r0;
-                                                }
+                        // Each lane walks the group's set bits as one set,
+                        // one per round while any lane of the plane has one
+                        // left: a round takes the lowest bit of the lane's
+                        // current word, and a lane whose word is spent takes
+                        // its next non-empty word. So a plane runs the most
+                        // pass bits one lane has in the group, instead of the
+                        // sum over the group's chunks and entry slots of each
+                        // one's most. With an exit that diverged per lane,
+                        // CUDA's independent thread scheduling (sm_70+) let
+                        // the lanes drift apart, and the AND loop after the
+                        // walk ran with the plane partly idle: 1.6-1.7x on
+                        // this kernel at base 57. On CUDA (`walk_sync`) each
+                        // round also ends with a plane barrier, which drops
+                        // the YIELD ptxas otherwise puts in the loop and lets
+                        // it keep fewer registers: another 2-11%.
+                        // The lane's current word, its index and its
+                        // chunk's first top.
+                        let mut x = 0u32;
+                        let mut wi = 0u32;
+                        let mut jb = 0u32;
+                        while plane_any((x | nm) != 0u32) {
+                            if (x | nm) != 0u32 {
+                                if x == 0u32 {
+                                    wi = nm.find_first_set() - 1u32;
+                                    nm &= nm - 1u32;
+                                    // Word wi, by a tree of selects on its
+                                    // bits (`pick` pads it to a power of two).
+                                    let mut pick = Array::<u32>::new(comptime!(nw_pow2 as usize));
+                                    #[unroll]
+                                    for i in 0..nw_pow2 {
+                                        if comptime!(i < nw) {
+                                            pick[i as usize] = pw[i as usize];
+                                        } else {
+                                            pick[i as usize] = 0u32;
+                                        }
+                                    }
+                                    #[unroll]
+                                    for l in 0..nw_log2 {
+                                        let bl = ((wi >> comptime!(l)) & 1u32) != 0u32;
+                                        #[unroll]
+                                        for i in 0..comptime!(nw_pow2 >> (l + 1)) {
+                                            pick[i as usize] = select(
+                                                bl,
+                                                pick[comptime!(2 * i + 1) as usize],
+                                                pick[comptime!(2 * i) as usize],
+                                            );
+                                        }
+                                    }
+                                    x = pick[0];
+                                    jb = jc + (wi / ept) * 32u32;
+                                }
+                                let jt2 = jb + x.trailing_zeros();
+                                x &= x - 1u32;
+                                // Word wi's entry slot.
+                                let j = wi % ept;
+                                let mut r0 = rr[0];
+                                let mut e_ac = ac[0];
+                                let mut e_pc = pc[0];
+                                let mut e_mlo = mlo[0];
+                                let mut e_mhi = mhi[0];
+                                #[unroll]
+                                for jj in 1..ept {
+                                    let s = j == jj;
+                                    r0 = select(s, rr[jj as usize], r0);
+                                    e_ac = select(s, ac[jj as usize], e_ac);
+                                    e_pc = select(s, pc[jj as usize], e_pc);
+                                    e_mlo = select(s, mlo[jj as usize], e_mlo);
+                                    e_mhi = select(s, mhi[jj as usize], e_mhi);
+                                }
+                                if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
+                                    nand += 1u32;
+                                    if walk_pf(
+                                        e_ac,
+                                        e_pc,
+                                        t_dm[jt2 as usize],
+                                        e_mlo,
+                                        e_mhi,
+                                        t_lo[jt2 as usize],
+                                        t_hi[jt2 as usize],
+                                        base,
+                                        k,
+                                        k2,
+                                    ) {
+                                        let at = s_cnt[0].fetch_add(1u32);
+                                        if at < SURV_SH_CAP {
+                                            s_t[at as usize] = t_id[jt2 as usize];
+                                            s_r[at as usize] = r0;
+                                        } else {
+                                            let g = surv_count[0].fetch_add(1u32);
+                                            if g < surv_cap {
+                                                surv[(2u32 * g) as usize] = t_id[jt2 as usize];
+                                                surv[(2u32 * g + 1u32) as usize] = r0;
                                             }
                                         }
                                     }
                                 }
-                                if walk_sync {
-                                    sync_plane();
-                                }
+                            }
+                            if walk_sync {
+                                sync_plane();
                             }
                         }
                         // Write the stage out once it is half full, after
-                        // every chunk of 32 tops. A chunk that adds more than
-                        // the half left (it can add up to 32 x 512 pairs, and
-                        // adds about 40 on the densest production fields)
-                        // writes its overflow to the list directly, above:
-                        // those pairs passed the prefilter too, so the list
-                        // holds the same entries either way.
+                        // every group of 128 tops (every chunk of 32 in a
+                        // small batch). A group that adds more than the half
+                        // left (it can add up to 128 x 512 pairs, and adds
+                        // about 160 on the densest production fields) writes
+                        // its overflow to the list directly, above: those
+                        // pairs passed the prefilter too, so the list holds
+                        // the same entries either way.
                         //
                         // Every thread reads the count before any appends the
-                        // next chunk's survivors (the second barrier): a plane
+                        // next group's survivors (the second barrier): a plane
                         // that read it after a faster plane's appends could
                         // decide alone to flush, and from then on the cube's
                         // barriers would pair up at different call sites. The
@@ -819,7 +896,11 @@ mod kernels {
                             );
                             sync_cube();
                         }
-                        jc += 32u32;
+                        if nt >= TRANSPOSE_MIN {
+                            jc += comptime!(AND_GROUP * 32);
+                        } else {
+                            jc += 32u32;
+                        }
                     }
                     ws += wave;
                 }
