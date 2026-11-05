@@ -183,9 +183,8 @@ impl JoinCeiling {
 /// with the partitions per launch, then the field's own tables.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Footprint {
-    pub(crate) ext_m: usize,
-    /// The join's prefilter terms, two words per extended entry.
-    pub(crate) ext_q: usize,
+    /// The extended entries' records, 32 bytes each (`EXT_REC_WORDS`).
+    pub(crate) ext_rec: usize,
     pub(crate) lists: usize,
     pub(crate) counts: usize,
     /// The tops' records, 32 bytes each (`TOP_REC_WORDS`).
@@ -230,8 +229,7 @@ impl Footprint {
             4,                                     // nice_count
         ];
         Self {
-            ext_m: nbp * 8,
-            ext_q: nbp.max(1) * 8,
+            ext_rec: nbp.max(1) * 32,
             lists: nbp * b * 4,
             counts: nkeys * (b - 1) * 4,
             top_rec: ntl * 32,
@@ -246,8 +244,7 @@ impl Footprint {
     }
 
     pub(crate) fn per_slot(&self) -> usize {
-        self.ext_m
-            + self.ext_q
+        self.ext_rec
             + self.lists
             + self.counts
             + self.top_rec
@@ -261,8 +258,7 @@ impl Footprint {
     /// The largest buffer one slot adds to (all of them grow linearly).
     pub(crate) fn largest_per_slot(&self) -> usize {
         [
-            self.ext_m,
-            self.ext_q,
+            self.ext_rec,
             self.lists,
             self.counts,
             self.top_rec,
