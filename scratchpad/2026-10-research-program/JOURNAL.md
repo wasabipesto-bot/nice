@@ -34,6 +34,16 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **Sweep 4 done (17:00 UTC):** fourth null with widened terms → the arXiv canvass is dropped;
   weekly sweeps become targeted questions + occasional OEIS/repo spot-checks. GTaP (2604.05982,
   divergence-aware queueing) noted for the walk; no nice-number news outside the project.
+- **#241 reviewed (17:20 UTC, `L38/REVIEW.md`): merge with small fixes** — code correct at every
+  site (52 uses converted one-to-one; alignment and plan bounds re-derived); low findings: record
+  size written three ways (→ `TOP_RECORD_BYTES` + compile-time assert), a shadowed `rec` in
+  `read_checked`, and PR-body wording (cycles-column method, "every run at the cap" only true for
+  1e16/1e17, "single round" was two, the 7.6e10 top-loads source). Applied on the branch; body
+  edited. The FD-vs-top test's buffer reuse (could miss a dropped constant store; pre-existing)
+  noted for a later test PR.
+- #241 → 7832f89 (tidy-ups amended into the single commit; `cargo check --features gpu` and
+  `--features cubecl` on ivory under nice, fmt clean; the first attempt missed the kernels'
+  inner-module import, caught by the check). Comment posted; CI check scheduled.
 
 ## 2026-11-04 (day 8; routine fired 04:41 UTC)
 
