@@ -44,6 +44,15 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - #241 → 7832f89 (tidy-ups amended into the single commit; `cargo check --features gpu` and
   `--features cubecl` on ivory under nice, fmt clean; the first attempt missed the kernels'
   inner-module import, caught by the check). Comment posted; CI check scheduled.
+- **L41 scoped (18:10 UTC, `L41/SCOPING.md`):** the join is integer-ALU-bound; one walk round is
+  110 SASS (74 every round), `walk_pf` 51 of which 20 are digit extraction (mod b², /b, %b) and
+  26 one-hot mask building — the pair's real arithmetic is 2 mul-adds. Lean prefilter bundle
+  (fixed-point digit extraction with a proof, shift+compare membership, seed-gated top masks):
+  51 → 25 instructions, est. 10–13 % of the field, exact by construction. **Tomorrow's first
+  prototype**, with host exhaustive tests of the fixed-point step before any timing, a codegen
+  gate, and ≥ 6 NiceMark rounds. Caveats: SASS from L40's M kernel (L37's tarball was already
+  unpacked); plane-wave counts estimated from L39's entry-load count.
+- Evening agents: 3 (2 Opus, 1 Sonnet); day total 5. Director time ~6.5 h.
 
 ## 2026-11-04 (day 8; routine fired 04:41 UTC)
 
