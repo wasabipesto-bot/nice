@@ -452,6 +452,7 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] rounds: u32,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -671,6 +672,16 @@ mod kernels {
                             cend = nt;
                         }
                         let mut pm = Array::<u32>::new(ept as usize);
+                        if comptime!(rounds == 2) {
+                            if UNIT_POS_PLANE == 0u32 {
+                                nand += 1u32;
+                            }
+                        }
+                        if comptime!(rounds == 3) {
+                            if UNIT_POS_PLANE == 0u32 && (jc / 32u32) % comptime!(AND_GROUP) == 0u32 {
+                                nand += 1u32;
+                            }
+                        }
                         if nt >= TRANSPOSE_MIN {
                             let cb = jc / 32u32;
                             if cb % ag == 0u32 {
@@ -750,11 +761,18 @@ mod kernels {
                             let mut x = pm[j as usize] & vv[j as usize];
                             let r0 = rr[j as usize];
                             while plane_any(x != 0u32) {
+                                if comptime!(rounds == 1) {
+                                    if UNIT_POS_PLANE == 0u32 {
+                                        nand += 1u32;
+                                    }
+                                }
                                 if x != 0u32 {
                                     let jt2 = jc + x.trailing_zeros();
                                     x &= x - 1u32;
                                     if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
-                                        nand += 1u32;
+                                        if comptime!(rounds == 0) {
+                                            nand += 1u32;
+                                        }
                                         if walk_pf(
                                             ac[j as usize],
                                             pc[j as usize],
@@ -2851,6 +2869,8 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
+    /// Test only (`NICE_EXP_JOIN_ROUNDS`): the walk counter in `and_count`.
+    rounds: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -3041,6 +3061,10 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
+            rounds: std::env::var("NICE_EXP_JOIN_ROUNDS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
             limbs,
             chunk_digits,
             chunk_div,
@@ -3410,6 +3434,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k,
                 self.k2,
                 self.walk_sync,
+                self.rounds,
             );
         }
         unsafe {
