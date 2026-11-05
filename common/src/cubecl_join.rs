@@ -453,6 +453,7 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] rounds: u32,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -779,6 +780,17 @@ mod kernels {
                         // round also ends with a plane barrier, which drops
                         // the YIELD ptxas otherwise puts in the loop and lets
                         // it keep fewer registers: another 2-11%.
+                        if comptime!(rounds == 2) {
+                            if UNIT_POS_PLANE == 0u32 {
+                                let nc = (nt - jc + 31u32) / 32u32;
+                                nand += select(nc > comptime!(AND_GROUP), comptime!(AND_GROUP), nc);
+                            }
+                        }
+                        if comptime!(rounds == 3) {
+                            if UNIT_POS_PLANE == 0u32 {
+                                nand += 1u32;
+                            }
+                        }
                         let mut nm = 0u32;
                         #[unroll]
                         for i in 0..nw {
@@ -790,6 +802,11 @@ mod kernels {
                         let mut wi = 0u32;
                         let mut jb = 0u32;
                         while plane_any((x | nm) != 0u32) {
+                            if comptime!(rounds == 1) {
+                                if UNIT_POS_PLANE == 0u32 {
+                                    nand += 1u32;
+                                }
+                            }
                             if (x | nm) != 0u32 {
                                 if x == 0u32 {
                                     wi = nm.find_first_set() - 1u32;
@@ -839,7 +856,9 @@ mod kernels {
                                     e_mhi = select(s, mhi[jj as usize], e_mhi);
                                 }
                                 if r0 >= t_rlo[jt2 as usize] && r0 < t_rhi[jt2 as usize] {
-                                    nand += 1u32;
+                                    if comptime!(rounds == 0) {
+                                        nand += 1u32;
+                                    }
                                     if walk_pf(
                                         e_ac,
                                         e_pc,
@@ -2935,6 +2954,8 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
+    /// Test only (`NICE_EXP_JOIN_ROUNDS`): the walk counter in `and_count`.
+    rounds: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -3125,6 +3146,10 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
+            rounds: std::env::var("NICE_EXP_JOIN_ROUNDS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
             limbs,
             chunk_digits,
             chunk_div,
@@ -3494,6 +3519,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k,
                 self.k2,
                 self.walk_sync,
+                self.rounds,
             );
         }
         unsafe {
