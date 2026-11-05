@@ -79,12 +79,10 @@ pub const TOP_CAP: u32 = 256;
 /// their ids, so a top's words are one sector of one array rather than one
 /// from each of three.
 pub const TOP_REC_WORDS: u32 = 8;
-/// Words per extended bottom entry in `ext_rec`, one 32-byte record per
-/// (slot, entry): the entry's digit mask (lo, hi), the prefilter's two terms
-/// ([`bucket_kernel`]), the entry's residue r0, then three words of padding.
-/// The join gathers a bucket's entries by their indices, so an entry's words
-/// are one sector of one array rather than one from each of three.
-pub const EXT_REC_WORDS: u32 = 8;
+/// Words per extended bottom entry in `ext_rec`, one 16-byte record per
+/// (slot, entry): the entry's digit mask (lo, hi) and the prefilter's two
+/// terms ([`bucket_kernel`]); the residue stays in `bp_r`.
+pub const EXT_REC_WORDS: u32 = 4;
 /// Top batches of at least this many tops get [`join_kernel`]'s transposed
 /// AND; smaller ones test each entry against each top, which is cheaper than
 /// the digit-major copy on a few tops (the fastest of 128, 192 and 256 on
@@ -303,15 +301,11 @@ mod kernels {
             // What the key digit must miss: the entry's digits and the
             // field's.
             let mf = m | fc;
-            // The entry's record ([`EXT_REC_WORDS`]): mask, the prefilter's
-            // terms (below), r0 and the padding, so every sector is whole.
-            let r8 = 8u32 * (slot * nbp + i);
+            // The entry's record ([`EXT_REC_WORDS`]): mask, then the
+            // prefilter's terms (below).
+            let r8 = 4u32 * (slot * nbp + i);
             ext_rec[r8 as usize] = u32::cast_from(m);
             ext_rec[(r8 + 1u32) as usize] = u32::cast_from(m >> 32u64);
-            ext_rec[(r8 + 4u32) as usize] = r0;
-            ext_rec[(r8 + 5u32) as usize] = 0u32;
-            ext_rec[(r8 + 6u32) as usize] = 0u32;
-            ext_rec[(r8 + 7u32) as usize] = 0u32;
             if key_level {
                 // Digits k-1..k2 of R'^2 and R'^3 as numbers, and R'^2 mod M
                 // from its low digits (k2 >= mid + 1 of them).
@@ -441,6 +435,7 @@ mod kernels {
     #[cube(launch_unchecked)]
     pub fn join_kernel(
         ext_rec: &Array<u32>,
+        bp_r: &Array<u32>,
         seg: &Array<u32>,
         lists: &Array<u32>,
         counts: &Array<u32>,
@@ -606,9 +601,9 @@ mod kernels {
                         if sl < ne {
                             vv[j as usize] = 0xFFFF_FFFFu32;
                             let e = lists[(lbase + sl) as usize];
-                            // Words 0-4 of the entry's record ([`EXT_REC_WORDS`]).
-                            let r8 = 8u32 * (ebase + e);
-                            let r0 = ext_rec[(r8 + 4u32) as usize];
+                            // The entry's record ([`EXT_REC_WORDS`]).
+                            let r8 = 4u32 * (ebase + e);
+                            let r0 = bp_r[e as usize];
                             let mut m = (u64::cast_from(ext_rec[(r8 + 1u32) as usize]) << 32u64)
                                 | u64::cast_from(ext_rec[r8 as usize]);
                             let q0 = ext_rec[(r8 + 2u32) as usize];
@@ -3392,6 +3387,7 @@ impl<R: Runtime> JoinDevice<R> {
                 CubeCount::Static(join_cubes, 1, 1),
                 CubeDim::new_1d(JOIN_WG),
                 ArrayArg::from_raw_parts(self.ext_rec.clone(), ext_len),
+                ArrayArg::from_raw_parts(self.bp_r.clone(), nbp),
                 ArrayArg::from_raw_parts(self.seg.clone(), self.b as usize),
                 ArrayArg::from_raw_parts(self.lists.clone(), nbp * max_slots * self.b as usize),
                 ArrayArg::from_raw_parts(

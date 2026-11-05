@@ -183,7 +183,7 @@ impl JoinCeiling {
 /// with the partitions per launch, then the field's own tables.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Footprint {
-    /// The extended entries' records, 32 bytes each (`EXT_REC_WORDS`).
+    /// The extended entries' records, 16 bytes each (`EXT_REC_WORDS`).
     pub(crate) ext_rec: usize,
     pub(crate) lists: usize,
     pub(crate) counts: usize,
@@ -229,7 +229,7 @@ impl Footprint {
             4,                                     // nice_count
         ];
         Self {
-            ext_rec: nbp.max(1) * 32,
+            ext_rec: nbp.max(1) * 16,
             lists: nbp * b * 4,
             counts: nkeys * (b - 1) * 4,
             top_rec: ntl * 32,
