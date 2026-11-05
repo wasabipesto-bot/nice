@@ -5,6 +5,28 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L39.1 One record per bottom entry: neutral, closed (2026-11-05, agent; `L39/RESULTS.md`, `L39/raw/`; branches on af21136: `pr/join-bottom-record` 08c9d90 (= F), `exp/join-bottom-record-r8` 746a1fc (E), `exp/join-bottom-record-r4` 72d1b85 (F), `exp/join-entry-sectors` c27c3ce (sector-count test))
+
+E = 32-byte record per (slot, entry) with mask, q0, q1, r0 (+3 pad; `bp_r` leaves the join; +16 B
+per slot-entry); F = 16-byte record (mask, q0, q1) beside `bp_r` (same bytes as before; r0 needs
+18 bits and the 16 bytes have 10 free). **Sectors per entry measured on the production bucket
+lists** (a warp's 32 lanes span ~1,000 class entries): base 2.50–2.54, E 1.00, F 1.71–1.73.
+Screen E / F vs af21136 at b62 1e17 / b62 1e16 / b60 1e16: E ×0.982 / 0.999 / 0.995 (slightly
+slower everywhere: doubled bytes), F ×0.997 / 1.015 / 1.004. **A/B of F vs af21136** (RTX 3080 at
+its default 320 W, still `SW power cap` throttled; 3 interleaved rounds; both sides 1880–1892 MHz):
+b62 1e17 ×0.997 (86.78 → 87.07 s), b62 1e16 ×1.004, b60 ×1.006, b64 ×1.003, 1e14 noise, NiceMark
+×1.009 (no scenario < ×0.98). **Below the bar; closed.** Why: cutting the entry gather's sectors by
+32 % (F) or 60 % (E) does not move field time, so in the full kernel the entry gather is not
+sector-bound: the entry arrays are 9–14 MiB per launch and `bp_r` 0.4 MiB (the top arrays #241
+fixed were ~250 MB each); L37's 10.5 s for "entry loads" came from a stripped kernel with an exposed
+dependent load chain (list → entry) that the other cubes' AND/walk work hides in the full kernel.
+**Lesson for the ablation method: a part's cost in a stripped kernel is an upper bound; latency-
+bound parts shrink when the rest of the kernel is present.** Exact on the full list (parity incl.
+b50/b54, #240's device test 24 fields / 259 batches / 309.9 M tops on this card's plans, certificate
+test, dense, b42, 1e14 COMPARE, every field = the exact counts, NiceMark join survivors; lavapipe
+naga + SPIR-V 7 tests; lint 16/0; fmt; clippy ×3). Registers unchanged (join 40; bucket 40/39/40
+vs 40/39/38). Box 2.0 h.
+
 ## L38.1 One 32-byte record per top: PR #241 (2026-11-04, agent; `L38/RESULTS.md`, `L38/PR-BODY.md`, `L38/raw/`; branch `pr/join-top-record` af21136 = one commit on main 6f060a9, +64/−87 in cubecl_join.rs + join_plan.rs; prototypes `exp/join-top-record-scalar`, `exp/join-top-record-vec`)
 
 `top_p`/`top_m`/`top_r`/`top_x` → one `top_rec` of 8 u32 per top (`TOP_REC_WORDS`); both top kernels

@@ -14,6 +14,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   **L39** bottom-entry record (box `l39-botrec` 3080 CA, instance 59214557) and **L40** group
   walk over the 8 pass words (box `l40-groupwalk` 3080 KR, instance 59214577); 6 h TTLs, hard
   stops 11:00 UTC. L37's `COMPACT=2` is L40's starting point.
+- **L39 closed (07:20 UTC, L39.1):** neutral (×0.997 b62 1e17, ×1.006 b60) despite sectors per
+  entry 2.5 → 1.0; the entry gather is latency-hidden, not sector-bound — L37's 10.5 s was a
+  stripped-kernel artefact (lesson recorded). Exact. Box l39-botrec destroyed (2.0 h).
 
 ## 2026-11-04 (day 8; routine fired 04:41 UTC)
 

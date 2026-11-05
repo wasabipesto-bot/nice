@@ -1,0 +1,25 @@
++ L=/root/l40/logs
++ mkdir -p /root/l40/logs /root/l40/bin /root/l40/src /root/l40/sass
++ cd /root/nice
++ git remote add upstream https://github.com/wasabipesto/nice.git
++ git fetch -q origin pr/join-top-record exp/join-walk-compact
++ git worktree add -q --detach /root/l40/src/M af21136
++ git worktree add -q --detach /root/l40/src/C 77241bc
++ git worktree add -q -b pr/join-group-walk /root/l40/src/G af21136
++ for t in M C G
++ cd /root/l40/src/M
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'M af21136 Overlap join: one 32-byte record per top aaf168fbdbe3c80fb1724106d36ae15c  common/src/cubecl_join.rs'
++ for t in M C G
++ cd /root/l40/src/C
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'C 77241bc exp: walk compaction: constant broadcast index, no shadowing of k2 (L37 H1) 7af965ae4c7204b1a27a8a2350559687  common/src/cubecl_join.rs'
++ for t in M C G
++ cd /root/l40/src/G
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'G af21136 Overlap join: one 32-byte record per top aaf168fbdbe3c80fb1724106d36ae15c  common/src/cubecl_join.rs'
++ nvidia-smi
++ nvidia-smi -q -d POWER,CLOCK

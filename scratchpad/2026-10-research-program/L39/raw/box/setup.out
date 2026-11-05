@@ -1,0 +1,24 @@
++ L=/root/l39/logs
++ mkdir -p /root/l39/logs /root/l39/bin /root/l39/src /root/l39/sass
++ cd /root/nice
++ git fetch -q origin pr/join-top-record exp/join-bottom-record-r8 exp/join-bottom-record-r4
++ git worktree add -q --detach /root/l39/src/B af21136
++ git worktree add -q --detach /root/l39/src/E origin/exp/join-bottom-record-r8
++ git worktree add -q --detach /root/l39/src/F origin/exp/join-bottom-record-r4
++ for t in B E F
++ cd /root/l39/src/B
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'B af21136 Overlap join: one 32-byte record per top aaf168fbdbe3c80fb1724106d36ae15c  common/src/cubecl_join.rs'
++ for t in B E F
++ cd /root/l39/src/E
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'E 746a1fc Overlap join: one 32-byte record per extended bottom entry (prototype, r in the record) 0ff58487384f917bcbf900aac420e6dc  common/src/cubecl_join.rs'
++ for t in B E F
++ cd /root/l39/src/F
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'F 72d1b85 Overlap join: 16-byte entry record, r from bp_r (prototype) 58f976e40b7a1d3aec1ee7d0edc47b77  common/src/cubecl_join.rs'
++ nvidia-smi
++ nvidia-smi -q -d POWER,CLOCK
