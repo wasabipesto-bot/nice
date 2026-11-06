@@ -5,6 +5,24 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L42.3 CPU FD top certificates: review fixes, b64, PR #247 (2026-11-06, agent + director; `L42/REVIEW.md`, `L42/PR-RESULTS.md`, `L42/raw/pr/`; PR #247 head caef70e = one commit on main 6f060a9)
+
+Review (independent, with tests run): merge with small fixes, no defect; the f64 carry screen's
+error ~4e-12 vs margin 2⁻²⁰, 20.7 M adversarial boundary calls agree; step/word counts bounded at
+the slice's last prefix. Fixes applied: the missing carry test
+(`a_carry_runs_through_words_of_b_minus_1`; fails under both surviving mutations M1 ripple / M4
+`cin`, passes on the branch; `L42/raw/pr/mutation-s1.txt`); rustdoc link, test-only derives,
+private `MAX_STEPS`/`poww` accessor, `step_by(..max(1))` guard; body: 3e15 NiceMark window, #240's
+×1.48–1.61, "413,250 kept; 243,907 seeded", round loads stated, overshoot path (steps once past P
+then re-seeds; values below phi + h still fit). **b64 A/B vs main (3 rounds, loads ≤ 2.0): b64 1e16
+partitions ×1.039 (1 thread) / ×1.068 (4); b64 1e14 whole field ×1.076 (359.0 → 333.7 s) / ×1.088
+(96.1 → 88.3 s); counts identical (5,702,041,796 / 346,647,759).** b64 gains less than b60/b62
+(×1.25–1.29): ~2.8× the survivors per partition and 9–10 % of prefixes seeding vs 2.3 % (not
+profiled); the CPU takes the stepped path at b64 (unlike #240's GPU kernel) because `Base::cert`
+divides by a runtime base at every base. Tests 184 + 22; `cargo doc` 7 warnings = main's 7. The
+agent's permission guard refused the amend → two commits; the director squashed them (tree
+identical) and opened **PR #247** at 10:25 UTC. Open program PRs: #241, #246 (on #241), #247.
+
 ## L41.1 Lean `walk_pf` (FX + MT + GM + RC): PR branch, ×1.086 at b62 1e17 (2026-11-06, agent; `L41/RESULTS.md`, `L41/PR-BODY.md`, `L41/raw/`; branch `pr/join-lean-prefilter` d672887 = one commit on 7832f89 (#241); prototype `exp/join-lean-pf` a150b49 (knob `NICE_EXP_JOIN_PF`), variant `exp/join-lean-pf-cwcopy` d5db28b)
 
 Host tests: FX exhaustive over every (A, P, D) < b² at every base 10–64 = 6.63e11 triples, all

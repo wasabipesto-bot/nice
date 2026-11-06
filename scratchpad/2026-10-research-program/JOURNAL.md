@@ -29,7 +29,7 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   at production shapes (1 and 4 threads), NiceMark CPU ×1.186, exact on 1.86 M random blocks,
   3.7 M production tops and whole fields. Reviewer agent launched (first use of the new rule);
   the f64 carry-test screen is flagged for it.
-- **Review of `pr/cpu-join-fd-tops` (09:40 UTC, `L42/REVIEW.md`): merge with small fixes, no
+- **Review of `pr/cpu-join-fd-tops` (09:25 UTC, `L42/REVIEW.md`): merge with small fixes, no
   correctness defect.** Step/word counts cannot overflow (bounded at the slice's last prefix; 14
   word adds a step, P³ ≤ 29 of 48 digits); seed exact; the f64 carry screen is sound (error
   ~4e-12 vs a 2⁻²⁰ margin; 20.7 M adversarial boundary calls agree); the walk is exact in any
@@ -38,12 +38,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   thousand b60 1e16 fields), body slips (3e15 NiceMark window, #240's ×1.48–1.61, seed count
   basis, overshoot path), rustdoc warning, test-only derives, b64 unmeasured. Sent back to the PR
   agent with a b64 1e14 A/B added.
-- **L41 PR branch ready (10:15 UTC, L41.1):** lean prefilter ×1.086 b62 1e17 / ×1.122 b60 / ×1.070
+- **L41 PR branch ready (09:35 UTC, L41.1):** lean prefilter ×1.086 b62 1e17 / ×1.122 b60 / ×1.070
   b64, NiceMark ×1.061 over 6 rounds (MSD-strong ×1.041), exact with exhaustive host tests; the
   round shrank 71 → 41 SASS; bit-reversed masks were needed to make MT shrink. Caveat for the
   body: some compiles spill 28–44 B (CubeCL's dynamic shared array hides the cube limit from
   ptxas). Box l41-leanpf destroyed. Reviewer agent launched.
-- **Review of `pr/join-lean-prefilter` (11:05 UTC, `L41/REVIEW.md`): merge with small fixes, no
+- **Review of `pr/join-lean-prefilter` (10:05 UTC, `L41/REVIEW.md`): merge with small fixes, no
   correctness defect.** FX's bound recomputed for every base (worst Δ = 2^24.67 at b62, margin
   ≥ 161×; the kernel's operands are exactly the host test's A, P, D < b²); MT's bit reversal is
   consistent at every producer/consumer behind the `lean` flag; the sign test is one
@@ -51,9 +51,14 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   body understates the spills (only level-4 builds spill, 14/26 offline compiles at b60/b62; new
   with this PR; the "6 blocks" explanation untested), the mask convention needs its own paragraph
   and one stale comment, two body slips. Sent back to the L41 agent (text + one comment).
-- **PR #246 opened (11:45 UTC): "Overlap join: a division-free middle-digit prefilter"**, f3fb390
+- **PR #246 opened (10:20 UTC): "Overlap join: a division-free middle-digit prefilter"**, f3fb390
   on #241 (review fixes applied: spill paragraph, mask-convention paragraph, stale comment, body
   slips). Open program PRs: #241, #246.
+- **PR #247 opened (10:25 UTC): "CPU overlap join: step the top certificates through a key's
+  prefixes"**, caef70e on main (review fixes + b64 A/B added; the agent's guard refused the amend
+  so I squashed the two commits — tree identical). Open program PRs: #241, #246, #247. Day total:
+  7 agents (all Opus: 3 prototypes/scoping, 2 PR branches incl. resumes, 2 reviewers); 3 boxes,
+  ~$1.6; director ~6.5 h.
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 

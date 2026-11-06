@@ -3,7 +3,6 @@
 # l42_ab, rounds interleaved with the order alternating per round; before
 # each round wait (up to 6 min) for the 1-min load to drop to <= 2 and log
 # it; a round that starts above 2 is marked DISCARD.
-# and log it; a round that starts above 2 is marked DISCARD.
 R=/home/claude/projects/nice/scratchpad/2026-10-research-program/L42/raw/pr
 AB=/home/claude/projects/nice/.worktrees/pr-cpu-join-fd/target-ab
 OUT=$R/ab-runs-b64.txt

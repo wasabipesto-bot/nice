@@ -1,7 +1,13 @@
 # L42 PR results: FD top certificates in the CPU join (2026-11-06; ivory, CPU only)
 
-**Branch:** `pr/cpu-join-fd-tops` on the fork (`wasabipesto-bot/nice`), one commit on upstream main `6f060a9`:
-**`fba54316b24643e3574c38005102e131a803393b`** (pushed over SSH, 08:47 UTC). Not opened as a PR. Body: `L42/PR-BODY.md`. Raw logs: `L42/raw/pr/`.
+**Branch:** `pr/cpu-join-fd-tops` on the fork (`wasabipesto-bot/nice`), on upstream main `6f060a9`. Head
+**`c8099d94c3b6e3b1136600d5fd183c54eaaf7def`** (10:27 UTC). Not opened as a PR. Body: `L42/PR-BODY.md`. Raw logs:
+`L42/raw/pr/`.
+- `fba54316` (08:47): the change.
+- `c8099d94` (10:27): the review follow-up (REVIEW.md S1 + nits N1–N5), as a **second commit, pushed as a
+  fast-forward**. The asked-for `commit --amend` + force-push was refused by this session's permission guard
+  (history rewrite), so I did not force it. Squash the two when opening the PR (or squash-merge), or amend +
+  `push --force-with-lease` from a session allowed to.
 
 **Worktree:** `.worktrees/pr-cpu-join-fd` (kept; `target/` and `target-ab/` removed at the end).
 
@@ -9,7 +15,8 @@
 
 - **A/B against main 6f060a9 (3 rounds, medians, counts identical in every run):**
   - production shapes: **b60 1e16 ×1.274 (1 thread) / ×1.289 (4 threads); b62 1e17 slice 0 ×1.264 / ×1.246**;
-  - whole 1e14 fields: b60 ×1.224 / ×1.224; b62 ×1.155 / ×1.163.
+  - whole 1e14 fields: b60 ×1.224 / ×1.224; b62 ×1.155 / ×1.163;
+  - b64 (follow-up): 1e16 partitions ×1.039 / ×1.068; whole 1e14 field ×1.076 / ×1.088.
 - **NiceMark CPU nice-only (4 rounds, 4 threads, 150 s): score ×1.186 (673.2 → 798.7)**. Per scenario: b58 weak ×1.141,
   b58 weak 1 thread ×1.142, b58 strong ×1.099, b60 weak ×1.336, b62 weak ×1.241.
 - **Exact.** Every top equals `Base::cert`'s path: 1.86 M random stepped blocks at bases 10–64 and 3.70 M production tops.
@@ -18,6 +25,29 @@
 - Better than the prototype's FD (×1.10–1.20, mean ×1.16), and about where the prototype's FD + lean prefilter was
   (×1.23–1.29). That comes from the plan's tightening: 14 instead of 21 word-adds a step, two long conversions per seed
   instead of five, and stepped `pc`/`dm` instead of u128 division on kept tops.
+
+## Review follow-up (10:27, commit `c8099d94`)
+
+- **S1:** new `cpu_top_fd::tests::a_carry_runs_through_words_of_b_minus_1` (REVIEW.md's test, doc comment added).
+  Mutation check (`raw/pr/mutation-s1.txt`): passes on the branch; **fails under M1** (ripple past the carry word
+  dropped, `if co && false`) and **fails under M4** (`add_word`'s `cout = c1`, dropping the `cin` carry); passes again
+  after reverting (file `cmp`-identical to the pre-mutation copy).
+- **N1:** `cpu_join.rs`'s module doc names `cpu_top_fd` in backticks instead of an intra-doc link.
+  `cargo doc -p nice_common --no-deps`: 7 warnings, the same 7 as main's (`raw/pr/doc-pr.txt`, `doc-main.txt`); none
+  from this PR. So "no warnings" holds for the PR's code; main's own seven remain.
+- **N2:** `Top` derives `Clone, Copy` always and `Debug, PartialEq, Eq` under `cfg_attr(test, …)`.
+- **N3:** `Base::poww` private again, with a `pub(crate) fn poww(&self) -> &[W4]` accessor (`cpu_top_fd` copies it).
+- **N4:** `MAX_STEPS` private.
+- **N5:** the production test's `step_by(… .max(1))`; the last live partition is added only if not already sampled.
+- Tests on the follow-up: `cargo test --release -p nice_common -p nice_client` **184 + 22 passed**, 5 ignored
+  (`raw/pr/unit-tests-v2.txt`); `cargo fmt --all --check` and default clippy `-D warnings` clean. The new tests' counts
+  on the head are unchanged (1,860,723 blocks; 3,698,847 production tops; `raw/pr/unit-tests-stats-v2.txt`).
+- **S2 body fixes:** NiceMark b60/b62 rows are "a 3e15 window of a 1e16 field"; #240's top kernel ×1.48–1.61;
+  "413,250 kept; 243,907 seeded"; the method states the round loads (no rounds were discarded); the no-overflow bullet
+  describes the overshoot path (steps once past P, re-seeds; addends from below P; values below phi + h fit).
+- **b64 A/B** (below) added, plus a body paragraph: the CPU takes the stepped path at b64, unlike #240's GPU kernel,
+  because `Base::cert` divides by a runtime base at every base.
+- CHANGELOG `#NNN` placeholder left as asked.
 
 ## What the commit does
 
@@ -49,7 +79,8 @@ All on the head's code (`raw/pr/unit-tests*.txt`):
 
 | test | result |
 |---|---|
-| `cargo test --release -p nice_common -p nice_client` | 183 + 22 passed, 5 ignored (opt-in) (`unit-tests.txt`) |
+| `cargo test --release -p nice_common -p nice_client` | 183 + 22 passed at `fba54316` (`unit-tests.txt`); 184 + 22 at `c8099d94` (`unit-tests-v2.txt`); 5 ignored (opt-in) |
+| new `cpu_top_fd::a_carry_runs_through_words_of_b_minus_1` (follow-up) | ok; fails under mutations M1 and M4 (`mutation-s1.txt`) |
 | new `cpu_top_fd::stepped_certificates_equal_the_divided_ones` (b10–64, random band fields, all f0 with w < 2^32, o = 1–3, runs of 200 with gaps 1/2–4/5–24/backwards) | ok: 1876 setups, 1,860,723 blocks (413,250 kept, 243,907 seeds), 3654 clipped left out (`unit-tests-stats.txt`) |
 | new `cpu_join::stepped_tops_equal_divided_tops_on_production_fields` (PLAN_FIELDS b42–b64, 25 partitions each, every key) | ok: 3,698,847 tops equal (`unit-tests-stats.txt`) |
 | new `the_test_windows_step_their_top_certificates` | ok (FD on every window but b10's) |
@@ -81,7 +112,27 @@ wall seconds.
 - One outlier: main's r2 b60 1e16 4-thread run (3675 ms; load 1.75 at its start), not used by the median.
 - Against the prototype (SCOPING §3.4, FD alone, same harness shapes): b60 1e16 1t 2616 → 2410 ms here, b62 1e17 s0 1t
   2659 → 2306 ms (prototype FD + lean prefilter: 2407 / 2360).
-- The b62 1e14 field gains least: per-partition bottom work (extend + lists) is 39 % of main's join there.
+- The b62 1e14 field gains least of b60/b62: per-partition bottom work (extend + lists) is 39 % of main's join there.
+
+### b64 (review follow-up; `raw/pr/ab-runs-b64.txt`, `scripts/run_ab_b64.sh`)
+
+Same harness and method; main = `6f060a9`, PR = the follow-up's code (`c8099d94`; hot path identical to `fba54316`).
+Field start 41242006262957161709568 (`PLAN_FIELDS`' b64, the GPU PRs' b64 field). Round start loads 2.00, 1.99, 1.40
+(all ≤ 2, none discarded); per-run loads were higher after 4-thread runs (load average lag).
+
+| work | thr | main (rounds) | spread | PR (rounds) | spread | × | per round | survivors / checked (both, every round) |
+|---|---|---|---|---|---|---|---|---|
+| b64 1e16, 4 partitions | 1 | 4921 (4921, 4963, 4878) | 1.7 % | 4738 (4738, 4719, 4749) | 0.6 % | **1.039** | 1.039, 1.052, 1.027 | 379,345,226 / 23,071,561 |
+| b64 1e16, 16 partitions | 4 | 5260 (5260, 5365, 5208) | 3.0 % | 4925 (4925, 4941, 4905) | 0.7 % | **1.068** | 1.068, 1.086, 1.062 | 1,537,343,011 / 93,506,501 |
+| b64 1e14 whole (4096 partitions) | 1 | 359.0 s (359.0, 359.1, 351.7) | 2.1 % | 333.7 s (336.8, 331.5, 333.7) | 1.6 % | **1.076** | 1.066, 1.083, 1.054 | 5,702,041,796 / 346,647,759 |
+| b64 1e14 whole | 4 | 96.1 s (96.1, 134.0, 91.6) | 44.2 % | 88.3 s (88.3, 89.8, 87.7) | 2.4 % | **1.088** | 1.088, 1.493, 1.045 | same |
+
+- **b64: ×1.04–1.09**, a gain but far below b60/b62's ×1.25–1.29. Not profiled. Likely reasons: b64 partitions carry
+  ~2.8× b60's survivors at 1e16 (more scan/survivor time, so a smaller certificate share), and 9.3–9.5 % of b64's
+  prefixes seed (prototype measurement) against 2.3 % at b60.
+- Outlier: main's r2 4-thread b64 1e14 run (134.0 s), other load; not in the median.
+- The b64 1e14 counts equal the GPU PRs' main counts for the same field (#240's body, its `NICE_TEST_JOIN_COMPARE` row: 5,702,041,796 /
+  346,647,759).
 
 ## NiceMark CPU nice-only
 
@@ -108,6 +159,8 @@ order alternating (r1 main→PR, r2 PR→main, …); every run started at load �
 
 - Machine: ivory, AMD EPYC-Rome (Zen 2) VM, 4 vCPUs, AVX2 only, every run `nice -n 19`. Other load: ~25 idle-ish
   Claude CLI processes and other agents' occasional git/ssh (1-min load ~1.0–1.9 when idle).
+- Follow-up builds used a scratch detached worktree `.worktrees/l42-main-ab` at `6f060a9` for main's harness (removed
+  afterwards with its target).
 - Builds: main client 1 min 10 s (after the deps' 1 min 29 s), target peaked at 2.0 GB (with clippy); `df -h /` 15 GB
   free at start, 13 GB at the peak. `target/` and `target-ab/` removed at the end; worktree kept.
 - The A/B harness (`raw/pr/scripts/l42_ab.rs`) is a public-API-only copy of the scoping's `l42_prof` (no phase
