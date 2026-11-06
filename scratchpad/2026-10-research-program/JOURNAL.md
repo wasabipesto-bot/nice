@@ -71,6 +71,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   into FD / clipped / scan / fill, L37's ablation on the lean join, stage-check cadence, spill vs
   no-spill timing. Decides whether L46 (static bucket order) gets a prototype tomorrow.
 - 11:26 UTC: **#246 (f3fb390) and #247 (caef70e) CI fully green** (25 pass, 3 skipped each), #241 too; no comments.
+- **L45 done (13:55 UTC, L45.1):** top scan + fill measured at 9.7 % / 9.0 % of the field (fill
+  8.6 %) → **L46 static bucket order gets its prototype tomorrow** (ceiling ×1.10). The lean join
+  after #246: base 16 %, **AND 8.3 %** (latency no longer hides it), walk 6.4 %, prefilter 16 %,
+  stage 1.3 %. Stage check once per batch is an exact ×1.02 rider. No spills in production
+  (NVRTC compiles at 47–48 registers; the spill came from nvcc offline); NVRTC's PTX is 1.7 % of
+  the field slower than nvcc with a launch bound (not actionable in CubeCL today). Box
+  l45-measure destroyed (2.7 h). Day: 4 boxes, $1.3; 9 agents; director ~7 h.
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 

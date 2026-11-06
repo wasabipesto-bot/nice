@@ -7,9 +7,9 @@ import re, sys, glob, os, statistics as st
 D = sys.argv[1] if len(sys.argv) > 1 else 'box'
 med = st.median
 KEYS = ['setup', 'device_wall', 'upload', 'inputs', 'top', 'bucket', 'join', 'check', 'read', 'probe', 'unattributed',
-        'top_fd', 'top_clip', 'top_scan', 'top_fill', 'clip_launches', 'spilled', 'batches', 'slots',
+        'top_fd', 'top_clip', 'top_scan', 'top_fill', 'clip_launches', 'spilled', 'batches', 'slots', 'null',
         'pairs', 'padded_pairs', 'survivors', 'checked', 'tops', 'listed', 'size', 'partitions']
-EXACT = {'e17_b62': (1020844021499, 62584252554), 'e16_b60': (460847952346, 30871838404)}
+EXACT = {'e17_b62': (1020844021499, 62584252554), 'e16_b60': (460847952346, 30871838404)}  # per run (1 / 2 fields)
 FIELDS = [('e17_b62', 'b62 1e17 (1 field)'), ('e16_b60', 'b60 1e16 (per field, 2 fields)')]
 def prof(path):
     out = []
@@ -26,7 +26,8 @@ def thr(path):
     m = re.findall(r'JOIN THROUGHPUT.*?fields=(\d+).*?per_field=([0-9.]+).*?device=([0-9.]+)s.*?survivors=(\d+) checked=(\d+) found=(\d+)', t)
     if not m: return None
     f, pf, dev, s, c, fo = m[-1]
-    return dict(fields=int(f), per_field=float(pf), device=float(dev) / int(f), survivors=int(s), checked=int(c), found=int(fo))
+    # device= is the mean device seconds per field; survivors / checked are the run's totals
+    return dict(fields=int(f), per_field=float(pf), device=float(dev), survivors=int(s), checked=int(c), found=int(fo))
 def smi(path):
     mhz, w = [], []
     if not os.path.exists(path): return None, None
@@ -66,7 +67,7 @@ def load(prefix):
     return runs
 def counts_ok(r, fld):
     s, c = EXACT[fld]; t = r['thr']
-    return t['survivors'] == s * t['fields'] and t['checked'] == c * t['fields']
+    return t['survivors'] == s and t['checked'] == c
 def fmt(xs, d=2): return ', '.join(f'{x:.{d}f}' for x in xs)
 def spread(xs): return 100 * (max(xs) - min(xs)) / med(xs) if len(xs) > 1 else 0
 MODES = [('c', 'full (#246)'), ('a', 'AND only'), ('b', 'walk without walk_pf_lean, no stage'), ('p', 'walk + walk_pf_lean, no stage'),
@@ -81,7 +82,7 @@ for fld, label in FIELDS:
         rs = R[t]
         if not rs: continue
         exact = all(counts_ok(r, fld) for r in rs)
-        cnt = 'exact' if exact else f'{rs[0]["thr"]["survivors"] // rs[0]["thr"]["fields"]:,} / {rs[0]["thr"]["checked"] // rs[0]["thr"]["fields"]:,}' + ('' if len({(r['thr']['survivors'], r['thr']['checked']) for r in rs}) == 1 else ' (vary)')
+        cnt = 'exact' if exact else f'{rs[0]["thr"]["survivors"]:,} / {rs[0]["thr"]["checked"]:,}' + ('' if len({(r['thr']['survivors'], r['thr']['checked']) for r in rs}) == 1 else ' (vary)')
         if 'join' in rs[0]:
             j = [r['join'] for r in rs]; fl = [r['field'] for r in rs]
             print(f'| {t}: {nm} | {med(j):.2f} ({fmt(j)}) | {spread(j):.1f} % | {med(fl):.2f} ({fmt(fl)}) | | {fmt([r["mhz"] or 0 for r in rs], 0)} | {fmt([r["w"] or 0 for r in rs], 0)} | {", ".join(vstr(r["var"]) for r in rs)} | {cnt} |')
@@ -91,7 +92,7 @@ for fld, label in FIELDS:
     c = R['c']
     if not c or 'join' not in c[0]: continue
     # Part A: top split
-    fieldp = med([r['field'] for r in c]); unp = med([r['dev'] for r in R['u']]) if R['u'] else None
+    fieldp = med([r['field'] for r in c]); unp = med([r['dev'] for r in R['u']]) if R['u'] else float('nan')
     mh = med([r['mhz'] for r in c if r['mhz']])
     print(f'\n### Part A, {label}: phases of mode c (3 profiled runs; medians; % of the profiled field excl. probe; '
           f'% of the unprofiled median {unp if unp else float("nan"):.2f} s)\n')
@@ -100,18 +101,20 @@ for fld, label in FIELDS:
     rows = [('top: FD kernel (`top_fd_kernel`)', 'top_fd'), ('top: clipped-block launch (`top_kernel`)', 'top_clip'),
             ('top: `top_scan_kernel`', 'top_scan'), ('top: `top_fill_kernel`', 'top_fill'), ('**top total**', 'top'),
             ('bucket', 'bucket'), ('join', 'join'), ('check', 'check'), ('upload', 'upload'), ('inputs', 'inputs'),
-            ('read', 'read'), ('unattributed', 'unattributed'), ('probe (excluded)', 'probe')]
+            ('read', 'read'), ('null mark (one empty sync per batch)', 'null'), ('unattributed', 'unattributed'), ('probe (excluded)', 'probe')]
     for nm, k in rows:
         xs = [r[k] for r in c]
         cyc = med([r[k] * r['mhz'] / 1000 for r in c if r['mhz']])
-        print(f'| {nm} | {med(xs):.3f} ({fmt(xs, 3)}) | {100 * med(xs) / fieldp:.2f} % | {100 * med(xs) / unp if unp else float("nan"):.2f} % | {cyc:.2f} |')
+        print(f'| {nm} | {med(xs):.3f} ({fmt(xs, 3)}) | {100 * med(xs) / fieldp:.2f} % | {100 * med(xs) / unp:.2f} % | {cyc:.2f} |')
     ss = [r['top_scan'] + r['top_fill'] for r in c]; ssc = [r['top_scan'] + r['top_fill'] + r['top_clip'] for r in c]
-    print(f'| **scan + fill** | {med(ss):.3f} ({fmt(ss, 3)}) | **{100 * med(ss) / fieldp:.2f} %** | **{100 * med(ss) / unp if unp else float("nan"):.2f} %** | |')
-    print(f'| scan + fill + clipped | {med(ssc):.3f} ({fmt(ssc, 3)}) | {100 * med(ssc) / fieldp:.2f} % | {100 * med(ssc) / unp if unp else float("nan"):.2f} % | |')
+    print(f'| **scan + fill** | {med(ss):.3f} ({fmt(ss, 3)}) | **{100 * med(ss) / fieldp:.2f} %** | **{100 * med(ss) / unp:.2f} %** | |')
+    print(f'| scan + fill + clipped | {med(ssc):.3f} ({fmt(ssc, 3)}) | {100 * med(ssc) / fieldp:.2f} % | {100 * med(ssc) / unp:.2f} % | |')
     print(f'| field (profiled device excl. probe) | {fieldp:.3f} ({fmt([r["field"] for r in c], 3)}) | | | |')
     print(f'\nclip launches/field {c[0]["clip_launches"]:.0f}, batches/field {c[0]["batches"]:.0f}, slots {c[0]["slots"]:.0f}, kept tops/field {c[0]["tops"]:.4g}; '
           f'scan+fill per kept top {1e9 * med(ss) / c[0]["tops"]:.3f} ns; profiled vs unprofiled: {fieldp:.2f} + probe {med([r["probe"] for r in c]):.2f} vs {unp:.2f} s '
-          f'(clock c {mh:.0f} / u {med([r["mhz"] for r in R["u"] if r["mhz"]]) if R["u"] else 0:.0f} MHz)')
+          f'(clock c {mh:.0f} / u {med([r["mhz"] for r in R["u"] if r["mhz"]]) if R["u"] else 0:.0f} MHz); '
+          f'per batch: scan {1e6 * med([r["top_scan"] for r in c]) / c[0]["batches"]:.0f} us, fill {1e6 * med([r["top_fill"] for r in c]) / c[0]["batches"]:.0f} us, '
+          f'null mark {1e6 * med([r.get("null", 0) for r in c]) / c[0]["batches"]:.1f} us, clipped {1e6 * med([r["top_clip"] for r in c]) / max(c[0]["clip_launches"], 1):.0f} us per launch')
     # Part B: ablation split
     if all(R[t] and 'join' in R[t][0] for t in 'cabpz'):
         J = {t: med([r['join'] for r in R[t]]) for t in ['c', 'a', 'b', 'p', 'z', 'd', 's7', 's8', 's15'] if R[t]}
@@ -138,21 +141,57 @@ for fld, label in FIELDS:
             pr = [r0['join'] / r1['join'] for r1, r0 in zip(R[t], R['c'])]
             fl = med([r['field'] for r in R[t]])
             print(f'| {t} | {J[t]:.2f} ({fmt([r["join"] for r in R[t]])}) | x{J["c"] / J[t]:.4f} | {fmt(pr, 4)} | x{Jc["c"] / Jc[t]:.4f} | {fl:.2f} | x{fieldp / fl:.4f} |')
-# spill / no-spill pinned
+# register variants, pinned (chain_sn.sh): N runtime compile, M nvcc 5 cubes (no spill), S nvcc with spills
 for fld, label in FIELDS:
-    S = load(f'sn_S_{fld}'); N = load(f'sn_N_{fld}')
-    if not S and not N: continue
-    print(f'\n## spill vs no-spill, {label} (pinned PTX; profile on)\n')
-    print('| variant | join kernel | join s/field (rounds) | field s (rounds) | SM MHz | counts |')
-    print('|---|---|---|---|---|---|')
-    for nm, rs in [('S (spill)', S), ('N (no spill)', N)]:
+    V = {v: load(f'sn_{v}_{fld}') for v in 'NMS'}
+    if not any(V.values()): continue
+    print(f'\n## join-kernel register variants, {label} (every kernel image pinned; profile on)\n')
+    print('| variant | join kernel | join s/field (rounds) | spread | field s (rounds) | SM MHz | counts |')
+    print('|---|---|---|---|---|---|---|')
+    names = {'N': 'N: runtime compile (NVRTC -> driver JIT)', 'M': 'M: nvcc, 5 cubes/SM, no spill', 'S': 'S: nvcc with spills'}
+    for v in 'NMS':
+        rs = V[v]
         if not rs: continue
-        print(f'| {nm} | {", ".join(vstr(r["var"]) for r in rs)} | {med([r["join"] for r in rs]):.3f} ({fmt([r["join"] for r in rs], 3)}) | '
+        j = [r['join'] for r in rs]
+        print(f'| {names[v]} | {", ".join(vstr(r["var"]) for r in rs)} | {med(j):.3f} ({fmt(j, 3)}) | {spread(j):.1f} % | '
               f'{med([r["field"] for r in rs]):.3f} ({fmt([r["field"] for r in rs], 3)}) | {fmt([r["mhz"] or 0 for r in rs], 0)} | {"exact" if all(counts_ok(r, fld) for r in rs) else "DIFFER"} |')
-    if S and N:
-        pr = [s['join'] / n['join'] for s, n in zip(S, N)]
-        print(f'\nN vs S: join x{med([r["join"] for r in S]) / med([r["join"] for r in N]):.4f} (per round {fmt(pr, 4)}), '
-              f'field x{med([r["field"] for r in S]) / med([r["field"] for r in N]):.4f}, cycles x{med([r["join"] * r["mhz"] for r in S]) / med([r["join"] * r["mhz"] for r in N]):.4f}')
+    for a, b in [('S', 'M'), ('N', 'M'), ('S', 'N')]:
+        if V[a] and V[b]:
+            ja = med([r['join'] for r in V[a]]); jb = med([r['join'] for r in V[b]])
+            ca = med([r['join'] * r['mhz'] for r in V[a] if r['mhz']]); cb = med([r['join'] * r['mhz'] for r in V[b] if r['mhz']])
+            print(f'\n{a} vs {b}: join {ja:.3f} / {jb:.3f} s = x{ja / jb:.4f} (cycles x{ca / cb:.4f}); field x{med([r["field"] for r in V[a]]) / med([r["field"] for r in V[b]]):.4f}')
+# unprofiled cadence A/B (chain_ab.sh)
+for fld, label in FIELDS:
+    A = {t: load(f'ab_{t}_{fld}') for t in ['c', 's8', 's15']}
+    if not A['c']: continue
+    print(f'\n## unprofiled stage-cadence A/B, {label} (device s/field; 3 rounds, order rotating)\n')
+    print('| mode | device s/field (rounds) | spread | SM MHz | vs c | per round | cycles vs c | join variant | counts |')
+    print('|---|---|---|---|---|---|---|---|---|')
+    dc = med([r['dev'] for r in A['c']]); cc = med([r['dev'] * r['mhz'] for r in A['c'] if r['mhz']])
+    for t in ['c', 's8', 's15']:
+        rs = A[t]
+        if not rs: continue
+        d = [r['dev'] for r in rs]
+        pr = [rc['dev'] / r['dev'] for r, rc in zip(rs, A['c'])]
+        cyc = med([r['dev'] * r['mhz'] for r in rs if r['mhz']])
+        print(f'| {t} | {med(d):.3f} ({fmt(d, 3)}) | {spread(d):.1f} % | {fmt([r["mhz"] or 0 for r in rs], 0)} | x{dc / med(d):.4f} | {fmt(pr, 4)} | x{cc / cyc:.4f} | '
+              f'{", ".join(vstr(r["var"]) for r in rs)} | {"exact" if all(counts_ok(r, fld) for r in rs) else "DIFFER"} |')
+# front end / back end (chain_pq.sh)
+for fld, label in FIELDS:
+    V = {v: load(f'pq_{v}_{fld}') for v in 'NMPQ'}
+    if not any(V.values()): continue
+    print(f'\n## compile paths of the same join kernel, {label} (pinned; profile on; 2 rounds)\n')
+    print('| image | join kernel | join s/field (rounds) | field s (rounds) | SM MHz | vs M (join) | counts |')
+    print('|---|---|---|---|---|---|---|')
+    names = {'N': 'N: NVRTC PTX -> driver JIT (the runtime)', 'M': 'M: nvcc + ptxas 12.8, 5 cubes/SM', 'P': 'P: NVRTC PTX -> offline ptxas 12.8',
+             'Q': 'Q: nvcc PTX -> driver JIT'}
+    jm = med([r['join'] for r in V['M']]) if V['M'] else float('nan')
+    for v in 'NMPQ':
+        rs = V[v]
+        if not rs: continue
+        j = [r['join'] for r in rs]
+        print(f'| {names[v]} | {", ".join(vstr(r["var"]) for r in rs)} | {med(j):.3f} ({fmt(j, 3)}) | {med([r["field"] for r in rs]):.3f} ({fmt([r["field"] for r in rs], 3)}) | '
+              f'{fmt([r["mhz"] or 0 for r in rs], 0)} | x{med(j) / jm:.4f} | {"exact" if all(counts_ok(r, fld) for r in rs) else "DIFFER"} |')
 # spill counts
 sp = sorted(glob.glob(f'{D}/spc_*.log'))
 if sp:

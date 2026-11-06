@@ -1,0 +1,318 @@
+
+## b62 1e17 (1 field)
+
+| mode | join s/field (rounds) | spread | field s (profiled, excl. probe) | unprofiled device s | SM MHz | W | join variant per round | counts |
+|---|---|---|---|---|---|---|---|---|
+| c: full (#246) | 48.17 (46.83, 48.49, 48.17) | 3.5 % | 100.85 (98.39, 101.36, 100.85) | | 1573, 1538, 1531 | 178, 178, 178 | 48r, 48r, 47r | exact |
+| a: AND only | 24.30 (23.09, 24.30, 24.54) | 6.0 % | 68.06 (65.87, 68.06, 68.39) | | 1495, 1518, 1518 | 178, 177, 177 | 40r, 40r, 40r | 1,020,844,021,499 / 0 |
+| b: walk without walk_pf_lean, no stage | 30.72 (30.31, 30.72, 30.92) | 2.0 % | 74.35 (73.21, 74.35, 74.47) | | 1555, 1536, 1510 | 180, 178, 178 | 43r, 43r, 44r | 1,020,844,021,506 / 0 (vary) |
+| p: walk + walk_pf_lean, no stage | 46.83 (45.87, 46.83, 46.87) | 2.1 % | 89.82 (88.59, 89.82, 89.92) | | 1570, 1574, 1571 | 178, 178, 177 | 47r, 47r, 47r | 1,020,844,021,499 / 0 |
+| z: no AND | 15.96 (15.90, 15.97, 15.96) | 0.4 % | 58.80 (58.80, 58.72, 58.84) | | 1662, 1535, 1560 | 174, 177, 180 | 37r, 38r, 37r | 1 / 0 (vary) |
+| d: full, per-top AND (TMIN 2^30) | 57.95 (57.97, 57.95, 55.90) | 3.6 % | 110.33 (110.33, 110.92, 108.56) | | 1511, 1519, 1525 | 179, 179, 179 | 48r, 47r, 47r | exact |
+| s7: stage checked every 4 chunks | 46.46 (46.31, 46.46, 46.61) | 0.7 % | 99.51 (99.41, 99.75, 99.51) | | 1494, 1487, 1467 | 178, 178, 179 | 47r, 48r, 48r | exact |
+| s8: stage checked every 8 chunks | 45.44 (45.28, 45.44, 45.92) | 1.4 % | 98.76 (98.59, 98.76, 99.15) | | 1485, 1473, 1498 | 179, 179, 178 | 47r, 47r, 48r | exact |
+| s15: stage checked once per top batch | 45.59 (45.13, 45.78, 45.59) | 1.4 % | 98.81 (98.23, 99.04, 98.81) | | 1486, 1454, 1503 | 179, 179, 179 | 47r, 48r, 47r | exact |
+| u: full, unprofiled | | | | 100.23 (100.23, 100.31, 99.84) | 1450, 1446, 1472 | 178, 178, 180 | 47r, 47r, 47r | exact |
+
+### Part A, b62 1e17 (1 field): phases of mode c (3 profiled runs; medians; % of the profiled field excl. probe; % of the unprofiled median 100.23 s)
+
+| phase | s/field (rounds) | % of profiled field | % of unprofiled field | G-cycles at the run clock |
+|---|---|---|---|---|
+| top: FD kernel (`top_fd_kernel`) | 25.226 (24.336, 25.226, 25.248) | 25.01 % | 25.17 % | 38.65 |
+| top: clipped-block launch (`top_kernel`) | 0.002 (0.002, 0.002, 0.002) | 0.00 % | 0.00 % | 0.00 |
+| top: `top_scan_kernel` | 1.059 (1.089, 1.059, 1.048) | 1.05 % | 1.06 % | 1.63 |
+| top: `top_fill_kernel` | 8.634 (8.523, 8.634, 8.644) | 8.56 % | 8.61 % | 13.28 |
+| **top total** | 34.921 (33.950, 34.921, 34.942) | 34.62 % | 34.84 % | 53.49 |
+| bucket | 2.339 (2.339, 2.378, 2.329) | 2.32 % | 2.33 % | 3.66 |
+| join | 48.170 (46.826, 48.491, 48.170) | 47.76 % | 48.06 % | 73.74 |
+| check | 9.140 (8.861, 9.162, 9.140) | 9.06 % | 9.12 % | 13.99 |
+| upload | 2.608 (2.608, 2.602, 2.616) | 2.59 % | 2.60 % | 4.00 |
+| inputs | 2.132 (2.132, 2.142, 2.116) | 2.11 % | 2.13 % | 3.29 |
+| read | 0.726 (0.726, 0.807, 0.707) | 0.72 % | 0.72 % | 1.14 |
+| null mark (one empty sync per batch) | 0.078 (0.080, 0.073, 0.078) | 0.08 % | 0.08 % | 0.12 |
+| unattributed | 0.782 (0.864, 0.782, 0.756) | 0.78 % | 0.78 % | 1.20 |
+| probe (excluded) | 1.924 (1.855, 1.924, 1.931) | 1.91 % | 1.92 % | 2.96 |
+| **scan + fill** | 9.692 (9.612, 9.693, 9.692) | **9.61 %** | **9.67 %** | |
+| scan + fill + clipped | 9.694 (9.614, 9.695, 9.694) | 9.61 % | 9.67 % | |
+| field (profiled device excl. probe) | 100.855 (98.386, 101.358, 100.855) | | | |
+
+clip launches/field 4, batches/field 6439, slots 5, kept tops/field 3.816e+10; scan+fill per kept top 0.254 ns; profiled vs unprofiled: 100.85 + probe 1.92 vs 100.23 s (clock c 1538 / u 1450 MHz); per batch: scan 164 us, fill 1341 us, null mark 12.2 us, clipped 475 us per launch
+
+### Part B, b62 1e17 (1 field): the lean join by ablation (marginals z → a → b → p → c; join 48.17 s/field, field 100.85 s)
+
+| part | s/field | % of join | % of field | G-cycles | % of join in cycles | per round (s) |
+|---|---|---|---|---|---|---|
+| base (no AND: work items, top batch + transposed copy, wave loads + prefilter terms, per-chunk check) | 15.96 | 33.1 % | 15.8 % | 24.89 | 33.8 % | 15.90, 15.97, 15.96 |
+| AND (a − z) | 8.35 | 17.3 % | 8.3 % | 12.00 | 16.3 % | 7.18, 8.33, 8.59 |
+| walk rounds (b − a) | 6.42 | 13.3 % | 6.4 % | 10.23 | 13.9 % | 7.23, 6.42, 6.37 |
+| prefilter `walk_pf_lean` (p − b) | 16.11 | 33.4 % | 16.0 % | 26.50 | 35.9 % | 15.55, 16.11, 15.95 |
+| stage + flush (c − p) | 1.34 | 2.8 % | 1.3 % | 0.12 | 0.2 % | 0.96, 1.66, 1.30 |
+| **join (c)** | 48.17 | 100 % | 47.8 % | 73.74 | | |
+
+per-top AND (d, TMIN 2^30): join 57.95 vs 48.17 s (+9.78, x1.203 join; field 110.33 vs 100.85, x1.094)
+
+### stage cadence (profiled join s/field; ratio = c / mode, per round)
+
+| mode | join s/field (rounds) | vs c | per round | G-cycles vs c | field s | vs c |
+|---|---|---|---|---|---|---|
+| s7 | 46.46 (46.31, 46.46, 46.61) | x1.0369 | 1.0111, 1.0438, 1.0334 | x1.0677 | 99.51 | x1.0135 |
+| s8 | 45.44 (45.28, 45.44, 45.92) | x1.0601 | 1.0342, 1.0672, 1.0489 | x1.0968 | 98.76 | x1.0212 |
+| s15 | 45.59 (45.13, 45.78, 45.59) | x1.0566 | 1.0375, 1.0593, 1.0566 | x1.0997 | 98.81 | x1.0207 |
+
+## b60 1e16 (per field, 2 fields)
+
+| mode | join s/field (rounds) | spread | field s (profiled, excl. probe) | unprofiled device s | SM MHz | W | join variant per round | counts |
+|---|---|---|---|---|---|---|---|---|
+| c: full (#246) | 10.15 (10.11, 10.16, 10.15) | 0.6 % | 20.02 (20.02, 20.05, 19.97) | | 1466, 1490, 1547 | 179, 180, 178 | 47r, 47r, 47r | exact |
+| a: AND only | 4.65 (4.55, 4.66, 4.65) | 2.2 % | 12.23 (12.23, 12.38, 12.19) | | 1522, 1515, 1530 | 180, 180, 176 | 40r, 40r, 40r | 460,847,952,346 / 0 |
+| b: walk without walk_pf_lean, no stage | 6.02 (5.94, 6.02, 6.03) | 1.5 % | 13.66 (13.46, 13.70, 13.66) | | 1490, 1505, 1511 | 179, 180, 180 | 44r, 44r, 43r | 460,847,952,346 / 0 (vary) |
+| p: walk + walk_pf_lean, no stage | 9.79 (9.76, 9.79, 9.79) | 0.3 % | 17.32 (17.32, 17.34, 17.17) | | 1557, 1533, 1551 | 180, 180, 180 | 47r, 47r, 47r | 460,847,952,346 / 0 |
+| z: no AND | 3.03 (3.03, 2.99, 3.03) | 1.2 % | 10.39 (10.37, 10.39, 10.40) | | 1568, 1515, 1530 | 180, 179, 178 | 37r, 38r, 37r | 0 / 0 (vary) |
+| d: full, per-top AND (TMIN 2^30) | 11.74 (11.76, 11.74, 11.72) | 0.4 % | 21.52 (21.52, 21.52, 21.57) | | 1483, 1519, 1489 | 179, 180, 178 | 48r, 48r, 48r | exact |
+| s7: stage checked every 4 chunks | 9.64 (9.64, 9.68, 9.64) | 0.4 % | 19.64 (19.60, 19.64, 19.64) | | 1498, 1478, 1465 | 180, 180, 180 | 47r, 48r, 48r | exact |
+| s8: stage checked every 8 chunks | 9.58 (9.48, 9.59, 9.58) | 1.1 % | 19.50 (19.50, 19.55, 19.47) | | 1465, 1452, 1450 | 180, 179, 180 | 47r, 48r, 48r | exact |
+| s15: stage checked once per top batch | 9.54 (9.46, 9.58, 9.54) | 1.3 % | 19.40 (19.35, 19.53, 19.40) | | 1468, 1452, 1452 | 179, 180, 180 | 47r, 48r, 48r | exact |
+| u: full, unprofiled | | | | 19.63 (19.65, 19.63, 19.62) | 1470, 1478, 1453 | 179, 180, 180 | 47r, 47r, 48r | exact |
+
+### Part A, b60 1e16 (per field, 2 fields): phases of mode c (3 profiled runs; medians; % of the profiled field excl. probe; % of the unprofiled median 19.63 s)
+
+| phase | s/field (rounds) | % of profiled field | % of unprofiled field | G-cycles at the run clock |
+|---|---|---|---|---|
+| top: FD kernel (`top_fd_kernel`) | 4.124 (4.121, 4.137, 4.124) | 20.60 % | 21.01 % | 6.16 |
+| top: clipped-block launch (`top_kernel`) | 0.001 (0.001, 0.001, 0.002) | 0.01 % | 0.01 % | 0.00 |
+| top: `top_scan_kernel` | 0.206 (0.200, 0.206, 0.217) | 1.03 % | 1.05 % | 0.31 |
+| top: `top_fill_kernel` | 1.563 (1.563, 1.565, 1.562) | 7.81 % | 7.96 % | 2.33 |
+| **top total** | 5.904 (5.885, 5.909, 5.904) | 29.50 % | 30.08 % | 8.80 |
+| bucket | 0.458 (0.465, 0.458, 0.458) | 2.29 % | 2.33 % | 0.68 |
+| join | 10.154 (10.106, 10.165, 10.154) | 50.73 % | 51.74 % | 15.15 |
+| check | 2.217 (2.217, 2.223, 2.208) | 11.08 % | 11.30 % | 3.31 |
+| upload | 0.495 (0.497, 0.495, 0.472) | 2.47 % | 2.52 % | 0.73 |
+| inputs | 0.447 (0.473, 0.447, 0.433) | 2.23 % | 2.28 % | 0.67 |
+| read | 0.157 (0.174, 0.157, 0.151) | 0.79 % | 0.80 % | 0.23 |
+| null mark (one empty sync per batch) | 0.015 (0.015, 0.016, 0.015) | 0.07 % | 0.08 % | 0.02 |
+| unattributed | 0.184 (0.184, 0.184, 0.174) | 0.92 % | 0.94 % | 0.27 |
+| probe (excluded) | 0.407 (0.356, 0.407, 0.419) | 2.03 % | 2.07 % | 0.61 |
+| **scan + fill** | 1.770 (1.763, 1.770, 1.778) | **8.84 %** | **9.02 %** | |
+| scan + fill + clipped | 1.772 (1.765, 1.772, 1.780) | 8.85 % | 9.03 % | |
+| field (profiled device excl. probe) | 20.018 (20.018, 20.055, 19.969) | | | |
+
+clip launches/field 4, batches/field 1350, slots 4, kept tops/field 6.891e+09; scan+fill per kept top 0.257 ns; profiled vs unprofiled: 20.02 + probe 0.41 vs 19.63 s (clock c 1490 / u 1470 MHz); per batch: scan 152 us, fill 1158 us, null mark 11.1 us, clipped 350 us per launch
+
+### Part B, b60 1e16 (per field, 2 fields): the lean join by ablation (marginals z → a → b → p → c; join 10.15 s/field, field 20.02 s)
+
+| part | s/field | % of join | % of field | G-cycles | % of join in cycles | per round (s) |
+|---|---|---|---|---|---|---|
+| base (no AND: work items, top batch + transposed copy, wave loads + prefilter terms, per-chunk check) | 3.03 | 29.8 % | 15.1 % | 4.64 | 30.6 % | 3.03, 2.99, 3.03 |
+| AND (a − z) | 1.62 | 16.0 % | 8.1 % | 2.41 | 15.9 % | 1.53, 1.66, 1.62 |
+| walk rounds (b − a) | 1.37 | 13.5 % | 6.9 % | 2.01 | 13.3 % | 1.39, 1.37, 1.38 |
+| prefilter `walk_pf_lean` (p − b) | 3.77 | 37.1 % | 18.8 % | 6.13 | 40.5 % | 3.82, 3.77, 3.76 |
+| stage + flush (c − p) | 0.37 | 3.6 % | 1.8 % | -0.05 | -0.3 % | 0.34, 0.38, 0.36 |
+| **join (c)** | 10.15 | 100 % | 50.7 % | 15.15 | | |
+
+per-top AND (d, TMIN 2^30): join 11.74 vs 10.15 s (+1.58, x1.156 join; field 21.52 vs 20.02, x1.075)
+
+### stage cadence (profiled join s/field; ratio = c / mode, per round)
+
+| mode | join s/field (rounds) | vs c | per round | G-cycles vs c | field s | vs c |
+|---|---|---|---|---|---|---|
+| s7 | 9.64 (9.64, 9.68, 9.64) | x1.0528 | 1.0482, 1.0500, 1.0528 | x1.0589 | 19.64 | x1.0195 |
+| s8 | 9.58 (9.48, 9.59, 9.58) | x1.0603 | 1.0655, 1.0602, 1.0603 | x1.0900 | 19.50 | x1.0268 |
+| s15 | 9.54 (9.46, 9.58, 9.54) | x1.0647 | 1.0687, 1.0615, 1.0647 | x1.0914 | 19.40 | x1.0317 |
+
+## join-kernel register variants, b62 1e17 (1 field) (every kernel image pinned; profile on)
+
+| variant | join kernel | join s/field (rounds) | spread | field s (rounds) | SM MHz | counts |
+|---|---|---|---|---|---|---|
+| N: runtime compile (NVRTC -> driver JIT) | 48r, 48r, 48r | 48.733 (48.307, 48.733, 48.784) | 1.0 % | 101.454 (100.834, 101.454, 101.622) | 1498, 1503, 1520 | exact |
+| M: nvcc, 5 cubes/SM, no spill | 47r, 47r, 47r | 47.104 (46.988, 47.193, 47.104) | 0.4 % | 99.778 (99.213, 99.881, 99.778) | 1522, 1538, 1524 | exact |
+| S: nvcc with spills | 40r+5STL, 40r+5STL, 40r+5STL | 48.455 (47.397, 48.455, 48.499) | 2.3 % | 101.184 (99.728, 101.705, 101.184) | 1528, 1486, 1509 | exact |
+
+S vs M: join 48.455 / 47.104 s = x1.0287 (cycles x1.0085); field x1.0141
+
+N vs M: join 48.733 / 47.104 s = x1.0346 (cycles x1.0204); field x1.0168
+
+S vs N: join 48.455 / 48.733 s = x0.9943 (cycles x0.9883); field x0.9973
+
+## join-kernel register variants, b60 1e16 (per field, 2 fields) (every kernel image pinned; profile on)
+
+| variant | join kernel | join s/field (rounds) | spread | field s (rounds) | SM MHz | counts |
+|---|---|---|---|---|---|---|
+| N: runtime compile (NVRTC -> driver JIT) | 48r, 48r, 48r | 10.150 (10.150, 10.163, 10.098) | 0.6 % | 19.980 (19.905, 20.018, 19.980) | 1500, 1539, 1492 | exact |
+| M: nvcc, 5 cubes/SM, no spill | 47r, 47r, 47r | 9.818 (9.812, 9.818, 9.843) | 0.3 % | 19.638 (19.697, 19.638, 19.608) | 1500, 1485, 1517 | exact |
+| S: nvcc with spills | 40r+5STL, 40r+5STL, 40r+5STL | 9.983 (9.983, 10.006, 9.980) | 0.3 % | 19.937 (19.937, 19.921, 19.983) | 1552, 1457, 1451 | exact |
+
+S vs M: join 9.983 / 9.818 s = x1.0168 (cycles x0.9906); field x1.0153
+
+N vs M: join 10.150 / 9.818 s = x1.0339 (cycles x1.0345); field x1.0174
+
+S vs N: join 9.983 / 10.150 s = x0.9835 (cycles x0.9576); field x0.9979
+
+## unprofiled stage-cadence A/B, b62 1e17 (1 field) (device s/field; 3 rounds, order rotating)
+
+| mode | device s/field (rounds) | spread | SM MHz | vs c | per round | cycles vs c | join variant | counts |
+|---|---|---|---|---|---|---|---|---|
+| c | 99.492 (99.330, 99.979, 99.492) | 0.7 % | 1465, 1502, 1474 | x1.0000 | 1.0000, 1.0000, 1.0000 | x1.0000 | 47r, 48r, 47r | exact |
+| s8 | 97.354 (97.076, 97.440, 97.354) | 0.4 % | 1467, 1505, 1456 | x1.0220 | 1.0232, 1.0261, 1.0220 | x1.0301 | 47r, 48r, 47r | exact |
+| s15 | 97.507 (97.591, 97.507, 96.618) | 1.0 % | 1449, 1475, 1438 | x1.0204 | 1.0178, 1.0254, 1.0297 | x1.0375 | 48r, 48r, 47r | exact |
+
+## unprofiled stage-cadence A/B, b60 1e16 (per field, 2 fields) (device s/field; 3 rounds, order rotating)
+
+| mode | device s/field (rounds) | spread | SM MHz | vs c | per round | cycles vs c | join variant | counts |
+|---|---|---|---|---|---|---|---|---|
+| c | 19.529 (19.725, 19.529, 19.477) | 1.3 % | 1465, 1483, 1533 | x1.0000 | 1.0000, 1.0000, 1.0000 | x1.0000 | 48r, 47r, 47r | exact |
+| s8 | 19.151 (19.212, 19.151, 19.128) | 0.4 % | 1457, 1462, 1449 | x1.0197 | 1.0267, 1.0197, 1.0182 | x1.0348 | 48r, 48r, 47r | exact |
+| s15 | 19.093 (19.093, 19.149, 19.055) | 0.5 % | 1442, 1522, 1449 | x1.0228 | 1.0331, 1.0198, 1.0221 | x1.0487 | 47r, 47r, 47r | exact |
+
+## compile paths of the same join kernel, b62 1e17 (1 field) (pinned; profile on; 2 rounds)
+
+| image | join kernel | join s/field (rounds) | field s (rounds) | SM MHz | vs M (join) | counts |
+|---|---|---|---|---|---|---|
+| N: NVRTC PTX -> driver JIT (the runtime) | 48r, 48r | 48.543 (48.434, 48.651) | 100.869 (101.039, 100.700) | 1513, 1515 | x1.0346 | exact |
+| M: nvcc + ptxas 12.8, 5 cubes/SM | 47r, 47r | 46.920 (46.879, 46.961) | 99.307 (99.334, 99.281) | 1510, 1526 | x1.0000 | exact |
+| P: NVRTC PTX -> offline ptxas 12.8 | 48r, 48r | 48.303 (48.024, 48.583) | 100.526 (100.152, 100.900) | 1566, 1508 | x1.0295 | exact |
+| Q: nvcc PTX -> driver JIT | 40r+6STL, 40r+6STL | 48.381 (48.222, 48.540) | 101.212 (101.079, 101.345) | 1493, 1489 | x1.0311 | exact |
+
+## compile paths of the same join kernel, b60 1e16 (per field, 2 fields) (pinned; profile on; 2 rounds)
+
+| image | join kernel | join s/field (rounds) | field s (rounds) | SM MHz | vs M (join) | counts |
+|---|---|---|---|---|---|---|
+| N: NVRTC PTX -> driver JIT (the runtime) | 48r, 48r | 10.074 (10.065, 10.082) | 19.875 (19.879, 19.870) | 1479, 1506 | x1.0338 | exact |
+| M: nvcc + ptxas 12.8, 5 cubes/SM | 47r, 47r | 9.745 (9.746, 9.743) | 19.594 (19.566, 19.623) | 1498, 1491 | x1.0000 | exact |
+| P: NVRTC PTX -> offline ptxas 12.8 | 48r, 48r | 10.084 (10.070, 10.098) | 19.874 (19.938, 19.810) | 1498, 1487 | x1.0348 | exact |
+| Q: nvcc PTX -> driver JIT | 40r+6STL, 40r+6STL | 10.003 (10.002, 10.004) | 19.827 (19.805, 19.850) | 1470, 1451 | x1.0265 | exact |
+
+## stage spills (NICE_EXP_JOIN_SPILLCNT=1, one run each)
+
+| run | spilled pairs/field | checked/field | % of checked | join s |
+|---|---|---|---|---|
+| spc_c_e16_b60 | 0 | 15,435,919,202 | 0.0000 % | 10.12 |
+| spc_c_e17_b62 | 0 | 62,584,252,554 | 0.0000 % | 48.47 |
+| spc_s15_e16_b60 | 0 | 15,435,919,202 | 0.0000 % | 9.56 |
+| spc_s15_e17_b62 | 0 | 62,584,252,554 | 0.0000 % | 44.98 |
+| spc_s7_e16_b60 | 0 | 15,435,919,202 | 0.0000 % | 9.58 |
+| spc_s8_e16_b60 | 0 | 15,435,919,202 | 0.0000 % | 9.57 |
+
+## join-kernel variants per process (driver JIT of each process's own PTX)
+
+ab_c_e16_b60_r1 #6:48r:sass1184:stl0:ldl0:5813c99f
+ab_c_e16_b60_r2 #6:47r:sass1168:stl0:ldl0:6d7d05af
+ab_c_e16_b60_r3 #6:47r:sass1168:stl0:ldl0:ef87f920
+ab_c_e17_b62_r1 #6:47r:sass1176:stl0:ldl0:380cf98a
+ab_c_e17_b62_r2 #6:48r:sass1184:stl0:ldl0:21c706bc
+ab_c_e17_b62_r3 #6:47r:sass1176:stl0:ldl0:7bbd43d7
+ab_s15_e16_b60_r1 #6:47r:sass1168:stl0:ldl0:557d9534
+ab_s15_e16_b60_r2 #6:47r:sass1176:stl0:ldl0:0f40d042
+ab_s15_e16_b60_r3 #6:47r:sass1168:stl0:ldl0:78f7ba81
+ab_s15_e17_b62_r1 #6:48r:sass1184:stl0:ldl0:2108cf8e
+ab_s15_e17_b62_r2 #6:48r:sass1184:stl0:ldl0:41e0d974
+ab_s15_e17_b62_r3 #6:47r:sass1176:stl0:ldl0:6a482f8e
+ab_s8_e16_b60_r1 #6:48r:sass1184:stl0:ldl0:748348ec
+ab_s8_e16_b60_r2 #6:48r:sass1184:stl0:ldl0:5b9a7943
+ab_s8_e16_b60_r3 #6:47r:sass1176:stl0:ldl0:21b301c0
+ab_s8_e17_b62_r1 #6:47r:sass1184:stl0:ldl0:13b72c1b
+ab_s8_e17_b62_r2 #6:48r:sass1192:stl0:ldl0:b8cf2ca8
+ab_s8_e17_b62_r3 #6:47r:sass1192:stl0:ldl0:d98a2e14
+m_a_e16_b60_r1 #6:40r:sass992:stl0:ldl0:04e5c2cc
+m_a_e16_b60_r2 #6:40r:sass1000:stl0:ldl0:aec2c134
+m_a_e16_b60_r3 #6:40r:sass1000:stl0:ldl0:952dd4bf
+m_a_e17_b62_r1 #6:40r:sass1000:stl0:ldl0:ba8aa2ac
+m_a_e17_b62_r2 #6:40r:sass1008:stl0:ldl0:6c015bcc
+m_a_e17_b62_r3 #6:40r:sass1008:stl0:ldl0:9be969a6
+m_b_e16_b60_r1 #6:44r:sass1056:stl0:ldl0:dd30f17a
+m_b_e16_b60_r2 #6:44r:sass1064:stl0:ldl0:99e4a50a
+m_b_e16_b60_r3 #6:43r:sass1064:stl0:ldl0:7f2bc422
+m_b_e17_b62_r1 #6:43r:sass1072:stl0:ldl0:fa74cf4a
+m_b_e17_b62_r2 #6:43r:sass1064:stl0:ldl0:3985690c
+m_b_e17_b62_r3 #6:44r:sass1064:stl0:ldl0:9f2927b7
+m_c_e16_b60_r1 #6:47r:sass1176:stl0:ldl0:e4241cb7
+m_c_e16_b60_r2 #6:47r:sass1176:stl0:ldl0:ca916d42
+m_c_e16_b60_r3 #6:47r:sass1176:stl0:ldl0:77840ae9
+m_c_e17_b62_r1 #6:48r:sass1184:stl0:ldl0:97d73c08
+m_c_e17_b62_r2 #6:48r:sass1184:stl0:ldl0:93192bac
+m_c_e17_b62_r3 #6:47r:sass1176:stl0:ldl0:aa82c6fc
+m_d_e16_b60_r1 #6:48r:sass1184:stl0:ldl0:5aa07ef6
+m_d_e16_b60_r2 #6:48r:sass1184:stl0:ldl0:e2c141cc
+m_d_e16_b60_r3 #6:48r:sass1184:stl0:ldl0:cd6a5541
+m_d_e17_b62_r1 #6:48r:sass1184:stl0:ldl0:a3e6b537
+m_d_e17_b62_r2 #6:47r:sass1184:stl0:ldl0:b5cf0210
+m_d_e17_b62_r3 #6:47r:sass1176:stl0:ldl0:19ce7b88
+m_p_e16_b60_r1 #6:47r:sass1120:stl0:ldl0:c803b2e9
+m_p_e16_b60_r2 #6:47r:sass1120:stl0:ldl0:9840c5d7
+m_p_e16_b60_r3 #6:47r:sass1120:stl0:ldl0:ae9d6b76
+m_p_e17_b62_r1 #6:47r:sass1128:stl0:ldl0:31bce0ea
+m_p_e17_b62_r2 #6:47r:sass1136:stl0:ldl0:b72df003
+m_p_e17_b62_r3 #6:47r:sass1136:stl0:ldl0:976b59a2
+m_s15_e16_b60_r1 #6:47r:sass1168:stl0:ldl0:f987c4cc
+m_s15_e16_b60_r2 #6:48r:sass1184:stl0:ldl0:8db807ea
+m_s15_e16_b60_r3 #6:48r:sass1184:stl0:ldl0:2e52401f
+m_s15_e17_b62_r1 #6:47r:sass1176:stl0:ldl0:9f2e2e90
+m_s15_e17_b62_r2 #6:48r:sass1184:stl0:ldl0:1633b0a2
+m_s15_e17_b62_r3 #6:47r:sass1184:stl0:ldl0:66f74519
+m_s7_e16_b60_r1 #6:47r:sass1184:stl0:ldl0:9b38556a
+m_s7_e16_b60_r2 #6:48r:sass1184:stl0:ldl0:79caff6d
+m_s7_e16_b60_r3 #6:48r:sass1184:stl0:ldl0:e84c7fd4
+m_s7_e17_b62_r1 #6:47r:sass1192:stl0:ldl0:3ca4e702
+m_s7_e17_b62_r2 #6:48r:sass1192:stl0:ldl0:3150edea
+m_s7_e17_b62_r3 #6:48r:sass1192:stl0:ldl0:cfdf1908
+m_s8_e16_b60_r1 #6:47r:sass1176:stl0:ldl0:7019fafd
+m_s8_e16_b60_r2 #6:48r:sass1184:stl0:ldl0:679c7933
+m_s8_e16_b60_r3 #6:48r:sass1184:stl0:ldl0:da213601
+m_s8_e17_b62_r1 #6:47r:sass1184:stl0:ldl0:456af27a
+m_s8_e17_b62_r2 #6:47r:sass1184:stl0:ldl0:6961a6a1
+m_s8_e17_b62_r3 #6:48r:sass1192:stl0:ldl0:3397bf82
+m_u_e16_b60_r1 #6:47r:sass1168:stl0:ldl0:6bed305d
+m_u_e16_b60_r2 #6:47r:sass1168:stl0:ldl0:8c628925
+m_u_e16_b60_r3 #6:48r:sass1184:stl0:ldl0:59c751e5
+m_u_e17_b62_r1 #6:47r:sass1184:stl0:ldl0:2cdf7c82
+m_u_e17_b62_r2 #6:47r:sass1176:stl0:ldl0:aa1e1432
+m_u_e17_b62_r3 #6:47r:sass1176:stl0:ldl0:80faadc2
+m_z_e16_b60_r1 #6:37r:sass696:stl0:ldl0:143b70c1
+m_z_e16_b60_r2 #6:38r:sass696:stl0:ldl0:765fd617
+m_z_e16_b60_r3 #6:37r:sass696:stl0:ldl0:1a6ecbb2
+m_z_e17_b62_r1 #6:37r:sass704:stl0:ldl0:37a428a2
+m_z_e17_b62_r2 #6:38r:sass696:stl0:ldl0:26c03348
+m_z_e17_b62_r3 #6:37r:sass704:stl0:ldl0:a96a8266
+pq_M_e16_b60_r1 #6:47r:sass1152:stl0:ldl0:2e8e1c6d #13:47r:sass1144:stl0:ldl0:b2151d50
+pq_M_e16_b60_r2 #6:47r:sass1152:stl0:ldl0:2e8e1c6d #13:47r:sass1144:stl0:ldl0:b2151d50
+pq_M_e17_b62_r1 #6:47r:sass1152:stl0:ldl0:2e8e1c6d #13:47r:sass1144:stl0:ldl0:b2151d50
+pq_M_e17_b62_r2 #6:47r:sass1152:stl0:ldl0:2e8e1c6d #13:47r:sass1144:stl0:ldl0:b2151d50
+pq_N_e16_b60_r1 #6:48r:sass1184:stl0:ldl0:5df9c36f #13:48r:sass1184:stl0:ldl0:df6d2185
+pq_N_e16_b60_r2 #6:48r:sass1184:stl0:ldl0:5df9c36f #13:48r:sass1184:stl0:ldl0:df6d2185
+pq_N_e17_b62_r1 #6:48r:sass1184:stl0:ldl0:5df9c36f #13:48r:sass1184:stl0:ldl0:df6d2185
+pq_N_e17_b62_r2 #6:48r:sass1184:stl0:ldl0:5df9c36f #13:48r:sass1184:stl0:ldl0:df6d2185
+pq_P_e16_b60_r1 #6:48r:sass1184:stl0:ldl0:aafd37e2 #13:48r:sass1184:stl0:ldl0:13d9a117
+pq_P_e16_b60_r2 #6:48r:sass1184:stl0:ldl0:aafd37e2 #13:48r:sass1184:stl0:ldl0:13d9a117
+pq_P_e17_b62_r1 #6:48r:sass1184:stl0:ldl0:aafd37e2 #13:48r:sass1184:stl0:ldl0:13d9a117
+pq_P_e17_b62_r2 #6:48r:sass1184:stl0:ldl0:aafd37e2 #13:48r:sass1184:stl0:ldl0:13d9a117
+pq_Q_e16_b60_r1 #6:40r+6STL:sass1184:stl6:ldl5:d89f0504 #13:40r+6STL:sass1184:stl6:ldl5:f7271afe
+pq_Q_e16_b60_r2 #6:40r+6STL:sass1184:stl6:ldl5:d89f0504 #13:40r+6STL:sass1184:stl6:ldl5:f7271afe
+pq_Q_e17_b62_r1 #6:40r+6STL:sass1184:stl6:ldl5:d89f0504 #13:40r+6STL:sass1184:stl6:ldl5:f7271afe
+pq_Q_e17_b62_r2 #6:40r+6STL:sass1184:stl6:ldl5:d89f0504 #13:40r+6STL:sass1184:stl6:ldl5:f7271afe
+san_a_e14 #6:40r:sass1008:stl0:ldl0:817cbb21 #13:40r:sass1000:stl0:ldl0:4ee36bde
+san_b_e14 #6:44r:sass1112:stl0:ldl0:3dbb981a #13:44r:sass1104:stl0:ldl0:9468d8a7
+san_c_e14 #6:48r:sass1224:stl0:ldl0:8a00a325 #13:47r:sass1224:stl0:ldl0:8d298d3c
+san_c_spc_e14 #6:47r:sass1232:stl0:ldl0:d772f7df #13:46r:sass1216:stl0:ldl0:fc2da2b8
+san_d_e14 #6:47r:sass1216:stl0:ldl0:9cb5eb58 #13:47r:sass1224:stl0:ldl0:83375632
+san_p_e14 #6:47r:sass1168:stl0:ldl0:c4d51dbf #13:48r:sass1168:stl0:ldl0:de311d9f
+san_s15_e14 #6:48r:sass1232:stl0:ldl0:121a0805 #13:47r:sass1224:stl0:ldl0:e5a43d78
+san_s7_e14 #6:47r:sass1232:stl0:ldl0:64c2e385 #13:48r:sass1232:stl0:ldl0:273ce517
+san_s8_e14 #6:47r:sass1232:stl0:ldl0:12aa87ce #13:48r:sass1232:stl0:ldl0:3eb43ec2
+san_z_e14 #6:38r:sass728:stl0:ldl0:8d3db31a #13:37r:sass728:stl0:ldl0:41a4f4f5
+sn_M_e16_b60_r1 #6:47r:sass1152:stl0:ldl0:2e8e1c6d #13:47r:sass1144:stl0:ldl0:b2151d50
+sn_M_e16_b60_r2 #6:47r:sass1152:stl0:ldl0:2e8e1c6d #13:47r:sass1144:stl0:ldl0:b2151d50
+sn_M_e16_b60_r3 #6:47r:sass1152:stl0:ldl0:2e8e1c6d #13:47r:sass1144:stl0:ldl0:b2151d50
+sn_M_e17_b62_r1 #6:47r:sass1152:stl0:ldl0:2e8e1c6d #13:47r:sass1144:stl0:ldl0:b2151d50
+sn_M_e17_b62_r2 #6:47r:sass1152:stl0:ldl0:2e8e1c6d #13:47r:sass1144:stl0:ldl0:b2151d50
+sn_M_e17_b62_r3 #6:47r:sass1152:stl0:ldl0:2e8e1c6d #13:47r:sass1144:stl0:ldl0:b2151d50
+sn_N_e16_b60_r1 #6:48r:sass1184:stl0:ldl0:5df9c36f #13:48r:sass1184:stl0:ldl0:df6d2185
+sn_N_e16_b60_r2 #6:48r:sass1184:stl0:ldl0:5df9c36f #13:48r:sass1184:stl0:ldl0:df6d2185
+sn_N_e16_b60_r3 #6:48r:sass1184:stl0:ldl0:5df9c36f #13:48r:sass1184:stl0:ldl0:df6d2185
+sn_N_e17_b62_r1 #6:48r:sass1184:stl0:ldl0:5df9c36f #13:48r:sass1184:stl0:ldl0:df6d2185
+sn_N_e17_b62_r2 #6:48r:sass1184:stl0:ldl0:5df9c36f #13:48r:sass1184:stl0:ldl0:df6d2185
+sn_N_e17_b62_r3 #6:48r:sass1184:stl0:ldl0:5df9c36f #13:48r:sass1184:stl0:ldl0:df6d2185
+sn_S_e16_b60_r1 #6:40r+5STL:sass1184:stl5:ldl4:f4e645db #13:40r+5STL:sass1184:stl5:ldl4:8e243ca3
+sn_S_e16_b60_r2 #6:40r+5STL:sass1184:stl5:ldl4:f4e645db #13:40r+5STL:sass1184:stl5:ldl4:8e243ca3
+sn_S_e16_b60_r3 #6:40r+5STL:sass1184:stl5:ldl4:f4e645db #13:40r+5STL:sass1184:stl5:ldl4:8e243ca3
+sn_S_e17_b62_r1 #6:40r+5STL:sass1184:stl5:ldl4:f4e645db #13:40r+5STL:sass1184:stl5:ldl4:8e243ca3
+sn_S_e17_b62_r2 #6:40r+5STL:sass1184:stl5:ldl4:f4e645db #13:40r+5STL:sass1184:stl5:ldl4:8e243ca3
+sn_S_e17_b62_r3 #6:40r+5STL:sass1184:stl5:ldl4:f4e645db #13:40r+5STL:sass1184:stl5:ldl4:8e243ca3

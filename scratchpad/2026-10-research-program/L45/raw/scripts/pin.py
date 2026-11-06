@@ -3,12 +3,19 @@
 entries of the same key (so two pins differ in the join kernel's PTX only); with --directive '.minnctapersm 6' (or
 '.maxnreg 40') that directive is added to each join kernel's entry (after its .maxntid line) instead, which makes the
 driver's JIT allocate for that occupancy (CubeCL emits only __launch_bounds__(256)).
-python3 pin.py [--directive D] OUT BASE_DIR [JOINFROM_DIR]   (dirs = /root/l45/ptx/<run>)"""
+With --replace KEY=FILE (repeatable) the entry with that key gets FILE's bytes as its image (a cubin: the driver's
+cuModuleLoadData takes a cubin as well as PTX, so CubeCL loads it unchanged).
+python3 pin.py [--directive D] [--replace KEY=FILE]... OUT BASE_DIR [JOINFROM_DIR]   (dirs = /root/l45/ptx/<run>)"""
 import glob, os, sys, shutil, re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cbor_min import entries, enc, key_raw
-args = sys.argv[1:]; directive = None
-if args[0] == '--directive': directive = args[1]; args = args[2:]
+args = sys.argv[1:]; directive = None; repl = {}
+while args[0].startswith('--'):
+    if args[0] == '--directive': directive = args[1]; args = args[2:]
+    elif args[0] == '--replace':
+        k, fn = args[1].split('=', 1); img = open(fn, 'rb').read()
+        if img[:4] != b'\x7fELF' and not img.endswith(b'\0'): img += b'\0'  # PTX text: NUL-terminated, as NVRTC's
+        repl[int(k)] = img; args = args[2:]
 out, base = args[0], args[1]; jf = args[2] if len(args) > 2 else base
 bdir = glob.glob(f'{base}/cuda/*/ptx')[0]; jdir = glob.glob(f'{jf}/cuda/*/ptx')[0]
 rel = os.path.relpath(bdir, base)
@@ -30,6 +37,11 @@ for s, e, v in entries(bd):
             val2 = {'entrypoint_name': val['entrypoint_name'], 'shared_mem_bytes': val['shared_mem_bytes'], 'ptx': arr}
             kr = key_raw(bd, s)
             raw = bytes([0xA2]) + enc('key') + kr + enc('value') + enc(val2); rep += 1
+    if v['key'] in repl:
+        val = v['value']
+        arr = [b if b < 128 else b - 256 for b in repl[v['key']]]
+        val2 = {'entrypoint_name': val['entrypoint_name'], 'shared_mem_bytes': val['shared_mem_bytes'], 'ptx': arr}
+        raw = bytes([0xA2]) + enc('key') + key_raw(bd, s) + enc('value') + enc(val2); rep += 1
     outb += raw; n += 1
 od = f'{out}/{rel}'; shutil.rmtree(out, ignore_errors=True); os.makedirs(od)
 open(f'{od}/chunk0.cbor', 'wb').write(outb)

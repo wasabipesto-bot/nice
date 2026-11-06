@@ -5,6 +5,31 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L45.1 Measurement session on #246: top-phase split, lean-join ablation, stage cadence, spills (2026-11-06, agent; `L45/RESULTS.md`, `L45/raw/` (logs, per-process kernel classification, SASS, CUDA, PTX; `analyze45.py`); branch `exp/join-l45-measure` 8a07c05 on f3fb390)
+
+RTX 3080 180 W (m139250); unprofiled field 100.23 s (b62 1e17) / 19.63 s per field (b60 1e16);
+every full-kernel run = the exact counts. **A. Top phase (3 profiled runs, medians):** FD kernel
+25.23 s = 25.2 % (b60 4.12 s = 21.0 %); clipped launches 0.0 %; `top_scan_kernel` 1.06 s = 1.06 %
+(0.21 s); **`top_fill_kernel` 8.63 s = 8.61 % (1.56 s = 7.96 %); scan + fill 9.7 % / 9.0 %** =
+0.254 / 0.257 ns per kept top (L31's 0.22–0.26). Profiled vs unprofiled +0.6 % / +2.0 %; one empty
+profile mark = 12 µs per batch. Check kernel 9.1 % / 11.3 % (L44 derived 9.5 / 11.4). **B. Lean-join
+ablation (3 interleaved profiled rounds, % of field):** base 15.9 / 15.4; **AND 8.3 / 8.3 (not
+L44's 1.1 %: #241's top record removed the latency that hid it)**; walk 6.4 / 7.0; prefilter 16.1 /
+19.2; stage + flush 1.3 / 1.9; join 48.2 s / 10.2 s. Per-top AND everywhere (TMIN 2^30) costs
+×1.094 / ×1.075 (#239 still pays). **Stage cadence (unprofiled A/B, 3 rounds vs every chunk):**
+every 8 chunks ×1.022 b62 / ×1.020 b60; once per top batch ×1.020 / ×1.023 (rounds 1.018–1.033;
+cycles ×1.03–1.05); every 4 chunks ≈ two thirds of that; all exact, the stage never fills even once
+per batch (0 spilled pairs in 6 runs) → barrier waits are ~2.5 s of L44's 23 s unattributed, not
+most. **Spills: none in production** — 100 runtime NVRTC→driver JIT compiles gave 47–48 registers,
+no spills; L41's 40 + 28 B came from nvcc's offline compile. Pinned-image timing (3 rounds): nvcc's
+spill build 1.7–2.9 % slower in the join (1.4–1.5 % of field) than nvcc's spill-free
+`__launch_bounds__(256,5)` build; the runtime compile 3.4–3.5 % slower in the join (1.7 % of field)
+than that — the gap is NVRTC's PTX, not the JIT; nvcc's PTX only wins with the 5-cube launch bound.
+**Verdicts: item 1 (scan + fill < 5 %) not fired → L46 builds (ceiling ×1.107 / ×1.099 if scan +
+fill vanish); item 5 no build** (cadence ~2 %, compile path ~1.7 %, spills 0) — once-per-batch
+stage check is an exact rider for the next join PR; the AND at 8 % of the field says re-price
+L44 §3a/§3f's AND ideas. Box 2.7 h.
+
 ## L42.3 CPU FD top certificates: review fixes, b64, PR #247 (2026-11-06, agent + director; `L42/REVIEW.md`, `L42/PR-RESULTS.md`, `L42/raw/pr/`; PR #247 head caef70e = one commit on main 6f060a9)
 
 Review (independent, with tests run): merge with small fixes, no defect; the f64 carry screen's
