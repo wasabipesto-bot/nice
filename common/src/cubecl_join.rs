@@ -3151,6 +3151,9 @@ pub(crate) struct JoinProfile {
     pub top_fill_secs: f64,
     /// L45: `top_kernel` launches (clipped-block or full).
     pub clip_launches: u64,
+    /// L45: one extra profile mark per batch with nothing queued (the
+    /// floor of a mark: a device sync and the host's bookkeeping).
+    pub null_secs: f64,
     /// L45: prefilter survivors the walk wrote straight to the list because
     /// the stage was full (`NICE_EXP_JOIN_SPILLCNT=1` only).
     pub spilled: u64,
@@ -3191,6 +3194,7 @@ impl JoinProfile {
         self.top_scan_secs += o.top_scan_secs;
         self.top_fill_secs += o.top_fill_secs;
         self.clip_launches += o.clip_launches;
+        self.null_secs += o.null_secs;
         self.spilled += o.spilled;
         self.bucket_secs += o.bucket_secs;
         self.join_secs += o.join_secs;
@@ -3835,7 +3839,8 @@ impl<R: Runtime> JoinDevice<R> {
             });
         }
         if let Some(t) = pt {
-            pt = Some(self.prof_mark(t, |p, s| p.inputs_secs += s)?);
+            let t = self.prof_mark(t, |p, s| p.inputs_secs += s)?;
+            pt = Some(self.prof_mark(t, |p, s| p.null_secs += s)?);
         }
         self.launch_top(vs, &vs_h, &top_count, &bucket_cnt, &ran, self.top_fd);
         if pt.is_some() {
@@ -4517,13 +4522,14 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         + p.bucket_secs
         + p.join_secs
         + p.check_secs
-        + p.read_secs;
+        + p.read_secs
+        + p.null_secs;
     eprintln!(
         "GPU_PROFILE base={base} start={s} end={e} size={} slices={} partitions={} batches={} \
          slots={} min_slots={} retried={} splits={} | setup={:.4} device_wall={:.4} \
          upload={:.4} inputs={:.4} top={:.4} bucket={:.4} join={:.4} check={:.4} read={:.4} \
          probe={:.4} unattributed={:.4} | top_fd={:.4} top_clip={:.4} top_scan={:.4} \
-         top_fill={:.4} clip_launches={} | ntlay={} nbp={} tops={} listed={} pairs={} \
+         top_fill={:.4} clip_launches={} null={:.4} | ntlay={} nbp={} tops={} listed={} pairs={} \
          padded_pairs={} live_buckets={} buckets={} survivors={} checked={} spilled={} hits={hits}",
         e - s,
         js.slices,
@@ -4549,6 +4555,7 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         p.top_scan_secs,
         p.top_fill_secs,
         p.clip_launches,
+        p.null_secs,
         p.ntlay,
         p.nbp,
         p.tops,
