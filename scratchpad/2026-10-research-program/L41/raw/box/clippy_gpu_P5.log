@@ -1,0 +1,133 @@
+    Checking ciborium-io v0.2.2
+    Checking hashbrown v0.15.5
+   Compiling cubecl-common v0.10.0
+   Compiling cudarc v0.19.10
+    Checking num-rational v0.4.2
+    Checking num-iter v0.1.46
+   Compiling libloading v0.9.0
+    Checking num-complex v0.4.6
+    Checking rustc-hash v2.1.3
+    Checking fixedbitset v0.5.7
+    Checking ciborium-ll v0.2.2
+    Checking type-map v0.5.1
+    Checking ciborium v0.2.2
+    Checking stable-vec v0.4.3
+   Compiling cubecl v0.10.0
+   Compiling nice_common v3.4.8-dev (/root/l41/src/P5/common)
+    Checking num v0.4.3
+    Checking gpu-descriptor v0.3.2
+    Checking petgraph v0.8.3
+    Checking wgpu-hal v29.0.4
+    Checking cubecl-ir v0.10.0
+    Checking wgpu-core-deps-windows-linux-android v29.0.4
+    Checking wgpu-core v29.0.4
+   Compiling cubecl-cuda v0.10.0
+    Checking cubecl-runtime v0.10.0
+    Checking cubecl-core v0.10.0
+    Checking wgpu v29.0.4
+    Checking cubecl-opt v0.10.0
+    Checking cubecl-std v0.10.0
+    Checking cubecl-wgpu v0.10.0
+    Checking cubecl-cpp v0.10.0
+error: 5 bindings with single-character names in scope
+    --> common/src/cubecl_join.rs:5994:18
+     |
+5994 |             let (c, q, r) = super::kernels::fx_consts(base);
+     |                  ^  ^  ^
+...
+6014 |             let m = u64::from(b2 - 1);
+     |                 ^
+...
+6019 |                     let x = (amax + p * d) % b2;
+     |                         ^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+     = note: `-D clippy::many-single-char-names` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::many_single_char_names)]`
+
+error: 5 bindings with single-character names in scope
+    --> common/src/cubecl_join.rs:5994:18
+     |
+5994 |             let (c, q, r) = super::kernels::fx_consts(base);
+     |                  ^  ^  ^
+...
+6014 |             let m = u64::from(b2 - 1);
+     |                 ^
+...
+6029 |                     let x = (a + amax * d) % b2;
+     |                         ^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+
+error: 7 bindings with single-character names in scope
+    --> common/src/cubecl_join.rs:6056:17
+     |
+6056 |             let c = super::kernels::fx_consts(base).0;
+     |                 ^
+...
+6062 |                             let d = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+     |                                 ^
+...
+6068 |                                 let u = p.wrapping_mul(dh);
+     |                                     ^
+6069 |                                 let y = p * d % b2;
+     |                                     ^
+6070 |                                 // (h, g): the digits of (A + P·D) mod b², stepped with A.
+6071 |                                 let (mut h, mut g) = (y / base, y % base);
+     |                                          ^      ^
+...
+6074 |                                     let f = (a * c).wrapping_add(u);
+     |                                         ^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+
+error: 6 bindings with single-character names in scope
+    --> common/src/cubecl_join.rs:6056:17
+     |
+6056 |             let c = super::kernels::fx_consts(base).0;
+     |                 ^
+...
+6062 |                             let d = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+     |                                 ^
+...
+6068 |                                 let u = p.wrapping_mul(dh);
+     |                                     ^
+6069 |                                 let y = p * d % b2;
+     |                                     ^
+6070 |                                 // (h, g): the digits of (A + P·D) mod b², stepped with A.
+6071 |                                 let (mut h, mut g) = (y / base, y % base);
+     |                                          ^      ^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+
+error: binding's name is too similar to existing binding
+    --> common/src/cubecl_join.rs:6176:21
+     |
+6176 |                 let seen = em | if seed { tm } else { 0 };
+     |                     ^^^^
+     |
+note: existing binding defined here
+    --> common/src/cubecl_join.rs:6173:21
+     |
+6173 |                 let seed = (r2 >> 20) & 1 == 1;
+     |                     ^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names
+     = note: `-D clippy::similar-names` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::similar_names)]`
+
+    Checking nice_client v3.4.8-dev (/root/l41/src/P5/client)
+    Checking nice-wasm-client v3.4.8-dev (/root/l41/src/P5/wasm-client)
+    Checking nice_jobs v3.4.8-dev (/root/l41/src/P5/jobs)
+    Checking nice_api v3.4.8-dev (/root/l41/src/P5/api)
+error: manually reimplementing `div_ceil`
+    --> common/src/cubecl_join.rs:5945:17
+     |
+5945 |         d * q + (d * r + b2 - 1) / b2
+     |                 ^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `(d * r).div_ceil(b2)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_div_ceil
+     = note: `-D clippy::manual-div-ceil` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::manual_div_ceil)]`
+
+error: could not compile `nice_common` (lib test) due to 6 previous errors
+clippy gpu rc=101

@@ -1,6 +1,6 @@
 # L41 RESULTS: the lean `walk_pf` (fixed-point digits, shift membership, gated top masks, per-chunk range test), RTX 3080 at 180 W (2026-11-06)
 
-PR branch on the fork: **`pr/join-lean-prefilter`** **`b6bf434`** (one commit on `pr/join-top-record` `7832f89` = upstream main
+PR branch on the fork: **`pr/join-lean-prefilter`** **`48ac631`** (one commit on `pr/join-top-record` `7832f89` = upstream main
 `6f060a9` + #241; CHANGELOG line included; PR not opened; body in `PR-BODY.md`). Prototype with the knobs (no PR):
 `exp/join-lean-pf` `a150b49` (`NICE_EXP_JOIN_PF` 0–4, `NICE_EXP_JOIN_MT`/`_FXM`/`_RCV` forms, `NICE_EXP_JOIN_ROUNDS`).
 Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Raw logs `raw/box/` (the box's
@@ -32,14 +32,16 @@ Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Ra
   | `P2` | `881e0ef`: `P` with the walk's comment moved below the range test and one test doc line | 1e1f8240 | `P2` **1c3dfee2 (= `P`, byte for byte)** |
   | `P3` | `exp/join-lean-pf-cwcopy` `d5db28b`: `P2` with the clip words copied once per batch to a plain shared array (no `ATOMS` per chunk) | b340f36c | `P3` adc4b164 |
   | `P4` | `f516356`: `P2` with two rustc warnings fixed (`let mut s_cw` → `let s_cw`; `let mut pass = false; if … { pass = … }` → `let pass = if … { … }`) | 3ea0575a | `P4` e10e2ace |
-  | `P5` | **the PR head `b6bf434`**: `P4` with `fx_digits_are_exact_everywhere` opt-in (`NICE_TEST_FX_EXHAUSTIVE=1`), since CI's lavapipe and macOS jobs run every ignored test of `nice_common` | 2f1726d2 | `P5` @@P5MD5@@ |
+  | `P5` | `b6bf434`: `P4` with `fx_digits_are_exact_everywhere` opt-in (`NICE_TEST_FX_EXHAUSTIVE=1`), since CI's lavapipe and macOS jobs run every ignored test of `nice_common` | 2f1726d2 | (not built; its lint failed on the tests) |
+  | `P6` | **the PR head `48ac631`**: `P5` with the new tests clippy-clean (`div_ceil` in the host mirror, two `many_single_char_names` allows, `seed` → `flag` in one test) | e952fb55 | `P6` @@P6MD5@@ |
 
   `P`'s source is `raw/scripts/make_pr.py` applied to 7832f89's `cubecl_join.rs`, the tests of `raw/scripts/pr_tests.rs`
   added, and rustfmt. The two warnings (unused `mut`, value never read) appeared in every build of `P` but were found
   only when the lavapipe build printed them; `cargo clippy -D warnings` would have failed. The exhaustive test, as
   first written, would have run in CI's lavapipe and macOS jobs (they run `--ignored` over the whole crate) for many
-  minutes. `P4` (the kernels of the head) was put through the CUDA list and lavapipe and timed against `P`; `P5` (the
-  head: `P4` + the test's gate, no kernel change) through the host tests, rustfmt and the lint (§4, §6).
+  minutes, and clippy (pedantic, `-D warnings`) then flagged the new tests. `P4` (the kernels of the head) was put
+  through the CUDA list and lavapipe and timed against `P`; `P6` (the head: `P4`'s kernels, the tests gated and
+  clippy-clean) through the host tests, rustfmt and the lint (§4, §6). `P5`'s lint is where the test lints showed.
 - **Harness:** L38's. `cubecl_cuda_join_throughput_fixed_fields` at L30's starts (b60 1366406074057412100454, b62
   7997740455941656911841, b64 41242006262957161709568), one untimed 1e14 warm-up field per process; metric `device=`
   (mean device seconds per field). nvidia-smi every 5 s; clock = mean SM MHz over samples at ≥ 90 % utilisation;
@@ -206,7 +208,29 @@ in-AND, out-of-range pairs:
 
 ### Lavapipe and lint (`P`)
 
-@@LVP@@
+Lavapipe (llvmpipe, LLVM 20.1.2, Mesa 25.2.8, **8-lane subgroups**, 128 MiB storage-buffer limit; binaries `P4_naga`
+= `--features cubecl`, `P4_spv` = `cubecl-spirv`; `chain_lvp.sh P4`, 08:33–08:58, beside `P4`'s CUDA list; `lvp_*_P4.log`):
+
+| check | result |
+|---|---|
+| CI's WGSL lint as the workflow runs it (`wgsl_dump_for_lint` on naga, `scripts/wgsl-lint.py` with the 13 `--require`s) | **16 shaders, 0 flagged**, rc 0. **JoinKernel b57: 26 constant divisions** (36 on the base, L38): the walk's `mod b²`, `/ b` and `% b` are gone (the batch load's `ceil(D·R/b²)` adds one), so fewer `/ K` and `% K` shapes for the lint to see, and none new flagged |
+| naga: every wgpu test of `cubecl_join` (`--ignored cubecl_join::`, as CI's lavapipe step): join parity with the CPU reference (incl. b50/b54, the b57 frontier, refused layouts), the FD-vs-top-kernel test, the certificate test, the production-field sample, the join/stride ticket test, and the exhaustive FX test | **8 ok**, 577 s; FD test 21 fields, 142 batches (20 with a clipped block), 1,018,088 tops (= #240's lavapipe run); certificate 102,365 / 33,582 / 203,413 / 69,824 |
+| direct SPIR-V (`cubecl-spirv`): the same | **8 ok**, 572 s; the same FD and certificate counts |
+
+The lavapipe runs exercise the lean prefilter's `mul_hi` (WGSL emulates it; SPIR-V's `OpUMulExtended`) and the 64-bit
+funnel shifts on 8-lane planes. (`P4`'s `fx_digits_are_exact_everywhere` ran in both, ungated: 346 s and 188 s, ok.
+That is what showed it would cost CI's lavapipe and macOS jobs minutes: `P5`/`P6` gate it.)
+
+**Lint** (`chain_lint.sh`, `just lint` as CI's lint job runs it, toolchain 1.99.1, own target dir):
+
+| check | `P5` (`b6bf434`) | **`P6` (`48ac631`, the head)** |
+|---|---|---|
+| `cargo fmt --all --check` | ok | @@FMT6@@ |
+| `cargo clippy -p "*" --all-targets -- -D warnings` | **failed**: `many_single_char_names` (×2 tests), `similar_names` (`seed`/`seen`), `manual_div_ceil` in the new tests | @@CL6A@@ |
+| the same with `--features nice_client/gpu` | failed (the same) | @@CL6B@@ |
+| the same with `--features nice_client/gpu,nice_client/cubecl-spirv` (CI's) | failed (the same) | @@CL6C@@ |
+| `P6`'s build: rustc warnings | | @@W6@@ |
+| `P6`'s host tests (the three CI tests, `join_plan::`, `cubecl_join::`; the exhaustive test skips without its env and passes with it) | | @@H6@@ |
 
 ## 5. Screen (brief step 4)
 

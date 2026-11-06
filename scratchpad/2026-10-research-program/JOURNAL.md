@@ -29,6 +29,15 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   at production shapes (1 and 4 threads), NiceMark CPU ×1.186, exact on 1.86 M random blocks,
   3.7 M production tops and whole fields. Reviewer agent launched (first use of the new rule);
   the f64 carry-test screen is flagged for it.
+- **Review of `pr/cpu-join-fd-tops` (09:40 UTC, `L42/REVIEW.md`): merge with small fixes, no
+  correctness defect.** Step/word counts cannot overflow (bounded at the slice's last prefix; 14
+  word adds a step, P³ ≤ 29 of 48 digits); seed exact; the f64 carry screen is sound (error
+  ~4e-12 vs a 2⁻²⁰ margin; 20.7 M adversarial boundary calls agree); the walk is exact in any
+  order. Fixes: a missing carry test (two mutations survive the suite: the ripple past the carry
+  word and the `cin` carry — code correct, test missing; the in-word case occurs ~once per
+  thousand b60 1e16 fields), body slips (3e15 NiceMark window, #240's ×1.48–1.61, seed count
+  basis, overshoot path), rustdoc warning, test-only derives, b64 unmeasured. Sent back to the PR
+  agent with a b64 1e14 A/B added.
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 
