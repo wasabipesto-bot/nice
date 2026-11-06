@@ -1,0 +1,40 @@
+== b62 1e17: main 171.77 G, #241 -7.36 G, #246 -15.80 G, post-stack 147.76 G = 100.38 s at 1472 MHz
+   join: route 1 (total - unchanged phases) 72.43 G; route 2 (main's join - #241 - #246) 73.27 G (+1.2 %)
+   top                                    51.03 G   34.67 s   34.5 %
+     FD kernel (seeds incl.)              38.24 G   25.98 s   25.9 %
+     scan + fill + clipped (residual)     12.79 G    8.69 s    8.7 %
+   bucket                                  3.22 G    2.19 s    2.2 %
+   join                                   72.43 G   49.20 s   49.0 %
+     base                                 30.76 G   20.90 s   20.8 %
+     AND                                   1.62 G    1.10 s    1.1 %
+     walk                                 13.05 G    8.87 s    8.8 %
+     pf                                   21.75 G   14.78 s   14.7 %
+     stage                                 5.24 G    3.56 s    3.5 %
+   check                                  14.04 G    9.54 s    9.5 %
+   other                                   7.04 G    4.79 s    4.8 %
+   FD: stepped pairs 9.99e+10, seeds 1.79e+10; seed excess (g-s) 2.78 s; stepped-slot time 19.67 s
+== b60 1e16: main 33.55 G, #241 -0.88 G, #246 -3.75 G, post-stack 28.86 G = 19.65 s at 1469 MHz
+   join: route 1 (total - unchanged phases) 15.36 G; route 2 (main's join - #241 - #246) 15.53 G (+1.1 %)
+   top                                     8.15 G    5.55 s   28.2 %
+     FD kernel (seeds incl.)               6.10 G    4.15 s   21.1 %
+     scan + fill + clipped (residual)      2.05 G    1.40 s    7.1 %
+   bucket                                  0.57 G    0.39 s    2.0 %
+   join                                   15.36 G   10.45 s   53.2 %
+     base                                  6.88 G    4.68 s   23.8 %
+     AND                                   0.00 G    0.00 s    0.0 %
+     walk                                  2.19 G    1.49 s    7.6 %
+     pf                                    5.58 G    3.80 s   19.3 %
+     stage                                 0.71 G    0.49 s    2.5 %
+   check                                   3.30 G    2.25 s   11.4 %
+   other                                   1.48 G    1.01 s    5.1 %
+   FD: stepped pairs 1.55e+10, seeds 3.58e+09; seed excess (g-s) 0.49 s; stepped-slot time 2.98 s
+== issue model, b62 1e17 post-stack (warp instructions / 272 SMSP-issues per clock)
+   walk rounds                   6.07e+12 instr   22.33 G
+   per chunk (+RC)               1.32e+12 instr    4.85 G
+   AND groups                    1.92e+12 instr    7.05 G
+   per wave                      3.57e+11 instr    1.31 G
+   per batch (+dh, gating)       7.52e+11 instr    2.77 G
+   work items                    7.04e+10 instr    0.26 G
+   total 1.05e+13 instr = 38.57 G issue; join 72.43 G; non-issue 33.86 G = 23.0 s
+   pre-#246: 53.73 G issue vs post-#241 join 88.23 G; #246 predicted issue saving 14.96 G vs measured 15.80 G
+== #241 b62 1e17 cycles across caps (G): [164.0, 158.5, 163.0, 163.6, 163.0, 164.4, 163.3]

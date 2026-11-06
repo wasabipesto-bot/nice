@@ -59,6 +59,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   so I squashed the two commits — tree identical). Open program PRs: #241, #246, #247. Day total:
   7 agents (all Opus: 3 prototypes/scoping, 2 PR branches incl. resumes, 2 reviewers); 3 boxes,
   ~$1.6; director ~6.5 h.
+- **L44 roadmap done (11:00 UTC, `L44/ROADMAP.md`):** post-#246 budget at b62 1e17 (100.4 s): top
+  FD 26 %, **top scan + fill 8.7 % (never touched)**, join base 21 %, prefilter 15 %, walk 9 %,
+  **check 9.5 % (doubled in share; 3 waves for 2.5; recomputes proven digits)**, ~23 s of join time
+  unattributed to instructions. Cycles are cap-independent; leaner code lowers the clock, less
+  memory traffic raises it. FD persistence is dead (6.9 TB of state traffic per field). Shortlist:
+  static bucket order for the top layer (×1.05–1.12), FD top kernel round 2 (×1.05–1.07), CPU lean
+  prefilter (×1.06–1.10, high confidence), check kernel rework (×1.045–1.07), re-price the lean
+  join. New ledger rows L45–L47; L4 reopened as L47 with the written reason.
+- **L45 measurement session launched (11:10 UTC)** on #246 (box `l45-measure`): the top phase split
+  into FD / clipped / scan / fill, L37's ablation on the lean join, stage-check cadence, spill vs
+  no-spill timing. Decides whether L46 (static bucket order) gets a prototype tomorrow.
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 
