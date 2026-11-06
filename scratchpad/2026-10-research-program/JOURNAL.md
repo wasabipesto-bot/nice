@@ -51,6 +51,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   body understates the spills (only level-4 builds spill, 14/26 offline compiles at b60/b62; new
   with this PR; the "6 blocks" explanation untested), the mask convention needs its own paragraph
   and one stale comment, two body slips. Sent back to the L41 agent (text + one comment).
+- **PR #246 opened (11:45 UTC): "Overlap join: a division-free middle-digit prefilter"**, f3fb390
+  on #241 (review fixes applied: spill paragraph, mask-convention paragraph, stale comment, body
+  slips). Open program PRs: #241, #246.
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 

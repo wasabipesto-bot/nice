@@ -1,6 +1,6 @@
 # L41 RESULTS: the lean `walk_pf` (fixed-point digits, shift membership, gated top masks, per-chunk range test), RTX 3080 at 180 W (2026-11-06)
 
-PR branch on the fork: **`pr/join-lean-prefilter`** **`d672887`** (one commit on `pr/join-top-record` `7832f89` = upstream main
+PR branch on the fork: **`pr/join-lean-prefilter`** **`ca14f24`** (one commit on `pr/join-top-record` `7832f89` = upstream main
 `6f060a9` + #241; CHANGELOG line included; PR not opened; body in `PR-BODY.md`). Prototype with the knobs (no PR):
 `exp/join-lean-pf` `a150b49` (`NICE_EXP_JOIN_PF` 0–4, `NICE_EXP_JOIN_MT`/`_FXM`/`_RCV` forms, `NICE_EXP_JOIN_ROUNDS`).
 Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Raw logs `raw/box/` (the box's
@@ -11,7 +11,7 @@ Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Ra
 
 - **Built** (brief steps 1–2, 6): the lean `walk_pf` as four cumulative levels on `exp/join-lean-pf` (FX fixed-point
   digits, MT membership by shifts, GM seed-gated top masks, RC the range test per clipped chunk), and the PR at level 4
-  without knobs: **`pr/join-lean-prefilter` `d672887`**, one commit on 7832f89 with the CHANGELOG line and the host
+  without knobs: **`pr/join-lean-prefilter` `ca14f24`**, one commit on 7832f89 with the CHANGELOG line and the host
   tests, pushed; `PR-BODY.md` written; PR not opened.
 - **Host tests** (§1): FX's constants for every D < b², its error bound, the digits at the worst A and P, and **every
   (A, P, D) < b² at every base 10–64 (663,187,945,915 triples): exact**; MT's test against the four-mask test for every
@@ -25,8 +25,9 @@ Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Ra
   - The 2 left over at each level: from level 1 on, ptxas emits its warp-convergence fallback at the walk's vote and
     plane barrier (3 issued per round); cause not found (§3).
   - **Registers 40 → 45** at b60/b62 (47 at b64), ≤ 48: 5 cubes per SM kept. **Spills: none in the timed binary's pass,
-    but some compiles of the same kernel land on 40 registers with 28–44 B of spills** (work-item and batch values,
-    never in the walk): ptxas aims at 6 blocks per SM because CubeCL's shared memory is a dynamic array it cannot see.
+    but about half of the compiles with the range test (14 of 26 offline at b60/b62; 0 of 18 without it) land on 40
+    registers with 28–44 B of spills** (work-item and batch values, never in the walk). Likely, not tested: ptxas aims
+    at 6 blocks per SM because CubeCL's shared memory is a dynamic array it cannot see (§3, §9).
 - **Exact** (§4): levels 3 and 4, the timed PR binary and the head's kernels each passed the CUDA list (CPU-reference
   parity incl. b50/b54 and the b57 frontier, #240's FD test 26 / 279 / 237,907,266, #235's certificate test, both dense
   fields, whole b42, the 1e14 compare at b57/60/62/64 with the base's counts); every timed field gave the exact counts
@@ -83,7 +84,7 @@ Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Ra
   | `P3` | `exp/join-lean-pf-cwcopy` `d5db28b`: `P2` with the clip words copied once per batch to a plain shared array (no `ATOMS` per chunk) | b340f36c | `P3` adc4b164 |
   | `P4` | `f516356`: `P2` with two rustc warnings fixed (`let mut s_cw` → `let s_cw`; `let mut pass = false; if … { pass = … }` → `let pass = if … { … }`) | 3ea0575a | `P4` e10e2ace |
   | `P5` | `b6bf434`: `P4` with `fx_digits_are_exact_everywhere` opt-in (`NICE_TEST_FX_EXHAUSTIVE=1`), since CI's lavapipe and macOS jobs run every ignored test of `nice_common` | 2f1726d2 | (not built; its lint failed on the tests) |
-  | `P6` | **the PR head's tree**, `48ac631` (the head `d672887` is the same tree with one line of the commit message changed): `P5` with the new tests clippy-clean (`div_ceil` in the host mirror, two `many_single_char_names` allows, `seed` → `flag` in one test) | e952fb55 | `P6` 4cedb136 |
+  | `P6` | **the PR head's code**, `48ac631` (`d672887` = the same tree with one line of the commit message changed; the head `ca14f24` = `d672887` with the review's comment fixes, §9): `P5` with the new tests clippy-clean (`div_ceil` in the host mirror, two `many_single_char_names` allows, `seed` → `flag` in one test) | e952fb55 | `P6` 4cedb136 |
 
   `P`'s source is `raw/scripts/make_pr.py` applied to 7832f89's `cubecl_join.rs`, the tests of `raw/scripts/pr_tests.rs`
   added, and rustfmt. The two warnings (unused `mut`, value never read) appeared in every build of `P` but were found
@@ -483,4 +484,27 @@ SCOPING §5–6 (instruction counts and a pipe model; nothing measured):
   `clippy_*` lint, `host_*` host tests, `build_*`, `regs_*`), the chains' `.out` files, `trees.txt`, `box-info.txt`,
   `power.txt`, `nvidia-smi.txt`, and `sass/` (per pass: CubeCL's CUDA sources and SASS — the join kernel's as text,
   the other kernels' gzipped — `registers.txt`, the run log, the debug log).
-- `raw/pr-join-lean-prefilter.bundle`: the PR commit `d672887` as a git bundle (on 7832f89).
+- `raw/pr-join-lean-prefilter.bundle`: the PR commit `ca14f24` as a git bundle (on 7832f89).
+
+## 9. Review fixes (`REVIEW.md`, after the box was destroyed; text only, on ivory)
+
+The independent review of `d672887` found no correctness defect ("merge with small fixes"). Applied in
+`.worktrees/join-lean-pf`, amended into the single commit, force-pushed with lease: **`ca14f24`**.
+
+- **Code (comments only;** `git diff d672887 ca14f24` has no non-comment line**):** the `t_tr` comment now says the
+  bit is the digit at mask bit d (digit 63 − d where `lean` holds the masks reversed); the kernel doc names the
+  reversed buffers and says the global buffers and other kernels keep digit d at bit d; the sign-test comment in
+  `walk_pf_lean` reworded (L7); `lean_prefilter_matches_the_division_form`'s doc says it compares with a host model of
+  the division form (L8).
+- **PR body:** the stacking line in #239/#240's wording (L1); a separate paragraph on the bit-reversed mask convention
+  (M2); the false "`D·Q + D·R` fits a word" replaced by what the kernel forms, `ceil(D·2^32/b²) < 2^32` (L2); the
+  operand ranges in the kernel (L3); "an estimated 70 %" and the ALU-bound claim labelled as the model's (L9); the full
+  list of differences between the timed build and the head (L10); no run on Metal or AMD hardware (L6); the spill
+  paragraph replaced (M1): only builds with the per-chunk range test spill (14 of 26 offline compiles at b60/b62, 0 of
+  18 at levels 1–3; recounted from `raw/registers.txt`), the layout dependence, the base's own per-process variation
+  (1080 / 1088 SASS, no spills), the 6-cube explanation as untested, the timed processes' variant not recorded, and the
+  offline `nvcc` pass not being the runtime NVRTC compile.
+- **Checks on ivory:** `cargo fmt --all --check` ok; `nice -n 19 cargo check -j 2 -p nice_common --features gpu
+  --all-targets` (target dir in the worktree, removed after) ok with no warnings. No GPU run: the box is gone, and the
+  change touches no code.
+- The CHANGELOG `#NNN` placeholder stays for the coordinator.

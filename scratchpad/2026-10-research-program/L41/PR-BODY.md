@@ -1,4 +1,4 @@
-Stacked on #241 (one 32-byte record per top); the diff below is this PR's commit only.
+Stacked on #241: its commit is the base of this branch; the new work is the last commit.
 
 ## What
 
@@ -7,15 +7,17 @@ The join kernel runs the middle-digit prefilter on every pair that passes the AN
 This PR computes the same predicate with fewer instructions:
 
 - **Digits by fixed point instead of division.** The entry keeps `A·C` and `P` for each power, with `C = ceil(2^32/b²)`, and the batch load writes `dh = ceil(D·2^32/b²)` for the top (as `D·Q + ceil(D·R/b²)`, `2^32 = Q·b² + R`). Per pair, `F = A·C + P·dh mod 2^32`; the digits are `h = hi32(F·b)` and `g = hi32((F·b mod 2^32)·b)`: three multiplies per power (`IMAD`, `IMAD.WIDE.U32`, `IMAD.HI.U32`), no reduction mod b² and no division.
-- **Membership by shifts.** The join kernel now holds every digit mask bit-reversed (digit d at bit 63 − d), the entries' in the wave load and the tops' in the batch load. Digit g is then in `seen` iff bit 63 of `seen << g` is set: `hi32(seen << g)` is one funnel shift, the four OR into one sign test, and six compares check that the four digits are distinct. Before, the kernel built four 64-bit one-hot masks (two shifts each) and tested them.
+- **Membership by shifts.** With the digit masks held bit-reversed (below), digit g is in `seen` iff bit 63 of `seen << g` is set: `hi32(seen << g)` is one funnel shift, the four OR into one sign test, and six compares check that the four digits are distinct. Before, the kernel built four 64-bit one-hot masks (two shifts each) and tested them.
 - **Seed-gated top masks.** The batch load writes each top's certificate gated by its seed flag (`t_glo`, `t_ghi`: the mask, or 0), so a pair ORs it in without a select.
 - **The residue range test per chunk, not per pair.** Only a clipped top (a block at the field's ends, whose range is not the whole `[0, w)`) can reject a residue. The batch load marks the clipped tops in one word per chunk of 32 (`s_cw`, `fetch_or` from the rare clipped tops), and a chunk with any clears their out-of-range pass bits before the walk. Every bit walked is then a join survivor, and they are counted by popcount per chunk.
 
 Shapes with mid ≠ 2 or k < mid (small test windows, e.g. b10's k = 1) keep `walk_pf` and its packed words; the range test is per chunk for every shape.
 
+**A representation change inside `join_kernel`.** Behind a comptime flag, `lean` (mid = 2, k ≥ 2: every production shape; the condition for the fixed-point digits, the shift membership and the gated masks), `join_kernel` holds every digit mask bit-reversed, digit d at bit 63 − d: the entries' `mlo`/`mhi` (reversed in the wave load), the tops' `t_lo`/`t_hi` and the gated `t_glo`/`t_ghi` (in the batch load), and so the digit-major `t_tr` built from them. The AND only tests disjointness, which does not depend on how the bits are labelled. Nothing outside the kernel reads these masks: the global buffers (`ext_m`, `top_rec`), every other kernel and the CPU join keep digit d at bit d. Shapes without `lean` (b10's k = 1) keep the natural order inside the kernel too.
+
 ## Why
 
-The walk is the bulk of the join: 1.28·10^11 plane-rounds per b62 1e17 field (counted on the device), about 70 % of the join's warp instructions by SASS count. One round issues for the whole warp whatever the number of live lanes, and it is integer-ALU-bound (one warp ALU instruction per 2 cycles per SM sub-partition on sm_86). Its prefilter part was 51 SASS instructions, 36 of them on the ALU pipe: unpacking the entry's and top's halves (loop-invariant, redone each round), `x mod b²`, `x / b` and `x % b` by multiply-shift, the four 64-bit one-hot masks and their tests, the seed select. Before it came the range test, two shared loads and a branch on the round's dependency chain in every round, which rejects almost nothing (26 of 4.85·10^9 in-AND pairs on a b57 1e14 field, 5 on a b62 one, none on b60/b64 ones).
+The walk is the bulk of the join: 1.28·10^11 plane-rounds per b62 1e17 field (counted on the device), an estimated 70 % of the join's warp instructions (SASS counts per unit times measured and estimated unit counts). One round issues for the whole warp whatever the number of live lanes, and by that instruction model it is integer-ALU-bound (one warp ALU instruction per 2 cycles per SM sub-partition on sm_86); the measured gain in cycles below agrees. Its prefilter part was 51 SASS instructions, 36 of them on the ALU pipe: unpacking the entry's and top's halves (loop-invariant, redone each round), `x mod b²`, `x / b` and `x % b` by multiply-shift, the four 64-bit one-hot masks and their tests, the seed select. Before it came the range test, two shared loads and a branch on the round's dependency chain in every round, which rejects almost nothing (26 of 4.85·10^9 in-AND pairs on a b57 1e14 field, 5 on a b62 one, none on b60/b64 ones).
 
 The round before the stage, at b62 (SASS of CubeCL's CUDA, ptxas 12.8, sm_86):
 
@@ -38,7 +40,9 @@ b60: 69 → 41; b64 (where `% 64` and `/ 64` were already shifts): 64 → 43. Th
 3. Hence `A·C + P·dh = q·2^32 + F0` with `F0 = (r·2^32 + Δ)/b²`. F0 is an integer (b² divides the left side of step 2 minus `q·b²·2^32`), and it is below 2^32 because `r ≤ b² − 1` and `Δ < 2^32`. So `F = (A·C + P·dh) mod 2^32 = F0`, and `F·b² = r·2^32 + Δ`.
 4. The two multiplies split `F·b²` exactly: `F·b = h·2^32 + F′` and `F′·b = g·2^32 + F″` with `g < b`, so `⌊F·b²/2^32⌋ = h·b + g`. Since `Δ < 2^32`, that is r: (h, g) are r's two base-b digits.
 
-`A·C` fits a word (`(b² − 1)·C < 2^32` for b < 256), and `D·Q + D·R` too. At b64, ε1 = ε2 = 0 and the same code runs. The only condition is Δ < 2^32, and Δ < 2b⁴ ≤ 2^25 leaves a factor of 128 to spare; nothing depends on the operands' values beyond their range.
+`A·C` fits a word (`(b² − 1)·C < 2^32` for b < 256). The batch load forms `dh = D·Q + ceil(D·R/b²)`, which is `ceil(D·2^32/b²) ≤ ceil((b² − 1)·2^32/b²) < 2^32`, with `D·R + b² − 1 < 2^25` inside it. At b64, ε1 = ε2 = 0 and the same code runs. The only condition is Δ < 2^32; Δ < 2b⁴ ≤ 2^25 leaves a factor of 128 to spare (the exact maximum over A, P, D < b² is about 2^24.7, at b62).
+
+The operands are in these ranges in the kernel, not only in the model: A is `(t2 mod b³) / b` at the key level and a digit pair of R² or R³ below b^mid otherwise; P is `2ρ` or `3ρ²` reduced mod b²; D is `⌊(P mod b^(k2 − f0)) / b^(k − f0)⌋ < b^mid`. (Δ stays below 2^32 even for A, P anywhere below 2^16, so the 16-bit packing of the non-key shapes could not break it either.)
 
 **The membership test is the same predicate.** Before: `g2 ≠ g3 ∧ h2 ≠ h3 ∧ (seen ∩ {g2, g3} = ∅) ∧ ((seen ∪ {g2, g3}) ∩ {h2, h3} = ∅)`. Unrolled, that is: the four digits pairwise distinct (six inequalities) and none in `seen`, which is what the new test checks. Reversing the bits of every mask the kernel holds relabels the digits without changing any intersection: the AND, the digit-major copy and the small-batch test compute the same pass bits.
 
@@ -51,7 +55,7 @@ b60: 69 → 41; b64 (where `% 64` and `/ 64` were already shifts): 64 → 43. Th
 - `fx_digits_match_the_division`: at every base 10–64, the constants and `dh` against exact ceilings for every D < b², the error bound, and the digits against `(A + P·D) mod b²` for every (P, D) at the largest A and every (A, D) at the largest P.
 - `fx_digits_are_exact_everywhere` (ignored, and opt-in by `NICE_TEST_FX_EXHAUSTIVE=1` since the GPU jobs run every ignored test; 190 s on 9 threads): every triple A, P, D < b² at every base 10–64, 663,187,945,915 in all.
 - `lean_membership_matches_the_masks`: the new membership test against the four one-hot masks for every digit 4-tuple at every base 10–64 against a random `seen`, and 10^7 random tuples against sets of every density.
-- `lean_prefilter_matches_the_division_form`: the whole lean prefilter against the division form on 10^6 random pairs per base 10–64.
+- `lean_prefilter_matches_the_division_form`: the whole lean prefilter against a host model of the division form (the digits of `(A + P·D) mod b²` and the four one-hot masks) on 10^6 random pairs per base 10–64. The device tests below compare the kernel itself with the CPU join.
 
 ## Measurements
 
@@ -92,7 +96,12 @@ MSD-strong (the smallest buckets, about 3 tops each) gains least: the change add
 
 ## Exactness
 
-All on the RTX 3080 (CUDA) unless marked lavapipe (llvmpipe, LLVM 20.1.2, Mesa 25.2.8, 8-lane subgroups). The timed runs used a build that differs from this head only by a comment moved, two rustc warnings fixed (an unneeded `mut`, a dead initial assignment) and the exhaustive test's opt-in; the CUDA tests below ran on both the timed build and this head's kernels with the same results.
+All on the RTX 3080 (CUDA) unless marked lavapipe (llvmpipe, LLVM 20.1.2, Mesa 25.2.8, 8-lane subgroups). The timed runs used a build that differs from this head by:
+- comments: the walk's comment moved below the range test, the `t_tr` comment and the kernel doc on the reversed masks, the wording of one comment in `walk_pf_lean`, and two test docs;
+- two rustc warnings fixed: an unneeded `mut` on `s_cw`, and `let mut pass = false; if … { pass = … }` written as `let pass = if … { … }` (this changes CubeCL's CUDA text; the resulting join SASS is the timed build's instruction for instruction);
+- the exhaustive test's opt-in, and lint fixes in the new tests (`div_ceil` in the host mirror, two `many_single_char_names` allows, one variable renamed).
+
+The CUDA tests below ran on both the timed build and this head's kernels with the same results.
 
 - `cubecl_cuda_join_matches_the_cpu_reference`: ok. It covers b10's 69 (k = 1: the division form, with the per-chunk range test); windows b20–b64, including b50 and b54 after refused layouts; the b57 frontier partitions 0/1000/3248, tight and refused; tight-layout and sliced windows; and the production shape. Its small windows are where clipped tops matter: a build without the per-chunk range test fails it at `b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 }` (join survivors differ).
 - `cubecl_cuda_top_fd_matches_the_top_kernel`: ok, 26 fields, 279 batches (23 with a clipped block), 237,907,266 tops.
@@ -113,6 +122,7 @@ All on the RTX 3080 (CUDA) unless marked lavapipe (llvmpipe, LLVM 20.1.2, Mesa 2
 - lavapipe, every wgpu test in `cubecl_join` (join parity incl. b50/b54 and the b57 frontier, the FD-vs-top-kernel test on 21 fields / 142 batches / 1,018,088 tops, the certificate test, the production-field sample, the ticket test): ok with the naga (WGSL) compiler and with CubeCL's direct SPIR-V compiler. These run the digits' `mul_hi` (emulated in WGSL, `OpUMulExtended` in SPIR-V) and the 64-bit funnel shifts on 8-lane planes.
 - CI's WGSL lint (`wgsl_dump_for_lint` on lavapipe + `scripts/wgsl-lint.py` with the workflow's 13 `--require`s): 16 shaders, 0 flagged. The join kernel (b57) now has 26 constant divisions, down from 36.
 - `cargo fmt --all --check`; `cargo clippy -p "*" --all-targets -- -D warnings`, default, with `--features nice_client/gpu` and with `--features nice_client/gpu,nice_client/cubecl-spirv` (rustc 1.99.1): clean.
+- Not run on Metal or AMD hardware. CI's macOS job (paravirtual Metal) will be the first Metal run of the new path. It adds no constant division of a shifted or high word (the Apple compiler's known bug class): `mul_hi`'s results are not divided, and the one new constant division divides a sum.
 
 ## Registers
 
@@ -120,13 +130,18 @@ From ptxas (`nvcc -cubin -arch=sm_86 -O3 -Xptxas -v`, CUDA 12.8) on CubeCL's CUD
 
 | kernel | #241 | this PR |
 |---|---|---|
-| `join_kernel` b60 / b62 / b64 | 40 / 40 / 47 | 45 / 45 / 45–47 (some compiles: 40 with 28–44 B of spills) |
+| `join_kernel` b60 / b62 / b64 | 40 / 40 / 47 | 45 / 45 / 45–47 (about half of compiles at b60/b62: 40 + 28–44 B of spills) |
 | `top_fd_kernel` b60 / b62 | 108 / 110 | 108 / 110 |
 | `top_kernel` b60 / b62 / b64 | 80 / 80 / 95 | 80 / 80 / 95 |
 | `check_kernel` b60 / b62 / b64 | 38 / 38 / 34 | 38 / 38 / 34 |
 
 - The join takes 45 registers at b60/b62 where it took 40: the entry keeps four words per slot (A·C and P for each power) instead of two packed ones. That is still ≤ 48, so the occupancy is unchanged: 5 cubes of 256 per SM, set by the shared memory (now ~18 KiB per cube: +2 KiB for the gated masks).
-- In some compiles ptxas squeezes the join to 40 registers with 28–44 bytes of spills instead. The shared memory is CubeCL's dynamic array, so ptxas does not see that the kernel is held to 5 cubes per SM, and aims at 6 (≤ 40 registers) when the spills are few; which compile does so depends on the order in which CubeCL lays out the shared arrays, which varies from process to process. The spilled values are per work item and per batch (the work index, the list base, four values around the digit-major copy), never in the walk, and the timed rounds agree to 0.1–0.6 %.
+- **Spills, new with this PR.** In about half of the compiles ptxas takes 40 registers with 28–44 B of spills instead of 45: 14 of 26 offline compiles at b60/b62, all of them with the per-chunk range test; none of 18 at the intermediate steps without it (one more at b64).
+  - Which variant a process gets depends on CubeCL's per-process order of the shared arrays: two compiles whose CUDA differs only in those offsets land on either side.
+  - The likely reason, not tested: the shared memory is one dynamic array, so ptxas does not see the 5-cube limit and aims at 6 cubes (≤ 40 registers). A compile with a static array of the same size would settle it; none was tried.
+  - The spilled values are per work item and per batch (the work index, the list base, four values around the digit-major copy), never in the walk; occupancy is 5 cubes per SM either way.
+  - Which variant each timed process compiled was not recorded, and the offline `nvcc` pass above is not the runtime's NVRTC compile. The PR's three processes per field agree to 0.1–0.6 %.
+  - The base sits at 40 registers without spills. Its codegen also varies by process (1080 or 1088 SASS for the b62 join), but it never spills.
 - The other kernels are unchanged.
 
 ## Not in this PR
