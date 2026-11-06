@@ -510,9 +510,6 @@ mod kernels {
         let wh = comptime!(wb & WB_WH != 0);
         let au = comptime!(wb & WB_AU != 0);
         let pcp = comptime!(wb & WB_PC != 0 && pc_pre_shape(key_level, f0, k, k2));
-        // AU: an empty slot's mask, 2k distinct digits (the AND's ORs for it
-        // are discarded: its pass words are masked by `vv`). 2k <= 24.
-        let au_lo = comptime!((1u32 << (2 * k)) - 1);
         let mid = comptime!(k2 - k);
         let bm = comptime!(base.pow(k2 - k));
         // M = b^(mid + 1): the key digit's output digit and the carries above.
@@ -679,13 +676,8 @@ mod kernels {
                         #[unroll]
                         for j in 0..ept {
                             let sl = ws + UNIT_POS_X + comptime!(j * JOIN_WG);
-                            if comptime!(au) {
-                                mlo[j as usize] = au_lo;
-                                mhi[j as usize] = 0u32;
-                            } else {
-                                mlo[j as usize] = 0xFFFF_FFFFu32;
-                                mhi[j as usize] = 0xFFFF_FFFFu32;
-                            }
+                            mlo[j as usize] = 0xFFFF_FFFFu32;
+                            mhi[j as usize] = 0xFFFF_FFFFu32;
                             rr[j as usize] = 0u32;
                             vv[j as usize] = 0u32;
                             ac[j as usize] = 0u32;
@@ -789,14 +781,18 @@ mod kernels {
                                         // AU: every listed entry has exactly
                                         // 2k digits (distinct and new in the
                                         // bucket kernel, the key digit's two
-                                        // among them), and an empty slot the
-                                        // 2k-digit stand-in `au_lo`.
+                                        // among them); an empty slot skips
+                                        // the loop (a plane of empty slots
+                                        // does not run it, as on the base).
                                         // A runtime trip count (`au_trips` =
                                         // 2k, uniform): unrolled, the trips'
                                         // loads all go up front (64 registers).
                                         let mut x = mlo[j as usize];
                                         let mut y = mhi[j as usize];
                                         let mut it = 0u32;
+                                        if vv[j as usize] == 0u32 {
+                                            it = au_trips;
+                                        }
                                         while it < au_trips {
                                             it += 1u32;
                                             let lo = x != 0u32;
