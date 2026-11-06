@@ -49,7 +49,7 @@ b60: 69 → 41; b64 (where `% 64` and `/ 64` were already shifts): 64 → 43. Th
 **Host tests** (new, in `cubecl_join::tests`; the first, third and fourth run in CI):
 
 - `fx_digits_match_the_division`: at every base 10–64, the constants and `dh` against exact ceilings for every D < b², the error bound, and the digits against `(A + P·D) mod b²` for every (P, D) at the largest A and every (A, D) at the largest P.
-- `fx_digits_are_exact_everywhere` (ignored; 190 s on 9 threads): every triple A, P, D < b² at every base 10–64, 663,187,945,915 in all.
+- `fx_digits_are_exact_everywhere` (ignored, and opt-in by `NICE_TEST_FX_EXHAUSTIVE=1` since the GPU jobs run every ignored test; 190 s on 9 threads): every triple A, P, D < b² at every base 10–64, 663,187,945,915 in all.
 - `lean_membership_matches_the_masks`: the new membership test against the four one-hot masks for every digit 4-tuple at every base 10–64 against a random `seen`, and 10^7 random tuples against sets of every density.
 - `lean_prefilter_matches_the_division_form`: the whole lean prefilter against the division form on 10^6 random pairs per base 10–64.
 
@@ -92,7 +92,7 @@ MSD-strong (the smallest buckets, about 3 tops each) gains least: the change add
 
 ## Exactness
 
-All on the RTX 3080 (CUDA) unless marked lavapipe (llvmpipe, LLVM 20.1.2, Mesa 25.2.8, 8-lane subgroups). The timed runs used a build that differs from this head only by a comment moved and two rustc warnings fixed (an unneeded `mut`, a dead initial assignment); the CUDA tests below ran on both builds with the same results.
+All on the RTX 3080 (CUDA) unless marked lavapipe (llvmpipe, LLVM 20.1.2, Mesa 25.2.8, 8-lane subgroups). The timed runs used a build that differs from this head only by a comment moved, two rustc warnings fixed (an unneeded `mut`, a dead initial assignment) and the exhaustive test's opt-in; the CUDA tests below ran on both the timed build and this head's kernels with the same results.
 
 - `cubecl_cuda_join_matches_the_cpu_reference`: ok. It covers b10's 69 (k = 1: the division form, with the per-chunk range test); windows b20–b64, including b50 and b54 after refused layouts; the b57 frontier partitions 0/1000/3248, tight and refused; tight-layout and sliced windows; and the production shape. Its small windows are where clipped tops matter: a build without the per-chunk range test fails it at `b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 }` (join survivors differ).
 - `cubecl_cuda_top_fd_matches_the_top_kernel`: ok, 26 fields, 279 batches (23 with a clipped block), 237,907,266 tops.

@@ -3,6 +3,8 @@
 # nice_client/cubecl-spirv), and clippy with nice_client/gpu alone; own target dir, niced.
 source ~/.cargo/env
 L=/root/l41/logs; W=$1
+# The final head P5 (P4 with the exhaustive test made opt-in; the same kernels) replaces P4 here.
+[ "$W" = P4 ] && [ -d /root/l41/src/P5 ] && W=P5
 
 cd /root/l41/src/$W
 export CARGO_TARGET_DIR=/root/tgt_clippy NICE_BUILD_SHA=test

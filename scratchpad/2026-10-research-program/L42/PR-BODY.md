@@ -38,7 +38,7 @@ The GPU took the same step in #240, where the top kernel went ×1.48–1.59. On 
 
 ## Soundness
 
-- **The stepped arrays hold exactly the divided digits.**
+- **The stepped arrays hold exactly the divided digits** (#240's argument, with step h):
   - The seed is exact. The products are exact `W4` arithmetic. The digit conversion is exact division: `Div64` returns the exact quotient and remainder, and the reciprocal multiply is `cpu_join`'s `SmallDiv`, exact below 2^48/b, which every four-digit half of a chunk (< b^4 ≤ 2^24) is. Shifting digits multiplies by b^o, and the additions are exact base-b additions.
   - Every step is an exact base-b addition. The biased add is valid for every b ≤ 128.
   - So after m steps the arrays hold P'², P'³ and their differences for P' = P + m·h, digit for digit, and d2, d3 and Δ3 are their binary values (identities in P).
@@ -79,9 +79,21 @@ Times are ms per partition and thread for the sampled partitions (wall × thread
 
 - **At production shapes (b60 1e16, b62 1e17) the join is ×1.25–1.29 faster**, at 1 and 4 threads alike. The certificates were 42–43 % of the join there. ×1.27 means they now take ~22 % of main's time instead of ~43 %, about ×1.9 for the certificates in place.
 - The 1e14 fields gain less (×1.16–1.22): there the bottoms and lists are rebuilt for every partition and take a larger share (main's split at b62 1e14: certificates 27 %, bottoms and lists 39 %).
-- main's second-round b60 1e16 run on 4 threads (3675 ms) is an outlier from other load on the VM; the median does not use it.
+- main's second-round b60 1e16 run on 4 threads (3675 ms) is an outlier, probably from other load on the VM. The median does not use it.
 
-NICEMARK_TABLE
+NiceMark nice-only on the CPU (`nice_client niceonly --threads 4 --benchmark-secs 150 --benchmark-json`, no `--gpu`), 4 rounds alternating (main, PR; PR, main; …), medians; the scenario rows are numbers/s; "per round" is the PR's over main's:
+
+| | main (rounds) | this PR (rounds) | speed-up | per round |
+|---|---|---|---|---|
+| **score** | 673.2 (674.1, 672.8, 673.6, 649.5) | 798.7 (792.6, 804.8, 806.6, 780.2) | **×1.186** | 1.176, 1.196, 1.197, 1.201 |
+| b58 MSD-weak (1e15 field, 4 threads) | 1.630e12 (1.633e12, 1.627e12, 1.647e12, 1.523e12) | 1.859e12 (1.840e12, 1.887e12, 1.878e12, 1.735e12) | **×1.141** | 1.127, 1.160, 1.141, 1.139 |
+| b58 MSD-weak, 1 thread | 4.349e11 (4.361e11, 4.336e11, 4.328e11, 4.385e11) | 4.968e11 (4.901e11, 5.034e11, 5.040e11, 4.880e11) | **×1.142** | 1.124, 1.161, 1.165, 1.113 |
+| b58 MSD-strong (1e15 field, 4 threads) | 1.078e13 (1.066e13, 1.094e13, 1.082e13, 1.074e13) | 1.184e13 (1.185e13, 1.183e13, 1.202e13, 1.164e13) | **×1.099** | 1.111, 1.082, 1.111, 1.084 |
+| b60 MSD-weak (sampled from a 1e16 field, 4 threads) | 3.754e12 (3.826e12, 3.742e12, 3.757e12, 3.751e12) | 5.016e12 (4.949e12, 5.035e12, 5.035e12, 4.997e12) | **×1.336** | 1.293, 1.345, 1.340, 1.332 |
+| b62 MSD-weak (sampled from a 1e16 window, 4 threads) | 4.181e12 (4.190e12, 4.175e12, 4.187e12, 3.759e12) | 5.191e12 (5.173e12, 5.218e12, 5.209e12, 5.136e12) | **×1.241** | 1.235, 1.250, 1.244, 1.367 |
+
+- main's fourth round ran low on two scenarios (b58 MSD-weak, b62), probably from other load on the VM. The medians barely move with it: main's score is 673.6 without it.
+- NiceMark samples partitions in bit-reversed order, but the stepping happens inside a partition, so its order does not matter here (unlike #240's, which steps across partitions).
 
 ## Exactness
 
@@ -106,7 +118,7 @@ All on this branch's head, release builds:
 
 ## Not in this PR
 
-- **A leaner survivor prefilter.** The CPU's middle-digit prefilter is the same arithmetic as the GPU's `walk_pf`. A fixed-point, branch-free form of it measured ×1.05–1.08 more on top of this change at production shapes, with identical survivor and checked counts. It follows separately once the GPU version lands.
+- **A leaner survivor prefilter.** The CPU's middle-digit prefilter is the same arithmetic as the GPU's `walk_pf`. A fixed-point, branch-free form of it measured ×1.05–1.08 on its own at production shapes, with identical survivor and checked counts. It follows separately once the GPU version lands.
 - **The seed budget** (4 steps) is not tuned. Seeds are 2–5 % of prefixes.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

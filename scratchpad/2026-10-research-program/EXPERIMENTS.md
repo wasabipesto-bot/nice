@@ -5,6 +5,26 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L42.2 CPU FD top certificates: PR branch (2026-11-06, agent; `L42/PR-RESULTS.md`, `L42/PR-BODY.md`, `L42/raw/pr/`; branch `pr/cpu-join-fd-tops` fba5431 = one commit on main 6f060a9; worktree `.worktrees/pr-cpu-join-fd`)
+
+New `common/src/cpu_top_fd.rs`: five packed digit-array additions per step with trimmed word
+counts (14 word adds per step at b60/b62 vs the prototype's 21); seed on a key's first prefix,
+after a gap > 4h, or when a walk does not land on P; the seed converts P, P², P³ without a
+hardware divide and builds the three difference arrays by shifts/additions; carry test = f64
+screen + exact fallback; digit count from a bit-length table; kept tops step `pc`/`dm` by one (no
+u128 division except at seeds). `CpuJoin::tops`: unclipped blocks always stepped; clipped blocks
+and non-fitting fields keep `Base::cert`. No knobs. **A/B vs main on ivory (Zen 2, AVX2; 3
+interleaved rounds, loads ≤ 2):** b60 1e16 partitions ×1.274 (1 thread) / ×1.289 (4); b62 1e17
+slice-0 partitions ×1.264 / ×1.246; b60 1e14 whole field ×1.224 / ×1.224; b62 1e14 ×1.155 /
+×1.163; counts identical every run (b60 1e14 1,326,103,590 / 84,383,498; b62 1e14 1,470,093,637 /
+87,495,922). **NiceMark CPU nice-only (4 rounds, 4 threads, 150 s): score ×1.186 (673.2 → 798.7)**;
+b58 weak ×1.141 (1 thread ×1.142), b58 strong ×1.099, b60 weak ×1.336, b62 weak ×1.241. Exact:
+new random-run test bases 10–64 (1,860,723 stepped blocks, 243,907 seeds, gaps/backward/clipped:
+certificate, `pc`, `dm` = `Base::cert`); new production-field test b42–b64 (3,698,847 tops
+identical in order); `check_partitions` now compares tops (windows + opt-in reference,
+`NICE_TEST_CPU_JOIN_REF=3`/`16` pass); whole b42 417,789,835 / 16,879,877; `cargo test --release`
+183 + 22; fmt; default clippy. → reviewer agent before the PR.
+
 ## L43.1 Per-wave base trims: ×1.017 at b62 1e17 → parked (2026-11-06, agent; `L43/RESULTS.md`, `L43/raw/`; branch `exp/join-wave-base` 0e1ba4e on 7832f89, bitmask `NICE_EXP_JOIN_WB`: 1 TT shuffle transpose, 16 TT2 cheaper transpose stage, 2 WH wave-load hoist, 4 AU fixed-trip AND loop, 8 PC `pc` from the bucket kernel)
 
 Screen (one binary, 2 interleaved rounds; time ratio (cycles)): TT ×1.012 (1.026) b62 1e17 /

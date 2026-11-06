@@ -25,6 +25,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   b64, exact; the fixed-trip AND loop and the bucket-kernel `pc` both lose. Below the 3 % line.
   The wave-load hoist saved 4× its instruction-count estimate: the list→entry latency is real.
   Box l43-wavebase destroyed (2.9 h).
+- **L42 PR branch ready (08:48 UTC, L42.2):** `pr/cpu-join-fd-tops` fba5431: CPU join ×1.25–1.29
+  at production shapes (1 and 4 threads), NiceMark CPU ×1.186, exact on 1.86 M random blocks,
+  3.7 M production tops and whole fields. Reviewer agent launched (first use of the new rule);
+  the f64 carry-test screen is flagged for it.
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 

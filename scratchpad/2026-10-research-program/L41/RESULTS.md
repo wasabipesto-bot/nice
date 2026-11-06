@@ -1,6 +1,6 @@
 # L41 RESULTS: the lean `walk_pf` (fixed-point digits, shift membership, gated top masks, per-chunk range test), RTX 3080 at 180 W (2026-11-06)
 
-PR branch on the fork: **`pr/join-lean-prefilter`** **`f516356`** (one commit on `pr/join-top-record` `7832f89` = upstream main
+PR branch on the fork: **`pr/join-lean-prefilter`** **`b6bf434`** (one commit on `pr/join-top-record` `7832f89` = upstream main
 `6f060a9` + #241; CHANGELOG line included; PR not opened; body in `PR-BODY.md`). Prototype with the knobs (no PR):
 `exp/join-lean-pf` `a150b49` (`NICE_EXP_JOIN_PF` 0–4, `NICE_EXP_JOIN_MT`/`_FXM`/`_RCV` forms, `NICE_EXP_JOIN_ROUNDS`).
 Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Raw logs `raw/box/` (the box's
@@ -31,12 +31,15 @@ Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Ra
   | `P` | **the A/B's binary**: `50465be` (rustfmt'd `P1`, CHANGELOG line) | 16707289 | `P` 1c3dfee2, `client_P` 95822b1c |
   | `P2` | `881e0ef`: `P` with the walk's comment moved below the range test and one test doc line | 1e1f8240 | `P2` **1c3dfee2 (= `P`, byte for byte)** |
   | `P3` | `exp/join-lean-pf-cwcopy` `d5db28b`: `P2` with the clip words copied once per batch to a plain shared array (no `ATOMS` per chunk) | b340f36c | `P3` adc4b164 |
-  | `P4` | **the PR head `f516356`**: `P2` with two rustc warnings fixed (`let mut s_cw` → `let s_cw`; `let mut pass = false; if … { pass = … }` → `let pass = if … { … }`) | 3ea0575a | `P4` e10e2ace |
+  | `P4` | `f516356`: `P2` with two rustc warnings fixed (`let mut s_cw` → `let s_cw`; `let mut pass = false; if … { pass = … }` → `let pass = if … { … }`) | 3ea0575a | `P4` e10e2ace |
+  | `P5` | **the PR head `b6bf434`**: `P4` with `fx_digits_are_exact_everywhere` opt-in (`NICE_TEST_FX_EXHAUSTIVE=1`), since CI's lavapipe and macOS jobs run every ignored test of `nice_common` | 2f1726d2 | `P5` @@P5MD5@@ |
 
   `P`'s source is `raw/scripts/make_pr.py` applied to 7832f89's `cubecl_join.rs`, the tests of `raw/scripts/pr_tests.rs`
   added, and rustfmt. The two warnings (unused `mut`, value never read) appeared in every build of `P` but were found
-  only when the lavapipe build printed them; `cargo clippy -D warnings` would have failed. `P4` was put through the
-  CUDA list, lavapipe and the lint, and timed against `P` (§4, §6).
+  only when the lavapipe build printed them; `cargo clippy -D warnings` would have failed. The exhaustive test, as
+  first written, would have run in CI's lavapipe and macOS jobs (they run `--ignored` over the whole crate) for many
+  minutes. `P4` (the kernels of the head) was put through the CUDA list and lavapipe and timed against `P`; `P5` (the
+  head: `P4` + the test's gate, no kernel change) through the host tests, rustfmt and the lint (§4, §6).
 - **Harness:** L38's. `cubecl_cuda_join_throughput_fixed_fields` at L30's starts (b60 1366406074057412100454, b62
   7997740455941656911841, b64 41242006262957161709568), one untimed 1e14 warm-up field per process; metric `device=`
   (mean device seconds per field). nvidia-smi every 5 s; clock = mean SM MHz over samples at ≥ 90 % utilisation;
