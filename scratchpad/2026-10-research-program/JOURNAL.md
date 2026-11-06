@@ -70,6 +70,7 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **L45 measurement session launched (11:10 UTC)** on #246 (box `l45-measure`): the top phase split
   into FD / clipped / scan / fill, L37's ablation on the lean join, stage-check cadence, spill vs
   no-spill timing. Decides whether L46 (static bucket order) gets a prototype tomorrow.
+- 11:26 UTC: **#246 (f3fb390) and #247 (caef70e) CI fully green** (25 pass, 3 skipped each), #241 too; no comments.
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 
