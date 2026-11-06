@@ -110,7 +110,9 @@ All on the RTX 3080 (CUDA) unless marked lavapipe (llvmpipe, LLVM 20.1.2, Mesa 2
   - NiceMark's whole-field scenarios: identical (b58 MSD-weak 33,590,315,220 join survivors, MSD-strong 4,027,773,430).
 - The walk's rounds are unchanged: 128,346,267,597 plane-rounds at b62 1e17 before, 128,350,614,206 after (+0.003 %, the run-to-run order of the bucket lists, which are filled with shared atomics).
 - The host tests above, and the `join_plan` and `cubecl_join` unit tests: ok.
-@@LVPPR@@
+- lavapipe, every wgpu test in `cubecl_join` (join parity incl. b50/b54 and the b57 frontier, the FD-vs-top-kernel test on 21 fields / 142 batches / 1,018,088 tops, the certificate test, the production-field sample, the ticket test): ok with the naga (WGSL) compiler and with CubeCL's direct SPIR-V compiler. These run the digits' `mul_hi` (emulated in WGSL, `OpUMulExtended` in SPIR-V) and the 64-bit funnel shifts on 8-lane planes.
+- CI's WGSL lint (`wgsl_dump_for_lint` on lavapipe + `scripts/wgsl-lint.py` with the workflow's 13 `--require`s): 16 shaders, 0 flagged. The join kernel (b57) now has 26 constant divisions, down from 36.
+- `cargo fmt --all --check`; `cargo clippy -p "*" --all-targets -- -D warnings`, default, with `--features nice_client/gpu` and with `--features nice_client/gpu,nice_client/cubecl-spirv` (rustc 1.99.1): clean.
 
 ## Registers
 
@@ -131,6 +133,7 @@ From ptxas (`nvcc -cubin -arch=sm_86 -O3 -Xptxas -v`, CUDA 12.8) on CubeCL's CUD
 
 - **The CPU join** keeps its division-based prefilter (`cpu_join`'s `SmallDiv`); the GPU's form needs no change there.
 - **ptxas's warp-convergence fallback.** With this change, ptxas no longer proves the walk's warp converged at its vote and plane barrier, and adds three issued instructions per round (a never-taken branch and a mask move at the loop head, and a branch over a dead WARPSYNC call at its tail). The CUDA around the vote is the same as before; dropping the plane barrier brings back a `YIELD` and costs more. Without the fallback the round before the stage would be 39 instead of 41.
+- **A plain read of the clip words.** A chunk reads its clip word as a shared atomic load (`ATOMS.ADD 0`, CubeCL's `Atomic::load`). Copying the words to a plain shared array once per batch, so the chunks read them with an `LDS`, measured ×1.003 at b62 1e17 and ×1.012 at b60 1e16 in a two-round screen, inside the noise; not included.
 - **Other parts of the join** (the transposed copy, the per-chunk bookkeeping, the AND's digit loop): each a few percent of its instructions, not touched here.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

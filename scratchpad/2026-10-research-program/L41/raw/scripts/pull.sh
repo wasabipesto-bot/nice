@@ -7,3 +7,5 @@ ssh -q -o StrictHostKeyChecking=no -o LogLevel=ERROR -p 39938 root@ssh4.vast.ai 
 ssh -q -o StrictHostKeyChecking=no -o LogLevel=ERROR -p 39938 root@ssh4.vast.ai 'cd /root/l41 && tar -cf - *.out' < /dev/null 2>/dev/null | tar -xf - -C box
 mkdir -p box/cuexp
 ssh -q -o StrictHostKeyChecking=no -o LogLevel=ERROR -p 39938 root@ssh4.vast.ai 'cd /root/l41/cuexp && tar -cf - *.cu *.sass' < /dev/null 2>/dev/null | tar -xf - -C box/cuexp
+# Keep the join kernel's CUDA and SASS as text; compress every other kernel's.
+find box/sass -type f \( -name "*.sass" -o -name "*.cu" \) ! -name "join_kernel_*" -exec gzip -9f {} +

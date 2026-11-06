@@ -1,0 +1,44 @@
+### 09:22:00 branch code (amended, before mutation runs)
+test cpu_top_fd::tests::a_carry_runs_through_words_of_b_minus_1 ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 188 filtered out; finished in 0.00s
+### 09:24:04 M1: ripple past the carry word dropped (`if co && false`)
+-    if co {
++    if co && false {
+-        let pw = base.poww.clone();
++        let pw = base.poww().to_vec();
++    /// A carry through words of b − 1: into word 0, through the words above
++    /// it (a carry in over eight digit sums of b − 1), and past the carry
++    /// word. The certificates' runs rarely reach either.
++    #[test]
++    fn a_carry_runs_through_words_of_b_minus_1() {
++        for b in 7..=64u32 {
++            let (bias, top) = (256 - u64::from(b), u64::from(b - 1));
++            for hi in 1..NW - 1 {
++                let mut x = [0u64; NW];
++                x[..=hi].fill(top * LO);
++                x[hi + 1] = top | (top << 8);
++                let mut one = [0u64; NW];
++                one[0] = 1;
++                add_digits(&mut x, &one, 0, hi, bias);
++                assert!(x[..=hi].iter().all(|&w| w == 0), "b{b} hi {hi}");
++                assert_eq!(x[hi + 1], 1 << 16, "b{b} hi {hi}");
++            }
++        }
++    }
+test cpu_top_fd::tests::a_carry_runs_through_words_of_b_minus_1 ... FAILED
+thread 'cpu_top_fd::tests::a_carry_runs_through_words_of_b_minus_1' (3536980) panicked at common/src/cpu_top_fd.rs:726:17:
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 188 filtered out; finished in 0.00s
+### 09:25:01 M4: add_word loses the cin carry
+59c59
+<     let cout = c1 | c2;
+---
+>     let cout = c1;
+test cpu_top_fd::tests::a_carry_runs_through_words_of_b_minus_1 ... FAILED
+thread 'cpu_top_fd::tests::a_carry_runs_through_words_of_b_minus_1' (3537341) panicked at common/src/cpu_top_fd.rs:725:17:
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 188 filtered out; finished in 0.00s
+### 09:25:49 M1 diff (for the record)
+<     if co {
+>     if co && false {
+### 09:25:49 branch code again, mutations reverted
+test cpu_top_fd::tests::a_carry_runs_through_words_of_b_minus_1 ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 188 filtered out; finished in 0.00s

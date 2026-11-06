@@ -38,6 +38,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   thousand b60 1e16 fields), body slips (3e15 NiceMark window, #240's ×1.48–1.61, seed count
   basis, overshoot path), rustdoc warning, test-only derives, b64 unmeasured. Sent back to the PR
   agent with a b64 1e14 A/B added.
+- **L41 PR branch ready (10:15 UTC, L41.1):** lean prefilter ×1.086 b62 1e17 / ×1.122 b60 / ×1.070
+  b64, NiceMark ×1.061 over 6 rounds (MSD-strong ×1.041), exact with exhaustive host tests; the
+  round shrank 71 → 41 SASS; bit-reversed masks were needed to make MT shrink. Caveat for the
+  body: some compiles spill 28–44 B (CubeCL's dynamic shared array hides the cube limit from
+  ptxas). Box l41-leanpf destroyed. Reviewer agent launched.
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 

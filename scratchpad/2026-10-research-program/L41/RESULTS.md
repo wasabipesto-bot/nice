@@ -1,6 +1,6 @@
 # L41 RESULTS: the lean `walk_pf` (fixed-point digits, shift membership, gated top masks, per-chunk range test), RTX 3080 at 180 W (2026-11-06)
 
-PR branch on the fork: **`pr/join-lean-prefilter`** **`48ac631`** (one commit on `pr/join-top-record` `7832f89` = upstream main
+PR branch on the fork: **`pr/join-lean-prefilter`** **`d672887`** (one commit on `pr/join-top-record` `7832f89` = upstream main
 `6f060a9` + #241; CHANGELOG line included; PR not opened; body in `PR-BODY.md`). Prototype with the knobs (no PR):
 `exp/join-lean-pf` `a150b49` (`NICE_EXP_JOIN_PF` 0–4, `NICE_EXP_JOIN_MT`/`_FXM`/`_RCV` forms, `NICE_EXP_JOIN_ROUNDS`).
 Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Raw logs `raw/box/` (the box's
@@ -9,7 +9,57 @@ Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Ra
 
 ## Summary
 
-@@SUMMARY@@
+- **Built** (brief steps 1–2, 6): the lean `walk_pf` as four cumulative levels on `exp/join-lean-pf` (FX fixed-point
+  digits, MT membership by shifts, GM seed-gated top masks, RC the range test per clipped chunk), and the PR at level 4
+  without knobs: **`pr/join-lean-prefilter` `d672887`**, one commit on 7832f89 with the CHANGELOG line and the host
+  tests, pushed; `PR-BODY.md` written; PR not opened.
+- **Host tests** (§1): FX's constants for every D < b², its error bound, the digits at the worst A and P, and **every
+  (A, P, D) < b² at every base 10–64 (663,187,945,915 triples): exact**; MT's test against the four-mask test for every
+  digit 4-tuple at every base (and 10^7 random); the whole lean prefilter against the division form on 10^6 random
+  pairs per base. The CI ones take 4.4 s; the exhaustive one is opt-in (`NICE_TEST_FX_EXHAUSTIVE=1`, ~190 s on 9 threads).
+- **SASS of the round before the stage at b62, levels 0–4: 71 → 59 / 51 / 47 / 41** against the predicted 71 → 56 / 48 /
+  45 / 39 (ALU ops 45 → 35 / 28 / 24 / 21, predicted 34 / 27 / 24 / 21; b60 69 → 41, b64 64 → 43) (§3).
+  - MT needed a different form: as specified (`(hit & 1)` of right shifts) NVVM split it into four 64-bit compares and
+    level 2 came out at 60. The shipped form holds every mask of the join kernel **bit-reversed** and tests the sign bit
+    of `hi32(seen << g)` (one funnel shift per digit), with the sign test last in the compare chain.
+  - The 2 left over at each level: from level 1 on, ptxas emits its warp-convergence fallback at the walk's vote and
+    plane barrier (3 issued per round); cause not found (§3).
+  - **Registers 40 → 45** at b60/b62 (47 at b64), ≤ 48: 5 cubes per SM kept. **Spills: none in the timed binary's pass,
+    but some compiles of the same kernel land on 40 registers with 28–44 B of spills** (work-item and batch values,
+    never in the walk): ptxas aims at 6 blocks per SM because CubeCL's shared memory is a dynamic array it cannot see.
+- **Exact** (§4): levels 3 and 4, the timed PR binary and the head's kernels each passed the CUDA list (CPU-reference
+  parity incl. b50/b54 and the b57 frontier, #240's FD test 26 / 279 / 237,907,266, #235's certificate test, both dense
+  fields, whole b42, the 1e14 compare at b57/60/62/64 with the base's counts); every timed field gave the exact counts
+  (b62 1e17 1,020,844,021,499 / 62,584,252,554 …). Lavapipe naga and SPIR-V: 8/8; the WGSL lint 16 shaders, 0 flagged
+  (JoinKernel b57: 36 → 26 constant divisions); fmt and clippy (default, gpu, gpu + spirv) clean on the head. **RC's
+  coverage:** the CPU-reference windows; a mutant without the range test fails it at `b20 [58945, 160000) (2,3,1)` and
+  counts 26 / 5 extra join survivors on the b57 / b62 1e14 fields.
+- **Screen** (§5; level 0 → 4, 2 rounds): b62 1e17 ×1.028 / ×1.055 / ×1.067 / **×1.075** (cycles ×1.038 / 1.077 / 1.078 /
+  **1.097**); b60 1e16 ×1.037 / 1.076 / 1.093 / **×1.111** (cycles up to **×1.143**). **Kill criterion not fired**: level 3
+  ×1.067 at b62 1e17 (rounds ×1.033, ×1.100). **Plane-rounds unchanged** (+0.003–0.008 % at levels 3/4, against
+  ±0.01 % between two level-0 runs).
+- **A/B** (§6; 7832f89 against the PR, 3 interleaved rounds, 180 W cap):
+
+  | field | wall time | clock-normalised | per round |
+  |---|---|---|---|
+  | **b62 1e17** | **×1.086** (109.0 → 100.4 s) | ×1.103 | 1.073, 1.086, 1.087 |
+  | b62 1e16 | ×1.086 | ×1.075 | 1.084, 1.081, 1.090 |
+  | **b60 1e16** | **×1.122** | ×1.126 | 1.122, 1.104, 1.124 |
+  | b64 1e16 | ×1.070 | ×1.104 | 1.068, 1.072, 1.070 |
+  | 1e14 b57 / b60 / b62 / b64 | ×1.027 / ×1.017 / ×1.006 / ×0.997 (noise ±3–6 %) | | |
+  | **NiceMark, 6 rounds** | **×1.061** (every round 1.056–1.063); b58 MSD-weak ×1.070, **MSD-strong ×1.041** (lowest round ×1.007), b60 ×1.058, b62 ×1.068 | not meaningful (bursty GPU, few samples) | |
+
+  **The bar is met** (≥ 5 % at b62 1e17 and b60 1e16, no NiceMark scenario below ×0.98). Under the cap the PR's side runs
+  29–48 MHz slower at b62 1e17 and b64 (the leaner round draws more power per cycle), so the time gain is below the
+  cycles gain there; an uncapped card should see about the cycles column.
+- **From the timed binary to the head** (§0, §4): the walk's comment moved (byte-identical test binary), two rustc
+  warnings fixed (an unneeded `mut`, a dead initial assignment: CI's `clippy -D warnings` would have failed), the
+  exhaustive test made opt-in (CI's lavapipe and macOS jobs run every ignored test of the crate), and the new tests made
+  clippy-clean. The head's kernels have the timed binary's SASS instruction for instruction, passed the CUDA list and
+  lavapipe, and timed the same.
+- **Not taken:** the clip words copied to plain shared memory per batch (no `ATOMS` per chunk): ×1.003 at b62 1e17,
+  ×1.012 at b60 1e16, inside the noise; ptxas's convergence fallback (3 issued per round) remains.
+- **The box (59373929) can be destroyed:** every log, SASS and source is in `raw/box/` and nothing is running on it.
 
 ## 0. Setup
 
@@ -33,7 +83,7 @@ Box: Vast 59373929 (`nice-research-l41-leanpf`), RTX 3080 at a **180 W cap**. Ra
   | `P3` | `exp/join-lean-pf-cwcopy` `d5db28b`: `P2` with the clip words copied once per batch to a plain shared array (no `ATOMS` per chunk) | b340f36c | `P3` adc4b164 |
   | `P4` | `f516356`: `P2` with two rustc warnings fixed (`let mut s_cw` → `let s_cw`; `let mut pass = false; if … { pass = … }` → `let pass = if … { … }`) | 3ea0575a | `P4` e10e2ace |
   | `P5` | `b6bf434`: `P4` with `fx_digits_are_exact_everywhere` opt-in (`NICE_TEST_FX_EXHAUSTIVE=1`), since CI's lavapipe and macOS jobs run every ignored test of `nice_common` | 2f1726d2 | (not built; its lint failed on the tests) |
-  | `P6` | **the PR head `48ac631`**: `P5` with the new tests clippy-clean (`div_ceil` in the host mirror, two `many_single_char_names` allows, `seed` → `flag` in one test) | e952fb55 | `P6` @@P6MD5@@ |
+  | `P6` | **the PR head's tree**, `48ac631` (the head `d672887` is the same tree with one line of the commit message changed): `P5` with the new tests clippy-clean (`div_ceil` in the host mirror, two `many_single_char_names` allows, `seed` → `flag` in one test) | e952fb55 | `P6` 4cedb136 |
 
   `P`'s source is `raw/scripts/make_pr.py` applied to 7832f89's `cubecl_join.rs`, the tests of `raw/scripts/pr_tests.rs`
   added, and rustfmt. The two warnings (unused `mut`, value never read) appeared in every build of `P` but were found
@@ -60,7 +110,7 @@ the division form. Times are release builds on the box (CI runs `cargo test --re
 | test | what it covers | result |
 |---|---|---|
 | `fx_digits_match_the_division` (CI) | every base 10–64: `C = ceil(2^32/b²)` and `Q`, `R` (2^32 = Q·b² + R) against u128 arithmetic; `dh(D)` = the true ceiling for **every D < b²**; `A·C` fits a word for every A < b²; the error bound `(b² − 1)·(ε1 + max ε2) < 2^32` from the exact ε's; then the digits against `(A + P·D) mod b²` for **every (P, D) at A = b² − 1** and **every (A, D) at P = b² − 1** (the error grows with A and P, so these are the worst cases) | ok |
-| `fx_digits_are_exact_everywhere` (ignored: minutes) | **every (A, P, D) with A, P, D < b², every base 10–64: 663,187,945,915 triples**, each recovered (h, g) against the true digits (stepped with A) | **ok, 190 s on 9 threads** (`X`; `host_exh_X.log`) @@EXHP@@ |
+| `fx_digits_are_exact_everywhere` (ignored: minutes) | **every (A, P, D) with A, P, D < b², every base 10–64: 663,187,945,915 triples**, each recovered (h, g) against the true digits (stepped with A) | **ok** on every build that ran it: `X` 190 s on 9 threads (`host_exh_X.log`), `P4` 186 s (`host_exh_P4.log`), and twice more inside `P4`'s lavapipe runs (346 s, 188 s); `P6`: skips without `NICE_TEST_FX_EXHAUSTIVE`, ok with it, 186 s (`host_P6.log`) |
 | `lean_membership_matches_the_masks` (CI) | the PR's membership test (bit-reversed `seen`, four `hi32(seen << g)` sign bits, six compares) against `walk_pf`'s four one-hot masks: **every digit 4-tuple (g2, g3, h2, h3) at every base 10–64** (2.1·10^8 tuples) against a random `seen` of ~25 % density each, plus 10^7 random tuples against sets of every density (1/2 to 1/16) | ok, 0 differ; 2–50 % pass (asserted) |
 | `lean_prefilter_matches_the_division_form` (CI) | end to end: random entries (A2, A3, P2, P3 < b², entry mask) and tops (D < b², certificate, seed flag), **10^6 per base 10–64**: the lean prefilter (gated mask, reversed `seen`) against the division form (`walk_pf` at mid = 2, `cpu_join`'s prefilter) | ok |
 
@@ -100,7 +150,7 @@ instructions); `NICE_EXP_JOIN_RCV=0`: RC reading the clipped tops' ranges from t
 
 **The PR** (`P` = level 4, MT form 2, `mul_hi`, ranges in shared; no knobs): `walk_pf_lean` replaces `walk_pf` at
 mid = 2, k ≥ 2; other shapes keep `walk_pf` and the packed words. RC applies to every shape. Shared memory: +2 KiB
-(`t_glo`, `t_ghi`) and 32 B (`s_cw`): ~18 KiB per cube, still 5 cubes per SM (5 × 19 KiB ≤ 100 KiB). `wf` (= `w_f0`) is a
+(`t_glo`, `t_ghi`) and 32 B (`s_cw`): ~18 KiB per cube, still 5 cubes per SM (5 × 19 KiB ≤ 100 KiB). `w_f0` (= w) is a
 new scalar argument of `join_kernel`.
 
 ## 3. Codegen gate (brief step 2)
@@ -122,7 +172,8 @@ The walk round before the stage (loop head to the warp-aggregated `ATOMS`, entry
 | 4 +RC, form 1 (`X3L4a`) | | 45 (25) | 45 (25) | 47 (25) | 45 / 45 / 47 | none |
 | 4 +RC, form 2 (`X3L4c`) | 39 (21) | **41 (21)** | 41 (21) | 43 (21) | 40 / 45 / 47 | **28 B** at b60 |
 | **PR** (`P` = level 4, form 2: the A/B's binary) | 39 (21) | **41 (21)** | 41 (21) | 43 (21) | **45 / 45 / 47** | **none** |
-| PR, final head (`P4`, warnings fixed) | 39 (21) | **41 (21)** | 41 (21) | 43 (21) | 40 / 45 / 45 | 44 B at b60 |
+| PR, the head's kernels (`P4`, warnings fixed) | 39 (21) | **41 (21)** | 41 (21) | 43 (21) | 40 / 45 / 45 | 44 B at b60 |
+| PR head (`P6`, tests only changed) | 39 (21) | **41 (21)** | 41 (21) | 43 (21) | 45 / 40 / 47 | 28 B at b62 |
 
 (`raw/registers.txt`; the second slot's loop is one shorter at every level from 1 on.)
 
@@ -136,8 +187,8 @@ The walk round before the stage (loop head to the warp-aggregated `ATOMS`, entry
   the prefilter's body (a trivial body keeps it), from RC or from the batch load's new terms one at a time, and that
   dropping the plane barrier brings back a `YIELD` and costs more. Cause not found; the walk keeps the barrier.
 - **Spills:** in some compiles ptxas lands on **40 registers with 28–44 B of spills** at b60 or b62 (`XL4`, `X3L4b`,
-  `X3L4c`, `X3L4e/f`, `P3`, and **the final head's own pass `P4` at b60**); in others the same kernel takes 45–47
-  registers and no spills (`P`, `P1`, `X3L4a`, and `P4` at b62/b64). The reason is in the source CubeCL emits: the
+  `X3L4c`, `X3L4e/f`, `P3`, and the head's own passes: `P4` at b60, `P6` at b62); in others the same kernel takes 45–47
+  registers and no spills (`P`, `P1`, `X3L4a`, `P4` at b62/b64, `P6` at b60/b64). The reason is in the source CubeCL emits: the
   join's shared memory is one `extern __shared__` dynamic array, so ptxas does not know it caps the kernel at 5 cubes per
   SM, aims at 6 (1536 threads, i.e. ≤ 40 registers), and takes the 40 whenever the spills it needs are few; which
   compile that is depends on CubeCL's per-process order of the shared arrays (the CUDA text differs between processes
@@ -185,7 +236,12 @@ The walk round before the stage (loop head to the warp-aggregated `ATOMS`, entry
   counts (§6).
 - **The final head is the timed binary:** `881e0ef` differs from `50465be` (the A/B's `P`) only in comments (the walk's
   comment moved below the range test's code, one test's doc line); its test binary `P2` is **byte-identical to `P`**
-  (md5 1c3dfee2, `build_P2.out`). `chain_x.sh P2` re-ran the CUDA list on it anyway: @@P2X@@
+  (md5 1c3dfee2, `build_P2.out`). Its CUDA list was started and stopped when the warnings turned up (`x_P2_ref` ok).
+- **The head's kernels (`P4`)**, `chain_x.sh P4` (08:31–08:45, beside lavapipe): every check above ok with the same
+  counts (CPU-reference parity, the FD test 26 / 279 / 237,907,266, the certificate test, both dense fields, whole
+  b42, the 1e14 compare with the four count pairs). `P4`'s join SASS at b62 is `P`'s instruction for instruction (1152
+  opcodes, the same sequence; only registers and shared offsets differ), and it timed the same (§6). `P6` (the head)
+  changes only host tests after `P4`.
 
 ### The range test's coverage (RC)
 
@@ -206,7 +262,7 @@ in-AND, out-of-range pairs:
 - #240's FD test (23 batches with a clipped block) checks the records (`rlo`, `rhi`) the clip words are made from,
   for both top kernels.
 
-### Lavapipe and lint (`P`)
+### Lavapipe (`P4`) and lint (`P5`, `P6`)
 
 Lavapipe (llvmpipe, LLVM 20.1.2, Mesa 25.2.8, **8-lane subgroups**, 128 MiB storage-buffer limit; binaries `P4_naga`
 = `--features cubecl`, `P4_spv` = `cubecl-spirv`; `chain_lvp.sh P4`, 08:33–08:58, beside `P4`'s CUDA list; `lvp_*_P4.log`):
@@ -223,14 +279,14 @@ That is what showed it would cost CI's lavapipe and macOS jobs minutes: `P5`/`P6
 
 **Lint** (`chain_lint.sh`, `just lint` as CI's lint job runs it, toolchain 1.99.1, own target dir):
 
-| check | `P5` (`b6bf434`) | **`P6` (`48ac631`, the head)** |
+| check | `P5` (`b6bf434`) | **`P6` (`48ac631` = the head's tree)** |
 |---|---|---|
-| `cargo fmt --all --check` | ok | @@FMT6@@ |
-| `cargo clippy -p "*" --all-targets -- -D warnings` | **failed**: `many_single_char_names` (×2 tests), `similar_names` (`seed`/`seen`), `manual_div_ceil` in the new tests | @@CL6A@@ |
-| the same with `--features nice_client/gpu` | failed (the same) | @@CL6B@@ |
-| the same with `--features nice_client/gpu,nice_client/cubecl-spirv` (CI's) | failed (the same) | @@CL6C@@ |
-| `P6`'s build: rustc warnings | | @@W6@@ |
-| `P6`'s host tests (the three CI tests, `join_plan::`, `cubecl_join::`; the exhaustive test skips without its env and passes with it) | | @@H6@@ |
+| `cargo fmt --all --check` | ok | **ok** |
+| `cargo clippy -p "*" --all-targets -- -D warnings` | **failed**: `many_single_char_names` (×2 tests), `similar_names` (`seed`/`seen`), `manual_div_ceil` in the new tests | **ok** |
+| the same with `--features nice_client/gpu` | failed (the same) | **ok** |
+| the same with `--features nice_client/gpu,nice_client/cubecl-spirv` (CI's) | failed (the same) | **ok** |
+| `P6`'s build: rustc warnings | | **none** (`build_P6.log`) |
+| `P6`'s host tests (the three CI tests, `join_plan::`, `cubecl_join::`; the exhaustive test skips without its env and passes with it) | | **ok** (`host_P6.log`) |
 
 ## 5. Screen (brief step 4)
 
@@ -275,7 +331,8 @@ SM MHz per level over the rounds; cycles = device seconds × the run's clock (`r
   **The rounds do not change** (level 0's count is L37/L40's: 1.284·10^11 at b62 1e17, 3.07·10^10 per b60 1e16 field).
   The few-in-10^5 differences are the order of the bucket lists, which the bucket kernel fills with shared atomics:
   which entries share a plane differs from run to run, and a plane's rounds are its lanes' maximum.
-  @@CTRREPEAT@@ RC can only clear bits, and level 4's count is level 3's to 2·10^-6.
+  A second level-0 run (09:16–09:20) gave 128,335,711,441 and 61,328,646,132: **−0.008 % and −0.011 % from the first,
+  more than the levels' differences**. RC can only clear bits, and level 4's count is level 3's to 2·10^-6.
 - So the change is per round, as designed: ~30 fewer instructions in each of 1.28·10^11 plane-rounds per b62 1e17
   field.
 
@@ -350,6 +407,23 @@ B P, P B, …; each run ~32 s; `nm_*.json`):
   "normalised" ratios computed from them scatter ×0.93–×1.23 (`nm_table.md`) and mean nothing. The whole fields above
   are the clock-normalised measurement.
 
+**The head's kernels and one more variant** (`chain_final.sh`, 09:00–09:16, the box quiet again; `P` = the A/B's
+binary, `P4` = the head's kernels, `P3` = the clip words copied once per batch to a plain shared array, so a chunk reads
+them with an `LDS` instead of an `ATOMS.ADD 0`; 2 rounds, order P P4 P3 then P3 P4 P; `raw/s3_table.md`):
+
+| field | P | P4 | P3 | P4 vs P (per round) | P3 vs P (per round) |
+|---|---|---|---|---|---|
+| b62 1e17 | 97.99 (96.07, 99.91) | 99.10 (97.61, 100.58) | 97.73 (96.89, 98.57) | ×0.989 (0.984, 0.993) | ×1.003 (0.992, 1.014) |
+| b60 1e16 | 19.66 (19.61, 19.71) | 19.72 (19.71, 19.73) | 19.44 (19.38, 19.50) | ×0.997 (0.995, 0.999) | ×1.012 (1.012, 1.011) |
+
+- `P4` = `P` within this session's noise (the b62 1e17 rounds of one binary differ by 3–4 % here, and `P4` ran in the
+  middle of both rounds); their join SASS is the same instruction sequence. Every run gave the exact counts.
+- This session ran faster than the A/B's (`P` 98.0 s against 100.4 s at b62 1e17, at about the same clocks): the
+  between-session scatter is why the A/B is interleaved.
+- `P3`: ×1.003 at b62 1e17 (rounds either side of 1), ×1.012 at b60 1e16 (both rounds). The per-chunk `ATOMS` costs at
+  most ~1 %, not measured above the noise at b62; not taken into the PR (it would need its own A/B), listed as a
+  follow-up.
+
 ## 7. Against the scoping
 
 SCOPING §5–6 (instruction counts and a pipe model; nothing measured):
@@ -394,8 +468,9 @@ SCOPING §5–6 (instruction counts and a pipe model; nothing measured):
     registers), `chain_mut.sh` (the RC mutant `X4`), `chain_post.sh P` (`chain_ab.sh P`: the A/B; `chain_x.sh P`;
     the mutant's tests; `B`'s registers; its lavapipe step was stopped when the warnings turned up), `chain_p2.sh`
     and `chain_p3.sh` (stopped; superseded), `chain_final.sh` (`P4`: build, host tests, rustfmt, registers,
-    `chain_x.sh P4` beside `chain_lvp.sh P4`, `chain_lint.sh P4`; the `P`/`P4`/`P3` screen; the exhaustive test on
-    `P4`; the level-0 counter repeat).
+    `chain_x.sh P4` beside `chain_lvp.sh P4`, then `chain_lint.sh` on `P5`; the `P`/`P4`/`P3` screen; the exhaustive
+    test on `P4`; the level-0 counter repeat), `chain_p6.sh` (`P6`, the head: build, host tests incl. the exhaustive
+    one with and without its env, rustfmt, registers, `chain_lint.sh P6`).
   - Codegen: `walkcount.py` (walk loops and the round before the stage by pipe), `cuexp.sh` (offline nvcc of an
     edited CUDA source, for the convergence-fallback bisection; sources and SASS in `raw/box/cuexp/`).
   - The PR's source: `make_pr.py` (applied to 7832f89's `cubecl_join.rs`), `pr_tests.rs` (its tests), then rustfmt;
@@ -406,5 +481,6 @@ SCOPING §5–6 (instruction counts and a pipe model; nothing measured):
 - `raw/box/`: every log and `.smi` trace (`scr_*` screen, `ctr_*` counters, `ab_*` A/B, `nm_*` NiceMark, `s3_*` the
   last screen, `x_*` / `cmp_*` exactness, `mut_*` the mutant, `lvp_*` / `wgsl_*` / `lint_dump_*` lavapipe, `fmt_*` /
   `clippy_*` lint, `host_*` host tests, `build_*`, `regs_*`), the chains' `.out` files, `trees.txt`, `box-info.txt`,
-  `power.txt`, `nvidia-smi.txt`, and `sass/` (per pass: CubeCL's CUDA sources, SASS, `registers.txt`, the run log, the
-  debug log).
+  `power.txt`, `nvidia-smi.txt`, and `sass/` (per pass: CubeCL's CUDA sources and SASS — the join kernel's as text,
+  the other kernels' gzipped — `registers.txt`, the run log, the debug log).
+- `raw/pr-join-lean-prefilter.bundle`: the PR commit `d672887` as a git bundle (on 7832f89).

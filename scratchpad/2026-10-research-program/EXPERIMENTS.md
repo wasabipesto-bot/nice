@@ -5,6 +5,38 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L41.1 Lean `walk_pf` (FX + MT + GM + RC): PR branch, ×1.086 at b62 1e17 (2026-11-06, agent; `L41/RESULTS.md`, `L41/PR-BODY.md`, `L41/raw/`; branch `pr/join-lean-prefilter` d672887 = one commit on 7832f89 (#241); prototype `exp/join-lean-pf` a150b49 (knob `NICE_EXP_JOIN_PF`), variant `exp/join-lean-pf-cwcopy` d5db28b)
+
+Host tests: FX exhaustive over every (A, P, D) < b² at every base 10–64 = 6.63e11 triples, all
+exact (190 s on 9 threads; ignored + `NICE_TEST_FX_EXHAUSTIVE=1` since CI runs ignored tests); in
+CI: constants and `dh` vs exact ceilings for every D < b², the Δ < 2³² bound, digits for every
+(P, D) at max A and every (A, D) at max P; MT vs the old four-mask test for every digit 4-tuple at
+every base (2.1e8) + 1e7 random; end-to-end lean vs division form on 1e6 random pairs per base
+(4.4 s release). SASS of the round before the stage at b62, predicted → actual: L0 71/71, L1 56/59,
+L2 48/51, L3 45/47, L4 39/41 (ALU 45 → 35 → 28 → 24 → 21; b60 69 → 41, b64 64 → 43). MT as
+specified did not shrink (NVVM split `(hit & 1)` on right shifts into four 64-bit compares →
+level 2 at 60); fixed by holding every digit mask bit-reversed and testing the sign bit of
+`hi32(seen << g)`, one funnel shift per digit. The residual +2 per level is a ptxas fallback (from
+L1 on it stops proving convergence at the walk's vote/plane barrier: +3 issued per round; cause
+not found). Registers 40 → 45 at b60/b62 (45–47 b64), ≤ 48, 5 cubes/SM kept; **some compiles of
+the same kernel land on 40 registers with 28–44 B spills** (CubeCL's dynamic shared array hides the
+5-cube limit, ptxas aims for 6; which compile spills depends on CubeCL's shared-array order per
+process; spilled values are per work item/batch, never in the walk; A/B rounds agree to 0.1–0.6 %).
+Exact (levels 3 and 4, timed binary and head): parity incl. b50/b54 + b57 frontier, #240's device
+test, certificate test, dense fields, whole b42, 1e14 COMPARE, every screen/A/B field = the exact
+counts; lavapipe naga + SPIR-V 8/8; lint 16/0 (JoinKernel b57 constant divisions 36 → 26); fmt,
+clippy ×3. RC's clipped path covered by the CPU-reference small windows (a mutant without the range
+test fails at b20 [58945,160000) and adds 26 / 5 survivors at b57 / b62 1e14). **Screen (2 rounds,
+time / cycles):** L1 ×1.028 / 1.038 b62 1e17, ×1.037 / 1.063 b60; L2 ×1.055 / 1.077, ×1.076 /
+1.087; L3 ×1.067 / 1.078, ×1.093 / 1.120; L4 ×1.075 / 1.097, ×1.111 / 1.143; plane-rounds
+unchanged (+0.003–0.008 %). **A/B vs 7832f89 (180 W, 3 interleaved rounds): b62 1e17 ×1.086
+(109.0 → 100.4 s; cycles ×1.103), b62 1e16 ×1.086 (×1.075), b60 1e16 ×1.122 (×1.126), b64 ×1.070
+(×1.104), 1e14 ×1.027/1.017/1.006/0.997 (noise); NiceMark 6 rounds ×1.061 (rounds 1.056–1.063):
+b58 weak ×1.070, b58 strong ×1.041 (lowest round ×1.007), b60 ×1.058, b62 ×1.068.** The leaner
+round draws more power per cycle: the PR side ran 29–48 MHz slower at the cap (opposite of the
+scoping's guess). Not taken: clip words copied to plain shared once per batch (×1.003 / ×1.012,
+noise). Box 59373929 destroyed (~4.7 h). → reviewer agent before the PR.
+
 ## L42.2 CPU FD top certificates: PR branch (2026-11-06, agent; `L42/PR-RESULTS.md`, `L42/PR-BODY.md`, `L42/raw/pr/`; branch `pr/cpu-join-fd-tops` fba5431 = one commit on main 6f060a9; worktree `.worktrees/pr-cpu-join-fd`)
 
 New `common/src/cpu_top_fd.rs`: five packed digit-array additions per step with trimmed word

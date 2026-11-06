@@ -27,6 +27,8 @@ A key's prefixes come from the top layer, which `CpuJoin::new` sorts by key stab
 
 **`CpuJoin::tops`.** An unclipped block goes through the stepped state. A clipped one goes through `Base::cert` as before and leaves the state alone; only P = plo and P = phi of a slice can be clipped. So does every block of a field whose arrays would not fit (`TopFdSetup::try_new` returns `None`), or of a base ≤ 6 (no field the join takes). Nothing else in the join changes: the bottoms, the lists, the scan and the survivors are as they were.
 
+**Power-of-two bases take the stepped path too.** #240 kept the old kernel at b64 on the GPU, where the long division compiles to shifts and FD measured slower. On the CPU `Base::cert` divides by a runtime base at every base, b64 included, so that reason does not apply. At b64 the step is 14–15 word additions. B64_MEASURED
+
 ## Why
 
 Measured on main with perf and a per-phase TSC split (not in this PR), at production shapes (b60 1e16, b62 1e16 and slices of b62 1e17, 1 and 4 threads alike):
@@ -34,7 +36,7 @@ Measured on main with perf and a per-phase TSC split (not in this PR), at produc
 - **About 57 % of `Base::cert`'s own samples sat on two hardware `div` instructions:** the per-digit `% b` and `/ b` by a runtime base in `digits_w`, 9–11 digits a power. That is ~17 % of the join on this core. The `shift_down_rem` division (`divrem_w4`) was another quarter of the certificate.
 - A certified prefix cost ~650 TSC cycles (≈ 260 ns) whatever the shape. Per b60 1e16 partition the join certifies 5.07 M prefixes and keeps 1.76 M.
 
-The GPU took the same step in #240, where the top kernel went ×1.48–1.59. On the CPU it needs no batching: `tops()` already walks a key's prefixes in order, so there is no new memory, and the threads, the bottoms and the scan are untouched.
+The GPU took the same step in #240, where the top kernel went ×1.48–1.61. On the CPU it needs no batching: `tops()` already walks a key's prefixes in order, so there is no new memory, and the threads, the bottoms and the scan are untouched.
 
 ## Soundness
 
@@ -42,7 +44,7 @@ The GPU took the same step in #240, where the top kernel went ×1.48–1.59. On 
   - The seed is exact. The products are exact `W4` arithmetic. The digit conversion is exact division: `Div64` returns the exact quotient and remainder, and the reciprocal multiply is `cpu_join`'s `SmallDiv`, exact below 2^48/b, which every four-digit half of a chunk (< b^4 ≤ 2^24) is. Shifting digits multiplies by b^o, and the additions are exact base-b additions.
   - Every step is an exact base-b addition. The biased add is valid for every b ≤ 128.
   - So after m steps the arrays hold P'², P'³ and their differences for P' = P + m·h, digit for digit, and d2, d3 and Δ3 are their binary values (identities in P).
-- **No overflow.** The state only ever holds a P whose block is unclipped and in the slice: it steps only to the prefix it then certifies.
+- **No overflow.** The state only ever certifies a P whose block is unclipped and in the slice. In the join every gap is a multiple of h, so the walk lands on P. A gap that is not (only the tests make one) steps once past P and then re-seeds: that step's addends are taken at a prefix below P, and the values it passes through (below phi + h; P³ has at most 29 digits at bases 40–64, against the arrays' 48) still fit.
   - Every array is increasing in P, so `TopFdSetup::try_new` sizes each one from its value at the slice's last prefix, phi. It requires every addend plus its carry word to fit the six-word arrays, and P³'s digits to stay within them.
   - Otherwise the field keeps `Base::cert`. Every production field (b40–b64) and every test window but base 10's (blocks of one number) fits.
 - **The certificate is the same function of the same digits.**
@@ -60,7 +62,7 @@ The GPU took the same step in #240, where the top kernel went ×1.48–1.59. On 
 
 **Machine:** a 4-vCPU AMD EPYC-Rome (**Zen 2**) VM with **AVX2 only** (so the scan is `scan_avx2`); every run under `nice -n 19`. Zen 2's 64-bit `div` is slow. Zen 3 and Zen 4 divide much faster, so there `Base::cert` is cheaper, its share of the join is smaller, and the gain from this PR should be smaller. The PR also removes the 256-bit divisions and products, so some gain should remain. With AVX-512 the scan is cheaper, which raises the certificates' share. I have not measured either.
 
-**Method:** release builds of main (`6f060a9`) and this PR. A harness outside this PR, using only `CpuJoin`'s public API, runs sampled partitions of one slice (NiceMark's bit-reversed `sample_order`) through `CpuJoin::run_partition` on 1 or 4 threads; whole fields run every partition. The two binaries are interleaved with the order alternating per round (main, PR; PR, main; main, PR), 3 rounds. Figures are medians; spread = (max − min) / median; "per round" is main's time over the PR's in the same round. I logged the load average before each round (other processes on the VM) and kept only rounds that started at ≤ 2.
+**Method:** release builds of main (`6f060a9`) and this PR. A harness outside this PR, using only `CpuJoin`'s public API, runs sampled partitions of one slice (NiceMark's bit-reversed `sample_order`) through `CpuJoin::run_partition` on 1 or 4 threads; whole fields run every partition. The two binaries are interleaved with the order alternating per round (main, PR; PR, main; main, PR), 3 rounds. Figures are medians; spread = (max − min) / median; "per round" is main's time over the PR's in the same round. Before each round the script waited for the 1-min load average (other processes on the VM) to be ≤ 2 and logged it: every round started at ≤ 2 (1.64, 1.87, 1.97; b64: LOADS_B64).
 
 Fields: b60 starts at NiceMark's `b60_msd_weak` start, 1157209632114824200908. b62 1e17 is the whole field 4473066762334864396992 + 1e17, which the CPU cuts into 7 slices; its slice 0 is used here, 4.75 M top-layer prefixes. b62 1e14 starts at 4473156762334864396992.
 
@@ -89,8 +91,8 @@ NiceMark nice-only on the CPU (`nice_client niceonly --threads 4 --benchmark-sec
 | b58 MSD-weak (1e15 field, 4 threads) | 1.630e12 (1.633e12, 1.627e12, 1.647e12, 1.523e12) | 1.859e12 (1.840e12, 1.887e12, 1.878e12, 1.735e12) | **×1.141** | 1.127, 1.160, 1.141, 1.139 |
 | b58 MSD-weak, 1 thread | 4.349e11 (4.361e11, 4.336e11, 4.328e11, 4.385e11) | 4.968e11 (4.901e11, 5.034e11, 5.040e11, 4.880e11) | **×1.142** | 1.124, 1.161, 1.165, 1.113 |
 | b58 MSD-strong (1e15 field, 4 threads) | 1.078e13 (1.066e13, 1.094e13, 1.082e13, 1.074e13) | 1.184e13 (1.185e13, 1.183e13, 1.202e13, 1.164e13) | **×1.099** | 1.111, 1.082, 1.111, 1.084 |
-| b60 MSD-weak (sampled from a 1e16 field, 4 threads) | 3.754e12 (3.826e12, 3.742e12, 3.757e12, 3.751e12) | 5.016e12 (4.949e12, 5.035e12, 5.035e12, 4.997e12) | **×1.336** | 1.293, 1.345, 1.340, 1.332 |
-| b62 MSD-weak (sampled from a 1e16 window, 4 threads) | 4.181e12 (4.190e12, 4.175e12, 4.187e12, 3.759e12) | 5.191e12 (5.173e12, 5.218e12, 5.209e12, 5.136e12) | **×1.241** | 1.235, 1.250, 1.244, 1.367 |
+| b60 MSD-weak (a 3e15 window of a 1e16 field, 4 threads) | 3.754e12 (3.826e12, 3.742e12, 3.757e12, 3.751e12) | 5.016e12 (4.949e12, 5.035e12, 5.035e12, 4.997e12) | **×1.336** | 1.293, 1.345, 1.340, 1.332 |
+| b62 MSD-weak (a 3e15 window of a 1e16 field, 4 threads) | 4.181e12 (4.190e12, 4.175e12, 4.187e12, 3.759e12) | 5.191e12 (5.173e12, 5.218e12, 5.209e12, 5.136e12) | **×1.241** | 1.235, 1.250, 1.244, 1.367 |
 
 - main's fourth round ran low on two scenarios (b58 MSD-weak, b62), probably from other load on the VM. The medians barely move with it: main's score is 673.6 without it.
 - NiceMark samples partitions in bit-reversed order, but the stepping happens inside a partition, so its order does not matter here (unlike #240's, which steps across partitions).
@@ -100,11 +102,11 @@ NiceMark nice-only on the CPU (`nice_client niceonly --threads 4 --benchmark-sec
 All on this branch's head, release builds:
 
 - **New `cpu_top_fd::stepped_certificates_equal_the_divided_ones`.** Bases 10–64, four random fields inside each base's nice band (n, n² and n³ of one length each), every f0 with b^f0 < 2^32 and o = 1–3 (cap = f0 + o): 1876 setups. Each is walked in runs of 200 prefixes from random starts, from the field's first prefix and up to its last, with random gaps (one step 62 %, two to four 25 %, 5–24 steps 9 %, backwards 3 %).
-  - 1,860,723 unclipped blocks certified (413,250 kept, 243,907 of them seeds), every certificate equal to `Base::cert`'s, and `pc`, `dm` equal to P's.
+  - 1,860,723 unclipped blocks certified (413,250 kept; 243,907 seeded), every certificate equal to `Base::cert`'s, and `pc`, `dm` equal to P's.
   - 3654 clipped blocks left out, as the join leaves them out, without touching the state.
 - **New `cpu_join::stepped_tops_equal_divided_tops_on_production_fields`.** For each production plan field (b42 1e13; b50, b57, b60, b62, b64 1e14), 25 sampled partitions including the first and last live ones. For every key, `tops()` must give the same tops, field by field and in order, as a join with every block through `Base::cert`: 3,698,847 tops.
 - **`check_partitions` now also compares every key's tops with the divided ones.** So `cpu_join_matches_the_reference_on_the_test_windows` (b10's band and the b20–b64 windows, clipped at both ends) checks them on every partition it visits. The opt-in `cpu_join_matches_the_reference_on_production_fields` (`NICE_TEST_CPU_JOIN_REF=16`: 16 partitions of each plan field) passes too, against the reference join. New `the_test_windows_step_their_top_certificates`: every window but b10's takes the stepped path.
-- The other `cpu_join` tests are unchanged and pass: all three scans, stride agreement on whole windows, slices, the field prune, b10's 69. `cargo test --release -p nice_common -p nice_client`: 183 + 22 passed.
+- The other `cpu_join` tests are unchanged and pass: all three scans, stride agreement on whole windows, slices, the field prune, b10's 69. `cargo test --release -p nice_common -p nice_client`: 184 + 22 passed.
 - The whole b42 field (`NICE_TEST_JOIN_FULL_FIELD=1`): join = reference = stride, 1764 partitions, 417,789,835 join survivors, 16,879,877 checked, no hits. On 4 threads: reference 85 s, join 12.9 s, stride 113.7 s.
 - **Every timed run above has main's join survivors and full checks:**
   - b60 1e16, 4 partitions: 136,900,315 / 8,692,368;
