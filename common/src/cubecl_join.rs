@@ -161,7 +161,6 @@ pub use kernels::{
 mod kernels {
     use super::{
         AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS,
-        TRANSPOSE_MIN,
     };
     use crate::cubecl_backend::candidate_check;
     use crate::cubecl_detailed_fd::fd_add_top;
@@ -406,7 +405,7 @@ mod kernels {
     ///
     /// A pair passes the AND iff the entry's and the top's digit masks are
     /// disjoint, i.e. iff no digit of the entry is a digit of the top. So for
-    /// a batch of at least [`TRANSPOSE_MIN`] tops the kernel first transposes
+    /// a batch of at least [`super::TRANSPOSE_MIN`] tops the kernel first transposes
     /// the tops' masks into `t_tr`, one word per (chunk of 32 tops, digit)
     /// with bit i set iff the chunk's top i has the digit, and an entry's
     /// pass mask for a chunk is the complement of the OR of the words of its
@@ -478,7 +477,22 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] abl: u32,
+        #[comptime] tmin: u32,
+        #[comptime] spc: bool,
     ) {
+        // Experimental ablation (L37's switches ported to #246 by L45,
+        // `NICE_EXP_JOIN_ABL`): 0 full; 1 AND only (pass masks formed and
+        // counted, no walk); 2 walk without the prefilter and the stage;
+        // 3 walk and prefilter, no stage; 4 no AND (entries and tops loaded,
+        // every pass mask 0); 7, 8 full with the stage checked every 4 or 8
+        // chunks; 15 full with the stage checked once per top batch (after
+        // the batch's last wave). A full stage spills to the list in every
+        // mode, so 0, 7, 8 and 15 are exact. `tmin` replaces TRANSPOSE_MIN
+        // (`NICE_EXP_JOIN_TMIN`); `spc` counts the spills in `and_count[1]`
+        // (`NICE_EXP_JOIN_SPILLCNT`).
+        let mut ck = 0u32;
+        let mut npf: u32 = 0u32;
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
         let wave = comptime!(ept * JOIN_WG);
@@ -610,7 +624,7 @@ mod kernels {
                     }
                 }
                 sync_cube();
-                if nt >= TRANSPOSE_MIN {
+                if nt >= tmin {
                     // Thread u writes chunk u / 32's words for digits u % 32
                     // and u % 32 + 32, over the chunk's 32 tops unrolled (the
                     // loads pipeline); bits past the batch's last top are
@@ -747,6 +761,18 @@ mod kernels {
                             rr[j as usize] = r0;
                         }
                     }
+                    if comptime!(abl == 1 || abl == 2 || abl == 4) {
+                        #[unroll]
+                        for j in 0..ept {
+                            ck ^= ac[j as usize]
+                                ^ ac3[j as usize]
+                                ^ pc[j as usize]
+                                ^ pc3[j as usize]
+                                ^ rr[j as usize]
+                                ^ mlo[j as usize]
+                                ^ mhi[j as usize];
+                        }
+                    }
                     // Branch-free AND over a chunk of up to 32 tops into a pass
                     // bitmask per entry, then only the (rare) set bits are
                     // walked: the survivor path diverges once per chunk, not
@@ -762,7 +788,12 @@ mod kernels {
                             cend = nt;
                         }
                         let mut pm = Array::<u32>::new(ept as usize);
-                        if nt >= TRANSPOSE_MIN {
+                        if comptime!(abl == 4) {
+                            #[unroll]
+                            for j in 0..ept {
+                                pm[j as usize] = 0u32;
+                            }
+                        } else if nt >= tmin {
                             let cb = jc / 32u32;
                             if cb % ag == 0u32 {
                                 #[unroll]
@@ -861,6 +892,9 @@ mod kernels {
                         // barrier, which drops the YIELD ptxas otherwise puts in
                         // the loop and lets it keep fewer registers: another
                         // 2-11%.
+                        if comptime!(abl == 1 || abl == 4) {
+                            // no walk
+                        } else {
                         #[unroll]
                         for j in 0..ept {
                             let mut x = pm[j as usize] & vv[j as usize];
@@ -869,6 +903,9 @@ mod kernels {
                                 if x != 0u32 {
                                     let jt2 = jc + x.trailing_zeros();
                                     x &= x - 1u32;
+                                    if comptime!(abl == 2) {
+                                        npf ^= jt2;
+                                    } else {
                                     let pass = if comptime!(lean) {
                                         walk_pf_lean(
                                             ac[j as usize],
@@ -896,12 +933,19 @@ mod kernels {
                                             k2,
                                         )
                                     };
-                                    if pass {
+                                    if comptime!(abl == 3) {
+                                        if pass {
+                                            npf += 1u32;
+                                        }
+                                    } else if pass {
                                         let at = s_cnt[0].fetch_add(1u32);
                                         if at < SURV_SH_CAP {
                                             s_t[at as usize] = t_id[jt2 as usize];
                                             s_r[at as usize] = r0;
                                         } else {
+                                            if comptime!(spc) {
+                                                and_count[1].fetch_add(1u32);
+                                            }
                                             let g = surv_count[0].fetch_add(1u32);
                                             if g < surv_cap {
                                                 surv[(2u32 * g) as usize] = t_id[jt2 as usize];
@@ -909,11 +953,13 @@ mod kernels {
                                             }
                                         }
                                     }
+                                    }
                                 }
                                 if walk_sync {
                                     sync_plane();
                                 }
                             }
+                        }
                         }
                         // Write the stage out once it is half full, after
                         // every chunk of 32 tops. A chunk that adds more than
@@ -932,6 +978,30 @@ mod kernels {
                         // reserved for it, which costs full checks of stale
                         // list entries and can overwrite ones another flush
                         // reserved.
+                        if comptime!(abl == 15) {
+                            // checked once per batch, below
+                        } else if comptime!(abl == 7 || abl == 8) {
+                            // The check every fg chunks and after a batch's last.
+                            let fg = comptime!(if abl == 7 { 4u32 } else { 8u32 });
+                            if (jc / 32u32) % fg == comptime!(fg - 1) || jc + 32u32 >= nt {
+                                sync_cube();
+                                let sc = s_cnt[0].load();
+                                sync_cube();
+                                if sc >= SURV_FLUSH {
+                                    flush_survivors(
+                                        &s_t,
+                                        &s_r,
+                                        &mut s_cnt,
+                                        &mut s_base,
+                                        surv,
+                                        surv_count,
+                                        surv_cap,
+                                        sc,
+                                    );
+                                    sync_cube();
+                                }
+                            }
+                        } else {
                         sync_cube();
                         let sc = s_cnt[0].load();
                         sync_cube();
@@ -948,9 +1018,31 @@ mod kernels {
                             );
                             sync_cube();
                         }
+                        }
                         jc += 32u32;
                     }
                     ws += wave;
+                }
+                if comptime!(abl == 15) {
+                    // Once per top batch, before the clip words are cleared
+                    // (the first barrier: every thread is past its last
+                    // chunk). Pairs past a full stage went to the list.
+                    sync_cube();
+                    let sc = s_cnt[0].load();
+                    sync_cube();
+                    if sc >= SURV_FLUSH {
+                        flush_survivors(
+                            &s_t,
+                            &s_r,
+                            &mut s_cnt,
+                            &mut s_base,
+                            surv,
+                            surv_count,
+                            surv_cap,
+                            sc,
+                        );
+                        sync_cube();
+                    }
                 }
                 // Every thread is past its last read of the clip words (each
                 // chunk ends with barriers), and the next batch sets them
@@ -976,6 +1068,16 @@ mod kernels {
                 surv_cap,
                 sc,
             );
+        }
+        if comptime!(abl == 1 || abl == 2 || abl == 4) {
+            if (ck ^ npf) == 0x9E37_79B9u32 {
+                nand += 1u32;
+            }
+        }
+        if comptime!(abl == 3) {
+            if npf == 0x9E37_79B9u32 {
+                nand += 1u32;
+            }
         }
         // One atomic per plane for the join survivors.
         let planes_and = plane_sum(nand);
@@ -3040,6 +3142,18 @@ pub(crate) struct JoinProfile {
     pub inputs_secs: f64,
     /// `top_kernel` + `top_scan_kernel` + `top_fill_kernel`.
     pub top_secs: f64,
+    /// L45: `top_secs` split: the FD kernel (`top_fd_kernel`), the
+    /// `top_kernel` launch (the clipped blocks, or the whole top stage
+    /// without FD), `top_scan_kernel`, `top_fill_kernel`.
+    pub top_fd_secs: f64,
+    pub top_clip_secs: f64,
+    pub top_scan_secs: f64,
+    pub top_fill_secs: f64,
+    /// L45: `top_kernel` launches (clipped-block or full).
+    pub clip_launches: u64,
+    /// L45: prefilter survivors the walk wrote straight to the list because
+    /// the stage was full (`NICE_EXP_JOIN_SPILLCNT=1` only).
+    pub spilled: u64,
     pub bucket_secs: f64,
     /// `join_kernel` (the AND scan and the inline `mid_pass` prefilter).
     pub join_secs: f64,
@@ -3072,6 +3186,12 @@ impl JoinProfile {
         self.upload_secs += o.upload_secs;
         self.inputs_secs += o.inputs_secs;
         self.top_secs += o.top_secs;
+        self.top_fd_secs += o.top_fd_secs;
+        self.top_clip_secs += o.top_clip_secs;
+        self.top_scan_secs += o.top_scan_secs;
+        self.top_fill_secs += o.top_fill_secs;
+        self.clip_launches += o.clip_launches;
+        self.spilled += o.spilled;
         self.bucket_secs += o.bucket_secs;
         self.join_secs += o.join_secs;
         self.check_secs += o.check_secs;
@@ -3123,6 +3243,13 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
+    /// Experimental (L37/L45): the join kernel's ablation mode
+    /// (`NICE_EXP_JOIN_ABL`, 0 = full), transposed-AND gate
+    /// (`NICE_EXP_JOIN_TMIN`, default [`TRANSPOSE_MIN`]) and spill counter
+    /// (`NICE_EXP_JOIN_SPILLCNT`).
+    abl: u32,
+    tmin: u32,
+    spc: bool,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -3332,6 +3459,15 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
+            abl: std::env::var("NICE_EXP_JOIN_ABL")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            tmin: std::env::var("NICE_EXP_JOIN_TMIN")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(TRANSPOSE_MIN),
+            spc: std::env::var("NICE_EXP_JOIN_SPILLCNT").is_ok_and(|v| v == "1"),
             limbs,
             chunk_digits,
             chunk_div,
@@ -3481,6 +3617,8 @@ impl<R: Runtime> JoinDevice<R> {
         let top_count = top_count.clone();
         let bucket_cnt = bucket_cnt.clone();
         let ran = ran.clone();
+        // L45: the caller synchronised just before (the inputs mark).
+        let mut t0 = Instant::now();
         unsafe {
             if fd {
                 let (slot_k, groups) = self.top_fd_groups(nslots_u32);
@@ -3519,6 +3657,14 @@ impl<R: Runtime> JoinDevice<R> {
                     self.f0,
                     self.tq,
                 );
+                if self.profile {
+                    t0 = self
+                        .prof_mark(t0, |p, s| {
+                            p.top_fd_secs += s;
+                            p.top_secs += s;
+                        })
+                        .expect("profile sync");
+                }
             }
             if !fd || fix {
                 top_kernel::launch_unchecked::<R>(
@@ -3553,6 +3699,14 @@ impl<R: Runtime> JoinDevice<R> {
                     self.nb,
                     fix,
                 );
+                if self.profile {
+                    self.prof_mark(t0, |p, s| {
+                        p.top_clip_secs += s;
+                        p.top_secs += s;
+                        p.clip_launches += 1;
+                    })
+                    .expect("profile sync");
+                }
             }
         }
     }
@@ -3651,7 +3805,7 @@ impl<R: Runtime> JoinDevice<R> {
         // The join kernel counts its survivors and writes only those that
         // pass the prefilter to the list, which it counts too. Both counts
         // are exact: every survivor is counted and prefiltered in the walk.
-        let survivors = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
+        let survivors = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 2]));
         let checked = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
         // Every kernel counts its cubes as they finish, against the cubes
         // it was launched with. A device that drops a dispatch without an
@@ -3684,6 +3838,9 @@ impl<R: Runtime> JoinDevice<R> {
             pt = Some(self.prof_mark(t, |p, s| p.inputs_secs += s)?);
         }
         self.launch_top(vs, &vs_h, &top_count, &bucket_cnt, &ran, self.top_fd);
+        if pt.is_some() {
+            pt = Some(Instant::now());
+        }
         unsafe {
             top_scan_kernel::launch_unchecked::<R>(
                 c,
@@ -3696,6 +3853,12 @@ impl<R: Runtime> JoinDevice<R> {
                 self.ntlay * self.nroots,
                 self.nb,
             );
+            if let Some(t) = pt {
+                pt = Some(self.prof_mark(t, |p, s| {
+                    p.top_scan_secs += s;
+                    p.top_secs += s;
+                })?);
+            }
             top_fill_kernel::launch_unchecked::<R>(
                 c,
                 CubeCount::Static(top_cubes, nslots_u32, 1),
@@ -3712,7 +3875,10 @@ impl<R: Runtime> JoinDevice<R> {
                 self.nb,
             );
             if let Some(t) = pt {
-                pt = Some(self.prof_mark(t, |p, s| p.top_secs += s)?);
+                pt = Some(self.prof_mark(t, |p, s| {
+                    p.top_fill_secs += s;
+                    p.top_secs += s;
+                })?);
             }
             bucket_kernel::launch_unchecked::<R>(
                 c,
@@ -3764,7 +3930,7 @@ impl<R: Runtime> JoinDevice<R> {
                 ArrayArg::from_raw_parts(self.top_rec.clone(), rec_len),
                 ArrayArg::from_raw_parts(self.list.clone(), 2 * self.list_cap as usize),
                 ArrayArg::from_raw_parts(checked.clone(), 1),
-                ArrayArg::from_raw_parts(survivors.clone(), 1),
+                ArrayArg::from_raw_parts(survivors.clone(), 2),
                 ArrayArg::from_raw_parts(ran.clone(), nran),
                 nwork_u32,
                 self.nbp,
@@ -3777,6 +3943,9 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k,
                 self.k2,
                 self.walk_sync,
+                self.abl,
+                self.tmin,
+                self.spc,
             );
             if let Some(t) = pt {
                 pt = Some(self.prof_mark(t, |p, s| p.join_secs += s)?);
@@ -4322,6 +4491,7 @@ fn run_pass<R: Runtime>(
             continue;
         }
         let surv = u32::from_bytes(&counts[3 * i])[0];
+        st.prof.spilled += u64::from(u32::from_bytes(&counts[3 * i]).get(1).copied().unwrap_or(0));
         let checked = u32::from_bytes(&counts[3 * i + 1])[0];
         if dev.overflowed(checked) {
             left.overflowed.extend_from_slice(batch);
@@ -4352,8 +4522,9 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         "GPU_PROFILE base={base} start={s} end={e} size={} slices={} partitions={} batches={} \
          slots={} min_slots={} retried={} splits={} | setup={:.4} device_wall={:.4} \
          upload={:.4} inputs={:.4} top={:.4} bucket={:.4} join={:.4} check={:.4} read={:.4} \
-         probe={:.4} unattributed={:.4} | ntlay={} nbp={} tops={} listed={} pairs={} \
-         padded_pairs={} live_buckets={} buckets={} survivors={} checked={} hits={hits}",
+         probe={:.4} unattributed={:.4} | top_fd={:.4} top_clip={:.4} top_scan={:.4} \
+         top_fill={:.4} clip_launches={} | ntlay={} nbp={} tops={} listed={} pairs={} \
+         padded_pairs={} live_buckets={} buckets={} survivors={} checked={} spilled={} hits={hits}",
         e - s,
         js.slices,
         js.partitions,
@@ -4373,6 +4544,11 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         p.read_secs,
         p.probe_secs,
         js.device_secs - phases - p.probe_secs,
+        p.top_fd_secs,
+        p.top_clip_secs,
+        p.top_scan_secs,
+        p.top_fill_secs,
+        p.clip_launches,
         p.ntlay,
         p.nbp,
         p.tops,
@@ -4383,6 +4559,7 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         p.buckets,
         js.survivors,
         js.checked,
+        p.spilled,
     );
 }
 
