@@ -1,0 +1,107 @@
+   Compiling nice_common v3.4.8-dev (/root/l41/src/X/common)
+warning: variable does not need to be mutable
+   --> common/src/cubecl_join.rs:529:13
+    |
+529 |         let mut s_cw = SharedMemory::<Atomic<u32>>::new(comptime!(if rc {
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `lo` is never read
+   --> common/src/cubecl_join.rs:875:54
+    |
+435 |     #[cube(launch_unchecked)]
+    |     ------------------------- `lo` is overwritten here before the previous value is read
+...
+875 |                                         let mut lo = 0u32;
+    |                                                      ^^^^ this value is reassigned later and never used
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `hi` is never read
+   --> common/src/cubecl_join.rs:876:54
+    |
+435 |     #[cube(launch_unchecked)]
+    |     ------------------------- `hi` is overwritten here before the previous value is read
+...
+876 |                                         let mut hi = 0u32;
+    |                                                      ^^^^ this value is reassigned later and never used
+
+warning: value assigned to `pass` is never read
+   --> common/src/cubecl_join.rs:919:56
+    |
+919 |   ...                   let mut pass = false;
+    |                                        ^^^^^ this value is reassigned later and never used
+...
+948 | / ...                       pass = walk_pf(
+949 | | ...                           ac[j as usize],
+950 | | ...                           pc[j as usize],
+951 | | ...                           t_dm[jt2 as usize],
+...   |
+958 | | ...                           k2,
+959 | | ...                       );
+    | |___________________________- `pass` is overwritten here before the previous value is read
+
+warning: value assigned to `tlo` is never read
+   --> common/src/cubecl_join.rs:921:59
+    |
+435 |     #[cube(launch_unchecked)]
+    |     ------------------------- `tlo` is overwritten here before the previous value is read
+...
+921 |                                             let mut tlo = 0u32;
+    |                                                           ^^^^ this value is reassigned later and never used
+
+warning: value assigned to `thi` is never read
+   --> common/src/cubecl_join.rs:922:59
+    |
+435 |     #[cube(launch_unchecked)]
+    |     ------------------------- `thi` is overwritten here before the previous value is read
+...
+922 |                                             let mut thi = 0u32;
+    |                                                           ^^^^ this value is reassigned later and never used
+
+warning: value assigned to `h2` is never read
+    --> common/src/cubecl_join.rs:2955:22
+     |
+2955 |         let mut h2 = 0u32;
+     |                      ^^^^ this value is reassigned later and never used
+...
+2968 |             h2 = u32::mul_hi(f2, bb);
+     |             ------------------------ `h2` is overwritten here before the previous value is read
+
+warning: value assigned to `g2` is never read
+    --> common/src/cubecl_join.rs:2956:22
+     |
+2956 |         let mut g2 = 0u32;
+     |                      ^^^^ this value is reassigned later and never used
+...
+2969 |             g2 = u32::mul_hi(f2 * bb, bb);
+     |             ----------------------------- `g2` is overwritten here before the previous value is read
+
+warning: value assigned to `h3` is never read
+    --> common/src/cubecl_join.rs:2957:22
+     |
+2957 |         let mut h3 = 0u32;
+     |                      ^^^^ this value is reassigned later and never used
+...
+2970 |             h3 = u32::mul_hi(f3, bb);
+     |             ------------------------ `h3` is overwritten here before the previous value is read
+
+warning: value assigned to `g3` is never read
+    --> common/src/cubecl_join.rs:2958:22
+     |
+2958 |         let mut g3 = 0u32;
+     |                      ^^^^ this value is reassigned later and never used
+...
+2971 |             g3 = u32::mul_hi(f3 * bb, bb);
+     |             ----------------------------- `g3` is overwritten here before the previous value is read
+
+warning: `nice_common` (lib) generated 10 warnings (run `cargo fix --lib -p nice_common` to apply 1 suggestion)
+warning: `nice_common` (lib test) generated 10 warnings (10 duplicates)
+    Finished `release` profile [optimized] target(s) in 3m 33s
+  Executable unittests src/lib.rs (/root/tgt/release/deps/nice_common-cbd4e892b0124d04)
+  Executable tests/claim_queries.rs (/root/tgt/release/deps/claim_queries-9619899b5292cb1b)
+  Executable tests/notable_numbers_cache.rs (/root/tgt/release/deps/notable_numbers_cache-dc272e6b3d6cd38c)
+  Executable tests/search_caches.rs (/root/tgt/release/deps/search_caches-1e7a68d619f6c564)

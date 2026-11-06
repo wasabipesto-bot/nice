@@ -3,6 +3,7 @@
 # nice_client/cubecl-spirv), and clippy with nice_client/gpu alone; own target dir, niced.
 source ~/.cargo/env
 L=/root/l41/logs; W=$1
+
 cd /root/l41/src/$W
 export CARGO_TARGET_DIR=/root/tgt_clippy NICE_BUILD_SHA=test
 ( cargo fmt --all --check; echo "fmt rc=$?" ) > $L/fmt_${W}.log 2>&1

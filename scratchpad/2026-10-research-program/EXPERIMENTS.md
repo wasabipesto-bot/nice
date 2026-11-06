@@ -5,6 +5,27 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L43.1 Per-wave base trims: ×1.017 at b62 1e17 → parked (2026-11-06, agent; `L43/RESULTS.md`, `L43/raw/`; branch `exp/join-wave-base` 0e1ba4e on 7832f89, bitmask `NICE_EXP_JOIN_WB`: 1 TT shuffle transpose, 16 TT2 cheaper transpose stage, 2 WH wave-load hoist, 4 AU fixed-trip AND loop, 8 PC `pc` from the bucket kernel)
+
+Screen (one binary, 2 interleaved rounds; time ratio (cycles)): TT ×1.012 (1.026) b62 1e17 /
+×1.012 b60; TT2 ×1.013 / ×1.013; WH ×1.015 / ×1.023; **AU ×0.995 / ×1.000** (the AND is bound by
+shared loads; cutting ALU there loses ~30 MHz at the cap); **PC ×0.993 / ×0.994** (swaps 16 ALU
+instructions for a dependent global load on the latency-bound wave-load chain); all four ×1.018 /
+×1.022; **TT2 + WH ×1.023 / ×1.026**. A/B of TT2 + WH vs 7832f89 (180 W, 3 rounds, NiceMark 4):
+**b62 1e17 ×1.017** (108.26 → 106.43 s; rounds 1.011/1.024/1.019; cycles ×1.016), b62 1e16 ×1.022,
+**b60 ×1.019**, b64 ×1.059 (a b64 split: TT2 ×1.017, WH ×1.013, pair ×1.039 — not investigated),
+1e14 ×1.000 / 0.978 / 1.010 (noise), NiceMark ×1.024 (lowest scenario b58 MSD-strong ×0.998).
+Against L41's estimates: TT at the top of its 0–1.7 s range (−1.3 to −1.4 s); WH −1.6 s vs −0.4 s
+from instruction count (the list→entry latency L39 suspected is real). **Parked: below the 3 %
+kill line.** Exact with all four on (WB=31) and with WB=15: parity incl. b50/b54, #240's device
+test (237.9 M tops), certificate test, dense b58/b62, whole b42, 1e14 COMPARE, every timed
+field = L38's counts; lavapipe naga + SPIR-V 7/7 (TT falls back on 8-lane subgroups); lint 16/0;
+fmt/clippy ×3. AU's invariant (every listed entry's mask has exactly 2k digits, key level or not)
+holds by construction (§1). Registers: WB=0 40; 15/31 46; WH alone 47–48; AU 48; TT/TT2 40 +
+12 B spills; **WB=19 40 + 8 B spills (the work-item index `w`)** — fails the no-spill gate as
+written; AU fully unrolled took 64 registers (replaced). Direct SPIR-V JoinKernel 133–136 →
+136–139 blocks. Box 2.9 h.
+
 ## L42.1 CPU join profile on ivory, and FD top certificates on the CPU (2026-11-06, agent; `L42/SCOPING.md`, `L42/raw/`; worktree `.worktrees/l42-cpu-join-prof`, scratch prototype `l42_fd.rs`, uncommitted)
 
 Ivory = Zen 2 (EPYC Rome) VM, 4 vCPUs, AVX2 only (`scan_avx2`); ~25 idle CLI processes (load

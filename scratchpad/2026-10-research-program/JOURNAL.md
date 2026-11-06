@@ -21,6 +21,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   prefilter), exact on 19 M slots and whole fields. PR agent launched on ivory
   (`pr/cpu-join-fd-tops` on main, independent of #241; hard stop 11:30 UTC); the CPU lean prefilter
   follows separately after the GPU version lands.
+- **L43 parked (08:50 UTC, L43.1):** the base trims give ×1.017 at b62 1e17 (TT2 + WH), ×1.059
+  b64, exact; the fixed-trip AND loop and the bucket-kernel `pc` both lose. Below the 3 % line.
+  The wave-load hoist saved 4× its instruction-count estimate: the list→entry latency is real.
+  Box l43-wavebase destroyed (2.9 h).
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 

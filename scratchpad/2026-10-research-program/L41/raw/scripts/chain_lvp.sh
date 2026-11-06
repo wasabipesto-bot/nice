@@ -3,6 +3,7 @@
 # niced), CI's WGSL dump + lint (naga, the workflow's 13 requires), and on naga and SPIR-V every wgpu test of
 # cubecl_join (join parity incl. b50/b54, the FD-vs-top-kernel test, the certificate test, ...).
 L=/root/l41/logs; BIN=/root/l41/bin; W=$1
+
 [ -e $BIN/${W}_naga ] || NICEN=15 J=10 /root/l41/build.sh $W ${W}_naga cubecl /root/tgt_lvp
 [ -e $BIN/${W}_spv ] || NICEN=15 J=10 /root/l41/build.sh $W ${W}_spv cubecl-spirv /root/tgt_lvp
 touch $L/lvp_${W}.built
