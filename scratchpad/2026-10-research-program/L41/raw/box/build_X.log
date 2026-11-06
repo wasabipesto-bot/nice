@@ -1,0 +1,53 @@
+   Compiling nice_common v3.4.8-dev (/root/l41/src/X/common)
+warning: variable does not need to be mutable
+   --> common/src/cubecl_join.rs:519:13
+    |
+519 |         let mut s_cw = SharedMemory::<Atomic<u32>>::new(comptime!(if rc {
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `pass` is never read
+   --> common/src/cubecl_join.rs:887:56
+    |
+887 |   ...                   let mut pass = false;
+    |                                        ^^^^^ this value is reassigned later and never used
+...
+913 | / ...                       pass = walk_pf(
+914 | | ...                           ac[j as usize],
+915 | | ...                           pc[j as usize],
+916 | | ...                           t_dm[jt2 as usize],
+...   |
+923 | | ...                           k2,
+924 | | ...                       );
+    | |___________________________- `pass` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `tlo` is never read
+   --> common/src/cubecl_join.rs:889:59
+    |
+435 |     #[cube(launch_unchecked)]
+    |     ------------------------- `tlo` is overwritten here before the previous value is read
+...
+889 |                                             let mut tlo = 0u32;
+    |                                                           ^^^^ this value is reassigned later and never used
+
+warning: value assigned to `thi` is never read
+   --> common/src/cubecl_join.rs:890:59
+    |
+435 |     #[cube(launch_unchecked)]
+    |     ------------------------- `thi` is overwritten here before the previous value is read
+...
+890 |                                             let mut thi = 0u32;
+    |                                                           ^^^^ this value is reassigned later and never used
+
+warning: `nice_common` (lib) generated 4 warnings (run `cargo fix --lib -p nice_common` to apply 1 suggestion)
+warning: `nice_common` (lib test) generated 4 warnings (4 duplicates)
+    Finished `release` profile [optimized] target(s) in 3m 16s
+  Executable unittests src/lib.rs (/root/tgt/release/deps/nice_common-cbd4e892b0124d04)
+  Executable tests/claim_queries.rs (/root/tgt/release/deps/claim_queries-9619899b5292cb1b)
+  Executable tests/notable_numbers_cache.rs (/root/tgt/release/deps/notable_numbers_cache-dc272e6b3d6cd38c)
+  Executable tests/search_caches.rs (/root/tgt/release/deps/search_caches-1e7a68d619f6c564)

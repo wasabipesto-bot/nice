@@ -1,0 +1,2 @@
+| field | wb0 s/field (rounds) | wb1 s/field (rounds) | wb17 s/field (rounds) | wb2 s/field (rounds) | wb4 s/field (rounds) | wb8 s/field (rounds) | wb15 s/field (rounds) | wb31 s/field (rounds) | wb1 vs wb0 (per round) | wb17 vs wb0 (per round) | wb2 vs wb0 (per round) | wb4 vs wb0 (per round) | wb8 vs wb0 (per round) | wb15 vs wb0 (per round) | wb31 vs wb0 (per round) | clock MHz | counts |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

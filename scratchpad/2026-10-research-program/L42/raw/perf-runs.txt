@@ -1,0 +1,116 @@
+### 06:10:19 perf b60 1e16 4t 16 partitions (delay 3.5 s past setup)
+Events disabled
+b60 [1157209632114824200908, +1e16) JoinParams { t: 9, k: 6, p: 2 }: 1 slices, slice 0 = [1157209632114824200908, +1e16); setup 2.818s; tlay 5073849 prefixes, bpre 78725, roots 2, keyspace 60, mid 2, k2 8, full_floor 16; 3600 partitions, running 16 on 4 thread(s)
+Events enabled
+wall 13.949s; 3487.13 ms/partition/thread; slice on 4 thread(s) ~3138.4s (+setup); survivors 549719536 checked 34926644 hits 0; tsc 2.495 GHz
+    29.47%  [.] _RNvMs4_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_4Base4cert                                                                    
+    28.88%  [.] _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin9scan_avx2                                                                 
+    17.34%  [.] _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin8survivor                                                                  
+    10.94%  [.] _RNvMs3_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_5Div649divrem_w4                                                              
+     8.27%  [.] _RNvNtCsfS6klqF1jUl_11nice_common14client_process26get_is_nice_with_known_lsd                                                         
+     2.21%  [.] _RINvNtNtCs8ZKwes1zzDd_3std3sys9backtrace28___rust_begin_short_backtraceNCNCNCNvCscEOpFG9KV9b_8l42_prof4mains1_000TNtNtCsfS6klqF1jUl_1
+     1.05%  [.] _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort8unstable9quicksort9quicksortNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB8_SB17_20so
+     0.98%  [.] __umodti3                                                                                                                             
+     0.38%  [.] __udivti3                                                                                                                             
+     0.05%  [k] native_read_msr                                                                                                                       
+     0.04%  [k] native_write_msr                                                                                                                      
+     0.02%  [.] _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort6shared5pivot11median3_recNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB8_SB14_20sort_
+     0.02%  [k] perf_adjust_freq_unthr_context                                                                                                        
+     0.02%  [k] update_load_avg                                                                                                                       
+### 06:10:37 perf b62 1e17 slice 0, 1t 4 partitions
+Events disabled
+b62 [4473066762334864396992, +1e17) JoinParams { t: 10, k: 6, p: 2 }: 7 slices, slice 0 = [4473066762334864396992, +1.5370157640322752e16); setup 2.827s; tlay 4745416 prefixes, bpre 90199, roots 2, keyspace 62, mid 2, k2 8, full_floor 16; 3844 partitions, running 4 on 1 thread(s)
+Events enabled
+wall 12.278s; 3069.58 ms/partition/thread; slice on 1 thread(s) ~11799.5s (+setup); survivors 137605271 checked 8194223 hits 0; tsc 2.495 GHz
+    29.94%  [.] _RNvMs4_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_4Base4cert                                                                    
+    27.89%  [.] _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin9scan_avx2                                                                 
+    17.98%  [.] _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin8survivor                                                                  
+    10.54%  [.] _RNvMs3_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_5Div649divrem_w4                                                              
+     8.78%  [.] _RNvNtCsfS6klqF1jUl_11nice_common14client_process26get_is_nice_with_known_lsd                                                         
+     2.29%  [.] _RINvNtNtCs8ZKwes1zzDd_3std3sys9backtrace28___rust_begin_short_backtraceNCNCNCNvCscEOpFG9KV9b_8l42_prof4mains1_000TNtNtCsfS6klqF1jUl_1
+     1.08%  [.] __umodti3                                                                                                                             
+     0.94%  [.] _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort8unstable9quicksort9quicksortNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB8_SB17_20so
+     0.29%  [.] __udivti3                                                                                                                             
+     0.03%  [.] _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort6shared5pivot11median3_recNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB8_SB14_20sort_
+     0.03%  [k] native_read_msr                                                                                                                       
+     0.02%  [k] update_curr                                                                                                                           
+     0.02%  [k] native_write_msr                                                                                                                      
+     0.01%  [k] rcu_sched_clock_irq                                                                                                                   
+### 06:10:52 perf b62 1e17 slice 0, 4t 16 partitions
+Events disabled
+b62 [4473066762334864396992, +1e17) JoinParams { t: 10, k: 6, p: 2 }: 7 slices, slice 0 = [4473066762334864396992, +1.5370157640322752e16); setup 2.873s; tlay 4745416 prefixes, bpre 90199, roots 2, keyspace 62, mid 2, k2 8, full_floor 16; 3844 partitions, running 16 on 4 thread(s)
+Events enabled
+wall 13.478s; 3369.60 ms/partition/thread; slice on 4 thread(s) ~3238.2s (+setup); survivors 550916180 checked 32806057 hits 0; tsc 2.495 GHz
+    29.75%  [.] _RNvMs4_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_4Base4cert                                                                    
+    27.95%  [.] _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin9scan_avx2                                                                 
+    18.08%  [.] _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin8survivor                                                                  
+    10.82%  [.] _RNvMs3_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_5Div649divrem_w4                                                              
+     8.53%  [.] _RNvNtCsfS6klqF1jUl_11nice_common14client_process26get_is_nice_with_known_lsd                                                         
+     2.31%  [.] _RINvNtNtCs8ZKwes1zzDd_3std3sys9backtrace28___rust_begin_short_backtraceNCNCNCNvCscEOpFG9KV9b_8l42_prof4mains1_000TNtNtCsfS6klqF1jUl_1
+     0.94%  [.] _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort8unstable9quicksort9quicksortNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB8_SB17_20so
+     0.89%  [.] __umodti3                                                                                                                             
+     0.28%  [.] __udivti3                                                                                                                             
+     0.03%  [k] native_read_msr                                                                                                                       
+     0.03%  [k] native_write_msr                                                                                                                      
+     0.02%  [k] update_curr                                                                                                                           
+     0.02%  [.] _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort6shared5pivot11median3_recNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB8_SB14_20sort_
+     0.01%  [k] __update_load_avg_se                                                                                                                  
+### 06:11:09 perf b60 1e14 1t 400 (delay 0.3 s)
+Events disabled
+b60 [1157209632114824200908, +1e14) JoinParams { t: 9, k: 6, p: 2 }: 1 slices, slice 0 = [1157209632114824200908, +1e14); setup 0.054s; tlay 58923 prefixes, bpre 47560, roots 2, keyspace 60, mid 2, k2 8, full_floor 16; 3600 partitions, running 400 on 1 thread(s)
+Events enabled
+wall 19.350s; 48.37 ms/partition/thread; slice on 1 thread(s) ~174.1s (+setup); survivors 147256256 checked 9373637 hits 0; tsc 2.495 GHz
+    29.32%  [.] _RINvNtNtCs8ZKwes1zzDd_3std3sys9backtrace28___rust_begin_short_backtraceNCNCNCNvCscEOpFG9KV9b_8l42_prof4mains1_000TNtNtCsfS6klqF1jUl_1
+    23.85%  [.] _RNvMs4_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_4Base4cert                                                                    
+    15.02%  [.] _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin9scan_avx2                                                                 
+    14.78%  [.] _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin8survivor                                                                  
+     8.48%  [.] _RNvMs3_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_5Div649divrem_w4                                                              
+     5.78%  [.] _RNvNtCsfS6klqF1jUl_11nice_common14client_process26get_is_nice_with_known_lsd                                                         
+     0.89%  [.] __umodti3                                                                                                                             
+     0.58%  [.] _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort6shared9smallsort18small_sort_generalNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB8_S
+     0.48%  [.] _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort8unstable9quicksort9quicksortNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB8_SB17_20so
+     0.34%  [.] __udivti3                                                                                                                             
+     0.03%  [k] native_write_msr                                                                                                                      
+     0.03%  [k] native_read_msr                                                                                                                       
+     0.03%  [.] _RINvNtNtNtCskADBYZwJmSU_4core5slice4sort8unstable7ipnsortNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB6_SBT_20sort_unstable_by_
+     0.02%  [k] update_curr                                                                                                                           
+### 06:11:29 perf b62 1e14 1t 400
+Events disabled
+b62 [4473156762334864396992, +1e14) JoinParams { t: 10, k: 6, p: 2 }: 1 slices, slice 0 = [4473156762334864396992, +1e14); setup 0.066s; tlay 50364 prefixes, bpre 75372, roots 2, keyspace 62, mid 2, k2 8, full_floor 16; 3844 partitions, running 400 on 1 thread(s)
+Events enabled
+wall 21.531s; 53.83 ms/partition/thread; slice on 1 thread(s) ~206.9s (+setup); survivors 152972308 checked 9104122 hits 0; tsc 2.495 GHz
+    39.86%  [.] _RINvNtNtCs8ZKwes1zzDd_3std3sys9backtrace28___rust_begin_short_backtraceNCNCNCNvCscEOpFG9KV9b_8l42_prof4mains1_000TNtNtCsfS6klqF1jUl_1
+    18.58%  [.] _RNvMs4_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_4Base4cert                                                                    
+    14.82%  [.] _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin8survivor                                                                  
+    13.23%  [.] _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin9scan_avx2                                                                 
+     6.52%  [.] _RNvMs3_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_5Div649divrem_w4                                                              
+     5.20%  [.] _RNvNtCsfS6klqF1jUl_11nice_common14client_process26get_is_nice_with_known_lsd                                                         
+     0.56%  [.] __umodti3                                                                                                                             
+     0.40%  [.] _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort6shared9smallsort18small_sort_generalNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB8_S
+     0.31%  [.] _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort8unstable9quicksort9quicksortNtNtCsfS6klqF1jUl_11nice_common8cpu_join3TopNCINvMB8_SB17_20so
+     0.18%  [.] __udivti3                                                                                                                             
+     0.03%  [k] native_write_msr                                                                                                                      
+     0.02%  [k] native_read_msr                                                                                                                       
+     0.02%  [k] __update_load_avg_se                                                                                                                  
+     0.02%  [k] pvclock_clocksource_read_nowd                                                                                                         
+### 06:11:51 perf stat b60 1e16 1t 4 partitions
+Events disabled
+b60 [1157209632114824200908, +1e16) JoinParams { t: 9, k: 6, p: 2 }: 1 slices, slice 0 = [1157209632114824200908, +1e16); setup 2.841s; tlay 5073849 prefixes, bpre 78725, roots 2, keyspace 60, mid 2, k2 8, full_floor 16; 3600 partitions, running 4 on 1 thread(s)
+Events enabled
+wall 12.443s; 3110.65 ms/partition/thread; slice on 1 thread(s) ~11198.3s (+setup); survivors 136900315 checked 8692368 hits 0; tsc 2.495 GHz
+
+ Performance counter stats for '/tmp/l42/l42_prof.plain 60 1157209632114824200908 1e16 1 4':
+
+    38,364,719,870      cycles                                                                
+    69,489,833,394      instructions                     #    1.81  insn per cycle            
+     8,481,603,837      branches                                                              
+       251,116,141      branch-misses                    #    2.96% of all branches           
+       555,371,759      L1-dcache-load-misses                                                 
+
+      11.787876802 seconds time elapsed
+
+      15.218010000 seconds user
+       0.051924000 seconds sys
+
+
+### done 06:12:06

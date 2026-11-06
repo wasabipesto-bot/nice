@@ -16,6 +16,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   59373935; kill < 3 %), **L42 CPU join profile + FD tops** (ivory CPU under nice; kill: top
   certification < 15 % of the CPU join). All hard-stop 10:30–12:30 UTC. A reviewer agent follows
   any PR-ready branch.
+- **L42 scoped (07:30 UTC, L42.1):** on the CPU join, top certificates are 42–43 % of production-
+  shaped partitions (hardware divides); the FD prototype gives ×1.16 in place (×1.26 with the lean
+  prefilter), exact on 19 M slots and whole fields. PR agent launched on ivory
+  (`pr/cpu-join-fd-tops` on main, independent of #241; hard stop 11:30 UTC); the CPU lean prefilter
+  follows separately after the GPU version lands.
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 

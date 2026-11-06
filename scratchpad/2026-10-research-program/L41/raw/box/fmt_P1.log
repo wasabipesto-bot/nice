@@ -1,0 +1,103 @@
+Diff in /root/l41/src/P1/common/src/cubecl_join.rs:598:
+                     let seed = top_rec[(r8 + 7u32) as usize];
+                     if comptime!(lean) {
+                         // ceil(D·2^32/b²) = D·Q + ceil(D·R/b²).
+-                        t_dm[UNIT_POS_X as usize] = dm * fx_q + (dm * fx_r + comptime!(bsq - 1)) / bsq;
++                        t_dm[UNIT_POS_X as usize] =
++                            dm * fx_q + (dm * fx_r + comptime!(bsq - 1)) / bsq;
+                         t_glo[UNIT_POS_X as usize] = select(seed != 0u32, lo, 0u32);
+                         t_ghi[UNIT_POS_X as usize] = select(seed != 0u32, hi, 0u32);
+                     } else {
+Diff in /root/l41/src/P1/common/src/cubecl_join.rs:845:
+                                 while y != 0u32 {
+                                     let i = y.trailing_zeros();
+                                     y &= y - 1u32;
+-                                    if r0 < t_rlo[(jc + i) as usize] || r0 >= t_rhi[(jc + i) as usize] {
++                                    if r0 < t_rlo[(jc + i) as usize]
++                                        || r0 >= t_rhi[(jc + i) as usize]
++                                    {
+                                         pm[j as usize] ^= 1u32 << i;
+                                     }
+                                 }
+Diff in /root/l41/src/P1/common/src/cubecl_join.rs:5949:
+     fn fx_digits(ah: u32, p: u32, dh: u32, base: u32) -> (u32, u32) {
+         let f = ah.wrapping_add(p.wrapping_mul(dh));
+         let fb = u64::from(f) * u64::from(base);
+-        ((fb >> 32) as u32, ((u64::from(fb as u32) * u64::from(base)) >> 32) as u32)
++        (
++            (fb >> 32) as u32,
++            ((u64::from(fb as u32) * u64::from(base)) >> 32) as u32,
++        )
+     }
+ 
+     /// [`walk_pf`]'s digit test at mid = 2: four one-hot masks.
+Diff in /root/l41/src/P1/common/src/cubecl_join.rs:5987:
+         for base in 10u32..=64 {
+             let b2 = base * base;
+             let (c, q, r) = super::kernels::fx_consts(base);
+-            assert_eq!(u128::from(c), (1u128 << 32).div_ceil(u128::from(b2)), "b{base}");
+-            assert_eq!(u64::from(q) * u64::from(b2) + u64::from(r), 1u64 << 32, "b{base}");
++            assert_eq!(
++                u128::from(c),
++                (1u128 << 32).div_ceil(u128::from(b2)),
++                "b{base}"
++            );
++            assert_eq!(
++                u64::from(q) * u64::from(b2) + u64::from(r),
++                1u64 << 32,
++                "b{base}"
++            );
+             assert!((b2 - 1).checked_mul(c).is_some(), "b{base}: A·C overflows");
+             let e1 = u64::from(c) * u64::from(b2) - (1u64 << 32);
+             let mut e2max = 0u64;
+Diff in /root/l41/src/P1/common/src/cubecl_join.rs:6057:
+                                     let f = (a * c).wrapping_add(u);
+                                     let fb = u64::from(f) * u64::from(base);
+                                     let fh = (fb >> 32) as u32;
+-                                    let fg = ((u64::from(fb as u32) * u64::from(base)) >> 32) as u32;
++                                    let fg =
++                                        ((u64::from(fb as u32) * u64::from(base)) >> 32) as u32;
+                                     bad |= (fh ^ h) | (fg ^ g);
+                                     g += 1;
+                                     if g == base {
+Diff in /root/l41/src/P1/common/src/cubecl_join.rs:6099:
+                         for h3 in 0..base {
+                             let seen = xorshift(&mut x) & xorshift(&mut x);
+                             let want = pf_masks(seen, g2, g3, h2, h3);
+-                            fails += u64::from(want != pf_lean(seen.reverse_bits(), g2, g3, h2, h3));
++                            fails +=
++                                u64::from(want != pf_lean(seen.reverse_bits(), g2, g3, h2, h3));
+                             pass += u64::from(want);
+                             n += 1;
+                         }
+Diff in /root/l41/src/P1/common/src/cubecl_join.rs:6141:
+             let full = u64::MAX >> (64 - base);
+             for _ in 0..1_000_000 {
+                 let r = xorshift(&mut x);
+-                let (a2, a3) = ((r % u64::from(b2)) as u32, ((r >> 16) % u64::from(b2)) as u32);
+-                let (p2, p3) = (((r >> 32) % u64::from(b2)) as u32, ((r >> 48) % u64::from(b2)) as u32);
++                let (a2, a3) = (
++                    (r % u64::from(b2)) as u32,
++                    ((r >> 16) % u64::from(b2)) as u32,
++                );
++                let (p2, p3) = (
++                    ((r >> 32) % u64::from(b2)) as u32,
++                    ((r >> 48) % u64::from(b2)) as u32,
++                );
+                 let r2 = xorshift(&mut x);
+                 let d = (r2 % u64::from(b2)) as u32;
+                 let seed = (r2 >> 20) & 1 == 1;
+Diff in /root/l41/src/P1/common/src/cubecl_join.rs:6155:
+                 let (h2, g2) = fx_digits(a2 * c, p2, dh, base);
+                 let (h3, g3) = fx_digits(a3 * c, p3, dh, base);
+                 let gated = if seed { tm.reverse_bits() } else { 0 };
+-                assert_eq!(pf_lean(em.reverse_bits() | gated, g2, g3, h2, h3), want, "b{base}");
++                assert_eq!(
++                    pf_lean(em.reverse_bits() | gated, g2, g3, h2, h3),
++                    want,
++                    "b{base}"
++                );
+                 pass += u64::from(want);
+             }
+         }
+fmt rc=1

@@ -1,0 +1,3 @@
+#!/bin/bash
+# bx CMD: run CMD on the box (ivory-side helper; stdin closed so background jobs detach).
+exec ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o LogLevel=ERROR -p 39938 root@ssh4.vast.ai "$@" < /dev/null 2>&1 | grep -v "^Welcome to vast.ai\|^Have fun\|double check your ssh key"

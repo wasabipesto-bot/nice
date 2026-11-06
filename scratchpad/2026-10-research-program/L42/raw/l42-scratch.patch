@@ -1,0 +1,1400 @@
+diff --git a/common/Cargo.toml b/common/Cargo.toml
+index 0dc887df..eb12b183 100644
+--- a/common/Cargo.toml
++++ b/common/Cargo.toml
+@@ -9,6 +9,9 @@ readme.workspace = true
+ license-file.workspace = true
+ 
+ [features]
++# L42 scratch: per-phase TSC counters in the CPU join (not for a PR).
++l42-prof = []
++l42-prof-surv = ["l42-prof"]
+ database = ["dep:diesel", "dep:dotenvy", "dep:bigdecimal", "dep:rand"]
+ openssl-tls = ["reqwest/native-tls", "dep:openssl", "dep:tokio"]
+ rustls-tls = ["reqwest/rustls", "dep:tokio"]
+diff --git a/common/examples/l42_fdbench.rs b/common/examples/l42_fdbench.rs
+new file mode 100644
+index 00000000..be276ec7
+--- /dev/null
++++ b/common/examples/l42_fdbench.rs
+@@ -0,0 +1,219 @@
++//! L42 scratch harness (not for a PR): the FD top certificate against
++//! `Base::cert` on a field's real top-layer prefixes, for exactness and
++//! time per certificate.
++//!
++//! usage: l42_fdbench <base> <start> <size> <mode: part|key> <sample> [batch] [slice]
++//!   part: consecutive partitions v0..v0+batch of every `sample`-th prefix (step h = 1)
++//!   key:  every key's prefixes in layer order, in `sample` partitions (step h = b^(p+1)),
++//!         stepping over gaps of up to `batch` (else seeding)
++use nice_common::FieldSize;
++use nice_common::cpu_join::{CpuJoin, slices_for};
++use nice_common::l42_fd::{Mg, TopFd, TopFdSetup, cert_df};
++use std::hint::black_box;
++use std::time::Instant;
++
++fn main() {
++    let a: Vec<String> = std::env::args().collect();
++    let base: u32 = a[1].parse().unwrap();
++    let start: u128 = a[2].parse().unwrap();
++    let size: u128 = a[3].parse::<f64>().unwrap() as u128;
++    let mode = a[4].as_str();
++    let sample: usize = a[5].parse().unwrap();
++    let batch: u32 = a.get(6).map_or(8, |s| s.parse().unwrap());
++    let si: usize = a.get(7).map_or(0, |s| s.parse().unwrap());
++    let range = FieldSize::new(start, start + size);
++    let (jp, slices) = slices_for(base, &range).expect("a join field");
++    let join = CpuJoin::new(base, &slices[si], jp).expect("setup");
++    let fs = join.l42_fs();
++    let bs = &fs.base;
++    let k = jp.k;
++    let t = fs.base.l - fs.f0;
++    let nparts = fs.nparts;
++    let w = fs.w;
++    // Slots: (P) in the order the variant visits them; `step[i]` = how many
++    // h-steps from the previous slot (0 = seed).
++    let mut slots: Vec<(u128, u32)> = Vec::new();
++    let s_exp = match mode {
++        "part" => 0,
++        "key" => jp.p + 1,
++        _ => panic!("mode"),
++    };
++    let unclipped = |p: u128| {
++        p >= fs.plo && p <= fs.phi && p * w >= fs.s && p * w + w - 1 <= fs.e - 1
++    };
++    match mode {
++        "part" => {
++            let parts = nparts as u32;
++            let mut i = 0usize;
++            while i < fs.tlay.len() {
++                let p0 = fs.tlay[i].0;
++                let v0 = (i as u32 * 7919) % parts.saturating_sub(batch).max(1);
++                let mut prev: Option<u128> = None;
++                for v in v0..(v0 + batch).min(parts) {
++                    let p = p0 * nparts + u128::from(v);
++                    if !unclipped(p) {
++                        prev = None;
++                        continue;
++                    }
++                    let st = match prev {
++                        Some(q) if q + 1 == p => 1,
++                        _ => 0,
++                    };
++                    slots.push((p, st));
++                    prev = Some(p);
++                }
++                i += sample;
++            }
++        }
++        _ => {
++            let key_off = join.l42_key_off();
++            let parts = nparts as u32;
++            let h = nparts * u128::from(base);
++            for n in 0..sample {
++                let v = (n as u32 * 997 + 13) % parts;
++                for key in 0..key_off.len() - 1 {
++                    let mut prev: Option<u128> = None;
++                    for &(p0, _) in &fs.tlay[key_off[key] as usize..key_off[key + 1] as usize] {
++                        let p = p0 * nparts + u128::from(v);
++                        if !unclipped(p) {
++                            prev = None;
++                            continue;
++                        }
++                        let st = match prev {
++                            Some(q) if p > q && (p - q) % h == 0 && (p - q) / h <= u128::from(batch) => {
++                                ((p - q) / h) as u32
++                            }
++                            _ => 0,
++                        };
++                        slots.push((p, st));
++                        prev = Some(p);
++                    }
++                }
++            }
++        }
++    }
++    let seeds = slots.iter().filter(|s| s.1 == 0).count();
++    let steps: u64 = slots.iter().map(|s| u64::from(s.1)).sum();
++    let mut gap_hist = [0usize; 9];
++    for s in &slots {
++        gap_hist[(s.1 as usize).min(8)] += 1;
++    }
++    let mut setup = TopFdSetup::new(bs, fs.f0, t, s_exp, k);
++    let mg = Mg::new(u64::from(base));
++    println!(
++        "b{base} [{start}, +{size:e}) {jp:?} slice {si}/{}: mode {mode}, {} slots, {} seeds ({:.1}%), {} steps ({:.2} per slot); step-count hist {:?}",
++        slices.len(),
++        slots.len(),
++        seeds,
++        100.0 * seeds as f64 / slots.len() as f64,
++        steps,
++        steps as f64 / slots.len() as f64,
++        gap_hist
++    );
++    // Exactness.
++    let mut st: Option<TopFd> = None;
++    let mut kept = 0usize;
++    for &(p, n) in &slots {
++        let a0 = p * w;
++        let want = bs.cert(a0, a0 + w - 1, k);
++        let s = if n == 0 {
++            st.insert(setup.seed(bs, p))
++        } else {
++            let s = st.as_mut().unwrap();
++            for _ in 0..n {
++                setup.step(s);
++            }
++            s
++        };
++        assert_eq!(s.p, p);
++        let got = setup.cert(bs, s);
++        assert_eq!(got, want, "P = {p}");
++        assert_eq!(cert_df(bs, mg, a0, a0 + w - 1, k), want, "DF P = {p}");
++        kept += usize::from(want.is_some());
++    }
++    println!("exact: {} slots agree ({} kept, {:.1}%)", slots.len(), kept, 100.0 * kept as f64 / slots.len() as f64);
++    // Timing, 3 rounds each, alternating.
++    for round in 0..3 {
++        let t0 = Instant::now();
++        let mut acc = 0u64;
++        for &(p, _) in &slots {
++            let a0 = p * w;
++            acc ^= bs.cert(black_box(a0), a0 + w - 1, k).unwrap_or(1);
++        }
++        let t_ref = t0.elapsed().as_secs_f64();
++        black_box(acc);
++        let mut t_fds = [0f64; 3];
++        for (vi, (fc, dfs)) in [(false, false), (true, false), (true, true)].into_iter().enumerate() {
++            setup.fast_carry = fc;
++            setup.df_seed = dfs;
++            let t0 = Instant::now();
++            let mut acc = 0u64;
++            let mut st: Option<TopFd> = None;
++            for &(p, n) in &slots {
++                let s = if n == 0 {
++                    st.insert(setup.seed(bs, black_box(p)))
++                } else {
++                    let s = st.as_mut().unwrap();
++                    for _ in 0..n {
++                        setup.step(s);
++                    }
++                    s
++                };
++                acc ^= setup.cert(bs, s).unwrap_or(1);
++            }
++            t_fds[vi] = t0.elapsed().as_secs_f64();
++            black_box(acc);
++        }
++        let t_fd = t_fds[2];
++        let t0 = Instant::now();
++        let mut acc = 0u64;
++        for &(p, _) in &slots {
++            let a0 = p * w;
++            acc ^= cert_df(bs, mg, black_box(a0), a0 + w - 1, k).unwrap_or(1);
++        }
++        let t_df = t0.elapsed().as_secs_f64();
++        black_box(acc);
++        // Seed-only and step-only costs.
++        let t0 = Instant::now();
++        let mut acc = 0u64;
++        for &(p, _) in slots.iter().take(slots.len() / 4) {
++            let s = setup.seed(bs, black_box(p));
++            acc ^= s.p as u64;
++        }
++        let t_seed = t0.elapsed().as_secs_f64() / (slots.len() / 4) as f64;
++        black_box(acc);
++        let n = slots.len() as f64;
++        println!(
++            "round {round}: Base::cert {:.1} ns/slot, DF {:.1} (x{:.2}), FD plain {:.1} (x{:.2}), +screen {:.1} (x{:.2}), +DF seed {:.1} ns/slot (x{:.2}); DF seed alone {:.1} ns",
++            t_ref / n * 1e9,
++            t_df / n * 1e9,
++            t_ref / t_df,
++            t_fds[0] / n * 1e9,
++            t_ref / t_fds[0],
++            t_fds[1] / n * 1e9,
++            t_ref / t_fds[1],
++            t_fd / n * 1e9,
++            t_ref / t_fd,
++            t_seed * 1e9
++        );
++    }
++    // Stepped-only cost: certificates of stepped slots, state stepped.
++    let stepped: Vec<_> = slots.iter().filter(|s| s.1 > 0).collect();
++    if !stepped.is_empty() {
++        let mut st = setup.seed(bs, slots[0].0);
++        let t0 = Instant::now();
++        let mut acc = 0u64;
++        for _ in 0..stepped.len() {
++            setup.step(&mut st);
++            acc ^= setup.cert(bs, black_box(&st)).unwrap_or(1);
++            if st.p > fs.phi.saturating_sub(4 * u128::from(base).pow(4)) {
++                st = setup.seed(bs, slots[0].0);
++            }
++        }
++        black_box(acc);
++        println!(
++            "pure step+cert (one prefix run): {:.1} ns/slot",
++            t0.elapsed().as_secs_f64() / stepped.len() as f64 * 1e9
++        );
++    }
++}
+diff --git a/common/examples/l42_prof.rs b/common/examples/l42_prof.rs
+new file mode 100644
+index 00000000..e2ae804b
+--- /dev/null
++++ b/common/examples/l42_prof.rs
+@@ -0,0 +1,135 @@
++//! L42 scratch harness (not for a PR): run sampled partitions of one slice
++//! of a nice-only field through the CPU join and print the wall time and,
++//! with `--features l42-prof`, the per-phase TSC split.
++//!
++//! usage: l42_prof <base> <start> <size> <threads> <partitions|0=all> [slice]
++use nice_common::FieldSize;
++use nice_common::bench_defs::sample_order;
++use nice_common::cpu_join::{CpuJoin, PartitionResult, Scratch, slices_for};
++use std::sync::atomic::{AtomicUsize, Ordering};
++use std::time::Instant;
++
++fn tsc() -> u64 {
++    // SAFETY: no preconditions.
++    unsafe { core::arch::x86_64::_rdtsc() }
++}
++
++fn main() {
++    let a: Vec<String> = std::env::args().collect();
++    let base: u32 = a[1].parse().unwrap();
++    let start: u128 = a[2].parse().unwrap();
++    let size: u128 = a[3].parse::<f64>().map(|x| x as u128).unwrap_or_else(|_| a[3].parse().unwrap());
++    let threads: usize = a[4].parse().unwrap();
++    let want: usize = a[5].parse().unwrap();
++    let si: usize = a.get(6).map_or(0, |s| s.parse().unwrap());
++    let range = FieldSize::new(start, start + size);
++    let (jp, slices) = slices_for(base, &range).expect("a join field");
++    let t = Instant::now();
++    let join = CpuJoin::new(base, &slices[si], jp).expect("setup");
++    let setup = t.elapsed().as_secs_f64();
++    let (tlay, bpre, roots, keyspace, mid, k2, ff) = join.l42_shape();
++    let parts = join.partitions();
++    let order = sample_order(parts);
++    let n = if want == 0 { order.len() } else { want.min(order.len()) };
++    println!(
++        "b{base} [{start}, +{size:e}) {jp:?}: {} slices, slice {si} = [{}, +{:e}); setup {setup:.3}s; \
++         tlay {tlay} prefixes, bpre {bpre}, roots {roots}, keyspace {keyspace}, mid {mid}, k2 {k2}, full_floor {ff}; \
++         {parts} partitions, running {n} on {threads} thread(s)",
++        slices.len(),
++        slices[si].start(),
++        slices[si].size() as f64,
++    );
++    let next = AtomicUsize::new(0);
++    let t0 = tsc();
++    let wall = Instant::now();
++    let (out, cyc_total) = std::thread::scope(|s| {
++        let ws: Vec<_> = (0..threads)
++            .map(|_| {
++                s.spawn(|| {
++                    let mut sc = Scratch::default();
++                    let mut out = PartitionResult::default();
++                    let mut cyc = 0u64;
++                    loop {
++                        let i = next.fetch_add(1, Ordering::Relaxed);
++                        if i >= n {
++                            return (out, cyc);
++                        }
++                        let c0 = tsc();
++                        out.add(join.run_partition(order[i], &mut sc));
++                        cyc += tsc() - c0;
++                    }
++                })
++            })
++            .collect();
++        let mut out = PartitionResult::default();
++        let mut cyc = 0u64;
++        for w in ws {
++            let (o, c) = w.join().unwrap();
++            out.add(o);
++            cyc += c;
++        }
++        (out, cyc)
++    });
++    let secs = wall.elapsed().as_secs_f64();
++    let tsc_hz = (tsc() - t0) as f64 / secs;
++    let per = secs * threads as f64 / n as f64;
++    let field_1t = per * f64::from(parts);
++    println!(
++        "wall {secs:.3}s; {:.2} ms/partition/thread; slice on {threads} thread(s) ~{:.1}s (+setup); \
++         survivors {} checked {} hits {}; tsc {:.3} GHz",
++        per * 1e3,
++        field_1t / threads as f64,
++        out.survivors,
++        out.checked,
++        out.hits.len(),
++        tsc_hz / 1e9
++    );
++    let p = &out.prof;
++    if p.cyc.iter().all(|&c| c == 0) {
++        return;
++    }
++    let tot = cyc_total as f64;
++    let pc = |c: u64| 100.0 * c as f64 / tot;
++    let scan_pure = p.cyc[4] - p.cyc[5];
++    let surv_other = p.cyc[5] - p.cyc[6] - p.cyc[7];
++    let other = cyc_total - p.cyc[0] - p.cyc[1] - p.cyc[2] - p.cyc[3] - p.cyc[4];
++    println!("phase split (% of partition cycles, summed over threads):");
++    println!("  tops (cert)        {:6.2}%", pc(p.cyc[0]));
++    println!("  extend (bottoms)   {:6.2}%", pc(p.cyc[1]));
++    println!("  advance+list       {:6.2}%", pc(p.cyc[2]));
++    println!("  sort tops          {:6.2}%", pc(p.cyc[3]));
++    if p.cyc[5] == 0 {
++        println!("  scan incl. surv.   {:6.2}%", pc(p.cyc[4]));
++    } else {
++        println!("  AND scan (pure)    {:6.2}%", pc(scan_pure));
++        println!("  survivor prefilter {:6.2}%  (incl. in-range test)", pc(p.cyc[7]));
++        println!("  survivor full chk  {:6.2}%", pc(p.cyc[6]));
++        let _ = surv_other;
++    }
++    println!("  other (loop etc.)  {:6.2}%", pc(other));
++    let nn = n as f64;
++    println!(
++        "per partition: layer {:.0} cert-pass {:.0} clipped {:.1} | ext {:.0} listed {:.0} keys {:.1} | ANDs {:.3e} pass {:.0} out-of-range {:.0} | survivors {:.0} checked {:.2}",
++        p.layer as f64 / nn,
++        p.cert_some as f64 / nn,
++        p.clipped as f64 / nn,
++        p.ext as f64 / nn,
++        p.listed as f64 / nn,
++        p.keys as f64 / nn,
++        p.ands as f64 / nn,
++        p.and_pass as f64 / nn,
++        p.out_of_range as f64 / nn,
++        out.survivors as f64 / nn,
++        out.checked as f64 / nn,
++    );
++    println!(
++        "unit costs (cycles; scan ones need l42-prof-surv): tops/visited {:.0}, extend/bpre {:.1}, list/listed {:.2}, AND/bottom {:.3}, survivor/pass {:.0}, prefilter/pass {:.0}, full/checked {:.0}",
++        p.cyc[0] as f64 / p.layer.max(1) as f64,
++        p.cyc[1] as f64 / p.ext.max(1) as f64,
++        p.cyc[2] as f64 / p.listed.max(1) as f64,
++        scan_pure as f64 / p.ands.max(1) as f64,
++        p.cyc[5] as f64 / p.and_pass.max(1) as f64,
++        p.cyc[7] as f64 / p.and_pass.max(1) as f64,
++        p.cyc[6] as f64 / out.checked.max(1) as f64,
++    );
++}
+diff --git a/common/src/cpu_join.rs b/common/src/cpu_join.rs
+index 6853beb6..97fa770f 100644
+--- a/common/src/cpu_join.rs
++++ b/common/src/cpu_join.rs
+@@ -54,6 +54,76 @@ pub fn slices_for(base: u32, range: &FieldSize) -> Option<(JoinParams, Vec<Field
+ /// The mask of a bottom whose fixed digits repeat: it joins no top.
+ const DEAD: u64 = u64::MAX;
+ 
++/// L42 scratch: per-phase TSC cycles and counts (feature `l42-prof`).
++/// Equality ignores them, so the tests compare what they always did.
++#[derive(Clone, Debug, Default)]
++pub struct Phases {
++    /// Cycles: 0 tops (cert), 1 extend, 2 advance+list, 3 sort tops,
++    /// 4 scan incl. survivors, 5 survivor calls (all), 6 full check,
++    /// 7 prefilter (incl. in-field test).
++    pub cyc: [u64; 8],
++    /// Top-layer prefixes visited (in range), cert calls that passed, tops.
++    pub layer: u64,
++    pub cert_some: u64,
++    pub clipped: u64,
++    /// Bottoms extended (kept by extend), listed (sum over keys), ANDs.
++    pub ext: u64,
++    pub listed: u64,
++    pub ands: u64,
++    /// AND passes, of them outside the top's residue range.
++    pub and_pass: u64,
++    pub out_of_range: u64,
++    /// Keys with tops (lists built).
++    pub keys: u64,
++}
++
++impl PartialEq for Phases {
++    fn eq(&self, _: &Self) -> bool {
++        true
++    }
++}
++impl Eq for Phases {}
++
++impl Phases {
++    pub fn add(&mut self, o: &Phases) {
++        for i in 0..8 {
++            self.cyc[i] += o.cyc[i];
++        }
++        self.layer += o.layer;
++        self.cert_some += o.cert_some;
++        self.clipped += o.clipped;
++        self.ext += o.ext;
++        self.listed += o.listed;
++        self.ands += o.ands;
++        self.and_pass += o.and_pass;
++        self.out_of_range += o.out_of_range;
++        self.keys += o.keys;
++    }
++}
++
++#[cfg(feature = "l42-prof")]
++#[inline(always)]
++fn tsc() -> u64 {
++    // SAFETY: rdtsc has no preconditions on x86_64.
++    unsafe { core::arch::x86_64::_rdtsc() }
++}
++#[cfg(not(feature = "l42-prof"))]
++#[inline(always)]
++fn tsc() -> u64 {
++    0
++}
++/// Per-survivor timer: only with `l42-prof-surv` (it costs ~10% at b60).
++#[cfg(feature = "l42-prof-surv")]
++#[inline(always)]
++fn tsc_s() -> u64 {
++    tsc()
++}
++#[cfg(not(feature = "l42-prof-surv"))]
++#[inline(always)]
++fn tsc_s() -> u64 {
++    0
++}
++
+ /// What one partition through the join found and did.
+ #[derive(Clone, Debug, Default, PartialEq, Eq)]
+ pub struct PartitionResult {
+@@ -63,6 +133,8 @@ pub struct PartitionResult {
+     /// ones that passed the prefilter (which the full check read).
+     pub survivors: u64,
+     pub checked: u64,
++    /// L42 scratch.
++    pub prof: Phases,
+ }
+ 
+ impl PartitionResult {
+@@ -71,6 +143,7 @@ impl PartitionResult {
+         self.hits.extend(other.hits);
+         self.survivors += other.survivors;
+         self.checked += other.checked;
++        self.prof.add(&other.prof);
+     }
+ }
+ 
+@@ -100,6 +173,10 @@ struct Top {
+     seed: bool,
+     /// `P mod (b − 1)`.
+     pc: u32,
++    /// L42 lean prefilter: `⌈D·2^32/b²⌉`, the seed-gated mask, clipped.
++    dhat: u32,
++    gmask: u64,
++    clipped: bool,
+ }
+ 
+ /// The bottom-list residues that survive the partition's fixed digits,
+@@ -236,6 +313,16 @@ pub struct CpuJoin {
+     div_m: Div64,
+     sb: SmallDiv,
+     smid: SmallDiv,
++    /// L42 scratch: lean survivor bits (1 = residue test only on clipped
++    /// tops, 2 = FX + MT prefilter), from `L42_LEAN`; `⌈2^32/b²⌉` and the
++    /// `δ̂` table for `D < b^mid`.
++    lean: u32,
++    /// L42 scratch: FD top certificates (`L42_FD=1`), stepping a key's
++    /// prefixes in layer order.
++    fd: Option<crate::l42_fd::TopFdSetup>,
++    fd_check: bool,
++    fx_c: u32,
++    dhat_tab: Vec<u32>,
+     /// The AND scan may use AVX2 (detected at run time).
+     #[cfg(target_arch = "x86_64")]
+     avx2: bool,
+@@ -300,6 +387,21 @@ impl CpuJoin {
+             div_m: Div64::new(big_m),
+             sb: SmallDiv::new(b),
+             smid: SmallDiv::new(bmid),
++            lean: std::env::var("L42_LEAN").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
++            fd: if std::env::var("L42_FD").is_ok_and(|v| v == "1") {
++                crate::l42_fd::TopFdSetup::try_new(
++                    &fs.base,
++                    fs.f0,
++                    fs.base.l - fs.f0,
++                    jp.p + u32::from(fs.key_level),
++                    k,
++                )
++            } else {
++                None
++            },
++            fd_check: std::env::var("L42_FD_CHECK").is_ok(),
++            fx_c: u32::try_from((1u64 << 32).div_ceil(bmid)).unwrap_or(0),
++            dhat_tab: (0..bmid).map(|d| u32::try_from((d << 32).div_ceil(bmid)).expect("dhat")).collect(),
+             #[cfg(target_arch = "x86_64")]
+             avx2: std::arch::is_x86_feature_detected!("avx2"),
+             #[cfg(target_arch = "x86_64")]
+@@ -323,6 +425,32 @@ impl CpuJoin {
+         self.fs.secs
+     }
+ 
++    /// L42 scratch: the field setup.
++    #[must_use]
++    pub fn l42_fs(&self) -> &FieldSetup {
++        &self.fs
++    }
++
++    /// L42 scratch: `key_off`.
++    #[must_use]
++    pub fn l42_key_off(&self) -> &[u32] {
++        &self.key_off
++    }
++
++    /// L42 scratch: (top-layer prefixes, bpre length, roots, keyspace, mid, k2, full_floor).
++    #[must_use]
++    pub fn l42_shape(&self) -> (usize, usize, usize, u32, u32, u32, u32) {
++        (
++            self.fs.tlay.len(),
++            self.fs.bp_r.len(),
++            self.fs.base.roots.len(),
++            self.keyspace,
++            self.mid,
++            self.fs.k2,
++            self.fs.full_floor,
++        )
++    }
++
+     /// Partition `v` of the field.
+     #[must_use]
+     pub fn run_partition(&self, v: u32, scratch: &mut Scratch) -> PartitionResult {
+@@ -384,26 +512,42 @@ impl CpuJoin {
+             if lo == hi {
+                 continue;
+             }
+-            self.tops(v, &self.fs.tlay[lo..hi], &mut sc.tops);
++            let t0 = tsc();
++            self.tops(v, &self.fs.tlay[lo..hi], &mut sc.tops, &mut out.prof);
++            out.prof.cyc[0] += tsc() - t0;
+             if sc.tops.is_empty() {
+                 continue;
+             }
+             if !extended {
++                let t0 = tsc();
+                 self.extend(v, &mut sc.ext);
++                out.prof.cyc[1] += tsc() - t0;
++                out.prof.ext += sc.ext.idx.len() as u64;
+                 extended = true;
+             }
++            let t0 = tsc();
+             sc.tops.sort_unstable_by_key(|t| t.pc);
++            out.prof.cyc[3] += tsc() - t0;
+             // The last bottom digit: the key itself, or the partition's last.
+             let d = if self.fs.key_level {
+                 key
+             } else {
+                 self.partition_digit(v, self.fs.jp.p - 1)
+             };
++            let t0 = tsc();
+             self.list(d, &mut sc.ext, &mut sc.masks, &mut sc.info, &mut sc.offs);
++            out.prof.cyc[2] += tsc() - t0;
++            out.prof.listed += sc.masks.len() as u64;
++            out.prof.keys += 1;
++            let t0 = tsc();
+             for top in &sc.tops {
+                 for &root in roots {
+                     let c = ((root + m1 - top.pc) % m1) as usize;
+                     let (lo, hi) = (sc.offs[c] as usize, sc.offs[c + 1] as usize);
++                    #[cfg(feature = "l42-prof")]
++                    {
++                        out.prof.ands += (hi - lo) as u64;
++                    }
+                     let pass = Pass {
+                         top,
+                         d,
+@@ -413,6 +557,7 @@ impl CpuJoin {
+                     self.scan(&pass, &sc.masks[lo..hi], &mut out, &mut record);
+                 }
+             }
++            out.prof.cyc[4] += tsc() - t0;
+         }
+         out
+     }
+@@ -422,10 +567,14 @@ impl CpuJoin {
+     // Below 2^32: w = b^f0 is (`JoinParams::supported`), and so are b^mid,
+     // b - 1 and the key space. w, p, a, e as in `overlap_join`.
+     #[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
+-    fn tops(&self, v: u32, layer: &[(u128, u64)], tops: &mut Vec<Top>) {
++    fn tops(&self, v: u32, layer: &[(u128, u64)], tops: &mut Vec<Top>, prof: &mut Phases) {
++        let _ = &prof;
+         tops.clear();
+         let fs = &self.fs;
+         let (w, v) = (fs.w, u128::from(v));
++        let mut st: Option<crate::l42_fd::TopFd> = None;
++        let mut prev_p0 = 0u128;
++        let ks = u128::from(self.keyspace);
+         for &(p0, _) in layer {
+             let p = p0 * fs.nparts + v;
+             if p < fs.plo || p > fs.phi {
+@@ -434,22 +583,62 @@ impl CpuJoin {
+             let lo = p * w;
+             let a = lo.max(fs.s);
+             let e = (lo + w - 1).min(fs.e - 1);
+-            let Some(mask) = fs.base.cert(a, e, self.k) else {
++            #[cfg(feature = "l42-prof")]
++            {
++                prof.layer += 1;
++            }
++            let cert = match &self.fd {
++                Some(fd) if a == lo && e == lo + w - 1 => {
++                    let gap = p0.wrapping_sub(prev_p0);
++                    prev_p0 = p0;
++                    let s = match st.as_mut() {
++                        Some(s) if gap > 0 && gap <= 4 * ks => {
++                            // A key's prefixes differ by multiples of the
++                            // key space, so P differs by multiples of h.
++                            while s.p < p {
++                                fd.step(s);
++                            }
++                            debug_assert_eq!(s.p, p);
++                            s
++                        }
++                        _ => st.insert(fd.seed(&fs.base, p)),
++                    };
++                    let c = fd.cert(&fs.base, s);
++                    if self.fd_check {
++                        assert_eq!(c, fs.base.cert(a, e, self.k), "FD cert differs at P = {p}");
++                    }
++                    c
++                }
++                _ => fs.base.cert(a, e, self.k),
++            };
++            let Some(mask) = cert else {
+                 continue;
+             };
++            #[cfg(feature = "l42-prof")]
++            {
++                prof.cert_some += 1;
++            }
+             let floor = if a == lo && e == lo + w - 1 {
+                 fs.full_floor
+             } else {
++                #[cfg(feature = "l42-prof")]
++                {
++                    prof.clipped += 1;
++                }
+                 fs.base.cert_floor(a, e, self.k)
+             };
++            let dm = ((p / self.pk) % u128::from(self.bmid)) as u32;
+             tops.push(Top {
+                 p,
+                 mask,
+                 rlo: (a - lo) as u32,
+                 rhi: (e - lo + 1) as u32,
+-                dm: ((p / self.pk) % u128::from(self.bmid)) as u32,
++                dm,
+                 seed: floor >= fs.k2,
+                 pc: (p % u128::from(fs.m1)) as u32,
++                dhat: self.dhat_tab[dm as usize],
++                gmask: if floor >= fs.k2 { mask } else { 0 },
++                clipped: a != lo || e != lo + w - 1,
+             });
+         }
+     }
+@@ -744,23 +933,43 @@ impl CpuJoin {
+         out: &mut PartitionResult,
+         record: &mut Option<&mut Vec<u128>>,
+     ) {
++        let ts = tsc_s();
++        #[cfg(feature = "l42-prof")]
++        {
++            out.prof.and_pass += 1;
++        }
+         let info = pass.info[j];
+         let row = info.row as usize;
+-        let r0 = self.fs.bp_r[pass.ext.idx[row] as usize];
+         let top = pass.top;
++        if self.lean & 1 != 0 && !top.clipped {
++            return self.survivor_lean(pass, bmask, info, out, record);
++        }
++        let r0 = self.fs.bp_r[pass.ext.idx[row] as usize];
+         if r0 < top.rlo || r0 >= top.rhi {
++            #[cfg(feature = "l42-prof")]
++            {
++                out.prof.out_of_range += 1;
++            }
++            let te = tsc_s();
++            out.prof.cyc[5] += te - ts;
++            out.prof.cyc[7] += te - ts;
+             return;
+         }
+         out.survivors += 1;
+         let ext = pass.ext;
+-        let pass_mid = if self.kb == 0 && self.bk == 0 && self.b2k == 0 {
++        let pass_mid = if self.lean & 2 != 0 && self.kb == 0 && self.bk == 0 && self.b2k == 0 && self.mid == 2 {
++            self.prefilter_lean(top, bmask, info.carries, ext.p2[row], ext.p3[row])
++        } else if self.kb == 0 && self.bk == 0 && self.b2k == 0 {
+             self.prefilter(top, bmask, info.carries, ext.p2[row], ext.p3[row])
+         } else {
+             // R mod b^mid: the residue's, plus what the last digit adds.
+             let rho = u64::from(ext.rho[row]) + u64::from(pass.d) * self.kb;
+             self.prefilter_any(top, bmask, info.carries, rho % self.bmid)
+         };
++        let tp = tsc_s();
++        out.prof.cyc[7] += tp - ts;
+         if !pass_mid {
++            out.prof.cyc[5] += tp - ts;
+             return;
+         }
+         out.checked += 1;
+@@ -778,6 +987,80 @@ impl CpuJoin {
+         if nice {
+             out.hits.push(n);
+         }
++        let te = tsc_s();
++        out.prof.cyc[6] += te - tp;
++        out.prof.cyc[5] += te - ts;
++    }
++
++    /// L42 scratch: [`Self::survivor`] for an unclipped top (no residue
++    /// test: every residue is in range), the residue loaded only for the
++    /// full check.
++    #[inline(always)]
++    fn survivor_lean(
++        &self,
++        pass: &Pass,
++        bmask: u64,
++        info: Info,
++        out: &mut PartitionResult,
++        record: &mut Option<&mut Vec<u128>>,
++    ) {
++        let row = info.row as usize;
++        let top = pass.top;
++        out.survivors += 1;
++        let ext = pass.ext;
++        let pass_mid = if self.lean & 2 != 0 && self.kb == 0 && self.bk == 0 && self.b2k == 0 && self.mid == 2 {
++            self.prefilter_lean(top, bmask, info.carries, ext.p2[row], ext.p3[row])
++        } else if self.kb == 0 && self.bk == 0 && self.b2k == 0 {
++            self.prefilter(top, bmask, info.carries, ext.p2[row], ext.p3[row])
++        } else {
++            let rho = u64::from(ext.rho[row]) + u64::from(pass.d) * self.kb;
++            self.prefilter_any(top, bmask, info.carries, rho % self.bmid)
++        };
++        if !pass_mid {
++            return;
++        }
++        out.checked += 1;
++        let idx = ext.idx[row] as usize;
++        let r0 = self.fs.bp_r[idx];
++        let n = top.p * self.fs.w + u128::from(r0);
++        if let Some(rec) = record.as_deref_mut() {
++            rec.push(n);
++        }
++        let nice = if self.fs.f0 == 3 {
++            get_is_nice_with_known_lsd(n, self.fs.b, 3, self.fs.bp_m[idx])
++        } else {
++            get_is_nice(n, self.fs.b)
++        };
++        if nice {
++            out.hits.push(n);
++        }
++    }
++
++    /// L42 scratch: [`Self::prefilter`] in L41's lean form (`mid = 2`): the
++    /// two digits of `x = (A + P·D) mod b²` by fixed point (FX: `F = A·C +
++    /// P·δ̂` mod 2^32, `h = ⌊F·b/2^32⌋`, `g` from the low word), and the
++    /// membership test by shifts and six compares (MT), branch-free.
++    #[inline(always)]
++    #[allow(clippy::cast_possible_truncation)]
++    fn prefilter_lean(&self, top: &Top, bmask: u64, carries: u32, p2: u32, p3: u32) -> bool {
++        let c = self.fx_c;
++        let b = u64::from(self.fs.b);
++        let f2 = (carries & 0xFFFF).wrapping_mul(c).wrapping_add(p2.wrapping_mul(top.dhat));
++        let f3 = (carries >> 16).wrapping_mul(c).wrapping_add(p3.wrapping_mul(top.dhat));
++        let x2 = u64::from(f2) * b;
++        let x3 = u64::from(f3) * b;
++        let (h2, h3) = (x2 >> 32, x3 >> 32);
++        let g2 = (u64::from(x2 as u32) * b) >> 32;
++        let g3 = (u64::from(x3 as u32) * b) >> 32;
++        let seen = bmask | top.gmask;
++        let hit = (seen >> g2) | (seen >> g3) | (seen >> h2) | (seen >> h3);
++        ((hit & 1) == 0)
++            & (g2 != g3)
++            & (h2 != h3)
++            & (g2 != h2)
++            & (g2 != h3)
++            & (g3 != h2)
++            & (g3 != h3)
+     }
+ 
+     /// The middle-digit prefilter: `n`'s output digits at positions
+diff --git a/common/src/l42_fd.rs b/common/src/l42_fd.rs
+new file mode 100644
+index 00000000..f5fd090d
+--- /dev/null
++++ b/common/src/l42_fd.rs
+@@ -0,0 +1,476 @@
++//! L42 scratch (not for a PR): the CPU top certificate stepped by finite
++//! differences across consecutive top prefixes `P, P + h, P + 2h, ...`
++//! (`h = b^s`), for timing and exactness against `Base::cert`.
++//!
++//! An unclipped block is `[a, a + w − 1]` with `a = P·w`, `w = b^f0`, so
++//! `a^j = P^j · b^(j·f0)`: the digits of `a²`, `a³` are those of `P²`, `P³`
++//! shifted up. The state keeps `P²`, `P³` and their differences in step `h`
++//! as packed base-b digits (8 a word, biased add as in `detailed_fd`), and
++//! `d_j = e^j − a^j` with its differences in binary.
++#![allow(
++    clippy::pedantic,
++    clippy::many_single_char_names,
++    clippy::cast_possible_truncation,
++    clippy::needless_range_loop,
++    missing_docs
++)]
++
++use crate::overlap_join::{Base, DIGIT_BUF, W4, close_certificate, digit_range_mask};
++
++/// Words per digit array (48 digits).
++const NW: usize = 6;
++const LO: u64 = 0x0101_0101_0101_0101;
++
++#[inline(always)]
++fn add_word(a: u64, r: u64, cin: bool, bias: u64) -> (u64, bool) {
++    let rb = r + bias * LO;
++    let (t, c1) = a.overflowing_add(rb);
++    let (t, c2) = t.overflowing_add(u64::from(cin));
++    let cout = c1 | c2;
++    let carried = (((t ^ a ^ rb) >> 8) & LO) | (u64::from(cout) << 56);
++    (t - (carried ^ LO) * bias, cout)
++}
++
++#[inline(always)]
++fn add_arr(a: &mut [u64; NW], r: &[u64; NW], nw: usize, bias: u64) {
++    let mut c = false;
++    for i in 0..nw {
++        let (t, co) = add_word(a[i], r[i], c, bias);
++        a[i] = t;
++        c = co;
++    }
++    debug_assert!(!c, "digit array overflow");
++}
++
++#[inline(always)]
++fn digit(a: &[u64; NW], i: u32) -> u8 {
++    (a[(i >> 3) as usize] >> ((i & 7) * 8)) as u8
++}
++
++/// The value of a word of 8 packed digits (`< b^8 <= 2^48`): three
++/// multiplies.
++#[inline(always)]
++fn word_value(w: u64, b: u64, b2: u64, b4: u64) -> u64 {
++    const M8: u64 = 0x00FF_00FF_00FF_00FF;
++    const M16: u64 = 0x0000_FFFF_0000_FFFF;
++    let x = (w & M8) + ((w >> 8) & M8) * b; // 16-bit lanes, < b^2
++    let y = (x & M16) + ((x >> 16) & M16) * b2; // 32-bit lanes, < b^4
++    (y & 0xFFFF_FFFF) + (y >> 32) * b4
++}
++
++fn to_digits(base: &Base, x: W4) -> [u64; NW] {
++    let mut buf = [0u8; DIGIT_BUF];
++    let len = base.ndig_w(&x);
++    base.digits_w(x, len, &mut buf);
++    let mut out = [0u64; NW];
++    for i in 0..len as usize {
++        out[i / 8] |= u64::from(buf[i]) << (8 * (i % 8));
++    }
++    out
++}
++
++/// [`to_digits`] without a hardware division: chunks of 8 digits by
++/// `Div64` (`b^8 <= 2^48`), each split by `b^4` and then digit by digit by a
++/// reciprocal multiply.
++fn to_digits_df(base: &Base, mut x: W4, mg: Mg) -> [u64; NW] {
++    let d8 = &base.dpow[8];
++    let d4 = &base.dpow[4];
++    let mut out = [0u64; NW];
++    let mut i = 0;
++    while x != W4::default() {
++        let chunk = d8.divrem_w4(&mut x);
++        let sh = d4.shift;
++        let u1 = if sh == 0 { 0 } else { chunk >> (64 - sh) };
++        let (hi, lo) = d4.div2by1(u1, chunk << sh);
++        let lo = lo >> sh;
++        let (mut hi, mut lo) = (hi, lo);
++        let mut word = 0u64;
++        for j in 0..4 {
++            let (q, r) = mg.divrem(lo);
++            word |= u64::from(r) << (8 * j);
++            lo = q;
++            let (q, r) = mg.divrem(hi);
++            word |= u64::from(r) << (8 * (j + 4));
++            hi = q;
++        }
++        out[i] = word;
++        i += 1;
++    }
++    out
++}
++
++fn w4(x: u128) -> W4 {
++    W4([x as u64, (x >> 64) as u64, 0, 0])
++}
++
++fn bitlen(x: &W4) -> u32 {
++    for i in (0..4).rev() {
++        if x.0[i] != 0 {
++            return 64 * i as u32 + 64 - x.0[i].leading_zeros();
++        }
++    }
++    0
++}
++
++/// Field constants for the FD certificate at one base.
++pub struct TopFdSetup {
++    b: u32,
++    bias: u64,
++    b2: u64,
++    b4: u64,
++    b8: u128,
++    f0: u32,
++    s2: u32,
++    s3: u32,
++    cap: u32,
++    w: u128,
++    delta: u128,
++    pub h: u128,
++    /// Words the square family and the cube family need.
++    n2: usize,
++    n3: usize,
++    k_dds: [u64; NW],
++    k_dddc: [u64; NW],
++    c2: W4,
++    c3: W4,
++    /// `ndig(2^(L − 1))` for bit length `L` (index `L`).
++    ndig_tab: [u8; 257],
++    /// `b^(2 − c)` as f64, and `b²`.
++    inv_pow2: [f64; 64],
++    b2f: f64,
++    /// Use the f64 carry screen (else always the exact remainder).
++    pub fast_carry: bool,
++    /// Seed without hardware division.
++    pub df_seed: bool,
++    mg: Mg,
++}
++
++const TWO64: f64 = 18_446_744_073_709_551_616.0;
++
++#[inline(always)]
++fn w4_f64(x: &W4) -> f64 {
++    let mut i = 3;
++    while i > 0 && x.0[i] == 0 {
++        i -= 1;
++    }
++    let hi = x.0[i] as f64;
++    if i == 0 {
++        return hi;
++    }
++    let lo = x.0[i - 1] as f64;
++    let sc = TWO64.powi(i as i32 - 1);
++    (hi * TWO64 + lo) * sc
++}
++
++/// The stepped state of one top prefix.
++#[derive(Clone)]
++pub struct TopFd {
++    pub p: u128,
++    sq: [u64; NW],
++    ds: [u64; NW],
++    cu: [u64; NW],
++    dc: [u64; NW],
++    ddc: [u64; NW],
++    d2: W4,
++    d3: W4,
++    dd3: W4,
++}
++
++impl TopFdSetup {
++    /// `s`: step `h = b^s` in `P`; `t`: digits of `P` (the top layer's `t`).
++    /// `None` if the arrays would not hold the field's powers.
++    #[must_use]
++    pub fn try_new(base: &Base, f0: u32, t: u32, s: u32, cap: u32) -> Option<Self> {
++        let n3 = ((3 * t + 2 * s + 2) as usize).div_ceil(8);
++        (n3 <= NW && base.b <= 64 && base.dpow.len() > 8).then(|| Self::new(base, f0, t, s, cap))
++    }
++
++    #[must_use]
++    pub fn new(base: &Base, f0: u32, t: u32, s: u32, cap: u32) -> Self {
++        let b = base.b;
++        let bu = u128::from(b);
++        let w = base.powu(f0);
++        let h = base.powu(s);
++        let hh = w * h;
++        let delta = w - 1;
++        // Square family: P², 2Ph + h², 2h²; cube family: P³, ..., 6h³.
++        let n2 = ((2 * t + s + 2) as usize).div_ceil(8);
++        let n3 = ((3 * t + 2 * s + 2) as usize).div_ceil(8);
++        assert!(n3 <= NW, "digit arrays too small");
++        let mut ndig_tab = [0u8; 257];
++        for l in 1..=256u32 {
++            let mut x = W4::default();
++            let bit = l - 1;
++            x.0[(bit / 64) as usize] = 1u64 << (bit % 64);
++            ndig_tab[l as usize] = base.ndig_w(&x) as u8;
++        }
++        Self {
++            b,
++            bias: 256 - u64::from(b),
++            b2: u64::from(b) * u64::from(b),
++            b4: u64::from(b).pow(4),
++            b8: bu.pow(8),
++            f0,
++            s2: base.s2,
++            s3: base.s3,
++            cap,
++            w,
++            delta,
++            h,
++            n2,
++            n3,
++            inv_pow2: std::array::from_fn(|c| f64::from(b).powi(2 - c as i32)),
++            b2f: f64::from(b) * f64::from(b),
++            fast_carry: true,
++            df_seed: true,
++            mg: Mg::new(u64::from(b)),
++            k_dds: to_digits(base, w4(2 * h * h)),
++            k_dddc: to_digits(base, w4(6 * h * h * h)),
++            c2: w4(2 * delta * hh),
++            c3: W4::mul_u128_u128(6 * delta * hh, hh),
++            ndig_tab,
++        }
++    }
++
++    /// `ndig(d)`: one table read and one compare.
++    #[inline(always)]
++    fn ndig(&self, base: &Base, d: &W4) -> u32 {
++        let l = bitlen(d);
++        if l == 0 {
++            return 0;
++        }
++        let c = u32::from(self.ndig_tab[l as usize]);
++        c + u32::from(!d.lt(&base.poww[c as usize]))
++    }
++
++    /// The state at `P` (exact arithmetic and divisions).
++    #[must_use]
++    pub fn seed(&self, base: &Base, p: u128) -> TopFd {
++        let h = self.h;
++        let p2 = W4::mul_u128_u128(p, p);
++        let p3 = p2.mul_u128(p);
++        let ds = W4::mul_u128_u128(2 * p + h, h);
++        let dc = p2.mul_u128(3).add(&W4::mul_u128_u128(3 * p + h, h)).mul_u128(h);
++        let ddc = W4::mul_u128_u128(6 * h * h, p + h);
++        let (a, dl, hh) = (p * self.w, self.delta, self.w * h);
++        let d2 = W4::mul_u128_u128(dl, 2 * a + dl);
++        let d3 = W4::mul_u128_u128(a, a)
++            .mul_u128(3)
++            .add(&W4::mul_u128_u128(3 * a + dl, dl))
++            .mul_u128(dl);
++        let dd3 = W4::mul_u128_u128(3 * dl * hh, 2 * a + hh + dl);
++        let conv = |x: W4| {
++            if self.df_seed {
++                to_digits_df(base, x, self.mg)
++            } else {
++                to_digits(base, x)
++            }
++        };
++        TopFd {
++            p,
++            sq: conv(p2),
++            ds: conv(ds),
++            cu: conv(p3),
++            dc: conv(dc),
++            ddc: conv(ddc),
++            d2,
++            d3,
++            dd3,
++        }
++    }
++
++    /// `P → P + h`: five digit-array adds and three binary adds.
++    #[inline]
++    pub fn step(&self, st: &mut TopFd) {
++        let bias = self.bias;
++        add_arr(&mut st.sq, &st.ds, self.n2, bias);
++        add_arr(&mut st.ds, &self.k_dds, self.n2, bias);
++        add_arr(&mut st.cu, &st.dc, self.n3, bias);
++        add_arr(&mut st.dc, &st.ddc, self.n3, bias);
++        add_arr(&mut st.ddc, &self.k_dddc, self.n3, bias);
++        st.d2 = st.d2.add(&self.c2);
++        st.d3 = st.d3.add(&st.dd3);
++        st.dd3 = st.dd3.add(&self.c3);
++        st.p += self.h;
++    }
++
++    /// `x mod b^k` for the digit array `x` (`k <= 48`).
++    #[inline(always)]
++    fn low_value(&self, x: &[u64; NW], k: u32) -> W4 {
++        let b = u64::from(self.b);
++        let mut acc = W4::default();
++        let full = (k / 8) as usize;
++        let part = k % 8;
++        // Top word first (partial), then down.
++        let mut started = false;
++        if part > 0 {
++            let wv = x[full] & ((1u64 << (8 * part)) - 1);
++            acc = w4(u128::from(word_value(wv, b, self.b2, self.b4)));
++            started = true;
++        }
++        for i in (0..full).rev() {
++            let wv = u128::from(word_value(x[i], b, self.b2, self.b4));
++            acc = if started {
++                acc.mul_u128(self.b8).add(&w4(wv))
++            } else {
++                w4(wv)
++            };
++            started = true;
++        }
++        acc
++    }
++
++    /// `(a^j mod b^c0) + d >= b^c0` decided in f64 from the top two digits
++    /// of `R = P^j mod b^(c0 − z)` and `d / b^(c0 − 2)`, when the margin is
++    /// clear; `None` sends it to the exact remainder (about `1/b²` of
++    /// calls). `R / b^(k−2)` lies in `[r, r + 1)` for `r` its top two digits,
++    /// and the f64 value of `d / b^(c0 − 2)` (below `b²`) is within 1e-12 of
++    /// the true one.
++    #[inline(always)]
++    fn carry_screen(&self, x: &[u64; NW], d: &W4, c0: u32, z: u32) -> Option<bool> {
++        if !self.fast_carry || c0 < z + 2 || c0 as usize >= 64 {
++            return None;
++        }
++        let k = c0 - z;
++        let r = f64::from(digit(x, k - 1)) * f64::from(self.b) + f64::from(digit(x, k - 2));
++        let df = w4_f64(d) * self.inv_pow2[c0 as usize];
++        let eps = 1e-9;
++        if r + df >= self.b2f + eps {
++            Some(true)
++        } else if r + 1.0 + df <= self.b2f - eps {
++            Some(false)
++        } else {
++            None
++        }
++    }
++
++    /// The certificate of the block of `st.p` (unclipped): `Base::cert(a,
++    /// a + w − 1, cap)`.
++    #[must_use]
++    #[inline]
++    pub fn cert(&self, base: &Base, st: &TopFd) -> Option<u64> {
++        let top = (self.b - 1) as u8;
++        let mut mask = 0u64;
++        let mut doms = [0u64; 2];
++        let pows = [
++            (&st.sq, &st.d2, self.s2, 2 * self.f0),
++            (&st.cu, &st.d3, self.s3, 3 * self.f0),
++        ];
++        for (dom, (x, d, sp, z)) in doms.iter_mut().zip(pows) {
++            let c0 = self.cap.max(self.ndig(base, d));
++            if c0 >= sp {
++                continue;
++            }
++            let at = |pos: u32| if pos < z { 0 } else { digit(x, pos - z) };
++            let one_more = match self.carry_screen(x, d, c0, z) {
++                Some(v) => v,
++                None => {
++                    let rem = if c0 > z {
++                        self.low_value(x, c0 - z).mul_u128(base.powu(z))
++                    } else {
++                        W4::default()
++                    };
++                    !rem.add(d).lt(&base.poww[c0 as usize])
++                }
++            };
++            let mut pos = c0;
++            if one_more {
++                while at(pos) == top {
++                    pos += 1;
++                }
++                let g = at(pos);
++                *dom = digit_range_mask(g, g + 1);
++                pos += 1;
++            }
++            while pos < sp {
++                let bit = 1u64 << at(pos);
++                if mask & bit != 0 {
++                    return None;
++                }
++                mask |= bit;
++                pos += 1;
++            }
++        }
++        close_certificate(mask, doms)
++    }
++}
++
++/// Exact `x / d` by a 48-bit reciprocal for `x < 2^48 / d` (as `cpu_join`'s
++/// `SmallDiv::divrem`).
++#[derive(Clone, Copy)]
++pub struct Mg {
++    d: u64,
++    magic: u64,
++}
++
++impl Mg {
++    #[must_use]
++    pub fn new(d: u64) -> Self {
++        Self {
++            d,
++            magic: (1u64 << 48).div_ceil(d),
++        }
++    }
++    #[inline(always)]
++    fn divrem(self, x: u64) -> (u64, u8) {
++        let q = ((u128::from(x) * u128::from(self.magic)) >> 48) as u64;
++        (q, (x - q * self.d) as u8)
++    }
++}
++
++/// `Base::cert` with its digit extraction division-free: the quotient's
++/// digits (at most 12, below `b^12`) come from one `Div64` split by `b^6`
++/// and two reciprocal-multiply chains, instead of a hardware `div` a digit.
++#[must_use]
++pub fn cert_df(base: &Base, mg: Mg, a: u128, e: u128, cap: u32) -> Option<u64> {
++    let a2 = W4::mul_u128_u128(a, a);
++    let e2 = W4::mul_u128_u128(e, e);
++    let a3 = a2.mul_u128(a);
++    let e3 = e2.mul_u128(e);
++    let top = (base.b - 1) as u8;
++    let mut mask = 0u64;
++    let mut dx = [0u8; DIGIT_BUF];
++    let mut doms = [0u64; 2];
++    for (dom, (x, y, sp)) in doms.iter_mut().zip([(a2, e2, base.s2), (a3, e3, base.s3)]) {
++        let d = y.sub(&x);
++        let c0 = cap.max(base.ndig_w(&d));
++        if c0 >= sp {
++            continue;
++        }
++        let (qx, rem) = base.shift_down_rem(x, c0);
++        let one_more = !rem.add(&d).lt(&base.poww[c0 as usize]);
++        let len = sp - c0;
++        if len <= 12 && qx.0[2] == 0 && qx.0[3] == 0 {
++            let (hi, lo) = base.dpow[6].divrem_u128(qx.to_u128());
++            let (mut hi, mut lo) = (hi as u64, lo);
++            for i in 0..6 {
++                let (q, r) = mg.divrem(lo);
++                dx[i] = r;
++                lo = q;
++                if i + 6 < len as usize {
++                    let (q, r) = mg.divrem(hi);
++                    dx[i + 6] = r;
++                    hi = q;
++                }
++            }
++        } else {
++            base.digits_w(qx, len, &mut dx);
++        }
++        let mut from = 0usize;
++        if one_more {
++            while dx[from] == top {
++                from += 1;
++            }
++            *dom = digit_range_mask(dx[from], dx[from] + 1);
++            from += 1;
++        }
++        for &digit in &dx[from..len as usize] {
++            let bit = 1u64 << digit;
++            if mask & bit != 0 {
++                return None;
++            }
++            mask |= bit;
++        }
++    }
++    close_certificate(mask, doms)
++}
+diff --git a/common/src/lib.rs b/common/src/lib.rs
+index 7ee9eef6..73510c03 100644
+--- a/common/src/lib.rs
++++ b/common/src/lib.rs
+@@ -27,6 +27,7 @@ pub mod gpu_config;
+ pub mod gpu_niceonly;
+ pub mod gpu_route;
+ pub mod join_plan;
++pub mod l42_fd;
+ pub mod lsd_filter;
+ pub mod msd_prefix_filter;
+ pub mod number_stats;
+diff --git a/common/src/overlap_join.rs b/common/src/overlap_join.rs
+index 6a9bfb0d..9acc59d0 100644
+--- a/common/src/overlap_join.rs
++++ b/common/src/overlap_join.rs
+@@ -462,8 +462,8 @@ impl W4 {
+ /// IEEE Trans. Computers 60 (2011), Algorithm 4).
+ #[derive(Clone, Copy, Debug)]
+ pub struct Div64 {
+-    dn: u64,
+-    shift: u32,
++    pub(crate) dn: u64,
++    pub(crate) shift: u32,
+     v: u64,
+ }
+ 
+@@ -480,7 +480,7 @@ impl Div64 {
+ 
+     /// (u1:u0) / dn with u1 < dn -> (q, r)
+     #[inline]
+-    fn div2by1(&self, u1: u64, u0: u64) -> (u64, u64) {
++    pub(crate) fn div2by1(&self, u1: u64, u0: u64) -> (u64, u64) {
+         let q = (u128::from(self.v) * u128::from(u1))
+             .wrapping_add((u128::from(u1) << 64) | u128::from(u0));
+         let mut q1 = ((q >> 64) as u64).wrapping_add(1);
+@@ -545,18 +545,18 @@ pub struct Base {
+     pub m1: u32,
+     /// Residues r mod (b − 1) with r² + r³ ≡ b(b − 1)/2.
+     pub roots: Vec<u32>,
+-    pow: Vec<u128>,
+-    poww: Vec<W4>,
+-    chd: u32,
+-    dpow: Vec<Div64>,
++    pub(crate) pow: Vec<u128>,
++    pub(crate) poww: Vec<W4>,
++    pub(crate) chd: u32,
++    pub(crate) dpow: Vec<Div64>,
+ }
+ 
+ /// Digits the certificate's buffers hold (`Base::cert`): the cube of any
+ /// field the join takes has at most 39, at bases 40-64.
+-const DIGIT_BUF: usize = 48;
++pub(crate) const DIGIT_BUF: usize = 48;
+ 
+ /// Digits `lo..=hi` as a mask (`lo <= hi < 64`).
+-fn digit_range_mask(lo: u8, hi: u8) -> u64 {
++pub(crate) fn digit_range_mask(lo: u8, hi: u8) -> u64 {
+     let width = u32::from(hi - lo) + 1;
+     let ones = if width >= 64 {
+         u64::MAX
+@@ -573,7 +573,7 @@ fn digit_range_mask(lo: u8, hi: u8) -> u64 {
+ /// every such n out, and one with a single free digit adds it to the mask,
+ /// which can empty or force the other interval in turn. For two positions
+ /// that is all of Hall's condition.
+-fn close_certificate(mut mask: u64, doms: [u64; 2]) -> Option<u64> {
++pub(crate) fn close_certificate(mut mask: u64, doms: [u64; 2]) -> Option<u64> {
+     let mut forced = [false; 2];
+     loop {
+         let mut changed = false;
+@@ -695,7 +695,7 @@ impl Base {
+ 
+     /// Smallest i with b^i > x.
+     #[inline]
+-    fn ndig_w(&self, x: &W4) -> u32 {
++    pub(crate) fn ndig_w(&self, x: &W4) -> u32 {
+         let (mut lo, mut hi) = (0usize, self.poww.len() - 1);
+         while lo < hi {
+             let mid = usize::midpoint(lo, hi);
+@@ -726,7 +726,7 @@ impl Base {
+     /// floor(x / b^c) and x mod b^c, the remainder put back together from
+     /// the remainders of the division steps.
+     #[inline]
+-    fn shift_down_rem(&self, mut x: W4, mut c: u32) -> (W4, W4) {
++    pub(crate) fn shift_down_rem(&self, mut x: W4, mut c: u32) -> (W4, W4) {
+         let mut rem = W4::default();
+         let mut at = 0usize;
+         while c >= self.chd {
+@@ -747,7 +747,7 @@ impl Base {
+     // Digits are below b <= 64, so `as u8` is exact; x fits u64 by then.
+     #[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
+     #[inline]
+-    fn digits_w(&self, mut x: W4, len: u32, out: &mut [u8; DIGIT_BUF]) {
++    pub(crate) fn digits_w(&self, mut x: W4, len: u32, out: &mut [u8; DIGIT_BUF]) {
+         let b = u64::from(self.b);
+         let mut n = 0usize;
+         while x.0[2] != 0 || x.0[3] != 0 {

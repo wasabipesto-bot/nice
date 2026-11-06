@@ -5,6 +5,30 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L42.1 CPU join profile on ivory, and FD top certificates on the CPU (2026-11-06, agent; `L42/SCOPING.md`, `L42/raw/`; worktree `.worktrees/l42-cpu-join-prof`, scratch prototype `l42_fd.rs`, uncommitted)
+
+Ivory = Zen 2 (EPYC Rome) VM, 4 vCPUs, AVX2 only (`scan_avx2`); ~25 idle CLI processes (load
+0.5–1.2). Release build of `nice_client`, default features, no GPU deps: 2 min 09 s, 545 MB target.
+Phase split (rdtsc counters on a scratch branch + `perf` + the pristine NiceMark run, score 665;
+same within 0.3 points at 1 and 4 threads): **production shapes (b60 1e16, b62 1e16, b62 1e17
+slices): top certificates 42–43 %, AND scan + survivors ~55 % (scan 28–29, prefilter 17–18, full
+check 8–9), extend + lists ~1 %, sort ~1 %**; b60 1e14: 35 / 36 / 7+22 / 1; b62 1e14: 27 / 33 /
+9+30 / 1. `Base::cert` + `divrem_w4` = 40.5 % of the join; 57 % of `Base::cert`'s samples sit on
+two hardware `div`s in `digits_w` (per-digit `% b`, `/ b` with a runtime base). ~12 % of cycles are
+branch mispredictions (survivor extraction, prefilter early exits). **FD top certificates:** `tops()`
+visits a key's prefixes in ascending order within a partition → consecutive P differ by h = b³,
+#240's five digit-array adds step in h; gaps ≤ 4 stepped, larger seed (2.3–4.7 % of slots).
+Certificate alone ×1.6–1.8 vs `Base::cert`; **in place, whole partitions, interleaved 2 rounds: FD
+×1.10–1.20 at production shapes (mean ×1.16) at 1 and 4 threads; FD + L41's lean prefilter
+×1.23–1.29 (mean ×1.26).** Exact: FD cert = `Base::cert` on ~19 M slots (b60/62/64); whole b60 and
+b62 1e14 fields with a per-slot self-check → identical survivor/checked counts; `cpu_join` tests,
+the opt-in production-field reference test (b42–b64) and whole b42 (417,789,835 / 16,879,877) pass.
+Point 4: the CPU join has #215's prune (`FieldSetup::fc`, `prune_bottoms`; cuts bottoms 43–65 %);
+no transpose benefit (AND arithmetic 0.3 of ~2.3 cycles per AND; a bit-sliced version ≤ ~4 %);
+the survivor prefilter is `walk_pf`'s arithmetic: FX+MT+GM port directly, ×1.05–1.08 alone, exact;
+RC ×1.00 (drop). Caveat: Zen 3/4 (Anvil, demoux) divide faster → smaller share and gain there;
+AVX-512 makes the scan cheaper → share back up. → PR agent launched (`L42/PR-BRIEF.md`).
+
 ## L40.1 Group walk over the AND group's 8 pass words: ×1.056 at b62 1e17 but b58 MSD-strong ×0.963 → parked (2026-11-05, agent; `L40/RESULTS.md`, `L40/raw/`; branch `pr/join-group-walk` f8a27cc = one commit on af21136 (#241) with a `#NNN` CHANGELOG line; variants `exp/join-group-walk-{p1,linear,f,h,h2,f2}`, counters `exp/join-rounds-base`, `exp/join-group-walk-rounds`)
 
 Head kernel = H2 (first word picked before the walk). RTX 3080 at 150 W, 3 interleaved rounds vs

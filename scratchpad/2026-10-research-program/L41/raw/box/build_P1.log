@@ -1,0 +1,35 @@
+   Compiling nice_common v3.4.8-dev (/root/l41/src/P1/common)
+warning: variable does not need to be mutable
+   --> common/src/cubecl_join.rs:527:13
+    |
+527 |         let mut s_cw = SharedMemory::<Atomic<u32>>::new(comptime!((TOP_CAP / 32) as usize));
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `pass` is never read
+   --> common/src/cubecl_join.rs:866:52
+    |
+866 |   ...                   let mut pass = false;
+    |                                        ^^^^^ this value is reassigned later and never used
+...
+881 | / ...                       pass = walk_pf(
+882 | | ...                           ac[j as usize],
+883 | | ...                           pc[j as usize],
+884 | | ...                           t_dm[jt2 as usize],
+...   |
+891 | | ...                           k2,
+892 | | ...                       );
+    | |___________________________- `pass` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `nice_common` (lib) generated 2 warnings (run `cargo fix --lib -p nice_common` to apply 1 suggestion)
+warning: `nice_common` (lib test) generated 2 warnings (2 duplicates)
+    Finished `release` profile [optimized] target(s) in 3m 18s
+  Executable unittests src/lib.rs (/root/tgt/release/deps/nice_common-cbd4e892b0124d04)
+  Executable tests/claim_queries.rs (/root/tgt/release/deps/claim_queries-9619899b5292cb1b)
+  Executable tests/notable_numbers_cache.rs (/root/tgt/release/deps/notable_numbers_cache-dc272e6b3d6cd38c)
+  Executable tests/search_caches.rs (/root/tgt/release/deps/search_caches-1e7a68d619f6c564)

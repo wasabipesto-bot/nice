@@ -1,0 +1,13 @@
++ L=/root/l41/logs
++ mkdir -p /root/l41/logs /root/l41/bin /root/l41/src /root/l41/sass
++ cd /root/nice
++ git fetch -q origin pr/join-top-record
++ git worktree add -q --detach /root/l41/src/B 7832f89
++ for t in B
++ cd /root/l41/src/B
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
+++ date -u +%T
++ echo 'B 7832f89d Overlap join: one 32-byte record per top 99c026b3b4c11528c328a9b22d28506a  common/src/cubecl_join.rs 05:51:51'
++ nvidia-smi
++ nvidia-smi -q -d POWER,CLOCK

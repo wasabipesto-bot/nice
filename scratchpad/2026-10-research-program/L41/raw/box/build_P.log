@@ -1,0 +1,28 @@
+   Compiling nice_common v3.4.8-dev (/root/l41/src/P/common)
+warning: variable does not need to be mutable
+   --> common/src/cubecl_join.rs:527:13
+    |
+527 |         let mut s_cw = SharedMemory::<Atomic<u32>>::new(comptime!((TOP_CAP / 32) as usize));
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `pass` is never read
+   --> common/src/cubecl_join.rs:869:52
+    |
+869 |   ...                   let mut pass = false;
+    |                                        ^^^^^ this value is reassigned later and never used
+...
+884 | / ...                       pass = walk_pf(
+885 | | ...                           ac[j as usize],
+886 | | ...                           pc[j as usize],
+887 | | ...                           t_dm[jt2 as usize],
+...   |
+894 | | ...                           k2,
+895 | | ...                       );
+    | |___________________________- `pass` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
