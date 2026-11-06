@@ -523,8 +523,10 @@ mod kernels {
             SharedMemory::<u32>::new(comptime!(if lean { TOP_CAP as usize } else { 1 }));
         let mut t_ghi =
             SharedMemory::<u32>::new(comptime!(if lean { TOP_CAP as usize } else { 1 }));
-        // Per chunk of 32 tops: bit i set iff top i is clipped.
+        // Per chunk of 32 tops: bit i set iff top i is clipped (set by the
+        // batch load), and a plain copy the chunks read.
         let mut s_cw = SharedMemory::<Atomic<u32>>::new(comptime!((TOP_CAP / 32) as usize));
+        let mut s_cwr = SharedMemory::<u32>::new(comptime!((TOP_CAP / 32) as usize));
         // The batch's masks digit-major: bit i of `t_tr[c·64 + d]` is set iff
         // top 32c + i has digit d.
         let mut t_tr = SharedMemory::<u32>::new(comptime!((TOP_CAP / 32 * 64) as usize));
@@ -607,6 +609,12 @@ mod kernels {
                     }
                 }
                 sync_cube();
+                // The clip words, copied for the chunks' plain loads and reset
+                // for the next batch (whose load sets them after two barriers).
+                if UNIT_POS_X < comptime!(TOP_CAP / 32) {
+                    s_cwr[UNIT_POS_X as usize] = s_cw[UNIT_POS_X as usize].load();
+                    s_cw[UNIT_POS_X as usize].store(0u32);
+                }
                 if nt >= TRANSPOSE_MIN {
                     // Thread u writes chunk u / 32's words for digits u % 32
                     // and u % 32 + 32, over the chunk's 32 tops unrolled (the
@@ -827,7 +835,7 @@ mod kernels {
                         // (none but in a field's edge blocks): their pass
                         // bits for residues outside the range are cleared,
                         // so every bit walked is a join survivor.
-                        let cw = s_cw[(jc / 32u32) as usize].load();
+                        let cw = s_cwr[(jc / 32u32) as usize];
                         if cw != 0u32 {
                             #[unroll]
                             for j in 0..ept {
@@ -949,12 +957,6 @@ mod kernels {
                         jc += 32u32;
                     }
                     ws += wave;
-                }
-                // Every thread is past its last read of the clip words (each
-                // chunk ends with barriers), and the next batch sets them
-                // after the barrier below.
-                if UNIT_POS_X < comptime!(TOP_CAP / 32) {
-                    s_cw[UNIT_POS_X as usize].store(0u32);
                 }
                 tc += TOP_CAP;
                 sync_cube();
