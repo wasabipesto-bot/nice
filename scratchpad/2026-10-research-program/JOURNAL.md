@@ -4,6 +4,19 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)
+
+- **Reconcile:** no research instances; November research $6.95 (fleet $9.67); credit $44.72;
+  ivory 15 GB free. #241 open, green at 7832f89, no comments; nothing merged; main = 6f060a9.
+  Dependabot opened #242–#245 (not ours; #242, the cubecl group bump, fails 14 checks —
+  consistent with the 0.11 evaluation). Six 7-day worktrees removed (46 remain). No user
+  messages since the posture change.
+- Leads today: **L41 lean `walk_pf` prototype** (box `l41-leanpf` 3080, instance 59373929; kill:
+  level 3 < ×1.03 at b62 1e17), **L43 per-wave base trims** (box `l43-wavebase` 3080, instance
+  59373935; kill < 3 %), **L42 CPU join profile + FD tops** (ivory CPU under nice; kill: top
+  certification < 15 % of the CPU join). All hard-stop 10:30–12:30 UTC. A reviewer agent follows
+  any PR-ready branch.
+
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; November research $6.12 (fleet $7.80); credit $47.43;
