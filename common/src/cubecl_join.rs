@@ -137,6 +137,9 @@ pub const WB_WH: u32 = 2;
 pub const WB_AU: u32 = 4;
 /// See [`WB_TT`].
 pub const WB_PC: u32 = 8;
+/// With `WB_TT`: the transpose's stages send a pre-shifted word and keep
+/// half of their own with one masked merge (fewer live values).
+pub const WB_TT2: u32 = 16;
 
 /// Whether the join kernel's `pc` (`2ρ | 3ρ² << 16`) depends on the entry's
 /// residue alone, so [`bucket_kernel`] can form it ([`WB_PC`]): key level,
@@ -187,7 +190,7 @@ pub use kernels::{
 mod kernels {
     use super::{
         AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS,
-        TRANSPOSE_MIN, WB_AU, WB_PC, WB_TT, WB_WH, pc_pre_shape,
+        TRANSPOSE_MIN, WB_AU, WB_PC, WB_TT, WB_TT2, WB_WH, pc_pre_shape,
     };
     use crate::cubecl_backend::candidate_check;
     use crate::cubecl_detailed_fd::fd_add_top;
@@ -488,6 +491,7 @@ mod kernels {
         nwork: u32,
         nbp: u32,
         surv_cap: u32,
+        au_trips: u32,
         #[comptime] base: u32,
         #[comptime] key_level: bool,
         #[comptime] ept: u32,
@@ -502,6 +506,7 @@ mod kernels {
         let wave = comptime!(ept * JOIN_WG);
         // Experimental (L43, `NICE_EXP_JOIN_WB`; see `WB_TT`).
         let tt = comptime!(wb & WB_TT != 0);
+        let tt2 = comptime!(wb & WB_TT2 != 0);
         let wh = comptime!(wb & WB_WH != 0);
         let au = comptime!(wb & WB_AU != 0);
         let pcp = comptime!(wb & WB_PC != 0 && pc_pre_shape(key_level, f0, k, k2));
@@ -624,8 +629,8 @@ mod kernels {
                     if nt >= TRANSPOSE_MIN {
                         let ln = UNIT_POS_X % 32u32;
                         let cc = UNIT_POS_X / 32u32;
-                        let w0 = bit_transpose32(glo, ln);
-                        let w1 = bit_transpose32(ghi, ln);
+                        let w0 = bit_transpose32(glo, ln, tt2);
+                        let w1 = bit_transpose32(ghi, ln, tt2);
                         t_tr[(cc * 64u32 + ln) as usize] = w0;
                         t_tr[(cc * 64u32 + 32u32 + ln) as usize] = w1;
                     }
@@ -786,10 +791,14 @@ mod kernels {
                                         // bucket kernel, the key digit's two
                                         // among them), and an empty slot the
                                         // 2k-digit stand-in `au_lo`.
+                                        // A runtime trip count (`au_trips` =
+                                        // 2k, uniform): unrolled, the trips'
+                                        // loads all go up front (64 registers).
                                         let mut x = mlo[j as usize];
                                         let mut y = mhi[j as usize];
-                                        #[unroll]
-                                        for _u in 0..comptime!(2 * k) {
+                                        let mut it = 0u32;
+                                        while it < au_trips {
+                                            it += 1u32;
                                             let lo = x != 0u32;
                                             let v = select(lo, x, y);
                                             let d = (v.find_first_set() - 1u32)
@@ -2766,13 +2775,37 @@ mod kernels {
     /// bit i is bit d of lane i's `x`. Five butterfly stages; at stage s a
     /// lane swaps the off-diagonal s-blocks with lane `ln ^ s`.
     #[cube]
-    fn bit_transpose32(x: u32, ln: u32) -> u32 {
+    fn bit_transpose32(x: u32, ln: u32, #[comptime] alt: bool) -> u32 {
         let mut v = x;
-        v = transpose_stage(v, ln, 16u32, 0x0000_FFFFu32);
-        v = transpose_stage(v, ln, 8u32, 0x00FF_00FFu32);
-        v = transpose_stage(v, ln, 4u32, 0x0F0F_0F0Fu32);
-        v = transpose_stage(v, ln, 2u32, 0x3333_3333u32);
-        transpose_stage(v, ln, 1u32, 0x5555_5555u32)
+        if comptime!(alt) {
+            v = transpose_stage2(v, ln, 16u32, 0x0000_FFFFu32);
+            v = transpose_stage2(v, ln, 8u32, 0x00FF_00FFu32);
+            v = transpose_stage2(v, ln, 4u32, 0x0F0F_0F0Fu32);
+            v = transpose_stage2(v, ln, 2u32, 0x3333_3333u32);
+            v = transpose_stage2(v, ln, 1u32, 0x5555_5555u32);
+        } else {
+            v = transpose_stage(v, ln, 16u32, 0x0000_FFFFu32);
+            v = transpose_stage(v, ln, 8u32, 0x00FF_00FFu32);
+            v = transpose_stage(v, ln, 4u32, 0x0F0F_0F0Fu32);
+            v = transpose_stage(v, ln, 2u32, 0x3333_3333u32);
+            v = transpose_stage(v, ln, 1u32, 0x5555_5555u32);
+        }
+        v
+    }
+
+    /// [`transpose_stage`] with the shift on the sender's side: a lower lane
+    /// (ln & s = 0) sends `v >> s` and keeps its `m` bits, an upper one sends
+    /// `v << s` and keeps the rest; each takes the other bits from what it
+    /// receives.
+    #[cube]
+    fn transpose_stage2(v: u32, ln: u32, #[comptime] s: u32, #[comptime] m: u32) -> u32 {
+        let low = (ln & s) == 0u32;
+        let send = select(low, v >> s, v << s);
+        let y = plane_shuffle_xor(send, s.runtime());
+        let mn = comptime!(!m);
+        let keep = select(low, m.runtime(), mn.runtime());
+        // (v & keep) | (y & !keep)
+        ((v ^ y) & keep) ^ y
     }
 
     /// One stage of [`bit_transpose32`]: `m` holds the bits j with j & s = 0.
@@ -3598,6 +3631,7 @@ impl<R: Runtime> JoinDevice<R> {
                 nwork_u32,
                 self.nbp,
                 self.list_cap,
+                2 * self.k,
                 self.b,
                 self.key_level,
                 ENTRIES_PER_THREAD,
