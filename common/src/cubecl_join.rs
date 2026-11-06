@@ -123,6 +123,32 @@ const TOP_FD_MIN_UNITS: u32 = 1 << 17;
 /// FD at power-of-two bases too: no, `top_kernel`'s division is shifts there and FD measured slower.
 const TOP_FD_AT_POW2_BASES: bool = false;
 
+/// Experimental (L43, `NICE_EXP_JOIN_WB`, a bitmask; 0 = the base kernel):
+/// trims of the join kernel's per-wave base. `WB_TT`: the transposed copy as
+/// a plane shuffle transpose (32-lane planes on CUDA only; elsewhere the
+/// shared-memory copy). `WB_WH`: the wave load hoisted out of the batch loop
+/// for buckets of one wave. `WB_AU`: the AND's digit loop at a fixed 2k
+/// trips. `WB_PC`: `pc` precomputed by [`bucket_kernel`] (key level, where
+/// it does not depend on the key digit).
+pub const WB_TT: u32 = 1;
+/// See [`WB_TT`].
+pub const WB_WH: u32 = 2;
+/// See [`WB_TT`].
+pub const WB_AU: u32 = 4;
+/// See [`WB_TT`].
+pub const WB_PC: u32 = 8;
+
+/// Whether the join kernel's `pc` (`2ρ | 3ρ² << 16`) depends on the entry's
+/// residue alone, so [`bucket_kernel`] can form it ([`WB_PC`]): key level,
+/// no `b^(k-1)` term (`kb`) and no partition digits in `R' mod M`
+/// (`v_digits`). The production shape (k = 6, k2 = 8, f0 = 3) is.
+pub(crate) fn pc_pre_shape(key_level: bool, f0: u32, k: u32, k2: u32) -> bool {
+    let mid = k2 - k;
+    let kb_zero = k > mid;
+    let v_zero = !(key_level && f0 <= mid) || (k - 1 - f0).min(mid + 1 - f0) == 0;
+    key_level && kb_zero && v_zero
+}
+
 // ---------------------------------------------------------------------------
 // Device kernels
 // ---------------------------------------------------------------------------
@@ -161,7 +187,7 @@ pub use kernels::{
 mod kernels {
     use super::{
         AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS,
-        TRANSPOSE_MIN,
+        TRANSPOSE_MIN, WB_AU, WB_PC, WB_TT, WB_WH, pc_pre_shape,
     };
     use crate::cubecl_backend::candidate_check;
     use crate::cubecl_detailed_fd::fd_add_top;
@@ -208,6 +234,7 @@ mod kernels {
         vs: &Array<u32>,
         ext_m: &mut Array<u32>,
         ext_q: &mut Array<u32>,
+        ext_p: &mut Array<u32>,
         lists: &mut Array<u32>,
         counts: &mut Array<u32>,
         ran: &mut Array<Atomic<u32>>,
@@ -221,6 +248,7 @@ mod kernels {
         #[comptime] k2: u32,
         #[comptime] key_level: bool,
         #[comptime] key_at_zero: bool,
+        #[comptime] pc_pre: bool,
     ) {
         let m1 = comptime!(base - 1);
         let mid = comptime!(k2 - k);
@@ -325,6 +353,15 @@ mod kernels {
                 let c3 = (3u32 * lo2) % big_m;
                 ext_q[(2u32 * idx) as usize] = q2 | ((c3 & 0x3FFFu32) << 18u32);
                 ext_q[(2u32 * idx + 1u32) as usize] = q3 | ((c3 >> 14u32) << 18u32);
+                if comptime!(pc_pre && pc_pre_shape(key_level, f0, k, k2)) {
+                    // Experimental (L43, `WB_PC`): the join's `pc`, 2ρ and
+                    // 3ρ² mod b^mid with ρ = r0 mod b^mid (no key or
+                    // partition term at this shape).
+                    let rho = r0 % bm;
+                    let p3 = (3u32 * ((rho * rho) % bm)) % bm;
+                    let p2 = (2u32 * rho) % bm;
+                    ext_p[idx as usize] = p2 | (p3 << 16u32);
+                }
             } else {
                 // Digits k..k2 of R^2 and R^3 as numbers, and R mod b^mid.
                 let mut a2 = 0u32;
@@ -436,6 +473,7 @@ mod kernels {
     pub fn join_kernel(
         ext_m: &Array<u32>,
         ext_q: &Array<u32>,
+        ext_p: &Array<u32>,
         bp_r: &Array<u32>,
         seg: &Array<u32>,
         lists: &Array<u32>,
@@ -457,10 +495,19 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] wb: u32,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
         let wave = comptime!(ept * JOIN_WG);
+        // Experimental (L43, `NICE_EXP_JOIN_WB`; see `WB_TT`).
+        let tt = comptime!(wb & WB_TT != 0);
+        let wh = comptime!(wb & WB_WH != 0);
+        let au = comptime!(wb & WB_AU != 0);
+        let pcp = comptime!(wb & WB_PC != 0 && pc_pre_shape(key_level, f0, k, k2));
+        // AU: an empty slot's mask, 2k distinct digits (the AND's ORs for it
+        // are discarded: its pass words are masked by `vv`). 2k <= 24.
+        let au_lo = comptime!((1u32 << (2 * k)) - 1);
         let mid = comptime!(k2 - k);
         let bm = comptime!(base.pow(k2 - k));
         // M = b^(mid + 1): the key digit's output digit and the carries above.
@@ -530,18 +577,38 @@ mod kernels {
                 }
             }
 
+            // The wave's entries (declared out here for `wh`, which keeps a
+            // one-wave bucket's entries over its top batches).
+            let mut mlo = Array::<u32>::new(ept as usize);
+            let mut mhi = Array::<u32>::new(ept as usize);
+            let mut rr = Array::<u32>::new(ept as usize);
+            // Per-slot validity: an empty slot must never pass, whatever
+            // the top's mask (a top may certify nothing at small t).
+            let mut vv = Array::<u32>::new(ept as usize);
+            // The entry's part of the prefilter (see above).
+            let mut ac = Array::<u32>::new(ept as usize);
+            let mut pc = Array::<u32>::new(ept as usize);
             let mut tc = ts;
             while tc < te {
                 let mut nt = te - tc;
                 if nt > TOP_CAP {
                     nt = TOP_CAP;
                 }
+                // TT: this thread's top's mask words, 0 past the batch.
+                let mut glo = 0u32;
+                let mut ghi = 0u32;
                 if UNIT_POS_X < nt {
                     let t = tl[(tc + UNIT_POS_X) as usize];
                     // Words 2-7 of the top's record ([`TOP_REC_WORDS`]).
                     let r8 = TOP_REC_WORDS * t;
-                    t_lo[UNIT_POS_X as usize] = top_rec[(r8 + 2u32) as usize];
-                    t_hi[UNIT_POS_X as usize] = top_rec[(r8 + 3u32) as usize];
+                    let wlo = top_rec[(r8 + 2u32) as usize];
+                    let whi = top_rec[(r8 + 3u32) as usize];
+                    t_lo[UNIT_POS_X as usize] = wlo;
+                    t_hi[UNIT_POS_X as usize] = whi;
+                    if comptime!(tt) {
+                        glo = wlo;
+                        ghi = whi;
+                    }
                     t_rlo[UNIT_POS_X as usize] = top_rec[(r8 + 4u32) as usize];
                     t_rhi[UNIT_POS_X as usize] = top_rec[(r8 + 5u32) as usize];
                     t_id[UNIT_POS_X as usize] = t;
@@ -549,117 +616,143 @@ mod kernels {
                     t_dm[UNIT_POS_X as usize] = (top_rec[(r8 + 6u32) as usize] / dm_div)
                         | (top_rec[(r8 + 7u32) as usize] << 16u32);
                 }
-                sync_cube();
-                if nt >= TRANSPOSE_MIN {
-                    // Thread u writes chunk u / 32's words for digits u % 32
-                    // and u % 32 + 32, over the chunk's 32 tops unrolled (the
-                    // loads pipeline); bits past the batch's last top are
-                    // clear, and chunks past it are zero.
-                    let cc = UNIT_POS_X / 32u32;
-                    let dl = UNIT_POS_X % 32u32;
-                    let t0 = cc * 32u32;
-                    let mut w0 = 0u32;
-                    let mut w1 = 0u32;
-                    if t0 < nt {
-                        #[unroll]
-                        for i in 0..32u32 {
-                            let lo = t_lo[(t0 + i) as usize];
-                            let hi = t_hi[(t0 + i) as usize];
-                            w0 |= ((lo >> dl) & 1u32) << i;
-                            w1 |= ((hi >> dl) & 1u32) << i;
-                        }
-                        let n = nt - t0;
-                        if n < 32u32 {
-                            let vm = (1u32 << n) - 1u32;
-                            w0 &= vm;
-                            w1 &= vm;
-                        }
+                if comptime!(tt) {
+                    // TT: plane p holds chunk p's 32 tops, one per lane
+                    // (32-lane planes, lane = UNIT_POS_X % 32), so the chunk's
+                    // digit-major words are the plane's 32x32 bit transpose:
+                    // lane d gets bit i = bit d of lane i's word.
+                    if nt >= TRANSPOSE_MIN {
+                        let ln = UNIT_POS_X % 32u32;
+                        let cc = UNIT_POS_X / 32u32;
+                        let w0 = bit_transpose32(glo, ln);
+                        let w1 = bit_transpose32(ghi, ln);
+                        t_tr[(cc * 64u32 + ln) as usize] = w0;
+                        t_tr[(cc * 64u32 + 32u32 + ln) as usize] = w1;
                     }
-                    t_tr[(cc * 64u32 + dl) as usize] = w0;
-                    t_tr[(cc * 64u32 + 32u32 + dl) as usize] = w1;
+                } else {
+                    sync_cube();
+                    if nt >= TRANSPOSE_MIN {
+                        // Thread u writes chunk u / 32's words for digits u % 32
+                        // and u % 32 + 32, over the chunk's 32 tops unrolled (the
+                        // loads pipeline); bits past the batch's last top are
+                        // clear, and chunks past it are zero.
+                        let cc = UNIT_POS_X / 32u32;
+                        let dl = UNIT_POS_X % 32u32;
+                        let t0 = cc * 32u32;
+                        let mut w0 = 0u32;
+                        let mut w1 = 0u32;
+                        if t0 < nt {
+                            #[unroll]
+                            for i in 0..32u32 {
+                                let lo = t_lo[(t0 + i) as usize];
+                                let hi = t_hi[(t0 + i) as usize];
+                                w0 |= ((lo >> dl) & 1u32) << i;
+                                w1 |= ((hi >> dl) & 1u32) << i;
+                            }
+                            let n = nt - t0;
+                            if n < 32u32 {
+                                let vm = (1u32 << n) - 1u32;
+                                w0 &= vm;
+                                w1 &= vm;
+                            }
+                        }
+                        t_tr[(cc * 64u32 + dl) as usize] = w0;
+                        t_tr[(cc * 64u32 + 32u32 + dl) as usize] = w1;
+                    }
                 }
                 sync_cube();
 
                 let mut ws = 0u32;
                 while ws < ne {
-                    let mut mlo = Array::<u32>::new(ept as usize);
-                    let mut mhi = Array::<u32>::new(ept as usize);
-                    let mut rr = Array::<u32>::new(ept as usize);
-                    // Per-slot validity: an empty slot must never pass, whatever
-                    // the top's mask (a top may certify nothing at small t).
-                    let mut vv = Array::<u32>::new(ept as usize);
-                    // The entry's part of the prefilter (see above).
-                    let mut ac = Array::<u32>::new(ept as usize);
-                    let mut pc = Array::<u32>::new(ept as usize);
-                    #[unroll]
-                    for j in 0..ept {
-                        let sl = ws + UNIT_POS_X + comptime!(j * JOIN_WG);
-                        mlo[j as usize] = 0xFFFF_FFFFu32;
-                        mhi[j as usize] = 0xFFFF_FFFFu32;
-                        rr[j as usize] = 0u32;
-                        vv[j as usize] = 0u32;
-                        ac[j as usize] = 0u32;
-                        pc[j as usize] = 0u32;
-                        if sl < ne {
-                            vv[j as usize] = 0xFFFF_FFFFu32;
-                            let e = lists[(lbase + sl) as usize];
-                            let gi = ebase + e;
-                            let r0 = bp_r[e as usize];
-                            let mut m = (u64::cast_from(ext_m[(2u32 * gi + 1u32) as usize])
-                                << 32u64)
-                                | u64::cast_from(ext_m[(2u32 * gi) as usize]);
-                            let q0 = ext_q[(2u32 * gi) as usize];
-                            let q1 = ext_q[(2u32 * gi + 1u32) as usize];
-                            if key_level {
-                                // t2, t3 = ⌊R²/b^(k-1)⌋, ⌊R³/b^(k-1)⌋ mod M for
-                                // this key digit: q + d·c (+ d²·e1, ...) from
-                                // the bucket kernel's terms at d = 0 (`cpu_join`'s
-                                // `advance`). The low digit is the key digit's
-                                // output digit, the two above the carries.
-                                let mut sigma = r0;
-                                if comptime!(v_digits > 0) {
-                                    sigma += v_part;
-                                }
-                                if comptime!(f0 > mid + 1) {
-                                    sigma = r0 % big_m;
-                                }
-                                let c3 = (q0 >> 18u32) | ((q1 >> 18u32) << 14u32);
-                                let mut t2 = (q0 & 0x3FFFFu32) + dkey * (2u32 * sigma);
-                                let mut t3 = (q1 & 0x3FFFFu32) + dkey * c3;
-                                if comptime!(e1 != 0) {
-                                    let dd = dkey * dkey;
-                                    t2 += (dd % comptime!(big_m / e1.max(1))) * e1;
-                                    let c3b = ((3u32 * sigma) % comptime!(big_m / e1.max(1))) * e1;
-                                    t3 += (dd * c3b) % big_m;
-                                    if comptime!(e2 != 0) {
-                                        t3 += ((dd * dkey) % comptime!(big_m / e2.max(1))) * e2;
-                                    }
-                                }
-                                t2 %= big_m;
-                                t3 %= big_m;
-                                let g2 = t2 % base;
-                                let g3 = t3 % base;
-                                m |= (1u64 << u64::cast_from(g2)) | (1u64 << u64::cast_from(g3));
-                                ac[j as usize] = (t2 / base) | ((t3 / base) << 16u32);
-                                // 2R and 3R² mod b^mid (R mod b^mid itself
-                                // when k < mid).
-                                let mut rho = sigma % bm;
-                                if comptime!(kb != 0) {
-                                    rho = (rho + dkey * kb) % bm;
-                                }
-                                let p3 = (3u32 * ((rho * rho) % bm)) % bm;
-                                let mut p2 = (2u32 * rho) % bm;
-                                if comptime!(k < mid) {
-                                    p2 = rho;
-                                }
-                                pc[j as usize] = p2 | (p3 << 16u32);
+                    // WH: a bucket of one wave keeps its entries from the
+                    // work item's first top batch.
+                    let mut skip = false;
+                    if comptime!(wh) {
+                        skip = ne <= wave && tc != ts;
+                    }
+                    if !skip {
+                        #[unroll]
+                        for j in 0..ept {
+                            let sl = ws + UNIT_POS_X + comptime!(j * JOIN_WG);
+                            if comptime!(au) {
+                                mlo[j as usize] = au_lo;
+                                mhi[j as usize] = 0u32;
                             } else {
-                                ac[j as usize] = q0;
-                                pc[j as usize] = q1;
+                                mlo[j as usize] = 0xFFFF_FFFFu32;
+                                mhi[j as usize] = 0xFFFF_FFFFu32;
                             }
-                            mlo[j as usize] = u32::cast_from(m);
-                            mhi[j as usize] = u32::cast_from(m >> 32u64);
-                            rr[j as usize] = r0;
+                            rr[j as usize] = 0u32;
+                            vv[j as usize] = 0u32;
+                            ac[j as usize] = 0u32;
+                            pc[j as usize] = 0u32;
+                            if sl < ne {
+                                vv[j as usize] = 0xFFFF_FFFFu32;
+                                let e = lists[(lbase + sl) as usize];
+                                let gi = ebase + e;
+                                let r0 = bp_r[e as usize];
+                                let mut m = (u64::cast_from(ext_m[(2u32 * gi + 1u32) as usize])
+                                    << 32u64)
+                                    | u64::cast_from(ext_m[(2u32 * gi) as usize]);
+                                let q0 = ext_q[(2u32 * gi) as usize];
+                                let q1 = ext_q[(2u32 * gi + 1u32) as usize];
+                                if key_level {
+                                    // t2, t3 = ⌊R²/b^(k-1)⌋, ⌊R³/b^(k-1)⌋ mod M for
+                                    // this key digit: q + d·c (+ d²·e1, ...) from
+                                    // the bucket kernel's terms at d = 0 (`cpu_join`'s
+                                    // `advance`). The low digit is the key digit's
+                                    // output digit, the two above the carries.
+                                    let mut sigma = r0;
+                                    if comptime!(v_digits > 0) {
+                                        sigma += v_part;
+                                    }
+                                    if comptime!(f0 > mid + 1) {
+                                        sigma = r0 % big_m;
+                                    }
+                                    let c3 = (q0 >> 18u32) | ((q1 >> 18u32) << 14u32);
+                                    let mut t2 = (q0 & 0x3FFFFu32) + dkey * (2u32 * sigma);
+                                    let mut t3 = (q1 & 0x3FFFFu32) + dkey * c3;
+                                    if comptime!(e1 != 0) {
+                                        let dd = dkey * dkey;
+                                        t2 += (dd % comptime!(big_m / e1.max(1))) * e1;
+                                        let c3b =
+                                            ((3u32 * sigma) % comptime!(big_m / e1.max(1))) * e1;
+                                        t3 += (dd * c3b) % big_m;
+                                        if comptime!(e2 != 0) {
+                                            t3 += ((dd * dkey) % comptime!(big_m / e2.max(1))) * e2;
+                                        }
+                                    }
+                                    t2 %= big_m;
+                                    t3 %= big_m;
+                                    let g2 = t2 % base;
+                                    let g3 = t3 % base;
+                                    m |=
+                                        (1u64 << u64::cast_from(g2)) | (1u64 << u64::cast_from(g3));
+                                    ac[j as usize] = (t2 / base) | ((t3 / base) << 16u32);
+                                    // 2R and 3R² mod b^mid (R mod b^mid itself
+                                    // when k < mid).
+                                    if comptime!(pcp) {
+                                        // PC: the bucket kernel's.
+                                        pc[j as usize] = ext_p[gi as usize];
+                                    } else {
+                                        let mut rho = sigma % bm;
+                                        if comptime!(kb != 0) {
+                                            rho = (rho + dkey * kb) % bm;
+                                        }
+                                        let p3 = (3u32 * ((rho * rho) % bm)) % bm;
+                                        let mut p2 = (2u32 * rho) % bm;
+                                        if comptime!(k < mid) {
+                                            p2 = rho;
+                                        }
+                                        pc[j as usize] = p2 | (p3 << 16u32);
+                                    }
+                                } else {
+                                    ac[j as usize] = q0;
+                                    pc[j as usize] = q1;
+                                }
+                                mlo[j as usize] = u32::cast_from(m);
+                                mhi[j as usize] = u32::cast_from(m >> 32u64);
+                                rr[j as usize] = r0;
+                            }
                         }
                     }
                     // Branch-free AND over a chunk of up to 32 tops into a pass
@@ -687,24 +780,50 @@ mod kernels {
                                 let ab = cb * 64u32;
                                 #[unroll]
                                 for j in 0..ept {
-                                    // The entry's digits, low word first; an
-                                    // empty slot (vv = 0) has none.
-                                    let mut x = mlo[j as usize] & vv[j as usize];
-                                    let mut y = mhi[j as usize] & vv[j as usize];
-                                    while (x | y) != 0u32 {
-                                        let lo = x != 0u32;
-                                        let v = select(lo, x, y);
-                                        // v != 0: its lowest set bit.
-                                        let d =
-                                            (v.find_first_set() - 1u32) + select(lo, 0u32, 32u32);
-                                        let v1 = v & (v - 1u32);
-                                        x = select(lo, v1, x);
-                                        y = select(lo, y, v1);
-                                        let a = ab + d;
+                                    if comptime!(au) {
+                                        // AU: every listed entry has exactly
+                                        // 2k digits (distinct and new in the
+                                        // bucket kernel, the key digit's two
+                                        // among them), and an empty slot the
+                                        // 2k-digit stand-in `au_lo`.
+                                        let mut x = mlo[j as usize];
+                                        let mut y = mhi[j as usize];
                                         #[unroll]
-                                        for c in 0..ag {
-                                            acc[comptime!(c * ept + j) as usize] |=
-                                                t_tr[(a + comptime!(c * 64)) as usize];
+                                        for _u in 0..comptime!(2 * k) {
+                                            let lo = x != 0u32;
+                                            let v = select(lo, x, y);
+                                            let d = (v.find_first_set() - 1u32)
+                                                + select(lo, 0u32, 32u32);
+                                            let v1 = v & (v - 1u32);
+                                            x = select(lo, v1, x);
+                                            y = select(lo, y, v1);
+                                            let a = ab + d;
+                                            #[unroll]
+                                            for c in 0..ag {
+                                                acc[comptime!(c * ept + j) as usize] |=
+                                                    t_tr[(a + comptime!(c * 64)) as usize];
+                                            }
+                                        }
+                                    } else {
+                                        // The entry's digits, low word first; an
+                                        // empty slot (vv = 0) has none.
+                                        let mut x = mlo[j as usize] & vv[j as usize];
+                                        let mut y = mhi[j as usize] & vv[j as usize];
+                                        while (x | y) != 0u32 {
+                                            let lo = x != 0u32;
+                                            let v = select(lo, x, y);
+                                            // v != 0: its lowest set bit.
+                                            let d = (v.find_first_set() - 1u32)
+                                                + select(lo, 0u32, 32u32);
+                                            let v1 = v & (v - 1u32);
+                                            x = select(lo, v1, x);
+                                            y = select(lo, y, v1);
+                                            let a = ab + d;
+                                            #[unroll]
+                                            for c in 0..ag {
+                                                acc[comptime!(c * ept + j) as usize] |=
+                                                    t_tr[(a + comptime!(c * 64)) as usize];
+                                            }
                                         }
                                     }
                                 }
@@ -2642,6 +2761,29 @@ mod kernels {
         cube_done(ran, 2u32);
     }
 
+    /// Experimental (L43, `WB_TT`): the 32x32 bit transpose of one word per
+    /// lane over a 32-lane plane, `ln` the lane: lane d returns the word whose
+    /// bit i is bit d of lane i's `x`. Five butterfly stages; at stage s a
+    /// lane swaps the off-diagonal s-blocks with lane `ln ^ s`.
+    #[cube]
+    fn bit_transpose32(x: u32, ln: u32) -> u32 {
+        let mut v = x;
+        v = transpose_stage(v, ln, 16u32, 0x0000_FFFFu32);
+        v = transpose_stage(v, ln, 8u32, 0x00FF_00FFu32);
+        v = transpose_stage(v, ln, 4u32, 0x0F0F_0F0Fu32);
+        v = transpose_stage(v, ln, 2u32, 0x3333_3333u32);
+        transpose_stage(v, ln, 1u32, 0x5555_5555u32)
+    }
+
+    /// One stage of [`bit_transpose32`]: `m` holds the bits j with j & s = 0.
+    #[cube]
+    fn transpose_stage(v: u32, ln: u32, #[comptime] s: u32, #[comptime] m: u32) -> u32 {
+        let y = plane_shuffle_xor(v, s.runtime());
+        let up = (v & m) | ((y << s) & comptime!(!m));
+        let dn = (v & comptime!(!m)) | ((y >> s) & m);
+        select((ln & s) == 0u32, up, dn)
+    }
+
     /// The middle-digit prefilter of one join survivor, in [`join_kernel`]'s
     /// walk: n's output digits at positions `k..k2` of n² and n³ must be
     /// distinct, and miss the bottom's (`mlo | mhi << 32`, positions `0..k`,
@@ -2857,6 +2999,9 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
+    /// Experimental (L43): `NICE_EXP_JOIN_WB` (see [`WB_TT`]), with `WB_TT`
+    /// dropped where planes are not 32 lanes on CUDA.
+    wb: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -2884,6 +3029,8 @@ pub(crate) struct JoinDevice<R: Runtime> {
     ext_m: Handle,
     /// The prefilter's terms per extended entry (see [`bucket_kernel`]).
     ext_q: Handle,
+    /// Experimental (L43, `WB_PC`): the join's `pc` per extended entry.
+    ext_p: Handle,
     lists: Handle,
     counts: Handle,
     nkeys: u32,
@@ -2941,6 +3088,15 @@ pub(crate) fn top_fd_fits(fs: &FieldSetup) -> bool {
 }
 
 impl<R: Runtime> JoinDevice<R> {
+    /// Words bound for `ext_p` (experimental, `WB_PC`).
+    fn ext_p_len(&self, nbp: usize, max_slots: usize) -> usize {
+        if self.wb & WB_PC != 0 {
+            nbp.max(1) * max_slots
+        } else {
+            1
+        }
+    }
+
     /// # Errors
     /// A base without a `u128` range, or `n` too wide for device tops.
     // One buffer per line, as the plan sized them.
@@ -3047,6 +3203,22 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
+            wb: {
+                let wb: u32 = std::env::var("NICE_EXP_JOIN_WB")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0);
+                let hw = &client.properties().hardware;
+                let plane32 = R::name(client).contains("cuda")
+                    && hw.plane_size_min == 32
+                    && hw.plane_size_max == 32
+                    && client
+                        .properties()
+                        .features
+                        .plane
+                        .contains(cubecl::ir::features::Plane::Ops);
+                if plane32 { wb } else { wb & !WB_TT }
+            },
             limbs,
             chunk_digits,
             chunk_div,
@@ -3082,6 +3254,20 @@ impl<R: Runtime> JoinDevice<R> {
             seg: client.create(cubecl::bytes::Bytes::from_elems(fs.seg.clone())),
             ext_m: client.empty(max_slots * fp.ext_m),
             ext_q: client.empty(max_slots * fp.ext_q),
+            // Outside the plan (experimental): half of `ext_q`.
+            ext_p: client.empty(
+                if std::env::var("NICE_EXP_JOIN_WB")
+                    .ok()
+                    .and_then(|v| v.parse::<u32>().ok())
+                    .unwrap_or(0)
+                    & WB_PC
+                    != 0
+                {
+                    max_slots * fp.ext_q / 2
+                } else {
+                    4
+                },
+            ),
             lists: client.empty(max_slots * fp.lists),
             counts: client.empty(max_slots * fp.counts),
             nkeys,
@@ -3369,6 +3555,7 @@ impl<R: Runtime> JoinDevice<R> {
                 ArrayArg::from_raw_parts(vs_h, nslots),
                 ArrayArg::from_raw_parts(self.ext_m.clone(), 2 * nbp * max_slots),
                 ArrayArg::from_raw_parts(self.ext_q.clone(), 2 * nbp.max(1) * max_slots),
+                ArrayArg::from_raw_parts(self.ext_p.clone(), self.ext_p_len(nbp, max_slots)),
                 ArrayArg::from_raw_parts(self.lists.clone(), nbp * max_slots * self.b as usize),
                 ArrayArg::from_raw_parts(
                     self.counts.clone(),
@@ -3385,6 +3572,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k2,
                 self.key_level,
                 self.key_level && self.k == 1,
+                self.wb & WB_PC != 0,
             );
             join_kernel::launch_unchecked::<R>(
                 c,
@@ -3392,6 +3580,7 @@ impl<R: Runtime> JoinDevice<R> {
                 CubeDim::new_1d(JOIN_WG),
                 ArrayArg::from_raw_parts(self.ext_m.clone(), 2 * nbp * max_slots),
                 ArrayArg::from_raw_parts(self.ext_q.clone(), 2 * nbp.max(1) * max_slots),
+                ArrayArg::from_raw_parts(self.ext_p.clone(), self.ext_p_len(nbp, max_slots)),
                 ArrayArg::from_raw_parts(self.bp_r.clone(), nbp),
                 ArrayArg::from_raw_parts(self.seg.clone(), self.b as usize),
                 ArrayArg::from_raw_parts(self.lists.clone(), nbp * max_slots * self.b as usize),
@@ -3416,6 +3605,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k,
                 self.k2,
                 self.walk_sync,
+                self.wb,
             );
         }
         unsafe {
