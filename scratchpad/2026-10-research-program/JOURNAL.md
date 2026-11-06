@@ -43,6 +43,14 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   round shrank 71 → 41 SASS; bit-reversed masks were needed to make MT shrink. Caveat for the
   body: some compiles spill 28–44 B (CubeCL's dynamic shared array hides the cube limit from
   ptxas). Box l41-leanpf destroyed. Reviewer agent launched.
+- **Review of `pr/join-lean-prefilter` (11:05 UTC, `L41/REVIEW.md`): merge with small fixes, no
+  correctness defect.** FX's bound recomputed for every base (worst Δ = 2^24.67 at b62, margin
+  ≥ 161×; the kernel's operands are exactly the host test's A, P, D < b²); MT's bit reversal is
+  consistent at every producer/consumer behind the `lean` flag; the sign test is one
+  `SHF.L.U64.HI`; GM/RC give the same predicate (RC pinned only by device parity). Findings: the
+  body understates the spills (only level-4 builds spill, 14/26 offline compiles at b60/b62; new
+  with this PR; the "6 blocks" explanation untested), the mask convention needs its own paragraph
+  and one stale comment, two body slips. Sent back to the L41 agent (text + one comment).
 
 ## 2026-11-05 (day 9; routine fired 04:41 UTC)
 
