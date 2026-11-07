@@ -28,6 +28,14 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   2^24.7). Fixes: drop `dm` from `Top` (48 → 64 bytes was a real +0.6 % sort cost; recompute in
   the test-only path), a test window with unseeded stepped tops (pre-existing gap), the dispatch
   assertion and wording, doc nits, "fixed-point" not "division-free". Sent back to the L49 agent.
+- **Review of `pr/join-static-buckets` (10:50 UTC, `L46/REVIEW.md`): merge with small fixes, correct.**
+  The reviewer re-derived the bucket algebra (pdiv_m1 = b^p mod (b−1) = 1), wrote a host test of the
+  segment arithmetic against cpu_join's bucket rule (24 fields, all match; patch kept in
+  `L46/raw/review/`), proved segments cannot overflow, and corrected my brief: the FD kernel steps
+  partitions per prefix, so the sort cannot touch its stepping. Fixes: a missing CHANGELOG line,
+  the register paragraph overstated production safety (the 40-register spilling variant is new,
+  7/37 images), rider as a proper second commit + body section, stale doc, a rename, a sentinel
+  fill in `run_tops`, a CI host test for the sort. Sent back to the L46 agent (ivory, no box).
 
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)
 

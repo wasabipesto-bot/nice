@@ -1,0 +1,25 @@
+CPU overlap join: a fixed-point middle-digit prefilter
+
+Every pair that passes the CPU join's AND inside the field goes through
+the middle-digit prefilter, which keeps about 6% of them for the full
+check. At mid = 2 it reduced A + P·D mod b² by a reciprocal multiply per
+power, then took x % b and x / b per digit with one-hot masks and an
+early exit after each digit pair.
+
+- Digits by fixed point: each top keeps dh = ceil(D·2^32/b²) (formed as
+  D·q + ceil(D·r/b²), 2^32 = q·b² + r) in place of D. F = A·C + P·dh mod
+  2^32, with C = ceil(2^32/b²), is (A + P·D) mod b² as a 32-bit fraction
+  of b², up to an error Δ = A·(C·b² − 2^32) + P·(dh·b² − D·2^32) < 2b⁴
+  <= 2^25, and the high words of F·b and of (F·b mod 2^32)·b are its two
+  base-b digits exactly whenever Δ < 2^32: four multiplies per power, no
+  reduction.
+- Membership by shifts: the four digits are new iff bit 0 of seen >> g
+  is clear for each, and distinct by six compares, all combined without
+  a branch, instead of building and testing four one-hot masks.
+- Each top keeps its certificate gated by its seed flag, so a pair ORs it
+  in without a select. Top stays at 48 bytes.
+
+The fixed-point path covers mid = 2 with k > 2 (every production shape);
+every other shape keeps the general form, which now recomputes D from P.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>

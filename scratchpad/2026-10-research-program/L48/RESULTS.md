@@ -163,7 +163,48 @@ level-4 plan (k = 7 / 6 slots a batch, a larger first slice):
 - Levels 4/6/7's s comes from a different first slice and k, so its "vs 0" is only indicative; levels 2 and 7 have
   the same kernel and agree at b62 (0.1480 / 0.1479).
 
-AB_PLACEHOLDER
+## 5. A/B 1: `B` against `P` (the PR form of level 6, slices cut at one survivor too)
+
+`chain_ab.sh P` 07:48–08:23 box UTC, binaries `B` / `P` and `client_B` / `client_P`, nothing else on the box; order per
+round B P, P B, B P; `raw/ab_table.md`, `raw/nm_table.md`.
+
+| field | B s/field (rounds) | P s/field (rounds) | P vs B (per round) | MHz B / P | cycles | plan B → P: slots, MiB, batches/field |
+|---|---|---|---|---|---|---|
+| **b62 1e17** | **107.49** (106.81, 107.81, 107.49) | **100.06** (99.54, 100.06, 100.96) | **×1.074** (1.073, 1.077, 1.065) | 1359 / 1307 | ×1.101 | 5 → 7, 1670 → 2438, 6439 → 3756 |
+| b62 1e16 | 8.996 (9.01, 8.98, 9.00) | 8.265 (8.22, 8.28, 8.27) | ×1.088 (1.096, 1.085, 1.088) | 1323 / 1291 | ×1.143 | 13 → 16, 2050 → 2457, 532 → 334 |
+| **b60 1e16** | **21.154** (20.99, 21.15, 21.21) | **20.005** (19.99, 20.00, 20.05) | **×1.057** (1.050, 1.057, 1.058) | 1337 / 1263 | ×1.128 | 4 → 6, 1566 → 2260, 1350 → 600 |
+| b64 1e16 (FD off) | 30.518 (30.52, 30.44, 30.58) | 30.627 (30.52, 30.63, 30.73) | ×0.996 (1.000, 0.994, 0.995) | 1326 / 1357 | ×0.980 | 6 → 7, 2151 → 2396, 683 → 586 |
+| b60 1e14 | 0.651 (0.66, 0.65, 0.65) | 0.633 (0.63, 0.63, 0.64) | ×1.028 (1.038, 1.035, 1.009) | | | 16, 1212 (both) |
+| b62 1e14 | 0.522 (0.54, 0.52, 0.52) | 0.517 (0.52, 0.52, 0.53) | ×1.010 (1.056, 1.010, 0.983) | | | 16, 1369 (both) |
+| b64 1e14 | 0.788 (0.79, 0.77, 0.79) | 0.783 (0.80, 0.77, 0.78) | ×1.006 (0.991, 0.994, 1.006) | | | |
+
+NiceMark nice-only (`client_* niceonly --gpu --benchmark --benchmark-secs 150 --benchmark-json`, 6 rounds, order
+alternating):
+
+| | B | P | P vs B (per round) |
+|---|---|---|---|
+| score | median 6257.3 | median 6320.5 | ×1.010 (1.020, 0.996, 1.013, 1.013, 1.005, 1.007) |
+| b58 MSD-weak (whole field) | 2.904e14 n/s | 2.956e14 | ×1.018 (1.009–1.023) |
+| b58 MSD-strong (whole field) | 1.267e15 | 1.291e15 | ×1.019 (0.965–1.052) |
+| **b60 MSD-weak (sampled)** | 5.959e14 | 5.814e14 | **×0.976 (0.972–0.980 in all six rounds)** |
+| b62 MSD-weak (sampled) | 7.469e14 | 7.690e14 | ×1.030 (1.019–1.033) |
+
+- The fields clear the bar (b62 1e17 ×1.074, b60 1e16 ×1.057, every round ≥ ×1.050), exact in every run; b64 is
+  neutral (×0.996, inside its 0.5–0.7 % spread; FD is off at b64, only its plan moved).
+- **But NiceMark's b60 scenario is ×0.976 in every one of six rounds: the kill fires for `P`.** Its scenario JSON
+  says why: B plans the b60 window as **2 slices** (5 partitions a launch, slice weight 1.27) and P as **1 slice** (7 a
+  launch): `max_slice_prefixes` also divides by `SURV_PER_PREFIX`, so at 1 it doubles the slice size wherever the
+  survivor bound set it. A wider slice's field certificate prunes less (L1's PROFILE-3 measured +9.4 % real AND pairs
+  at 4 instead of 11 slices), and NiceMark samples every slot as a seed, so it gets none of the stepped-slot gain to
+  pay for that: its per-partition time rose from 3.59 ms × 1.27 = 4.56 ms to 4.68 ms (+2.6 %). The whole b60 field
+  also went from 1.5 slices to 1 (1350 → 600 batches) and paid the same, but the stepped-slot cuts more than covered it.
+- The P side runs 30–75 MHz **slower** at b62/b60 under the same cap (the opposite of #241's record): the cheaper
+  slot does more work per cycle and draws more power per cycle. Clock-normalised the gains are ×1.10 (b62 1e17) and
+  ×1.13 (b60 1e16).
+
+So the PR form was changed to keep the slices (§6).
+
+AB2_PLACEHOLDER
 
 PLAN_PLACEHOLDER
 

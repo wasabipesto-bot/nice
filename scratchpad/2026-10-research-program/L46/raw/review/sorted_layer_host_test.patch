@@ -1,0 +1,219 @@
+diff --git a/common/src/cubecl_join.rs b/common/src/cubecl_join.rs
+index a71865a7..522b8b01 100644
+--- a/common/src/cubecl_join.rs
++++ b/common/src/cubecl_join.rs
+@@ -6428,3 +6428,214 @@ mod tests {
+         }
+     }
+ }
++
++// REVIEW-L46 scratch (not for commit): the host sort and the join's segment
++// mapping against cpu_join's bucket rule, on the test windows and 1e14 fields.
++#[cfg(test)]
++mod review_l46 {
++    use super::*;
++    use crate::FieldSize;
++    use crate::overlap_join::test_fields::{PLAN_FIELDS, WINDOWS};
++    use crate::overlap_join::{JoinParams, join_params_for};
++
++    fn xs(x: &mut u64) -> u64 {
++        *x ^= *x << 13;
++        *x ^= *x >> 7;
++        *x ^= *x << 17;
++        *x
++    }
++
++    #[allow(clippy::too_many_lines, clippy::cast_possible_truncation)]
++    fn check(label: &str, fs: &FieldSetup, nv: usize) -> (usize, u64, u64) {
++        let b = u64::from(fs.b);
++        let m1 = u64::from(fs.m1);
++        let nkeys = if fs.key_level { fs.b } else { 1 };
++        assert_eq!(fs.nparts % u128::from(m1), 1, "{label}: b^p != 1 mod b-1");
++        let (tl, goff) = sorted_layer(fs, nkeys).expect("sorted layer");
++        let n = fs.tlay.len();
++        let nb = fs.nb;
++        assert_eq!(nb as u64, u64::from(nkeys) * m1);
++        assert_eq!(goff.len(), nb + 1);
++        assert_eq!(goff[0], 0);
++        assert_eq!(goff[nb] as usize, n);
++        assert!(goff.windows(2).all(|w| w[0] <= w[1]));
++        assert_eq!(tl.len(), 5 * n);
++        let p0mod = u64::try_from(fs.base.powu(fs.k2 - fs.f0 - fs.jp.p)).unwrap();
++        let grp_of = |p0: u64| -> usize {
++            let key = if fs.key_level { p0 % b } else { 0 };
++            (key * m1 + p0 % m1) as usize
++        };
++        let mut want: Vec<Vec<u64>> = vec![Vec::new(); nb];
++        for &(p0, _) in &fs.tlay {
++            let p0 = u64::try_from(p0).unwrap();
++            want[grp_of(p0)].push(p0);
++        }
++        let mut sp0 = Vec::with_capacity(n);
++        for i in 0..n {
++            let w = &tl[5 * i..5 * i + 5];
++            let p0 = u64::from(w[0]) | (u64::from(w[1]) << 32);
++            let g = grp_of(p0);
++            assert_eq!(w[2] as usize, g, "{label}: word 2");
++            assert_eq!(w[3], goff[g], "{label}: word 3");
++            assert_eq!(u64::from(w[4]), p0 % p0mod, "{label}: word 4");
++            assert!(i >= goff[g] as usize && i < goff[g + 1] as usize);
++            sp0.push(p0);
++        }
++        for g in 0..nb {
++            assert_eq!(
++                &sp0[goff[g] as usize..goff[g + 1] as usize],
++                &want[g][..],
++                "{label}: group {g} not the stable order"
++            );
++        }
++        let nparts = u64::try_from(fs.nparts).unwrap();
++        let roots: Vec<u32> = fs.base.roots.clone();
++        let nroots = roots.len();
++        let m1u = fs.m1;
++        let mut vsel: Vec<u64> = Vec::new();
++        if nparts as usize <= nv {
++            vsel.extend(0..nparts);
++        } else {
++            let edge = (nv / 4) as u64;
++            vsel.extend(0..edge);
++            vsel.extend(nparts - edge..nparts);
++            let mut x = 0x9E37_79B9_7F4A_7C15u64 ^ nparts;
++            for _ in 0..nv / 2 {
++                vsel.push(xs(&mut x) % nparts);
++            }
++        }
++        let mut rng = 0x1234_5678_9ABC_DEF1u64 ^ (n as u64);
++        let (mut ntops, mut npairs) = (0u64, 0u64);
++        for (iv, &v) in vsel.iter().enumerate() {
++            // Kept: every in-range top for even iv, about 60 % of them for odd.
++            let mut seg: Vec<Vec<u128>> = vec![Vec::new(); nb];
++            let mut cpu: Vec<Vec<u128>> = vec![Vec::new(); nb];
++            for (i, &p0) in sp0.iter().enumerate() {
++                let p = u128::from(p0) * u128::from(nparts) + u128::from(v);
++                if p < fs.plo || p > fs.phi {
++                    continue;
++                }
++                if iv % 2 == 1 && xs(&mut rng) % 10 >= 6 {
++                    continue;
++                }
++                let g = w_group(&tl, i);
++                seg[g].push(p);
++                ntops += 1;
++                // cpu_join's rule: key = P0 mod b (key level), class per root.
++                let key = if fs.key_level {
++                    (p / u128::from(nparts)) % u128::from(b)
++                } else {
++                    0
++                } as u64;
++                let pc = (p % u128::from(m1)) as u32;
++                for &root in &roots {
++                    let c = (root + m1u - pc) % m1u;
++                    cpu[(key * m1) as usize + c as usize].push(p);
++                }
++            }
++            for c in &mut cpu {
++                c.sort_unstable();
++            }
++            // The join's mapping, in u32 as on the device (slot 0 and 3).
++            for slot in [0u32, 3u32] {
++                let ntl = n as u32;
++                for bx in 0..nb as u32 {
++                    let dkey = bx / m1u;
++                    let cls = bx - dkey * m1u;
++                    let vv = v as u32;
++                    let mut s_db = [0u32; MAX_ROOTS as usize];
++                    let mut s_cum = [0u32; MAX_ROOTS as usize + 1];
++                    let mut gs = [0usize; MAX_ROOTS as usize];
++                    for r in 0..nroots {
++                        let c0 = (roots[r] + 2 * m1u - cls - vv % m1u) % m1u;
++                        let g = (dkey * m1u + c0) as usize;
++                        gs[r] = g;
++                        s_db[r] = slot.wrapping_mul(ntl).wrapping_add(goff[g]);
++                        s_cum[r + 1] = seg[g].len() as u32;
++                    }
++                    // the groups of one bucket are distinct
++                    let mut gd = gs[..nroots].to_vec();
++                    gd.sort_unstable();
++                    gd.dedup();
++                    assert_eq!(gd.len(), nroots, "{label}: groups repeat");
++                    s_cum[0] = 0;
++                    for r in 0..nroots {
++                        let c = s_cum[r];
++                        s_cum[r + 1] = s_cum[r + 1].wrapping_add(c);
++                        s_db[r] = s_db[r].wrapping_sub(c);
++                    }
++                    let total = s_cum[nroots];
++                    let mut got: Vec<u128> = Vec::with_capacity(total as usize);
++                    let mut tc = 0u32;
++                    while tc < total {
++                        let nt = (total - tc).min(TOP_CAP);
++                        for u in 0..nt {
++                            let q = tc + u;
++                            let mut sr = 0usize;
++                            for j in 1..nroots {
++                                if s_cum[j] <= q {
++                                    sr = j;
++                                }
++                            }
++                            let t = s_db[sr].wrapping_add(q);
++                            let base = slot.wrapping_mul(ntl).wrapping_add(goff[gs[sr]]);
++                            let off = t.wrapping_sub(base);
++                            assert!(
++                                (off as usize) < seg[gs[sr]].len(),
++                                "{label}: q {q} outside its segment"
++                            );
++                            got.push(seg[gs[sr]][off as usize]);
++                        }
++                        tc += TOP_CAP;
++                    }
++                    got.sort_unstable();
++                    assert_eq!(
++                        got, cpu[bx as usize],
++                        "{label}: v {v} slot {slot} bucket ({dkey}, {cls}) differs"
++                    );
++                    npairs += u64::from(total);
++                }
++            }
++        }
++        (vsel.len(), ntops, npairs)
++    }
++
++    fn w_group(tl: &[u32], i: usize) -> usize {
++        tl[5 * i + 2] as usize
++    }
++
++    #[test]
++    fn review_l46_sorted_layer_and_segments_match_cpu_buckets() {
++        let mut fields: Vec<(String, FieldSetup)> = Vec::new();
++        fields.push((
++            "b10 [47,100) (2,1,0)".into(),
++            FieldSetup::new(10, 47, 100, JoinParams { t: 2, k: 1, p: 0 }).unwrap(),
++        ));
++        for &(b, s, e, t, k, p) in WINDOWS {
++            fields.push((
++                format!("b{b} [{s}, {e}) ({t},{k},{p})"),
++                FieldSetup::new(b, s, e, JoinParams { t, k, p }).unwrap(),
++            ));
++        }
++        for &(b, s, size) in PLAN_FIELDS {
++            let r = FieldSize::new(s, s + size);
++            let jp = join_params_for(b, &r).expect("join params");
++            fields.push((
++                format!("b{b} {size:e} at {s} {jp:?}"),
++                FieldSetup::new(b, r.start(), r.end(), jp).unwrap(),
++            ));
++        }
++        for (label, fs) in &fields {
++            let nv = if fs.tlay.len() > 20_000 { 24 } else { 400 };
++            let (nvs, ntops, npairs) = check(label, fs, nv);
++            println!(
++                "{label}: key_level {} roots {} nb {} ntlay {} nparts {}: {nvs} partitions, {ntops} tops, {npairs} bucket slots agree",
++                fs.key_level,
++                fs.base.roots.len(),
++                fs.nb,
++                fs.tlay.len(),
++                fs.nparts
++            );
++        }
++    }
++}

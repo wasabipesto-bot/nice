@@ -12,3 +12,70 @@ llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b40 [3000000000000, 3000
 llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b40 [3000000000000, 3000002000000) (7,4,2) agrees
 llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b50 [62082117268529817, 62082117268829817) (7,4,1) agrees
 llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b54 [2321864499473908801, 2321864499474208801) (8,4,1) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b57 [30000000000000000000, 30000000000000300000) (10,4,1) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b57 [20635899893042801193, 20635899893043101193) (9,5,1) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b57 [78920310198429586458, 78920310198429886458) (9,5,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b58 [114041927169846138720, 114041927169846438720) (10,4,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b60 [1573714731429953349518, 1573714731429953649518) (10,4,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b64 [52125117810081128433988, 52125117810081128733988) (11,4,2) agrees
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b57 frontier field JoinParams { t: 9, k: 6, p: 2 }, partitions 0, 1000, 3248 agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) JoinParams { t: 3, k: 2, p: 0 } tight layouts agree (1 partitions re-run, 110 splits)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (10 partitions re-run, 29 splits)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (8 partitions re-run, 20 splits)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } tight layouts agree (12 partitions re-run, 58 splits)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): 5 windows agree whole and in slices
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 64 MiB layout (1 refusals, ceiling 32 MiB)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 64 MiB layout (1 refusals, ceiling 32 MiB)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } agrees after the device refused a 65 MiB layout (1 refusals, ceiling 32 MiB)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b50 [62082117268529817, 62082117268829817) JoinParams { t: 7, k: 4, p: 1 } agrees after the device refused a 196 MiB layout (1 refusals, ceiling 98 MiB)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b54 [2321864499473908801, 2321864499474208801) JoinParams { t: 8, k: 4, p: 1 } agrees after the device refused a 199 MiB layout (1 refusals, ceiling 99 MiB)
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b57 frontier partitions [0, 1000, 3248] agree in a tight layout (3 re-run, 6 splits) and after a refused one
+ok
+test cubecl_join::tests::cubecl_niceonly_keeps_join_and_stride_apart_by_ticket ... ok
+test cubecl_join::tests::fx_digits_are_exact_everywhere ... skipping: set NICE_TEST_FX_EXHAUSTIVE=1 to run every operand triple
+ok
+test cubecl_join::tests::join_matches_the_reference_on_a_whole_field ... skipping: set NICE_TEST_JOIN_FULL_FIELD to run the whole-field comparison
+ok
+test cubecl_join::tests::join_sample_runs_partitions_of_a_production_field ... llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): limits JoinLimits { max_binding: 134217728, budget: 268435456 }; 1 slice(s); plan JoinPlan { slots: 4, list_cap: 8388608, nice_cap: 1024, bytes: 220714344 }; re-run JoinPlan { slots: 1, list_cap: 16777216, nice_cap: 1024, bytes: 175048948 }
+partition 1000: CPU (1486824, 82672); production layout (1486824, 82672, 0 re-run, 0 refused, ceiling none); 4-slot layout (1486824, 82672)
+Memory Usage Report:
+  Number of allocations: 0
+  Bytes in use: 0 B
+  Bytes used for padding: 0 B
+  Total bytes reserved: 318.77 MB
+  Usage efficiency: 0.00%
+  Padding overhead: NaN%
+
+ok
+test cubecl_join::tests::join_throughput_fixed_fields ... skipping: set NICE_TEST_JOIN_FIELDS to run the throughput harness
+ok
+test cubecl_join::tests::top_certificates_match_the_lockstep_scan_and_the_cpu ... llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): 102365 intervals, 33582 kept; 203413 of the powers scanned above c0, 69824 of them with the carry
+ok
+test cubecl_join::tests::top_fd_matches_the_top_kernel ... llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) (3,2,0): 2 batches (slots 4, 3576 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) (2,3,1): 7 batches (slots 4, 13 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b20 [60001, 150003) (2,3,1): 7 batches (slots 4, 12 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b25 [3339797, 4339797) (4,3,1): 9 batches (slots 4, 1059 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b25 [5000123, 5700456) (3,4,2): 4 batches (slots 4, 3 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b30 [300000000, 301000000) (5,4,2): 4 batches (slots 4, 0 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b34 [12000000017, 12001000017) (5,5,2): 4 batches (slots 4, 0 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b40 [3000000000000, 3000002000000) (6,5,2): 4 batches (slots 4, 1 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b40 [3000000000000, 3000002000000) (7,4,2): 4 batches (slots 4, 4 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b50 [62082117268529817, 62082117268829817) (7,4,1): 15 batches (slots 4, 1 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b54 [2321864499473908801, 2321864499474208801) (8,4,1): 16 batches (slots 4, 1 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b57 [30000000000000000000, 30000000000000300000) (10,4,1): 17 batches (slots 4, 0 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b57 [20635899893042801193, 20635899893043101193) (9,5,1): 17 batches (slots 4, 0 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b57 [78920310198429586458, 78920310198429886458) (9,5,2): 4 batches (slots 4, 1 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b58 [114041927169846138720, 114041927169846438720) (10,4,2): 4 batches (slots 4, 1 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b60 [1573714731429953349518, 1573714731429953649518) (10,4,2): 4 batches (slots 4, 0 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b64 [52125117810081128433988, 52125117810081128733988) (11,4,2): 4 batches (slots 4, 1 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b57 1e14 at 28151599893042801193, first slice: 4 batches (slots 4, 80906 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b60 1e14 at 1366406074057412100454, first slice: 4 batches (slots 4, 61160 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b62 1e14 at 7997740455941656911841, first slice: 4 batches (slots 3, 53067 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): b64 1e14 at 41242006262957161709568, first slice: 4 batches (slots 2, 42039 prefixes) agree
+llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): top_fd (one slot group and several) = top_kernel on 21 fields, 142 batches (20 with a clipped block), 1018088 tops
+ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 234 filtered out; finished in 460.07s
+
+exit 0
+Sat Nov  7 08:35:00 UTC 2026
