@@ -546,6 +546,8 @@ mod kernels {
         // its tops s_cum[r]..s_cum[r + 1], top q of it at record s_db[r] + q.
         let mut s_cum = SharedMemory::<u32>::new(comptime!(MAX_ROOTS as usize + 1));
         let mut s_db = SharedMemory::<u32>::new(comptime!(MAX_ROOTS as usize));
+        // The work item's list offset, entry base, entries and key digit.
+        let mut s_hd = SharedMemory::<u32>::new(4usize);
         // This thread's join survivors (pairs that pass the AND in range).
         let mut nand = 0u32;
 
@@ -563,6 +565,12 @@ mod kernels {
         // slot-v tops [`top_kernel`] appended into
         // `top_rec[slot·ntlay + goff[g]..][..grp_cnt[slot·nb + g]]`. The
         // batches take them in that order, across the groups' boundaries.
+        //
+        // The item's entry list (its offset, the slot's extended entries, its
+        // length) and key digit go to shared memory with the segments, and
+        // each wave reads them there: held in registers they would be live
+        // across the whole batch loop, and the kernel sits at the 48-register
+        // line.
         let nbk = comptime!(nkeys * m1);
         let mut w = CUBE_POS_X;
         while w < nwork {
@@ -570,11 +578,6 @@ mod kernels {
             let bx = w - slot * nbk;
             let dkey = bx / m1;
             let cls = bx - dkey * m1;
-            let cs = seg[cls as usize];
-            let clen = seg[(cls + 1u32) as usize] - cs;
-            let ne = counts[((slot * nkeys + dkey) * m1 + cls) as usize];
-            let lbase = slot * base * nbp + base * cs + dkey * clen;
-            let ebase = slot * nbp;
             let v = vs[slot as usize];
             // Thread r < nroots takes segment r, thread 0 places them. Every
             // thread is past the previous item's reads of the table (the
@@ -585,6 +588,14 @@ mod kernels {
                 let g = dkey * m1 + c0;
                 s_db[UNIT_POS_X as usize] = slot * ntlay + goff[g as usize];
                 s_cum[(UNIT_POS_X + 1u32) as usize] = grp_cnt[(slot * nbk + g) as usize];
+            }
+            if UNIT_POS_X == 0u32 {
+                let cs = seg[cls as usize];
+                let clen = seg[(cls + 1u32) as usize] - cs;
+                s_hd[0] = slot * base * nbp + base * cs + dkey * clen;
+                s_hd[1] = slot * nbp;
+                s_hd[2] = counts[((slot * nkeys + dkey) * m1 + cls) as usize];
+                s_hd[3] = dkey;
             }
             sync_cube();
             if UNIT_POS_X == 0u32 {
@@ -597,7 +608,6 @@ mod kernels {
                 }
             }
             sync_cube();
-            let te = s_cum[nroots as usize];
             let mut v_part = 0u32;
             if comptime!(v_digits > 0) {
                 // The slot's partition digits below M (`v_digits <= pp`).
@@ -605,8 +615,8 @@ mod kernels {
             }
 
             let mut tc = 0u32;
-            while tc < te {
-                let mut nt = te - tc;
+            while tc < s_cum[nroots as usize] {
+                let mut nt = s_cum[nroots as usize] - tc;
                 if nt > TOP_CAP {
                     nt = TOP_CAP;
                 }
@@ -684,7 +694,11 @@ mod kernels {
                 sync_cube();
 
                 let mut ws = 0u32;
-                while ws < ne {
+                while ws < s_hd[2] {
+                    let lbase = s_hd[0];
+                    let ebase = s_hd[1];
+                    let ne = s_hd[2];
+                    let dkey = s_hd[3];
                     let mut mlo = Array::<u32>::new(ept as usize);
                     let mut mhi = Array::<u32>::new(ept as usize);
                     let mut rr = Array::<u32>::new(ept as usize);
