@@ -39,6 +39,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **PR #248 opened (11:10 UTC): "CPU overlap join: a fixed-point middle-digit prefilter"**, 7f5260b
   on #247 (`Top` back to 48 bytes after the review; no unseeded-stepped-top window can exist, proved
   and stated). Open program PRs: #241, #246, #247, #248.
+- **PR #249 opened (11:20 UTC): "Overlap join: a static bucket order for the top layer"**, 87958fd
+  on #246, two commits (layout 8e0eb99 + the stage rider; the review's fixes incl. a CI host test
+  of the sort against the CPU bucket rule and a sentinel fill in the device test; the first
+  commit's own snapshot keeps `#NNN` in history, the final tree carries #249 twice). **Open program
+  PRs: 5 = the cap** (#241 → #246 → #249; #247 → #248). CI's macOS job is the first Metal run of
+  #249 (new `plane_all`, plain u32 `%`/`/`) — watch it.
 
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)
 

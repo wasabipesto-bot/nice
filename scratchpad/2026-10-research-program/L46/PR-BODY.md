@@ -1,4 +1,4 @@
-Stacked on #246 (itself on #241): their commits are the base of this branch; the new work is the last commit.
+Stacked on #246 (itself on #241): their commits are the base of this branch; the new work is the last two commits. The first (the static bucket order) is the main change; the second checks the join's survivor stage once per top batch (its own section below).
 
 ## What
 
@@ -21,7 +21,7 @@ Measured on #246 on an RTX 3080 at the same 180 W cap, with one device sync per 
 
 - **Same tops per bucket.** By the identity above, the kept tops of a bucket's `nroots` groups are exactly the kept tops whose class `(root − pc) mod (b−1)` is the bucket's for some root, with the same key: the tops the fill used to list there. The roots are distinct mod `b − 1`, so the groups are disjoint, and each kept top is still in exactly `nroots` buckets. Only the order inside a bucket changes, and that was atomic order before. Every pair the AND and the prefilter see is the same, so every count is unchanged.
 - **Records.** Every kept top is written once. Its index is its group's segment start plus a unique place from the group's counter: an aggregated atomic plus the plane's exclusive prefix, or a per-lane atomic. Segments are disjoint and at most as long as the group. The check reads `top_rec` by the index the join staged, as before.
-- **Indices.** Records stay below `slots · ntlay`, as before. The host checks `nroots ≤ 8` (the most of any base up to 64) and that every prefix fits 64 bits, as before.
+- **Indices.** Records stay below `slots · ntlay`, as before. The host checks that every prefix fits 64 bits, as before, and, new, that a base has at most 8 digit-sum roots (the most of any base up to 64; the join keeps a bucket's segments in 8 shared words).
 
 ## Measurements
 
@@ -68,7 +68,7 @@ NiceMark nice-only (`nice_client niceonly --gpu --benchmark --benchmark-secs 150
 
 ## Exactness
 
-All on the RTX 3080 (CUDA) unless marked lavapipe.
+All on the RTX 3080 (CUDA) unless marked lavapipe, on this code as of the GPU session. Since then only comments, one variable name and the tests changed (the new host test and the sentinel, below).
 
 - `cubecl_cuda_join_matches_the_cpu_reference`: ok. It covers b10's 69; windows b20–b64, including b50 and b54 after refused layouts; the b57 frontier partitions; sliced windows; and the production shape.
 - `cubecl_cuda_top_fd_matches_the_top_kernel`, adapted: ok, 26 fields, 279 batches (23 with a clipped block), 237,907,266 tops (the same totals as before this PR). Both top kernels give the same count per (slot, group) and the same sorted records in every segment. Every record's prefix belongs to its segment's group, and no segment overruns.
@@ -78,13 +78,14 @@ All on the RTX 3080 (CUDA) unless marked lavapipe.
   - b62 1e16, 4 partitions: 120,013,475 / 7,355,827.
 - Whole b42 field (`NICE_TEST_JOIN_FULL_FIELD=1`): ok. 417,789,835 join survivors, 16,879,877 checked, no hits; join = stride = CPU reference.
 - `NICE_TEST_JOIN_COMPARE=1` at 1e14 (b57/60/62/64): join = stride, found 0. Counts identical to #246's: 4,850,227,888 / 268,123,373; 2,694,700,282 / 180,517,288; 1,439,469,648 / 88,159,810; 5,702,041,796 / 346,647,759.
-- Every timed field above has #246's survivors and full checks in every round:
+- Every timed field above has #246's survivors and full checks in every round (at 1e16, the two fields' totals):
   - b62 1e17: 1,020,844,021,499 / 62,584,252,554.
   - b62 1e16: 163,513,599,082 / 10,027,698,695.
   - b60 1e16: 460,847,952,346 / 30,871,838,404.
   - b64 1e16: 787,584,956,227 / 47,900,853,327.
   - NiceMark's whole-field scenarios: identical in all 12 runs (b58 MSD-weak 33,590,315,220 join survivors, MSD-strong 4,027,773,430).
-- `join_plan` and `cubecl_join` unit tests: ok.
+- `join_plan` and `cubecl_join` unit tests: ok. A new host test, `sorted_layer_and_segments_match_the_cpu_buckets`, runs without a device (8 s in a debug build): on b10, the 17 test windows and the b62 and b64 1e14 fields (key level on and off; 2 to 8 roots), it checks that the sorted layer is a stable permutation by group with the right words and offsets, and that for any kept subset of a partition's tops the join's segment walk, simulated in u32 at two slots, reads each bucket exactly the tops `cpu_join` lists there (492,116 buckets).
+- Since the GPU runs, `run_tops` (the FD-vs-top-kernel test's helper) fills `top_rec` with a sentinel before each kernel's run and asserts no counted record is left at it, so a skipped record write cannot hide behind the other kernel's record at the same index. That version has run on the CPU build only (clippy, the host tests); CI's lavapipe job is the first to run it on a device.
 - lavapipe (llvmpipe, LLVM 20.1.2, Mesa 25.2.8, 8-lane subgroups), every wgpu test of `cubecl_join` (CPU-reference parity incl. b50/b54, the FD-vs-top-kernel test on 21 fields / 142 batches / 1,018,088 tops, the certificate test, the production-field sample, the ticket test): ok with the naga (WGSL) compiler and with CubeCL's direct SPIR-V compiler (8 passed each).
 - CI's WGSL lint (`wgsl_dump_for_lint` on lavapipe + `scripts/wgsl-lint.py` with the workflow's 13 `--require`s): 14 shaders, 0 flagged (the two deleted kernels' shaders are gone; JoinKernel b57: 29 constant divisions).
 - `cargo fmt --all --check`; `cargo clippy -p "*" --all-targets -- -D warnings`, default, with `--features nice_client/gpu` and with `--features nice_client/gpu,nice_client/cubecl-spirv` (rustc 1.99.1): clean.
@@ -99,13 +100,33 @@ From the driver's JIT of the PTX each process compiled at run time (NVRTC, as Cu
 | `top_fd_kernel` | 108–111 | 108–112 |
 | `top_kernel` | 80 | 97–103 |
 
-- The 7 images with spills are 1e14 processes and register samples. Every timed 1e16 and 1e17 process compiled spill-free. The spills sit in the per-work-item and per-wave code, not in the chunk loop or the walk, and those runs were no slower.
-- The join stays at 5 cubes per SM, as set by its shared memory (+84 bytes per cube here).
-- `top_kernel` does a whole batch only at power-of-two bases (b64); elsewhere it takes only the clipped blocks. Its timing above is unchanged.
+- **The spilling variant is new with this PR.** In about one image in five (7 of 37), the driver's JIT allocates the join 40 registers and spills 8–32 B, in the per-work-item and per-wave code (not in the chunk loop or the walk). #246's join never did: 37 of 37 images here, and 100 of 100 processes in an earlier session. The 47/48 wobble was there before; it moves with CubeCL's per-process order of the shared arrays.
+- The kernel is the same at every field size for a base (the 1e14 and the production fields have the same join parameters), so production processes will get the spilling variant at about that rate. That none of the 12 timed 1e16/1e17 processes did is not a guarantee: at about one in five per process, 0 of 12 has roughly an 8 % chance.
+- Where it occurred (four 1e14 A/B processes), the runs were −2.7 % to +1.8 % against the same field's spill-free runs, within those fields' 2–4 % spread. It was not timed on a production field; for scale, nvcc's 40-register spill variant of #246's join cost about 1.5 % of a field.
+- The join stays at 5 cubes per SM, set by its shared memory (+84 bytes per cube here), whichever variant the JIT picks.
+- `top_kernel` went from 80 to ~100 registers (3 to 2 cubes per SM). It runs a whole batch only at power-of-two bases (b64); elsewhere it takes only the clipped blocks. The top-stage timing above is at b62 and b60, where it does not run whole. At b64 it was not timed alone: the whole-field ×1.222 at b64 includes it.
+
+## Second commit: the survivor stage checked once per top batch
+
+The join kernel stages the pairs that pass the prefilter in shared memory and writes them to the survivor list once the stage is half full. It checked the stage after every chunk of 32 tops: two barriers and a shared load per chunk. The second commit checks it once per batch of up to 256 tops, after the batch's last wave. The first of the two barriers there also orders the clearing of the batch's clip words after every thread's last chunk, as the per-chunk barriers did before.
+
+**Exactness.** A batch can still overrun the stage: it can add up to 256 tops times the bucket's entries, far more than the 1,024 the stage holds. That was already handled: a pair that finds the stage full goes to the survivor list directly, with the same list atomic and the same bound. Those pairs passed the prefilter too, so the list holds the same entries either way, and no pair is lost. If the list itself overflows, the batch's count says so and the batch runs again, as before. The commit only moves where the barriers are, and the counts below are unchanged.
+
+**Measured** on the same box after the A/B above: the first commit alone against both commits, 3 interleaved rounds (device s per field):
+
+| field | first commit | both commits | speed-up | per round | MHz first / both | cycles |
+|---|---|---|---|---|---|---|
+| **b62 1e17**, 1 field | 86.27 (85.39, 86.58, 86.27) | **83.86** (83.60, 83.86, 84.60) | **×1.029** | 1.021, 1.032, 1.020 | 1504 / 1455 | ×1.060 |
+| b62 1e16, 2 fields | 7.244 (7.23, 7.28, 7.24) | 7.071 (7.07, 7.05, 7.27) | ×1.024 | 1.023, 1.032, 0.996 | 1490 / 1485 | ×1.037 |
+| **b60 1e16**, 2 fields | 17.116 (17.02, 17.13, 17.12) | **16.745** (16.60, 17.00, 16.75) | **×1.022** | 1.025, 1.008, 1.022 | 1461 / 1448 | ×1.034 |
+| b64 1e16, 2 fields | 23.144 (23.15, 23.10, 23.14) | 22.465 (22.46, 22.48, 22.36) | ×1.030 | 1.031, 1.028, 1.035 | 1466 / 1458 | ×1.045 |
+
+- NiceMark nice-only, 2 rounds: score ×1.019 (per round 1.024, 1.014); b58 MSD-weak ×1.030, MSD-strong ×1.014, b60 ×1.009, b62 ×1.024. The whole-field scenarios' join survivors are identical.
+- Both commits together against #246: about ×1.19 at b62 1e17 (100.38 → 83.86 s) and ×1.18 at b60 1e16 (19.675 → 16.745 s), from runs in two A/B sessions on the same box.
+- Exactness on the two commits (the GPU runs used the same kernel code; since then only comments, one variable name and the tests changed): the 1e14 compare at b57/60/62/64, `cubecl_cuda_join_matches_the_cpu_reference`, both dense fields, the whole b42 field, the FD-vs-top-kernel and certificate device tests (same totals as above), lavapipe with naga and direct SPIR-V (8 passed each), the WGSL lint (14 shaders, 0 flagged), fmt and clippy ×3. Every timed field has the counts above in every round.
 
 ## Not in this PR
 
-- **The survivor stage checked once per top batch** instead of after every chunk of 32 tops (two barriers per chunk). Measured on top of this branch at ×1.022–1.030; a follow-up, not included.
 - **No CPU change.** The CPU join forms each partition's buckets on the host and is unaffected.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

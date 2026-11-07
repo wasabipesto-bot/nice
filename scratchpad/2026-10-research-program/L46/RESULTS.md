@@ -2,7 +2,7 @@
 
 Roadmap item 1 (L44 §3e), priced by L45 §A (scan + fill 9.7 % of b62 1e17, 9.0 % of b60 1e16). Design:
 `DESIGN.md`. Branch **`exp/join-static-buckets`** on the fork (head `b058bb7`, six commits on `f3fb390`); the
-PR-ready squash is **`pr/join-static-buckets`** (see §6). Box: Vast **59529576** (`nice-research-l46-static`), machine
+PR-ready branch is **`pr/join-static-buckets`** (`8e0eb99` + the rider `b7feb89` after the review, §6–7). Box: Vast **59529576** (`nice-research-l46-static`), machine
 **m139246**, RTX 3080 10 GB, driver 580.159.03, host cap **180 W** (every timed run at 176–180 W), Xeon (cgroup
 9.6 CPUs). Raw logs `raw/box/` (the box's `/root/l46/logs`, SASS in `raw/box/sass/`), scripts `raw/scripts/`.
 
@@ -30,14 +30,16 @@ PR-ready squash is **`pr/join-static-buckets`** (see §6). Box: Vast **59529576*
   MSD-weak ×1.153, b62 MSD-weak ×1.145. `PR-BODY.md` is written; no PR opened.
 - **Exactness: every check passed** (§2), counts identical to the base and to L38's lists.
 - **Registers** (driver JIT of the runtime's NVRTC PTX, `ptxjit.py`): the join is 46–48 registers and spill-free in
-  30 of 37 kernel images, **all 12 timed production-field processes among them**; in 7 (1e14 processes and register
-  samples) the JIT chose 40 registers with 8–32 B of spills in the per-item and per-wave code, not in
-  the chunk loop, and those runs were no slower. The base: 47–48, never a spill (37 of 37). So the "no spills" gate
-  holds for every timed production field but not for every process. `top_fd_kernel` 108–112 (base 108–111),
+  30 of 37 kernel images; in 7 (about one in five) the JIT chose 40 registers with 8–32 B of spills in the per-item
+  and per-wave code, not in the chunk loop. **That spilling variant is new** (the base: 47–48, 37 of 37 spill-free
+  here, 100 of 100 in L45). The kernel is the same at every field size, so production processes will get it at about
+  that rate; that the 12 timed production processes did not is chance (0.81^12 ≈ 8 %). Where it occurred (four 1e14
+  A/B processes) the runs were −2.7 % to +1.8 % against the spill-free ones, inside the 2–4 % spread; it was not
+  timed on a production field. So the "no spills" gate is not met in every process (review item 2). `top_fd_kernel` 108–112 (base 108–111),
   `top_kernel` 97–103 (base 80), neither spills (§3).
 - **The rider** (survivor stage checked once per top batch, `exp/join-static-buckets-s15`) is another **×1.022–1.030**
-  on top (b62 1e17 ×1.029, b60 1e16 ×1.022; NiceMark ×1.019 over 2 rounds), exact (§5). Kept out of the PR branch.
-- **Remaining:** nothing for this item's build. Open: whether the rider goes into this PR or its own; the rebase
+  on top (b62 1e17 ×1.029, b60 1e16 ×1.022; NiceMark ×1.019 over 2 rounds), exact (§5). Folded into the PR branch as its second commit after the review (§6).
+- **Remaining:** nothing for this item's build. Open: the rebase
   against L48 (it changes `top_fd_kernel`'s append too, its level 2: the conflict is the append block, which this
   branch replaces by `top_slot(...)`, plus the kernel's argument list and the FD device test's helper).
 - **The box (59529576) can be destroyed:** nothing is running on it and every log, SASS dump and script is in
@@ -180,13 +182,42 @@ NiceMark, 2 rounds: score ×1.019 (per round 1.024, 1.014); b58 MSD-weak ×1.030
 7,355,827), the whole b42 field (417,789,835 / 16,879,877, no hits), the FD-vs-top-kernel and certificate device
 tests (same totals), lavapipe naga and SPIR-V (8 passed each, FD test 21 / 142 / 1,018,088), WGSL lint (14 shaders,
 0 flagged), fmt, clippy ×3 (re-run after `cargo clean -p`: the first run reused S5's artifacts from the shared
-target dir and checked nothing). It repeats L45's ×1.020–1.023 on the new base. Not in `pr/join-static-buckets`:
-ready to go in as a second commit or its own PR.
+target dir and checked nothing). It repeats L45's ×1.020–1.023 on the new base. Since the review it is the second
+commit of `pr/join-static-buckets` (`b7feb89`).
 
-## 6. Files and branches
+## 6. Review and fixes (after the GPU session; ivory only)
 
-- Fork branches: `exp/join-static-buckets` (`b058bb7`, the six working commits), `pr/join-static-buckets` (one
-  commit on `f3fb390`, the same tree, PR body `PR-BODY.md`; no PR opened), `exp/join-static-buckets-s15` (the rider,
-  one commit on `b058bb7`).
+`REVIEW.md` (independent): merge with small fixes; the algebra re-derived, a host simulation of the segment
+arithmetic against `cpu_join`'s rule on 24 fields matched. Applied on ivory (no box), branch `pr/join-static-buckets`
+force-pushed with lease from `318fdae` to **`8e0eb99`** (the static bucket order, amended) + **`b7feb89`** (the rider,
+retitled "Overlap join: check the survivor stage once per top batch", with a body):
+
+- CHANGELOG: one line under Unreleased per commit, `#NNN` placeholders.
+- `TOP_REC_WORDS` doc (the join reads records in order; only the check reads one by index); `top_fd_kernel`'s
+  `let g = top_slot(..)` renamed `rec` (a record index); `top_slot`'s doc now says why keying on lane 0's group is
+  harmless (lane 0 holds the plane's lowest index: a dead lane 0 is a dead plane; only planes straddling a group
+  boundary can fall back to per-lane atomics needlessly). The review's "last partial plane" case does not fall back:
+  its dead lanes are not kept, so they never fail the `plane_all`. No kernel code changed (no box to re-measure).
+- The rider's stage comment no longer claims "none did on the production fields measured"; it states the overflow
+  path instead.
+- `run_tops`: a test-only `fill_sentinel` kernel writes `u32::MAX` over `top_rec` before each kernel's run; every
+  counted record must have its seed word ≤ 1. Not run on a device yet (CI's lavapipe job is first).
+- New host test `sorted_layer_and_segments_match_the_cpu_buckets` (trimmed from the review's patch): b10, the 17
+  windows, b62 and b64 1e14; ~12 partitions each, two slots; 492,116 buckets; 8 s in debug on ivory. A mutation
+  (`− v` → `+ v` in the segment formula) makes it fail.
+- PR body: registers reworded as above; the rider has its own section (table, NiceMark, the overflow argument) and is
+  out of "Not in this PR"; the `nroots ≤ 8` check marked new; `top_kernel`'s 80 → ~100 registers not timed alone at
+  b64 (the whole-field ×1.222 covers it).
+- Run on ivory (`CARGO_TARGET_DIR` in the worktree, `nice -n 19`, removed after): `cargo check -p nice_common
+  --features gpu --all-targets`; `cargo test -p nice_common --features cubecl --lib -- join_plan:: cubecl_join::`
+  (12 passed, 8 device tests ignored) on both commits; `cargo fmt --all --check`; `cargo clippy -p nice_common
+  --all-targets -D warnings` with `--features cubecl` and with `--features gpu`, both commits: clean. Not run: any
+  device test (no GPU, no lavapipe on ivory), clippy of the other crates (unchanged).
+
+## 7. Files and branches
+
+- Fork branches: `exp/join-static-buckets` (`b058bb7`, the six working commits), `pr/join-static-buckets`
+  (`8e0eb99` + `b7feb89` on `f3fb390` after the review fixes, PR body `PR-BODY.md`; no PR opened),
+  `exp/join-static-buckets-s15` (the rider as measured, `4b27507` on `b058bb7`).
 - `DESIGN.md`; `raw/scripts/` (setup, build, run, test, chain_x/post/ab/lvp/lint/rider, regsample, ptxjit, ab.py,
   nm_table.py, topt.py); `raw/box/` (logs, SASS).
