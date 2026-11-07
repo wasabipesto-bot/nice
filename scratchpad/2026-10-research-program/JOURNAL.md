@@ -23,6 +23,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   Box l46-static destroyed (2.75 h). Reviewer launched on the PR squash + the rider; decision: the
   rider goes in as a clearly separated second commit (asked in the report whether to split).
   L48 (same append block) will rebase on whichever lands first.
+- **Review of `pr/cpu-join-lean-prefilter` (10:20 UTC, `L49/REVIEW.md`): merge with small fixes, no
+  defect** (FX exhaustive re-run: 6.63e11 triples exact; constants = exact ceilings; max error
+  2^24.7). Fixes: drop `dm` from `Top` (48 → 64 bytes was a real +0.6 % sort cost; recompute in
+  the test-only path), a test window with unseeded stepped tops (pre-existing gap), the dispatch
+  assertion and wording, doc nits, "fixed-point" not "division-free". Sent back to the L49 agent.
 
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)
 
