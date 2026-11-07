@@ -130,15 +130,15 @@ const TOP_FD_AT_POW2_BASES: bool = false;
 /// unless the carry test needs them; 4 plans one expected survivor per
 /// prefix and partition (`join_plan`); 5 propagates the step's carries past
 /// each addend's words only when there is one; 6 is 5 without level 3's
-/// partial remainder. 103 is level 3 with the left-out words always added
-/// back (tests the fallback).
+/// partial remainder, 7 is 4 without it. 103 is level 3 with the left-out
+/// words always added back (tests the fallback).
 pub(crate) fn exp_topfd_level() -> u32 {
     static L: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
     *L.get_or_init(|| {
         std::env::var("NICE_EXP_TOPFD")
             .ok()
             .and_then(|v| v.parse::<u32>().ok())
-            .filter(|&l| l <= 6 || l == 103)
+            .filter(|&l| l <= 7 || l == 103)
             .unwrap_or(0)
     })
 }
@@ -2494,7 +2494,7 @@ mod kernels {
             // out of x mod b^c0 here; the carry test adds it back when it
             // can decide the test.
             let mut take = true;
-            if comptime!(lvl >= 3 && lvl != 6) {
+            if comptime!(lvl >= 3 && lvl != 6 && lvl != 7) {
                 take = c0 < comptime!(wend + 4);
             }
             if c0 >= wend {
@@ -2572,7 +2572,7 @@ mod kernels {
                     c >>= 32u64;
                 }
                 one_more = c == 0u64;
-                if comptime!(lvl >= 3 && lvl != 6) {
+                if comptime!(lvl >= 3 && lvl != 6 && lvl != 7) {
                     // Level 3: the left-out words (those ending at or below
                     // c0 - 4) add L < b^p, p the first kept word's position;
                     // one more iff L > dd. Only if dd < b^p can they matter:
