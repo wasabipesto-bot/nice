@@ -1,7 +1,7 @@
 # L46 RESULTS: a static bucket order for the top layer — built, exact, ×1.15–1.22 (2026-11-07)
 
 Roadmap item 1 (L44 §3e), priced by L45 §A (scan + fill 9.7 % of b62 1e17, 9.0 % of b60 1e16). Design:
-`DESIGN.md`. Branch **`exp/join-static-buckets`** on the fork (head `b058bb7`, five commits on `f3fb390`); the
+`DESIGN.md`. Branch **`exp/join-static-buckets`** on the fork (head `b058bb7`, six commits on `f3fb390`); the
 PR-ready squash is **`pr/join-static-buckets`** (see §6). Box: Vast **59529576** (`nice-research-l46-static`), machine
 **m139246**, RTX 3080 10 GB, driver 580.159.03, host cap **180 W** (every timed run at 176–180 W), Xeon (cgroup
 9.6 CPUs). Raw logs `raw/box/` (the box's `/root/l46/logs`, SASS in `raw/box/sass/`), scripts `raw/scripts/`.
@@ -40,11 +40,12 @@ PR-ready squash is **`pr/join-static-buckets`** (see §6). Box: Vast **59529576*
 - **Remaining:** nothing for this item's build. Open: whether the rider goes into this PR or its own; the rebase
   against L48 (it changes `top_fd_kernel`'s append too, its level 2: the conflict is the append block, which this
   branch replaces by `top_slot(...)`, plus the kernel's argument list and the FD device test's helper).
-- **The box (59529576) can be destroyed** BOX_PLACEHOLDER
+- **The box (59529576) can be destroyed:** nothing is running on it and every log, SASS dump and script is in
+  `raw/` (pulled 08:35 UTC). Box time used: ~2 h 45 min of the 7 h.
 
 ## 1. What was built (`exp/join-static-buckets`)
 
-Five commits (squashed into one for `pr/join-static-buckets`); 2 files, +304 / −344:
+Six commits (squashed into one for `pr/join-static-buckets`); 2 files, +304 / −344:
 
 - `sorted_layer` (host, per `JoinDevice::new`): counting sort of the slice's top layer by group `g = key·(b−1) +
   P0·b^p mod (b−1)`, group offsets `goff` (nb + 1 words, a new fixed buffer); tlay words 2–3 carry `g` and `goff[g]`
@@ -176,12 +177,15 @@ Same box, after the main A/B; static buckets (S5) against S5 + rider (R), 3 inte
 NiceMark, 2 rounds: score ×1.019 (per round 1.024, 1.014); b58 MSD-weak ×1.030, MSD-strong ×1.014, b60 ×1.009, b62
 ×1.024; whole-field join survivors identical. Counts identical in every timed run. Exactness on R: 1e14 COMPARE
 (b57/60/62/64, L38's counts), CPU-reference parity, both dense fields (254,938,965 / 14,396,829; 120,013,475 /
-7,355,827), and R2_PLACEHOLDER. It repeats L45's ×1.020–1.023 on the new base. Not in `pr/join-static-buckets`:
+7,355,827), the whole b42 field (417,789,835 / 16,879,877, no hits), the FD-vs-top-kernel and certificate device
+tests (same totals), lavapipe naga and SPIR-V (8 passed each, FD test 21 / 142 / 1,018,088), WGSL lint (14 shaders,
+0 flagged), fmt, clippy ×3 (re-run after `cargo clean -p`: the first run reused S5's artifacts from the shared
+target dir and checked nothing). It repeats L45's ×1.020–1.023 on the new base. Not in `pr/join-static-buckets`:
 ready to go in as a second commit or its own PR.
 
 ## 6. Files and branches
 
-- Fork branches: `exp/join-static-buckets` (`b058bb7`, the five working commits), `pr/join-static-buckets` (one
+- Fork branches: `exp/join-static-buckets` (`b058bb7`, the six working commits), `pr/join-static-buckets` (one
   commit on `f3fb390`, the same tree, PR body `PR-BODY.md`; no PR opened), `exp/join-static-buckets-s15` (the rider,
   one commit on `b058bb7`).
 - `DESIGN.md`; `raw/scripts/` (setup, build, run, test, chain_x/post/ab/lvp/lint/rider, regsample, ptxjit, ab.py,

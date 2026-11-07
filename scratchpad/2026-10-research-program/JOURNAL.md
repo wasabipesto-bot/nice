@@ -17,6 +17,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **L49 PR branch ready (08:20 UTC, L49.1):** CPU lean prefilter on #247: ×1.07–1.11 at
   production shapes (1 / 4 threads), ×1.05–1.12 on 1e14 fields, NiceMark CPU ×1.088, exact with
   the FX exhaustive test. Reviewer launched.
+- **L46 built in one day (09:30 UTC, L46.1): ×1.158 at b62 1e17, ×1.154 b60, ×1.222 b64, NiceMark
+  ×1.119, exact; two kernels and five buffers deleted; beats L45's ceiling because the FD kernel's
+  atomics and the join's gathers go too.** Rider (stage once per batch) ×1.02–1.03 on top, exact.
+  Box l46-static destroyed (2.75 h). Reviewer launched on the PR squash + the rider; decision: the
+  rider goes in as a clearly separated second commit (asked in the report whether to split).
+  L48 (same append block) will rebase on whichever lands first.
 
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)
 

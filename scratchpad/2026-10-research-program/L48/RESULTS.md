@@ -85,11 +85,83 @@ PTX from CubeCL's PTX cache, JIT-loaded by the driver: `ptxjit.py`, L45's) and (
   could not be taken (no counter access, §0).
 - Level 2's append in SASS: SHFL 7 → 2, VOTE 0 → 2, POPC 8 → 10 (b62).
 
-SPIRV_PLACEHOLDER
+**Direct SPIR-V** (lavapipe, `cubecl-spirv`; `blocks.py` on the CUBECL_DEBUG_LOG of #240's light FD test;
+`raw/box/blocks_*.txt`): TopFdKernel's basic blocks, which bound that compiler's recursion, against TopKernel's
+368–386 at b57–b64:
+
+| | b57 | b58 | b60 | b62 | b64 |
+|---|---|---|---|---|---|
+| level 0 (`f3fb390`'s kernel) | 298 | 304 | 304 | 298 | 310 |
+| levels 1, 2 | 247 | 256 | 256 | 247 | 265 |
+| level 3 | 355 | 373 | 373 | 355 | **391** |
+| level 103 | 325 | 340 | 340 | 325 | 355 |
+| **PR form `P`** (= level 6) | **280** | **289** | **289** | **280** | **298** |
+
+Level 3's fallback pushes TopFdKernel past TopKernel at b64 (391 > 386); it still compiled and passed on lavapipe,
+but it is one more reason not to ship it. The PR form is below level 0.
 
 EXACTNESS_PLACEHOLDER
 
-SCREEN_PLACEHOLDER
+## 4. Screen: levels 0–4 (and 4/6/7) on whole fields, and the kernel alone
+
+**Whole fields** (binary `X`, one binary for every level, 2 interleaved rounds, order 0→4 then 4→0, nothing else on
+the box, 06:22–06:48; `raw/scr_table.md`): device s/field, medians; per-round ratios against level 0; clock = mean SM
+MHz per level.
+
+| level | b62 1e17 s (rounds) | vs 0 (per round) | b60 1e16 s (rounds) | vs 0 (per round) | MHz b62 / b60 |
+|---|---|---|---|---|---|
+| 0 | **105.05** (104.55, 105.54) | | **20.79** (20.82, 20.75) | | 1382 / 1323 |
+| 1 | 100.91 (100.82, 101.00) | ×1.041 (1.037, 1.045) | 20.16 (20.29, 20.03) | ×1.031 (1.026, 1.036) | 1367 / 1406 |
+| 2 | 100.37 (100.75, 99.99) | ×1.047 (1.038, 1.056) | 19.93 (19.89, 19.96) | ×1.043 (1.047, 1.040) | 1350 / 1367 |
+| 3 | 100.63 (100.61, 100.66) | ×1.044 (1.039, 1.049) | 20.01 (20.05, 19.98) | ×1.039 (1.039, 1.039) | 1378 / 1363 |
+| **4** | **98.85** (98.75, 98.95) | **×1.063** (1.059, 1.067) | **19.62** (19.67, 19.58) | **×1.059** (1.059, 1.060) | 1335 / 1332 |
+
+Then (binary `X7`, 2 interleaved rounds, 07:06–07:22; `raw/s6_table.md`) levels 4, 6 and 7:
+
+| level | b62 1e17 s (rounds) | b60 1e16 s (rounds) | MHz b62 / b60 |
+|---|---|---|---|
+| 4 | 99.49 (98.28, 100.70) | 19.88 (19.71, 20.05) | 1354 / 1294 |
+| **6** | **98.88** (98.34, 99.42) | **19.76** (19.69, 19.83) | 1313 / 1309 |
+| 7 | 100.15 (100.14, 100.17) | 19.87 (19.85, 19.88) | 1321 / 1341 |
+
+- Every run had the exact counts (b62 1e17 1,020,844,021,499 / 62,584,252,554; b60 1e16 460,847,952,346 /
+  30,871,838,404).
+- **Level 1 (the trims) is ×1.04 / ×1.03**, as L36 measured on all5 (×1.041). The ballot adds ~0.6 / 1.2 points,
+  the partial remainder takes a little back, `SURV_PER_PREFIX` 1 adds ~1.5–2 points. Level 6 (5 without the partial
+  remainder) is the fastest of 4/6/7 at both fields, by about 1 % — inside the runs' spread, so the choice rests on
+  the kernel-alone numbers below.
+- The clock wanders by up to 6 % between runs of one configuration at this cap (1276–1443 MHz), so single-round
+  differences of 1–2 % are noise.
+
+**The kernel alone** (#240's `cubecl_cuda_top_fd_timing`; binary `X` 06:48–06:52 for levels 0–4, `X7` 07:22–07:24
+for 2/6/7; 2 processes per level and field, 3 rounds each = 6; `raw/topt_table.md`, `raw/t6_table.md`). ns per
+(prefix, slot); stepped s normalised to the median `top_kernel` time of the field's runs; levels 4, 6, 7 run the
+level-4 plan (k = 7 / 6 slots a batch, a larger first slice):
+
+| level | b62 1e17: k | FD consecutive c | all-seed g | **stepped s** | vs 0 | b60 1e16: k | c | g | **stepped s** | vs 0 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | 5 | 0.2400 | 0.3900 | **0.2045** | | 4 | 0.2404 | 0.3751 | **0.2021** | |
+| 1 | 5 | 0.2010 | 0.3914 | **0.1554** | −24.0 % | 4 | 0.2060 | 0.3619 | **0.1537** | −23.9 % |
+| 2 | 5 | 0.1930 | 0.3863 | **0.1454** | −28.9 % | 4 | 0.1982 | 0.3504 | **0.1444** | −28.6 % |
+| 3 | 5 | 0.1975 | 0.3915 | **0.1504** | −26.5 % | 4 | 0.2036 | 0.3542 | **0.1526** | −24.5 % |
+| 4 | 7 | 0.1833 | 0.3566 | 0.1498 | (−26.8 %) | 6 | 0.1825 | 0.3478 | 0.1576 | (−22.0 %) |
+| 2 (`X7`) | 5 | 0.1942 | 0.3940 | 0.1480 | | 4 | 0.1992 | 0.3621 | 0.1447 | |
+| **6** | 7 | **0.1740** | 0.3537 | **0.1424** | (−30.4 %) | 6 | **0.1738** | 0.3447 | **0.1493** | (−26.1 %) |
+| 7 | 7 | 0.1779 | 0.3537 | 0.1479 | (−27.7 %) | 6 | 0.1772 | 0.3432 | 0.1533 | (−24.1 %) |
+
+- **The trims take 24 % off the stepped slot** at both fields (L36 on all5: 22.3 / 22.9 %), and **the ballot another
+  5 points (−28.9 / −28.6 %)**.
+- **The partial remainder costs 2.4 / 4 points instead of saving** (level 3 against level 2): the left-out words are
+  the cheap ones (their powers have few limbs), and the test that replaces them (a subtraction chain kept as dd, the
+  word-position case split and the comparison with b^p) costs about as much, with 3 more registers at b60 and +480
+  SASS for the fallback. Dropped (levels 6/7).
+- **The early-exit carries take ~3.7 / 2.6 % off** (level 6 against 7, same plan) — less than their instruction
+  count suggested; the step's word adds were partly hidden behind the scan.
+- In production batches (FD consecutive c, seeds included), **level 6 is 0.1740 against 0.2400 ns per (prefix, slot)
+  at b62 1e17 (−27.5 %) and 0.1738 against 0.2404 at b60 1e16 (−27.7 %)**; the seeded slot (g) is ~2.4× a stepped one
+  after the cuts (1.9× before), which is what makes the larger batches (level 4) worth ~2 points of the field.
+- Levels 4/6/7's s comes from a different first slice and k, so its "vs 0" is only indicative; levels 2 and 7 have
+  the same kernel and agree at b62 (0.1480 / 0.1479).
 
 AB_PLACEHOLDER
 

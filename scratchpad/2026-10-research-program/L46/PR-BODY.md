@@ -101,11 +101,11 @@ From the driver's JIT of the PTX each process compiled at run time (NVRTC, as Cu
 
 - The 7 images with spills are 1e14 processes and register samples. Every timed 1e16 and 1e17 process compiled spill-free. The spills sit in the per-work-item and per-wave code, not in the chunk loop or the walk, and those runs were no slower.
 - The join stays at 5 cubes per SM, as set by its shared memory (+84 bytes per cube here).
-- `top_kernel` runs alone only at power-of-two bases (b64) and on the clipped blocks. Its timing above is unchanged.
+- `top_kernel` does a whole batch only at power-of-two bases (b64); elsewhere it takes only the clipped blocks. Its timing above is unchanged.
 
 ## Not in this PR
 
-- **The survivor stage checked once per top batch** instead of after every chunk of 32 tops (its two barriers per chunk). This is measured separately as a follow-up, not included.
+- **The survivor stage checked once per top batch** instead of after every chunk of 32 tops (two barriers per chunk). Measured on top of this branch at ×1.022–1.030; a follow-up, not included.
 - **No CPU change.** The CPU join forms each partition's buckets on the host and is unaffected.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

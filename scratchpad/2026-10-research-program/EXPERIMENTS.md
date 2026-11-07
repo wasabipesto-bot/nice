@@ -5,6 +5,39 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L46.1 Static bucket order for the top layer: built, exact, ×1.158 at b62 1e17 (2026-11-07, agent; `L46/DESIGN.md`, `L46/RESULTS.md`, `L46/PR-BODY.md`, `L46/raw/`; branches `exp/join-static-buckets` b058bb7 (6 commits), PR-ready squash `pr/join-static-buckets` 318fdae (one commit on f3fb390), rider `exp/join-static-buckets-s15` 4b27507)
+
+Design: a slot's top lands in bucket (key, (root − pc) mod (b−1)) with pc = (c0 + v) mod (b−1), c0 =
+P0 mod (b−1) (b^p ≡ 1), so the slot only rotates the class; the host counting-sorts each slice's
+top layer once by g = key·(b−1) + c0 and uploads `goff` (nb + 1 words); tlay words 2–3 carry g and
+goff[g]; the top kernels append each kept top into its group's segment of `top_rec` with one
+counter per (slot, group) (`top_slot` helper: one atomic per plane in `top_fd_kernel`, one per top
+in `top_kernel`); a join work item w = slot·nb + bucket reads `nroots` segments g_r = (key,
+(root_r − cls − v) mod (b−1)) with consecutive record loads (batches still fill 256 tops across
+segment boundaries); **deleted: `top_scan_kernel`, `top_fill_kernel`, `tl`, `top_b`, `work`,
+`cursor`, the per-slot count and the per-kept-top `nroots` atomics; STAGES 6 → 4; layouts 11–29 %
+smaller; slots/slices/batches unchanged.** `nroots` is comptime in the join (runtime loops → 60
+registers or spills); a serial thread-0 scan places the segments (plane-size independent); the
+work item's offsets/count/key live in shared memory. **Exact on the final tree** (= base and L38's
+lists): parity incl. b50/b54 + b57 frontier; adapted FD-vs-top device test (per-(slot, group)
+counts and segment records; 26 fields / 279 batches / 237.9 M tops); certificate test; dense
+254,938,965 / 14,396,829 and 120,013,475 / 7,355,827; whole b42 417,789,835 / 16,879,877; 1e14
+COMPARE; every timed field every round (b62 1e17 1,020,844,021,499 / 62,584,252,554 …); lavapipe
+naga + SPIR-V 8/8; lint 14 shaders 0 flagged; fmt/clippy ×3. Registers (driver JIT of each
+process's NVRTC PTX): join 46–48 spill-free in 30/37 processes incl. all 12 timed production
+fields (the other 7, 1e14 and register samples: 40 + 8–32 B spills in per-item/per-wave code, no
+slowdown); top_fd 108–112; top_kernel 80 → 97–103 no spills (no measurable cost); 5 cubes/SM.
+**A/B vs f3fb390 (180 W RTX 3080 m139246, 3 interleaved rounds, equal clocks): b62 1e17 100.38 →
+86.68 s ×1.158 (rounds 1.141/1.158/1.158; cycles ×1.174); b62 1e16 ×1.147; b60 1e16 19.675 →
+17.049 ×1.154 (cycles ×1.150); b64 1e16 ×1.222; 1e14 b57/60/62/64 ×1.096/1.056/1.055/1.028;
+NiceMark 6 rounds ×1.119 (1.103–1.138): b58 weak ×1.145, strong ×1.043, b60 ×1.153, b62 ×1.145.**
+Beats L45's ×1.107 ceiling: scan + fill = 9.7 of the 13.7 s saved, the rest the FD kernel's lost
+atomics (FD kernel alone ×1.054–1.060) and the join's consecutive record loads. **Rider (stage
+checked once per top batch) vs this branch: b62 1e17 ×1.029, b62 1e16 ×1.024, b60 ×1.022, b64
+×1.030, NiceMark (2 rounds) ×1.019; exact, lavapipe + lint pass; not in the PR branch yet.**
+Conflicts with L48's level-2 append trim (same block; whichever lands second redoes it). Box
+2.75 h. → reviewer agent on 318fdae + the rider.
+
 ## L49.1 CPU lean prefilter: PR branch (2026-11-07, agent; `L49/PR-RESULTS.md`, `L49/PR-BODY.md`, `L49/raw/`; branch `pr/cpu-join-lean-prefilter` d32f579 = one commit on #247 caef70e; worktree `.worktrees/pr-cpu-join-lean`)
 
 `cpu_join.rs` +329/−41 (~200 lines tests): private `Fx` type (own constants) for the digits; `fresh4`
