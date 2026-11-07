@@ -13,6 +13,7 @@
 - Speed up the GPU overlap join's middle-digit prefilter by reading each pair's digits off a fixed-point fraction with multiplications instead of divisions, and testing them with fewer instructions ([#246](https://github.com/wasabipesto/nice/pull/246)).
 - Speed up the GPU overlap join by sorting each slice's top prefixes once by the buckets they feed, so that the tops need no bucketing pass and the join reads each bucket's tops in order ([#249](https://github.com/wasabipesto/nice/pull/249)).
 - Speed up the GPU overlap join by checking whether its survivor stage needs writing out once per batch of tops instead of after every 32 tops ([#249](https://github.com/wasabipesto/nice/pull/249)).
+- Speed up the GPU overlap join's stepped top certificates by carrying the position each power's certificate starts at, and its carry bound, from one partition to the next, skipping work that cannot change the result, and (on CUDA) running up to twice as many partitions per launch ([#NNN](https://github.com/wasabipesto/nice/pull/NNN)).
 
 ## Nice v3.4.7
 
