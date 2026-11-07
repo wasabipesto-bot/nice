@@ -11,7 +11,7 @@ Designs:
        n^3 (truncated product), the rest of n^3 only if a lane passes the gate.
 Warp = 32 consecutive survivors (list order is unrelated to digit patterns). SIMT: a warp issues the union of
 its lanes' paths, i.e. the longest pass sequence of n^2, and the cube if any lane needs it."""
-import json, sys, os, collections, random
+import json, sys, os, collections, random, gzip
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sasscost import PRO, SQ_EXIT, EPI, CU_SETUP, SQ, CU, pass_cost
 
@@ -21,7 +21,7 @@ def limbs(x):
 def load(paths):
     meta = None; S = []
     for p in paths:
-        for line in open(p):
+        for line in (gzip.open(p, 'rt') if p.endswith('.gz') else open(p)):
             d = json.loads(line)
             if 'meta' in d: meta = d['meta']
             elif 'n' in d: S.append(d)

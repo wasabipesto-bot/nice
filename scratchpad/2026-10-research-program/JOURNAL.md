@@ -61,6 +61,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   PR's survivor bound binds (~11 slots) and slices may widen → the combination must be re-measured
   incl. NiceMark's b60 window. Resumed the L48 agent on a new box to apply the fixes, rebase onto
   #249 and A/B the combination.
+- **L47 scoped (11:00 UTC, `L47/SCOPING.md`): GO.** The check kernel is instruction-heavy (1,046
+  warp-instructions per warp-iteration at half issue rate) and runs 3 waves where 2.5 fit;
+  design D (base-b² limbs, schoolbook n², digits from the carry normalisation, a gate before
+  n³) plus a device-side work counter: ×1.05–1.09 b62 1e17 / ×1.06–1.12 b60 (estimates under a
+  memory floor). Existing tests cannot catch an over-rejecting check (every hit list but b10's is
+  empty) → the prototype needs count-mode/gate-mode device tests vs the CPU. Tomorrow's GPU
+  lead; step 0 is a 45-min floor measurement.
 - 10:10 UTC: **#248 and #249 CI fully green** (25 pass, 3 skipped each; #249's Metal job, the lavapipe parity job with the sentinel test, and both macOS builds all passed); all five open PRs green; no comments.
 
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)

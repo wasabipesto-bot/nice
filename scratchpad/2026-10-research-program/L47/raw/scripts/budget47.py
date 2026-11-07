@@ -64,5 +64,5 @@ def main(tag, files, secs, checks, mhz):
 
 if __name__ == '__main__':
     R = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'surv')
-    main('b62 1e17', [f'{R}/b62_e17_s1.jsonl', f'{R}/b62_e17_s2.jsonl'], 9.140, 62_584_252_554, 1538)
-    main('b60 1e16', [f'{R}/b60_e16_s1.jsonl', f'{R}/b60_e16_s2.jsonl'], 2.217, 30_871_838_404 / 2, 1490)
+    main('b62 1e17', [f'{R}/b62_e17_s1.jsonl.gz', f'{R}/b62_e17_s2.jsonl.gz'], 9.140, 62_584_252_554, 1538)
+    main('b60 1e16', [f'{R}/b60_e16_s1.jsonl.gz', f'{R}/b60_e16_s2.jsonl.gz'], 2.217, 30_871_838_404 / 2, 1490)
