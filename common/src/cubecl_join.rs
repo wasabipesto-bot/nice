@@ -10,11 +10,13 @@
 //! begins the field, and then every partition value goes through the device
 //! in batches:
 //!
-//! 1. [`top_kernel`], [`top_scan_kernel`], [`top_fill_kernel`]: certify each
-//!    top `P = P0·b^p + v` of the slot's partition `v` (96-bit endpoints,
-//!    their powers in 16-bit limbs; the low endpoint's digits and a carry
-//!    test, as `Base::cert`), and bucket it by (key digit, digit-sum class)
-//!    once per root. Where it pays, [`top_fd_kernel`] does the certifying:
+//! 1. [`top_kernel`]: certify each top `P = P0·b^p + v` of the slot's
+//!    partition `v` (96-bit endpoints, their powers in 16-bit limbs; the low
+//!    endpoint's digits and a carry test, as `Base::cert`), and append it to
+//!    its prefix's group: the host sorts the top layer by (key digit, P0 mod
+//!    b - 1), and a bucket (key digit, digit-sum class) of any slot is the
+//!    union of one group per root, so the tops need no bucketing pass. Where
+//!    it pays, [`top_fd_kernel`] does the certifying:
 //!    consecutive partitions shift a prefix's interval by a power of the
 //!    base, so its square's and cube's digits step from slot to slot by
 //!    additions, and only a batch's first slot divides them out.
@@ -115,9 +117,12 @@ const CHECK_CUBES: u32 = 1024;
 /// How deep the halving of an overflowing partition's top layer may go: a
 /// layer of up to 2^32 prefixes reaches single prefixes well within it.
 const MAX_SPLITS: u32 = 32;
-/// Kernels a batch launches (top, top scan, top fill, bucket, join, check),
-/// each counting its finished cubes.
-const STAGES: usize = 6;
+/// Kernels a batch launches (top, bucket, join, check), each counting its
+/// finished cubes.
+const STAGES: usize = 4;
+/// The most digit-sum roots of any base the join takes (8, at bases 46, 50
+/// and 64): [`join_kernel`] holds a bucket's group segments in shared memory.
+const MAX_ROOTS: u32 = 8;
 /// Units [`top_fd_kernel`] should have: a smaller top layer splits a batch's slots into groups.
 const TOP_FD_MIN_UNITS: u32 = 1 << 17;
 /// FD at power-of-two bases too: no, `top_kernel`'s division is shifts there and FD measured slower.
@@ -127,10 +132,7 @@ const TOP_FD_AT_POW2_BASES: bool = false;
 // Device kernels
 // ---------------------------------------------------------------------------
 
-pub use kernels::{
-    bucket_kernel, check_kernel, join_kernel, top_fd_kernel, top_fill_kernel, top_kernel,
-    top_scan_kernel,
-};
+pub use kernels::{bucket_kernel, check_kernel, join_kernel, top_fd_kernel, top_kernel};
 
 /// The kernels. The cube macro evaluates `comptime!` expressions host-side,
 /// where fn-level allows do not reach, and the bodies are ported integer
@@ -160,7 +162,7 @@ pub use kernels::{
 )]
 mod kernels {
     use super::{
-        AND_GROUP, DEAD_MASK, JOIN_WG, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS,
+        AND_GROUP, DEAD_MASK, JOIN_WG, MAX_ROOTS, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS,
         TRANSPOSE_MIN,
     };
     use crate::cubecl_backend::candidate_check;
@@ -395,14 +397,15 @@ mod kernels {
             counts[((slot * nkeys + UNIT_POS_X) * m1 + c) as usize] =
                 s_cnt[UNIT_POS_X as usize].load();
         }
-        cube_done(ran, 3u32);
+        cube_done(ran, 1u32);
     }
 
-    /// Step 2 (v3): one cube per work item over the dense (slot, d, c) list
-    /// built by [`bucket_kernel`]; `ept` entries per thread per wave, every
-    /// thread runs every wave (uniform). A branch-free AND over 32 tops at a
-    /// time gives each entry a bitmask of the tops it passes, and each lane
-    /// walks its set bits.
+    /// Step 2 (v3): one cube per work item, a (slot, d, c) bucket: its entries
+    /// from the list built by [`bucket_kernel`], its tops from `nroots`
+    /// group segments of `top_rec` (read in order, see the work item); `ept`
+    /// entries per thread per wave, every thread runs every wave (uniform).
+    /// A branch-free AND over 32 tops at a time gives each entry a bitmask of
+    /// the tops it passes, and each lane walks its set bits.
     ///
     /// A pair passes the AND iff the entry's and the top's digit masks are
     /// disjoint, i.e. iff no digit of the entry is a digit of the top. So for
@@ -460,8 +463,10 @@ mod kernels {
         seg: &Array<u32>,
         lists: &Array<u32>,
         counts: &Array<u32>,
-        work: &Array<u32>,
-        tl: &Array<u32>,
+        vs: &Array<u32>,
+        roots: &Array<u32>,
+        goff: &Array<u32>,
+        grp_cnt: &Array<u32>,
         top_rec: &Array<u32>,
         surv: &mut Array<u32>,
         surv_count: &mut Array<Atomic<u32>>,
@@ -471,6 +476,8 @@ mod kernels {
         nbp: u32,
         surv_cap: u32,
         w_f0: u32,
+        ntlay: u32,
+        nroots: u32,
         #[comptime] base: u32,
         #[comptime] key_level: bool,
         #[comptime] ept: u32,
@@ -535,6 +542,10 @@ mod kernels {
         let mut s_r = SharedMemory::<u32>::new(comptime!(SURV_SH_CAP as usize));
         let mut s_cnt = SharedMemory::<Atomic<u32>>::new(1usize);
         let mut s_base = SharedMemory::<u32>::new(1usize);
+        // The work item's tops: per root, its group's first record and kept
+        // tops (see the work item below).
+        let mut s_sb = SharedMemory::<u32>::new(comptime!(MAX_ROOTS as usize));
+        let mut s_sn = SharedMemory::<u32>::new(comptime!(MAX_ROOTS as usize));
         // This thread's join survivors (pairs that pass the AND in range).
         let mut nand = 0u32;
 
@@ -546,12 +557,17 @@ mod kernels {
         }
         sync_cube();
 
+        // Work item w is bucket (key dkey, class cls) of slot w / nb. Its tops
+        // are the kept tops of `nroots` groups of the top layer, one per
+        // digit-sum root r: group (dkey, (root_r - cls - v) mod (b-1)), whose
+        // slot-v tops [`top_kernel`] appended into
+        // `top_rec[slot·ntlay + goff[g]..][..grp_cnt[slot·nb + g]]`. The
+        // batches take them in that order, across the groups' boundaries.
+        let nbk = comptime!(nkeys * m1);
         let mut w = CUBE_POS_X;
         while w < nwork {
-            let slot = work[(4u32 * w) as usize];
-            let bx = work[(4u32 * w + 1u32) as usize];
-            let ts = work[(4u32 * w + 2u32) as usize];
-            let te = work[(4u32 * w + 3u32) as usize];
+            let slot = w / nbk;
+            let bx = w - slot * nbk;
             let dkey = bx / m1;
             let cls = bx - dkey * m1;
             let cs = seg[cls as usize];
@@ -559,24 +575,49 @@ mod kernels {
             let ne = counts[((slot * nkeys + dkey) * m1 + cls) as usize];
             let lbase = slot * base * nbp + base * cs + dkey * clen;
             let ebase = slot * nbp;
+            let v = vs[slot as usize];
+            // Every thread is past the previous item's reads of the segments.
+            sync_cube();
+            if UNIT_POS_X < nroots {
+                let c0 = (roots[UNIT_POS_X as usize] + comptime!(2 * m1) - cls - v % m1) % m1;
+                let g = dkey * m1 + c0;
+                s_sb[UNIT_POS_X as usize] = slot * ntlay + goff[g as usize];
+                s_sn[UNIT_POS_X as usize] = grp_cnt[(slot * nbk + g) as usize];
+            }
+            sync_cube();
+            let mut te = 0u32;
+            let mut ri = 0u32;
+            while ri < nroots {
+                te += s_sn[ri as usize];
+                ri += 1u32;
+            }
             let mut v_part = 0u32;
             if comptime!(v_digits > 0) {
-                if ts < te {
-                    let t0 = tl[ts as usize];
-                    v_part = (top_rec[(TOP_REC_WORDS * t0 + 6u32) as usize]
-                        % comptime!(base.pow(v_digits)))
-                        * comptime!(base.pow(f0));
-                }
+                // The slot's partition digits below M (`v_digits <= pp`).
+                v_part = (v % comptime!(base.pow(v_digits))) * comptime!(base.pow(f0));
             }
 
-            let mut tc = ts;
+            let mut tc = 0u32;
             while tc < te {
                 let mut nt = te - tc;
                 if nt > TOP_CAP {
                     nt = TOP_CAP;
                 }
                 if UNIT_POS_X < nt {
-                    let t = tl[(tc + UNIT_POS_X) as usize];
+                    // Top q of the bucket: in the group segment whose span
+                    // [cum, cum + n) holds it.
+                    let q = tc + UNIT_POS_X;
+                    let mut t = 0u32;
+                    let mut cum = 0u32;
+                    let mut sr = 0u32;
+                    while sr < nroots {
+                        let n = s_sn[sr as usize];
+                        if q >= cum && q - cum < n {
+                            t = s_sb[sr as usize] + (q - cum);
+                        }
+                        cum += n;
+                        sr += 1u32;
+                    }
                     // Words 2-7 of the top's record ([`TOP_REC_WORDS`]).
                     let r8 = TOP_REC_WORDS * t;
                     let mut lo = top_rec[(r8 + 2u32) as usize];
@@ -982,7 +1023,7 @@ mod kernels {
         if UNIT_POS_PLANE == 0u32 {
             and_count[0].fetch_add(planes_and);
         }
-        cube_done(ran, 4u32);
+        cube_done(ran, 2u32);
     }
 
     /// 16-bit limbs of `k^e`, least significant first: the host-side
@@ -1663,32 +1704,65 @@ mod kernels {
         mask
     }
 
+    /// Append a plane's kept tops of one slot into their groups' segments of
+    /// `top_rec` (see [`top_kernel`]) and return a kept lane's record index:
+    /// `slot·ntlay + goff + at`, `at` its place among the group's kept tops
+    /// (`grp_cnt[slot·nb + g]`). The host sorts the top layer by group, so a
+    /// plane's kept tops are almost always of one group, and take one atomic;
+    /// a plane that straddles groups takes one per kept lane. Every lane of
+    /// the plane must call it.
+    #[cube]
+    fn top_slot(
+        kept: bool,
+        g: u32,
+        goff: u32,
+        slot: u32,
+        ntlay: u32,
+        grp_cnt: &mut Array<Atomic<u32>>,
+        #[comptime] nb: u32,
+    ) -> u32 {
+        let g0 = plane_broadcast(g, 0u32);
+        let one = plane_all(!kept || g == g0);
+        let kc = select(kept && one, 1u32, 0u32);
+        let n = plane_sum(kc);
+        let pre = plane_exclusive_sum(kc);
+        let mut a0 = 0u32;
+        if UNIT_POS_PLANE == 0u32 && n > 0u32 {
+            a0 = grp_cnt[(slot * nb + g0) as usize].fetch_add(n);
+        }
+        let mut at = plane_broadcast(a0, 0u32) + pre;
+        if kept && !one {
+            at = grp_cnt[(slot * nb + g) as usize].fetch_add(1u32);
+        }
+        slot * ntlay + goff + at
+    }
+
     /// Stage 0a: certify every top prefix of every slot's partition. Grid: x
-    /// over the field's top layer (depth t - pp, host-built once per field),
-    /// y over slots. With `only_clipped`, only the blocks clipped to the
-    /// slice's ends (beside [`top_fd_kernel`], which leaves them out). Per tlay entry (5 words): P0 lo, hi, P0 mod (b-1),
-    /// P0 mod b, P0 mod b^(k2-f0-pp). `fb` = s (3 limbs), e-1 (3 limbs), the P
-    /// range lo (2 words) and hi (2 words). Passing tops are appended per slot
-    /// (stride `ntlay`), one record each in `top_rec` ([`TOP_REC_WORDS`]) and
-    /// the bucket word in `top_b`, and counted into their buckets, one per
-    /// digit-sum root.
+    /// over the field's top layer (depth t - pp, host-built once per slice
+    /// and sorted by group), y over slots. With `only_clipped`, only the
+    /// blocks clipped to the slice's ends (beside [`top_fd_kernel`], which
+    /// leaves them out). Per tlay entry (5 words): P0 lo, hi, its group `g =
+    /// key·(b-1) + P0·b^pp mod (b-1)` (key = P0 mod b at the key level, else
+    /// 0), the group's first index `goff[g]` in the sorted layer, and P0 mod
+    /// b^(k2-f0-pp). `fb` = s (3 limbs), e-1 (3 limbs), the P range lo (2
+    /// words) and hi (2 words). Passing tops are appended into their group's
+    /// segment of the slot's records ([`top_slot`]), one record each in
+    /// `top_rec` ([`TOP_REC_WORDS`]): a top of group `g` at slot `v` belongs
+    /// to bucket `(key, (root - (g mod (b-1)) - v) mod (b-1))` for each
+    /// digit-sum root, so [`join_kernel`] reads a bucket's tops as the
+    /// segments of `nroots` groups.
     #[cube(launch_unchecked)]
     pub fn top_kernel(
         tlay: &Array<u32>,
         vs: &Array<u32>,
         fb: &Array<u32>,
         pw: &Array<u32>,
-        roots: &Array<u32>,
         top_rec: &mut Array<u32>,
-        top_b: &mut Array<u32>,
-        top_count: &mut Array<Atomic<u32>>,
-        bucket_cnt: &mut Array<Atomic<u32>>,
+        grp_cnt: &mut Array<Atomic<u32>>,
         ran: &mut Array<Atomic<u32>>,
         ntlay: u32,
-        nroots: u32,
         w: u32,
         pdiv: u32,
-        pdiv_m1: u32,
         full_floor: u32, // certificate floor bound of every unclipped block (host rule)
         #[comptime] base: u32,
         #[comptime] limbs: u32,
@@ -1698,16 +1772,26 @@ mod kernels {
         #[comptime] s3: u32,
         #[comptime] chunk_digits: u32,
         #[comptime] chunk_div: u32,
-        #[comptime] key_level: bool,
         #[comptime] nb: u32,
         #[comptime] only_clipped: bool,
     ) {
-        let m1 = comptime!(base - 1);
         let i = ABSOLUTE_POS_X;
         let slot = CUBE_POS_Y;
+        // The kept top's record words, written after the plane's append.
+        let mut kept = false;
+        let mut g = 0u32;
+        let mut goff = 0u32;
+        let mut p_k = 0u64;
+        let mut mask_k = 0u64;
+        let mut rlo = 0u32;
+        let mut rhi = 0u32;
+        let mut pmod = 0u32;
+        let mut seed = 0u32;
         if i < ntlay {
             let p0 = (u64::cast_from(tlay[(5u32 * i + 1u32) as usize]) << 32u64)
                 | u64::cast_from(tlay[(5u32 * i) as usize]);
+            g = tlay[(5u32 * i + 2u32) as usize];
+            goff = tlay[(5u32 * i + 3u32) as usize];
             let v = vs[slot as usize];
             let p = p0 * u64::cast_from(pdiv) + u64::cast_from(v);
             let plo = (u64::cast_from(fb[7]) << 32u64) | u64::cast_from(fb[6]);
@@ -1813,37 +1897,30 @@ mod kernels {
                         if !a_lt_s && !e_gt_e {
                             floor = full_floor;
                         }
-                        let idx = top_count[slot as usize].fetch_add(1u32);
-                        let g = slot * ntlay + idx;
-                        let r8 = TOP_REC_WORDS * g;
-                        top_rec[r8 as usize] = u32::cast_from(p);
-                        top_rec[(r8 + 1u32) as usize] = u32::cast_from(p >> 32u64);
-                        top_rec[(r8 + 2u32) as usize] = u32::cast_from(mask);
-                        top_rec[(r8 + 3u32) as usize] = u32::cast_from(mask >> 32u64);
-                        top_rec[(r8 + 4u32) as usize] = a[0] - pw0;
-                        top_rec[(r8 + 5u32) as usize] = e[0] - pw0 + 1u32;
-                        let pmod = tlay[(5u32 * i + 4u32) as usize] * pdiv + v;
-                        top_rec[(r8 + 6u32) as usize] = pmod;
-                        let mut seed = 0u32;
+                        kept = true;
+                        p_k = p;
+                        mask_k = mask;
+                        rlo = a[0] - pw0;
+                        rhi = e[0] - pw0 + 1u32;
+                        pmod = tlay[(5u32 * i + 4u32) as usize] * pdiv + v;
                         if floor >= k2 {
                             seed = 1u32;
-                        }
-                        top_rec[(r8 + 7u32) as usize] = seed;
-                        let pc = (tlay[(5u32 * i + 2u32) as usize] * pdiv_m1 + v) % m1;
-                        let mut key = 0u32;
-                        if key_level {
-                            key = tlay[(5u32 * i + 3u32) as usize];
-                        }
-                        top_b[g as usize] = pc | (key << 8u32);
-                        let mut r = 0u32;
-                        while r < nroots {
-                            let cls = (roots[r as usize] + m1 - pc) % m1;
-                            bucket_cnt[(slot * nb + key * m1 + cls) as usize].fetch_add(1u32);
-                            r += 1u32;
                         }
                     }
                 }
             }
+        }
+        let at = top_slot(kept, g, goff, slot, ntlay, grp_cnt, nb);
+        if kept {
+            let r8 = TOP_REC_WORDS * at;
+            top_rec[r8 as usize] = u32::cast_from(p_k);
+            top_rec[(r8 + 1u32) as usize] = u32::cast_from(p_k >> 32u64);
+            top_rec[(r8 + 2u32) as usize] = u32::cast_from(mask_k);
+            top_rec[(r8 + 3u32) as usize] = u32::cast_from(mask_k >> 32u64);
+            top_rec[(r8 + 4u32) as usize] = rlo;
+            top_rec[(r8 + 5u32) as usize] = rhi;
+            top_rec[(r8 + 6u32) as usize] = pmod;
+            top_rec[(r8 + 7u32) as usize] = seed;
         }
         cube_done(ran, 0u32);
     }
@@ -2398,17 +2475,12 @@ mod kernels {
         vs: &Array<u32>,
         fb: &Array<u32>,
         pw: &Array<u32>,
-        roots: &Array<u32>,
         top_rec: &mut Array<u32>,
-        top_b: &mut Array<u32>,
-        top_count: &mut Array<Atomic<u32>>,
-        bucket_cnt: &mut Array<Atomic<u32>>,
+        grp_cnt: &mut Array<Atomic<u32>>,
         ran: &mut Array<Atomic<u32>>,
         ntlay: u32,
-        nroots: u32,
         w: u32,
         pdiv: u32,
-        pdiv_m1: u32,
         full_floor: u32,
         nslots: u32,
         slot_k: u32,
@@ -2420,12 +2492,10 @@ mod kernels {
         #[comptime] s3: u32,
         #[comptime] chunk_digits: u32,
         #[comptime] chunk_div: u32,
-        #[comptime] key_level: bool,
         #[comptime] nb: u32,
         #[comptime] f0: u32,
         #[comptime] tq: u32,
     ) {
-        let m1 = comptime!(base - 1);
         let nl2 = comptime!(2 * limbs);
         let nl3 = comptime!(3 * limbs);
         let nh2 = comptime!(4 * limbs);
@@ -2441,14 +2511,14 @@ mod kernels {
         let i = ABSOLUTE_POS_X;
         let live = i < ntlay;
         let mut p0 = 0u64;
-        let mut tl_m1 = 0u32;
-        let mut tl_key = 0u32;
+        let mut tl_g = 0u32;
+        let mut tl_off = 0u32;
         let mut tl_mod = 0u32;
         if live {
             p0 = (u64::cast_from(tlay[(5u32 * i + 1u32) as usize]) << 32u64)
                 | u64::cast_from(tlay[(5u32 * i) as usize]);
-            tl_m1 = tlay[(5u32 * i + 2u32) as usize];
-            tl_key = tlay[(5u32 * i + 3u32) as usize];
+            tl_g = tlay[(5u32 * i + 2u32) as usize];
+            tl_off = tlay[(5u32 * i + 3u32) as usize];
             tl_mod = tlay[(5u32 * i + 4u32) as usize];
         }
         // Unclipped blocks only: r is (0, w) and the seed flag is the
@@ -2643,19 +2713,9 @@ mod kernels {
                 } else {
                     valid = false;
                 }
-                // Append the plane's kept tops with one atomic: `slot` is a
-                // loop counter, so the compiler does not aggregate it as it
-                // does `top_kernel`'s (whose slot is the cube's y).
-                let kc = select(kept, 1u32, 0u32);
-                let n = plane_sum(kc);
-                let pre = plane_exclusive_sum(kc);
-                let mut at = 0u32;
-                if UNIT_POS_PLANE == 0u32 && n > 0u32 {
-                    at = top_count[slot as usize].fetch_add(n);
-                }
-                at = plane_broadcast(at, 0u32);
+                // Append the plane's kept tops into their groups' segments.
+                let g = top_slot(kept, tl_g, tl_off, slot, ntlay, grp_cnt, nb);
                 if kept {
-                    let g = slot * ntlay + at + pre;
                     let r8 = TOP_REC_WORDS * g;
                     top_rec[r8 as usize] = u32::cast_from(p);
                     top_rec[(r8 + 1u32) as usize] = u32::cast_from(p >> 32u64);
@@ -2665,110 +2725,11 @@ mod kernels {
                     top_rec[(r8 + 5u32) as usize] = w;
                     top_rec[(r8 + 6u32) as usize] = tl_mod * pdiv + v;
                     top_rec[(r8 + 7u32) as usize] = seedf;
-                    let pc = (tl_m1 * pdiv_m1 + v) % m1;
-                    let mut key = 0u32;
-                    if key_level {
-                        key = tl_key;
-                    }
-                    top_b[g as usize] = pc | (key << 8u32);
-                    let mut r = 0u32;
-                    while r < nroots {
-                        let cls = (roots[r as usize] + m1 - pc) % m1;
-                        bucket_cnt[(slot * nb + key * m1 + cls) as usize].fetch_add(1u32);
-                        r += 1u32;
-                    }
                 }
                 slot += 1u32;
             }
         }
         cube_done(ran, 0u32);
-    }
-
-    /// Stage 0b: per slot (one cube), exclusive scan of the bucket counts into
-    /// offsets and fill cursors; writes every (slot, bucket) work item.
-    #[cube(launch_unchecked)]
-    pub fn top_scan_kernel(
-        bucket_cnt: &Array<Atomic<u32>>,
-        cursor: &mut Array<Atomic<u32>>,
-        work: &mut Array<u32>,
-        ran: &mut Array<Atomic<u32>>,
-        tl_stride: u32,
-        #[comptime] nb: u32,
-    ) {
-        let per = comptime!(nb.div_ceil(JOIN_WG));
-        let mut tot = SharedMemory::<u32>::new(comptime!(JOIN_WG as usize));
-        let slot = CUBE_POS_X;
-        let first = UNIT_POS_X * per;
-        let mut acc = 0u32;
-        #[unroll]
-        for q in 0..per {
-            let bx = first + q;
-            if bx < nb {
-                acc += bucket_cnt[(slot * nb + bx) as usize].load();
-            }
-        }
-        tot[UNIT_POS_X as usize] = acc;
-        sync_cube();
-        if UNIT_POS_X == 0u32 {
-            let mut run = 0u32;
-            let mut t = 0u32;
-            while t < CUBE_DIM_X {
-                let c = tot[t as usize];
-                tot[t as usize] = run;
-                run += c;
-                t += 1u32;
-            }
-        }
-        sync_cube();
-        let mut off = tot[UNIT_POS_X as usize] + slot * tl_stride;
-        #[unroll]
-        for q in 0..per {
-            let bx = first + q;
-            if bx < nb {
-                let c = bucket_cnt[(slot * nb + bx) as usize].load();
-                cursor[(slot * nb + bx) as usize].store(off);
-                let wi = slot * nb + bx;
-                work[(4u32 * wi) as usize] = slot;
-                work[(4u32 * wi + 1u32) as usize] = bx;
-                work[(4u32 * wi + 2u32) as usize] = off;
-                work[(4u32 * wi + 3u32) as usize] = off + c;
-                off += c;
-            }
-        }
-        cube_done(ran, 1u32);
-    }
-
-    /// Stage 0c: every certified top onto the list of each bucket it probes.
-    #[cube(launch_unchecked)]
-    pub fn top_fill_kernel(
-        top_b: &Array<u32>,
-        top_count: &Array<Atomic<u32>>,
-        roots: &Array<u32>,
-        cursor: &mut Array<Atomic<u32>>,
-        tl: &mut Array<u32>,
-        ran: &mut Array<Atomic<u32>>,
-        ntlay: u32,
-        nroots: u32,
-        #[comptime] base: u32,
-        #[comptime] nb: u32,
-    ) {
-        let m1 = comptime!(base - 1);
-        let i = ABSOLUTE_POS_X;
-        let slot = CUBE_POS_Y;
-        if i < top_count[slot as usize].load() {
-            let g = slot * ntlay + i;
-            let b = top_b[g as usize];
-            let pc = b & 255u32;
-            let key = b >> 8u32;
-            let mut r = 0u32;
-            while r < nroots {
-                let cls = (roots[r as usize] + m1 - pc) % m1;
-                let at = cursor[(slot * nb + key * m1 + cls) as usize].fetch_add(1u32);
-                tl[at as usize] = g;
-                r += 1u32;
-            }
-        }
-        cube_done(ran, 2u32);
     }
 
     /// The middle-digit prefilter of one join survivor, in [`join_kernel`]'s
@@ -3010,7 +2971,7 @@ mod kernels {
             );
             i += stride;
         }
-        cube_done(ran, 5u32);
+        cube_done(ran, 3u32);
     }
 }
 
@@ -3091,18 +3052,16 @@ pub(crate) struct JoinDevice<R: Runtime> {
     s2: u32,
     s3: u32,
     pdiv: u32,
-    pdiv_m1: u32,
     full_floor: u32,
+    /// The top layer sorted by group (see [`top_kernel`]), and each group's
+    /// first index in it (`nb + 1` words).
     tlay: Handle,
+    goff: Handle,
     fb: Handle,
     pw: Handle,
     pw_len: usize,
     roots: Handle,
     top_rec: Handle,
-    top_b: Handle,
-    tl: Handle,
-    work: Handle,
-    cursor: Handle,
 }
 
 /// What a launched batch leaves behind to be read later: its two counts,
@@ -3129,6 +3088,63 @@ pub(crate) fn top_fd_fits(fs: &FieldSetup) -> bool {
     }
     let (q2, q3) = (s2 - 2 * f0, s3 - 3 * f0);
     (t + 1).div_ceil(4) <= q2.div_ceil(4) && (q2 + 1).div_ceil(4) <= q3.div_ceil(4)
+}
+
+/// The device's top layer: 5 words per prefix (P0 lo, hi, its group `g`,
+/// `goff[g]`, P0 mod b^(k2 - f0 - p)), sorted by group (stably: a counting
+/// sort), and the groups' offsets `goff` (`fs.nb + 1` words). Group `g =
+/// key·(b-1) + c0` with `key = P0 mod b` at the key level (else 0) and
+/// `c0 = P0·b^p mod (b-1)`: a top `P = P0·b^p + v` of slot `v` has digit-sum
+/// class `(c0 + v) mod (b-1)` (`overlap_join`'s `pc`), so for every slot a
+/// bucket's tops are the kept tops of one group per root ([`join_kernel`]).
+///
+/// # Errors
+/// A prefix of `2^64` or more.
+fn sorted_layer(fs: &FieldSetup, nkeys: u32) -> Result<(Vec<u32>, Vec<u32>)> {
+    let (m1, nk) = (u64::from(fs.m1), u64::from(nkeys));
+    ensure!(
+        fs.nb == (nk * m1) as usize,
+        "{} buckets for {nkeys} keys",
+        fs.nb
+    );
+    let pdiv_m1 = u64::try_from(fs.nparts % u128::from(m1))?;
+    // p0mod = b^(k2 - f0 - p) < 2^32, as `FieldSetup::new` chose k2.
+    let p0mod = u64::try_from(fs.base.powu(fs.k2 - fs.f0 - fs.jp.p))?;
+    let p0s: Vec<u64> = fs
+        .tlay
+        .iter()
+        .map(|&(p0, _)| u64::try_from(p0).map_err(|_| anyhow!("top-layer prefix exceeds u64")))
+        .collect::<Result<_>>()?;
+    let group = |p0: u64| -> usize {
+        let key = if nkeys > 1 { p0 % nk } else { 0 };
+        // Below nb <= 64·63.
+        #[allow(clippy::cast_possible_truncation)]
+        let g = (key * m1 + (p0 % m1) * pdiv_m1 % m1) as usize;
+        g
+    };
+    let mut goff = vec![0u32; fs.nb + 1];
+    for &p0 in &p0s {
+        goff[group(p0) + 1] += 1;
+    }
+    for g in 0..fs.nb {
+        goff[g + 1] += goff[g];
+    }
+    let mut at = goff.clone();
+    let mut tl = vec![0u32; 5 * p0s.len()];
+    for &p0 in &p0s {
+        let g = group(p0);
+        let i = at[g] as usize;
+        at[g] += 1;
+        let w = u32_words(u128::from(p0));
+        tl[5 * i..5 * i + 5].copy_from_slice(&[
+            w[0],
+            w[1],
+            u32::try_from(g)?,
+            goff[g],
+            u32::try_from(p0 % p0mod)?,
+        ]);
+    }
+    Ok((tl, goff))
 }
 
 impl<R: Runtime> JoinDevice<R> {
@@ -3170,24 +3186,10 @@ impl<R: Runtime> JoinDevice<R> {
         let nkeys = if fs.key_level { fs.b } else { 1 };
         let (list_cap, nice_cap) = (plan.list_cap, plan.nice_cap);
 
-        // Device-side tops: the top layer with its residues, the field
-        // bounds, the power table and the per-slot top and bucket lists.
-        let (b128, pp) = (u128::from(fs.b), fs.jp.p);
-        let m1 = u128::from(fs.m1);
-        let p0mod = fs.base.powu(fs.k2 - fs.f0 - pp);
-        let mut tl = Vec::with_capacity(5 * fs.tlay.len());
-        for &(p0, _) in &fs.tlay {
-            let w = u32_words(p0);
-            ensure!(w[2] == 0 && w[3] == 0, "top-layer prefix exceeds u64");
-            // p0mod = b^(k2 - f0 - p) < 2^32, as `FieldSetup::new` chose k2.
-            tl.extend_from_slice(&[
-                w[0],
-                w[1],
-                u32::try_from(p0 % m1)?,
-                u32::try_from(p0 % b128)?,
-                u32::try_from(p0 % p0mod)?,
-            ]);
-        }
+        // Device-side tops: the top layer with its residues, sorted by
+        // group, the field bounds, the power table and the per-slot records.
+        let pp = fs.jp.p;
+        let (tl, goff) = sorted_layer(fs, nkeys)?;
         // n < 2^96 (`FieldSetup::new`) and the prefix blocks below 2^64.
         let (s_w, e_w) = (u32_words(fs.s), u32_words(fs.e - 1));
         let (plo, phi) = (u32_words(fs.plo), u32_words(fs.phi));
@@ -3219,6 +3221,11 @@ impl<R: Runtime> JoinDevice<R> {
         }
         let roots: Vec<u32> = fs.base.roots.clone();
         let nroots = roots.len();
+        ensure!(
+            nroots <= MAX_ROOTS as usize,
+            "base {} has {nroots} digit-sum roots",
+            fs.b
+        );
         let ntlay = fs.tlay.len();
         let nb = fs.nb;
         let pdiv = fs.nparts;
@@ -3292,18 +3299,14 @@ impl<R: Runtime> JoinDevice<R> {
             s2: fs.base.s2,
             s3,
             pdiv: u32::try_from(pdiv)?,
-            pdiv_m1: u32::try_from(pdiv % m1)?,
             full_floor: fs.full_floor,
             tlay: client.create(cubecl::bytes::Bytes::from_elems(tl)),
+            goff: client.create(cubecl::bytes::Bytes::from_elems(goff)),
             fb: client.create(cubecl::bytes::Bytes::from_elems(fb)),
             pw_len: pw.len(),
             pw: client.create(cubecl::bytes::Bytes::from_elems(pw)),
             roots: client.create(cubecl::bytes::Bytes::from_elems(roots)),
             top_rec: client.empty(max_slots * fp.top_rec),
-            top_b: client.empty(max_slots * fp.top_b),
-            tl: client.empty(max_slots * fp.tl),
-            work: client.empty(max_slots * fp.work),
-            cursor: client.empty(max_slots * fp.cursor),
         };
         // The FD top stage takes `top_kernel` (only_clipped) beside it on a
         // batch with a clipped block. Compile that now, on this slice's first
@@ -3320,13 +3323,12 @@ impl<R: Runtime> JoinDevice<R> {
     fn warm_top(&self, v: u32) {
         let c = &self.client;
         let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vec![v]));
-        let tc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
-        let bc = c.create(cubecl::bytes::Bytes::from_elems(vec![
+        let gc = c.create(cubecl::bytes::Bytes::from_elems(vec![
             0u32;
             self.nb as usize
         ]));
         let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; STAGES]));
-        self.launch_top(&[v], &vs_h, &tc, &bc, &ran, self.top_fd);
+        self.launch_top(&[v], &vs_h, &gc, &ran, self.top_fd);
     }
 
     /// Whether batch `vs` holds a clipped block (see `clip_vs`).
@@ -3360,16 +3362,10 @@ impl<R: Runtime> JoinDevice<R> {
 
     /// Launch the top stage of batch `vs` (on the device as `vs_h`):
     /// [`top_fd_kernel`] if `fd`, with `top_kernel` on the clipped blocks
-    /// alone if the batch has one; else `top_kernel`.
-    fn launch_top(
-        &self,
-        vs: &[u32],
-        vs_h: &Handle,
-        top_count: &Handle,
-        bucket_cnt: &Handle,
-        ran: &Handle,
-        fd: bool,
-    ) {
+    /// alone if the batch has one; else `top_kernel`. Both append into the
+    /// slots' group segments of `top_rec`, counted in `grp_cnt` (zeroed,
+    /// `vs.len() · nb` words).
+    fn launch_top(&self, vs: &[u32], vs_h: &Handle, grp_cnt: &Handle, ran: &Handle, fd: bool) {
         let nslots = vs.len();
         let fix = fd && self.top_fix(vs);
         let c = &self.client;
@@ -3382,8 +3378,7 @@ impl<R: Runtime> JoinDevice<R> {
         let rec_len = TOP_REC_WORDS as usize * max_slots * ntl;
         let (cd16, cdiv16) = chunk_constants_u16(self.b);
         let vs_h = vs_h.clone();
-        let top_count = top_count.clone();
-        let bucket_cnt = bucket_cnt.clone();
+        let grp_cnt = grp_cnt.clone();
         let ran = ran.clone();
         unsafe {
             if fd {
@@ -3396,17 +3391,12 @@ impl<R: Runtime> JoinDevice<R> {
                     ArrayArg::from_raw_parts(vs_h.clone(), nslots),
                     ArrayArg::from_raw_parts(self.fb.clone(), 10),
                     ArrayArg::from_raw_parts(self.pw.clone(), self.pw_len),
-                    ArrayArg::from_raw_parts(self.roots.clone(), self.nroots as usize),
                     ArrayArg::from_raw_parts(self.top_rec.clone(), rec_len),
-                    ArrayArg::from_raw_parts(self.top_b.clone(), max_slots * ntl),
-                    ArrayArg::from_raw_parts(top_count.clone(), nslots),
-                    ArrayArg::from_raw_parts(bucket_cnt.clone(), nslots * nb),
+                    ArrayArg::from_raw_parts(grp_cnt.clone(), nslots * nb),
                     ArrayArg::from_raw_parts(ran.clone(), nran),
                     self.ntlay,
-                    self.nroots,
                     self.w_f0,
                     self.pdiv,
-                    self.pdiv_m1,
                     self.full_floor,
                     nslots_u32,
                     slot_k,
@@ -3418,7 +3408,6 @@ impl<R: Runtime> JoinDevice<R> {
                     self.s3,
                     cd16,
                     cdiv16,
-                    self.key_level,
                     self.nb,
                     self.f0,
                     self.tq,
@@ -3433,17 +3422,12 @@ impl<R: Runtime> JoinDevice<R> {
                     ArrayArg::from_raw_parts(vs_h.clone(), nslots),
                     ArrayArg::from_raw_parts(self.fb.clone(), 10),
                     ArrayArg::from_raw_parts(self.pw.clone(), self.pw_len),
-                    ArrayArg::from_raw_parts(self.roots.clone(), self.nroots as usize),
                     ArrayArg::from_raw_parts(self.top_rec.clone(), rec_len),
-                    ArrayArg::from_raw_parts(self.top_b.clone(), max_slots * ntl),
-                    ArrayArg::from_raw_parts(top_count.clone(), nslots),
-                    ArrayArg::from_raw_parts(bucket_cnt.clone(), nslots * nb),
+                    ArrayArg::from_raw_parts(grp_cnt.clone(), nslots * nb),
                     ArrayArg::from_raw_parts(ran.clone(), nran),
                     self.ntlay,
-                    self.nroots,
                     self.w_f0,
                     self.pdiv,
-                    self.pdiv_m1,
                     self.full_floor,
                     self.b,
                     self.limbs,
@@ -3453,7 +3437,6 @@ impl<R: Runtime> JoinDevice<R> {
                     self.s3,
                     cd16,
                     cdiv16,
-                    self.key_level,
                     self.nb,
                     fix,
                 );
@@ -3485,11 +3468,10 @@ impl<R: Runtime> JoinDevice<R> {
         let nwork = nslots * nb;
         let nwork_u32 = u32::try_from(nwork)?;
         let max_slots = self.max_slots;
-        let tl_len = max_slots * ntl * self.nroots as usize;
         let rec_len = TOP_REC_WORDS as usize * max_slots * ntl;
         let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vs.to_vec()));
-        let top_count = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots]));
-        let bucket_cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots * nb]));
+        // Kept tops per (slot, group), which the top stage appends.
+        let grp_cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots * nb]));
         // The join kernel counts its survivors and writes only those that
         // pass the prefilter to the list, which it counts too. Both counts
         // are exact: every survivor is counted and prefiltered in the walk.
@@ -3500,12 +3482,9 @@ impl<R: Runtime> JoinDevice<R> {
         // error (as the macOS runner's paravirtual GPU does with layouts
         // above about 0.65 GiB) leaves its count short, where the batch
         // would otherwise read as having no survivors.
-        let top_cubes = self.ntlay.div_ceil(JOIN_WG).max(1);
         let join_cubes = nwork_u32.min(65_535);
         let expect: [u32; STAGES] = [
             self.top_expect(vs, self.top_fd), // top
-            nslots_u32,                       // top scan
-            top_cubes * nslots_u32,           // top fill
             (self.b - 1) * nslots_u32,        // bucket
             join_cubes,                       // join
             CHECK_CUBES,                      // check
@@ -3522,34 +3501,8 @@ impl<R: Runtime> JoinDevice<R> {
                 expect,
             });
         }
-        self.launch_top(vs, &vs_h, &top_count, &bucket_cnt, &ran, self.top_fd);
+        self.launch_top(vs, &vs_h, &grp_cnt, &ran, self.top_fd);
         unsafe {
-            top_scan_kernel::launch_unchecked::<R>(
-                c,
-                CubeCount::Static(nslots_u32, 1, 1),
-                CubeDim::new_1d(JOIN_WG),
-                ArrayArg::from_raw_parts(bucket_cnt.clone(), nslots * nb),
-                ArrayArg::from_raw_parts(self.cursor.clone(), max_slots * nb),
-                ArrayArg::from_raw_parts(self.work.clone(), 4 * max_slots * nb),
-                ArrayArg::from_raw_parts(ran.clone(), nran),
-                self.ntlay * self.nroots,
-                self.nb,
-            );
-            top_fill_kernel::launch_unchecked::<R>(
-                c,
-                CubeCount::Static(top_cubes, nslots_u32, 1),
-                CubeDim::new_1d(JOIN_WG),
-                ArrayArg::from_raw_parts(self.top_b.clone(), max_slots * ntl),
-                ArrayArg::from_raw_parts(top_count.clone(), nslots),
-                ArrayArg::from_raw_parts(self.roots.clone(), self.nroots as usize),
-                ArrayArg::from_raw_parts(self.cursor.clone(), max_slots * nb),
-                ArrayArg::from_raw_parts(self.tl.clone(), tl_len),
-                ArrayArg::from_raw_parts(ran.clone(), nran),
-                self.ntlay,
-                self.nroots,
-                self.b,
-                self.nb,
-            );
             bucket_kernel::launch_unchecked::<R>(
                 c,
                 CubeCount::Static(self.b - 1, nslots_u32, 1),
@@ -3557,7 +3510,7 @@ impl<R: Runtime> JoinDevice<R> {
                 ArrayArg::from_raw_parts(self.bp_r.clone(), nbp),
                 ArrayArg::from_raw_parts(self.bp_m.clone(), 2 * nbp),
                 ArrayArg::from_raw_parts(self.seg.clone(), self.b as usize),
-                ArrayArg::from_raw_parts(vs_h, nslots),
+                ArrayArg::from_raw_parts(vs_h.clone(), nslots),
                 ArrayArg::from_raw_parts(self.ext_m.clone(), 2 * nbp * max_slots),
                 ArrayArg::from_raw_parts(self.ext_q.clone(), 2 * nbp.max(1) * max_slots),
                 ArrayArg::from_raw_parts(self.lists.clone(), nbp * max_slots * self.b as usize),
@@ -3590,8 +3543,10 @@ impl<R: Runtime> JoinDevice<R> {
                     self.counts.clone(),
                     max_slots * self.nkeys as usize * (self.b as usize - 1),
                 ),
-                ArrayArg::from_raw_parts(self.work.clone(), 4 * max_slots * nb),
-                ArrayArg::from_raw_parts(self.tl.clone(), tl_len),
+                ArrayArg::from_raw_parts(vs_h, nslots),
+                ArrayArg::from_raw_parts(self.roots.clone(), self.nroots as usize),
+                ArrayArg::from_raw_parts(self.goff.clone(), nb + 1),
+                ArrayArg::from_raw_parts(grp_cnt, nslots * nb),
                 ArrayArg::from_raw_parts(self.top_rec.clone(), rec_len),
                 ArrayArg::from_raw_parts(self.list.clone(), 2 * self.list_cap as usize),
                 ArrayArg::from_raw_parts(checked.clone(), 1),
@@ -3601,6 +3556,8 @@ impl<R: Runtime> JoinDevice<R> {
                 self.nbp,
                 self.list_cap,
                 self.w_f0,
+                self.ntlay,
+                self.nroots,
                 self.b,
                 self.key_level,
                 ENTRIES_PER_THREAD,
@@ -6200,10 +6157,12 @@ mod tests {
     // The top kernel by finite differences against the top kernel.
     // ---------------------------------------------------------------------
 
-    /// One batch's tops from one top kernel alone: per slot its count, the
-    /// bucket counts, and its (p, mask, r, x, b) entries sorted (the
-    /// kernels append in atomic order).
-    type Tops = (Vec<u32>, Vec<u32>, Vec<Vec<[u32; 9]>>);
+    /// One batch's tops from one top kernel alone: per (slot, group) its
+    /// count, and per slot its (group, p, mask, r, x, seed) entries sorted
+    /// (the kernels append in atomic order within a group). Every record must
+    /// lie in its group's segment, within the group's size, and its prefix
+    /// `P / b^p` must be of that group by the host's rule ([`sorted_layer`]).
+    type Tops = (Vec<u32>, Vec<Vec<[u32; 9]>>);
 
     impl<R: Runtime> JoinDevice<R> {
         fn run_tops(&self, vs: &[u32], fd: bool) -> Tops {
@@ -6211,36 +6170,51 @@ mod tests {
             let nslots = vs.len();
             let nb = self.nb as usize;
             let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vs.to_vec()));
-            let top_count = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots]));
-            let bucket_cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots * nb]));
+            let grp_cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots * nb]));
             let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; STAGES]));
-            self.launch_top(vs, &vs_h, &top_count, &bucket_cnt, &ran, fd);
-            let counts = self.read_u32(&top_count).expect("top counts");
-            let buckets = self.read_u32(&bucket_cnt).expect("bucket counts");
+            self.launch_top(vs, &vs_h, &grp_cnt, &ran, fd);
+            let counts = self.read_u32(&grp_cnt).expect("group counts");
             let want = self.top_expect(vs, fd);
             assert_eq!(self.read_u32(&ran).expect("ran")[0], want, "top cubes run");
             let rec = self.read_u32(&self.top_rec).unwrap();
-            let tb = self.read_u32(&self.top_b).unwrap();
+            let goff = self.read_u32(&self.goff).unwrap();
             let ntl = self.ntlay as usize;
+            let (b, m1, pdiv) = (
+                u64::from(self.b),
+                u64::from(self.b - 1),
+                u64::from(self.pdiv),
+            );
+            let group = |p0: u64| {
+                let key = if self.key_level { p0 % b } else { 0 };
+                key * m1 + (p0 % m1) * (pdiv % m1) % m1
+            };
             let entries = (0..nslots)
                 .map(|s| {
-                    let mut e: Vec<[u32; 9]> = (0..counts[s] as usize)
-                        .map(|i| {
-                            let g = s * ntl + i;
-                            let r = &rec[TOP_REC_WORDS as usize * g..][..8];
-                            [r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], tb[g]]
-                        })
-                        .collect();
+                    let mut e: Vec<[u32; 9]> = Vec::new();
+                    for g in 0..nb {
+                        let n = counts[s * nb + g] as usize;
+                        assert!(
+                            n <= (goff[g + 1] - goff[g]) as usize,
+                            "slot {s} group {g}: {n} tops overrun the segment"
+                        );
+                        for i in 0..n {
+                            let at = s * ntl + goff[g] as usize + i;
+                            let r = &rec[TOP_REC_WORDS as usize * at..][..8];
+                            let p = u64::from(r[0]) | (u64::from(r[1]) << 32);
+                            assert_eq!(group(p / pdiv), g as u64, "slot {s}: P {p} not in its group");
+                            e.push([g as u32, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]]);
+                        }
+                    }
                     e.sort_unstable();
                     e
                 })
                 .collect();
-            (counts, buckets, entries)
+            (counts, entries)
         }
     }
 
     /// `top_fd_kernel` must give exactly `top_kernel`'s tops: the same count
-    /// per slot, the same bucket counts, the same entries. On the test
+    /// per slot and group, the same entries in the same segments. On the test
     /// windows (small bases, clipped at both ends, every partition) and on
     /// production plans' first and last slices (`heavy`: also 1e16 fields),
     /// in consecutive batches (the first ones, the middle, the last), in the
@@ -6326,9 +6300,8 @@ mod tests {
                     let f = dev.run_tops(vs, true);
                     let groups = dev.top_fd_groups(u32::try_from(vs.len()).unwrap());
                     let how = format!("slot groups {groups:?}");
-                    assert_eq!(a.0, f.0, "{label} {vs:?} {how}: top counts differ");
-                    assert_eq!(a.1, f.1, "{label} {vs:?} {how}: bucket counts differ");
-                    assert!(a.2 == f.2, "{label} {vs:?} {how}: top entries differ");
+                    assert_eq!(a.0, f.0, "{label} {vs:?} {how}: group counts differ");
+                    assert!(a.1 == f.1, "{label} {vs:?} {how}: top entries differ");
                 }
                 ntops += a.0.iter().map(|&x| u64::from(x)).sum::<u64>();
                 nfix += usize::from(dev.top_fix(vs));
@@ -6416,11 +6389,10 @@ mod tests {
             for vs in sets {
                 let c = &dev.client;
                 let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vs.clone()));
-                let tc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; vs.len()]));
-                let bc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; vs.len() * nb]));
+                let gc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; vs.len() * nb]));
                 let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; STAGES]));
-                dev.launch_top(vs, &vs_h, &tc, &bc, &ran, fd);
-                last = Some(tc);
+                dev.launch_top(vs, &vs_h, &gc, &ran, fd);
+                last = Some(ran);
             }
             let _ = dev.read_u32(&last.expect("a batch")).expect("sync");
             t.elapsed().as_secs_f64()
