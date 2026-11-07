@@ -45,6 +45,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   commit's own snapshot keeps `#NNN` in history, the final tree carries #249 twice). **Open program
   PRs: 5 = the cap** (#241 → #246 → #249; #247 → #248). CI's macOS job is the first Metal run of
   #249 (new `plane_all`, plain u32 `%`/`/`) — watch it.
+- **L48 PR-ready (09:15 UTC, L48.1):** FD top kernel round 2 ×1.082 b62 1e17 / ×1.070 b60 / ×1.093
+  b62 1e16, NiceMark ×1.029, exact; the stepped slot −31 %. The first form that also cut slices
+  failed NiceMark b60 (×0.976) — slices now stay at 2 survivors per prefix. **Held at the PR cap**;
+  reviewer launched so it opens the moment a slot frees. Box l48-fdround2 destroyed (3.3 h).
 
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)
 

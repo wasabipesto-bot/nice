@@ -5,6 +5,35 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L48.1 FD top kernel round 2: ×1.082 at b62 1e17, PR-ready (2026-11-07, agent; `L48/RESULTS.md`, `L48/PR-BODY.md`, `L48/raw/` (box logs, scripts, patches, bundle); `pr/top-fd-round2` bedc658 = one commit on f3fb390; switchable `exp/top-fd-round2` f168b28, levels 1–7 and 103)
+
+Box at **170 W** (default 320). Levels: 1 = L36.2's three trims, 2 = +ballot append (f3fb390's
+append was `plane_sum` + `plane_exclusive_sum` + atomic + broadcast, not "one ballot + one atomic"
+as L44 said; level 2: 7 SHFL → 2, +2 VOTE), 3 = +partial x mod b^c0 (**slower** than 2: SASS
+4,936, SPIR-V blocks 355–391 > TopKernel at b64), 4 = +SURV_PER_PREFIX 1, 5 = +early-exit carries,
+6 = 5 without 3, 7 = 4 without 3. **PR ships level 6** (trims + ballot + early-exit carries +
+SURV_PER_PREFIX 1) **with a separate `SLICE_SURV_PER_PREFIX = 2`**: the first PR form also cut
+slices and **failed the kill rule** (NiceMark b60 ×0.976 in all six rounds: its window went 2 → 1
+slices, a wider slice prunes less at the field certificate, +2.6 % per partition); keeping slices
+fixed it and the fields came out slightly faster. Registers/SASS (NVRTC→JIT = nvcc): base 110 /
+3,888 (b62), PR 108 / 4,472; 0 spills, 2 blocks of 256 per SM at every level; SPIR-V blocks base
+298–310 → PR 280–298. Kernel-alone ns per stepped slot (b62 / b60): L0 0.2045 / 0.2021; L1 0.1554 /
+0.1537 (−24 %); L2 0.1454 / 0.1444 (−29 %); L6 0.1424 / 0.1493; base vs PR binary in production
+batches: FD kernel 0.2424 → 0.1678 ns (−30.8 %) / 0.2447 → 0.1644 (−32.8 %). Screen vs L0 (b62 /
+b60): L1 ×1.041 / 1.031; L2 ×1.047 / 1.043; L3 ×1.044 / 1.039; L4 ×1.063 / 1.059; L6 ≈ L4 + 0.6 %.
+**A/B PR vs f3fb390 (3 interleaved rounds; NiceMark 6): b62 1e17 ×1.082 (1.076/1.083/1.086;
+107.90 → 99.76 s; cycles ×1.111), b60 1e16 ×1.070 (1.068/1.075/1.070; 21.32 → 19.92 s; cycles
+×1.054), b62 1e16 ×1.093 (×1.197), b64 ×0.997 neutral (FD off; plan 6 → 7 a launch), 1e14
+×1.028/1.034/1.014; NiceMark ×1.029 (b58 weak ×1.018, strong ×1.036 (lowest round ×1.003), b60
+×1.034, b62 ×1.033; NiceMark seeds every slot, so it sees only the ballot, the carry test and the
+larger batches).** PR side 50–100 MHz slower at the cap on b62. Plans (10 GB, 2,560 MiB): b62 1e17
+5 slots / 1,670 MiB / 6,439 batches → PR 9 / 2,457 / 4,009; b60 1e16 4 / 1,566 / 1,350 → 8 / 2,431 /
+675; memory and binding bounds now bind first; measured 0.53 survivors per prefix and partition vs
+1 assumed; no overflow re-runs. **Exact everywhere** (CUDA full list at levels 1–4 and both PR
+forms; levels 5–7/103 the device test; every timed field; lavapipe naga + SPIR-V; lint 16/0;
+fmt/clippy ×3). Conflicts with L46/#249 only in the append block (destination untouched → should
+rebase cleanly). Box 3.3 h. **Held at the PR cap (5 open); reviewer launched.**
+
 ## L49.2 CPU fixed-point prefilter: review fixes and PR #248 (2026-11-07; `L49/REVIEW.md`, `L49/PR-RESULTS.md` "Review follow-up", `L49/raw/*-v2.txt`, `raw/m2/`; PR #248 head 7f5260b = one commit on #247 caef70e)
 
 Review (tests run incl. FX exhaustive 6.63e11 triples, 306 s): merge with small fixes, no defect.
