@@ -18,7 +18,7 @@ only clipped blocks < ~b/2 numbers at a field's end; search of every b20 4-digit
 found none); the stepping test now asserts `full_floor ≥ k2` and the body states the coverage.
 Dispatch `lean: mid == 2 && k > mid` with the matching assertion; docs/nits applied; title
 "fixed-point". Tests 188 + 22, fmt, clippy, `NICE_TEST_CPU_JOIN_REF=3`, whole b42 all pass. **PR
-#248 opened 11:10 UTC.** Open program PRs: #241, #246 (on #241), #247, #248 (on #247).
+#248 opened 09:00 UTC.** Open program PRs: #241, #246 (on #241), #247, #248 (on #247).
 
 ## L46.1 Static bucket order for the top layer: built, exact, ×1.158 at b62 1e17 (2026-11-07, agent; `L46/DESIGN.md`, `L46/RESULTS.md`, `L46/PR-BODY.md`, `L46/raw/`; branches `exp/join-static-buckets` b058bb7 (6 commits), PR-ready squash `pr/join-static-buckets` 318fdae (one commit on f3fb390), rider `exp/join-static-buckets-s15` 4b27507)
 

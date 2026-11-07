@@ -14,21 +14,21 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   either field), **L48 FD top kernel round 2** (box `l48-fdround2`, instance 59529585; kill
   < ×1.05 at either field), **L49 CPU lean prefilter** (ivory; PR branch on #247; kill < ×1.05 at
   both shapes). Hard stops 11:00–12:30 UTC; reviewer agents follow PR-ready branches.
-- **L49 PR branch ready (08:20 UTC, L49.1):** CPU lean prefilter on #247: ×1.07–1.11 at
+- **L49 PR branch ready (07:50 UTC, L49.1):** CPU lean prefilter on #247: ×1.07–1.11 at
   production shapes (1 / 4 threads), ×1.05–1.12 on 1e14 fields, NiceMark CPU ×1.088, exact with
   the FX exhaustive test. Reviewer launched.
-- **L46 built in one day (09:30 UTC, L46.1): ×1.158 at b62 1e17, ×1.154 b60, ×1.222 b64, NiceMark
+- **L46 built in one day (08:20 UTC, L46.1): ×1.158 at b62 1e17, ×1.154 b60, ×1.222 b64, NiceMark
   ×1.119, exact; two kernels and five buffers deleted; beats L45's ceiling because the FD kernel's
   atomics and the join's gathers go too.** Rider (stage once per batch) ×1.02–1.03 on top, exact.
   Box l46-static destroyed (2.75 h). Reviewer launched on the PR squash + the rider; decision: the
   rider goes in as a clearly separated second commit (asked in the report whether to split).
   L48 (same append block) will rebase on whichever lands first.
-- **Review of `pr/cpu-join-lean-prefilter` (10:20 UTC, `L49/REVIEW.md`): merge with small fixes, no
+- **Review of `pr/cpu-join-lean-prefilter` (08:35 UTC, `L49/REVIEW.md`): merge with small fixes, no
   defect** (FX exhaustive re-run: 6.63e11 triples exact; constants = exact ceilings; max error
   2^24.7). Fixes: drop `dm` from `Top` (48 → 64 bytes was a real +0.6 % sort cost; recompute in
   the test-only path), a test window with unseeded stepped tops (pre-existing gap), the dispatch
   assertion and wording, doc nits, "fixed-point" not "division-free". Sent back to the L49 agent.
-- **Review of `pr/join-static-buckets` (10:50 UTC, `L46/REVIEW.md`): merge with small fixes, correct.**
+- **Review of `pr/join-static-buckets` (08:50 UTC, `L46/REVIEW.md`): merge with small fixes, correct.**
   The reviewer re-derived the bucket algebra (pdiv_m1 = b^p mod (b−1) = 1), wrote a host test of the
   segment arithmetic against cpu_join's bucket rule (24 fields, all match; patch kept in
   `L46/raw/review/`), proved segments cannot overflow, and corrected my brief: the FD kernel steps
@@ -36,10 +36,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   the register paragraph overstated production safety (the 40-register spilling variant is new,
   7/37 images), rider as a proper second commit + body section, stale doc, a rename, a sentinel
   fill in `run_tops`, a CI host test for the sort. Sent back to the L46 agent (ivory, no box).
-- **PR #248 opened (11:10 UTC): "CPU overlap join: a fixed-point middle-digit prefilter"**, 7f5260b
+- **PR #248 opened (09:00 UTC): "CPU overlap join: a fixed-point middle-digit prefilter"**, 7f5260b
   on #247 (`Top` back to 48 bytes after the review; no unseeded-stepped-top window can exist, proved
   and stated). Open program PRs: #241, #246, #247, #248.
-- **PR #249 opened (11:20 UTC): "Overlap join: a static bucket order for the top layer"**, 87958fd
+- **PR #249 opened (09:10 UTC): "Overlap join: a static bucket order for the top layer"**, 87958fd
   on #246, two commits (layout 8e0eb99 + the stage rider; the review's fixes incl. a CI host test
   of the sort against the CPU bucket rule and a sentinel fill in the device test; the first
   commit's own snapshot keeps `#NNN` in history, the final tree carries #249 twice). **Open program
