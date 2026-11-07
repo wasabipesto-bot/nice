@@ -50,6 +50,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   failed NiceMark b60 (×0.976) — slices now stay at 2 survivors per prefix. **Held at the PR cap**;
   reviewer launched so it opens the moment a slot frees. Box l48-fdround2 destroyed (3.3 h).
 - Report sent 09:35 UTC. Afternoon: **L47 check-kernel scoping** launched (analysis, no GPU); L48 review running.
+- **Review of `pr/top-fd-round2` (10:30 UTC, `L48/REVIEW.md`): merge with small fixes; kernel changes
+  exact (all three trims, the early-exit carries and the plan re-derived; a host model agrees).
+  Two medium findings: (M1) the ballot append keeps only 32 bits on CubeCL's C++ backends → wrong
+  on wave64 (CDNA via the opt-in cubecl-hip build) — gate on `plane_size_max <= 32`; (M2) real
+  memory rises to the budget at 1e16+ (b60 1e16: 1.6 → 2.5 GiB on a 10 GB card; on wgpu the
+  binding-limit budget gives 2.6 → 3.9 GiB even on 4–6 GB cards) — scope `SURV_PER_PREFIX` 1 to
+  CUDA or measure on AMD/M4. Also: #249 replaces the whole append block (`top_slot` still uses the
+  two plane scans) — the ballot must move into `top_slot`; #249 shrinks per-slot memory so this
+  PR's survivor bound binds (~11 slots) and slices may widen → the combination must be re-measured
+  incl. NiceMark's b60 window. Resumed the L48 agent on a new box to apply the fixes, rebase onto
+  #249 and A/B the combination.
 - 10:10 UTC: **#248 and #249 CI fully green** (25 pass, 3 skipped each; #249's Metal job, the lavapipe parity job with the sentinel test, and both macOS builds all passed); all five open PRs green; no comments.
 
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)

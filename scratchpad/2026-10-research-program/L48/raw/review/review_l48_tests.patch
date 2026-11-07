@@ -1,0 +1,284 @@
+diff --git a/common/src/cubecl_join.rs b/common/src/cubecl_join.rs
+index 7793dc30..9529a350 100644
+--- a/common/src/cubecl_join.rs
++++ b/common/src/cubecl_join.rs
+@@ -6615,3 +6615,279 @@ mod tests {
+         }
+     }
+ }
++
++/// Review-only (not part of the branch): where the FD kernel's carried c0
++/// must be re-formed, and what the plan gives per device.
++#[cfg(test)]
++mod review_l48 {
++    use super::top_fd_fits;
++    use crate::FieldSize;
++    use crate::join_plan::{JoinLimits, JoinPlan, plan_join};
++    use crate::overlap_join::test_fields::{FRONTIER_57, PLAN_FIELDS, WINDOWS, live_partitions};
++    use crate::overlap_join::{FieldSetup, JoinParams};
++    use malachite::natural::Natural;
++    use std::collections::HashSet;
++
++    fn ndig(x: &Natural, b: u32) -> u32 {
++        let bb = Natural::from(b);
++        let mut p = Natural::from(1u32);
++        let mut i = 0;
++        while &p <= x {
++            p *= &bb;
++            i += 1;
++        }
++        i
++    }
++
++    /// The kernel's c0 for the unclipped block of P, power k.
++    fn c0(fs: &FieldSetup, p: u128, k: u32) -> u32 {
++        let w = Natural::from(fs.w);
++        let a = Natural::from(p) * &w;
++        let e = &a + &w - Natural::from(1u32);
++        let (ak, ek) = if k == 2 {
++            (&a * &a, &e * &e)
++        } else {
++            (&a * &a * &a, &e * &e * &e)
++        };
++        let d = ek - ak;
++        let sp = if k == 2 { fs.base.s2 } else { fs.base.s3 };
++        fs.jp.k.max(ndig(&d, fs.b).min(sp))
++    }
++
++    /// Every P in (lo, hi] where the kernel's carried c0 of power k changes
++    /// from P - 1 (and P - 1's c0 is below the digit count).
++    fn transitions(fs: &FieldSetup, lo: u128, hi: u128, k: u32) -> Vec<(u128, u32, u32)> {
++        let sp = if k == 2 { fs.base.s2 } else { fs.base.s3 };
++        let (clo, chi) = (c0(fs, lo, k), c0(fs, hi, k));
++        let mut out = Vec::new();
++        if clo == chi {
++            return out;
++        }
++        let mut seen = HashSet::new();
++        for c in clo + 1..=chi {
++            // smallest P in (lo, hi] with c0 >= c
++            let (mut l, mut h) = (lo + 1, hi);
++            while l < h {
++                let m = l + (h - l) / 2;
++                if c0(fs, m, k) >= c {
++                    h = m;
++                } else {
++                    l = m + 1;
++                }
++            }
++            let prev = c0(fs, l - 1, k);
++            if prev < sp && seen.insert(l) {
++                out.push((l, prev, c0(fs, l, k)));
++            }
++        }
++        out
++    }
++
++    fn unclipped(fs: &FieldSetup, p: u128) -> bool {
++        p * fs.w >= fs.s && p * fs.w + fs.w - 1 <= fs.e - 1
++    }
++
++    /// The device test's batches (`check_top_fd`, heavy).
++    fn test_batches(fs: &FieldSetup, ms: usize) -> Vec<Vec<u32>> {
++        let n = u32::try_from(fs.nparts).unwrap();
++        let all: Vec<u32> = (0..n).collect();
++        let chunks: Vec<&[u32]> = all.chunks(ms).collect();
++        let mut batches: Vec<Vec<u32>> = Vec::new();
++        if chunks.len() <= 64 {
++            batches.extend(chunks.iter().map(|c| c.to_vec()));
++        } else {
++            for i in [0, 1, 2, chunks.len() / 2, chunks.len() - 1] {
++                batches.push(chunks[i].to_vec());
++            }
++        }
++        let live = live_partitions(fs);
++        let step = live.len().div_ceil(96).max(1);
++        let thinned: Vec<u32> = live.into_iter().step_by(step).collect();
++        batches.extend(thinned.chunks(ms).take(4).map(<[u32]>::to_vec));
++        if n >= 12 {
++            batches.push([3, 2, 4, 5, 7, 8, 9, 11].into_iter().take(ms).collect());
++        }
++        batches
++    }
++
++    fn report(label: &str, fs: &FieldSetup, ms: Option<usize>) {
++        if !top_fd_fits(fs) {
++            println!("REVIEW {label}: FD does not fit");
++            return;
++        }
++        let tl: HashSet<u128> = fs.tlay.iter().map(|t| t.0).collect();
++        let batches = ms.map(|m| test_batches(fs, m));
++        for k in [2u32, 3] {
++            let tr = transitions(fs, fs.plo, fs.phi, k);
++            let mut desc = Vec::new();
++            for &(p, from, to) in &tr {
++                let (p0, v) = (p / fs.nparts, p % fs.nparts);
++                let live = tl.contains(&p0);
++                let steps = v >= 1 && unclipped(fs, p - 1) && unclipped(fs, p);
++                let in_test = batches.as_ref().is_some_and(|bs| {
++                    bs.iter().any(|b| {
++                        b.windows(2)
++                            .any(|w| u128::from(w[0]) + 1 == v && u128::from(w[1]) == v)
++                    })
++                });
++                desc.push(format!(
++                    "P={p} c0 {from}->{to} prefix_live={live} steppable={steps} in_test_batch={in_test}"
++                ));
++            }
++            println!(
++                "REVIEW {label}: k={k} cap={} s={} c0(plo)={} c0(phi)={} transitions={} {:?}",
++                fs.jp.k,
++                if k == 2 { fs.base.s2 } else { fs.base.s3 },
++                c0(fs, fs.plo, k),
++                c0(fs, fs.phi, k),
++                tr.len(),
++                desc
++            );
++        }
++    }
++
++    const MIB: u64 = 1 << 20;
++
++    #[test]
++    #[ignore = "review only"]
++    fn review_c0_transitions() {
++        let lim3080 = JoinLimits::for_buffer(10240 * MIB / 4);
++        for &(b, s, e, t, k, p) in WINDOWS {
++            let jp = JoinParams { t, k, p };
++            let fs = FieldSetup::new(b, s, e, jp).expect("field setup");
++            let tl = JoinLimits {
++                max_binding: lim3080.max_binding,
++                budget: 4 << 30,
++            };
++            let ms = JoinPlan::new(&fs, tl, 4, 1 << 24, 1, 2 << 30).unwrap().slots;
++            report(&format!("window b{b} [{s},{e}) ms={ms}"), &fs, Some(ms));
++        }
++        let mut prod: Vec<(u32, u128, u128)> = vec![
++            (57, FRONTIER_57, 100_000_000_000_000),
++            (60, 1_366_406_074_057_412_100_454, 100_000_000_000_000),
++            (62, 7_997_740_455_941_656_911_841, 100_000_000_000_000),
++            (64, 41_242_006_262_957_161_709_568, 100_000_000_000_000),
++            (60, 1_366_406_074_057_412_100_454, 10_000_000_000_000_000),
++            (62, 7_997_740_455_941_656_911_841, 10_000_000_000_000_000),
++            (64, 41_242_006_262_957_161_709_568, 10_000_000_000_000_000),
++        ];
++        for (b, start, size) in prod.drain(..) {
++            let range = FieldSize::new(start, start + size);
++            let field = plan_join(b, &range, lim3080).expect("a join field");
++            let ms = field.plan.slots;
++            report(&format!("test b{b} {size:e} first slice ms={ms}"), &field.fs, Some(ms));
++            if field.slices.len() > 1 {
++                let last = field.slices.last().unwrap();
++                let fs = field.fs.sub_range(last.start(), last.end()).unwrap();
++                let ms = JoinPlan::for_field(&fs, lim3080).unwrap().0.slots;
++                report(&format!("test b{b} {size:e} last slice ms={ms}"), &fs, Some(ms));
++            }
++        }
++        // Whole fields run in production order (every slice, consecutive
++        // batches): transitions anywhere in the field's P range.
++        for (b, start, size) in [
++            (62u32, 7_997_740_455_941_656_911_841u128, 100_000_000_000_000_000u128),
++            (60, 1_366_406_074_057_412_100_454, 10_000_000_000_000_000),
++            (62, 7_997_740_455_941_656_911_841, 10_000_000_000_000_000),
++            (60, 1_573_714_731_429_953_349_518, 100_000_000_000_000),
++            (57, FRONTIER_57, 100_000_000_000_000),
++            (62, 7_997_740_455_941_656_911_841, 100_000_000_000_000),
++        ] {
++            let range = FieldSize::new(start, start + size);
++            let field = plan_join(b, &range, lim3080).expect("a join field");
++            // The first slice's setup with the whole field's bounds (the
++            // top layer is irrelevant here: prefix_live is not meaningful).
++            let mut fs = field.fs.clone();
++            fs.tlay.clear();
++            fs.s = start;
++            fs.e = start + size;
++            fs.plo = fs.s / fs.w;
++            fs.phi = (fs.e - 1) / fs.w;
++            println!("REVIEW whole b{b} {size:e}: {} slices, first-slice ms={}", field.slices.len(), field.plan.slots);
++            report(&format!("whole b{b} {size:e} at {start}"), &fs, None);
++        }
++        let (b, s, size) = PLAN_FIELDS[0];
++        let range = FieldSize::new(s, s + size);
++        let jp = crate::overlap_join::join_params_for(b, &range).unwrap();
++        let fs = FieldSetup::new(b, s, s + size, jp).unwrap();
++        report(&format!("whole b{b} {size:e} (full-field test)"), &fs, None);
++    }
++
++    /// The plan's slots at a survivor rate `surv` (JoinPlan::new's rule).
++    fn slots_at(fs: &FieldSetup, lim: JoinLimits, surv: usize) -> (usize, usize, usize, [usize; 4]) {
++        use crate::join_plan::Footprint;
++        let fp = Footprint::of(fs, 1 << 10);
++        let bound: u32 = if lim.budget > (1 << 30) { u32::MAX } else { 1 << 24 };
++        let list_cap = (bound as usize).min(lim.max_binding / 8).min(lim.budget / 4 / 8);
++        let list = list_cap * 8;
++        let room = lim.budget.saturating_sub(fp.fixed + list);
++        let ntl = fs.tlay.len().max(1);
++        let by = [
++            16,
++            lim.max_binding / fp.largest_per_slot().max(1),
++            room / fp.per_slot().max(1),
++            (list_cap / 2 / (surv * ntl)).max(1),
++        ];
++        let slots = by.iter().copied().min().unwrap();
++        (slots, fp.fixed + list + slots * fp.per_slot(), list_cap, by)
++    }
++
++    #[test]
++    #[ignore = "review only"]
++    #[allow(clippy::cast_precision_loss)]
++    fn review_plans_per_device() {
++        let gib = 1u64 << 30;
++        let devices: Vec<(&str, JoinLimits)> = vec![
++            ("cuda 4GB", JoinLimits::for_buffer(4 * gib / 4)),
++            ("cuda 6GB", JoinLimits::for_buffer(6 * gib / 4)),
++            ("cuda 8GB", JoinLimits::for_buffer(8 * gib / 4)),
++            ("cuda 10GB", JoinLimits::for_buffer(10 * gib / 4)),
++            ("cuda 12GB", JoinLimits::for_buffer(12 * gib / 4)),
++            ("cuda 24GB", JoinLimits::for_buffer(24 * gib / 4)),
++            ("wgpu 128MiB", JoinLimits::for_buffer(128 << 20)),
++            ("wgpu 1GiB", JoinLimits::for_buffer(gib)),
++            ("wgpu 2GiB", JoinLimits::for_buffer(2 * gib)),
++            ("wgpu 4GiB-1", JoinLimits::for_buffer(4 * gib - 1)),
++            ("wgpu 64bit-index", JoinLimits::for_buffer(u64::MAX)),
++        ];
++        let fields: Vec<(u32, u128, u128, f64)> = vec![
++            (62, 7_997_740_455_941_656_911_841, 100_000_000_000_000_000, 0.53),
++            (60, 1_366_406_074_057_412_100_454, 10_000_000_000_000_000, 0.79),
++            (62, 7_997_740_455_941_656_911_841, 10_000_000_000_000_000, 0.53),
++            (64, 41_242_006_262_957_161_709_568, 10_000_000_000_000_000, 1.0),
++            (58, 130_525_216_587_923_470_200, 10_000_000_000_000_000, 1.1),
++            (58, crate::join_plan::tests::DENSE_58, 1_000_000_000_000_000, 1.6),
++            (57, FRONTIER_57, 100_000_000_000_000, 1.6),
++        ];
++        for (dname, lim) in &devices {
++            for &(b, start, size, dens) in &fields {
++                let range = FieldSize::new(start, start + size);
++                match plan_join(b, &range, *lim) {
++                    Ok(field) => {
++                        let (s1, by1, l1, b1) = slots_at(&field.fs, *lim, 1);
++                        let (s2, by2, _, b2) = slots_at(&field.fs, *lim, 2);
++                        assert_eq!(s1, field.plan.slots, "replica of the plan");
++                        assert_eq!(by1, field.plan.bytes, "replica of the bytes");
++                        let ntl = field.fs.tlay.len();
++                        let fill1 = (s1 * ntl) as f64 * dens / l1 as f64;
++                        let fill2 = (s2 * ntl) as f64 * dens / l1 as f64;
++                        println!(
++                            "REVIEWPLAN {dname} (bind {} MiB, budget {} MiB) b{b} {size:e}: {} slices, ntl {ntl}, \
++                             base {s2} slots {} MiB (bounds {b2:?}) -> PR {s1} slots {} MiB (bounds {b1:?}); \
++                             list {l1}; fill at {dens}/prefix: {:.0}% -> {:.0}%; overflow above {:.2}/prefix",
++                            lim.max_binding >> 20,
++                            lim.budget >> 20,
++                            field.slices.len(),
++                            by2 >> 20,
++                            by1 >> 20,
++                            fill2 * 100.0,
++                            fill1 * 100.0,
++                            l1 as f64 / (s1 * ntl) as f64,
++                        );
++                    }
++                    Err(e) => println!("REVIEWPLAN {dname} b{b} {size:e}: {e:?}"),
++                }
++            }
++        }
++    }
++}
