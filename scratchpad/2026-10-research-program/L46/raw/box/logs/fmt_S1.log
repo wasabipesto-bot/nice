@@ -1,0 +1,28 @@
+Diff in /root/l46/src/S/common/src/cubecl_join.rs:6201:
+                             let at = s * ntl + goff[g] as usize + i;
+                             let r = &rec[TOP_REC_WORDS as usize * at..][..8];
+                             let p = u64::from(r[0]) | (u64::from(r[1]) << 32);
+-                            assert_eq!(group(p / pdiv), g as u64, "slot {s}: P {p} not in its group");
++                            assert_eq!(
++                                group(p / pdiv),
++                                g as u64,
++                                "slot {s}: P {p} not in its group"
++                            );
+                             e.push([g as u32, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]]);
+                         }
+                     }
+Diff in /root/l46/src/S/common/src/join_plan.rs:243:
+     }
+ 
+     pub(crate) fn per_slot(&self) -> usize {
+-        self.ext_m
+-            + self.ext_q
+-            + self.lists
+-            + self.counts
+-            + self.top_rec
+-            + self.scratch
++        self.ext_m + self.ext_q + self.lists + self.counts + self.top_rec + self.scratch
+     }
+ 
+     /// The largest buffer one slot adds to (all of them grow linearly).
+fmt rc=1

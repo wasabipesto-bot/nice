@@ -5,6 +5,26 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L49.1 CPU lean prefilter: PR branch (2026-11-07, agent; `L49/PR-RESULTS.md`, `L49/PR-BODY.md`, `L49/raw/`; branch `pr/cpu-join-lean-prefilter` d32f579 = one commit on #247 caef70e; worktree `.worktrees/pr-cpu-join-lean`)
+
+`cpu_join.rs` +329/−41 (~200 lines tests): private `Fx` type (own constants) for the digits; `fresh4`
+membership by shifts + six compares joined with `&` (branch-free; masks keep digit d at bit d —
+x86 shifts need no reversal); `Top.seed` → gated `Top.gmask` + `Top.dh` (Top 48 → 64 B). The
+fixed-point path is the only path for mid = 2 and k > mid (all production shapes); k ≤ mid (b10,
+one b20 window) keeps the division form; old `prefilter` body, `smid`, `SmallDiv::rem` removed.
+**A/B vs #247 (ivory Zen 2, 3 interleaved rounds, loads ≤ 2.0; 1 / 4 threads):** b60 1e16
+partitions ×1.091 / ×1.076; b62 1e17 slice-0 partitions ×1.067 / ×1.106; whole b60 1e14 ×1.051 /
+×1.056; b62 1e14 ×1.047 / ×1.064; b64 1e14 ×1.119 / ×1.109. **NiceMark CPU (4 rounds): 798.5 →
+868.5 = ×1.088** (rounds 1.069–1.104): b58 weak ×1.097 (1 thread ×1.093), b58 strong ×1.053, b60
+×1.113, b62 ×1.074. perf: `survivor` (range test + prefilter) 22.9 % of #247's join → 14.7–15.1 %
+(×1.7 cheaper). Exact: every run = #247's counts (b60/b62/b64 1e14 fields; sampled production
+partitions); whole b42; `NICE_TEST_CPU_JOIN_REF=3`; FX exhaustive over 6.63e11 triples (299 s on 4
+threads). Tests in the PR: `fx_digits_match_the_division` (CI-sized, 4.46e8 triples),
+`fx_digits_are_exact_everywhere` (opt-in `NICE_TEST_FX_EXHAUSTIVE=1`), `lean_membership_matches_
+the_masks`, `lean_prefilter_matches_the_division_form` (1e6 pairs per base), `production_shapes_
+take_the_fixed_point_prefilter`; stepped-vs-divided tops test now compares `dh`/`gmask`; 188 + 22
+pass; fmt; default clippy. Caveats: Zen 2 only; RC's ×1.00 is the old L42 number. → reviewer.
+
 ## L45.1 Measurement session on #246: top-phase split, lean-join ablation, stage cadence, spills (2026-11-06, agent; `L45/RESULTS.md`, `L45/raw/` (logs, per-process kernel classification, SASS, CUDA, PTX; `analyze45.py`); branch `exp/join-l45-measure` 8a07c05 on f3fb390)
 
 RTX 3080 180 W (m139250); unprofiled field 100.23 s (b62 1e17) / 19.63 s per field (b60 1e16);

@@ -1,0 +1,150 @@
+Diff in /root/l48/src/P/common/src/cubecl_join.rs:2136:
+     /// out of the top word. A borrow past `y`'s words is propagated only when
+     /// there is one.
+     #[cube]
+-    fn sub_words(x: &mut Array<u32>, y: &Array<u32>, #[comptime] ny: u32, #[comptime] nx: u32) -> u32 {
++    fn sub_words(
++        x: &mut Array<u32>,
++        y: &Array<u32>,
++        #[comptime] ny: u32,
++        #[comptime] nx: u32,
++    ) -> u32 {
+         // x + !y + 1, carried as `add_words` carries.
+         let mut c = 1u64;
+         #[unroll]
+Diff in /root/l48/src/P/common/src/cubecl_join.rs:2419:
+             let mut c = 1u64;
+             #[unroll]
+             for j in 0..nl {
+-                c += u64::cast_from(dm[j as usize]) + u64::cast_from(rem[j as usize] ^ 0xFFFF_FFFFu32);
++                c += u64::cast_from(dm[j as usize])
++                    + u64::cast_from(rem[j as usize] ^ 0xFFFF_FFFFu32);
+                 dd[j as usize] = u32::cast_from(c);
+                 c >>= 32u64;
+             }
+Diff in /root/l48/src/P/common/src/cubecl_join.rs:2647:
+                     // steps needs neither a nor e (they feed a seed).
+                     let interior_step = valid && v == prev_v + 1u32 && p != plo && p != phi;
+                     if !interior_step {
+-                    // a = p*w (< 2^96, 3 limbs), e = a + w - 1, clipped to [s, e-1].
+-                    let t0 = (p & 0xFFFF_FFFFu64) * u64::cast_from(w);
+-                    let t1 = (p >> 32u64) * u64::cast_from(w) + (t0 >> 32u64);
+-                    let pw0 = u32::cast_from(t0);
+-                    #[unroll]
+-                    for j in 0..limbs {
+-                        if comptime!(j == 0) {
+-                            a[j as usize] = pw0;
+-                        } else if comptime!(j == 1) {
+-                            a[j as usize] = u32::cast_from(t1);
+-                        } else if comptime!(j == 2) {
+-                            a[j as usize] = u32::cast_from(t1 >> 32u64);
+-                        } else {
+-                            a[j as usize] = 0u32;
+-                        }
+-                    }
+-                    let mut carry = w - 1u32;
+-                    #[unroll]
+-                    for j in 0..limbs {
+-                        let t = a[j as usize] + carry;
+-                        let mut c = 0u32;
+-                        if t < carry {
+-                            c = 1u32;
+-                        }
+-                        e[j as usize] = t;
+-                        carry = c;
+-                    }
+-                    let mut eq_a = true;
+-                    let mut eq_e = true;
+-                    #[unroll]
+-                    for jj in 0..limbs {
+-                        let j = comptime!(limbs - 1 - jj);
+-                        let sj = fb[j as usize];
+-                        let ej = fb[comptime!(3 + j) as usize];
+-                        if eq_a {
+-                            if a[j as usize] < sj {
+-                                a_lt_s = true;
+-                                eq_a = false;
+-                            } else if a[j as usize] > sj {
+-                                eq_a = false;
++                        // a = p*w (< 2^96, 3 limbs), e = a + w - 1, clipped to [s, e-1].
++                        let t0 = (p & 0xFFFF_FFFFu64) * u64::cast_from(w);
++                        let t1 = (p >> 32u64) * u64::cast_from(w) + (t0 >> 32u64);
++                        let pw0 = u32::cast_from(t0);
++                        #[unroll]
++                        for j in 0..limbs {
++                            if comptime!(j == 0) {
++                                a[j as usize] = pw0;
++                            } else if comptime!(j == 1) {
++                                a[j as usize] = u32::cast_from(t1);
++                            } else if comptime!(j == 2) {
++                                a[j as usize] = u32::cast_from(t1 >> 32u64);
++                            } else {
++                                a[j as usize] = 0u32;
+                             }
+                         }
+-                        if eq_e {
+-                            if e[j as usize] > ej {
+-                                e_gt_e = true;
+-                                eq_e = false;
+-                            } else if e[j as usize] < ej {
+-                                eq_e = false;
+-                            }
+-                        }
+-                    }
+-                    if a_lt_s {
++                        let mut carry = w - 1u32;
+                         #[unroll]
+                         for j in 0..limbs {
+-                            a[j as usize] = fb[j as usize];
++                            let t = a[j as usize] + carry;
++                            let mut c = 0u32;
++                            if t < carry {
++                                c = 1u32;
++                            }
++                            e[j as usize] = t;
++                            carry = c;
+                         }
+-                    }
+-                    if e_gt_e {
++                        let mut eq_a = true;
++                        let mut eq_e = true;
+                         #[unroll]
+-                        for j in 0..limbs {
+-                            e[j as usize] = fb[comptime!(3 + j) as usize];
++                        for jj in 0..limbs {
++                            let j = comptime!(limbs - 1 - jj);
++                            let sj = fb[j as usize];
++                            let ej = fb[comptime!(3 + j) as usize];
++                            if eq_a {
++                                if a[j as usize] < sj {
++                                    a_lt_s = true;
++                                    eq_a = false;
++                                } else if a[j as usize] > sj {
++                                    eq_a = false;
++                                }
++                            }
++                            if eq_e {
++                                if e[j as usize] > ej {
++                                    e_gt_e = true;
++                                    eq_e = false;
++                                } else if e[j as usize] < ej {
++                                    eq_e = false;
++                                }
++                            }
+                         }
+-                    }
++                        if a_lt_s {
++                            #[unroll]
++                            for j in 0..limbs {
++                                a[j as usize] = fb[j as usize];
++                            }
++                        }
++                        if e_gt_e {
++                            #[unroll]
++                            for j in 0..limbs {
++                                e[j as usize] = fb[comptime!(3 + j) as usize];
++                            }
++                        }
+                     }
+                     // Clipped blocks (P = plo, P = phi) are `top_kernel`'s
+                     // (`only_clipped`), launched beside this one.

@@ -14,6 +14,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   either field), **L48 FD top kernel round 2** (box `l48-fdround2`, instance 59529585; kill
   < ×1.05 at either field), **L49 CPU lean prefilter** (ivory; PR branch on #247; kill < ×1.05 at
   both shapes). Hard stops 11:00–12:30 UTC; reviewer agents follow PR-ready branches.
+- **L49 PR branch ready (08:20 UTC, L49.1):** CPU lean prefilter on #247: ×1.07–1.11 at
+  production shapes (1 / 4 threads), ×1.05–1.12 on 1e14 fields, NiceMark CPU ×1.088, exact with
+  the FX exhaustive test. Reviewer launched.
 
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)
 
