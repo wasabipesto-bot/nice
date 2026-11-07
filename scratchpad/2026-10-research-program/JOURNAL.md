@@ -61,6 +61,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   PR's survivor bound binds (~11 slots) and slices may widen → the combination must be re-measured
   incl. NiceMark's b60 window. Resumed the L48 agent on a new box to apply the fixes, rebase onto
   #249 and A/B the combination.
+- **L48 round 2 on #249 done (12:40 UTC, L48.2): ×1.127 b62 1e17 / ×1.112 b60 vs #249, NiceMark
+  ×1.032 with the b60 window at ×1.052; exact; wave64 ballot gate and CUDA-only batch scoping in;
+  `pr/top-fd-round2` d813aea on #249, held at the PR cap.** Box l48-rebase destroyed. Day: 4
+  boxes ($1.3), 10 agents (all Opus), director ~7 h.
 - **L47 scoped (11:00 UTC, `L47/SCOPING.md`): GO.** The check kernel is instruction-heavy (1,046
   warp-instructions per warp-iteration at half issue rate) and runs 3 waves where 2.5 fit;
   design D (base-b² limbs, schoolbook n², digits from the carry normalisation, a gate before

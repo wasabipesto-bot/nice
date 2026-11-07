@@ -383,3 +383,179 @@ largest over the field's slices), `plan_mib` (the largest layout) and `batches` 
   `wgsl_*`, `blocks_*` lavapipe; `fmt_*`, `clippy_*` lint; `*.smi` the nvidia-smi samples), the chains' outputs, and
   `sass/<tree>/` (CubeCL CUDA source, nvcc SASS, driver-JIT SASS of every level's `top_fd_kernel`).
 - The box (59529585) can be destroyed: everything above is pulled and nothing runs on it.
+
+---
+
+# Round 2 (2026-11-07 afternoon): the review's fixes, rebased onto #249
+
+The independent review (`REVIEW.md`) said "merge with small fixes". This round makes the fixes, rebases onto PR #249's
+head (fork `pr/join-static-buckets` `87958fd` = `f3fb390` + the static bucket order + the stage rider) and re-measures
+the combination. Box: Vast **59555088** (`nice-research-l48-rebase`), RTX 3080 10 GB, driver 580.159.03, **180 W
+cap** (not this morning's 170 W), 19.2 CPUs. Raw logs `raw/r2/box/`, scripts `raw/r2/scripts/`, tables `raw/r2/*.md`.
+
+## R2 Summary
+
+- **Pushed `pr/top-fd-round2` `d813aea`** (with lease, over `bedc658`): one commit on #249's head `87958fd`, CHANGELOG
+  line with `([#NNN](...))`; `PR-BODY.md` rewritten (stacked on #249, backend scoping and memory stated). PR not opened.
+- **Review fixes:** M1 (ballot only on planes ≤ 32 lanes, comptime gate from `plane_size_max`, two-scan fallback
+  exact on CUDA when forced), M2 (the denser plan on CUDA only, via `JoinLimits::vram_budget`; wgpu keeps 2), L1 (comment
+  + host test pinning the b20 windows' c0 crossings), L2 (b64 keeps its plan: identical to the base there), L3
+  (headroom in the doc comment and body), L4 (CHANGELOG and body wording), nits.
+- **On #249: b62 1e17 ×1.127** (82.80 → 73.44 s; rounds 1.123, 1.108, 1.127; cycles ×1.140), **b60 1e16 ×1.112**
+  (16.43 → 14.77 s; 1.136, 1.108, 1.112), b62 1e16 ×1.129, b64 1e16 ×1.005 with the timed build's 12 slots (final:
+  b64 runs the base's kernels and plan, ×0.991 / ×0.998 in cycles = scatter), 1e14 set ×0.978–1.059 (same plans
+  both sides); **NiceMark ×1.032**, every scenario ≥ ×1.009 (b60 window ×1.052 with its 2 slices kept; lowest single
+  round b58 MSD-strong ×0.972, median ×1.009). Kill not fired.
+- **Plan** (10 GB card, budget 2,469 MiB): b62 1e17 5 → 11 slots, 1,463 → 2,393 MiB, 6,439 → 3,288 batches, **11
+  slices on both sides, same sizes**; b60 1e16 4 → 9, 1,367 → 2,199 MiB, 1,350 → 625 batches, **2 slices per field on
+  both sides**. No overflow re-run anywhere.
+- **Kernel alone** (production batches): FD per (prefix, slot) −33.8 % (b62 1e17) / −34.1 % (b60 1e16); stepped slot
+  −30.4 % / −31.6 %.
+- **Registers:** `top_fd_kernel` 108 / 107 (b62 / b60) against #249's 112 / 108; SASS 4,360 / 4,176 against 3,760 /
+  3,576; no spills, 2 blocks per SM.
+- **Exact** on the combination: #249's FD-vs-top device test (and with the gate forced off), CPU-reference parity,
+  both dense fields, whole b42, the 1e14 COMPARE, every timed field, lavapipe naga + SPIR-V, WGSL lint, fmt, clippy ×3.
+- **The box (59555088) can be destroyed** (everything pulled to `raw/r2/box/`, nothing running).
+
+## R2.1 What changed against `bedc658`
+
+| review item | change |
+|---|---|
+| **M1** (ballot wrong on 64-lane planes under CubeCL's C++ dialects) | `ballot_append(plane_size_max) = plane_size_max <= 32`, computed in `JoinDevice::new` from `client.properties().hardware.plane_size_max` and passed to `top_fd_kernel` as a comptime `ballot`. With it, `top_slot` uses the ballot's first word alone (count = popcount, rank = popcount of the bits below the lane); without it, #249's `plane_sum` + `plane_exclusive_sum`. Host test `the_ballot_append_is_for_planes_of_at_most_32_lanes`. |
+| **M2** (real memory rises to the budget; on wgpu the budget is not tied to VRAM) | `JoinLimits` gets `vram_budget` (set by `limits_of` for the CUDA runtime only, kept through `JoinCeiling::cap`). Batches plan for `SURV_PER_PREFIX_VRAM` = 1 only where `vram_budget` and the FD kernel certifies the field (`top_fd_runs`, which `JoinDevice::new` now uses too); everything else, and slices everywhere, keep `SURV_PER_PREFIX` = 2 (so `SLICE_SURV_PER_PREFIX` is gone). Host test `vram_budgets_get_larger_batches_in_the_same_slices` (b60/b62: same cuts, more slots, within budget; b64: the same plan). |
+| **L1** (re-forming branch pinned only by the b20 windows) | `check_top_fd`'s doc says so; host test `top_fd_test_windows_step_across_a_c0_change` checks (u128 arithmetic) that the b20 windows step across a c0 change for both powers. |
+| **L2** (b64 −0.3 %) | b64 now keeps its plan (FD off at powers of two): identical kernels and plan to the base there. |
+| **L3** (headroom halves) | `SURV_PER_PREFIX_VRAM`'s doc: half full at this rate, ~80 % at 1.6, overflow above ~2 (2.0–2.1 at b62 1e17 / b60 1e16 on a 10 GB card, was 4.5–4.7), the re-run unchanged. |
+| **L4** (CHANGELOG, body) | CHANGELOG: "the position each power's certificate starts at", "up to twice", "(on CUDA)"; body: no 1e16 cycle ratios, early exits 2.6–3.7 %, only the FD-vs-top device test pins the changed certificate code, b64 stated as measured. |
+| nits | `dd` dropped (borrow-only loop), `fd_step_words` clamps to the arrays itself, doc of `fd_add_small`. |
+| **#249** | Its `top_slot` replaced the append block; the ballot moved into `top_slot` behind the gate, #249's per-(slot, group) destination unchanged. Two textual conflicts (the append hunk, CHANGELOG), resolved by hand. |
+
+## R2.2 Plan at b62 1e17 and b60 1e16 (`raw/r2/box/plan_CM.log`, a measurement-only test in a throwaway tree)
+
+On this card `CubeCL` reports a largest buffer of 2,588,688,384 B, so the budget is **2,469 MiB**. Base rule (`87958fd`) against
+this PR, every slice of the A/B's fields (first slice's plan):
+
+| field | slices (base / PR) | slice sizes | first slice: slots | MiB | batches/field (harness) |
+|---|---|---|---|---|---|
+| b62 1e17 | **11 / 11** | identical | 5 → **11** | 1,463 → **2,393** | 6,439 → 3,288 |
+| b60 1e16, field 0 / 1 | **2 / 2**, 2 / 2 | identical | 4 → **9**, 4 → 9 | 1,367 → **2,199**, 1,345 → 2,154 | 1,350 → 625 |
+| b62 1e16, field 0 / 1 | 2 / 2, 2 / 2 | identical | 5 → 11, 13 → 16 | 1,463 → 2,393, 1,825 → 2,096 | 532 → 296 |
+| b64 1e16 (FD off) | 1 / 1 | identical | 6 (A/B binary `C`: 12; final `F`: 6) | 1,519 (`C`: 2,361) | 683 (`C`: 342) |
+
+- **Slices are cut exactly as before** on every field (same count, same sizes); only the batches grow.
+- With #249's smaller per-slot footprint the survivor bound now binds (11 slots at b62 1e17, as the review predicted),
+  and the layout is 97 % of the budget.
+- The A/B binary `C` still applied the CUDA rate at b64; the final tree `F` keeps b64's plan (R2.5).
+
+## R2.3 Codegen (`raw/r2/box/sass/`, registers via NVRTC → driver JIT and offline nvcc, identical)
+
+| `top_fd_kernel` | b62 registers / static SASS | b60 registers / static SASS |
+|---|---|---|
+| `87958fd` (#249) | 112 / 3,760 | 108 / 3,576 |
+| this PR (`C`) | **108 / 4,360** | **107 / 4,176** |
+
+No spills; 2 blocks of 256 per SM on both sides. The final tree `F` gives the same (108 / 4,360, 107 / 4,176).
+
+## R2.4 Exactness
+
+Trees: `C` = the A/B binary (fork `exp/top-fd-round2-rb` `2bc83e0`, since deleted), `F` = `C` + the doc fixes and the
+b64 plan scope (`737976a`), `G` = `F` + a clippy fix in a host test and rustfmt = **the pushed `d813aea`**, `CF` = `C`
+with the ballot gate at 16 lanes (measurement only: CUDA takes the two-scan append that 64-lane planes take).
+
+| check | result |
+|---|---|
+| #249's `cubecl_cuda_top_fd_matches_the_top_kernel` (per slot and group the same counts and sorted entries in the same segments; one slot group and several) | **`C` ok: 26 fields, 279 batches (23 with a clipped block), 423,133,750 tops; `CF` ok, the same; `F` ok: 26 / 279 / 375,887,645** (b64's heavy fields keep the smaller plan) |
+| `cubecl_cuda_join_matches_the_cpu_reference` (b10's 69; b20–b64 windows incl. b50/b54; the b57 frontier; sliced windows; the production shape) | `C` ok |
+| `cubecl_cuda_top_certificates_match_the_lockstep_scan_and_the_cpu` (the division path; not this PR's code) | `C` ok: 102,365 / 33,582 / 203,413 / 69,824 |
+| dense b58 1e15, 32 partitions (= CPU join) | `C` ok: 254,938,965 / 14,396,829, 16 a launch, 0 re-run |
+| dense b62 1e16, 4 partitions (= CPU join) | `C` ok: 120,013,475 / 7,355,827, **11** a launch, 2 slices, 0 re-run |
+| whole b42 field | `C` ok: 417,789,835 join survivors, 16,879,877 checked, no hits; join = stride = reference |
+| 1e14 COMPARE b57 / b60 / b62 / b64 | `C` ok, join = stride: 4,850,227,888 / 268,123,373; 2,694,700,282 / 180,517,288; 1,439,469,648 / 88,159,810; 5,702,041,796 / 346,647,759 |
+| host unit tests `join_plan::` (8, incl. `vram_budgets_get_larger_batches_in_the_same_slices`) and `cubecl_join::` (7, incl. `top_fd_test_windows_step_across_a_c0_change`, `the_ballot_append_is_for_planes_of_at_most_32_lanes`) | `C`, `F`, `G` ok |
+| every timed field (A/B and the final check), both sides, every round | the exact counts, `retried=0`, no hits |
+| lavapipe (llvmpipe, 8-lane subgroups: the ballot path), naga and direct SPIR-V, every wgpu test of `cubecl_join` (join parity, #249's FD-vs-top test on 21 fields / 142 batches / 1,018,088 tops, the certificate test, the production sample, the ticket test) | `F` (kernels = `G`'s): **8 ok / 8 ok**; TopFdKernel 278–296 SPIR-V blocks at b57–b64, below TopKernel's 363–381 |
+| CI's WGSL lint (`wgsl_dump_for_lint` + `scripts/wgsl-lint.py`, the 13 `--require`s) | `F`: 14 shaders (#249 removed the scan and fill kernels), 0 flagged |
+| `cargo fmt --all --check`; clippy `-D warnings` default, `nice_client/gpu`, `nice_client/gpu,nice_client/cubecl-spirv` | **`G` (the pushed tree): all clean.** (`F` failed one clippy lint, `int_plus_one` in the new host test, and fmt; fixed in `G`) |
+
+## R2.5 A/B: `87958fd` (`S`) against this PR (`C`), 3 interleaved rounds, 180 W
+
+`raw/r2/scripts/chain_ab.sh`, 11:29–11:57 box UTC, binaries `S` / `C`, `client_S` / `client_C`, nothing else on the
+box; order S C, C S, S C. `raw/r2/ab_table.md`, `raw/r2/nm_table.md`.
+
+| field | S s/field (rounds) | C s/field (rounds) | C vs S (per round) | MHz S / C |
+|---|---|---|---|---|
+| **b62 1e17** | **82.80** (82.03, 83.25, 82.80) | **73.44** (73.03, 75.14, 73.44) | **×1.127** (1.123, 1.108, 1.127); cycles ×1.140 (12–16 clock samples a run) | 1486 / 1474 |
+| b62 1e16 | 6.989 (6.91, 7.05, 6.99) | 6.191 (6.30, 6.19, 6.17) | ×1.129 (1.096, 1.139, 1.133) | (3–4 samples) |
+| **b60 1e16** | **16.431** (16.69, 16.43, 16.43) | **14.770** (14.70, 14.83, 14.77) | **×1.112** (1.136, 1.108, 1.112) | 1499 / 1489 (6–7 samples) |
+| b64 1e16 (FD off; `C` at 12 slots) | 21.983 (21.60, 22.04, 21.98) | 21.868 (21.93, 21.86, 21.87) | ×1.005 (0.985, 1.008, 1.005) | 1464 / 1453 |
+| b60 1e14 | 0.557 (0.56, 0.56, 0.55) | 0.547 (0.55, 0.55, 0.55) | ×1.018 (1.018, 1.018, 1.007) | |
+| b62 1e14 | 0.486 (0.50, 0.46, 0.49) | 0.459 (0.45, 0.50, 0.46) | ×1.059 (1.097, 0.918, 1.059) | |
+| b64 1e14 | 0.673 (0.69, 0.66, 0.67) | 0.688 (0.69, 0.65, 0.69) | ×0.978 (1.007, 1.026, 0.973) | |
+
+- Every run: the exact counts (b62 1e17 1,020,844,021,499 / 62,584,252,554; b62 1e16 163,513,599,082 /
+  10,027,698,695; b60 1e16 460,847,952,346 / 30,871,838,404; b64 1e16 787,584,956,227 / 47,900,853,327; the 1e14
+  fields), `retried=0`.
+- The 1e14 fields run 16 slots on both sides (the cap binds); at b64 1e14 the two binaries run the same kernels and
+  plan, so its ×0.978 (per round 1.007, 1.026, 0.973) is run-to-run scatter (4–7 % per side).
+
+NiceMark nice-only (150 s, 6 rounds, alternating):
+
+| | S | C | C vs S (per round) |
+|---|---|---|---|
+| **score** | median **7850.3** (7745.2–7874.0) | median **8104.9** (8039.7–8174.3) | **×1.032** (1.039, 1.039, 1.035, 1.022, 1.043, 1.032) |
+| b58 MSD-weak (whole field) | 3.747e14 n/s | 3.831e14 | ×1.022 (1.006–1.033) |
+| b58 MSD-strong (whole field) | 1.463e15 | 1.475e15 | ×1.009 (0.972–1.020) |
+| **b60 MSD-weak (sampled)** | 7.755e14 | 8.157e14 | **×1.052** (1.030–1.080); **2 slices on both sides**, 5 → 10 a launch |
+| b62 MSD-weak (sampled) | 9.454e14 | 9.977e14 | ×1.055 (1.035–1.089); 2 slices, 6 → 12 |
+
+- **The bar holds on #249: b62 1e17 ×1.127, b60 1e16 ×1.112** (every round ≥ ×1.108); every NiceMark scenario's
+  ratio is ≥ ×1.009. The b60 window, which failed this morning (×0.976) when slices widened, keeps its 2 slices and
+  gains ×1.052. The lowest single round is b58 MSD-strong ×0.972 (round 6; its ~1 s scenario scattered 0.965–1.052
+  this morning too); its median is ×1.009.
+- The FD kernel's share of a field is larger on #249 (the field is ~83 s instead of ~100–108 s), so the same kernel cut
+  is worth more: ×1.127 here against ×1.082 on `f3fb390`.
+
+**The final tree's check** (`chain_final.sh`, 12:18–12:27, binaries `S` / `F`; `F` keeps b64's plan; 3 interleaved
+rounds of b64, one round of b62 1e17 and b60 1e16):
+
+| field | S | F | F vs S (per round) | plan S → F |
+|---|---|---|---|---|
+| b64 1e16 | 21.49 (21.49, 21.45, 21.96) | 21.83 (21.70, 21.83, 22.01) | ×0.991 (0.991, 0.983, 0.998); in cycles about ×0.998 (F's side ran 8–11 MHz lower each round) | 6 / 1,519 MiB / 683 batches on both |
+| b64 1e14 | 0.674 (0.643, 0.674, 0.699) | 0.685 (0.685, 0.685, 0.694) | ×0.983 | 16 / 1,388 on both |
+| b62 1e17 (1 round) | 83.11 | 72.97 | ×1.139 | 5 → 11, 6,439 → 3,288 batches (as `C`) |
+| b60 1e16 (1 round) | 16.40 | 14.69 | ×1.117 | 4 → 9, 1,350 → 625 (as `C`) |
+
+- At b64, `F` runs exactly `S`'s kernels and plan (FD is off; the plan scope keeps 6 slots), so its ×0.991 / ×0.983
+  are this session's scatter for identical work. With the plan scoped, b64 can neither gain nor lose from this PR.
+- b62 1e17 and b60 1e16 reproduce `C`'s plans and gains (×1.139, ×1.117 in one round).
+
+**The kernel alone, `S` against `F`** (#240's `cubecl_cuda_top_fd_timing`, 12:48–12:52, after everything else;
+2 processes per side and field, 3 rounds each; `raw/r2/topt_table.md`). Production batches (k = each side's plan):
+
+| field | side | k | FD consecutive c (ns per prefix and slot) | all-seed g | stepped s (normalised) |
+|---|---|---|---|---|---|
+| b62 1e17 | `S` (#249) | 5 | 0.2070 | 0.3234 | 0.1781 |
+| b62 1e17 | `F` | 11 | **0.1371 (−33.8 %)** | 0.2963 | **0.1239 (−30.4 %)** |
+| b60 1e16 | `S` | 4 | 0.2061 | 0.3037 | 0.1735 |
+| b60 1e16 | `F` | 9 | **0.1358 (−34.1 %)** | 0.2806 | **0.1186 (−31.6 %)** |
+
+#249 already made the FD kernel cheaper (its append is lighter); this PR takes another third off it in production
+batches.
+
+## R2.6 Files
+
+- `raw/r2/scripts/`: `setup.sh`, `tree.sh`, `build.sh`, `buildclient.sh`, `run.sh`, `test.sh`, `regs48.sh`
+  (+ `ptxjit.py`, `cbor_min.py`), `plan_report_patch.py` (the measurement-only plan report, tree `CM`), chains in
+  order: `chain_main.sh` (C's device test, unit tests, client, plan report, registers, exactness list, the A/B
+  `chain_ab.sh`; its lavapipe/lint tail was stopped after the A/B, as `F` repeats them), `chain_cf.sh` (tree `CF`: C
+  with the ballot gate at 16 lanes, so CUDA takes the two-scan path), `chain_final.sh` (tree `F` = the pushed commit:
+  unit tests, device test, registers, the b64 check and one b62/b60 round, lint, lavapipe), `chain_topt.sh`;
+  analysis `ab.py`, `nm_table.py`, `xsum.py`, `topt48.py`, `clocks.py`, `blocks.py`, `pull.sh`.
+- `raw/r2/box/`: every log (`ab_*`, `nm_*` the A/B; `fin_*` the final check; `x_C_*`, `cmp_C_*` exactness;
+  `q_topfd_*` device tests; `plan_CM.log`; `lvp*`, `wgsl_*`, `blocks_*`; `fmt_*`, `clippy_*`; `topt_*`), `sass/`.
+- `raw/review/`: the reviewer's model, host-test patch and outputs (unchanged).
+- `raw/r2/pr-top-fd-round2-d813aea.bundle` (`87958fd..d813aea`), `raw/r2/*_table.md`, `raw/r2/registers.txt`,
+  `raw/r2/clocks.txt` (`raw/r2/scripts/analyze.sh` regenerates them); `raw/PR-BODY-v1-bedc658.md` (the first body).
+- The first PR form's branch head `bedc658` is superseded (force-pushed with lease); its bundle stays in
+  `raw/pr-top-fd-round2.bundle`. The switchable experiment branch `exp/top-fd-round2` (`f168b28`, on `f3fb390`) is
+  unchanged.

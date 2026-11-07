@@ -1,0 +1,39 @@
+Diff in /root/l48/src/F/common/src/cubecl_join.rs:2287:
+         (
+             bits(2 * w * w).div_ceil(32).min(3).min(2 * limbs),
+             bits(6 * w * w * w).div_ceil(32).min(4).min(3 * limbs),
+-            (bits(3 * w * w) + 32 * limbs + 2).div_ceil(32).min(3 * limbs),
++            (bits(3 * w * w) + 32 * limbs + 2)
++                .div_ceil(32)
++                .min(3 * limbs),
+         )
+     }
+ 
+Diff in /root/l48/src/F/common/src/cubecl_join.rs:6608:
+                 }
+             }
+         }
+-        assert_eq!(crossed, [true, true], "the windows no longer cross a c0 change");
++        assert_eq!(
++            crossed,
++            [true, true],
++            "the windows no longer cross a c0 change"
++        );
+     }
+ 
+     /// The FD kernel's append ranks kept tops with a ballot only on planes
+Diff in /root/l48/src/F/common/src/join_plan.rs:728:
+                     .collect::<Vec<_>>()
+             };
+             assert_eq!(cuts(&a), cuts(&b), "b{base}");
+-            assert!(b.plan.slots >= a.plan.slots, "b{base}: {:?} {:?}", a.plan, b.plan);
++            assert!(
++                b.plan.slots >= a.plan.slots,
++                "b{base}: {:?} {:?}",
++                a.plan,
++                b.plan
++            );
+             assert!(b.plan.bytes <= vram.budget, "b{base}: {:?}", b.plan);
+             let ntl = b.fs.tlay.len();
+             assert!(
+fmt rc=1

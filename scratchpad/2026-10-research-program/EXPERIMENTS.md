@@ -5,6 +5,34 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L48.2 FD top kernel round 2 on #249: review fixes, wave64 gate, CUDA-scoped batches, combination A/B (2026-11-07, agent; `L48/REVIEW.md`, `L48/RESULTS.md` "Round 2", `L48/raw/r2/`; `pr/top-fd-round2` d813aea = one commit on #249's 87958fd; held at the PR cap)
+
+Review (merge with small fixes; kernel changes exact by re-derivation + a host model): M1 the
+ballot append keeps only 32 bits on CubeCL's C++ backends (wave64 CDNA via opt-in cubecl-hip
+would miscount) → comptime `ballot = plane_size_max <= 32` from `client.properties().hardware`,
+#249's `top_slot` uses the ballot's first word when on, the two plane scans otherwise (gate
+forced off on CUDA: device test passes); M2 real memory rises to the budget at 1e16+ (b60 1e16
+1.6 → 2.5 GiB; on wgpu the binding-limit budget would give 2.6 → 3.9 GiB even on small cards) →
+`JoinLimits.vram_budget` set only by the CUDA runtime; `SURV_PER_PREFIX_VRAM = 1` only on CUDA and
+only on fields the FD kernel certifies (`top_fd_runs`); wgpu, power-of-two bases and all slices
+keep 2 (`SLICE_SURV_PER_PREFIX` gone); layout +31–64 % at 1e16+ on CUDA, stated; host tests pin
+the gate, the plan (same slice cuts, more slots; b64 identical) and the two b20 windows that
+re-form the carried c0 (P = 201 square, P = 231 cube — the only coverage of that path; timed
+fields never cross a c0 change). L3 headroom halved (overflow above 2.0–2.1 survivors per prefix,
+was 4.5–4.7; re-run path unchanged) documented. **Plan (10 GB, budget 2,469 MiB):** b62 1e17 11
+slices identical, first-slice slots 5 → 11, 1,463 → 2,393 MiB, batches 6,439 → 3,288; b60 1e16 2
+slices identical, slots 4 → 9, batches 1,350 → 625; no overflow re-runs. **A/B vs 87958fd (180 W,
+3 interleaved rounds): b62 1e17 ×1.127 (1.123/1.108/1.127; 82.80 → 73.44 s; cycles ×1.140), b60
+1e16 ×1.112 (1.136/1.108/1.112; 16.43 → 14.77 s), b62 1e16 ×1.129, b64 ×0.991–1.005 (#249's
+kernels and plan exactly; scatter), 1e14 ×0.978–1.059 (same plans); NiceMark 6 rounds ×1.032
+(b58 weak ×1.022, strong ×1.009 (lowest round ×0.972), b60 window ×1.052 still 2 slices with 5 →
+10 a launch, b62 ×1.055).** Kernel alone: FD 0.2070 → 0.1371 ns per (prefix, slot) (−33.8 %) /
+0.2061 → 0.1358 (−34.1 %); stepped slot −30.4 / −31.6 %. Registers 108 / 107 (#249: 112 / 108),
+SASS 4,360 / 4,176, no spills, 2 blocks/SM; SPIR-V blocks 278–296. Exact on the combination:
+#249's sentinel FD-vs-top test (423.1 M tops; pushed code 375.9 M; gate off too), parity,
+certificate test, dense (b62 at 11 a launch, 0 re-runs), whole b42, 1e14 COMPARE, every timed
+field; lavapipe naga + SPIR-V 8/8; lint 14/0; fmt/clippy ×3. Box 180 W, ~2 h.
+
 ## L48.1 FD top kernel round 2: ×1.082 at b62 1e17, PR-ready (2026-11-07, agent; `L48/RESULTS.md`, `L48/PR-BODY.md`, `L48/raw/` (box logs, scripts, patches, bundle); `pr/top-fd-round2` bedc658 = one commit on f3fb390; switchable `exp/top-fd-round2` f168b28, levels 1–7 and 103)
 
 Box at **170 W** (default 320). Levels: 1 = L36.2's three trims, 2 = +ballot append (f3fb390's

@@ -1,0 +1,28 @@
+   Compiling syn v1.0.109
+    Checking cubecl-opt v0.10.0
+    Checking tracel-rspirv v0.12.1+sdk-1.4.341.0
+   Compiling cubecl-wgpu v0.10.0
+   Compiling cubecl v0.10.0
+   Compiling nice_common v3.4.8-dev (/root/l48/src/F/common)
+    Checking cubecl-cpp v0.10.0
+    Checking cubecl-cuda v0.10.0
+   Compiling c2rust-bitfields-derive v0.20.0
+    Checking c2rust-bitfields v0.20.0
+    Checking tracel-ash v0.39.5+sdk1.4.357
+    Checking cubecl-spirv v0.10.0
+error: unnecessary `>= y + 1` or `x - 1 >=`
+    --> common/src/cubecl_join.rs:6598:59
+     |
+6598 |             let unclipped = |p: u128| p * fs.w >= fs.s && p * fs.w + fs.w - 1 <= fs.e - 1;
+     |                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change it to: `p * fs.w + fs.w - 1 < fs.e`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#int_plus_one
+     = note: `-D clippy::int-plus-one` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::int_plus_one)]`
+
+    Checking nice_jobs v3.4.8-dev (/root/l48/src/F/jobs)
+    Checking nice_client v3.4.8-dev (/root/l48/src/F/client)
+    Checking nice-wasm-client v3.4.8-dev (/root/l48/src/F/wasm-client)
+    Checking nice_api v3.4.8-dev (/root/l48/src/F/api)
+error: could not compile `nice_common` (lib test) due to 1 previous error
+clippy gpu+spirv rc=101
