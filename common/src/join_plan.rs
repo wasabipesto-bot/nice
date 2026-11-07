@@ -73,9 +73,9 @@ const JOIN_MEMORY_MAX: usize = 4 << 30;
 /// survivor list on this bound; one that still overflows is re-run in
 /// smaller batches (`cubecl_join::run_field`).
 const SURV_PER_PREFIX: usize = 2;
-/// Experiment (L48): [`SURV_PER_PREFIX`], or 1 at `NICE_EXP_TOPFD` 4 and 5.
+/// Experiment (L48): [`SURV_PER_PREFIX`], or 1 at `NICE_EXP_TOPFD` 4-6.
 fn surv_per_prefix() -> usize {
-    if matches!(crate::cubecl_join::exp_topfd_level(), 4 | 5) {
+    if matches!(crate::cubecl_join::exp_topfd_level(), 4..=6) {
         1
     } else {
         SURV_PER_PREFIX
