@@ -576,31 +576,28 @@ mod kernels {
             let lbase = slot * base * nbp + base * cs + dkey * clen;
             let ebase = slot * nbp;
             let v = vs[slot as usize];
-            // Thread r < nroots (all in the first plane) takes segment r; the
-            // plane's prefix sum places it. Every thread is past the previous
-            // item's reads of the table (the barrier).
-            let mut sb = 0u32;
-            let mut sn = 0u32;
+            // Thread r < nroots takes segment r, thread 0 places them. Every
+            // thread is past the previous item's reads of the table (the
+            // first barrier).
+            sync_cube();
             if UNIT_POS_X < nroots {
                 let c0 = (roots[UNIT_POS_X as usize] + comptime!(2 * m1) - cls - v % m1) % m1;
                 let g = dkey * m1 + c0;
-                sb = slot * ntlay + goff[g as usize];
-                sn = grp_cnt[(slot * nbk + g) as usize];
+                s_db[UNIT_POS_X as usize] = slot * ntlay + goff[g as usize];
+                s_cum[(UNIT_POS_X + 1u32) as usize] = grp_cnt[(slot * nbk + g) as usize];
             }
-            let ex = plane_exclusive_sum(sn);
             sync_cube();
-            if UNIT_POS_X < nroots {
-                s_cum[UNIT_POS_X as usize] = ex;
-                s_db[UNIT_POS_X as usize] = sb - ex;
-                if UNIT_POS_X == comptime!(nroots.max(1) - 1) {
-                    s_cum[nroots as usize] = ex + sn;
+            if UNIT_POS_X == 0u32 {
+                s_cum[0] = 0u32;
+                #[unroll]
+                for r in 0..nroots {
+                    let c = s_cum[r as usize];
+                    s_cum[comptime!(r + 1) as usize] += c;
+                    s_db[r as usize] -= c;
                 }
             }
             sync_cube();
-            let mut te = 0u32;
-            if comptime!(nroots > 0) {
-                te = s_cum[nroots as usize];
-            }
+            let te = s_cum[nroots as usize];
             let mut v_part = 0u32;
             if comptime!(v_digits > 0) {
                 // The slot's partition digits below M (`v_digits <= pp`).
