@@ -1891,13 +1891,11 @@ mod kernels {
                         if !a_lt_s && !e_gt_e {
                             floor = full_floor;
                         }
-                        // Into the group's segment, one atomic per top (a
-                        // plane-wide append here held the record across the
-                        // branches: 80 -> 98 registers).
+                        // Into the group's segment, one atomic per top.
                         let g = tlay[(5u32 * i + 2u32) as usize];
                         let at = grp_cnt[(slot * nb + g) as usize].fetch_add(1u32);
-                        let r8 = TOP_REC_WORDS
-                            * (slot * ntlay + tlay[(5u32 * i + 3u32) as usize] + at);
+                        let r8 =
+                            TOP_REC_WORDS * (slot * ntlay + tlay[(5u32 * i + 3u32) as usize] + at);
                         top_rec[r8 as usize] = u32::cast_from(p);
                         top_rec[(r8 + 1u32) as usize] = u32::cast_from(p >> 32u64);
                         top_rec[(r8 + 2u32) as usize] = u32::cast_from(mask);
