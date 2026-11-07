@@ -36,6 +36,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   the register paragraph overstated production safety (the 40-register spilling variant is new,
   7/37 images), rider as a proper second commit + body section, stale doc, a rename, a sentinel
   fill in `run_tops`, a CI host test for the sort. Sent back to the L46 agent (ivory, no box).
+- **PR #248 opened (11:10 UTC): "CPU overlap join: a fixed-point middle-digit prefilter"**, 7f5260b
+  on #247 (`Top` back to 48 bytes after the review; no unseeded-stepped-top window can exist, proved
+  and stated). Open program PRs: #241, #246, #247, #248.
 
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)
 

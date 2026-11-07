@@ -2,7 +2,7 @@ Stacked on #247: its commit is the base of this branch; the new work is the last
 
 ## What
 
-Every pair that passes the CPU join's AND inside the field goes through the middle-digit prefilter (`CpuJoin::survivor` → `prefilter`), which keeps about 6 % of them for the client's full check. At mid = 2 (every production shape) it tests the two base-b digits of x2 = (A2 + P2·D) mod b² and x3 = (A3 + P3·D) mod b², where A (< b²) is the listed bottom's carry (`Info.carries`), P (< b²) its coefficient 2R or 3R² (`Ext.p2`, `p3`) and D (< b²) the top's next two digits (`Top.dm`): the four digits must be distinct, and none of them in the bottom's digits or, when the top's seed flag is set, its certificate. It reduced A + P·D mod b² with a reciprocal multiply per power (`SmallDiv::rem`), took x % b and x / b per digit (`divrem_small`), and built and tested two one-hot masks per digit pair with an early exit after each pair.
+Every pair that passes the CPU join's AND inside the field goes through the middle-digit prefilter (`CpuJoin::survivor` → `prefilter`), which keeps about 6 % of them for the client's full check. At mid = 2 (every production shape) it tests the two base-b digits of x2 = (A2 + P2·D) mod b² and x3 = (A3 + P3·D) mod b², where A (< b²) is the listed bottom's carry (`Info.carries`), P (< b²) its coefficient 2R or 3R² (`Ext.p2`, `p3`) and D (< b²) the top's next two digits (`Top.dm` before this PR): the four digits must be distinct, and none of them in the bottom's digits or, when the top's seed flag is set, its certificate. It reduced A + P·D mod b² with a reciprocal multiply per power (`SmallDiv::rem`), took x % b and x / b per digit (`divrem_small`), and built and tested two one-hot masks per digit pair with an early exit after each pair.
 
 This PR computes the same predicate the way #246 does on the GPU:
 
@@ -10,7 +10,7 @@ This PR computes the same predicate the way #246 does on the GPU:
 - **Membership by shifts** (`fresh4`). Digit g is in `seen` iff bit 0 of `seen >> g` is set: the four shifts OR into one test, and six compares check that the four digits are distinct. All of it is combined with `&`, so a survivor takes one branch on the outcome instead of up to four.
 - **Seed-gated top masks.** `Top` keeps `gmask` (its certificate if the seed flag is set, else 0) in place of the flag, so a pair ORs it in without a select.
 
-The fixed-point path covers mid = 2 with k > 2, which is every production shape. Every other shape keeps the general form (`prefilter_any`): in the tests, b10's k = 1 and one b20 window with k = 2, whose last bottom digit reaches below b^mid. (Shapes with mid = 1 and k ≥ 2 also move from the old `prefilter` to `prefilter_any`, which is equivalent there; no field or test window has mid = 1.) `prefilter_any` now reads `gmask`, and recomputes D from P, since `Top` no longer keeps it. The old `prefilter` body and `SmallDiv::rem` are gone. **`Top` stays at 48 bytes**: `dh` takes `dm`'s place and `gmask` the flag's (a compile-time assertion pins the size).
+The fixed-point path covers mid = 2 with k > 2, which is every production shape. Every other shape keeps the general form (`prefilter_any`): in the tests, b10's k = 1 and one b20 window with k = 2, whose last bottom digit reaches below b^mid. (Shapes with mid = 1 and k ≥ 2 also move from the old `prefilter` to `prefilter_any`, which is equivalent there; no field or test window has mid = 1.) `prefilter_any` now reads `gmask`, and recomputes D from P, since `Top` no longer keeps it. The old `prefilter` body and `SmallDiv::rem` are gone. **`Top` stays at 48 bytes**: `dh` replaces `dm`, and `gmask` takes the flag's byte and the padding after it (a compile-time assertion pins the size).
 
 Unlike #246, the masks keep digit d at bit d: on the CPU a u64 shift takes any count below 64, on any target, so no bit reversal is needed. `A·C` is formed per pair (two multiplies) rather than stored per listed bottom, so `Info` stays 8 bytes. The residue range test stays per pair (below).
 
@@ -28,7 +28,7 @@ Measured with perf on #247's head at production shapes (b60 1e16 and b62 1e17 sl
 | ms per partition in these runs | 2598 | 2345 | 2445 | 2265 |
 
 - **`survivor` was 22–23 % of the join** at both shapes. #247 cut the top certificates and left it alone, so its share grew (perf on main at the same shapes: 17–18 %). A b60 1e16 partition sends 34.2 M pairs through it, of which 2.17 M (6.3 %) go on to the full check.
-- With this PR it takes ~340 ms of a b60 1e16 partition instead of ~570 ms (×1.7). That predicts ×1.10 for the partition; the A/B below measured ×1.07–1.11.
+- With this PR it takes ~340 ms of a b60 1e16 partition instead of ~570 ms (×1.7). That predicts ×1.10 for the partition; the A/B below measured ×1.07–1.11 (on a first version; the final one is no slower).
 - The top sort moves whole `Top`s. A first version of this PR grew `Top` to 64 bytes, and the sort's share rose to 1.8 % (b60) and 1.6 % (b62); at 48 bytes it costs what it did on #247 (33 ms of a b60 1e16 partition on both sides).
 
 #246 makes the same change in the GPU join's walk, together with a per-chunk range test (×1.07–1.12 there on 1e16 and 1e17 fields).
@@ -52,7 +52,7 @@ The only condition is Δ < 2^32. The exact maximum of Δ over A, P, D < b² at b
 - `A·C` fits a word: `(b² − 1)·C < 2^32` for b < 256. `dh = D·q + ceil(D·r/b²) = ceil(D·2^32/b²) < 2^32`, and its division is `SmallDiv::divrem` of `D·r + b² − 1 < b⁴ ≤ 2^24`, inside its exact range (below 2^48/b²).
 - `F·b < 2^38` fits a u64; h, g < b ≤ 64, so the shifts `seen >> g` are in range.
 
-**The membership test is the same predicate.** Before (`fresh_digits`, unchanged, still used for k ≤ mid): low digits first, fail if `g2 = g3` or `{g2, g3} ∩ seen ≠ ∅`; then the high digits, fail if `h2 = h3` or `{h2, h3} ∩ (seen ∪ {g2, g3}) ≠ ∅`. Unrolled: the four digits pairwise distinct (six inequalities) and none in `seen`, which is what `fresh4` checks.
+**The membership test is the same predicate.** Before (`fresh_digits`, unchanged, still used by the general form): low digits first, fail if `g2 = g3` or `{g2, g3} ∩ seen ≠ ∅`; then the high digits, fail if `h2 = h3` or `{h2, h3} ∩ (seen ∪ {g2, g3}) ≠ ∅`. Unrolled: the four digits pairwise distinct (six inequalities) and none in `seen`, which is what `fresh4` checks.
 
 **The gated masks** are `seed ? mask : 0`, set where each top is made (stepped and divided paths alike): `seen = bmask | gmask` is the value the select gave.
 
@@ -127,7 +127,7 @@ All release builds. The tests ran on this head; the timed runs' counts are from 
 - **The four new host tests** above pass (`fx_digits_match_the_division`: 446,418,038 triples; `lean_membership_matches_the_masks`; `lean_prefilter_matches_the_division_form`; `production_shapes_take_the_fixed_point_prefilter`), and so does the opt-in exhaustive one: all 663,187,945,915 triples exact.
 - **The existing `cpu_join` tests pass unchanged**, and with them the prefilter in place: `cpu_join_matches_the_reference_on_the_test_windows` compares every visited partition's prefilter survivors, one by one, with the prefilter's definition (`mid_mirror`, the digits of n² and n³ mod b^k2 in u128) on b10's band and the b20–b64 windows, clipped at both ends; the windows with k > 2 run the fixed-point form, b10 and the b20 k = 2 window the division form. Also all three scans, stride agreement on whole windows, slices, the field prune, the stepped-vs-divided tops on production fields (which now compare `dh` and `gmask` too), every stepped window seeded, b10's 69. `cargo test --release -p nice_common -p nice_client`: 188 + 22 passed, 6 ignored (opt-in).
 - The opt-in `cpu_join_matches_the_reference_on_production_fields` (`NICE_TEST_CPU_JOIN_REF=3`: 3 partitions of each plan field, b42–b64): ok, against the reference join.
-- The whole b42 field (`NICE_TEST_JOIN_FULL_FIELD=1`): join = reference = stride, 1764 partitions, 417,789,835 join survivors, 16,879,877 checked, no hits. On 4 threads: reference TBD-ref s, join TBD-join s, stride TBD-stride s.
+- The whole b42 field (`NICE_TEST_JOIN_FULL_FIELD=1`): join = reference = stride, 1764 partitions, 417,789,835 join survivors, 16,879,877 checked, no hits. On 4 threads: reference 86 s, join 12.1 s, stride 112.9 s (the first version; the head's run, with other load on the VM, took 107 s, 18.4 s and 164.8 s).
 - **Every timed run above, of both versions, has #247's join survivors and full checks:**
   - b60 1e16, 4 partitions: 136,900,315 / 8,692,368;
   - b60 1e16, 16 partitions: 549,719,536 / 34,926,644;

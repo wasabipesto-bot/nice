@@ -1,10 +1,45 @@
 # L49 PR results: the lean prefilter in the CPU join (2026-11-07; ivory, CPU only)
 
-**Branch:** `pr/cpu-join-lean-prefilter` on the fork (`wasabipesto-bot/nice`), **one commit `d32f579f`** (`d32f579fd373abcdce3f6b44edaa8af0f7d280bd`) on fork `pr/cpu-join-fd-tops` `caef70e` (#247). Pushed over SSH (no refusal; no HTTPS fallback needed). Not opened as a PR. Body: `L49/PR-BODY.md`. Raw logs: `L49/raw/`.
+**Branch:** `pr/cpu-join-lean-prefilter` on the fork (`wasabipesto-bot/nice`), **one commit, head `03f42b90917c3962e5689e34c5d287ccb9500975`** on fork `pr/cpu-join-fd-tops` `caef70e` (#247). The first version (`d32f579f`, 08:14 UTC) was amended after REVIEW.md (`commit --amend` was allowed) and force-pushed with lease (§ Review follow-up). PR title per the commit: "CPU overlap join: a fixed-point middle-digit prefilter". Not opened as a PR. Body: `L49/PR-BODY.md` (v1 kept as `raw/PR-BODY-v1.md`). Raw logs: `L49/raw/`.
 
-**Worktree:** `.worktrees/pr-cpu-join-lean` (kept, clean: the harness copy in `common/examples/` removed; `target/` 2.2 GB and `target-ab/` removed). A second worktree `.worktrees/l49-base` (detached at `caef70e`, for the base binaries) was removed with its 0.6 GB target. Peak disk use 2.8 GB; `df -h /` 15 GB free before and after.
+**Worktree:** `.worktrees/pr-cpu-join-lean` (kept, clean; `target/` and `target-ab/` removed). The base worktree `.worktrees/l49-base` (detached at `caef70e`) was created twice for the base binaries and removed each time with its target.
 
-## Summary
+## Review follow-up (09:00 UTC; REVIEW.md "merge with small fixes")
+
+- **M1:** `Top.dm` dropped. The stepped path forms `dh` from `st.dm`, the divided path from `(p / pk) % bmid`; `prefilter_any` (test shapes only) recomputes D from `top.p`. **`Top` is 48 bytes again** (`const _: () = assert!(size_of::<Top>() == 48)`; layout 16 + 8 + 8 + 4×4). `stepped_tops_equal_divided_tops_on_production_fields` still compares D through `dh` (strictly increasing in D).
+- **M2:** no window exists for it, and I added none. Full blocks are always seeded at every supported shape: `e² − a² ≥ (b^f0 − 1)·2b^(L−1) ≥ b^(L+f0−1)`, so floor ≥ L + f0 ≥ L + 1 ≥ k + 2 ≥ k2 (since f0 ≥ 1 for FD and k < L). So the stepped path can never see an unseeded top. Unseeded tops on the fixed-point path are clipped blocks of < ~b/2 numbers at a field end, and a join survivor on one is nearly nice. A search of every window start in b20's 4-digit band with a first block of ≤ 10 numbers (t = k = 3, f0 = 1) found none (`raw/m2/search.py`, `search-b20.txt`). Done instead: `the_test_windows_step_their_top_certificates` now asserts `full_floor ≥ k2` for every stepping window, and the body's coverage paragraph says exactly what is pinned. "Never gate" is caught by the reference comparisons. "Always gate" is a no-op on full blocks, is caught only by b10 (general form), and on fixed-point clipped blocks is not pinned.
+- **L1:** `lean: mid == 2 && k > mid`; the hoisted `kb`/`bk`/`b2k` locals are gone. The test asserts `join.lean == (join.mid == 2 && jp.k > 2)`. The body and commit message say the fixed-point path covers mid = 2 with k > 2 and everything else keeps the general form, with mid = 1 / k ≥ 2 moving to `prefilter_any` (equivalent; occurs nowhere).
+- **Nits:**
+  - `Fx` doc: the proof's quotient is now `m`, the local is `fb`, and the cost reads "four multiplies (`A·C`, `P·δ̂` and two by `b`)".
+  - `lean_prefilter_matches_the_division_form` now draws sets of every size 0..=b, with the rationale removed.
+  - The body says "on the CPU a u64 shift takes any count below 64, on any target".
+  - Title "a fixed-point middle-digit prefilter". CHANGELOG: "by reading each pair's digits off a fixed-point fraction, with fewer multiplications and no branches"; `#NNN` placeholder left.
+  - The stray blank line is removed, the body proof's quotient renamed `m`, and the `dh` table (L5) added under "Not in this PR".
+- **Tests on the amended head** (`raw/unit-tests-v2.txt`, `clippy-v2.txt`, `unit-tests-prodref-v2.txt`, `unit-tests-fullfield-v2.txt`, `unit-tests-fx-exhaustive-v2.txt`):
+  - `cargo test --release -p nice_common -p nice_client`: **188 + 22 passed, 6 ignored**.
+  - fmt clean; default clippy `-D warnings` clean.
+  - `NICE_TEST_CPU_JOIN_REF=3`: ok, 25.8 s.
+  - Whole b42: ok, 417,789,835 / 16,879,877, no hits. Reference 107 s, join 18.4 s, stride 164.8 s, all slower because another session's cargo build ran on the VM at the same time.
+  - Exhaustive FX: ok, all 663,187,945,915 triples exact, 401 s (slower than the first run's 299 s because of the same outside load).
+- **Sanity A/B** (`raw/ab-runs-v2.txt`, `scripts/run_ab_v2.sh` + `run_ab_v2b.sh`): 4 threads, 16 partitions, b60 1e16 and b62 1e17 s0, 4 alternating rounds, ms/partition-thread, #247 / PR. Every run had #247's counts (549,719,536 / 34,926,644 and 550,916,180 / 32,806,057).
+
+| work | r1 (other load: 1-min load 3.7–4.7) | r2 | r3 | r4 | medians r2–r4 |
+|---|---|---|---|---|---|
+| b60 1e16 | 3154 / 4173 | 2642 / 2298 (×1.150) | 2558 / 2290 (×1.117) | 3258 (load) / 2390 | 2642 / **2298** |
+| b62 1e17 s0 | 4304 / 2730 | 2474 / 2234 (×1.108) | 2490 / 2428 (×1.026) | 2422 / 2234 (×1.084) | 2474 / **2234** (×1.107) |
+
+  The PR medians (2298, 2234 ms) are at or below the first version's 3-round medians (2389, 2252 ms): no regression. The other load came from another session (its cargo builds were visible in `top` around 08:43 and 09:00).
+- **Perf after M1** (`raw/perf-runs-v2.txt`, 1 thread, 4 partitions, each run gated at load ≤ 2):
+
+| symbol | b60 #247 | b60 PR (48 B) | b60 PR v1 (64 B) | b62 #247 | b62 PR (48 B) | b62 PR v1 (64 B) |
+|---|---|---|---|---|---|---|
+| top sort | 1.27 % (33 ms) | **1.39 % (33 ms)** | 1.84 % (43 ms) | 1.08 % (26 ms) | **1.27 % (29 ms)** | 1.57 % (35 ms) |
+| `survivor` | 21.9 % | 14.5 % | 14.7 % | 22.8 % | 14.5 % | 15.1 % |
+| ms / partition | 2598 | 2345 | 2340 | 2445 | 2265 | 2236 |
+
+  The body's Why table now uses these runs (#247 and the final PR).
+
+## Summary (first version d32f579f; still valid for the amended head except the `Top` size)
 
 - **Verdict: keep.** Kill was "< ×1.05 at both production shapes, or any count differs": all four production-shape medians are ≥ ×1.067 and every count is identical.
 - **A/B against #247's head `caef70e` (3 rounds, medians, interleaved, order alternating):**
@@ -15,12 +50,12 @@
 - **Profile (perf, 1 thread):** `CpuJoin::survivor` (range test + prefilter) was **22.9 %** of #247's join at b60 1e16 and b62 1e17 s0 (17–18 % on main before #247); **14.7 / 15.1 %** with the PR, ~590 → ~345 ms of a b60 1e16 partition (×1.7), predicting ×1.11 for the partition.
 - Matches the brief's estimate (×1.06–1.10) and the L42 prototype (×1.05–1.08 standalone, on main, where the share was smaller).
 
-## What the commit does (`common/src/cpu_join.rs` +329/−41, of which ~200 lines are the new tests; CHANGELOG +1)
+## What the commit does (first version; the amended head's differences are in § Review follow-up) (`common/src/cpu_join.rs` +329/−41, of which ~200 lines are the new tests; CHANGELOG +1)
 
 - New private `Fx` (FX): `C = ⌈2^32/b²⌉`, `q`, `r` (2^32 = q·b² + r), a `SmallDiv(b²)`; `dh(D) = D·q + ⌈D·r/b²⌉` per kept top; `digits(A, P, dh)` = (hi32(F·b), hi32(lo32(F·b)·b)) with F = A·C + P·dh mod 2^32; `pass(seen, carries, p2, p3, dh)` (FX + MT).
-- New `fresh4` (MT): `(seen >> g) & 1` for the four digits ORed, six `!=`, combined with `&` (`#[allow(clippy::needless_bitwise_bool)]`, commented as deliberate). Masks stay natural-order (digit d at bit d): no bit reversal on x86.
-- GM: `Top.seed: bool` replaced by `Top.gmask: u64` (seed ? mask : 0); `Top.dh: u32` added (48 → 64 bytes, verified with `size_of`).
-- `CpuJoin.lean = mid == 2 && kb == bk == b2k == 0` (i.e. k > mid; every production shape). `survivor` calls `prefilter` (now the fixed-point form; the name kept so `cubecl_join`'s doc reference to `cpu_join::CpuJoin::prefilter` stays valid) when `lean`, else `prefilter_any`. The old division `prefilter`, the `smid` field and `SmallDiv::rem` are gone (the only `mid != 2 && k > mid` shape would now take `prefilter_any`, which is equivalent there; no field or window has mid ≠ 2).
+- New `fresh4` (MT): `(seen >> g) & 1` for the four digits ORed, six `!=`, combined with `&` (`#[allow(clippy::needless_bitwise_bool)]`, commented as deliberate). Masks stay natural-order (digit d at bit d): no bit reversal on any target.
+- GM: `Top.seed: bool` replaced by `Top.gmask: u64` (seed ? mask : 0); `Top.dh: u32` added. First version: `Top.dm` kept too, 48 → 64 bytes; amended head: `dm` dropped, 48 bytes (const-asserted).
+- `CpuJoin.lean = mid == 2 && k > mid` (amended head; the first version wrote it as `mid == 2 && kb == bk == b2k == 0`, the same set; every production shape). `survivor` calls `prefilter` (now the fixed-point form; the name kept so `cubecl_join`'s doc reference to `cpu_join::CpuJoin::prefilter` stays valid) when `lean`, else `prefilter_any`. The old division `prefilter`, the `smid` field and `SmallDiv::rem` are gone (the only `mid != 2 && k > mid` shape would now take `prefilter_any`, which is equivalent there; no field or window has mid ≠ 2).
 - `prefilter_digits`' loop moved into a free `fresh_digits(sb, mid, seen, x2, x3)` (same code), so the tests compare the new form against the live division form.
 - No knobs, no env toggles, no GPU code touched. `cpu_join.rs` has no feature-gated items.
 - **Interpretation notes:** (1) `A·C` is computed per pair (as in the L42 scratch), not stored per listed bottom (Info stays 8 bytes); listed under "Not in this PR". (2) The opt-in exhaustive test reuses #246's env name `NICE_TEST_FX_EXHAUSTIVE` (one switch for both FX exhaustive tests). (3) The commit message and body describe the predicate as #246's; the RC part of #246 is explicitly left out.
@@ -95,7 +130,7 @@ Rounds started 06:14 / 06:42 / 07:10 UTC at 1-min loads 2.00 / 1.88 / 1.97 (gate
 ## Deviations / notes
 
 - No subagents, no Vast, nothing pushed upstream, no PR, no GitHub comments; nothing outside `L49/` and `.worktrees/` written (the base worktree was created and removed under `.worktrees/`).
-- `commit --amend` was not needed: the paren edit was made before the first commit; the branch is one commit.
+- The first version needed no amend (the paren edit preceded the first commit). The review follow-up was squashed into the same commit with `commit --amend` (allowed) and pushed with `--force-with-lease` against `d32f579f`.
 - The body's RC paragraph cites the L42 prototype's numbers (on main, 1 thread, 2 rounds) and says so; RC was not re-measured on top of #247.
 - Not measured: other microarchitectures (AVX-512, Zen 3/4); b64 1e16 partitions (the brief asked for whole b64 1e14 fields only).
 

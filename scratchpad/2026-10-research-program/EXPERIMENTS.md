@@ -5,6 +5,21 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L49.2 CPU fixed-point prefilter: review fixes and PR #248 (2026-11-07; `L49/REVIEW.md`, `L49/PR-RESULTS.md` "Review follow-up", `L49/raw/*-v2.txt`, `raw/m2/`; PR #248 head 7f5260b = one commit on #247 caef70e)
+
+Review (tests run incl. FX exhaustive 6.63e11 triples, 306 s): merge with small fixes, no defect.
+Fixes: `dm` dropped from `Top` (64 → 48 bytes; `const _: () = assert!(size_of::<Top>() == 48)`;
+`prefilter_any` recomputes D from `top.p`) — the sort share back to #247's (1.39 % / 1.27 % vs 1.84 /
+1.57 at 64 B); sanity A/B on the new head (4 threads, 4 rounds, two loaded rounds discarded):
+b60 1e16 2642 → 2298 ms (×1.15), b62 1e17 slice 0 2474 → 2234 ms (×1.107), counts identical;
+`survivor` share 21.9 / 22.8 % → 14.5 %. **M2: no test window with unseeded stepped tops can
+exist** (every full block seeds: e² − a² ≥ b^(L+f0−1) → floor ≥ L + f0 ≥ k + 2; unseeded tops are
+only clipped blocks < ~b/2 numbers at a field's end; search of every b20 4-digit window start
+found none); the stepping test now asserts `full_floor ≥ k2` and the body states the coverage.
+Dispatch `lean: mid == 2 && k > mid` with the matching assertion; docs/nits applied; title
+"fixed-point". Tests 188 + 22, fmt, clippy, `NICE_TEST_CPU_JOIN_REF=3`, whole b42 all pass. **PR
+#248 opened 11:10 UTC.** Open program PRs: #241, #246 (on #241), #247, #248 (on #247).
+
 ## L46.1 Static bucket order for the top layer: built, exact, ×1.158 at b62 1e17 (2026-11-07, agent; `L46/DESIGN.md`, `L46/RESULTS.md`, `L46/PR-BODY.md`, `L46/raw/`; branches `exp/join-static-buckets` b058bb7 (6 commits), PR-ready squash `pr/join-static-buckets` 318fdae (one commit on f3fb390), rider `exp/join-static-buckets-s15` 4b27507)
 
 Design: a slot's top lands in bucket (key, (root − pc) mod (b−1)) with pc = (c0 + v) mod (b−1), c0 =
