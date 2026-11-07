@@ -73,6 +73,14 @@ const JOIN_MEMORY_MAX: usize = 4 << 30;
 /// survivor list on this bound; one that still overflows is re-run in
 /// smaller batches (`cubecl_join::run_field`).
 const SURV_PER_PREFIX: usize = 2;
+/// Experiment (L48): [`SURV_PER_PREFIX`], or 1 at `NICE_EXP_TOPFD=4`.
+fn surv_per_prefix() -> usize {
+    if crate::cubecl_join::exp_topfd_level() == 4 {
+        1
+    } else {
+        SURV_PER_PREFIX
+    }
+}
 /// Partitions per launch a slice of a large field is cut for
 /// ([`max_slice_prefixes`]). A slice of that size usually gets two or three
 /// times as many, since only a third to a half of its top-layer prefixes
@@ -319,7 +327,7 @@ impl JoinPlan {
         let room = lim.budget.checked_sub(fp.fixed + list)?;
         // The batch's expected prefilter survivors fill at most half its list.
         let by_survivors =
-            (list_cap as usize / 2 / (SURV_PER_PREFIX * fs.tlay.len().max(1))).max(1);
+            (list_cap as usize / 2 / (surv_per_prefix() * fs.tlay.len().max(1))).max(1);
         let slots = slots
             .min(lim.max_binding / fp.largest_per_slot().max(1))
             .min(room / fp.per_slot().max(1))
@@ -370,7 +378,7 @@ pub(crate) fn max_slice_prefixes(fs: &FieldSetup, lim: JoinLimits) -> usize {
     let by_budget = lim.budget.saturating_sub(base_bytes) / (per_fixed + s * per_slot).max(1);
     let by_binding =
         (lim.max_binding / s / per_largest.max(1)).min(lim.max_binding / per_fixed.max(1));
-    let by_survivors = list_cap / 2 / (s * SURV_PER_PREFIX);
+    let by_survivors = list_cap / 2 / (s * surv_per_prefix());
     by_budget.min(by_binding).min(by_survivors)
 }
 
@@ -668,8 +676,8 @@ pub(crate) mod tests {
             assert!(plan.bytes <= lim.budget, "b{base}: {plan:?}");
             assert!(plan.slots >= SLICE_SLOTS, "b{base}: {plan:?}");
             assert!(
-                plan.slots * ntl * SURV_PER_PREFIX
-                    <= plan.list_cap as usize / 2 + ntl * SURV_PER_PREFIX
+                plan.slots * ntl * surv_per_prefix()
+                    <= plan.list_cap as usize / 2 + ntl * surv_per_prefix()
             );
             println!(
                 "b{base} {:.0e}: {n} slice(s), first {ntl} prefixes, {} per launch, {} MiB",
