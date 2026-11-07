@@ -243,12 +243,7 @@ impl Footprint {
     }
 
     pub(crate) fn per_slot(&self) -> usize {
-        self.ext_m
-            + self.ext_q
-            + self.lists
-            + self.counts
-            + self.top_rec
-            + self.scratch
+        self.ext_m + self.ext_q + self.lists + self.counts + self.top_rec + self.scratch
     }
 
     /// The largest buffer one slot adds to (all of them grow linearly).

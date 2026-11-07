@@ -3096,7 +3096,7 @@ pub(crate) fn top_fd_fits(fs: &FieldSetup) -> bool {
 fn sorted_layer(fs: &FieldSetup, nkeys: u32) -> Result<(Vec<u32>, Vec<u32>)> {
     let (m1, nk) = (u64::from(fs.m1), u64::from(nkeys));
     ensure!(
-        fs.nb == (nk * m1) as usize,
+        usize::try_from(nk * m1) == Ok(fs.nb),
         "{} buckets for {nkeys} keys",
         fs.nb
     );
@@ -6172,34 +6172,39 @@ mod tests {
             let rec = self.read_u32(&self.top_rec).unwrap();
             let goff = self.read_u32(&self.goff).unwrap();
             let ntl = self.ntlay as usize;
-            let (b, m1, pdiv) = (
+            let (base, m1, pdiv) = (
                 u64::from(self.b),
                 u64::from(self.b - 1),
                 u64::from(self.pdiv),
             );
             let group = |p0: u64| {
-                let key = if self.key_level { p0 % b } else { 0 };
+                let key = if self.key_level { p0 % base } else { 0 };
                 key * m1 + (p0 % m1) * (pdiv % m1) % m1
             };
             let entries = (0..nslots)
                 .map(|s| {
-                    let mut e: Vec<[u32; 9]> = Vec::new();
-                    for g in 0..nb {
-                        let n = counts[s * nb + g] as usize;
+                    let mut ents: Vec<[u32; 9]> = Vec::new();
+                    for (grp, w) in goff.windows(2).enumerate() {
+                        let n = counts[s * nb + grp] as usize;
                         assert!(
-                            n <= (goff[g + 1] - goff[g]) as usize,
-                            "slot {s} group {g}: {n} tops overrun the segment"
+                            n <= (w[1] - w[0]) as usize,
+                            "slot {s} group {grp}: {n} tops overrun the segment"
                         );
+                        let gw = u32::try_from(grp).unwrap();
                         for i in 0..n {
-                            let at = s * ntl + goff[g] as usize + i;
-                            let r = &rec[TOP_REC_WORDS as usize * at..][..8];
-                            let p = u64::from(r[0]) | (u64::from(r[1]) << 32);
-                            assert_eq!(group(p / pdiv), g as u64, "slot {s}: P {p} not in its group");
-                            e.push([g as u32, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]]);
+                            let at = s * ntl + w[0] as usize + i;
+                            let rw = &rec[TOP_REC_WORDS as usize * at..][..8];
+                            let pv = u64::from(rw[0]) | (u64::from(rw[1]) << 32);
+                            assert_eq!(
+                                group(pv / pdiv),
+                                u64::from(gw),
+                                "slot {s}: P {pv} not in its group"
+                            );
+                            ents.push([gw, rw[0], rw[1], rw[2], rw[3], rw[4], rw[5], rw[6], rw[7]]);
                         }
                     }
-                    e.sort_unstable();
-                    e
+                    ents.sort_unstable();
+                    ents
                 })
                 .collect();
             (counts, entries)
