@@ -50,6 +50,7 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   failed NiceMark b60 (×0.976) — slices now stay at 2 survivors per prefix. **Held at the PR cap**;
   reviewer launched so it opens the moment a slot frees. Box l48-fdround2 destroyed (3.3 h).
 - Report sent 09:35 UTC. Afternoon: **L47 check-kernel scoping** launched (analysis, no GPU); L48 review running.
+- 10:10 UTC: **#248 and #249 CI fully green** (25 pass, 3 skipped each; #249's Metal job, the lavapipe parity job with the sentinel test, and both macOS builds all passed); all five open PRs green; no comments.
 
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)
 
