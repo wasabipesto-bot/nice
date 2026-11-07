@@ -4,6 +4,17 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-07 (day 11; routine fired 04:41 UTC)
+
+- **Reconcile:** no research instances; November research $8.12 (fleet $11.44); credit $41.78;
+  ivory 15 GB free. #241, #246, #247 open and green, no comments; nothing merged (weekend);
+  main = 6f060a9. Twelve 7-day worktrees removed (38 remain). No user messages.
+- Leads today (from `L44/ROADMAP.md`, L45's verdicts): **L46 static bucket order** (box `l46-static`
+  3080, instance 59529576; day 1 of 2: design + implementation + exactness; kill < ×1.05 at
+  either field), **L48 FD top kernel round 2** (box `l48-fdround2`, instance 59529585; kill
+  < ×1.05 at either field), **L49 CPU lean prefilter** (ivory; PR branch on #247; kill < ×1.05 at
+  both shapes). Hard stops 11:00–12:30 UTC; reviewer agents follow PR-ready branches.
+
 ## 2026-11-06 (day 10; routine fired 04:41 UTC; first full heavy+ day)
 
 - **Reconcile:** no research instances; November research $6.95 (fleet $9.67); credit $44.72;
