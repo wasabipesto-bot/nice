@@ -3362,6 +3362,12 @@ pub(crate) struct JoinProfile {
     pub clip_launches: u64,
     /// One empty mark per batch (the floor of a mark).
     pub null_secs: f64,
+    /// L51: `upload_secs` split: host preparation (of which `sorted_layer`),
+    /// the buffers' creation and allocation, `warm_top`.
+    pub up_host_secs: f64,
+    pub up_sort_secs: f64,
+    pub up_dev_secs: f64,
+    pub up_warm_secs: f64,
     /// Pairs the walk wrote past a full stage (`NICE_EXP_JOIN_SPILLCNT=1`).
     pub spilled: u64,
     pub bucket_secs: f64,
@@ -3400,6 +3406,10 @@ impl JoinProfile {
         self.top_clip_secs += o.top_clip_secs;
         self.clip_launches += o.clip_launches;
         self.null_secs += o.null_secs;
+        self.up_host_secs += o.up_host_secs;
+        self.up_sort_secs += o.up_sort_secs;
+        self.up_dev_secs += o.up_dev_secs;
+        self.up_warm_secs += o.up_warm_secs;
         self.spilled += o.spilled;
         self.bucket_secs += o.bucket_secs;
         self.join_secs += o.join_secs;
@@ -3642,6 +3652,7 @@ impl<R: Runtime> JoinDevice<R> {
     // One buffer per line, as the plan sized them.
     #[allow(clippy::too_many_lines)]
     fn new_inner(client: &ComputeClient<R>, fs: &FieldSetup, plan: &JoinPlan) -> Result<Self> {
+        let t_in = Instant::now();
         let limbs = n_limbs(fs.b).ok_or_else(|| anyhow!("base {} has no u128 range", fs.b))?;
         ensure!(limbs <= 3, "device tops: n must fit 96 bits");
         let wide = wide_chunk_for(client);
@@ -3678,7 +3689,9 @@ impl<R: Runtime> JoinDevice<R> {
         // Device-side tops: the top layer with its residues, sorted by
         // group, the field bounds, the power table and the per-slot records.
         let pp = fs.jp.p;
+        let t_sort = Instant::now();
         let (tl, goff) = sorted_layer(fs, nkeys)?;
+        let sort_secs = t_sort.elapsed().as_secs_f64();
         // n < 2^96 (`FieldSetup::new`) and the prefix blocks below 2^64.
         let (s_w, e_w) = (u32_words(fs.s), u32_words(fs.e - 1));
         let (plo, phi) = (u32_words(fs.plo), u32_words(fs.phi));
@@ -3718,6 +3731,8 @@ impl<R: Runtime> JoinDevice<R> {
         let ntlay = fs.tlay.len();
         let nb = fs.nb;
         let pdiv = fs.nparts;
+        let host_secs = t_in.elapsed().as_secs_f64();
+        let t_dev = Instant::now();
         let dev = Self {
             client: client.clone(),
             b: fs.b,
@@ -3807,12 +3822,27 @@ impl<R: Runtime> JoinDevice<R> {
             profile: gpu_profile_enabled(),
             prof: std::cell::Cell::new(JoinProfile::default()),
         };
+        if dev.profile {
+            profile_sync(client)?;
+            let dev_secs = t_dev.elapsed().as_secs_f64();
+            dev.prof_add(|p| {
+                p.up_host_secs += host_secs;
+                p.up_sort_secs += sort_secs;
+                p.up_dev_secs += dev_secs;
+            });
+        }
+        let t_warm = Instant::now();
         // The FD top stage takes `top_kernel` (only_clipped) beside it on a
         // batch with a clipped block. Compile that now, on this slice's first
         // clipped partition, rather than inside whichever batch first holds
         // one (NiceMark's warm-up runs partition 0 only).
         if let Some(&v) = dev.clip_vs.first().filter(|_| dev.top_fd) {
             dev.warm_top(v);
+        }
+        if dev.profile {
+            profile_sync(client)?;
+            let w = t_warm.elapsed().as_secs_f64();
+            dev.prof_add(|p| p.up_warm_secs += w);
         }
         Ok(dev)
     }
@@ -4752,7 +4782,7 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
          slots={} min_slots={} retried={} splits={} | setup={:.4} device_wall={:.4} \
          upload={:.4} inputs={:.4} top={:.4} bucket={:.4} join={:.4} check={:.4} read={:.4} \
          probe={:.4} unattributed={:.4} | top_fd={:.4} top_clip={:.4} clip_launches={} null={:.4} \
-         | ntlay={} nbp={} tops={} listed={} pairs={} \
+         up_host={:.4} up_sort={:.4} up_dev={:.4} up_warm={:.4} | ntlay={} nbp={} tops={} listed={} pairs={} \
          padded_pairs={} live_buckets={} buckets={} survivors={} checked={} spilled={} hits={hits}",
         e - s,
         js.slices,
@@ -4777,6 +4807,10 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         p.top_clip_secs,
         p.clip_launches,
         p.null_secs,
+        p.up_host_secs,
+        p.up_sort_secs,
+        p.up_dev_secs,
+        p.up_warm_secs,
         p.ntlay,
         p.nbp,
         p.tops,
