@@ -48,6 +48,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   b57 frontier; kernel unchanged: 39 registers, 736 SASS; count/gated/probe pass on CUDA and
   lavapipe both compilers; `check_all`, b62 COMPARE, exhaustive quotient test, clippy ×3). Box
   l47-fixes destroyed (1.5 h). Two PR-ready branches held: FD round 2 (d813aea) and check D.
+- **L52 PR-ready (10:45 UTC, L52.1): CPU two-pass scan ×1.24–1.27 at production shapes (1 and 4
+  threads), NiceMark CPU ×1.261, exact; branch misses −60 %, IPC 2.2 → 2.8.** AVX-512 pass 1 is
+  compiled and read but never executed on this VM; the path's detection should also require avx2
+  (flagged for the reviewer). Reviewer launched; third PR-ready branch held at the cap.
 
 ## 2026-11-07 (day 11; routine fired 04:41 UTC)
 

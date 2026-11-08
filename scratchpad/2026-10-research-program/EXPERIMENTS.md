@@ -5,6 +5,27 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L52.1 CPU two-pass AND scan: PR branch (2026-11-08, agent; `L52/PR-RESULTS.md`, `L52/PR-BODY.md`, `L52/raw/`; `pr/cpu-join-two-pass-scan` cd661b0 = one commit on #248 7f5260b; worktree `.worktrees/l52-two-pass-scan`)
+
+All three scan paths run two passes over pieces of ≤ 1024 bottoms: pass 1 makes a byte of pass
+bits per 8 bottoms (`vptestnmq` / AVX2 compare + movemask / 8 scalar tests) and a shared `emit`
+stores the set-bit positions as u16 indices from a 256-entry table, advancing by a 256-entry
+count table (no branch on the bits; the last 0–7 bottoms stored always); pass 2 runs `survivor`
+(`#[inline(always)]`) on the listed bottoms in original order; the full check stays out of line;
+bounds-checked slice writes, no new `unsafe`, no knobs. New test
+`the_first_pass_lists_the_same_bottoms_on_every_path` (114 class lengths ≤ 1024 at 0/1/40/100 %
+passing + 1025–5120 through each path's dispatch). **A/B vs #248 (ivory Zen 2, 3 interleaved
+rounds, loads ≤ 2; 1 / 4 threads):** b60 1e16 ×1.266 (2225 → 1758 ms) / ×1.260; b62 1e17 slice 0
+×1.237 / ×1.237; b58 1e15 ×1.300 / ×1.316; whole b60 1e14 ×1.100 / ×1.104, b62 ×1.079 / ×1.083, b64
+×1.162 / ×1.182; every production-shape round ×1.22–1.28. **NiceMark CPU 4 rounds ×1.261 (864.9 →
+1091.0)**, rounds 1.22–1.28. perf (1 thread): branch misses 61.3 M → 25.3 M (b60) / 58.4 → 21.7 M
+(b62); IPC 2.18 → 2.81; instructions +3–4 %; cycles −19–20 %. Exact: every run = #248's counts
+(1e14 b60/b62/b64 incl.); tests 189 + 22; `NICE_TEST_CPU_JOIN_REF=3`; whole b42; the three-path
+comparison incl. a b57 window with classes split into two pieces. **AVX-512 pass 1 compiled and
+its assembly read (AVX-512F/AVX2 only) but never executed** (no AVX-512 host; CI runner CPU
+unknown); the path is still selected on `avx512f` alone although pass 1 now uses an AVX2
+instruction — detection should require avx2 too (reviewer). → reviewer; held at the cap.
+
 ## L51.1 Full stack d813aea profiled, ablated, retuned (2026-11-08, agent; `L51/RESULTS.md`, `L51/raw/` (logs, PTX-replay records, SASS, `analyze51.py`); branch `exp/l51-profile` 14f87cd)
 
 RTX 3080 180 W on m139246 (L47's host too): d813aea = 79.10 s per b62 1e17 field, 15.85 s per b60

@@ -62,12 +62,16 @@ Times are ms per partition and thread for the sampled partitions (wall × thread
 | **b62 1e17** slice 0, 16 partitions | 4 | **2371** ms (2378, 2346, 2371) | 1.3 % | **1916** ms (1860, 1922, 1916) | 3.2 % | **×1.237** | 1.278, 1.221, 1.237 |
 | b58 1e15 (NiceMark's field), 32 partitions | 1 | **536** ms (536, 538, 521) | 3.2 % | **412** ms (414, 400, 412) | 3.3 % | **×1.300** | 1.296, 1.345, 1.264 |
 | b58 1e15, 128 partitions | 4 | **593** ms (593, 606, 586) | 3.3 % | **451** ms (451, 450, 476) | 5.7 % | **×1.316** | 1.316, 1.346, 1.233 |
-| b60 1e14, whole field (3600 partitions) | 4 | **33.8** s (33.0, 33.8, 33.8) | 2.4 % | **30.6** s (30.3, 30.6, 31.0) | 2.3 % | **×1.104** | 1.089, 1.105, 1.089 |
-| b62 1e14, whole field (3844 partitions) | 4 | **42.9** s (42.5, 42.9, 45.0) | 5.8 % | **39.6** s (39.1, 39.6, 39.6) | 1.3 % | **×1.083** | 1.085, 1.082, 1.135 |
-| b64 1e14, whole field (4096 partitions) | 4 | **83.9** s (83.9, 84.7, 83.9) | 1.0 % | **71.0** s (70.8, 71.0, 73.9) | 4.4 % | **×1.182** | 1.186, 1.194, 1.135 |
-TBD-WHOLE1T
+| b60 1e14, whole field (3600 partitions) | 1 | **122.7** s (122.7, 122.6, 124.6) | 1.6 % | **111.6** s (111.6, 112.6, 110.8) | 1.6 % | **×1.100** | 1.100, 1.089, 1.124 |
+| b62 1e14, whole field (3844 partitions) | 1 | **156.4** s (156.3, 156.4, 156.5) | 0.2 % | **145.0** s (145.0, 144.1, 145.1) | 0.6 % | **×1.079** | 1.078, 1.085, 1.079 |
+| b64 1e14, whole field (4096 partitions) | 1 | **299.8** s (299.6, 301.8, 299.8) | 0.7 % | **258.0** s (262.8, 258.0, 255.9) | 2.7 % | **×1.162** | 1.140, 1.170, 1.172 |
+| b60 1e14, whole field | 4 | **33.8** s (33.0, 33.8, 33.8) | 2.4 % | **30.6** s (30.3, 30.6, 31.0) | 2.3 % | **×1.104** | 1.089, 1.105, 1.089 |
+| b62 1e14, whole field | 4 | **42.9** s (42.5, 42.9, 45.0) | 5.8 % | **39.6** s (39.1, 39.6, 39.6) | 1.3 % | **×1.083** | 1.085, 1.082, 1.135 |
+| b64 1e14, whole field | 4 | **83.9** s (83.9, 84.7, 83.9) | 1.0 % | **71.0** s (70.8, 71.0, 73.9) | 4.4 % | **×1.182** | 1.186, 1.194, 1.135 |
+
 - **At the production shapes (b60 1e16, b62 1e17) the join is ×1.24–1.27 faster**, at 1 and 4 threads alike; every single round is ×1.22–1.28. b58 1e15, where the scan is a larger share of a partition, gains ×1.30–1.32.
-- The whole 1e14 fields gain less (b60 ×1.10, b62 ×1.08): their partitions spend a larger share on listing and extending the bottoms, which this PR does not touch. b64 1e14 has 4.3× b60's join survivors for 1.14× its partitions, so it gains more (×1.18).
+- The whole 1e14 fields gain less (b60 ×1.10, b62 ×1.08, at 1 and 4 threads): their partitions spend a larger share on listing and extending the bottoms, which this PR does not touch. b64 1e14 has 4.3× b60's join survivors for 1.14× its partitions, so it gains more (×1.16 / ×1.18).
+- The 1-thread whole fields ran as a separate block of 3 rounds after NiceMark (rounds started at a 1-min load of 1.89, 1.41 and 1.09; other sessions ≤ 0.3 cores at every run start).
 
 **Counters** (`perf stat`, counting from 3.5 s on, past the slice setup; 1 thread, 4 partitions, 2 rounds alternating; per partition = count × ms per partition / task-clock; medians):
 
@@ -80,9 +84,23 @@ TBD-WHOLE1T
 | **IPC** | **2.18** | **2.81** | **2.17** | **2.81** |
 | ms per partition in these runs | 2218 | 1797 | 2136 | 1703 |
 
-- **Mispredictions fall by 59–63 %** (61 → 25 M a b60 1e16 partition, 58 → 22 M at b62), and IPC rises from 2.2 to 2.8. Instructions grow by 3–4 % and branches by 5–8 %: the compaction's stores and table loads, and a bounds check per eight bottoms, all predictable. Cycles fall by 19–21 %.
+- **Mispredictions fall by 59–63 %** (61 → 25 M a b60 1e16 partition, 58 → 22 M at b62), and IPC rises from 2.2 to 2.8. Instructions grow by 3–4 % and branches by 5–8 %: the compaction's table loads and stores, and two bounds compares per eight bottoms, all predictable. Cycles fall by 19–21 %.
 
-TBD-NICEMARK
+NiceMark nice-only on the CPU (`nice_client niceonly --benchmark --threads 4 --benchmark-secs 150 --benchmark-json`, no `--gpu`), 4 rounds alternating (#248, PR; PR, #248; …), every run started at a 1-min load of ≤ 2.0 (1.85–1.98); medians; the scenario rows are numbers/s; "per round" is the PR's over #248's:
+
+| | #248 (rounds) | this PR (rounds) | speed-up | per round |
+|---|---|---|---|---|
+| **score** | 864.9 (851.4, 861.0, 868.8, 874.2) | 1091.0 (1090.2, 1099.7, 1091.8, 1068.2) | **×1.261** | 1.280, 1.277, 1.257, 1.222 |
+| b58 MSD-weak (1e15 field, 4 threads) | 2.045e12 (1.949e12, 2.017e12, 2.073e12, 2.090e12) | 2.666e12 (2.641e12, 2.690e12, 2.692e12, 2.627e12) | **×1.303** | 1.355, 1.334, 1.298, 1.257 |
+| b58 MSD-weak, 1 thread | 5.453e11 (5.461e11, 5.366e11, 5.446e11, 5.529e11) | 7.228e11 (7.330e11, 7.250e11, 7.206e11, 6.908e11) | **×1.325** | 1.342, 1.351, 1.323, 1.249 |
+| b58 MSD-strong | 1.275e13 (1.252e13, 1.273e13, 1.279e13, 1.277e13) | 1.511e13 (1.501e13, 1.522e13, 1.525e13, 1.424e13) | **×1.185** | 1.199, 1.196, 1.192, 1.115 |
+| b60 MSD-weak (sampled) | 5.297e12 (5.242e12, 5.296e12, 5.297e12, 5.417e12) | 6.537e12 (6.545e12, 6.591e12, 6.528e12, 6.478e12) | **×1.234** | 1.248, 1.244, 1.232, 1.196 |
+| b62 MSD-weak (sampled) | 5.627e12 (5.599e12, 5.672e12, 5.656e12, 5.583e12) | 7.134e12 (7.079e12, 7.188e12, 7.027e12, 7.262e12) | **×1.268** | 1.264, 1.267, 1.242, 1.301 |
+
+- #248's score here (864.9) is within 0.5 % of what its own PR measured on this machine (868.5).
+- The PR's fourth round was its lowest (score 1068.2, b58 MSD-strong 1.424e13 against 1.50–1.53e13 in the others); the medians do not use it.
+- MSD-strong gains least: it has about an eighth of MSD-weak's join survivors per partition, so the scan's passes, and the mispredictions they caused, are a smaller part of its work.
+- NiceMark samples partitions for a fixed time, so the two sides sampled different numbers of partitions and their survivor counts are not comparable; the A/B above compares counts. Within a side, runs that sampled the same number of partitions agree.
 
 **AVX-512.** This machine has none.
 
@@ -112,7 +130,7 @@ All release builds of this head.
 
 - **The seeded check.** The full check could start from the 16 digits the join already knows (positions 0..7 of n² and n³: the bottom's 12 and the prefilter's 4) instead of re-deriving some of them; a prototype measured ×1.07–1.11 on top of this PR at the production shapes on this machine. A separate PR.
 - **A vectorised second pass** (the prefilter run eight listed pairs at a time): not tried.
-- **Raw-pointer stores in the compaction.** The slice writes cost one predictable bounds check per eight bottoms (most of the 5–8 % more branches in the counter table under Measurements); unchecked stores would save some of the 3–4 % more instructions. Not measured; the checked form keeps the module free of new `unsafe` beyond the existing SIMD loads.
+- **Raw-pointer stores in the compaction.** The slice writes cost two predictable bounds compares per eight bottoms; unchecked stores would save some of the 3–4 % more instructions and 5–8 % more branches in the counter table under Measurements. Not measured; the checked form adds no `unsafe` beyond the SIMD loads, which the old scans had too.
 - **The AVX-512 path's detection** is unchanged: it is taken on `avx512f` alone. Like `stride_filter`'s, it could also require AVX2, which rustc's `avx512f` implies for code generation; the new pass 1 uses the AVX2 form of the index broadcast. Only a VM that exposes AVX-512F without AVX2 would tell the difference.
 - **Other shapes of the same scan**, measured in single runs at b60 1e16 on 1 thread and no better: AVX2 taking 16 bottoms a step as the old loop did (two bytes per step; 1733 and 1740 ms per partition against 1742 and 1800 ms for 8 a step), and `scan` kept out of line (`#[inline(never)]`; 1772 and 1809 ms against 1745 and 1706 ms).
 
