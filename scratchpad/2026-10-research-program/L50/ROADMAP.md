@@ -45,7 +45,7 @@ run equal L49's (b60 1e16 16-partition sample 549,719,536 / 34,926,644; b62 1e17
     per long division): ×1.04–1.07 alone, **×1.07–1.11 on top of the two-pass**; on recorded survivors the check
     alone is ×2.1 in this form and **×2.3 with design D's base-b² columns** (§2.3);
   - **all three: ×1.32–1.39 at b60 1e16 and b62 1e17, 1 and 4 threads; b58 1e15 ×1.43; whole 1e14 fields (4 t,
-    single rounds) ×1.09–1.17.** Branch misses 62 M → 26 M a partition, IPC 2.1 → 2.8, instructions −3 %;
+    single rounds) ×1.09–1.17; NiceMark CPU score ×1.35 (871 → 1174, one clean round).** Branch misses 62 M → 26 M a partition, IPC 2.1 → 2.8, instructions −3 %;
   - measured and dropped: a bit-sliced (`TRANSPOSE`-style) pass 1, ×0.93–0.98 against the two-pass (×0.84–0.90
     at 1e14); RC (no residue load before the prefilter for unclipped tops), ×0.99–1.02, as L42 found;
     `MAX_STEPS` 8/16/32 (fewer seeds), ≤ ×1.02.
@@ -281,8 +281,8 @@ are b − 1 key spaces apart, so FD would step by (b − 1)·h and seed far more
 ## 3. Ranked shortlist
 
 Gains are per partition = per field (setup ≤ 0.2 %), on **ivory (Zen 2, AVX2)** unless stated; "on top of"
-means against the build with the items above it. NiceMark's CPU scenarios are these shapes (b58 1e15, b60/b62
-3e15 windows of 1e16 fields), so they should move alike; not run (A/B only).
+means against the build with the items above it. NiceMark's CPU nice-only sweep with items 1 + 2 (one clean
+round, §4): **score ×1.35** (871 → 1174).
 
 | # | item | gain (ivory) | confidence | cost | kill criterion | hardware |
 |---|---|---|---|---|---|---|
@@ -330,8 +330,8 @@ of the same A/B. **Survivors, checked and hits are identical to the plain build 
 | b62 1e17 s0, 4 t | 2284 | 1805 ×1.265 | 1827 ×1.250 | **1714 ×1.333** | ×1.053 |
 | b58 1e15, 1 t | 561 | 407 ×1.378 | 423 ×1.325 | **386 ×1.452** | ×1.054 |
 
-(A/B 2's plain medians are 0–3 % above A/B 1's on the same shapes, so its ratios read ~2 % high; within A/B 2
-the inlining is +5.3–6.2 %.)
+(A/B 2's plain medians are −0.5 to +4.5 % off A/B 1's on the same shapes, so some of its ratios read a few % high;
+within A/B 2 the inlining is +5.3–6.2 %.)
 
 **Counters** (`perf stat`, counting, 1 thread, past the setup, per partition; `raw/perfstat-runs.txt`):
 
@@ -341,7 +341,9 @@ the inlining is +5.3–6.2 %.)
 | two-pass + check | 1.56e10 | 1.67e9 | **2.6e7** (1.5 %) | 2.70 | 5.8e9 |
 | two-pass + check + inlined survivor | 1.54e10 | 1.64e9 | 2.6e7 (1.6 %) | 2.82 | 5.5e9 |
 
-(b62 1e17 s0: 1.51e10 → 1.46e10 instructions, 5.9e7 → 2.4e7 misses, IPC 2.13 → 2.60.) **The instruction count
+(b62 1e17 s0: 1.51e10 → 1.46e10 instructions, 5.9e7 → 2.4e7 misses, IPC 2.13 → 2.60. The plain b60 run overlapped
+a `cargo check` of mine and the b62 two-pass + check run was slow for no visible reason, so their cycles and IPC
+read low; the instruction and miss counts are unaffected.) **The instruction count
 barely moves (−3 %); 36 M of 62 M mispredictions a partition go, and IPC rises from 2.1 to 2.8.** The seeded
 check's instruction savings and the compaction's added work roughly cancel.
 
@@ -382,6 +384,14 @@ b60 1e16 1 t 1664/1617/1618 → 1562/1607/1613 (×1.007), b62 1e17 s0 1 t 1544/1
 (×1.001), b60 4 t 1777/1748/1809 → 1808/1740/1711 (×1.021), b62 4 t 1797/1643/1661 → 1989/1661/1675 (×0.992).
 **No gain.**
 
+**NiceMark** (`raw/nicemark-*.json`, `raw/nicemark-summary.txt`; `nice_client niceonly --benchmark --threads 4
+--benchmark-secs 150 --benchmark-json`, release builds of the client with and without the three prototypes,
+nothing uploaded): round 1 (08:02–08:08, start loads 1.41 / 1.47): **score 871.2 → 1174.0, ×1.348**; b58 weak
+×1.438, b58 weak 1 thread ×1.415, b58 strong ×1.249, b60 weak ×1.293, b62 weak ×1.352. The base score equals
+L49's measurement of #248 (868.5). **Round 2 is void:** another session started a multi-threaded `nice_common`
+test run (`.worktrees/review-check-d`) at ~08:10 that overlapped both its runs (base 536, proto 905). Counts
+within a side agree wherever the sampled prefix matches; NiceMark samples by time, so the sides' counts differ.
+
 **Other measurements:**
 - `MAX_STEPS` 4 → 8 / 16 / 32 (`raw/steps-runs.txt`, §2.4): ≤ ×1.017.
 - The check on recorded survivors (`raw/check-bench.txt`, §2.3): V1 ×1.63–1.73, V3 ×2.09–2.15, V2 ×2.23–2.32.
@@ -402,8 +412,10 @@ b60 1e16 1 t 1664/1617/1618 → 1562/1607/1613 (×1.007), b62 1e17 s0 1 t 1544/1
   re-derives the prefilter's four digits instead of passing them; `l50-inl` inlines `survivor` everywhere. They
   are exact on every run here (counts) and the check variants on every recorded survivor (tested digits), but they
   have no unit tests; a PR needs the tests listed in §3.
-- **Not measured:** NiceMark (the A/B harness samples the same partitions NiceMark does, in the same order); b64
-  and b57 shapes; V2 (base-b² columns) in place; the FD round-2 trims and the vectorised pass 2 (estimates only).
+- **NiceMark** has one clean round (the second overlapped another session's test run); the A/B harness's
+  3-round medians are the primary numbers. The 5- and 15-minute loads were ~20 at 08:02 (another session's work
+  between my A/Bs and NiceMark round 1; every timed run started at a 1-minute load ≤ 1.5).
+- **Not measured:** b64 and b57 shapes; V2 (base-b² columns) in place; the FD round-2 trims and the vectorised pass 2 (estimates only).
 
 ## Files
 
@@ -417,4 +429,8 @@ b60 1e16 1 t 1664/1617/1618 → 1562/1607/1613 (×1.007), b62 1e17 s0 1 t 1544/1
   `raw/build2.log` (builds, md5s).
 - `raw/scripts/`: `run_chain1.sh` … `run_chain6.sh`, `build2.sh`, `perfsym.py` (per-symbol shares, IPC, misses),
   `phases.py` (symbols → phases), `annot.py` (cycle samples by address within a function), `abtable.py`.
-- Worktree `.worktrees/l50-cpu-roadmap` (detached at 7f5260b, uncommitted scratch patch): CLEANUP-PLACEHOLDER
+- Worktree `.worktrees/l50-cpu-roadmap` (detached at 7f5260b) keeps the scratch patch uncommitted (= `raw/
+  l50-scratch.patch` + the two examples), as L42's did; its `target/` (up to 1.2 GB), the binaries, perf data and
+  recorded survivors are removed, and so are perf's build-id cache entries for them under `~/.debug`. `df -h /`:
+  15 GB free before and after. Nothing committed, pushed or opened; the main checkout, the fleet and the server
+  untouched.

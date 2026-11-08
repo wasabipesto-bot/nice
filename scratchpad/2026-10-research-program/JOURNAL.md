@@ -21,6 +21,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   bandwidth) with 39 registers and no divisions.** Box l47-check destroyed (2 h). Reviewer launched;
   `pr/check-d` is the second PR-ready branch held at the cap (GPU chain: #241 → #246 → #249 →
   FD round 2 → check D).
+- **L50 CPU roadmap done (09:10 UTC):** the CPU join after #248 is 38 % scan (branchy survivor
+  extraction, IPC 1.6), 31 % tops, 15 % prefilter, 12 % check; two levers prototyped in place —
+  two-pass scan ×1.16–1.20 (+5–6 % inlined) and a seeded check ×1.07–1.11 — ×1.32–1.39 together,
+  exact. **L52 (two-pass scan PR branch on #248) launched on ivory**; the seeded check follows as
+  L53 once L47's design-D arithmetic is reviewed (it reuses the columns).
 
 ## 2026-11-07 (day 11; routine fired 04:41 UTC)
 
