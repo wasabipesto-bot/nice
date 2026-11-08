@@ -3116,7 +3116,38 @@ mod kernels {
         #[comptime] pre_chunk_digits: u32,
         #[comptime] pre_chunk_div: u32,
         #[comptime] probe: bool,
+        #[comptime] gather: bool,
     ) {
+        if comptime!(gather) {
+            // exp (L47 step 0): the loads alone (list entry, record words 0, 1
+            // and 6), folded into a never-true compare.
+            let mut count = surv_count[0].load();
+            if count > surv_cap {
+                count = surv_cap;
+            }
+            let stride = CUBE_COUNT_X * CUBE_DIM_X;
+            let mut i = ABSOLUTE_POS_X;
+            let mut acc = 0u64;
+            while i < count {
+                let t = surv[(2u32 * i) as usize];
+                let r0 = surv[(2u32 * i + 1u32) as usize];
+                let p_lo = top_rec[(TOP_REC_WORDS * t) as usize];
+                let p_hi = top_rec[(TOP_REC_WORDS * t + 1u32) as usize];
+                let w6 = top_rec[(TOP_REC_WORDS * t + 6u32) as usize];
+                acc = (acc << 7u64) ^ (acc >> 57u64)
+                    ^ (u64::cast_from(p_hi ^ r0) << 32u64)
+                    ^ u64::cast_from(p_lo ^ w6 ^ (r0 << 9u32));
+                i += stride;
+            }
+            if acc == 0x9E37_79B9_7F4A_7C15u64 ^ u64::cast_from(w_f0) {
+                let pos = nice_count[0].fetch_add(1u32);
+                if pos < nice_cap {
+                    nice_out[(4u32 * pos) as usize] = u32::cast_from(acc);
+                }
+            }
+            cube_done(ran, 3u32);
+            terminate!();
+        }
         let cu_limbs = comptime!(3 * limbs);
         let sv_pad = comptime!(cu_limbs | 1);
         let mut sv_s = SharedMemory::<u32>::new(comptime!((JOIN_WG * (cu_limbs | 1)) as usize));
@@ -3181,6 +3212,25 @@ pub(crate) fn gpu_profile_enabled() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| {
         std::env::var("NICE_EXP_GPU_PROFILE").is_ok_and(|v| !v.is_empty() && v != "0")
+    })
+}
+
+/// exp (L47 step 0): `NICE_EXP_CHECK=gather` runs the check kernel's loads
+/// alone.
+pub(crate) fn exp_check_gather() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NICE_EXP_CHECK").is_ok_and(|v| v == "gather"))
+}
+
+/// exp (L47 step 0): `NICE_EXP_CHECK_CUBES` sets the check kernel's grid
+/// (default [`CHECK_CUBES`]).
+pub(crate) fn exp_check_cubes() -> u32 {
+    static N: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *N.get_or_init(|| {
+        std::env::var("NICE_EXP_CHECK_CUBES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(CHECK_CUBES)
     })
 }
 
@@ -3865,7 +3915,7 @@ impl<R: Runtime> JoinDevice<R> {
             self.top_expect(vs, self.top_fd), // top
             (self.b - 1) * nslots_u32,        // bucket
             join_cubes,                       // join
-            CHECK_CUBES,                      // check
+            exp_check_cubes(),                // check
         ];
         let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; expect.len()]));
         let nran = expect.len();
@@ -3962,7 +4012,7 @@ impl<R: Runtime> JoinDevice<R> {
         unsafe {
             check_kernel::launch_unchecked::<R>(
                 c,
-                CubeCount::Static(CHECK_CUBES, 1, 1),
+                CubeCount::Static(exp_check_cubes(), 1, 1),
                 CubeDim::new_1d(JOIN_WG),
                 ArrayArg::from_raw_parts(self.list.clone(), 2 * self.list_cap as usize),
                 ArrayArg::from_raw_parts(checked.clone(), 1),
@@ -3985,6 +4035,7 @@ impl<R: Runtime> JoinDevice<R> {
                 0u32,
                 0u32,
                 probe,
+                exp_check_gather(),
             );
         }
         c.flush().map_err(|e| anyhow!("flush failed: {e:?}"))?;
