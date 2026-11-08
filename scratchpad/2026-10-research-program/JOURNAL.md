@@ -4,6 +4,18 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-08 (day 12; routine fired 04:41 UTC)
+
+- **Reconcile:** no research instances; November research $9.26 (fleet $13.48); credit $38.59;
+  ivory 15 GB free. Five program PRs open and green (#241, #246, #249; #247, #248), no comments,
+  nothing merged (weekend); `pr/top-fd-round2` d813aea held at the cap; main = 6f060a9. Twenty
+  7-day worktrees removed (24 remain). No user messages.
+- Leads today: **L47 check kernel design D** (box `l47-check`, instance 59671449; step 0 floor
+  first; kill: gather-only > 6.3 s per b62 1e17 field, A/B < ×1.05 at both fields, NiceMark
+  scenario < ×0.98), **L51 full-stack profile + ablation + constant retune** on d813aea (box
+  `l51-profile`, instance 59671466; kill: retune < 3 %), **L50 CPU join roadmap** (ivory, perf).
+  Hard stops 12:30 UTC.
+
 ## 2026-11-07 (day 11; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; November research $8.12 (fleet $11.44); credit $41.78;
