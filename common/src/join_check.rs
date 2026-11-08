@@ -27,6 +27,7 @@ pub const GATE_DIGITS: u32 = 10;
 /// whose second term is below `1/d` when `x·e < 2^(32+s)`, which holds for
 /// `x < 2^31`: the quotient is exact ([`magic_bound`] is the exact limit).
 #[must_use]
+#[allow(clippy::cast_lossless)] // `u64::from` is not const
 pub const fn magic(d: u32) -> (u32, u32) {
     assert!(d >= 3 && !d.is_power_of_two(), "magic: d >= 3, not a power of 2");
     let s = 31 - d.leading_zeros();
@@ -40,6 +41,7 @@ pub const fn magic(d: u32) -> (u32, u32) {
 /// The first `x` the sufficient condition `x·e < 2^(32+s)` of [`magic`]
 /// fails at for divisor `d` (at least 2^31).
 #[must_use]
+#[allow(clippy::cast_lossless)] // `u64::from` is not const
 pub const fn magic_bound(d: u32) -> u64 {
     let (m, s) = magic(d);
     let e = m as u64 * d as u64 - (1u64 << (32 + s));
@@ -97,7 +99,7 @@ impl CheckShape {
     #[allow(clippy::many_single_char_names)]
     pub fn new(b: u32, l: u32, s2: u32, s3: u32, f0: u32, k2: u32, g: u32) -> Result<Self> {
         ensure!((3..=64).contains(&b), "check: base {b} outside 3-64");
-        ensure!(l >= 1 && l <= 48, "check: {l} digits");
+        ensure!((1..=48).contains(&l), "check: {l} digits");
         ensure!(
             (2 * l - 1..=2 * l).contains(&s2) && (3 * l - 2..=3 * l).contains(&s3),
             "check: n of {l} digits has no square of {s2} or cube of {s3} digits"
@@ -207,7 +209,7 @@ fn mul(x: u32, y: u32) -> u32 {
 /// sum and product is checked for u32 overflow.
 #[must_use]
 // The kernel's names: b, bb, nl, ql, cl, gl, x, q, v.
-#[allow(clippy::many_single_char_names)]
+#[allow(clippy::many_single_char_names, clippy::similar_names)]
 pub fn mirror(sh: &CheckShape, p: u64, w6: u32, r0: u32) -> Mirror {
     let (b, bb) = (sh.b, sh.b * sh.b);
     let (nl, ql, cl, gl) = (sh.nl() as usize, sh.ql() as usize, sh.cl() as usize, sh.gl() as usize);
@@ -367,6 +369,7 @@ pub fn wide_div(v: u64, d: u32) -> (u64, u32) {
 }
 
 #[cfg(test)]
+#[allow(clippy::many_single_char_names, clippy::similar_names)]
 pub(crate) mod tests {
     use super::*;
     use malachite::base::num::arithmetic::traits::Pow;
@@ -511,9 +514,9 @@ pub(crate) mod tests {
     /// (f0 = 3, k2 = 8) and the test windows' (f0 0-3, k2 up to 8).
     fn shapes_for(n: u128, b: u32, all: bool) -> Vec<CheckShape> {
         let l = ndigits(n, b);
-        let s2 = ndigits(n * n, b);
-        let n3 = Natural::from(n).pow(3);
-        let s3 = u32::try_from(digits(&n3, b).len()).unwrap();
+        let nat = Natural::from(n);
+        let s2 = u32::try_from(digits(&(&nat * &nat), b).len()).unwrap();
+        let s3 = u32::try_from(digits(&nat.pow(3), b).len()).unwrap();
         let mut v = Vec::new();
         let pairs: &[(u32, u32)] = if all {
             &[(3, 8), (0, 3), (1, 4), (1, 6), (2, 5), (2, 6), (2, 7), (3, 6), (3, 7)]
@@ -521,6 +524,10 @@ pub(crate) mod tests {
             &[(3, 8), (0, 3), (2, 6), (3, 7)]
         };
         for &(f0, k2) in pairs {
+            // The records hold P = n / b^f0 in two words.
+            if n / u128::from(b).pow(f0) >= 1 << 64 {
+                continue;
+            }
             if let Ok(sh) = CheckShape::new(b, l, s2, s3, f0, k2, GATE_DIGITS) {
                 v.push(sh);
             }
