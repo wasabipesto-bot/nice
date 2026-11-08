@@ -544,8 +544,12 @@ pub(crate) mod tests {
         let nat = Natural::from(n);
         let (d2, d3) = (digits(&(&nat * &nat), b), digits(&(&nat * &nat * &nat), b));
         let mask = d2.iter().chain(&d3).fold(0u64, |a, &x| a | 1u64 << x);
-        let uniq = crate::client_process::get_num_unique_digits(n, b);
-        assert_eq!(uniq, mask.count_ones(), "b{b} n = {n}");
+        let uniq = mask.count_ones();
+        // The client's count (its fast paths hold n³ in 128 or 256 bits,
+        // enough for the base's own range, where s2 + s3 = b).
+        if sh.s2 + sh.s3 == b {
+            assert_eq!(uniq, crate::client_process::get_num_unique_digits(n, b), "b{b} n = {n}");
+        }
         let mut seen = d2.clone();
         seen.extend_from_slice(&d3[..2 * sh.gl() as usize]);
         seen.sort_unstable();
@@ -576,11 +580,13 @@ pub(crate) mod tests {
         let gd = 2 * sh.gl() as usize;
         assert_eq!(m.mask, bits(&d2) | bits(&d3), "b{b} n = {n}: mask");
         assert_eq!(m.gate_mask, bits(&d2) | bits(&d3[..gd]), "b{b} n = {n}: gate mask");
-        assert_eq!(
-            m.mask.count_ones(),
-            crate::client_process::get_num_unique_digits(n, b),
-            "b{b} n = {n}: distinct digits"
-        );
+        if sh.s2 + sh.s3 == b {
+            assert_eq!(
+                m.mask.count_ones(),
+                crate::client_process::get_num_unique_digits(n, b),
+                "b{b} n = {n}: distinct digits"
+            );
+        }
         let mut seen = d2.clone();
         seen.extend_from_slice(&d3[..gd]);
         seen.sort_unstable();

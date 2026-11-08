@@ -5836,7 +5836,10 @@ mod tests {
                 let step = live.len().div_ceil(8).max(1);
                 live.into_iter().step_by(step).collect()
             });
-            let plan = test_plan(&fs, limits_of(client), 4);
+            // Within the device's ceiling, with a list for a few partitions:
+            // the macOS runner's device runs nothing in a large layout.
+            let lim = device_limits(client, name);
+            let plan = JoinPlan::new(&fs, lim, 2, 1 << 20, 1, lim.budget).expect("a layout fits");
             let mut dev = JoinDevice::new(client, &fs, &plan).expect("device");
             let sh = dev.check;
             let rec_len = TOP_REC_WORDS as usize * dev.max_slots * dev.ntlay as usize;
@@ -5855,7 +5858,7 @@ mod tests {
                 entries += ns.len();
             }
             // A synthetic list: record i holds n_i's prefix and residue.
-            let ns = synthetic(&sh, u64::from(b) << 32 | u64::from(sh.f0 * 16 + sh.k2));
+            let ns = synthetic(&sh, (u64::from(b) << 32) | u64::from(sh.f0 * 16 + sh.k2));
             let (w, m) = (fs.base.powu(sh.f0), fs.base.powu(sh.k2 - sh.f0));
             let mut recs = vec![0u32; 8 * ns.len().max(1)];
             let mut list = vec![0u32; 2 * ns.len().max(1)];
