@@ -219,14 +219,15 @@ if rows:
 
 # ---- pinned spill-tax runs (chain_post.sh): S spill variant, N spill-free, D = S's PTX + '.minnctapersm 5'
 for fld, label in FIELDS:
-    P = {v: load(f'pn_{v}_{fld}') for v in 'SND'}
-    if not all(P.values()): continue
-    print(f'\n## Pinned join images, {label} (unprofiled device s/field; 3 interleaved rounds)\n')
+    P = {v: load(f'pn_{v}_{fld}') for v in 'SNDM'}
+    if not all(P[v] for v in 'SND'): continue
+    print(f'\n## Pinned join images, {label} (unprofiled device s/field; S/N/D 3 interleaved rounds, N/M 2 more)\n')
     print('| image | s/field (rounds) | vs N (per round) | MHz | join kernel (driver JIT of the pinned PTX) | counts |')
     print('|---|---|---|---|---|---|')
     n = {r['rnd']: r['dev'] for r in P['N']}
-    for v, nm in (('S', 'S: the 40-register spill variant'), ('N', 'N: spill-free (same config, another process)'), ('D', "D: S's PTX + .minnctapersm 5")):
+    for v, nm in (('S', 'S: the 40-register spill variant'), ('N', 'N: spill-free (same config, another process)'), ('D', "D: S's PTX + .minnctapersm 5"), ('M', "M: S's PTX + .maxnreg 48 (rounds 4-5, chain_post2.sh)")):
         rs = P[v]
+        if not rs: continue
         rat = [n[r['rnd']] / r['dev'] for r in rs if r['rnd'] in n]
         print(f'| {nm} | {med([r["dev"] for r in rs]):.3f} ({fmt([r["dev"] for r in rs], 3)}) | ×{med(rat):.3f} ({fmt(rat, 3)}) | {fmt([r["mhz"] or 0 for r in rs], 0)} | {", ".join(vstr(r["var"]) for r in rs)} | {"exact" if all(counts_ok(r, fld) for r in rs) else "DIFFER"} |')
 bf = sorted(glob.glob(f'{D}/bfreq_*_jit.txt'))

@@ -5,6 +5,38 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L51.1 Full stack d813aea profiled, ablated, retuned (2026-11-08, agent; `L51/RESULTS.md`, `L51/raw/` (logs, PTX-replay records, SASS, `analyze51.py`); branch `exp/l51-profile` 14f87cd)
+
+RTX 3080 180 W on m139246 (L47's host too): d813aea = 79.10 s per b62 1e17 field, 15.85 s per b60
+1e16 (L48.2's machine 73.4 s); exact counts throughout. **Phase split (b62 / b60):** FD top kernel
+22.8 % (18.0 s) / 18.4 %; bucket 2.5 / 2.3; **join 55.9 % (44.2 s) / 59.0 %**; **check 12.0 % (9.5 s) /
+14.4 %**; other 6.7 / 6.0 (**slice setup 4.8 / 4.5**). Profiled field 0.966× / 0.977× the unprofiled
+in time (syncs let the card run 104 MHz faster at b62). **Join ablation (3 profiled rounds, % of
+field):** base 10.9 / 10.5 (#249 took it from 15.9); **AND 14.9 / 15.0** (8.4 → 11.4 s; issue-bound by
+instruction count); walk 9.2 / 9.0; prefilter 19.8 / 23.5; stage 1.1 / 0.9; the per-top AND
+everywhere would cost ×1.14 / ×1.12. **Retune (2 interleaved rounds, each value its own kernel):**
+EPT 1 ×0.949 / 0.948, EPT 3 ×0.939 / 0.951; TRANSPOSE_MIN 128 ×1.005 / 1.007, 256 ×0.985 / 0.984, 512
+×0.873 / 0.908; AND_GROUP 2 ×0.946 / 0.953, 8 ×0.990 / 0.986 (4 cubes/SM); TOP_CAP 128 ×0.962 /
+0.961, 512 ×0.935 / 0.945 (3 cubes/SM); FD cube 128 ×0.991 / 0.994, 512 ×0.994 / 0.998; stage once
+per work item ×0.995 / 1.005; SURV_FLUSH 256 ×0.999 / 1.005, 768 ×0.996 / 1.008 → **no retune
+reaches 3 %; defaults stay** (default scatter ~3 % within a block). **Two findings:** (1) **#249's
+`sorted_layer` host counting sort runs inside the per-slice setup on the device thread with the
+GPU idle: 2.55–2.84 s per b62 field (3.2–3.6 %), 0.44–0.46 s per b60 (2.8–2.9 %); ~7 u64 divisions
+per prefix** → move into the overlapped field setup or do it in u32: ×1.03–1.04 / ×1.03 (host-only,
+exact). (2) **~1 in 7 `join_kernel` compiles (5 of 32) picks a 40-register spilling variant worth
+~3 % of the field (×0.968 / ×0.972 pinned)**; `.minnctapersm 5` or `.maxnreg 48` in the PTX gives 44
+registers, no spill, ×0.992–1.003 of the normal 46–48-register code → ~0.4 % fleet-wide, 3 % for
+affected processes; **A/B method: record each process's join-kernel variant (`ptxjit.py`) or pin
+the compiled code** (every spill-variant process in this screen was re-run). **Re-pricing (no-go):**
+L44 §3a fewer AND digits ×0.92–0.97; §3f digit-major LDS.128 ≤ 1 % (bank conflicts); L40 group walk
+on the 41-instruction round 1.3–3.0 % / 2.2–4.0 % at best with its NiceMark loss and 4 cubes/SM;
+COMPACT=2 ≤ 0.5 %. **AND codegen (go, no GPU needed):** the AND runs at ~2× its shared-memory floor,
+52–60 % instruction overhead (7.8–9.0 % of the field in cycles); 8 of its 30 instructions per digit
+are unfolded address arithmetic from CubeCL's index construction → folding ≈ 4.3 % of the field in
+cycles (2.1–3.6 % time), with a leaner bit loop 3.0–5.1 %. **Ranked ≥ 3 %:** check kernel (L47,
+done), `sorted_layer` off the device thread, AND codegen; below: the spill-variant fix (~0.4 %),
+TRANSPOSE_MIN 128 (+0.5–0.7 %). Box 3.5 h.
+
 ## L47.1 Check kernel design D: built, exact, at the memory floor (2026-11-08, agent; `L47/RESULTS.md`, `L47/PR-BODY.md`, `L47/raw/`; `pr/check-d` 0f3332d = one commit on d813aea; knobs on `exp/check-d` 1187527c)
 
 **Step 0 (old kernel, profiled, 2 rounds):** loads-only check (list entry + record words 0, 1, 6) =

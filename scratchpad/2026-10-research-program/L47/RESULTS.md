@@ -17,7 +17,7 @@ Box: Vast 59671449 (`nice-research-l47-check`), RTX 3080 10 GB, driver 580.159.0
   b62 common path** (gate ≤ ~360), + 249 for the rest of n³. Screen: g ∈ {8, 10, 12} flat (±2 %, memory-bound);
   one entry per lane per take beats 4 and 8 (−7 % of the check; 39 vs 47 registers → 6 cubes/SM).
 - **Exactness:** every test passed (§5): the new count/probe device test (1,413,630 real survivors + 96,042 synthetic
-  n, 26 shapes, digit counts, gate and masks = CPU), `check_all` (b10's 69), whole b42 (417,789,835 / 16,879,877,
+  n, 22 distinct shapes, digit counts, gate and masks = CPU; strengthened after the review, §11), `check_all` (b10's 69), whole b42 (417,789,835 / 16,879,877,
   join = stride = reference), the 1e14 COMPARE b57/60/62/64, dense fields, FD-vs-top with sentinels, certificates,
   host tests incl. the exhaustive quotient test (114 divisors × every x < 2^31), lavapipe naga + SPIR-V (§7).
 - **A/B against d813aea** (§6, 3 interleaved rounds, medians, device s per field): **b62 1e17 ×1.088** (74.65 → 68.64;
@@ -149,8 +149,9 @@ Gate: ≤ 48 registers, 0 spills, no local memory, ≤ ~360 instructions per war
   counts). (The stride path runs `candidate_check`, untouched, so it stays an independent reference.)
 - **New: `cubecl_cuda_check_counts_match_the_cpu`** (count mode: every list entry's distinct-digit count, gate and
   digit mask against the CPU; probe mode: every n rebuilt from its limbs against the list's n): **ok, 1,413,630
-  list entries and 96,042 synthetic n, 3,599 past the gate**, 26 field shapes (b10's window, the 17 windows, the six
-  production fields of `PLAN_FIELDS` at 1e14 plus the b57 frontier partitions 0/1000/3248), H narrow and wide
+  list entries and 96,042 synthetic n, 3,599 past the gate**, 25 lists over 22 distinct shapes (b10's window, the 17
+  windows, the six production fields of `PLAN_FIELDS` at 1e14, the b57 frontier field a second time by mistake;
+  corrected in §11), H narrow and wide
   (b57/b58/b60/b64 windows), f0 0–3, k2 3–8, 76 s. (Binary D, K = 4, ran it first: 1,413,630 + 37,933, before the
   synthetic n were drawn from each shape's band.)
 - `cubecl_cuda_join_matches_the_cpu_reference` (`check_all`): ok, 131 s — b10's [47, 100) → [69] through the new
@@ -291,3 +292,50 @@ both sides; the unprofiled A/B is the measurement. b64 gains least, probably bec
 
 Vast 59671449 can be destroyed: nothing is running on it (the last job, `final.sh`, ended 07:49 UTC) and every log,
 smi trace, SASS dump and table is in `raw/box/` (pulled 07:50 UTC). Box time used: ~2 h of the 7 h (05:50–07:50).
+
+## 11. Review fixes (REVIEW.md, after the session; box 59687089)
+
+The independent review (`REVIEW.md`: merge with small fixes, no correctness defect) asked for M1–M3, D1–D3 and
+optionally L1–L7. Applied to `pr/check-d` (amended, one commit on d813aea) and re-run on a second box, Vast
+59687089 (RTX 3080, 280 W cap, driver 595.99.02, 5 CPUs). No timing was re-run: the kernel's arithmetic and loop
+are unchanged.
+
+- **Test, M1:** `check_counts` now calls `ensure_ran` on every batch before reading its list, reads the list with
+  `read_list` (the unsorted half of `read_checked`, which `ensure!`s the cap instead of clamping; L7), and requires a
+  non-empty real list on every `PLAN_FIELDS` field. The global floor stays.
+- **Test, M2:** `synthetic` adds per shape the band's ends (lo, lo + 1, hi − 1, hi − 2), the last n whose square or
+  cube stays below a power of b, both ends with their low i digits all 0 or all b − 1 (every i), and both ends' top
+  digits over a low half of all b − 1, all 0, or alternating 0 and b − 1. The b64 production shape now gets edge n.
+- **Test, M3:** the b57 frontier field ran twice (it is in `PLAN_FIELDS`); now once, and each distinct shape's
+  synthetic list runs once. (The original run was 25 lists over 22 distinct shapes, not "26 shapes" as §5 said.)
+- **Kernel, L1:** a fourth test-only mode, gated, writes the count words with the gate applied as the hits mode
+  applies it (the rest of n³ only in passing lanes); the test compares it with the CPU (passing entries: the full
+  digits; failing ones: the gate's digits only). No nice number is known above base 10, so the gated path meets a
+  real hit only at b10 (69, in `check_all`); the gated mode covers its control flow on every gate-passing survivor.
+- **Kernel, L2:** documented that the counter relies on full planes (256-thread cubes, plane widths a power of two
+  up to 128, plane ops in plane-uniform control flow) rather than adding plane reductions to a measured kernel.
+- **Test, L3:** gated mode runs on 3 cubes (real lists) and 1 cube (synthetic lists), so every plane loops; the
+  `>= cap` assertion is replaced by an exact one: the counter ends at the list rounded up to whole takes plus one
+  take per plane (`cubes · 256` entries), checked on every run.
+- **L5/L6:** the kernel takes the `CheckShape` itself as its comptime argument and uses its methods (`nl`, `ql`,
+  `cl`, `gl`, `part`, `h_wide`, `h_div`) instead of recomputing them; the host mirror (`Mirror`, `mirror`, `qdiv`,
+  `wide_div`, `magic_bound`) is test-only.
+- **Body, D1–D3 and notes:** both instruction counts are per warp-iteration (32 survivors); the A/B's identical counts
+  are the join's, so the check's evidence is the device test and the hit comparisons; the b57 1e14 row's clock
+  (P 1905 against B 1635 MHz); the shared-atomic question on A100/H100 (unmeasured); the full-plane note; the gated
+  mode and the dispatch check in the test description; H "about 2^40".
+
+Results on box 59687089, tree `ec7b773` (the fixes before rustfmt; logs in raw/box2/):
+- `cubecl_cuda_check_counts_match_the_cpu`: **ok, 52 s: 24 fields (64 batches), 1,168,717 list entries and 84,652
+  synthetic n over 22 distinct shapes, 3,047 past the gate**, in count, gated (3 or 1 cubes, exact counter end
+  asserted) and probe modes; every batch's `ensure_ran` passed; every production field had survivors. Synthetic n per
+  shape: 3,941–4,051 after dedupe: 4,000 random draws plus the adversarial and edge n that fall in the band, at the
+  production shapes b42 32, b50 43, b57 41, b60 51, b62 44, b64 44 (before: 11, 13, 14, 15, 15 and 0;
+  `raw/scripts/edge_count.py` ports the test's lists and reproduces the box's totals); b10 53. (Fewer real entries than §5's 1,413,630 because the b57
+  frontier field no longer runs twice.)
+- `cubecl_cuda_join_matches_the_cpu_reference` (`check_all`, b10's 69): ok, 127 s. 1e14 COMPARE b62: join = stride,
+  1,439,469,648 / 88,159,810, found 0. `join_check::` 5 passed; the exhaustive test, 114 divisors, ok.
+- lavapipe (llvmpipe, LLVM 20.1.2, 8-lane subgroups), the same test: **naga ok (203 s), direct SPIR-V ok (321 s)**,
+  65 lists (the device's limits batch one field differently), the same totals as CUDA.
+- clippy ×3 on `ec7b773` (default, gpu, gpu+spirv; rustc 1.99.1): clean. fmt: 4 hunks (line wraps), applied.
+(the final head below)

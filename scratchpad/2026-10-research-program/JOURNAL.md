@@ -36,6 +36,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   1,050 are both per 32 survivors; the A/B counts come from the join, not the check; b57 1e14's
   clock). Recommends one M4 run of the count test (asked in the report). Sent back to the L47
   agent with a 3 h box to re-run the device tests after the fixes.
+- **L51 done (09:20 UTC, L51.1):** d813aea at b62 1e17: join 56 % (AND 15 %, prefilter 20 %, base
+  11 %, walk 9 %), FD 23 %, check 12 %, slice setup 4.8 %; **no constant retune reaches 3 %**
+  (defaults stay). Two findings: #249's host sort runs with the GPU idle (3.2–3.6 % → L53), and
+  1 in 7 runtime compiles of the join kernel spills (~3 %; a register pin fixes it → L55; A/B
+  method must pin or record the variant). AND codegen has unfolded address arithmetic (→ L54,
+  est. 2–5 %). Group walk, COMPACT=2, fewer AND digits and LDS.128 are all no-go by arithmetic.
+  Box l51-profile destroyed (3.5 h).
 
 ## 2026-11-07 (day 11; routine fired 04:41 UTC)
 

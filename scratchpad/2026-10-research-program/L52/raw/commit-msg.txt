@@ -1,0 +1,29 @@
+CPU overlap join: a two-pass AND scan
+
+A scan tests one top against one digit-sum class of bottoms, one 64-bit
+AND per bottom, and about 3% of the pairs pass at the production shapes.
+It took each pass on the spot: a chunk of 16 bottoms (the AVX2 step)
+holds a pass about 40% of the time, so the branch on the chunk's pass
+bits was a coin toss (half of the join's mispredictions), and each pass
+was a call into the survivor code with the vector state saved around
+it.
+
+- Pass 1, per piece of up to 1024 bottoms of a class: the same AND, a
+  byte of pass bits per eight bottoms, and the positions of its set bits
+  stored as u16 indices from a 256-entry table, the list's end moved by
+  the byte's count. It always stores and never branches on the bits.
+- Pass 2 takes the listed bottoms, in the class's order, through the
+  survivor code (the in-range test, the prefilter, the full check), now
+  inlined.
+
+All three scan paths (AVX-512F, AVX2 and the portable loop) share the
+compaction, the piece loop and pass 2; they differ only in how they form
+the byte of pass bits. The pairs, their order and every count are the
+same as before.
+
+A new test checks pass 1's index lists on every path the CPU has against
+a plain filter, on random classes of every length up to a piece with 0%,
+1%, 40% and 100% of the bottoms passing, and longer classes in pieces
+through each path's dispatch.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
