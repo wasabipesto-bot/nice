@@ -52,6 +52,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   threads), NiceMark CPU ×1.261, exact; branch misses −60 %, IPC 2.2 → 2.8.** AVX-512 pass 1 is
   compiled and read but never executed on this VM; the path's detection should also require avx2
   (flagged for the reviewer). Reviewer launched; third PR-ready branch held at the cap.
+- **Review of `pr/cpu-join-two-pass-scan` (10:55 UTC, `L52/REVIEW.md`): merge with small fixes;**
+  correct on the portable and AVX2 paths (all seven planted bugs caught by the new test); the
+  AVX-512 pass 1 correct on reading but never executed anywhere; its dispatch must also require
+  avx2 (pass 1 uses a VEX `vpbroadcastw`); the "two pieces" coverage claim was false (the cited
+  window never scans). Fixes sent to the L52 agent; **an AVX-512 box rented to execute the path**
+  (instance 59703250, 4090 host with a Ryzen 9 9950X, $0.43/h, 2 h TTL; `vast.py create` needs
+  `--gpu` + `--query 'cpu_name="…"'` — the id lookup only sees the default price page).
 
 ## 2026-11-07 (day 11; routine fired 04:41 UTC)
 
