@@ -1,0 +1,65 @@
+diff --git a/common/src/cubecl_join.rs b/common/src/cubecl_join.rs
+index 7da8edbb..803cdd08 100644
+--- a/common/src/cubecl_join.rs
++++ b/common/src/cubecl_join.rs
+@@ -187,8 +187,8 @@ pub use kernels::{bucket_kernel, check_kernel, join_kernel, top_fd_kernel, top_k
+ )]
+ mod kernels {
+     use super::{
+-        AND_GROUP, CHECK_COUNT, CHECK_GATED, CHECK_PROBE, DEAD_MASK, JOIN_WG, MAX_ROOTS, STAGES_U32, SURV_FLUSH,
+-        SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS, TRANSPOSE_MIN,
++        AND_GROUP, CHECK_COUNT, CHECK_GATED, CHECK_PROBE, DEAD_MASK, JOIN_WG, MAX_ROOTS,
++        STAGES_U32, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS, TRANSPOSE_MIN,
+     };
+     use crate::cubecl_backend::NICEONLY_STRIDE;
+     use crate::cubecl_detailed_fd::fd_add_top;
+@@ -5534,7 +5534,12 @@ mod tests {
+         let h = l / 2;
+         let alt = |first: u32| -> u128 {
+             (0..h).fold(0u128, |a, j| {
+-                a + bb.pow(j) * u128::from(if (j + first).is_multiple_of(2) { b - 1 } else { 0 })
++                a + bb.pow(j)
++                    * u128::from(if (j + first).is_multiple_of(2) {
++                        b - 1
++                    } else {
++                        0
++                    })
+             })
+         };
+         let p = bb.pow(h);
+@@ -5629,7 +5634,16 @@ mod tests {
+                 let ns = dev.read_list(&rec).expect("the batch's list");
+                 let lw = 2 * dev.list_cap as usize;
+                 let run = |cubes: u32, mode: u32| {
+-                    run_check(&dev, cubes, &dev.list, lw, &dev.top_rec, rec_len, ns.len(), mode)
++                    run_check(
++                        &dev,
++                        cubes,
++                        &dev.list,
++                        lw,
++                        &dev.top_rec,
++                        rec_len,
++                        ns.len(),
++                        mode,
++                    )
+                 };
+                 passed += assert_counts(&sh, &ns, &run(CHECK_CUBES, CHECK_COUNT), false, &what);
+                 assert_counts(&sh, &ns, &run(3, CHECK_GATED), true, &what);
+@@ -5663,7 +5677,16 @@ mod tests {
+                 client.create(cubecl::bytes::Bytes::from_elems(recs.clone())),
+             );
+             let run = |cubes: u32, mode: u32| {
+-                run_check(&dev, cubes, &lh, list.len(), &rh, recs.len(), ns.len(), mode)
++                run_check(
++                    &dev,
++                    cubes,
++                    &lh,
++                    list.len(),
++                    &rh,
++                    recs.len(),
++                    ns.len(),
++                    mode,
++                )
+             };
+             let syn = format!("{what} synthetic");
+             passed += assert_counts(&sh, &ns, &run(CHECK_CUBES, CHECK_COUNT), false, &syn);

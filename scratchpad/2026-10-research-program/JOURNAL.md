@@ -43,6 +43,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   method must pin or record the variant). AND codegen has unfolded address arithmetic (→ L54,
   est. 2–5 %). Group walk, COMPACT=2, fewer AND digits and LDS.128 are all no-go by arithmetic.
   Box l51-profile destroyed (3.5 h).
+- **L47 fixes done (09:45 UTC): `pr/check-d` → 7d6956f** (the test now `ensure_ran`s every batch,
+  covers band-edge n at every production shape incl. 44 at b64, has a gated mode, and dedupes the
+  b57 frontier; kernel unchanged: 39 registers, 736 SASS; count/gated/probe pass on CUDA and
+  lavapipe both compilers; `check_all`, b62 COMPARE, exhaustive quotient test, clippy ×3). Box
+  l47-fixes destroyed (1.5 h). Two PR-ready branches held: FD round 2 (d813aea) and check D.
 
 ## 2026-11-07 (day 11; routine fired 04:41 UTC)
 

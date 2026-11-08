@@ -1,0 +1,68 @@
+info: syncing channel updates for 1.99.1-x86_64-unknown-linux-gnu
+info: latest update on 2026-10-15 for version 1.99.1 (58cf8f9c3 2026-10-13)
+info: downloading 5 components
+warn: the missing active toolchain `1.99.1-x86_64-unknown-linux-gnu` has been auto-installed
+warn: this might cause rustup commands to take longer time to finish than expected
+info: you may opt out with `RUSTUP_AUTO_INSTALL=0` or `rustup set auto-install disable`
+Diff in /root/l47/src/F/common/src/cubecl_join.rs:187:
+ )]
+ mod kernels {
+     use super::{
+-        AND_GROUP, CHECK_COUNT, CHECK_GATED, CHECK_PROBE, DEAD_MASK, JOIN_WG, MAX_ROOTS, STAGES_U32, SURV_FLUSH,
+-        SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS, TRANSPOSE_MIN,
++        AND_GROUP, CHECK_COUNT, CHECK_GATED, CHECK_PROBE, DEAD_MASK, JOIN_WG, MAX_ROOTS,
++        STAGES_U32, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS, TRANSPOSE_MIN,
+     };
+     use crate::cubecl_backend::NICEONLY_STRIDE;
+     use crate::cubecl_detailed_fd::fd_add_top;
+Diff in /root/l47/src/F/common/src/cubecl_join.rs:5534:
+         let h = l / 2;
+         let alt = |first: u32| -> u128 {
+             (0..h).fold(0u128, |a, j| {
+-                a + bb.pow(j) * u128::from(if (j + first).is_multiple_of(2) { b - 1 } else { 0 })
++                a + bb.pow(j)
++                    * u128::from(if (j + first).is_multiple_of(2) {
++                        b - 1
++                    } else {
++                        0
++                    })
+             })
+         };
+         let p = bb.pow(h);
+Diff in /root/l47/src/F/common/src/cubecl_join.rs:5629:
+                 let ns = dev.read_list(&rec).expect("the batch's list");
+                 let lw = 2 * dev.list_cap as usize;
+                 let run = |cubes: u32, mode: u32| {
+-                    run_check(&dev, cubes, &dev.list, lw, &dev.top_rec, rec_len, ns.len(), mode)
++                    run_check(
++                        &dev,
++                        cubes,
++                        &dev.list,
++                        lw,
++                        &dev.top_rec,
++                        rec_len,
++                        ns.len(),
++                        mode,
++                    )
+                 };
+                 passed += assert_counts(&sh, &ns, &run(CHECK_CUBES, CHECK_COUNT), false, &what);
+                 assert_counts(&sh, &ns, &run(3, CHECK_GATED), true, &what);
+Diff in /root/l47/src/F/common/src/cubecl_join.rs:5663:
+                 client.create(cubecl::bytes::Bytes::from_elems(recs.clone())),
+             );
+             let run = |cubes: u32, mode: u32| {
+-                run_check(&dev, cubes, &lh, list.len(), &rh, recs.len(), ns.len(), mode)
++                run_check(
++                    &dev,
++                    cubes,
++                    &lh,
++                    list.len(),
++                    &rh,
++                    recs.len(),
++                    ns.len(),
++                    mode,
++                )
+             };
+             let syn = format!("{what} synthetic");
+             passed += assert_counts(&sh, &ns, &run(CHECK_CUBES, CHECK_COUNT), false, &syn);
+fmt rc=1

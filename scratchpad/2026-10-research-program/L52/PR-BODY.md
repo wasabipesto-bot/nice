@@ -27,7 +27,7 @@ perf on #248's head, on the machine below (1 thread, 4 sampled partitions each o
 
 - **The chunk branch is a coin toss.** A 16-bottom chunk holds a passing bottom with probability about 1 − 0.97^16 ≈ 0.39, so the branch on the chunk's pass bits mispredicts about 0.4 times a chunk. That is about 30 M mispredictions per b60 1e16 partition, half of the partition's, at roughly 18 cycles each on this core.
 - **Each pass left the vector loop.** Every passing bottom was a `vzeroupper` and a `call` into `survivor`, and the loop kept its chunk pointer and both broadcast masks on the stack across the call. By address range, about 52 % of `scan_avx2`'s cycle samples fell in this per-pass extraction and 36 % in the vector loop itself.
-- **Two passes remove both.** Pass 1 has no data-dependent branch. Pass 2 is a counted loop over the list, so its one branch mispredicts only at the end, and the inlined `survivor`'s loads and arithmetic overlap from one pair to the next.
+- **Two passes remove both.** Pass 1 has no data-dependent branch. Pass 2 is a counted loop over the list, whose loop branch mispredicts only at its end, and the inlined `survivor`'s loads and arithmetic overlap from one pair to the next.
 
 ## Soundness
 
@@ -46,17 +46,74 @@ perf on #248's head, on the machine below (1 thread, 4 sampled partitions each o
 
 ## Measurements
 
-TBD-MEAS
+**Machine:** a 4-vCPU AMD EPYC-Rome (**Zen 2**) VM with **AVX2 only**, so pass 1 is the AVX2 one; every run under `nice -n 19`. Mispredictions, calls and spills cost differently on other cores, so the ratio there may differ; I have measured only this machine (AVX-512 below).
+
+**Method:** release builds of #248's head (`7f5260b`) and this PR. A harness outside this PR, using only `CpuJoin`'s public API, runs sampled partitions of one slice (NiceMark's bit-reversed `sample_order`) through `CpuJoin::run_partition` on 1 or 4 threads; whole fields run every partition. The two binaries are interleaved with the order alternating per round (#248, PR; PR, #248; #248, PR), 3 rounds. Figures are medians; spread = (max − min) / median; "per round" is #248's time over the PR's in the same round. Before each round the script waited for the 1-min load average to be ≤ 2 and logged it: the rounds started at 1.36, 2.00 and 1.94. It also sampled the other processes at the start of every run: other sessions never used more than 1.7 cores there. The 4-thread runs lift the load to 3–5 themselves.
+
+Fields as in #248: b60 at NiceMark's `b60_msd_weak` start, 1157209632114824200908. b62 1e17 is the whole field 4473066762334864396992 + 1e17, which the CPU cuts into 7 slices; its slice 0 is used here. b62 1e14 starts at 4473156762334864396992, b64 at 41242006262957161709568, and b58 1e15 is NiceMark's field at 104400216587923470200.
+
+Times are ms per partition and thread for the sampled partitions (wall × threads / partitions) and wall seconds for the whole fields. Every run of both sides found the same join survivors and full checks (below).
+
+| work | threads | #248 (rounds) | spread | this PR (rounds) | spread | speed-up | per round |
+|---|---|---|---|---|---|---|---|
+| **b60 1e16**, 4 partitions | 1 | **2225** ms (2222, 2236, 2225) | 0.6 % | **1758** ms (1764, 1758, 1750) | 0.8 % | **×1.266** | 1.260, 1.272, 1.272 |
+| **b62 1e17** slice 0, 4 partitions | 1 | **2110** ms (2110, 2107, 2148) | 2.0 % | **1706** ms (1706, 1688, 1710) | 1.3 % | **×1.237** | 1.237, 1.248, 1.256 |
+| **b60 1e16**, 16 partitions | 4 | **2436** ms (2365, 2436, 2439) | 3.0 % | **1934** ms (1936, 1921, 1934) | 0.8 % | **×1.260** | 1.222, 1.268, 1.261 |
+| **b62 1e17** slice 0, 16 partitions | 4 | **2371** ms (2378, 2346, 2371) | 1.3 % | **1916** ms (1860, 1922, 1916) | 3.2 % | **×1.237** | 1.278, 1.221, 1.237 |
+| b58 1e15 (NiceMark's field), 32 partitions | 1 | **536** ms (536, 538, 521) | 3.2 % | **412** ms (414, 400, 412) | 3.3 % | **×1.300** | 1.296, 1.345, 1.264 |
+| b58 1e15, 128 partitions | 4 | **593** ms (593, 606, 586) | 3.3 % | **451** ms (451, 450, 476) | 5.7 % | **×1.316** | 1.316, 1.346, 1.233 |
+| b60 1e14, whole field (3600 partitions) | 4 | **33.8** s (33.0, 33.8, 33.8) | 2.4 % | **30.6** s (30.3, 30.6, 31.0) | 2.3 % | **×1.104** | 1.089, 1.105, 1.089 |
+| b62 1e14, whole field (3844 partitions) | 4 | **42.9** s (42.5, 42.9, 45.0) | 5.8 % | **39.6** s (39.1, 39.6, 39.6) | 1.3 % | **×1.083** | 1.085, 1.082, 1.135 |
+| b64 1e14, whole field (4096 partitions) | 4 | **83.9** s (83.9, 84.7, 83.9) | 1.0 % | **71.0** s (70.8, 71.0, 73.9) | 4.4 % | **×1.182** | 1.186, 1.194, 1.135 |
+TBD-WHOLE1T
+- **At the production shapes (b60 1e16, b62 1e17) the join is ×1.24–1.27 faster**, at 1 and 4 threads alike; every single round is ×1.22–1.28. b58 1e15, where the scan is a larger share of a partition, gains ×1.30–1.32.
+- The whole 1e14 fields gain less (b60 ×1.10, b62 ×1.08): their partitions spend a larger share on listing and extending the bottoms, which this PR does not touch. b64 1e14 has 4.3× b60's join survivors for 1.14× its partitions, so it gains more (×1.18).
+
+**Counters** (`perf stat`, counting from 3.5 s on, past the slice setup; 1 thread, 4 partitions, 2 rounds alternating; per partition = count × ms per partition / task-clock; medians):
+
+| per partition | b60 1e16, #248 | b60 1e16, this PR | b62 1e17 slice 0, #248 | b62 1e17 slice 0, this PR |
+|---|---|---|---|---|
+| instructions | 1.571e10 | 1.635e10 (+4.1 %) | 1.511e10 | 1.557e10 (+3.0 %) |
+| branches | 1.854e9 | 1.999e9 (+7.8 %) | 1.777e9 | 1.869e9 (+5.2 %) |
+| **branch mispredictions** | **61.3 M** (3.31 % of branches) | **25.3 M** (1.26 %) | **58.4 M** (3.29 %) | **21.7 M** (1.16 %) |
+| cycles | 7.21e9 | 5.83e9 (−19.2 %) | 6.96e9 | 5.53e9 (−20.5 %) |
+| **IPC** | **2.18** | **2.81** | **2.17** | **2.81** |
+| ms per partition in these runs | 2218 | 1797 | 2136 | 1703 |
+
+- **Mispredictions fall by 59–63 %** (61 → 25 M a b60 1e16 partition, 58 → 22 M at b62), and IPC rises from 2.2 to 2.8. Instructions grow by 3–4 % and branches by 5–8 %: the compaction's stores and table loads, and a bounds check per eight bottoms, all predictable. Cycles fall by 19–21 %.
+
+TBD-NICEMARK
+
+**AVX-512.** This machine has none.
+
+- **What ran for the AVX-512F pass 1:** it was compiled (in the release, test and clippy builds), and its code in the release binary was read: per eight bottoms one `vptestnmq` against the broadcast top mask, a `kmovw`, the two table loads, a `vpaddw` and one 16-byte store, all AVX-512F or AVX2 instructions. It was never executed: `is_x86_feature_detected!("avx512f")` is false here, so the new test ran the portable and AVX2 paths only, and `every_scan_finds_the_same_pairs` compared AVX2 (as the best path and forced) with the portable loop.
+- On a CPU with AVX-512F the new test also runs the AVX-512 path against the plain filter, and the parity tests use it as the best path. **Whether CI's x86-64 runners have AVX-512 is unknown:** they are GitHub's `ubuntu-latest` (ubuntu-24.04 on Azure), their logs do not show the CPU model, and the tests print the paths they ran only with `--nocapture`.
+- **Estimate for an AVX-512 core such as Zen 4: ×1.08–1.15** at the production shapes, not measured. The old AVX-512 loop needed about a quarter of the AVX2 loop's instructions per AND and branched once per 32 bottoms (a 32-bottom chunk holds a pass with probability ≈ 0.62, so that branch is still unpredictable), so the scan was a smaller share of a partition there, with about half as many mispredictions to remove; the call into `survivor` per pass was the same. If the new AVX-512 form measures slower than the old one on some host, the old loop can come back for that path alone.
 
 ## Exactness
 
-TBD-EXACT
+All release builds of this head.
+
+- **The new test** passes: on this machine it ran the portable and AVX2 paths (`first pass on ["portable", "avx2"]: 84860 bottoms listed alike`).
+- **The existing `cpu_join` tests pass unchanged**: the reference join on the test windows (including the b57 window whose classes take two pieces), all three scan dispatches on every partition of the windows, the stride path on whole windows, slices, the field prune, the stepped against the divided tops, b10's 69, and the fixed-point prefilter tests. `cargo test --release -p nice_common -p nice_client`: 189 + 22 passed, 6 ignored (opt-in); #248 had 188 + 22.
+- The opt-in `cpu_join_matches_the_reference_on_production_fields` (`NICE_TEST_CPU_JOIN_REF=3`: 3 partitions of each plan field, b42–b64): ok, against the reference join.
+- The whole b42 field (`NICE_TEST_JOIN_FULL_FIELD=1`): join = reference = stride, 1764 partitions, 417,789,835 join survivors, 16,879,877 checked, no hits. On 4 threads: reference 87 s, join 11.3 s, stride 118.5 s.
+- **Every timed run above, of both sides, has #248's join survivors and full checks:**
+  - b60 1e16, 4 partitions: 136,900,315 / 8,692,368; 16 partitions: 549,719,536 / 34,926,644;
+  - b62 1e17 slice 0, 4 partitions: 137,605,271 / 8,194,223; 16 partitions: 550,916,180 / 32,806,057;
+  - b58 1e15, 32 partitions: 319,652,260 / 18,029,967; 128 partitions: 1,277,611,815 / 72,056,777;
+  - whole b60 1e14 field: 1,326,103,590 / 84,383,498;
+  - whole b62 1e14 field: 1,470,093,637 / 87,495,922;
+  - whole b64 1e14 field: 5,702,041,796 / 346,647,759.
+  - No hits on either side.
+- `cargo fmt --all --check`; `cargo clippy -p "*" --all-targets -- -D warnings` (default features, rustc 1.99.1): clean. The GPU feature sets do not touch this code: `cpu_join.rs` has no feature-gated items, and the GPU modules use only `CpuJoin`'s public API.
 
 ## Not in this PR
 
 - **The seeded check.** The full check could start from the 16 digits the join already knows (positions 0..7 of n² and n³: the bottom's 12 and the prefilter's 4) instead of re-deriving some of them; a prototype measured ×1.07–1.11 on top of this PR at the production shapes on this machine. A separate PR.
 - **A vectorised second pass** (the prefilter run eight listed pairs at a time): not tried.
-- **Raw-pointer stores in the compaction.** The slice writes cost one predictable bounds check per eight bottoms (most of the 5–8 % more branches in the counter table above); unchecked stores would save some of the 3–4 % more instructions. Not measured; the checked form keeps the module free of new `unsafe` beyond the existing SIMD loads.
+- **Raw-pointer stores in the compaction.** The slice writes cost one predictable bounds check per eight bottoms (most of the 5–8 % more branches in the counter table under Measurements); unchecked stores would save some of the 3–4 % more instructions. Not measured; the checked form keeps the module free of new `unsafe` beyond the existing SIMD loads.
+- **The AVX-512 path's detection** is unchanged: it is taken on `avx512f` alone. Like `stride_filter`'s, it could also require AVX2, which rustc's `avx512f` implies for code generation; the new pass 1 uses the AVX2 form of the index broadcast. Only a VM that exposes AVX-512F without AVX2 would tell the difference.
 - **Other shapes of the same scan**, measured in single runs at b60 1e16 on 1 thread and no better: AVX2 taking 16 bottoms a step as the old loop did (two bytes per step; 1733 and 1740 ms per partition against 1742 and 1800 ms for 8 a step), and `scan` kept out of line (`#[inline(never)]`; 1772 and 1809 ms against 1745 and 1706 ms).
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

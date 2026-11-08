@@ -26,6 +26,11 @@ Box: Vast 59671449 (`nice-research-l47-check`), RTX 3080 10 GB, driver 580.159.0
   **NiceMark ×1.056** (6 rounds, per round 1.050–1.066; scenarios ×1.039–1.077). **The bar is met** (≥ ×1.05 at both
   production fields, no NiceMark scenario below ×0.98, exactness clean): `pr/check-d` pushed, `PR-BODY.md` written,
   no PR opened.
+- **After the independent review** (`REVIEW.md`: merge with small fixes, no correctness defect; §11): the device test
+  checks every batch ran, adds band-edge n (b64's production shape had none in band), runs each list once, and
+  gains a gated mode on a few-cube grid with an exact work-counter assertion; the kernel takes its `CheckShape` as
+  the comptime argument; the mirror is test-only; the body's wording fixed. New head **`7d6956f`**, re-tested on a
+  second box (CUDA, lavapipe naga and SPIR-V, `check_all`, COMPARE, fmt, clippy ×3).
 
 ## 0. Step 0: the floor and the wave tail (old kernel, profile on)
 
@@ -280,18 +285,21 @@ both sides; the unprofiled A/B is the measurement. b64 gains least, probably bec
 
 - Fork `exp/check-d` (head `1187527c`): d813aea + the profile commit (`NICE_EXP_GPU_PROFILE`) + step 0's knobs
   (`53b52a6`, binary S0) + design D with `NICE_EXP_CHECK_G/K/CUBES` (`7973b691`, binary D) + test fixes. Not for merge.
-- Fork **`pr/check-d`** (`0f3332d`): one commit on d813aea (the PR). Timed and tested tree `5be672c` (binary P,
-  client_P); the head adds only rustfmt, clippy's host/test fixes and comments, re-tested on the box (§7). (Built
-  as `exp/check-d-pr`, deleted from the fork once `pr/check-d` was pushed.)
+- Fork **`pr/check-d`** (**`7d6956f`** after the review, §11; was `0f3332d`): one commit on d813aea (the PR). Timed
+  tree `5be672c` (binary P, client_P); the head adds the review's test and kernel-interface fixes, rustfmt, clippy's
+  host/test fixes and comments, re-tested on the boxes (§7, §11). (Built as `exp/check-d-pr`, deleted from the fork
+  once `pr/check-d` was pushed; the review fixes' working commit is `exp/check-d-fixes` `ec7b773`.)
 - `PR-BODY.md` (no PR opened); `raw/scripts/` (setup, build, buildclient, run, test, chain_s0/screen/sanity/x/ab/lvp/
   lint, queueX2, orch, final, rebuildP, lintF/lintF2, p2, tables, prof.py, s0table.py, sasscount.py, ptxjit.py, ab.py,
   nm_table.py, shapes.py, pull.sh; the scoping's scripts as before); `raw/box/` (every log, smi trace and SASS dump of
-  the session; `sass/` binary D, `sass_P/` the PR tree); `raw/ivory_join_check_tests.log`.
+  the session; `sass/` binary D, `sass_P/` the PR tree); `raw/box2/` (box 59687089: the review fixes' logs);
+  `raw/ivory_join_check_tests.log`; `raw/PR-BODY.before-review.md`; `raw/scripts/fix_chain.sh`, `edge_count.py`.
 
-## 10. The box
+## 10. The boxes
 
-Vast 59671449 can be destroyed: nothing is running on it (the last job, `final.sh`, ended 07:49 UTC) and every log,
-smi trace, SASS dump and table is in `raw/box/` (pulled 07:50 UTC). Box time used: ~2 h of the 7 h (05:50–07:50).
+- Vast 59671449 (the session's box) could be destroyed from 07:50 UTC: every log, smi trace, SASS dump and table is
+  in `raw/box/`. Box time used: ~2 h of the 7 h (05:50–07:50).
+- Vast 59687089 (the review fixes) could be destroyed from 09:40 UTC (§11's last line).
 
 ## 11. Review fixes (REVIEW.md, after the session; box 59687089)
 
@@ -338,4 +346,21 @@ Results on box 59687089, tree `ec7b773` (the fixes before rustfmt; logs in raw/b
 - lavapipe (llvmpipe, LLVM 20.1.2, 8-lane subgroups), the same test: **naga ok (203 s), direct SPIR-V ok (321 s)**,
   65 lists (the device's limits batch one field differently), the same totals as CUDA.
 - clippy ×3 on `ec7b773` (default, gpu, gpu+spirv; rustc 1.99.1): clean. fmt: 4 hunks (line wraps), applied.
-(the final head below)
+
+**The final head, `7d6956f` = `pr/check-d`** (the squash of the above plus rustfmt; one commit on d813aea, pushed with
+lease over `0f3332d`), the whole list again on box 59687089:
+- fmt clean.
+- `cubecl_cuda_check_counts_match_the_cpu`: ok, 64 lists, 1,168,717 / 84,652 / 22 shapes / 3,047 past the gate.
+- `cubecl_cuda_join_matches_the_cpu_reference`: ok. 1e14 COMPARE b62: join = stride, 1,439,469,648 / 88,159,810,
+  found 0. `join_check::` 5 passed; the exhaustive test (114 divisors) ok.
+- The check kernel from that COMPARE process (driver JIT, b62): 39 registers, no spills, no local memory, 736 SASS
+  instructions, as the timed tree's b62 image.
+- lavapipe, the same test: **naga ok (159 s), direct SPIR-V ok (304 s)**, 65 lists, the same totals as CUDA.
+- clippy ×3 (default, gpu, gpu+spirv; rustc 1.99.1; each re-checked `nice_common`): clean.
+- Wall times of the CUDA tests were longer on this run (count test 178 s against 52 s, `check_all` 227 s against
+  127 s, the exhaustive test 87 s against 75 s, the same chain and box). The kernel's image is the one above (39
+  registers, 736 SASS); the tests' CPU reference side is most of their time. The difference was not investigated.
+- Logs: `raw/box2/*_7d6956f8.*`; the JIT report `raw/box2/ptxjit_check_7d6956f8.txt`.
+
+Vast 59687089 can be destroyed from 09:40 UTC: nothing running, every log pulled into `raw/box2/` (binaries and PTX
+caches not kept; they rebuild from `7d6956f`). Box time used: about 1 h 05 min (first chain 08:34, last 09:38).
