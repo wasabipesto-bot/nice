@@ -5771,9 +5771,29 @@ mod tests {
     /// Adversarial and random n of `sh`'s shape (digit counts of n, n² and
     /// n³) whose prefix `n / b^f0` fits u64, as the top records hold it.
     fn synthetic(sh: &CheckShape, seed: u64) -> Vec<u128> {
+        use malachite::base::num::arithmetic::traits::Pow;
         let (b, l) = (sh.b, sh.l);
         let bb = u128::from(b);
-        let (lo, hi) = (bb.pow(l - 1), bb.pow(l));
+        // The n of l digits whose square and cube have s2 and s3 digits:
+        // [lo, hi), from the least n with x^k >= b^(s - 1) and b^s.
+        let root_above = |s: u32, k: u32| -> u128 {
+            let target = malachite::natural::Natural::from(bb).pow(u64::from(s));
+            let (mut a, mut z) = (0u128, bb.pow(l) + 1);
+            while a < z {
+                let m = a + (z - a) / 2;
+                if malachite::natural::Natural::from(m).pow(u64::from(k)) >= target {
+                    z = m;
+                } else {
+                    a = m + 1;
+                }
+            }
+            a
+        };
+        let lo = bb
+            .pow(l - 1)
+            .max(root_above(sh.s2 - 1, 2))
+            .max(root_above(sh.s3 - 1, 3));
+        let hi = bb.pow(l).min(root_above(sh.s2, 2)).min(root_above(sh.s3, 3));
         let mut ns = crate::join_check::tests::adversarial(b, l);
         let mut r = seed | 1;
         let mut next = || {
@@ -5784,7 +5804,7 @@ mod tests {
         };
         for _ in 0..4000 {
             let x = (u128::from(next()) << 64) | u128::from(next());
-            ns.push(lo + x % (hi - lo));
+            ns.push(lo + x % (hi - lo).max(1));
         }
         let fits = |n: u128| {
             let nd = |x: malachite::natural::Natural| {

@@ -11,8 +11,8 @@
 //! multiply-high quotients ([`magic`]): no long division of a binary number,
 //! and no `/` or `%` anywhere. A survivor goes on to `n³`'s upper limbs only
 //! if the digits of `n²` and the low digits of `n³` are distinct (the gate,
-//! [`CheckShape::gl`]), a necessary condition that about 0.15% of the join's
-//! survivors at bases 60-62 pass.
+//! [`CheckShape::gl`]): a necessary condition that few survivors pass, so
+//! most planes of the kernel skip the rest of `n³`.
 
 use anyhow::{Result, ensure};
 
