@@ -5,6 +5,25 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L52.2 Two-pass scan: review fixes and the AVX-512 path executed on a Zen 5 host (2026-11-08; `L52/REVIEW.md`, `L52/PR-RESULTS.md` "Review follow-up", `L52/raw/avx512/`; head 1cce00d = one commit on #248)
+
+Review (all seven planted bugs caught by the new test; portable + AVX2 correct by test, AVX-512
+correct by reading only): fixes — AVX-512 taken only with `avx2` too (pass 1 uses a VEX
+`vpbroadcastw`); the false "two pieces" coverage claim removed and a `piece` field (1024 outside
+tests) lets `every_scan_finds_the_same_pairs` cross piece boundaries (suite also run once with
+the constant at 9); `the_bit_tables_list_every_byte` over all 256 bytes; `debug_assert` on
+`pass1`'s length contract; commit message/body corrections. Tests on ivory at 1cce00d: 190 + 22,
+`NICE_TEST_CPU_JOIN_REF=3`, whole b42; fmt; clippy; sanity A/B ×1.21–1.29 (runtime piece length
+costs nothing). **AVX-512 host: Vast 59703250, AMD Ryzen 9 9950X (Zen 5), ~15.4-core container
+($0.43/h, 1.3 h):** avx512f + avx2 detected; the pass-1 test ran all three paths (84,860 bottoms
+listed alike); the whole `cpu_join` suite (15), 190 + 22, `NICE_TEST_CPU_JOIN_REF=3`, whole b42
+(same counts as ivory) all pass; three binaries (#248's old AVX-512 loop, the PR, the PR with
+AVX-512 switched off) give identical counts everywhere (b60 1e14 1,326,103,590 / 84,383,498);
+**speed over #248 on Zen 5: b60 1e16 ×1.232 (1 thread, 6 rounds) / ×1.225 (8 threads); b62 1e17
+slice 0 ×1.238 / ×1.216** (beats the ×1.08–1.15 AVX-512 estimate; the new AVX-512 pass 1 is within
+noise of the new AVX2 pass 1 there, ×0.95–1.04; box noise ±8 %). CI runners' AVX-512 support
+still unknown. PR-ready, held at the cap.
+
 ## L52.1 CPU two-pass AND scan: PR branch (2026-11-08, agent; `L52/PR-RESULTS.md`, `L52/PR-BODY.md`, `L52/raw/`; `pr/cpu-join-two-pass-scan` cd661b0 = one commit on #248 7f5260b; worktree `.worktrees/l52-two-pass-scan`)
 
 All three scan paths run two passes over pieces of ≤ 1024 bottoms: pass 1 makes a byte of pass

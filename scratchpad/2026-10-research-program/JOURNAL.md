@@ -59,6 +59,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   window never scans). Fixes sent to the L52 agent; **an AVX-512 box rented to execute the path**
   (instance 59703250, 4090 host with a Ryzen 9 9950X, $0.43/h, 2 h TTL; `vast.py create` needs
   `--gpu` + `--query 'cpu_name="…"'` — the id lookup only sees the default price page).
+- **L52 done (11:15 UTC, L52.2): fixes in (`avx2` required with `avx512f`; piece size lowerable
+  in tests; table test), and the AVX-512 path executed on a Ryzen 9 9950X: all tests pass, counts
+  identical across the three binaries, ×1.22–1.24 over #248 there.** Head 1cce00d, held at the
+  cap. Box l52-avx512 destroyed (1.3 h, $0.56). Day: 6 boxes, ~$1.4; 11 agents; director ~6 h.
 
 ## 2026-11-07 (day 11; routine fired 04:41 UTC)
 
