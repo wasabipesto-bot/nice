@@ -3146,57 +3146,57 @@ mod kernels {
                 }
             }
             cube_done(ran, 3u32);
-            terminate!();
-        }
-        let cu_limbs = comptime!(3 * limbs);
-        let sv_pad = comptime!(cu_limbs | 1);
-        let mut sv_s = SharedMemory::<u32>::new(comptime!((JOIN_WG * (cu_limbs | 1)) as usize));
-        let svb = UNIT_POS_X * sv_pad;
-        let mut count = surv_count[0].load();
-        if count > surv_cap {
-            count = surv_cap;
-        }
-        let stride = CUBE_COUNT_X * CUBE_DIM_X;
-        let mut i = ABSOLUTE_POS_X;
-        while i < count {
-            let t = surv[(2u32 * i) as usize];
-            let r0 = surv[(2u32 * i + 1u32) as usize];
-            let p_lo = u64::cast_from(top_rec[(TOP_REC_WORDS * t) as usize]);
-            let p_hi = u64::cast_from(top_rec[(TOP_REC_WORDS * t + 1u32) as usize]);
-            let wf = u64::cast_from(w_f0);
-            // n = (p_hi 2^32 + p_lo) * w + r0 over (lo, hi) u64 halves.
-            let a = p_lo * wf;
-            let bq = p_hi * wf;
-            let lo1 = a + (bq << 32u64);
-            let mut hi = bq >> 32u64;
-            if lo1 < a {
-                hi += 1u64;
+        } else {
+            let cu_limbs = comptime!(3 * limbs);
+            let sv_pad = comptime!(cu_limbs | 1);
+            let mut sv_s = SharedMemory::<u32>::new(comptime!((JOIN_WG * (cu_limbs | 1)) as usize));
+            let svb = UNIT_POS_X * sv_pad;
+            let mut count = surv_count[0].load();
+            if count > surv_cap {
+                count = surv_cap;
             }
-            let lo = lo1 + u64::cast_from(r0);
-            if lo < lo1 {
-                hi += 1u64;
+            let stride = CUBE_COUNT_X * CUBE_DIM_X;
+            let mut i = ABSOLUTE_POS_X;
+            while i < count {
+                let t = surv[(2u32 * i) as usize];
+                let r0 = surv[(2u32 * i + 1u32) as usize];
+                let p_lo = u64::cast_from(top_rec[(TOP_REC_WORDS * t) as usize]);
+                let p_hi = u64::cast_from(top_rec[(TOP_REC_WORDS * t + 1u32) as usize]);
+                let wf = u64::cast_from(w_f0);
+                // n = (p_hi 2^32 + p_lo) * w + r0 over (lo, hi) u64 halves.
+                let a = p_lo * wf;
+                let bq = p_hi * wf;
+                let lo1 = a + (bq << 32u64);
+                let mut hi = bq >> 32u64;
+                if lo1 < a {
+                    hi += 1u64;
+                }
+                let lo = lo1 + u64::cast_from(r0);
+                if lo < lo1 {
+                    hi += 1u64;
+                }
+                candidate_check(
+                    lo,
+                    hi,
+                    &mut sv_s,
+                    svb,
+                    nice_out,
+                    nice_count,
+                    nice_cap,
+                    base,
+                    limbs,
+                    chunk_digits,
+                    chunk_div,
+                    wide_chunk,
+                    pre_limbs,
+                    pre_chunk_digits,
+                    pre_chunk_div,
+                    probe,
+                );
+                i += stride;
             }
-            candidate_check(
-                lo,
-                hi,
-                &mut sv_s,
-                svb,
-                nice_out,
-                nice_count,
-                nice_cap,
-                base,
-                limbs,
-                chunk_digits,
-                chunk_div,
-                wide_chunk,
-                pre_limbs,
-                pre_chunk_digits,
-                pre_chunk_div,
-                probe,
-            );
-            i += stride;
+            cube_done(ran, 3u32);
         }
-        cube_done(ran, 3u32);
     }
 }
 
