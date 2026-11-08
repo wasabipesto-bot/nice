@@ -95,6 +95,7 @@ pub const TRANSPOSE_MIN: u32 = 192;
 const AND_GROUP: u32 = 4;
 // The transposed copy maps thread u to chunk u / 32 of the batch, and the
 // groups tile the batch's chunks.
+#[allow(dead_code)]
 const _: () = assert!(
     JOIN_WG == TOP_CAP && TOP_CAP.is_multiple_of(32 * AND_GROUP) && TRANSPOSE_MIN <= TOP_CAP
 );
@@ -172,8 +173,7 @@ pub use kernels::{bucket_kernel, check_kernel, join_kernel, top_fd_kernel, top_k
 )]
 mod kernels {
     use super::{
-        AND_GROUP, DEAD_MASK, JOIN_WG, MAX_ROOTS, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS,
-        TRANSPOSE_MIN,
+        DEAD_MASK, JOIN_WG, MAX_ROOTS, SURV_SH_CAP, TOP_REC_WORDS,
     };
     use crate::cubecl_backend::candidate_check;
     use crate::cubecl_detailed_fd::fd_add_top;
@@ -495,7 +495,23 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] abl: u32,
+        #[comptime] tmin: u32,
+        #[comptime] spc: bool,
+        #[comptime] ag_c: u32,
+        #[comptime] tcap: u32,
+        #[comptime] sflush: u32,
+        #[comptime] stg: u32,
     ) {
+        // L51 (experimental, `NICE_EXP_JOIN_*`): `abl` 0 full; 1 AND only
+        // (pass masks formed, range-tested and counted, no walk); 2 walk
+        // without the prefilter and the stage; 3 walk and prefilter, no
+        // stage; 4 no AND (every pass mask 0). `tmin` = the transpose gate, `ag_c`
+        // = AND_GROUP, `tcap` = TOP_CAP, `sflush` = SURV_FLUSH; `stg` 0 the
+        // stage checked once per top batch (d813aea), 1 once per work item;
+        // `spc` counts pairs written past a full stage in `and_count[1]`.
+        let mut ck = 0u32;
+        let mut npf: u32 = 0u32;
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
         let wave = comptime!(ept * JOIN_WG);
@@ -531,23 +547,23 @@ mod kernels {
         let fx_q = comptime!(fx_consts(base).1);
         let fx_r = comptime!(fx_consts(base).2);
         let bsq = comptime!(base * base);
-        let mut t_lo = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
-        let mut t_hi = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
-        let mut t_rlo = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
-        let mut t_rhi = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
-        let mut t_id = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
-        let mut t_dm = SharedMemory::<u32>::new(comptime!(TOP_CAP as usize));
+        let mut t_lo = SharedMemory::<u32>::new(comptime!(tcap as usize));
+        let mut t_hi = SharedMemory::<u32>::new(comptime!(tcap as usize));
+        let mut t_rlo = SharedMemory::<u32>::new(comptime!(tcap as usize));
+        let mut t_rhi = SharedMemory::<u32>::new(comptime!(tcap as usize));
+        let mut t_id = SharedMemory::<u32>::new(comptime!(tcap as usize));
+        let mut t_dm = SharedMemory::<u32>::new(comptime!(tcap as usize));
         // The tops' certificates where their seed flag is set, else 0.
         let mut t_glo =
-            SharedMemory::<u32>::new(comptime!(if lean { TOP_CAP as usize } else { 1 }));
+            SharedMemory::<u32>::new(comptime!(if lean { tcap as usize } else { 1 }));
         let mut t_ghi =
-            SharedMemory::<u32>::new(comptime!(if lean { TOP_CAP as usize } else { 1 }));
+            SharedMemory::<u32>::new(comptime!(if lean { tcap as usize } else { 1 }));
         // Per chunk of 32 tops: bit i set iff top i is clipped.
-        let s_cw = SharedMemory::<Atomic<u32>>::new(comptime!((TOP_CAP / 32) as usize));
+        let s_cw = SharedMemory::<Atomic<u32>>::new(comptime!((tcap / 32) as usize));
         // The batch's masks digit-major: bit i of `t_tr[c·64 + d]` is set iff
         // top 32c + i has the digit at mask bit d (digit d, or digit 63 - d
         // where `lean` holds the masks bit-reversed, see the doc above).
-        let mut t_tr = SharedMemory::<u32>::new(comptime!((TOP_CAP / 32 * 64) as usize));
+        let mut t_tr = SharedMemory::<u32>::new(comptime!((tcap / 32 * 64) as usize));
         let mut s_t = SharedMemory::<u32>::new(comptime!(SURV_SH_CAP as usize));
         let mut s_r = SharedMemory::<u32>::new(comptime!(SURV_SH_CAP as usize));
         let mut s_cnt = SharedMemory::<Atomic<u32>>::new(1usize);
@@ -564,7 +580,7 @@ mod kernels {
         if UNIT_POS_X == 0u32 {
             s_cnt[0].store(0u32);
         }
-        if UNIT_POS_X < comptime!(TOP_CAP / 32) {
+        if UNIT_POS_X < comptime!(tcap / 32) {
             s_cw[UNIT_POS_X as usize].store(0u32);
         }
         sync_cube();
@@ -627,79 +643,154 @@ mod kernels {
             let mut tc = 0u32;
             while tc < s_cum[nroots as usize] {
                 let mut nt = s_cum[nroots as usize] - tc;
-                if nt > TOP_CAP {
-                    nt = TOP_CAP;
+                if nt > tcap {
+                    nt = tcap;
                 }
-                if UNIT_POS_X < nt {
-                    // Top q of the bucket: in the last segment that starts
-                    // at or before it (the ones between are empty).
-                    let q = tc + UNIT_POS_X;
-                    let mut sr = 0u32;
-                    #[unroll]
-                    for j in 1..nroots {
-                        sr = select(s_cum[j as usize] <= q, j, sr);
+                if comptime!(tcap <= JOIN_WG) {
+                    if UNIT_POS_X < nt {
+                        // Top q of the bucket: in the last segment that starts
+                        // at or before it (the ones between are empty).
+                        let q = tc + UNIT_POS_X;
+                        let mut sr = 0u32;
+                        #[unroll]
+                        for j in 1..nroots {
+                            sr = select(s_cum[j as usize] <= q, j, sr);
+                        }
+                        let t = s_db[sr as usize] + q;
+                        // Words 2-7 of the top's record ([`TOP_REC_WORDS`]).
+                        let r8 = TOP_REC_WORDS * t;
+                        let mut lo = top_rec[(r8 + 2u32) as usize];
+                        let mut hi = top_rec[(r8 + 3u32) as usize];
+                        if comptime!(lean) {
+                            let l0 = lo;
+                            lo = hi.reverse_bits();
+                            hi = l0.reverse_bits();
+                        }
+                        t_lo[UNIT_POS_X as usize] = lo;
+                        t_hi[UNIT_POS_X as usize] = hi;
+                        let rlo = top_rec[(r8 + 4u32) as usize];
+                        let rhi = top_rec[(r8 + 5u32) as usize];
+                        t_rlo[UNIT_POS_X as usize] = rlo;
+                        t_rhi[UNIT_POS_X as usize] = rhi;
+                        if rlo != 0u32 || rhi != w_f0 {
+                            s_cw[(UNIT_POS_X / 32u32) as usize].fetch_or(1u32 << (UNIT_POS_X % 32u32));
+                        }
+                        t_id[UNIT_POS_X as usize] = t;
+                        // D (below b^mid <= 2^12) and the seed flag.
+                        let dm = top_rec[(r8 + 6u32) as usize] / dm_div;
+                        let seed = top_rec[(r8 + 7u32) as usize];
+                        if comptime!(lean) {
+                            // ceil(D·2^32/b²) = D·Q + ceil(D·R/b²).
+                            t_dm[UNIT_POS_X as usize] =
+                                dm * fx_q + (dm * fx_r + comptime!(bsq - 1)) / bsq;
+                            t_glo[UNIT_POS_X as usize] = select(seed != 0u32, lo, 0u32);
+                            t_ghi[UNIT_POS_X as usize] = select(seed != 0u32, hi, 0u32);
+                        } else {
+                            t_dm[UNIT_POS_X as usize] = dm | (seed << 16u32);
+                        }
                     }
-                    let t = s_db[sr as usize] + q;
-                    // Words 2-7 of the top's record ([`TOP_REC_WORDS`]).
-                    let r8 = TOP_REC_WORDS * t;
-                    let mut lo = top_rec[(r8 + 2u32) as usize];
-                    let mut hi = top_rec[(r8 + 3u32) as usize];
-                    if comptime!(lean) {
-                        let l0 = lo;
-                        lo = hi.reverse_bits();
-                        hi = l0.reverse_bits();
-                    }
-                    t_lo[UNIT_POS_X as usize] = lo;
-                    t_hi[UNIT_POS_X as usize] = hi;
-                    let rlo = top_rec[(r8 + 4u32) as usize];
-                    let rhi = top_rec[(r8 + 5u32) as usize];
-                    t_rlo[UNIT_POS_X as usize] = rlo;
-                    t_rhi[UNIT_POS_X as usize] = rhi;
-                    if rlo != 0u32 || rhi != w_f0 {
-                        s_cw[(UNIT_POS_X / 32u32) as usize].fetch_or(1u32 << (UNIT_POS_X % 32u32));
-                    }
-                    t_id[UNIT_POS_X as usize] = t;
-                    // D (below b^mid <= 2^12) and the seed flag.
-                    let dm = top_rec[(r8 + 6u32) as usize] / dm_div;
-                    let seed = top_rec[(r8 + 7u32) as usize];
-                    if comptime!(lean) {
-                        // ceil(D·2^32/b²) = D·Q + ceil(D·R/b²).
-                        t_dm[UNIT_POS_X as usize] =
-                            dm * fx_q + (dm * fx_r + comptime!(bsq - 1)) / bsq;
-                        t_glo[UNIT_POS_X as usize] = select(seed != 0u32, lo, 0u32);
-                        t_ghi[UNIT_POS_X as usize] = select(seed != 0u32, hi, 0u32);
-                    } else {
-                        t_dm[UNIT_POS_X as usize] = dm | (seed << 16u32);
+                } else {
+                    let mut uu = UNIT_POS_X;
+                    while uu < nt {
+                        // Top q of the bucket: in the last segment that starts
+                        // at or before it (the ones between are empty).
+                        let q = tc + uu;
+                        let mut sr = 0u32;
+                        #[unroll]
+                        for j in 1..nroots {
+                            sr = select(s_cum[j as usize] <= q, j, sr);
+                        }
+                        let t = s_db[sr as usize] + q;
+                        // Words 2-7 of the top's record ([`TOP_REC_WORDS`]).
+                        let r8 = TOP_REC_WORDS * t;
+                        let mut lo = top_rec[(r8 + 2u32) as usize];
+                        let mut hi = top_rec[(r8 + 3u32) as usize];
+                        if comptime!(lean) {
+                            let l0 = lo;
+                            lo = hi.reverse_bits();
+                            hi = l0.reverse_bits();
+                        }
+                        t_lo[uu as usize] = lo;
+                        t_hi[uu as usize] = hi;
+                        let rlo = top_rec[(r8 + 4u32) as usize];
+                        let rhi = top_rec[(r8 + 5u32) as usize];
+                        t_rlo[uu as usize] = rlo;
+                        t_rhi[uu as usize] = rhi;
+                        if rlo != 0u32 || rhi != w_f0 {
+                            s_cw[(uu / 32u32) as usize].fetch_or(1u32 << (uu % 32u32));
+                        }
+                        t_id[uu as usize] = t;
+                        // D (below b^mid <= 2^12) and the seed flag.
+                        let dm = top_rec[(r8 + 6u32) as usize] / dm_div;
+                        let seed = top_rec[(r8 + 7u32) as usize];
+                        if comptime!(lean) {
+                            // ceil(D·2^32/b²) = D·Q + ceil(D·R/b²).
+                            t_dm[uu as usize] =
+                                dm * fx_q + (dm * fx_r + comptime!(bsq - 1)) / bsq;
+                            t_glo[uu as usize] = select(seed != 0u32, lo, 0u32);
+                            t_ghi[uu as usize] = select(seed != 0u32, hi, 0u32);
+                        } else {
+                            t_dm[uu as usize] = dm | (seed << 16u32);
+                        }
+                        uu += JOIN_WG;
                     }
                 }
                 sync_cube();
-                if nt >= TRANSPOSE_MIN {
+                if nt >= tmin {
                     // Thread u writes chunk u / 32's words for digits u % 32
                     // and u % 32 + 32, over the chunk's 32 tops unrolled (the
                     // loads pipeline); bits past the batch's last top are
                     // clear, and chunks past it are zero.
-                    let cc = UNIT_POS_X / 32u32;
-                    let dl = UNIT_POS_X % 32u32;
-                    let t0 = cc * 32u32;
-                    let mut w0 = 0u32;
-                    let mut w1 = 0u32;
-                    if t0 < nt {
-                        #[unroll]
-                        for i in 0..32u32 {
-                            let lo = t_lo[(t0 + i) as usize];
-                            let hi = t_hi[(t0 + i) as usize];
-                            w0 |= ((lo >> dl) & 1u32) << i;
-                            w1 |= ((hi >> dl) & 1u32) << i;
+                    if comptime!(tcap == JOIN_WG) {
+                        let cc = UNIT_POS_X / 32u32;
+                        let dl = UNIT_POS_X % 32u32;
+                        let t0 = cc * 32u32;
+                        let mut w0 = 0u32;
+                        let mut w1 = 0u32;
+                        if t0 < nt {
+                            #[unroll]
+                            for i in 0..32u32 {
+                                let lo = t_lo[(t0 + i) as usize];
+                                let hi = t_hi[(t0 + i) as usize];
+                                w0 |= ((lo >> dl) & 1u32) << i;
+                                w1 |= ((hi >> dl) & 1u32) << i;
+                            }
+                            let n = nt - t0;
+                            if n < 32u32 {
+                                let vm = (1u32 << n) - 1u32;
+                                w0 &= vm;
+                                w1 &= vm;
+                            }
                         }
-                        let n = nt - t0;
-                        if n < 32u32 {
-                            let vm = (1u32 << n) - 1u32;
-                            w0 &= vm;
-                            w1 &= vm;
+                        t_tr[(cc * 64u32 + dl) as usize] = w0;
+                        t_tr[(cc * 64u32 + 32u32 + dl) as usize] = w1;
+                    } else {
+                        let mut cc = UNIT_POS_X / 32u32;
+                        while cc < comptime!(tcap / 32) {
+                            let dl = UNIT_POS_X % 32u32;
+                            let t0 = cc * 32u32;
+                            let mut w0 = 0u32;
+                            let mut w1 = 0u32;
+                            if t0 < nt {
+                                #[unroll]
+                                for i in 0..32u32 {
+                                    let lo = t_lo[(t0 + i) as usize];
+                                    let hi = t_hi[(t0 + i) as usize];
+                                    w0 |= ((lo >> dl) & 1u32) << i;
+                                    w1 |= ((hi >> dl) & 1u32) << i;
+                                }
+                                let n = nt - t0;
+                                if n < 32u32 {
+                                    let vm = (1u32 << n) - 1u32;
+                                    w0 &= vm;
+                                    w1 &= vm;
+                                }
+                            }
+                            t_tr[(cc * 64u32 + dl) as usize] = w0;
+                            t_tr[(cc * 64u32 + 32u32 + dl) as usize] = w1;
+                            cc += comptime!(JOIN_WG / 32);
                         }
                     }
-                    t_tr[(cc * 64u32 + dl) as usize] = w0;
-                    t_tr[(cc * 64u32 + 32u32 + dl) as usize] = w1;
                 }
                 sync_cube();
 
@@ -814,13 +905,25 @@ mod kernels {
                             rr[j as usize] = r0;
                         }
                     }
+                    if comptime!(abl == 1 || abl == 2 || abl == 4) {
+                        #[unroll]
+                        for j in 0..ept {
+                            ck ^= ac[j as usize]
+                                ^ ac3[j as usize]
+                                ^ pc[j as usize]
+                                ^ pc3[j as usize]
+                                ^ rr[j as usize]
+                                ^ mlo[j as usize]
+                                ^ mhi[j as usize];
+                        }
+                    }
                     // Branch-free AND over a chunk of up to 32 tops into a pass
                     // bitmask per entry, then only the (rare) set bits are
                     // walked: the survivor path diverges once per chunk, not
                     // once per top.
                     // The transposed AND's ORs of the next AND_GROUP chunks,
                     // per entry slot (chunk-major).
-                    let ag = comptime!(AND_GROUP);
+                    let ag = comptime!(ag_c);
                     let mut acc = Array::<u32>::new(comptime!((ag * ept) as usize));
                     let mut jc = 0u32;
                     while jc < nt {
@@ -829,7 +932,12 @@ mod kernels {
                             cend = nt;
                         }
                         let mut pm = Array::<u32>::new(ept as usize);
-                        if nt >= TRANSPOSE_MIN {
+                        if comptime!(abl == 4) {
+                            #[unroll]
+                            for j in 0..ept {
+                                pm[j as usize] = 0u32;
+                            }
+                        } else if nt >= tmin {
                             let cb = jc / 32u32;
                             if cb % ag == 0u32 {
                                 #[unroll]
@@ -928,6 +1036,9 @@ mod kernels {
                         // barrier, which drops the YIELD ptxas otherwise puts in
                         // the loop and lets it keep fewer registers: another
                         // 2-11%.
+                        if comptime!(abl == 1 || abl == 4) {
+                            // no walk
+                        } else {
                         #[unroll]
                         for j in 0..ept {
                             let mut x = pm[j as usize] & vv[j as usize];
@@ -936,6 +1047,9 @@ mod kernels {
                                 if x != 0u32 {
                                     let jt2 = jc + x.trailing_zeros();
                                     x &= x - 1u32;
+                                    if comptime!(abl == 2) {
+                                        npf ^= jt2;
+                                    } else {
                                     let pass = if comptime!(lean) {
                                         walk_pf_lean(
                                             ac[j as usize],
@@ -963,12 +1077,19 @@ mod kernels {
                                             k2,
                                         )
                                     };
-                                    if pass {
+                                    if comptime!(abl == 3) {
+                                        if pass {
+                                            npf += 1u32;
+                                        }
+                                    } else if pass {
                                         let at = s_cnt[0].fetch_add(1u32);
                                         if at < SURV_SH_CAP {
                                             s_t[at as usize] = t_id[jt2 as usize];
                                             s_r[at as usize] = r0;
                                         } else {
+                                            if comptime!(spc) {
+                                                and_count[1].fetch_add(1u32);
+                                            }
                                             let g = surv_count[0].fetch_add(1u32);
                                             if g < surv_cap {
                                                 surv[(2u32 * g) as usize] = t_id[jt2 as usize];
@@ -976,11 +1097,13 @@ mod kernels {
                                             }
                                         }
                                     }
+                                    }
                                 }
                                 if walk_sync {
                                     sync_plane();
                                 }
                             }
+                        }
                         }
                         jc += 32u32;
                     }
@@ -1004,9 +1127,35 @@ mod kernels {
                 // reserved. The first barrier also puts every thread past its
                 // last read of the batch's clip words, cleared below.
                 sync_cube();
+                if comptime!(stg == 0) {
+                    let sc = s_cnt[0].load();
+                    sync_cube();
+                    if sc >= sflush {
+                        flush_survivors(
+                            &s_t,
+                            &s_r,
+                            &mut s_cnt,
+                            &mut s_base,
+                            surv,
+                            surv_count,
+                            surv_cap,
+                            sc,
+                        );
+                        sync_cube();
+                    }
+                }
+                if UNIT_POS_X < comptime!(tcap / 32) {
+                    s_cw[UNIT_POS_X as usize].store(0u32);
+                }
+                tc += tcap;
+                sync_cube();
+            }
+            if comptime!(stg == 1) {
+                // Once per work item: every thread is past the last batch's
+                // final barrier, so the count is complete and uniform.
                 let sc = s_cnt[0].load();
                 sync_cube();
-                if sc >= SURV_FLUSH {
+                if sc >= sflush {
                     flush_survivors(
                         &s_t,
                         &s_r,
@@ -1019,11 +1168,6 @@ mod kernels {
                     );
                     sync_cube();
                 }
-                if UNIT_POS_X < comptime!(TOP_CAP / 32) {
-                    s_cw[UNIT_POS_X as usize].store(0u32);
-                }
-                tc += TOP_CAP;
-                sync_cube();
             }
             w += CUBE_COUNT_X;
         }
@@ -1040,6 +1184,16 @@ mod kernels {
                 surv_cap,
                 sc,
             );
+        }
+        if comptime!(abl == 1 || abl == 2 || abl == 4) {
+            if (ck ^ npf) == 0x9E37_79B9u32 {
+                nand += 1u32;
+            }
+        }
+        if comptime!(abl == 3) {
+            if npf == 0x9E37_79B9u32 {
+                nand += 1u32;
+            }
         }
         // One atomic per plane for the join survivors.
         let planes_and = plane_sum(nand);
@@ -3177,6 +3331,13 @@ mod kernels {
 /// the device is synchronised after each kernel group of every batch, so
 /// each group's seconds are its own, at the cost of the overlap between
 /// batches (a few percent of device time). Off, nothing here runs.
+pub(crate) fn exp_env(name: &str, default: u32) -> u32 {
+    std::env::var(name)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
+}
+
 pub(crate) fn gpu_profile_enabled() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| {
@@ -3193,8 +3354,16 @@ pub(crate) struct JoinProfile {
     pub upload_secs: f64,
     /// Each batch's small input buffers (partition values, zeroed counters).
     pub inputs_secs: f64,
-    /// `top_kernel` + `top_scan_kernel` + `top_fill_kernel`.
+    /// `top_fd_kernel` + the clipped-block `top_kernel` (#249: no scan, fill).
     pub top_secs: f64,
+    /// L51: `top_secs` split into the FD kernel and the clipped launches.
+    pub top_fd_secs: f64,
+    pub top_clip_secs: f64,
+    pub clip_launches: u64,
+    /// One empty mark per batch (the floor of a mark).
+    pub null_secs: f64,
+    /// Pairs the walk wrote past a full stage (`NICE_EXP_JOIN_SPILLCNT=1`).
+    pub spilled: u64,
     pub bucket_secs: f64,
     /// `join_kernel` (the AND scan and the inline `mid_pass` prefilter).
     pub join_secs: f64,
@@ -3227,6 +3396,11 @@ impl JoinProfile {
         self.upload_secs += o.upload_secs;
         self.inputs_secs += o.inputs_secs;
         self.top_secs += o.top_secs;
+        self.top_fd_secs += o.top_fd_secs;
+        self.top_clip_secs += o.top_clip_secs;
+        self.clip_launches += o.clip_launches;
+        self.null_secs += o.null_secs;
+        self.spilled += o.spilled;
         self.bucket_secs += o.bucket_secs;
         self.join_secs += o.join_secs;
         self.check_secs += o.check_secs;
@@ -3284,6 +3458,18 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
+    /// L51 experiment knobs (see `join_kernel`): `NICE_EXP_JOIN_ABL`,
+    /// `_TMIN`, `_SPILLCNT`, `_EPT`, `_AG`, `_TCAP`, `_FLUSH`, `_STAGE`, and
+    /// `NICE_EXP_FD_WG` (the FD top kernel's cube size).
+    abl: u32,
+    tmin: u32,
+    spc: bool,
+    ept: u32,
+    ag: u32,
+    tcap: u32,
+    sflush: u32,
+    stg: u32,
+    fd_wg: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -3548,6 +3734,15 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
+            abl: exp_env("NICE_EXP_JOIN_ABL", 0),
+            tmin: exp_env("NICE_EXP_JOIN_TMIN", TRANSPOSE_MIN),
+            spc: exp_env("NICE_EXP_JOIN_SPILLCNT", 0) == 1,
+            ept: exp_env("NICE_EXP_JOIN_EPT", ENTRIES_PER_THREAD),
+            ag: exp_env("NICE_EXP_JOIN_AG", AND_GROUP),
+            tcap: exp_env("NICE_EXP_JOIN_TCAP", TOP_CAP),
+            sflush: exp_env("NICE_EXP_JOIN_FLUSH", SURV_FLUSH),
+            stg: exp_env("NICE_EXP_JOIN_STAGE", 0),
+            fd_wg: exp_env("NICE_EXP_FD_WG", JOIN_WG),
             limbs,
             chunk_digits,
             chunk_div,
@@ -3656,7 +3851,7 @@ impl<R: Runtime> JoinDevice<R> {
         let top_cubes = self.ntlay.div_ceil(JOIN_WG).max(1);
         let nslots = u32::try_from(vs.len()).expect("a batch fits u32");
         let per_slot = top_cubes * nslots;
-        let fd_cubes = top_cubes * self.top_fd_groups(nslots).1;
+        let fd_cubes = self.ntlay.div_ceil(self.fd_wg).max(1) * self.top_fd_groups(nslots).1;
         match (fd, self.top_fix(vs)) {
             (false, _) => per_slot,
             (true, true) => fd_cubes + per_slot,
@@ -3684,13 +3879,14 @@ impl<R: Runtime> JoinDevice<R> {
         let vs_h = vs_h.clone();
         let grp_cnt = grp_cnt.clone();
         let ran = ran.clone();
+        let mut t0 = Instant::now();
         unsafe {
             if fd {
                 let (slot_k, groups) = self.top_fd_groups(nslots_u32);
                 top_fd_kernel::launch_unchecked::<R>(
                     c,
-                    CubeCount::Static(top_cubes, groups, 1),
-                    CubeDim::new_1d(JOIN_WG),
+                    CubeCount::Static(self.ntlay.div_ceil(self.fd_wg).max(1), groups, 1),
+                    CubeDim::new_1d(self.fd_wg),
                     ArrayArg::from_raw_parts(self.tlay.clone(), 5 * ntl),
                     ArrayArg::from_raw_parts(vs_h.clone(), nslots),
                     ArrayArg::from_raw_parts(self.fb.clone(), 10),
@@ -3717,6 +3913,14 @@ impl<R: Runtime> JoinDevice<R> {
                     self.tq,
                     self.ballot,
                 );
+                if self.profile {
+                    t0 = self
+                        .prof_mark(t0, |p, s| {
+                            p.top_fd_secs += s;
+                            p.top_secs += s;
+                        })
+                        .expect("profile sync");
+                }
             }
             if !fd || fix {
                 top_kernel::launch_unchecked::<R>(
@@ -3745,6 +3949,14 @@ impl<R: Runtime> JoinDevice<R> {
                     self.nb,
                     fix,
                 );
+                if self.profile {
+                    self.prof_mark(t0, |p, s| {
+                        p.top_clip_secs += s;
+                        p.top_secs += s;
+                        p.clip_launches += 1;
+                    })
+                    .expect("profile sync");
+                }
             }
         }
     }
@@ -3782,7 +3994,7 @@ impl<R: Runtime> JoinDevice<R> {
         let counts = self.read_u32(&self.counts)?;
         let nb = self.nb as usize;
         let m1 = self.b as usize - 1;
-        let wave = u64::from(ENTRIES_PER_THREAD * JOIN_WG);
+        let wave = u64::from(self.ept * JOIN_WG);
         let (mut pairs, mut padded, mut live) = (0u64, 0u64, 0u64);
         // #249: work item w = (slot, key, class) takes one group per root.
         for wi in 0..nslots * nb {
@@ -3853,7 +4065,7 @@ impl<R: Runtime> JoinDevice<R> {
         // The join kernel counts its survivors and writes only those that
         // pass the prefilter to the list, which it counts too. Both counts
         // are exact: every survivor is counted and prefiltered in the walk.
-        let survivors = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
+        let survivors = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 2]));
         let checked = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
         // Every kernel counts its cubes as they finish, against the cubes
         // it was launched with. A device that drops a dispatch without an
@@ -3880,7 +4092,8 @@ impl<R: Runtime> JoinDevice<R> {
             });
         }
         if let Some(t) = pt {
-            pt = Some(self.prof_mark(t, |p, s| p.inputs_secs += s)?);
+            let t = self.prof_mark(t, |p, s| p.inputs_secs += s)?;
+            pt = Some(self.prof_mark(t, |p, s| p.null_secs += s)?);
         }
         self.launch_top(vs, &vs_h, &grp_cnt, &ran, self.top_fd);
         if pt.is_some() {
@@ -3939,7 +4152,7 @@ impl<R: Runtime> JoinDevice<R> {
                 ArrayArg::from_raw_parts(self.top_rec.clone(), rec_len),
                 ArrayArg::from_raw_parts(self.list.clone(), 2 * self.list_cap as usize),
                 ArrayArg::from_raw_parts(checked.clone(), 1),
-                ArrayArg::from_raw_parts(survivors.clone(), 1),
+                ArrayArg::from_raw_parts(survivors.clone(), 2),
                 ArrayArg::from_raw_parts(ran.clone(), nran),
                 nwork_u32,
                 self.nbp,
@@ -3949,11 +4162,18 @@ impl<R: Runtime> JoinDevice<R> {
                 self.b,
                 self.key_level,
                 self.nroots,
-                ENTRIES_PER_THREAD,
+                self.ept,
                 self.f0,
                 self.k,
                 self.k2,
                 self.walk_sync,
+                self.abl,
+                self.tmin,
+                self.spc,
+                self.ag,
+                self.tcap,
+                self.sflush,
+                self.stg,
             );
             if let Some(t) = pt {
                 pt = Some(self.prof_mark(t, |p, s| p.join_secs += s)?);
@@ -4499,6 +4719,7 @@ fn run_pass<R: Runtime>(
             continue;
         }
         let surv = u32::from_bytes(&counts[3 * i])[0];
+        st.prof.spilled += u64::from(u32::from_bytes(&counts[3 * i]).get(1).copied().unwrap_or(0));
         let checked = u32::from_bytes(&counts[3 * i + 1])[0];
         if dev.overflowed(checked) {
             left.overflowed.extend_from_slice(batch);
@@ -4524,13 +4745,15 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         + p.bucket_secs
         + p.join_secs
         + p.check_secs
-        + p.read_secs;
+        + p.read_secs
+        + p.null_secs;
     eprintln!(
         "GPU_PROFILE base={base} start={s} end={e} size={} slices={} partitions={} batches={} \
          slots={} min_slots={} retried={} splits={} | setup={:.4} device_wall={:.4} \
          upload={:.4} inputs={:.4} top={:.4} bucket={:.4} join={:.4} check={:.4} read={:.4} \
-         probe={:.4} unattributed={:.4} | ntlay={} nbp={} tops={} listed={} pairs={} \
-         padded_pairs={} live_buckets={} buckets={} survivors={} checked={} hits={hits}",
+         probe={:.4} unattributed={:.4} | top_fd={:.4} top_clip={:.4} clip_launches={} null={:.4} \
+         | ntlay={} nbp={} tops={} listed={} pairs={} \
+         padded_pairs={} live_buckets={} buckets={} survivors={} checked={} spilled={} hits={hits}",
         e - s,
         js.slices,
         js.partitions,
@@ -4550,6 +4773,10 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         p.read_secs,
         p.probe_secs,
         js.device_secs - phases - p.probe_secs,
+        p.top_fd_secs,
+        p.top_clip_secs,
+        p.clip_launches,
+        p.null_secs,
         p.ntlay,
         p.nbp,
         p.tops,
@@ -4560,6 +4787,7 @@ fn print_profile(base: u32, field: &JoinField, js: &JoinFieldStats, hits: usize)
         p.buckets,
         js.survivors,
         js.checked,
+        p.spilled,
     );
 }
 
