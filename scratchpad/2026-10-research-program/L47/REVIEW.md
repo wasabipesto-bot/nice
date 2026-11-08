@@ -18,7 +18,8 @@ The small fixes are in the new device test, which is the only thing that checks 
 and in the PR body's wording:
 
 - **M1:** the count test can pass without checking anything for a batch the device dropped.
-- **M2:** its synthetic n miss the production bands' edges. At b64 no adversarial n is kept at all.
+- **M2:** its synthetic n miss the production bands' top edges at four of the six production shapes. At b64 no
+  adversarial n is kept at all.
 - **M3:** it runs the b57 frontier field twice. It has 25 lists and 22 distinct shapes, not the 26 shapes the
   body and RESULTS claim.
 - **D1:** the body states the instruction counts in two different units.
@@ -53,14 +54,16 @@ None of these hides a known bug. I would fix M1–M3 and D1–D2 before opening 
   field's (s2, s3) band. I computed what survives at the six production shapes:
   - **b42, b57, b62:** only the low-end set survives: `low`, `low+1`, `low+b^i−1`, `alt1`, the f0/k2
     boundaries.
-  - **b50, b60** (s2 = 2l): only the top-end set survives.
+  - **b50, b60** (s2 = 2l): only the top-end set survives, including `b^l − 1`, which is the band's last n
+    there.
   - **b64** (l = 13, s2 = 26, s3 = 38): 0 of 34. Its band starts at ∛(64³⁷) ≈ 3.78e22, above 64¹², and ends
     below 64¹³ − 1.
-- **What is never tested on the device:** no production shape gets the band's last n (`hi − 1`). Nor does it get
-  the n whose square or cube sits just below a power of b, which is where the high digits of n² or n³ run to
-  b − 1 and the carry normalisation's longest chains reach the top limbs. The task named "carries propagating
-  through every limb" and "b64 edge" as the cases to cover. At b64, which is also the one base where every
-  quotient is a shift, the synthetic list is 4,000 random n.
+- **What is never tested on the device:** at b42, b57, b62 and b64 the device lists get neither the band's last
+  n (`hi − 1`) nor any n whose square or cube sits just below a power of b. That is where the high digits of n²
+  or n³ run to b − 1 and the carry normalisation's longest chains reach the top limbs. b50 and b60 get both,
+  through `b^l − 1`. The task named "carries propagating through every limb" and "b64 edge" as the cases to
+  cover. At b64, which is also the one base where every quotient is a shift, the synthetic list is 4,000 random
+  n.
 - **Why it is Medium and not High:** my independent simulation covers exactly these n (below) and they are
   exact. Real lists and random n exercise the same code. So this is a gap in the test, not a suspected bug.
 - **Fix:** in `synthetic`, push `lo`, `lo + 1`, `hi − 1`, `hi − 2`, `⌈√(b^s2)⌉ − 1` and `⌈∛(b^s3)⌉ − 1` (when
@@ -161,7 +164,8 @@ base's survivors and full checks"; RESULTS §5–6 "exact counts").
   - In the WGSL, every quotient is `u32((u64(x)·u64(m)) >> 32) >> s` followed by a multiply and a subtract.
   - The direct MSL compiler's `__umulhi` helper is `static_cast<uint32_t>((uint64_t)a*b >> 32)`.
   - So the Apple pattern (a division whose dividend is a half shift or a high word) cannot occur. The same
-    `u32::mul_hi` already ships in the join's prefilter (#246), so CubeCL's MSL lowering of it has passed CI.
+    `u32::mul_hi` is already in the join's prefilter (#246, still open), and #246's PR CI passed the macOS Metal
+    job (10m56s), so CubeCL's MSL lowering of it compiles and runs there.
 - **What is lost:** nothing now asserts that the dump still contains `CheckKernel`. An optional `--present
   KERNEL@BASE` flag in `scripts/wgsl-lint.py` would restore that.
 - **Both compilers still run the new test:**
@@ -178,7 +182,8 @@ base's survivors and full checks"; RESULTS §5–6 "exact counts").
   cubecl-metal) on mayalaran (M4). It needs the user's per-task permission. The kernel has no division, so the
   known bug class should not apply, but this is the cheapest real-Apple evidence there is.
 - **Runtime budget:** the new test adds roughly 1–3 minutes per compiler to the lavapipe and macOS jobs. The
-  macOS job's healthy run is 9–16 minutes against a 30-minute limit. Watch the first run; M3 trims a little.
+  macOS job took 10m56s on #246's PR and 15m34s on #249's, against a 30-minute limit. Watch the first run; M3
+  trims a little.
 
 **D6. The CHANGELOG line is fine.** It is one sentence and user-facing, in the style the user trimmed #178 and
 #154 to; `#NNN` is to be filled in. Optionally drop "taken straight from its top's record".
@@ -300,12 +305,13 @@ base's survivors and full checks"; RESULTS §5–6 "exact counts").
 - `cargo test --release -p nice_common --lib join_check`: 5 passed, 1 ignored, 2.6 s (build 2m17s, target
   273 MB).
 - `NICE_TEST_CHECK_EXHAUSTIVE=1 … join_check::tests::magic_quotients_are_exact_everywhere -- --ignored`
-  (taskset 3 cores): EXHAUSTIVE_RESULT. It covers all 114 divisors (b and b² at bases 3–64, not powers of two),
+  (taskset 3 cores): **ok, "114 divisors exact on every x below 2^31"**, 691 s (31 CPU-minutes; log in
+  `raw/review/exhaustive_ivory.log`). It covers all 114 divisors (b and b² at bases 3–64, not powers of two),
   every x in [0, 2^31), comparing `mul_hi(x, m) >> s` with `x / d`. It does not cover the inverses or `wide_div`,
   which `inverses_and_wide_division_are_exact` tests at random.
 - `cargo fmt --all --check`: clean (rustc 1.99.1). Clippy was not re-run here; the box's three-feature clippy
   logs (`clippy_*_FIN.log`) are rc 0.
-- **Independent simulation** (`/tmp/l47rev/py/kernel_sim.py`, `windows_sim.py`; Python, written from
+- **Independent simulation** (`raw/review/kernel_sim.py`, `windows_sim.py`, `adv.py` for M2's table; Python, written from
   `check_kernel`'s text). It reproduces the kernel's control flow: `part_limbs`, `wide_div`, the schoolbook
   columns, the magic quotients with exactness asserts, the u32 overflow asserts, the gate and the masks.
   - **What was compared:** every limb of n (rebuilt), the distinct count, the gate and the mask, against big-int

@@ -26,6 +26,16 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   two-pass scan ×1.16–1.20 (+5–6 % inlined) and a seeded check ×1.07–1.11 — ×1.32–1.39 together,
   exact. **L52 (two-pass scan PR branch on #248) launched on ivory**; the seeded check follows as
   L53 once L47's design-D arithmetic is reviewed (it reuses the columns).
+- **Review of `pr/check-d` (10:10 UTC, `L47/REVIEW.md`): merge with small fixes, no correctness
+  defect** — the reviewer wrote an independent Python model of the kernel from its text (u32
+  overflow and quotient-exactness checks) and matched big-integer digits on all 20 production
+  bands at b40–64 (60,080 n incl. band edges) and the 18 window shapes; every quotient input
+  < 2³¹; the gate is necessary for niceness; the work counter is exact. Fixes are in the new
+  device test (no `ensure_ran` → a silently dropped batch compares nothing; adversarial n miss the
+  bands' top edges; the b57 frontier counted twice: 22 shapes, not 26) and body wording (330 vs
+  1,050 are both per 32 survivors; the A/B counts come from the join, not the check; b57 1e14's
+  clock). Recommends one M4 run of the count test (asked in the report). Sent back to the L47
+  agent with a 3 h box to re-run the device tests after the fixes.
 
 ## 2026-11-07 (day 11; routine fired 04:41 UTC)
 
