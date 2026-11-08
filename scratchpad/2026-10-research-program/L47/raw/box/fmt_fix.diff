@@ -1,0 +1,289 @@
+diff --git a/common/src/cubecl_join.rs b/common/src/cubecl_join.rs
+index 56e901b2..2e705183 100644
+--- a/common/src/cubecl_join.rs
++++ b/common/src/cubecl_join.rs
+@@ -3228,7 +3228,13 @@ mod kernels {
+ 
+     /// n from its base-b² limbs, as three words into `out[o..o + 4]`.
+     #[cube]
+-    fn put_n(nn: &Array<u32>, out: &mut Array<u32>, o: u32, #[comptime] nl: u32, #[comptime] bb: u32) {
++    fn put_n(
++        nn: &Array<u32>,
++        out: &mut Array<u32>,
++        o: u32,
++        #[comptime] nl: u32,
++        #[comptime] bb: u32,
++    ) {
+         let mut w0 = 0u32;
+         let mut w1 = 0u32;
+         let mut w2 = 0u32;
+@@ -3317,8 +3323,8 @@ mod kernels {
+                 let p_hi = top_rec[(rb + 1u32) as usize];
+                 let w6 = top_rec[(rb + 6u32) as usize];
+                 // H = (P − w6) / b^(k2 − f0), exact: a shift, an inverse.
+-                let x = ((u64::cast_from(p_hi) << 32u64) | u64::cast_from(p_lo))
+-                    - u64::cast_from(w6);
++                let x =
++                    ((u64::cast_from(p_hi) << 32u64) | u64::cast_from(p_lo)) - u64::cast_from(w6);
+                 let mut nn = Array::<u32>::new(nl as usize);
+                 let mut pend = part_limbs(r0, 0u32, &mut nn, 0u32, f0c, l, base);
+                 pend = part_limbs(w6, pend, &mut nn, f0c, comptime!(k2c - f0c), l, base);
+@@ -3330,8 +3336,8 @@ mod kernels {
+                         hv[1] = u32::cast_from(h >> 32u64);
+                         part_limbs_wide(&mut hv, pend, &mut nn, k2c, hdig, l, base);
+                     } else {
+-                        let h = u32::cast_from(x >> comptime!(u64::from(hz)))
+-                            * comptime!(hinv as u32);
++                        let h =
++                            u32::cast_from(x >> comptime!(u64::from(hz))) * comptime!(hinv as u32);
+                         part_limbs(h, pend, &mut nn, k2c, hdig, l, base);
+                     }
+                 }
+@@ -3383,8 +3389,8 @@ mod kernels {
+                     carry = q;
+                     mask = put2(mask, x3 - q * bb, base);
+                 }
+-                let seen = u32::cast_from(mask).count_ones()
+-                    + u32::cast_from(mask >> 32u64).count_ones();
++                let seen =
++                    u32::cast_from(mask).count_ones() + u32::cast_from(mask >> 32u64).count_ones();
+                 let pass = seen == comptime!(s2 + 2 * gl);
+                 if pass || comptime!(mode == CHECK_COUNT) {
+                     #[unroll]
+@@ -3409,8 +3415,8 @@ mod kernels {
+                         }
+                     }
+                 }
+-                let uniq = u32::cast_from(mask).count_ones()
+-                    + u32::cast_from(mask >> 32u64).count_ones();
++                let uniq =
++                    u32::cast_from(mask).count_ones() + u32::cast_from(mask >> 32u64).count_ones();
+                 if comptime!(mode == CHECK_COUNT) {
+                     let o = 4u32 * i;
+                     nice_out[o as usize] = uniq;
+@@ -4056,7 +4062,10 @@ impl<R: Runtime> JoinDevice<R> {
+             &checked,
+             &self.top_rec,
+             rec_len,
+-            (&self.nice_out, self.nice_cap as usize * NICEONLY_STRIDE as usize),
++            (
++                &self.nice_out,
++                self.nice_cap as usize * NICEONLY_STRIDE as usize,
++            ),
+             &self.nice_count,
+             &ran,
+             self.list_cap,
+@@ -5495,7 +5504,10 @@ mod tests {
+             .pow(l - 1)
+             .max(root_above(sh.s2 - 1, 2))
+             .max(root_above(sh.s3 - 1, 3));
+-        let hi = bb.pow(l).min(root_above(sh.s2, 2)).min(root_above(sh.s3, 3));
++        let hi = bb
++            .pow(l)
++            .min(root_above(sh.s2, 2))
++            .min(root_above(sh.s3, 3));
+         let mut ns = crate::join_check::tests::adversarial(b, l);
+         let mut r = seed | 1;
+         let mut next = || {
+@@ -5570,12 +5582,26 @@ mod tests {
+                 let rec = dev.launch_batch(batch, false).expect("launch");
+                 let ns = read_list(&dev, &rec);
+                 let lw = 2 * dev.list_cap as usize;
+-                let (got, cubes) =
+-                    run_check(&dev, &dev.list, lw, &dev.top_rec, rec_len, ns.len(), CHECK_COUNT);
++                let (got, cubes) = run_check(
++                    &dev,
++                    &dev.list,
++                    lw,
++                    &dev.top_rec,
++                    rec_len,
++                    ns.len(),
++                    CHECK_COUNT,
++                );
+                 assert_eq!(cubes, CHECK_CUBES, "{what}: check cubes");
+                 passed += assert_counts(&sh, &ns, &got, &what);
+-                let (got, _) =
+-                    run_check(&dev, &dev.list, lw, &dev.top_rec, rec_len, ns.len(), CHECK_PROBE);
++                let (got, _) = run_check(
++                    &dev,
++                    &dev.list,
++                    lw,
++                    &dev.top_rec,
++                    rec_len,
++                    ns.len(),
++                    CHECK_PROBE,
++                );
+                 assert_probe(ns.clone(), &got, &what);
+                 entries += ns.len();
+             }
+@@ -5596,9 +5622,25 @@ mod tests {
+                 client.create(cubecl::bytes::Bytes::from_elems(list.clone())),
+                 client.create(cubecl::bytes::Bytes::from_elems(recs.clone())),
+             );
+-            let (got, _) = run_check(&dev, &lh, list.len(), &rh, recs.len(), ns.len(), CHECK_COUNT);
++            let (got, _) = run_check(
++                &dev,
++                &lh,
++                list.len(),
++                &rh,
++                recs.len(),
++                ns.len(),
++                CHECK_COUNT,
++            );
+             passed += assert_counts(&sh, &ns, &got, &format!("{what} synthetic"));
+-            let (got, _) = run_check(&dev, &lh, list.len(), &rh, recs.len(), ns.len(), CHECK_PROBE);
++            let (got, _) = run_check(
++                &dev,
++                &lh,
++                list.len(),
++                &rh,
++                recs.len(),
++                ns.len(),
++                CHECK_PROBE,
++            );
+             assert_probe(ns.clone(), &got, &format!("{what} synthetic"));
+             synth += ns.len();
+             println!(
+@@ -5607,7 +5649,10 @@ mod tests {
+                 if sh.h_wide() { "wide" } else { "narrow" }
+             );
+         }
+-        assert!(entries > 10_000 && synth > 10_000 && passed > 0, "{entries} / {synth} / {passed}");
++        assert!(
++            entries > 10_000 && synth > 10_000 && passed > 0,
++            "{entries} / {synth} / {passed}"
++        );
+         println!(
+             "{name}: check counts agree on {entries} list entries and {synth} synthetic n \
+              ({passed} past the gate)"
+diff --git a/common/src/join_check.rs b/common/src/join_check.rs
+index d4dfbb3e..bb58fd88 100644
+--- a/common/src/join_check.rs
++++ b/common/src/join_check.rs
+@@ -29,7 +29,10 @@ pub const GATE_DIGITS: u32 = 10;
+ #[must_use]
+ #[allow(clippy::cast_lossless)] // `u64::from` is not const
+ pub const fn magic(d: u32) -> (u32, u32) {
+-    assert!(d >= 3 && !d.is_power_of_two(), "magic: d >= 3, not a power of 2");
++    assert!(
++        d >= 3 && !d.is_power_of_two(),
++        "magic: d >= 3, not a power of 2"
++    );
+     let s = 31 - d.leading_zeros();
+     let k = 32 + s;
+     let m = (1u64 << k).div_ceil(d as u64);
+@@ -123,7 +126,10 @@ impl CheckShape {
+         // A column of n² or n³ has at most nl products of limbs below b²,
+         // and a carry below nl·b² (by induction): below nl·b²·(1 + 1/b²).
+         let col = u128::from(sh.nl()) * bb.pow(4) + u128::from(sh.nl()) * bb * bb;
+-        ensure!(col < 1 << 31, "check: columns reach 2^31 at base {b}, {l} digits");
++        ensure!(
++            col < 1 << 31,
++            "check: columns reach 2^31 at base {b}, {l} digits"
++        );
+         Ok(sh)
+     }
+ 
+@@ -212,7 +218,12 @@ fn mul(x: u32, y: u32) -> u32 {
+ #[allow(clippy::many_single_char_names, clippy::similar_names)]
+ pub fn mirror(sh: &CheckShape, p: u64, w6: u32, r0: u32) -> Mirror {
+     let (b, bb) = (sh.b, sh.b * sh.b);
+-    let (nl, ql, cl, gl) = (sh.nl() as usize, sh.ql() as usize, sh.cl() as usize, sh.gl() as usize);
++    let (nl, ql, cl, gl) = (
++        sh.nl() as usize,
++        sh.ql() as usize,
++        sh.cl() as usize,
++        sh.gl() as usize,
++    );
+     // H = (P − w6) / b^(k2 − f0), exact: a shift and an inverse.
+     let (z, inv) = sh.h_div();
+     let x = (p - u64::from(w6)) >> z;
+@@ -519,7 +530,17 @@ pub(crate) mod tests {
+         let s3 = u32::try_from(digits(&nat.pow(3), b).len()).unwrap();
+         let mut v = Vec::new();
+         let pairs: &[(u32, u32)] = if all {
+-            &[(3, 8), (0, 3), (1, 4), (1, 6), (2, 5), (2, 6), (2, 7), (3, 6), (3, 7)]
++            &[
++                (3, 8),
++                (0, 3),
++                (1, 4),
++                (1, 6),
++                (2, 5),
++                (2, 6),
++                (2, 7),
++                (3, 6),
++                (3, 7),
++            ]
+         } else {
+             &[(3, 8), (0, 3), (2, 6), (3, 7)]
+         };
+@@ -548,7 +569,11 @@ pub(crate) mod tests {
+         // The client's count (its fast paths hold n³ in 128 or 256 bits,
+         // enough for the base's own range, where s2 + s3 = b).
+         if sh.s2 + sh.s3 == b {
+-            assert_eq!(uniq, crate::client_process::get_num_unique_digits(n, b), "b{b} n = {n}");
++            assert_eq!(
++                uniq,
++                crate::client_process::get_num_unique_digits(n, b),
++                "b{b} n = {n}"
++            );
+         }
+         let mut seen = d2.clone();
+         seen.extend_from_slice(&d3[..2 * sh.gl() as usize]);
+@@ -573,13 +598,29 @@ pub(crate) mod tests {
+             digits(&(&nat * &nat * &nat), b),
+         );
+         assert_eq!((d2.len(), d3.len()), (sh.s2 as usize, sh.s3 as usize));
+-        assert_eq!(m.nn, limbs(&d1, b, sh.nl() as usize), "b{b} n = {n} {sh:?}: n's limbs");
+-        assert_eq!(m.sq, limbs(&d2, b, sh.ql() as usize), "b{b} n = {n} {sh:?}: n²");
+-        assert_eq!(m.cu, limbs(&d3, b, sh.cl() as usize), "b{b} n = {n} {sh:?}: n³");
++        assert_eq!(
++            m.nn,
++            limbs(&d1, b, sh.nl() as usize),
++            "b{b} n = {n} {sh:?}: n's limbs"
++        );
++        assert_eq!(
++            m.sq,
++            limbs(&d2, b, sh.ql() as usize),
++            "b{b} n = {n} {sh:?}: n²"
++        );
++        assert_eq!(
++            m.cu,
++            limbs(&d3, b, sh.cl() as usize),
++            "b{b} n = {n} {sh:?}: n³"
++        );
+         let bits = |d: &[u32]| d.iter().fold(0u64, |a, &x| a | 1u64 << x);
+         let gd = 2 * sh.gl() as usize;
+         assert_eq!(m.mask, bits(&d2) | bits(&d3), "b{b} n = {n}: mask");
+-        assert_eq!(m.gate_mask, bits(&d2) | bits(&d3[..gd]), "b{b} n = {n}: gate mask");
++        assert_eq!(
++            m.gate_mask,
++            bits(&d2) | bits(&d3[..gd]),
++            "b{b} n = {n}: gate mask"
++        );
+         if sh.s2 + sh.s3 == b {
+             assert_eq!(
+                 m.mask.count_ones(),
+@@ -683,7 +724,10 @@ pub(crate) mod tests {
+                 }
+             }
+         }
+-        assert!(decided > 1000 && passed > 100, "{decided} decided, {passed} passed");
++        assert!(
++            decided > 1000 && passed > 100,
++            "{decided} decided, {passed} passed"
++        );
+     }
+ 
+     #[test]
+@@ -693,7 +737,9 @@ pub(crate) mod tests {
+         let mut shapes = 0;
+         for b in 40..=64u32 {
+             for l in 8..=13u32 {
+-                for (s2, s3) in (2 * l - 1..=2 * l).flat_map(|s2| (3 * l - 2..=3 * l).map(move |s3| (s2, s3))) {
++                for (s2, s3) in
++                    (2 * l - 1..=2 * l).flat_map(|s2| (3 * l - 2..=3 * l).map(move |s3| (s2, s3)))
++                {
+                     if s2 + s3 != b {
+                         continue;
+                     }

@@ -5,6 +5,35 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L47.1 Check kernel design D: built, exact, at the memory floor (2026-11-08, agent; `L47/RESULTS.md`, `L47/PR-BODY.md`, `L47/raw/`; `pr/check-d` 0f3332d = one commit on d813aea; knobs on `exp/check-d` 1187527c)
+
+**Step 0 (old kernel, profiled, 2 rounds):** loads-only check (list entry + record words 0, 1, 6) =
+3.36 s per b62 1e17 field / 0.76 s per b60 1e16 field = 0.745 TB/s = 98 % of the 3080's DRAM
+bandwidth (< the 4.5 s build line); old kernel 8.79 / 2.13 s; cube sweep: 2048 cubes −3.7 / −3.8 %,
+one exact wave (408) +2.8 / +1.6 % → the wave tail is ~4 %, not 6–16 %. **Kernel (driver JIT of
+NVRTC PTX):** 39–40 registers in all 24 A/B processes (gate ≤ 48), no spills, no local, no shared;
+330 instructions per warp-iteration on the b62 common path (gate ≤ ~360; +249 for the rest of n³
+past the gate; b60 312, b64 306, b57 302); check 3.19 / 0.74 s = at the gather floor (×2.8 / ×2.9
+vs the old kernel); gate width g = 8/10/12 flat ±2 % (memory-bound) → ships g = 10; one entry per
+lane per take beat 4 and 8 by ~7 % (39 regs → 6 cubes/SM vs 5). **New device tests**
+`cubecl_{,cuda_}check_counts_match_the_cpu`: per survivor the distinct-digit count, the gate
+result and the digit mask vs the CPU (count mode) + every n rebuilt from its limbs (probe mode):
+1,413,630 real list entries + 96,042 synthetic adversarial/random n over 26 field shapes, 3,599
+past the gate; same totals on CUDA, lavapipe naga, lavapipe SPIR-V, and on the final head; host
+tests for the new `join_check` module incl. an exhaustive check of all 114 divisors over every
+x < 2³¹. **A/B vs d813aea (3 interleaved rounds):** b62 1e17 74.65 → 68.64 s **×1.088**
+(1.077/1.086/1.107; cycles ×1.099; same median clock 1440 MHz at 179.6 W), **b60 1e16 15.20 →
+13.52 s ×1.124** (1.137/1.105/1.124; ×1.140), b62 1e16 ×1.085, b64 ×1.070, 1e14 b57/60/62/64
+×1.078/1.046/1.015/1.003; **NiceMark 6 rounds ×1.056** (1.050–1.066; b58 weak ×1.077, strong
+×1.039, b60 ×1.060, b62 ×1.060). Exact: 1e14 COMPARE join = stride same counts; `check_all` incl.
+b10's [69]; whole b42 417,789,835 / 16,879,877 join = stride = reference; dense fields; #249's
+sentinel FD-vs-top test; certificate test; identical counts in every timed run and all 12
+NiceMark runs; lint 14/0. The PR drops CI's `--require CheckKernel@57` (that requirement needs a
+constant division in the kernel; the new kernel has no `/` or `%`). Final head 5be672c-equivalent
+= timed tree + fmt/clippy/comments, re-verified. Next lever: the check is load-bound; carrying P in
+the survivor list ≤ ~2 % of the field (not tried). Box 2 h. → reviewer; held at the PR cap (second
+PR-ready branch on the GPU chain after FD round 2).
+
 ## L48.2 FD top kernel round 2 on #249: review fixes, wave64 gate, CUDA-scoped batches, combination A/B (2026-11-07, agent; `L48/REVIEW.md`, `L48/RESULTS.md` "Round 2", `L48/raw/r2/`; `pr/top-fd-round2` d813aea = one commit on #249's 87958fd; held at the PR cap)
 
 Review (merge with small fixes; kernel changes exact by re-derivation + a host model): M1 the

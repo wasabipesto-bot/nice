@@ -1,0 +1,14 @@
+Diff in /root/l47/src/F/common/src/join_check.rs:663:
+         let low = bb.pow(l - 1);
+         let alt = |first: u32| -> u128 {
+             (0..l).fold(0u128, |a, i| {
+-                let d = if (i + first).is_multiple_of(2) { b - 1 } else { 0 };
++                let d = if (i + first).is_multiple_of(2) {
++                    b - 1
++                } else {
++                    0
++                };
+                 a * bb + u128::from(if i == 0 && d == 0 { 1 } else { d })
+             })
+         };
+fmt rc=1

@@ -1,0 +1,197 @@
+## Sanity (1e14, b62 then b60, one process each)
+
+| cfg | env | b62 survivors / checked | b60 survivors / checked | = base | join kernel (b62, b60) |
+|---|---|---|---|---|---|
+| B |  | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 47r/1200, 47r/1200 |
+| a | GPU_PROFILE=1 JOIN_ABL=1 | 1,439,469,648 / 0 | 2,694,700,282 / 0 | **NO** | 40r/1032, 40r/1048 |
+| ag2 | JOIN_AG=2 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 40r/1168+9STL, 46r/1152 |
+| ag8 | JOIN_AG=8 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 55r/1256, 53r/1256 |
+| b | GPU_PROFILE=1 JOIN_ABL=2 | 1,439,469,649 / 0 | 2,694,700,282 / 0 | **NO** | 39r/1088, 40r/1056 |
+| base |  | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 46r/1200, 47r/1200 |
+| c | GPU_PROFILE=1 JOIN_ABL=0 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 46r/1200, 48r/1200 |
+| d | GPU_PROFILE=1 JOIN_ABL=0 JOIN_TMIN=1073741824 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 48r/1192, 48r/1200 |
+| ept1 | JOIN_EPT=1 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 40r/1128, 40r/1136 |
+| ept3 | JOIN_EPT=3 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 64r/1416, 64r/1424 |
+| fd128 | FD_WG=128 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 48r/1200, 48r/1200 |
+| fd512 | FD_WG=512 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 48r/1192, 48r/1192 |
+| fl256 | JOIN_FLUSH=256 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 47r/1200, 48r/1200 |
+| fl768 | JOIN_FLUSH=768 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 40r/1224+3STL, 48r/1200 |
+| p | GPU_PROFILE=1 JOIN_ABL=3 | 1,439,469,648 / 0 | 2,694,700,282 / 0 | **NO** | 47r/1152, 47r/1152 |
+| spc | JOIN_SPILLCNT=1 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 48r/1208, 48r/1200 |
+| stg1 | JOIN_STAGE=1 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 48r/1192, 48r/1192 |
+| tc128 | JOIN_TCAP=128 JOIN_TMIN=96 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 48r/1200, 48r/1200 |
+| tc512 | JOIN_TCAP=512 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 40r/1432+1STL, 40r/1424+1STL |
+| tm128 | JOIN_TMIN=128 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 48r/1192, 48r/1200 |
+| tm256 | JOIN_TMIN=256 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 47r/1200, 48r/1200 |
+| tm512 | JOIN_TMIN=512 | 1,439,469,648 / 88,159,810 | 2,694,700,282 / 180,517,288 | yes | 48r/1200, 40r/1224+3STL |
+| z | GPU_PROFILE=1 JOIN_ABL=4 | 0 / 0 | 0 / 0 | **NO** | 36r/800, 40r/800 |
+
+## Main chain, b62 1e17 (1 field)
+
+| mode | join s/field (rounds) | spread | field s profiled excl. probe (rounds) | device s/field (harness) | SM MHz | W | join kernel per round | counts |
+|---|---|---|---|---|---|---|---|---|
+| c: full (d813aea), profiled | 42.73 (41.13, 42.73, 43.23) | 4.9 % | 76.41 (73.79, 76.41, 76.90) | 81.61 | 1478, 1462, 1432 | 178, 179, 179 | 48r/1200, 48r/1200, 46r/1200 | exact |
+| a: AND only | 19.71 (19.71, 19.67, 20.34) | 3.4 % | 44.31 (44.22, 44.31, 45.29) | 49.54 | 1470, 1455, 1410 | 179, 179, 179 | 45r/1032, 39r/1056, 40r/1032 | 1,020,844,021,499 / 0 (vary) |
+| b: walk without the prefilter, no stage | 26.76 (26.86, 26.76, 26.61) | 0.9 % | 51.48 (51.72, 51.38, 51.48) | 56.89 | 1425, 1440, 1423 | 179, 180, 179 | 40r/1056, 39r/1096, 40r/1048 | 1,020,844,021,502 / 0 (vary) |
+| p: walk + prefilter, no stage | 41.90 (41.82, 42.04, 41.90) | 0.5 % | 66.24 (66.24, 66.42, 66.16) | 71.55 | 1453, 1412, 1512 | 177, 178, 178 | 47r/1152, 47r/1144, 47r/1152 | 1,020,844,021,499 / 0 |
+| z: no AND | 8.30 (8.23, 8.30, 8.30) | 0.9 % | 32.79 (32.79, 32.82, 32.52) | 38.14 | 1588, 1412, 1965 | 177, 178, 174 | 38r/792, 37r/792, 40r/800 | 0 / 0 (vary) |
+| d: full, per-top AND (TMIN 2^30) | 53.41 (54.13, 51.74, 53.41) | 4.5 % | 87.27 (88.09, 85.53, 87.27) | 92.87 | 1408, 1431, 1460 | 178, 178, 178 | 48r/1200, 48r/1192, 48r/1200 | exact |
+| u: full, unprofiled (E) | | | | 79.06 (79.08, 78.73, 79.06) | 1395, 1351, 1325 | 178, 180, 179 | 48r/1200, 48r/1192, 48r/1200 | exact |
+| B: d813aea binary, unprofiled | | | | 79.10 (79.33, 78.63, 79.10) | 1328, 1393, 1358 | 179, 177, 178 | 48r/1200, 48r/1192, 48r/1200 | exact |
+
+### Phases of mode c, b62 1e17 (1 field) (3 profiled runs, medians; share = % of the profiled field excl. probe; "in B s" = share × the unprofiled d813aea median 79.10 s (E unprofiled 79.06 s))
+
+| phase | profiled s/field (rounds) | share | in B s | G-cycles |
+|---|---|---|---|---|
+| top: FD kernel (`top_fd_kernel`, seeds incl.) | 17.417 (16.670, 17.417, 17.566) | 22.79 % | 18.03 | 25.16 |
+| top: clipped-block launch (`top_kernel`) | 0.003 (0.003, 0.003, 0.003) | 0.00 % | 0.00 | 0.00 |
+| **top total** | 17.420 (16.673, 17.420, 17.569) | 22.80 % | 18.03 | 25.17 |
+| bucket | 1.924 (1.922, 1.938, 1.924) | 2.52 % | 1.99 | 2.83 |
+| join | 42.727 (41.129, 42.727, 43.230) | 55.92 % | 44.23 | 61.93 |
+| check | 9.199 (8.830, 9.199, 9.261) | 12.04 % | 9.52 | 13.27 |
+| other: upload | 3.701 (3.852, 3.701, 3.618) | 4.84 % | 3.83 | 5.41 |
+| other: inputs | 0.735 (0.735, 0.773, 0.667) | 0.96 % | 0.76 | 1.09 |
+| other: read | 0.199 (0.199, 0.199, 0.182) | 0.26 % | 0.21 | 0.29 |
+| other: null mark (one empty sync per batch) | 0.038 (0.038, 0.038, 0.036) | 0.05 % | 0.04 | 0.06 |
+| other: unattributed | 0.413 (0.415, 0.413, 0.413) | 0.54 % | 0.43 | 0.60 |
+| probe (excluded) | 5.165 (5.165, 5.204, 5.133) | 6.76 % | 5.35 | 7.61 |
+| **other total** | 5.124 (5.240, 5.124, 4.916) | 6.71 % | 5.30 | |
+| field (profiled device excl. probe) | 76.409 (73.793, 76.409, 76.899) | 100 % | 79.10 | 111.7 (B: 107.4) |
+
+profiled field excl. probe ÷ unprofiled B: 0.966 in time, 1.040 in cycles (clock c 1462, B 1358 MHz); with probe 1.031
+
+clip launches/field 4, batches/field 3288, slots 11, slices 11, kept tops/field 3.816e+10, pairs 2.532e+13, padded 3.907e+13 (lanes used 64.8 %), live buckets 1.599e+08 of 1.599e+08; clock c 1462 / u 1351 / B 1358 MHz; null mark 11.6 us per batch; FD per batch 5.297 ms; join per batch 12.995 ms; check per batch 2.798 ms
+
+### Join ablation, b62 1e17 (1 field) (profiled join kernel seconds, medians of 3 rounds; marginal z → a → b → p → c)
+
+| part | profiled s/field | % of join | % of field (profiled) | in B s | G-cycles (% of join) | per round (s) |
+|---|---|---|---|---|---|---|
+| base (z: work items, batch load + transposed copy, wave loads + prefilter terms, per-batch stage check) | **8.30** | 19.4 % | 10.9 % | 8.59 | 13.1 (21.1 %) | 8.23, 8.30, 8.30 |
+| AND (a − z: transposed ORs, clipped-chunk range test, popcounts) | **11.41** | 26.7 % | 14.9 % | 11.81 | 15.6 (25.2 %) | 11.48, 11.37, 12.04 |
+| walk rounds (b − a: vote, pop, plane barrier) | **7.05** | 16.5 % | 9.2 % | 7.29 | 9.6 (15.5 %) | 7.15, 7.09, 6.27 |
+| prefilter `walk_pf_lean` (p − b) | **15.14** | 35.4 % | 19.8 % | 15.67 | 22.5 (36.3 %) | 14.95, 15.28, 15.28 |
+| stage + flush (c − p) | **0.83** | 1.9 % | 1.1 % | 0.86 | 1.2 (1.9 %) | -0.69, 0.69, 1.33 |
+| **join (c)** | **42.73** | 100 % | 55.9 % | 44.23 | 61.9 | 41.13, 42.73, 43.23 |
+
+per-mode mean SM MHz (median of rounds): z 1588, a 1455, b 1425, p 1453, c 1462, d 1431
+
+per-top AND (d) join 53.41 s: +10.68 s; d field 87.27 s profiled: ×1.142
+survivor path (walk + prefilter + stage) 23.02 s = 53.9 % of join, 30.1 % of field
+
+## Main chain, b60 1e16 (per field, 2 fields)
+
+| mode | join s/field (rounds) | spread | field s profiled excl. probe (rounds) | device s/field (harness) | SM MHz | W | join kernel per round | counts |
+|---|---|---|---|---|---|---|---|---|
+| c: full (d813aea), profiled | 9.12 (9.15, 9.12, 9.11) | 0.4 % | 15.48 (15.56, 15.48, 15.39) | 16.30 | 1380, 1369, 1376 | 179, 179, 180 | 46r/1192, 48r/1192, 48r/1192 | exact |
+| a: AND only | 3.94 (3.94, 3.98, 3.83) | 3.8 % | 8.25 (8.28, 8.25, 7.98) | 9.10 | 1380, 1245, 1350 | 180, 178, 180 | 40r/1032, 40r/1032, 39r/1048 | 460,847,952,346 / 0 |
+| b: walk without the prefilter, no stage | 5.34 (5.47, 5.34, 5.24) | 4.3 % | 9.55 (9.61, 9.50, 9.55) | 10.45 | 1405, 1350, 1425 | 180, 179, 180 | 40r/1056, 40r/1048, 40r/1048 | 460,847,952,346 / 0 (vary) |
+| p: walk + prefilter, no stage | 8.98 (8.98, 9.04, 8.89) | 1.7 % | 13.07 (13.07, 13.03, 13.10) | 13.91 | 1451, 1436, 1482 | 180, 179, 171 | 47r/1144, 47r/1144, 47r/1152 | 460,847,952,346 / 0 |
+| z: no AND | 1.62 (1.62, 1.63, 1.61) | 1.3 % | 5.76 (5.76, 5.71, 5.81) | 6.63 | 1485, 1650, 1582 | 177, 176, 162 | 37r/792, 36r/792, 37r/792 | 2 / 0 (vary) |
+| d: full, per-top AND (TMIN 2^30) | 10.99 (11.06, 10.99, 10.98) | 0.7 % | 17.29 (17.29, 17.26, 17.36) | 18.13 | 1430, 1431, 1419 | 179, 180, 179 | 48r/1192, 47r/1200, 48r/1192 | exact |
+| u: full, unprofiled (E) | | | | 16.42 (16.50, 16.42, 15.69) | 1270, 1328, 1419 | 178, 180, 180 | 40r/1224+3STL, 40r/1224+3STL, 46r/1192 | exact |
+| B: d813aea binary, unprofiled | | | | 15.85 (15.87, 15.85, 15.56) | 1412, 1295, 1384 | 179, 179, 180 | 46r/1192, 48r/1192, 48r/1192 | exact |
+
+### Phases of mode c, b60 1e16 (per field, 2 fields) (3 profiled runs, medians; share = % of the profiled field excl. probe; "in B s" = share × the unprofiled d813aea median 15.85 s (E unprofiled 16.42 s))
+
+| phase | profiled s/field (rounds) | share | in B s | G-cycles |
+|---|---|---|---|---|
+| top: FD kernel (`top_fd_kernel`, seeds incl.) | 2.843 (2.846, 2.843, 2.817) | 18.37 % | 2.91 | 3.89 |
+| top: clipped-block launch (`top_kernel`) | 0.002 (0.002, 0.002, 0.002) | 0.01 % | 0.00 | 0.00 |
+| **top total** | 2.845 (2.848, 2.845, 2.819) | 18.38 % | 2.91 | 3.90 |
+| bucket | 0.349 (0.354, 0.348, 0.349) | 2.25 % | 0.36 | 0.48 |
+| join | 9.123 (9.148, 9.123, 9.109) | 58.95 % | 9.34 | 12.53 |
+| check | 2.232 (2.239, 2.232, 2.218) | 14.43 % | 2.29 | 3.06 |
+| other: upload | 0.690 (0.731, 0.690, 0.661) | 4.46 % | 0.71 | 0.94 |
+| other: inputs | 0.131 (0.128, 0.131, 0.133) | 0.85 % | 0.13 | 0.18 |
+| other: read | 0.044 (0.047, 0.044, 0.032) | 0.28 % | 0.04 | 0.06 |
+| other: null mark (one empty sync per batch) | 0.007 (0.007, 0.007, 0.006) | 0.04 % | 0.01 | 0.01 |
+| other: unattributed | 0.056 (0.053, 0.056, 0.063) | 0.36 % | 0.06 | 0.08 |
+| probe (excluded) | 0.830 (0.883, 0.830, 0.819) | 5.36 % | 0.85 | 1.14 |
+| **other total** | 0.927 (0.966, 0.927, 0.896) | 5.99 % | 0.95 | |
+| field (profiled device excl. probe) | 15.476 (15.555, 15.476, 15.391) | 100 % | 15.85 | 21.3 (B: 21.9) |
+
+profiled field excl. probe ÷ unprofiled B: 0.977 in time, 0.970 in cycles (clock c 1376, B 1384 MHz); with probe 1.029
+
+clip launches/field 4, batches/field 625, slots 9, slices 2, kept tops/field 6.891e+09, pairs 5.52e+12, padded 7.057e+12 (lanes used 78.2 %), live buckets 2.549e+07 of 2.549e+07; clock c 1376 / u 1328 / B 1384 MHz; null mark 10.5 us per batch; FD per batch 4.548 ms; join per batch 14.597 ms; check per batch 3.572 ms
+
+### Join ablation, b60 1e16 (per field, 2 fields) (profiled join kernel seconds, medians of 3 rounds; marginal z → a → b → p → c)
+
+| part | profiled s/field | % of join | % of field (profiled) | in B s | G-cycles (% of join) | per round (s) |
+|---|---|---|---|---|---|---|
+| base (z: work items, batch load + transposed copy, wave loads + prefilter terms, per-batch stage check) | **1.62** | 17.8 % | 10.5 % | 1.66 | 2.6 (20.4 %) | 1.62, 1.63, 1.61 |
+| AND (a − z: transposed ORs, clipped-chunk range test, popcounts) | **2.32** | 25.4 % | 15.0 % | 2.37 | 2.6 (20.9 %) | 2.32, 2.35, 2.22 |
+| walk rounds (b − a: vote, pop, plane barrier) | **1.40** | 15.3 % | 9.0 % | 1.43 | 2.3 (18.3 %) | 1.53, 1.36, 1.41 |
+| prefilter `walk_pf_lean` (p − b) | **3.64** | 39.9 % | 23.5 % | 3.72 | 5.6 (44.4 %) | 3.51, 3.70, 3.65 |
+| stage + flush (c − p) | **0.15** | 1.6 % | 0.9 % | 0.15 | -0.5 (-4.0 %) | 0.17, 0.08, 0.22 |
+| **join (c)** | **9.12** | 100 % | 59.0 % | 9.34 | 12.5 | 9.15, 9.12, 9.11 |
+
+per-mode mean SM MHz (median of rounds): z 1582, a 1350, b 1405, p 1451, c 1376, d 1430
+
+per-top AND (d) join 10.99 s: +1.87 s; d field 17.29 s profiled: ×1.117
+survivor path (walk + prefilter + stage) 5.18 s = 56.8 % of join, 33.5 % of field
+
+## Screen, b62 1e17 (1 field) (unprofiled device s/field; ratio = base ÷ variant, base = mean of the round's base runs)
+
+| variant | s/field (rounds) | **× vs local base** (per round) | × vs round-mean base | MHz (rounds) | cycles × | join kernel | FD kernel | counts |
+|---|---|---|---|---|---|---|---|---|
+| base: base (EPT 2, TMIN 192, AG 4, TCAP 256, FD 256, stage per batch, flush 512) | 78.378 (78.378) | **×0.993** (0.993) | ×0.992 (0.992) | 1369 | ×1.008 | 48r/1200 | - | exact |
+| base2: base, second run | 78.717 (78.717) | **×0.986** (0.986) | ×0.988 (0.988) | 1334 | ×1.030 | 48r/1200 | - | exact |
+| base3: base (round 1 b62: the run labelled ag2 by the name bug) | 77.024 (77.024) | **×1.016** (1.016) | ×1.009 (1.009) | 1426 | ×0.985 | 48r/1200 | - | exact |
+| base4: base (round 1 b62: the run labelled tm512 by the name bug) | 77.840 (77.840) | **×0.998** (0.998) | ×0.999 (0.999) | 1406 | ×0.988 | 48r/1192 | - | exact |
+| base5: base (round 1 b62, after the restart) | 78.242 (78.242) | **×0.990** (0.990) | ×0.994 (0.994) | 1382 | ×1.000 | 48r/1192 | - | exact |
+| base6: base (round 1 b62, after the restart, mid-block) | 76.274 (76.274) | **×1.026** (1.026) | ×1.019 (1.019) | 1434 | ×0.989 | 48r/1200 | - | exact |
+| ept1: EPT 1 | 82.346 (82.346) | **×0.949** (0.949) | ×0.944 (0.944) | 1364 | ×0.963 | 38r/904 | - | exact |
+| ept3: EPT 3 | 83.319 (83.319) | **×0.937** (0.937) | ×0.933 (0.933) | 1384 | ×0.938 | 63r/1416 | - | exact |
+| tm128: TRANSPOSE_MIN 128 | 77.708 (77.708) | **×1.005** (1.005) | ×1.000 (1.000) | 1380 | ×1.009 | 48r/1200 | - | exact |
+| tm256: TRANSPOSE_MIN 256 | 79.520 (79.520) | **×0.982** (0.982) | ×0.978 (0.978) | 1318 | ×1.032 | 48r/1200 | - | exact |
+| tm512: TRANSPOSE_MIN 512 (= per-top AND) | 88.776 (88.776) | **×0.870** (0.870) | ×0.876 (0.876) | 1393 | ×0.875 | 48r/1200 | - | exact |
+| ag2: AND_GROUP 2 | 81.657 (81.657) | **×0.946** (0.946) | ×0.952 (0.952) | 1376 | ×0.963 | 48r/1152 | - | exact |
+| ag8: AND_GROUP 8 | 78.154 (78.154) | **×0.996** (0.996) | ×0.995 (0.995) | 1450 | ×0.955 | 53r/1256 | - | exact |
+| tc128: TOP_CAP 128 (TMIN 96) | 80.691 (80.691) | **×0.957** (0.957) | ×0.964 (0.964) | 1356 | ×0.989 | 46r/1200 | - | exact |
+| tc512: TOP_CAP 512 | 82.083 (82.083) | **×0.941** (0.941) | ×0.947 (0.947) | 1482 | ×0.889 | 40r/1432+1STL | - | exact |
+| fd128: FD cube 128 | 77.326 (77.326) | **×0.986** (0.986) | ×1.005 (1.005) | 1374 | ×1.018 | 48r/1200 | - | exact |
+| fd512: FD cube 512 | 77.033 (77.033) | **×0.990** (0.990) | ×1.009 (1.009) | 1355 | ×1.036 | 48r/1200 | - | exact |
+| stg1: stage once per work item | 76.949 (76.949) | **×0.991** (0.991) | ×1.010 (1.010) | 1377 | ×1.021 | 46r/1200 | - | exact |
+| fl256: SURV_FLUSH 256 | 76.368 (76.368) | **×0.999** (0.999) | ×1.018 (1.018) | 1383 | ×1.024 | 48r/1192 | - | exact |
+| fl768: SURV_FLUSH 768 | 76.429 (76.429) | **×0.998** (0.998) | ×1.017 (1.017) | 1411 | ×1.003 | 48r/1192 | - | exact |
+
+## Screen, b60 1e16 (per field, 2 fields) (unprofiled device s/field; ratio = base ÷ variant, base = mean of the round's base runs)
+
+| variant | s/field (rounds) | **× vs local base** (per round) | × vs round-mean base | MHz (rounds) | cycles × | join kernel | FD kernel | counts |
+|---|---|---|---|---|---|---|---|---|
+| base: base (EPT 2, TMIN 192, AG 4, TCAP 256, FD 256, stage per batch, flush 512) | 15.471 (15.471) | **×1.006** (1.006) | ×1.003 (1.003) | 1410 | ×0.985 | 46r/1192 | - | exact |
+| base2: base, second run | 15.565 (15.565) | **×0.994** (0.994) | ×0.997 (0.997) | 1359 | ×1.016 | 46r/1192 | - | exact |
+| ept1: EPT 1 | 16.354 (16.354) | **×0.949** (0.949) | ×0.949 (0.949) | 1332 | ×0.986 | 40r/1136 | - | exact |
+| ept3: EPT 3 | 16.241 (16.241) | **×0.955** (0.955) | ×0.955 (0.955) | 1395 | ×0.948 | 64r/1416 | - | exact |
+| tm128: TRANSPOSE_MIN 128 | 15.340 (15.340) | **×1.012** (1.012) | ×1.012 (1.012) | 1402 | ×0.999 | 48r/1192 | - | exact |
+| tm256: TRANSPOSE_MIN 256 | 15.722 (15.722) | **×0.987** (0.987) | ×0.987 (0.987) | 1420 | ×0.962 | 48r/1200 | - | exact |
+| tm512: TRANSPOSE_MIN 512 (= per-top AND) | 17.279 (17.279) | **×0.898** (0.898) | ×0.898 (0.898) | 1418 | ×0.877 | 48r/1200 | - | exact |
+| ag2: AND_GROUP 2 | 16.346 (16.346) | **×0.949** (0.949) | ×0.949 (0.949) | 1348 | ×0.975 | 46r/1152 | - | exact |
+| ag8: AND_GROUP 8 | 15.774 (15.774) | **×0.984** (0.984) | ×0.984 (0.984) | 1385 | ×0.983 | 55r/1256 | - | exact |
+| tc128: TOP_CAP 128 (TMIN 96) | 16.177 (16.177) | **×0.962** (0.962) | ×0.959 (0.959) | 1402 | ×0.947 | 48r/1192 | - | exact |
+| tc512: TOP_CAP 512 | 16.308 (16.308) | **×0.954** (0.954) | ×0.952 (0.952) | 1468 | ×0.898 | 40r/1424+1STL | - | exact |
+| fd128: FD cube 128 | 15.339 (15.339) | **×1.015** (1.015) | ×1.012 (1.012) | 1369 | ×1.023 | 46r/1192 | - | exact |
+| fd512: FD cube 512 | 15.308 (15.308) | **×1.017** (1.017) | ×1.014 (1.014) | 1325 | ×1.059 | 48r/1192 | - | exact |
+| stg1: stage once per work item | 15.307 (15.307) | **×1.017** (1.017) | ×1.014 (1.014) | 1487 | ×0.944 | 46r/1192 | - | exact |
+| fl256: SURV_FLUSH 256 | 15.307 (15.307) | **×1.017** (1.017) | ×1.014 (1.014) | 1402 | ×1.001 | 48r/1192 | - | exact |
+| fl768: SURV_FLUSH 768 | 15.266 (15.266) | **×1.020** (1.020) | ×1.017 (1.017) | 1410 | ×0.998 | 48r/1192 | - | exact |
+
+## Spill tax (screen runs that compiled the 40-register spill variant, then re-ran)
+
+| field | variant | round | spill run s | re-run s | spill ÷ re-run | kernels | MHz |
+|---|---|---|---|---|---|---|---|
+| b62 1e17 (1 field) | base2 | 1 | 80.935 | 78.717 | ×1.028 | 40r/1224+3STL / 48r/1200 | 1356 / 1334 |
+| b62 1e17 (1 field) | base4 | 1 | 80.929 | 77.840 | ×1.040 | 40r/1224+3STL / 48r/1192 | 1296 / 1406 |
+| b62 1e17 (1 field) | base5 | 1 | 82.032 | 78.242 | ×1.048 | 40r/1224+3STL / 48r/1192 | 1345 / 1382 |
+| b62 1e17 (1 field) | tm256 | 1 | 82.467 | 79.520 | ×1.037 | 40r/1224+3STL / 48r/1200 | 1312 / 1318 |
+| b62 1e17 (1 field) | tm512 | 1 | 89.382 | 88.776 | ×1.007 | 40r/1224+3STL / 48r/1200 | 1354 / 1393 |
+| b62 1e17 (1 field) | tc128 | 1 | 84.454 | 80.691 | ×1.047 | 40r/1232+3STL / 46r/1200 | 1271 / 1356 |
+| b62 1e17 (1 field) | tc512 | 1 | 83.567 | 82.083 | ×1.018 | 40r/1432+1STL / 40r/1432+1STL | 1462 / 1482 |
+| b62 1e17 (1 field) | tc512 | 1 | 82.749 | 82.083 | ×1.008 | 40r/1432+1STL / 40r/1432+1STL | 1483 / 1482 |
+| b62 1e17 (1 field) | fl768 | 1 | 79.429 | 76.429 | ×1.039 | 40r/1224+3STL / 48r/1192 | 1354 / 1411 |
+| b60 1e16 (per field, 2 fields) | ag2 | 1 | 16.972 | 16.346 | ×1.038 | 40r/1168+9STL / 46r/1152 | 1432 / 1348 |
+| b60 1e16 (per field, 2 fields) | ag8 | 1 | 15.954 | 15.774 | ×1.011 | 48r/1272+2STL / 55r/1256 | 1317 / 1385 |
+| b60 1e16 (per field, 2 fields) | ag8 | 1 | 15.917 | 15.774 | ×1.009 | 48r/1280+2STL / 55r/1256 | 1322 / 1385 |
+| b60 1e16 (per field, 2 fields) | tc512 | 1 | 16.444 | 16.308 | ×1.008 | 40r/1432+1STL / 40r/1424+1STL | 1455 / 1468 |
+| b60 1e16 (per field, 2 fields) | tc512 | 1 | 16.205 | 16.308 | ×0.994 | 40r/1352+1STL / 40r/1424+1STL | 1461 / 1468 |
+| b60 1e16 (per field, 2 fields) | fd128 | 1 | 15.742 | 15.339 | ×1.026 | 40r/1224+3STL / 46r/1192 | 1432 / 1369 |

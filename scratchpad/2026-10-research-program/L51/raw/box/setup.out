@@ -1,0 +1,18 @@
++ L=/root/l51/logs
++ mkdir -p /root/l51/logs /root/l51/bin /root/l51/src /root/l51/run /root/l51/ptx
++ cd /root/nice
++ git fetch -q origin exp/l51-profile pr/top-fd-round2
++ git worktree add -q --detach /root/l51/src/E origin/exp/l51-profile
++ git worktree add -q --detach /root/l51/src/B origin/pr/top-fd-round2
++ for t in E B
++ cd /root/l51/src/E
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'E c1537076 exp: L51 profile split (FD / clipped, null mark), join ablation modes on #249'\''s kernel, env knobs da99b3761a350042c2e53b32ca682a36  common/src/cubecl_join.rs'
++ for t in E B
++ cd /root/l51/src/B
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'B d813aead Overlap join: carry the FD top certificates'\'' bounds across partitions 84e90ac04d87e298008d7cf56c3630d6  common/src/cubecl_join.rs'
++ nvidia-smi
++ nvidia-smi -q -d POWER,CLOCK

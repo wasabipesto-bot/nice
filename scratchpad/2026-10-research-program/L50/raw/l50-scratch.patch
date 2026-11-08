@@ -1,0 +1,691 @@
+diff --git a/common/Cargo.toml b/common/Cargo.toml
+index 0dc887df..a3c98669 100644
+--- a/common/Cargo.toml
++++ b/common/Cargo.toml
+@@ -9,6 +9,14 @@ readme.workspace = true
+ license-file.workspace = true
+ 
+ [features]
++# L50 scratch instrumentation (not for a PR).
++l50-prof = []
++l50-split = []
++l50-scan2 = []
++l50-check = []
++l50-inl = []
++l50-tr = ["l50-scan2"]
++l50-rc = []
+ database = ["dep:diesel", "dep:dotenvy", "dep:bigdecimal", "dep:rand"]
+ openssl-tls = ["reqwest/native-tls", "dep:openssl", "dep:tokio"]
+ rustls-tls = ["reqwest/rustls", "dep:tokio"]
+diff --git a/common/src/cpu_join.rs b/common/src/cpu_join.rs
+index 1f422b21..c8a0b918 100644
+--- a/common/src/cpu_join.rs
++++ b/common/src/cpu_join.rs
+@@ -40,6 +40,29 @@ use crate::overlap_join::{
+ };
+ use anyhow::Result;
+ 
++/// L50 scratch instrumentation: per-phase TSC cycles and counts.
++#[cfg(feature = "l50-prof")]
++pub mod l50 {
++    use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
++    pub const NAMES: [&str; 29] = [
++        "t_tops", "t_extend", "t_sort", "t_list", "t_scan", "t_part",
++        "n_parts", "n_keys", "n_slots_fd", "n_seeds", "n_steps", "n_clipped",
++        "n_kept", "n_ext_rows", "n_listed", "n_ands", "n_class_scans", "n_bpre",
++        "g_first", "g1", "g2", "g3", "g4", "g5_8", "g9_16", "g17_32", "g33_64", "g65_256", "g257_",
++    ];
++    pub static C: [AtomicU64; 29] = [const { AtomicU64::new(0) }; 29];
++    #[inline(always)]
++    #[must_use]
++    pub fn t() -> u64 {
++        // SAFETY: rdtsc has no preconditions.
++        unsafe { core::arch::x86_64::_rdtsc() }
++    }
++    #[inline(always)]
++    pub fn add(i: usize, v: u64) {
++        C[i].fetch_add(v, Relaxed);
++    }
++}
++
+ /// The most top-layer prefixes one slice of a field may have on the CPU
+ /// (see [`slices_for`]). This bounds the host's top layer (about 32 bytes a
+ /// prefix, so 0.5 GiB at most) and its key index; a thread's tops are one
+@@ -87,6 +110,12 @@ pub struct Scratch {
+     masks: Vec<u64>,
+     info: Vec<Info>,
+     offs: Vec<u32>,
++    /// L50: the listed masks bit-sliced per class (digit-major), and each
++    /// class's start in it.
++    #[cfg(feature = "l50-tr")]
++    tr: Vec<u64>,
++    #[cfg(feature = "l50-tr")]
++    trb: Vec<u32>,
+ }
+ 
+ /// A top prefix of the partition: `n = P·b^f0 + r` for the bottom residues
+@@ -254,6 +283,7 @@ impl Fx {
+     /// `δ̂ = ⌈D·2^32/b²⌉` for `D < b²` (once per top). `D·r + b² − 1 <
+     /// b⁴ <= 2^24` is in `SmallDiv::divrem`'s range, and the sum is below
+     /// `2^32`.
++    #[cfg_attr(feature = "l50-split", inline(never))]
+     fn dh(self, d: u32) -> u32 {
+         let (up, _) = self
+             .b2
+@@ -485,7 +515,54 @@ impl CpuJoin {
+         (v / self.fs.b.pow(i)) % self.fs.b
+     }
+ 
++    /// L50: for each class, for each digit, the bitset of the class's
++    /// listed bottoms whose mask has that digit (`w = ⌈len/64⌉` words).
++    #[cfg(feature = "l50-tr")]
++    #[allow(clippy::cast_possible_truncation)]
++    fn l50_transpose(&self, masks: &[u64], offs: &[u32], tr: &mut Vec<u64>, trb: &mut Vec<u32>) {
++        let b = self.fs.b as usize;
++        tr.clear();
++        trb.clear();
++        for c in 0..self.fs.m1 as usize {
++            let (lo, hi) = (offs[c] as usize, offs[c + 1] as usize);
++            let w = (hi - lo).div_ceil(64);
++            let base = tr.len();
++            trb.push(base as u32);
++            tr.resize(base + b * w, 0);
++            for (r, &m0) in masks[lo..hi].iter().enumerate() {
++                let mut m = m0;
++                let (word, bit) = (r / 64, 1u64 << (r % 64));
++                while m != 0 {
++                    let d = m.trailing_zeros() as usize;
++                    m &= m - 1;
++                    tr[base + d * w + word] |= bit;
++                }
++            }
++        }
++        trb.push(tr.len() as u32);
++    }
++
++    #[cfg_attr(feature = "l50-split", inline(never))]
++    fn sort_tops(tops: &mut [Top]) {
++        tops.sort_unstable_by_key(|t| t.pc);
++    }
++
++    /// L50: partition `v`, recording every checked `n`.
++    #[cfg(feature = "l50-prof")]
++    pub fn run_partition_recording(&self, v: u32, scratch: &mut Scratch, rec: &mut Vec<u128>) -> PartitionResult {
++        self.run(v, scratch, Some(rec))
++    }
++
++    /// L50: the bottom list's length after the prune.
++    #[cfg(feature = "l50-prof")]
++    #[must_use]
++    pub fn bpre_len(&self) -> usize {
++        self.fs.bp_r.len()
++    }
++
+     fn run(&self, v: u32, sc: &mut Scratch, mut record: Option<&mut Vec<u128>>) -> PartitionResult {
++        #[cfg(feature = "l50-prof")]
++        let t_part = l50::t();
+         let mut out = PartitionResult::default();
+         let m1 = self.fs.m1;
+         let roots = &self.fs.base.roots;
+@@ -500,15 +577,35 @@ impl CpuJoin {
+             if lo == hi {
+                 continue;
+             }
++            #[cfg(feature = "l50-prof")]
++            let t0 = l50::t();
+             self.tops(v, &self.fs.tlay[lo..hi], &mut sc.tops);
++            #[cfg(feature = "l50-prof")]
++            let t1 = l50::t();
++            #[cfg(feature = "l50-prof")]
++            l50::add(0, t1 - t0);
+             if sc.tops.is_empty() {
+                 continue;
+             }
++            #[cfg(feature = "l50-prof")]
++            l50::add(7, 1);
++            #[cfg(feature = "l50-prof")]
++            l50::add(12, sc.tops.len() as u64);
+             if !extended {
+                 self.extend(v, &mut sc.ext);
+                 extended = true;
++                #[cfg(feature = "l50-prof")]
++                l50::add(13, sc.ext.idx.len() as u64);
+             }
+-            sc.tops.sort_unstable_by_key(|t| t.pc);
++            #[cfg(feature = "l50-prof")]
++            let t2 = l50::t();
++            #[cfg(feature = "l50-prof")]
++            l50::add(1, t2 - t1);
++            Self::sort_tops(&mut sc.tops);
++            #[cfg(feature = "l50-prof")]
++            let t3 = l50::t();
++            #[cfg(feature = "l50-prof")]
++            l50::add(2, t3 - t2);
+             // The last bottom digit: the key itself, or the partition's last.
+             let d = if self.fs.key_level {
+                 key
+@@ -516,19 +613,46 @@ impl CpuJoin {
+                 self.partition_digit(v, self.fs.jp.p - 1)
+             };
+             self.list(d, &mut sc.ext, &mut sc.masks, &mut sc.info, &mut sc.offs);
++            #[cfg(feature = "l50-tr")]
++            self.l50_transpose(&sc.masks, &sc.offs, &mut sc.tr, &mut sc.trb);
++            #[cfg(feature = "l50-prof")]
++            let t4 = l50::t();
++            #[cfg(feature = "l50-prof")]
++            l50::add(3, t4 - t3);
++            #[cfg(feature = "l50-prof")]
++            l50::add(14, sc.masks.len() as u64);
++            #[cfg(feature = "l50-prof")]
++            let mut ands = 0u64;
+             for top in &sc.tops {
+                 for &root in roots {
+                     let c = ((root + m1 - top.pc) % m1) as usize;
+                     let (lo, hi) = (sc.offs[c] as usize, sc.offs[c + 1] as usize);
++                    #[cfg(feature = "l50-prof")]
++                    {
++                        ands += (hi - lo) as u64;
++                    }
+                     let pass = Pass {
+                         top,
+                         d,
+                         ext: &sc.ext,
+                         info: &sc.info[lo..hi],
++                        #[cfg(feature = "l50-tr")]
++                        tr: &sc.tr[sc.trb[c] as usize..sc.trb[c + 1] as usize],
+                     };
+                     self.scan(&pass, &sc.masks[lo..hi], &mut out, &mut record);
+                 }
+             }
++            #[cfg(feature = "l50-prof")]
++            {
++                l50::add(4, l50::t() - t4);
++                l50::add(15, ands);
++                l50::add(16, (sc.tops.len() * roots.len()) as u64);
++            }
++        }
++        #[cfg(feature = "l50-prof")]
++        {
++            l50::add(5, l50::t() - t_part);
++            l50::add(6, 1);
+         }
+         out
+     }
+@@ -540,7 +664,12 @@ impl CpuJoin {
+     // Below 2^32: w = b^f0 is (`JoinParams::supported`), and so are b^mid,
+     // b - 1 and the key space. w, p, a, e as in `overlap_join`.
+     #[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
++    #[cfg_attr(feature = "l50-split", inline(never))]
+     fn tops(&self, v: u32, layer: &[(u128, u64)], tops: &mut Vec<Top>) {
++        #[cfg(feature = "l50-prof")]
++        let (mut n_fd, mut n_clip) = (0u64, 0u64);
++        #[cfg(feature = "l50-prof")]
++        let mut gh = [0u64; 11];
+         tops.clear();
+         let fs = &self.fs;
+         let (w, v) = (fs.w, u128::from(v));
+@@ -558,6 +687,28 @@ impl CpuJoin {
+                 && a == lo
+                 && e == lo + w - 1
+             {
++                #[cfg(feature = "l50-prof")]
++                {
++                    n_fd += 1;
++                    let prev = st.p_prof();
++                    let i = if prev == u128::MAX || p <= prev {
++                        0
++                    } else {
++                        match (p - prev) / self.pk {
++                            1 => 1,
++                            2 => 2,
++                            3 => 3,
++                            4 => 4,
++                            5..=8 => 5,
++                            9..=16 => 6,
++                            17..=32 => 7,
++                            33..=64 => 8,
++                            65..=256 => 9,
++                            _ => 10,
++                        }
++                    };
++                    gh[i] += 1;
++                }
+                 fd.advance(&mut st, p);
+                 if let Some(mask) = fd.cert(&st) {
+                     tops.push(Top {
+@@ -572,6 +723,10 @@ impl CpuJoin {
+                 }
+                 continue;
+             }
++            #[cfg(feature = "l50-prof")]
++            {
++                n_clip += 1;
++            }
+             let Some(mask) = fs.base.cert(a, e, self.k) else {
+                 continue;
+             };
+@@ -590,6 +745,16 @@ impl CpuJoin {
+                 pc: (p % u128::from(fs.m1)) as u32,
+             });
+         }
++        #[cfg(feature = "l50-prof")]
++        {
++            l50::add(8, n_fd);
++            l50::add(9, st.n_seeds);
++            l50::add(10, st.n_steps);
++            l50::add(11, n_clip);
++            for (i, &g) in gh.iter().enumerate() {
++                l50::add(18 + i, g);
++            }
++        }
+     }
+ 
+     /// The bottom list extended by the partition's fixed digits: the
+@@ -600,6 +765,7 @@ impl CpuJoin {
+     // Narrowed: b^f0 and the list's length (at most b^f0) are below 2^32,
+     // r below b^(k-1) < 2^40, and every column below M <= 2^18.
+     #[allow(clippy::cast_possible_truncation)]
++    #[cfg_attr(feature = "l50-split", inline(never))]
+     fn extend(&self, v: u32, ext: &mut Ext) {
+         let fs = &self.fs;
+         let (b, k, f0) = (u64::from(fs.b), self.k, fs.f0);
+@@ -668,6 +834,7 @@ impl CpuJoin {
+     /// addition mod `M` per residue, over plain columns.
+     // M <= 2^18, so it and everything reduced mod M fit u32.
+     #[allow(clippy::cast_possible_truncation)]
++    #[cfg_attr(feature = "l50-split", inline(never))]
+     fn advance(&self, ext: &mut Ext, d: u32) {
+         let m = self.big_m as u32;
+         if self.e1 == 0 && self.e2 == 0 && d >= ext.d && d - ext.d <= 2 {
+@@ -701,6 +868,7 @@ impl CpuJoin {
+     /// `masks` and `info` side by side, class `c` at `offs[c]..offs[c + 1]`.
+     // A list is at most the bottom list, below b^f0 < 2^32 entries.
+     #[allow(clippy::cast_possible_truncation)]
++    #[cfg_attr(feature = "l50-split", inline(never))]
+     fn list(
+         &self,
+         d: u32,
+@@ -814,7 +982,101 @@ impl CpuJoin {
+         };
+         let t = _mm256_set1_epi64x(pass.top.mask.cast_signed());
+         let zero = _mm256_setzero_si256();
++        #[cfg(feature = "l50-tr")]
++        if masks.len() <= 4096 {
++            // L50: pass bits = NOT (OR of the top's digits' bitsets), then
++            // the same LUT compaction and pass 2.
++            use std::arch::x86_64::{__m128i, _mm_add_epi16, _mm_loadu_si128, _mm_set1_epi16, _mm_storeu_si128};
++            let n = masks.len();
++            let w = n.div_ceil(64);
++            let mut acc_m = std::mem::MaybeUninit::<[u64; 64]>::uninit();
++            let ap = acc_m.as_mut_ptr().cast::<u64>();
++            for k in 0..w {
++                // SAFETY: k < w <= 64.
++                unsafe { *ap.add(k) = 0 };
++            }
++            let mut tm = pass.top.mask;
++            while tm != 0 {
++                let d = tm.trailing_zeros() as usize;
++                tm &= tm - 1;
++                let row = &pass.tr[d * w..d * w + w];
++                for (k, &x) in row.iter().enumerate() {
++                    // SAFETY: k < w <= 64.
++                    unsafe { *ap.add(k) |= x };
++                }
++            }
++            let mut buf = std::mem::MaybeUninit::<[u16; 4096 + 16]>::uninit();
++            let bp = buf.as_mut_ptr().cast::<u16>();
++            let mut cnt = 0usize;
++            for k in 0..w {
++                // SAFETY: written above.
++                let mut bits = !unsafe { *ap.add(k) };
++                if k + 1 == w && n % 64 != 0 {
++                    bits &= (1u64 << (n % 64)) - 1;
++                }
++                for h in 0..8u16 {
++                    let byte = ((bits >> (8 * h)) & 0xFF) as usize;
++                    // SAFETY: LUT rows are 8 u16; buf has 16 spare slots.
++                    unsafe {
++                        let idx = _mm_loadu_si128(L50_LUT[byte].as_ptr().cast::<__m128i>());
++                        let v = _mm_add_epi16(idx, _mm_set1_epi16((k as u16 * 64 + 8 * h).cast_signed()));
++                        _mm_storeu_si128(bp.add(cnt).cast::<__m128i>(), v);
++                    }
++                    cnt += L50_LUT_N[byte] as usize;
++                }
++            }
++            for i in 0..cnt {
++                // SAFETY: slots below cnt were written above.
++                let j = unsafe { *bp.add(i) } as usize;
++                self.survivor(pass, masks[j], j, out, record);
++            }
++            return;
++        }
+         let (chunks, rest) = masks.as_chunks::<16>();
++        #[cfg(feature = "l50-scan2")]
++        if masks.len() <= 4096 {
++            // L50: pass 1 compacts the passing indices branch-free (a LUT
++            // of the set bits of each byte), pass 2 runs the survivors.
++            use std::arch::x86_64::{__m128i, _mm_add_epi16, _mm_loadu_si128, _mm_set1_epi16, _mm_storeu_si128};
++            let mut buf = std::mem::MaybeUninit::<[u16; 4096 + 16]>::uninit();
++            let bp = buf.as_mut_ptr().cast::<u16>();
++            let mut cnt = 0usize;
++            let mut at = 0u16;
++            for chunk in chunks {
++                let mut bits = 0u32;
++                for q in 0..4 {
++                    // SAFETY: as below.
++                    #[allow(clippy::cast_ptr_alignment)]
++                    let v = unsafe { _mm256_loadu_si256(chunk.as_ptr().add(4 * q).cast::<__m256i>()) };
++                    let z = _mm256_cmpeq_epi64(_mm256_and_si256(v, t), zero);
++                    bits |= (_mm256_movemask_pd(_mm256_castsi256_pd(z)).cast_unsigned()) << (4 * q);
++                }
++                for h in 0..2u16 {
++                    let byte = ((bits >> (8 * h)) & 0xFF) as usize;
++                    // SAFETY: LUT rows are 8 u16; buf has 16 spare slots.
++                    unsafe {
++                        let idx = _mm_loadu_si128(L50_LUT[byte].as_ptr().cast::<__m128i>());
++                        let v = _mm_add_epi16(idx, _mm_set1_epi16((at + 8 * h).cast_signed()));
++                        _mm_storeu_si128(bp.add(cnt).cast::<__m128i>(), v);
++                    }
++                    cnt += L50_LUT_N[byte] as usize;
++                }
++                at += 16;
++            }
++            for i in 0..cnt {
++                // SAFETY: slots below cnt were written by pass 1.
++                let j = unsafe { *bp.add(i) } as usize;
++                self.survivor(pass, masks[j], j, out, record);
++            }
++            let at = at as usize;
++            let t = pass.top.mask;
++            for (j, &m) in rest.iter().enumerate() {
++                if m & t == 0 {
++                    self.survivor(pass, m, at + j, out, record);
++                }
++            }
++            return;
++        }
+         let mut at = 0;
+         for chunk in chunks {
+             let mut bits = 0u32;
+@@ -873,7 +1135,8 @@ impl CpuJoin {
+ 
+     /// A pair that passed the AND: inside the field, through the prefilter,
+     /// then the full check.
+-    #[inline(never)]
++    #[cfg_attr(not(feature = "l50-inl"), inline(never))]
++    #[cfg_attr(feature = "l50-inl", inline(always))]
+     fn survivor(
+         &self,
+         pass: &Pass,
+@@ -884,11 +1147,22 @@ impl CpuJoin {
+     ) {
+         let info = pass.info[j];
+         let row = info.row as usize;
+-        let r0 = self.fs.bp_r[pass.ext.idx[row] as usize];
+         let top = pass.top;
++        #[cfg(not(feature = "l50-rc"))]
++        let r0 = self.fs.bp_r[pass.ext.idx[row] as usize];
++        #[cfg(not(feature = "l50-rc"))]
+         if r0 < top.rlo || r0 >= top.rhi {
+             return;
+         }
++        // L50 (RC): only a clipped top reads the residue before the
++        // prefilter; an unclipped one takes every residue.
++        #[cfg(feature = "l50-rc")]
++        if top.rlo != 0 || u128::from(top.rhi) != self.fs.w {
++            let r0 = self.fs.bp_r[pass.ext.idx[row] as usize];
++            if r0 < top.rlo || r0 >= top.rhi {
++                return;
++            }
++        }
+         out.survivors += 1;
+         let ext = pass.ext;
+         let pass_mid = if self.lean {
+@@ -902,10 +1176,40 @@ impl CpuJoin {
+             return;
+         }
+         out.checked += 1;
++        #[cfg(feature = "l50-rc")]
++        let r0 = self.fs.bp_r[pass.ext.idx[row] as usize];
+         let n = top.p * self.fs.w + u128::from(r0);
+         if let Some(rec) = record.as_deref_mut() {
+             rec.push(n);
+         }
++        #[cfg(feature = "l50-check")]
++        if self.lean && self.fs.f0 == 3 && self.fs.k2 == 8 {
++            // L50: the check seeded with the 16 digits the join knows
++            // (positions 0..7 of n² and n³: the bottom's 12, the
++            // prefilter's 4), from position 8.
++            let (h2, g2) = self.fx.digits(info.carries & 0xFFFF, ext.p2[row], top.dh);
++            let (h3, g3) = self.fx.digits(info.carries >> 16, ext.p3[row], top.dh);
++            let seen = bmask | (1 << h2) | (1 << g2) | (1 << h3) | (1 << g3);
++            static MODE: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
++            let v3 = *MODE.get_or_init(|| {
++                std::env::var("L50_CHECK").ok().and_then(|s| s.parse().ok()).unwrap_or(3)
++            }) == 3;
++            let nice = match (self.fs.b, v3) {
++                (58, false) => l50_check_v1::<58, { 58 * 58 * 58 * 58 }>(n, seen),
++                (60, false) => l50_check_v1::<60, { 60 * 60 * 60 * 60 }>(n, seen),
++                (62, false) => l50_check_v1::<62, { 62 * 62 * 62 * 62 }>(n, seen),
++                (64, false) => l50_check_v1::<64, { 64 * 64 * 64 * 64 }>(n, seen),
++                (58, true) => l50_check_v3::<58, { 58 * 58 * 58 * 58 }, { 58 * 58 * 58 * 58 * 58 }>(n, seen),
++                (60, true) => l50_check_v3::<60, { 60 * 60 * 60 * 60 }, { 60 * 60 * 60 * 60 * 60 }>(n, seen),
++                (62, true) => l50_check_v3::<62, { 62 * 62 * 62 * 62 }, { 62 * 62 * 62 * 62 * 62 }>(n, seen),
++                (64, true) => l50_check_v3::<64, { 64 * 64 * 64 * 64 }, { 64 * 64 * 64 * 64 * 64 }>(n, seen),
++                _ => get_is_nice(n, self.fs.b),
++            };
++            if nice {
++                out.hits.push(n);
++            }
++            return;
++        }
+         // With f0 = 3 (the production parameters) the bottom list's own
+         // mask is the low three digits of both powers, which the check skips.
+         let nice = if self.fs.f0 == 3 {
+@@ -956,6 +1260,98 @@ impl CpuJoin {
+     }
+ }
+ 
++/// L50: the set bits of each byte as u16 indices, and their count.
++#[cfg(feature = "l50-scan2")]
++static L50_LUT: [[u16; 8]; 256] = {
++    let mut t = [[0u16; 8]; 256];
++    let mut b = 0;
++    while b < 256 {
++        let mut n = 0;
++        let mut i = 0;
++        while i < 8 {
++            if b & (1 << i) != 0 {
++                t[b][n] = i as u16;
++                n += 1;
++            }
++            i += 1;
++        }
++        b += 1;
++    }
++    t
++};
++#[cfg(feature = "l50-scan2")]
++static L50_LUT_N: [u8; 256] = {
++    let mut t = [0u8; 256];
++    let mut b = 0;
++    while b < 256 {
++        t[b] = (b as u32).count_ones() as u8;
++        b += 1;
++    }
++    t
++};
++
++/// L50: n² and n³ from position 8 against `seen` (their 16 digits below 8).
++#[cfg(feature = "l50-check")]
++#[inline(never)]
++fn l50_check_v1<const B: u32, const B4: u32>(n: u128, seed16: u64) -> bool {
++    use crate::fixed_width::U256;
++    #[inline(always)]
++    fn scan_from<const B: u32, const B4: u32>(mut x: U256, mut seen: u64) -> Option<u64> {
++        x.div_assign_rem_u32_const::<B4>();
++        x.div_assign_rem_u32_const::<B4>();
++        while !x.is_zero() {
++            let d = x.div_assign_rem_u32_const::<B>();
++            let bit = 1u64 << d;
++            if seen & bit != 0 {
++                return None;
++            }
++            seen |= bit;
++        }
++        Some(seen)
++    }
++    let sq = U256::mul_u128_u128(n, n);
++    let Some(seen) = scan_from::<B, B4>(sq, seed16) else {
++        return false;
++    };
++    scan_from::<B, B4>(sq.mul_u128_truncating(n), seen).is_some()
++}
++
++/// L50: as [`l50_check_v1`], five digits per long division (by `b⁵`),
++/// split by constant divisions of a `u32`.
++#[cfg(feature = "l50-check")]
++#[inline(never)]
++fn l50_check_v3<const B: u32, const B4: u32, const B5: u32>(n: u128, seed16: u64) -> bool {
++    use crate::fixed_width::U256;
++    #[inline(always)]
++    fn scan5<const B: u32, const B4: u32, const B5: u32>(mut x: U256, mut seen: u64) -> Option<u64> {
++        x.div_assign_rem_u32_const::<B4>();
++        x.div_assign_rem_u32_const::<B4>();
++        loop {
++            let mut r = x.div_assign_rem_u32_const::<B5>();
++            let last = x.is_zero();
++            let mut i = 0;
++            while if last { r != 0 } else { i < 5 } {
++                let d = r % B;
++                r /= B;
++                let bit = 1u64 << d;
++                if seen & bit != 0 {
++                    return None;
++                }
++                seen |= bit;
++                i += 1;
++            }
++            if last {
++                return Some(seen);
++            }
++        }
++    }
++    let sq = U256::mul_u128_u128(n, n);
++    let Some(seen) = scan5::<B, B4, B5>(sq, seed16) else {
++        return false;
++    };
++    scan5::<B, B4, B5>(sq.mul_u128_truncating(n), seen).is_some()
++}
++
+ /// What a scan needs besides the masks: the top, the last bottom digit, the
+ /// residues and the scanned class's list entries.
+ struct Pass<'a> {
+@@ -963,6 +1359,9 @@ struct Pass<'a> {
+     d: u32,
+     ext: &'a Ext,
+     info: &'a [Info],
++    /// L50: the class's bit-sliced masks, `w` words a digit.
++    #[cfg(feature = "l50-tr")]
++    tr: &'a [u64],
+ }
+ 
+ #[cfg(test)]
+diff --git a/common/src/cpu_top_fd.rs b/common/src/cpu_top_fd.rs
+index a3498899..c0b03b41 100644
+--- a/common/src/cpu_top_fd.rs
++++ b/common/src/cpu_top_fd.rs
+@@ -38,6 +38,16 @@ use crate::overlap_join::{Base, Div64, W4, close_certificate, digit_range_mask};
+ /// seeds it instead.
+ const MAX_STEPS: u32 = 4;
+ 
++#[cfg(not(feature = "l50-prof"))]
++fn l50_max_steps() -> u32 {
++    MAX_STEPS
++}
++/// L50: `L50_MAX_STEPS` overrides it in the instrumented build.
++#[cfg(feature = "l50-prof")]
++fn l50_max_steps() -> u32 {
++    std::env::var("L50_MAX_STEPS").ok().and_then(|s| s.parse().ok()).unwrap_or(MAX_STEPS)
++}
++
+ /// Digits of every digit array: `P³` for every field the join takes, with
+ /// the word a carry out of the longest addend runs into.
+ const DIGITS: u32 = 48;
+@@ -252,6 +262,18 @@ pub(crate) struct TopFd {
+     dd3: W4,
+     pub(crate) pc: u32,
+     pub(crate) dm: u32,
++    #[cfg(feature = "l50-prof")]
++    pub(crate) n_steps: u64,
++    #[cfg(feature = "l50-prof")]
++    pub(crate) n_seeds: u64,
++}
++
++impl TopFd {
++    /// L50: the prefix the state is at.
++    #[cfg(feature = "l50-prof")]
++    pub(crate) fn p_prof(&self) -> u128 {
++        self.p
++    }
+ }
+ 
+ impl Default for TopFd {
+@@ -269,6 +291,10 @@ impl Default for TopFd {
+             dd3: W4::default(),
+             pc: 0,
+             dm: 0,
++            #[cfg(feature = "l50-prof")]
++            n_steps: 0,
++            #[cfg(feature = "l50-prof")]
++            n_seeds: 0,
+         }
+     }
+ }
+@@ -351,7 +377,7 @@ impl TopFdSetup {
+             cap,
+             w,
+             h,
+-            reach: h * u128::from(MAX_STEPS),
++            reach: h * u128::from(l50_max_steps()),
+             addend_words,
+             dds: digit_at(2, 2 * o),
+             dds_at,
+@@ -407,7 +433,12 @@ impl TopFdSetup {
+     /// The state at `p` (an unclipped block of the field) from scratch.
+     // The join's residues: below b − 1 and b^mid.
+     #[allow(clippy::cast_possible_truncation)]
++    #[cfg_attr(feature = "l50-split", inline(never))]
+     fn seed(&self, st: &mut TopFd, p: u128) {
++        #[cfg(feature = "l50-prof")]
++        {
++            st.n_seeds += 1;
++        }
+         let bias = self.bias;
+         let (o, h) = (self.o, self.h);
+         let pd = self.to_digits(w4(p));
+@@ -443,8 +474,13 @@ impl TopFdSetup {
+     }
+ 
+     /// `P → P + h`: five digit-array additions and three binary ones.
+-    #[inline(always)]
++    #[cfg_attr(not(feature = "l50-split"), inline(always))]
++    #[cfg_attr(feature = "l50-split", inline(never))]
+     fn step(&self, st: &mut TopFd) {
++        #[cfg(feature = "l50-prof")]
++        {
++            st.n_steps += 1;
++        }
+         let bias = self.bias;
+         let [ds, dc, ddc] = self.addend_words;
+         add_digits(&mut st.sq, &st.ds, 0, ds, bias);
+@@ -544,7 +580,8 @@ impl TopFdSetup {
+     /// as `Base::cert(a, a + w − 1, cap)`, read from the stepped digits.
+     /// The digit of `a^j` at position `pos` is digit `pos − j·f0` of `P^j`
+     /// (zero below).
+-    #[inline]
++    #[cfg_attr(not(feature = "l50-split"), inline)]
++    #[cfg_attr(feature = "l50-split", inline(never))]
+     pub(crate) fn cert(&self, st: &TopFd) -> Option<u64> {
+         // A digit, below b <= 64.
+         #[allow(clippy::cast_possible_truncation)]

@@ -1,0 +1,178 @@
+ Downloading crates ...
+  Downloaded c2rust-bitfields-derive v0.20.0
+  Downloaded c2rust-bitfields v0.20.0
+  Downloaded cubecl-spirv v0.10.0
+  Downloaded syn v1.0.109
+  Downloaded tracel-rspirv v0.12.1+sdk-1.4.341.0
+  Downloaded tracel-ash v0.39.5+sdk1.4.357
+   Compiling syn v1.0.109
+    Checking cubecl-opt v0.10.0
+    Checking tracel-rspirv v0.12.1+sdk-1.4.341.0
+   Compiling cubecl-wgpu v0.10.0
+   Compiling cubecl v0.10.0
+   Compiling nice_common v3.4.8-dev (/root/l47/src/P/common)
+    Checking cubecl-cpp v0.10.0
+    Checking cubecl-cuda v0.10.0
+   Compiling c2rust-bitfields-derive v0.20.0
+    Checking c2rust-bitfields v0.20.0
+    Checking tracel-ash v0.39.5+sdk1.4.357
+    Checking cubecl-spirv v0.10.0
+error: 5 bindings with single-character names in scope
+   --> common/src/join_check.rs:357:17
+    |
+357 | pub fn wide_div(v: u64, d: u32) -> (u64, u32) {
+    |                 ^       ^
+358 |     let mut rem = 0u32;
+359 |     let mut q = 0u64;
+    |             ^
+...
+362 |         let c = ((v >> (16 * i)) & 0xFFFF) as u32;
+    |             ^
+363 |         let x = (rem << 16) | c;
+    |             ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+    = note: `-D clippy::many-single-char-names` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::many_single_char_names)]`
+
+error: 5 bindings with single-character names in scope
+    --> common/src/cubecl_join.rs:5477:14
+     |
+5477 |         let (b, l) = (sh.b, sh.l);
+     |              ^  ^
+...
+5483 |             let (mut a, mut z) = (0u128, bb.pow(l) + 1);
+     |                      ^      ^
+5484 |             while a < z {
+5485 |                 let m = a + (z - a) / 2;
+     |                     ^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+     = note: `-D clippy::many-single-char-names` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::many_single_char_names)]`
+
+error: 5 bindings with single-character names in scope
+   --> common/src/join_check.rs:357:17
+    |
+357 | pub fn wide_div(v: u64, d: u32) -> (u64, u32) {
+    |                 ^       ^
+358 |     let mut rem = 0u32;
+359 |     let mut q = 0u64;
+    |             ^
+...
+362 |         let c = ((v >> (16 * i)) & 0xFFFF) as u32;
+    |             ^
+363 |         let x = (rem << 16) | c;
+    |             ^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+
+error: docs for function which may panic missing `# Panics` section
+  --> common/src/join_check.rs:31:1
+   |
+31 | pub const fn magic(d: u32) -> (u32, u32) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: first possible panic found here
+  --> common/src/join_check.rs:32:5
+   |
+32 |     assert!(d >= 3 && !d.is_power_of_two(), "magic: d >= 3, not a power of 2");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#missing_panics_doc
+   = note: `-D clippy::missing-panics-doc` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::missing_panics_doc)]`
+
+error: manually reimplementing `ilog2`
+  --> common/src/join_check.rs:33:13
+   |
+33 |     let s = 31 - d.leading_zeros();
+   |             ^^^^^^^^^^^^^^^^^^^^^^ help: try: `d.ilog2()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_ilog2
+   = note: `-D clippy::manual-ilog2` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::manual_ilog2)]`
+
+error: docs for function which may panic missing `# Panics` section
+  --> common/src/join_check.rs:67:1
+   |
+67 | pub const fn inverse_mod_2_64(o: u64) -> u64 {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: first possible panic found here
+  --> common/src/join_check.rs:68:5
+   |
+68 |     assert!(o % 2 == 1, "inverse of an even number");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#missing_panics_doc
+
+error: manual implementation of `.is_multiple_of()`
+   --> common/src/join_check.rs:108:27
+    |
+108 |         ensure!(g >= 2 && g % 2 == 0, "check: gate of {g} digits");
+    |                           ^^^^^^^^^^ help: replace with: `g.is_multiple_of(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+    = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+error: docs for function which may panic missing `# Panics` section
+   --> common/src/join_check.rs:213:1
+    |
+213 | pub fn mirror(sh: &CheckShape, p: u64, w6: u32, r0: u32) -> Mirror {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: first possible panic found here
+   --> common/src/join_check.rs:242:27
+    |
+242 |                 let v32 = u32::try_from(v).expect("a narrow part");
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#missing_panics_doc
+
+error: this function has too many lines (127/100)
+   --> common/src/join_check.rs:213:1
+    |
+213 | pub fn mirror(sh: &CheckShape, p: u64, w6: u32, r0: u32) -> Mirror {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#too_many_lines
+    = note: `-D clippy::too-many-lines` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::too_many_lines)]`
+
+error: manual implementation of `.is_multiple_of()`
+   --> common/src/join_check.rs:333:41
+    |
+333 |         put(&mut mask, y, k + 1 < ql || sh.s2 % 2 == 0);
+    |                                         ^^^^^^^^^^^^^^ help: replace with: `sh.s2.is_multiple_of(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: manual implementation of `.is_multiple_of()`
+   --> common/src/join_check.rs:341:41
+    |
+341 |         put(&mut mask, y, k + 1 < cl || sh.s3 % 2 == 0);
+    |                                         ^^^^^^^^^^^^^^ help: replace with: `sh.s3.is_multiple_of(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: could not compile `nice_common` (lib) due to 9 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> common/src/cubecl_join.rs:5536:25
+     |
+5536 |         let mut fields: Vec<(u32, u128, u128, JoinParams, Option<Vec<u32>>)> =
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#type_complexity
+     = note: `-D clippy::type-complexity` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::type_complexity)]`
+
+error: manual implementation of `.is_multiple_of()`
+   --> common/src/join_check.rs:610:28
+    |
+610 |                 let d = if (i + first) % 2 == 0 { b - 1 } else { 0 };
+    |                            ^^^^^^^^^^^^^^^^^^^^ help: replace with: `(i + first).is_multiple_of(2)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_is_multiple_of
+
+error: could not compile `nice_common` (lib test) due to 12 previous errors
+clippy gpu+spirv rc=101

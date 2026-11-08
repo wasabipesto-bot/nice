@@ -15,6 +15,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   scenario < ×0.98), **L51 full-stack profile + ablation + constant retune** on d813aea (box
   `l51-profile`, instance 59671466; kill: retune < 3 %), **L50 CPU join roadmap** (ivory, perf).
   Hard stops 12:30 UTC.
+- **L47 built (08:00 UTC, L47.1): check kernel design D ×1.088 at b62 1e17 / ×1.124 b60 / ×1.070
+  b64, NiceMark ×1.056, exact with new per-survivor device tests against the CPU (the old suite
+  could not catch an over-rejecting check); the check now runs at the DRAM floor (3.2 s, 98 % of
+  bandwidth) with 39 registers and no divisions.** Box l47-check destroyed (2 h). Reviewer launched;
+  `pr/check-d` is the second PR-ready branch held at the cap (GPU chain: #241 → #246 → #249 →
+  FD round 2 → check D).
 
 ## 2026-11-07 (day 11; routine fired 04:41 UTC)
 
