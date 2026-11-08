@@ -121,10 +121,12 @@ const ENTRIES_PER_THREAD: u32 = 2;
 /// exhausted exits at once, and no part of the list waits for a last wave.
 const CHECK_CUBES: u32 = 2048;
 /// [`check_kernel`]'s modes: write the nice numbers; every n (tests); four
-/// words per list entry (tests, see the kernel).
+/// words per list entry, with the gate bypassed or applied (tests, see the
+/// kernel).
 pub(crate) const CHECK_HITS: u32 = 0;
 pub(crate) const CHECK_PROBE: u32 = 1;
 pub(crate) const CHECK_COUNT: u32 = 2;
+pub(crate) const CHECK_GATED: u32 = 3;
 /// How deep the halving of an overflowing partition's top layer may go: a
 /// layer of up to 2^32 prefixes reaches single prefixes well within it.
 const MAX_SPLITS: u32 = 32;
@@ -185,12 +187,12 @@ pub use kernels::{bucket_kernel, check_kernel, join_kernel, top_fd_kernel, top_k
 )]
 mod kernels {
     use super::{
-        AND_GROUP, CHECK_COUNT, CHECK_PROBE, DEAD_MASK, JOIN_WG, MAX_ROOTS, STAGES_U32, SURV_FLUSH,
+        AND_GROUP, CHECK_COUNT, CHECK_GATED, CHECK_PROBE, DEAD_MASK, JOIN_WG, MAX_ROOTS, STAGES_U32, SURV_FLUSH,
         SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS, TRANSPOSE_MIN,
     };
     use crate::cubecl_backend::NICEONLY_STRIDE;
     use crate::cubecl_detailed_fd::fd_add_top;
-    use crate::join_check::{inverse_mod_2_64, magic};
+    use crate::join_check::{CheckShape, magic};
     use cubecl::prelude::*;
 
     /// Count the cube in `ran[stage]` once every unit of it is done (see
@@ -3262,10 +3264,17 @@ mod kernels {
     /// of the carry normalisation into a mask; the rest of n³ only where a
     /// lane of the plane passed the gate (n²'s digits and n³'s low `2·gl`
     /// distinct). Each plane takes the next entry per lane from the batch's
-    /// counter (`ran[STAGES]`), so the grid has no wave tail.
+    /// counter (`ran[STAGES]`), so the grid has no wave tail. The counter
+    /// assumes full planes: a cube's `JOIN_WG` = 256 threads is a multiple
+    /// of every plane width (a power of two up to 128), so every plane
+    /// starts full, and the plane ops sit in plane-uniform control flow
+    /// (`cur`, `nxt` are broadcast and `count` is the same for every lane).
     /// Modes: [`CHECK_HITS`] writes the nice numbers; [`CHECK_PROBE`] every
     /// n (rebuilt from its limbs); [`CHECK_COUNT`] four words per list entry
-    /// (distinct digits, the gate, the digit mask) with no gate.
+    /// (distinct digits, the gate, the digit mask) with the gate bypassed,
+    /// so every lane builds all of n³; [`CHECK_GATED`] the same four words
+    /// with the gate applied as in [`CHECK_HITS`] (the mask then holds all
+    /// of n³'s digits only where the gate passed).
     #[cube(launch_unchecked)]
     pub fn check_kernel(
         surv: &Array<u32>,
@@ -3276,28 +3285,25 @@ mod kernels {
         ran: &mut Array<Atomic<u32>>,
         surv_cap: u32,
         nice_cap: u32,
-        #[comptime] base: u32,
-        #[comptime] l: u32,
-        #[comptime] s2: u32,
-        #[comptime] s3: u32,
-        #[comptime] f0: u32,
-        #[comptime] k2: u32,
-        #[comptime] g: u32,
+        #[comptime] sh: CheckShape,
         #[comptime] mode: u32,
     ) {
-        let bb = comptime!(base * base);
-        let nl = comptime!(l.div_ceil(2));
-        let ql = comptime!(s2.div_ceil(2));
-        let cl = comptime!(s3.div_ceil(2));
-        let gl = comptime!((g / 2).min(s3.div_ceil(2) - 1));
-        let f0c = comptime!(f0.min(l));
-        let k2c = comptime!(k2.min(l));
-        let hdig = comptime!(l - k2.min(l));
-        let hwide = comptime!(u128::from(base).pow(l - k2.min(l)) > 1 << 31);
-        let hz = comptime!(u64::from(base).pow(k2 - f0).trailing_zeros());
-        let hinv = comptime!(inverse_mod_2_64(
-            u64::from(base).pow(k2 - f0) >> u64::from(base).pow(k2 - f0).trailing_zeros()
-        ));
+        let base = comptime!(sh.b);
+        let l = comptime!(sh.l);
+        let s2 = comptime!(sh.s2);
+        let s3 = comptime!(sh.s3);
+        let bb = comptime!(sh.b * sh.b);
+        let nl = comptime!(sh.nl());
+        let ql = comptime!(sh.ql());
+        let cl = comptime!(sh.cl());
+        let gl = comptime!(sh.gl());
+        // n's digit parts: r0's [0, f0c), w6's [f0c, k2c), H's [k2c, l).
+        let f0c = comptime!(sh.part(1).0);
+        let k2c = comptime!(sh.part(2).0);
+        let hdig = comptime!(sh.part(2).1);
+        let hwide = comptime!(sh.h_wide());
+        let hz = comptime!(sh.h_div().0);
+        let hinv = comptime!(sh.h_div().1);
         let mut count = surv_count[0].load();
         if count > surv_cap {
             count = surv_cap;
@@ -3418,7 +3424,7 @@ mod kernels {
                 }
                 let uniq =
                     u32::cast_from(mask).count_ones() + u32::cast_from(mask >> 32u64).count_ones();
-                if comptime!(mode == CHECK_COUNT) {
+                if comptime!(mode == CHECK_COUNT || mode == CHECK_GATED) {
                     let o = 4u32 * i;
                     nice_out[o as usize] = uniq;
                     let mut pv = 0u32;
@@ -4058,6 +4064,7 @@ impl<R: Runtime> JoinDevice<R> {
             );
         }
         self.launch_check(
+            CHECK_CUBES,
             &self.list,
             2 * self.list_cap as usize,
             &checked,
@@ -4087,10 +4094,11 @@ impl<R: Runtime> JoinDevice<R> {
     /// entries index the records `recs`; hits (or the mode's output) go to
     /// `out` (a handle and its words), counted in `out_count` up to
     /// `out_cap`, and the cubes and the work counter in `ran`
-    /// (`STAGES + 1` words).
+    /// (`STAGES + 1` words), on `cubes` cubes ([`CHECK_CUBES`] but in tests).
     #[allow(clippy::too_many_arguments)]
     fn launch_check(
         &self,
+        cubes: u32,
         list: &Handle,
         list_words: usize,
         count: &Handle,
@@ -4103,11 +4111,10 @@ impl<R: Runtime> JoinDevice<R> {
         out_cap: u32,
         mode: u32,
     ) {
-        let sh = &self.check;
         unsafe {
             check_kernel::launch_unchecked::<R>(
                 &self.client,
-                CubeCount::Static(CHECK_CUBES, 1, 1),
+                CubeCount::Static(cubes, 1, 1),
                 CubeDim::new_1d(JOIN_WG),
                 ArrayArg::from_raw_parts(list.clone(), list_words),
                 ArrayArg::from_raw_parts(count.clone(), 1),
@@ -4117,13 +4124,7 @@ impl<R: Runtime> JoinDevice<R> {
                 ArrayArg::from_raw_parts(ran.clone(), STAGES + 1),
                 cap,
                 out_cap,
-                sh.b,
-                sh.l,
-                sh.s2,
-                sh.s3,
-                sh.f0,
-                sh.k2,
-                sh.g,
+                self.check,
                 mode,
             );
         }
@@ -4194,10 +4195,10 @@ impl<R: Runtime> JoinDevice<R> {
         ))
     }
 
-    /// The prefilter's survivors of the most recent batch as n, sorted
-    /// (tests).
+    /// The prefilter's survivors of the most recent batch as n, in list
+    /// order (tests).
     #[cfg(test)]
-    fn read_checked(&self, rec: &BatchRec) -> Result<Vec<u128>> {
+    fn read_list(&self, rec: &BatchRec) -> Result<Vec<u128>> {
         let cnt = self.read_u32(&rec.checked)?[0];
         ensure!(
             cnt <= self.list_cap,
@@ -4206,13 +4207,19 @@ impl<R: Runtime> JoinDevice<R> {
         );
         let words = self.read_u32(&self.list)?;
         let tops = self.read_u32(&self.top_rec)?;
-        let mut v: Vec<u128> = (0..cnt as usize)
+        Ok((0..cnt as usize)
             .map(|i| {
                 let r8 = TOP_REC_WORDS as usize * words[2 * i] as usize;
                 let p = u128::from(tops[r8]) | (u128::from(tops[r8 + 1]) << 32);
                 p * u128::from(self.w_f0) + u128::from(words[2 * i + 1])
             })
-            .collect();
+            .collect())
+    }
+
+    /// [`Self::read_list`], sorted (tests).
+    #[cfg(test)]
+    fn read_checked(&self, rec: &BatchRec) -> Result<Vec<u128>> {
+        let mut v = self.read_list(rec)?;
         v.sort_unstable();
         Ok(v)
     }
@@ -5380,43 +5387,33 @@ mod tests {
         check_all(&client, &name);
     }
 
-    /// The list's survivors in list order, as n (`read_checked` unsorted).
-    fn read_list<R: Runtime>(dev: &JoinDevice<R>, rec: &BatchRec) -> Vec<u128> {
-        let cnt = dev.read_u32(&rec.checked).expect("checked")[0].min(dev.list_cap) as usize;
-        let words = dev.read_u32(&dev.list).expect("list");
-        let tops = dev.read_u32(&dev.top_rec).expect("records");
-        (0..cnt)
-            .map(|i| {
-                let r8 = TOP_REC_WORDS as usize * words[2 * i] as usize;
-                let p = u128::from(tops[r8]) | (u128::from(tops[r8 + 1]) << 32);
-                p * u128::from(dev.w_f0) + u128::from(words[2 * i + 1])
-            })
-            .collect()
-    }
-
-    /// [`check_kernel`] in `mode` over `list` (`n` entries) and the records
-    /// `recs`: the output words (four per entry in count mode, else four per
-    /// reported n) and the cubes it ran.
+    /// [`check_kernel`] in `mode` on `cubes` cubes over `list` (`n` entries)
+    /// and the records `recs`: the output words (four per entry in count and
+    /// gated mode, else four per reported n). Every cube must have run, and
+    /// the work counter must end where whole takes put it: each plane takes
+    /// once more after the list is exhausted, so it ends at `n` rounded up
+    /// to a whole take (less than 128 more) plus one take per plane,
+    /// `cubes · JOIN_WG` entries in all.
     #[allow(clippy::too_many_arguments)]
     fn run_check<R: Runtime>(
         dev: &JoinDevice<R>,
+        cubes: u32,
         list: &Handle,
         list_words: usize,
         recs: &Handle,
         rec_words: usize,
         n: usize,
         mode: u32,
-    ) -> (Vec<u32>, u32) {
+    ) -> Vec<u32> {
         let c = &dev.client;
         let words = 4 * n.max(1);
         let out = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; words]));
         let oc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
-        let cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![
-            u32::try_from(n).expect("a list fits u32"),
-        ]));
-        let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; STAGES + 1]));
         let cap = u32::try_from(n).expect("a list fits u32");
+        let cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![cap]));
+        let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; STAGES + 1]));
         dev.launch_check(
+            cubes,
             list,
             list_words,
             &cnt,
@@ -5430,34 +5427,44 @@ mod tests {
             mode,
         );
         let ran = dev.read_u32(&ran).expect("ran");
+        assert_eq!(ran[3], cubes, "check cubes run");
+        let past = ran[STAGES]
+            .checked_sub(cubes * JOIN_WG)
+            .expect("one take per plane past the list");
         assert!(
-            ran[STAGES] >= cap,
-            "the work counter ({}) stopped short of the list ({n})",
+            past >= cap && past - cap < 128,
+            "work counter {} on {cubes} cubes for a list of {n}",
             ran[STAGES]
         );
         let out = dev.read_u32(&out).expect("out");
-        let got = if mode == CHECK_COUNT {
+        let got = if mode == CHECK_COUNT || mode == CHECK_GATED {
             n
         } else {
             dev.read_u32(&oc).expect("count")[0] as usize
         };
-        (out[..4 * got].to_vec(), ran[3])
+        out[..4 * got].to_vec()
     }
 
-    /// Count mode against the CPU entry by entry: the distinct digits of n²
-    /// and n³ (`get_num_unique_digits`), the gate's predicate (n²'s digits
-    /// and n³'s low `2·gl` distinct) and the digit mask. Returns the entries
-    /// that passed the gate.
-    fn assert_counts(sh: &CheckShape, ns: &[u128], got: &[u32], what: &str) -> usize {
+    /// Count mode (`gated` false) or gated mode against the CPU, entry by
+    /// entry: the distinct digits of n² and n³ (`get_num_unique_digits`),
+    /// the gate's predicate (n²'s digits and n³'s low `2·gl` distinct) and
+    /// the digit mask. In gated mode an entry that fails the gate has only
+    /// the gate's digits in its mask. Returns the entries that passed.
+    fn assert_counts(sh: &CheckShape, ns: &[u128], got: &[u32], gated: bool, what: &str) -> usize {
         let mut passed = 0;
         for (i, &n) in ns.iter().enumerate() {
-            let (uniq, gate, mask) = crate::join_check::tests::reference(sh, n);
+            let (uniq, gate, mask, gate_mask) = crate::join_check::tests::reference(sh, n);
+            let want = if gated && !gate {
+                (gate_mask.count_ones(), 0, gate_mask)
+            } else {
+                (uniq, u32::from(gate), mask)
+            };
             let w = &got[4 * i..4 * i + 4];
             let gm = u64::from(w[2]) | (u64::from(w[3]) << 32);
             assert_eq!(
                 (w[0], w[1], gm),
-                (uniq, u32::from(gate), mask),
-                "{what}: entry {i}, n = {n} ({sh:?})"
+                want,
+                "{what}: entry {i}, n = {n} ({sh:?}, gated {gated})"
             );
             passed += usize::from(gate);
         }
@@ -5480,8 +5487,8 @@ mod tests {
         assert_eq!(v, want, "{what}: probe");
     }
 
-    /// Adversarial and random n of `sh`'s shape (digit counts of n, n² and
-    /// n³) whose prefix `n / b^f0` fits u64, as the top records hold it.
+    /// Adversarial, edge and random n of `sh`'s shape (digit counts of n, n²
+    /// and n³) whose prefix `n / b^f0` fits u64, as the top records hold it.
     #[allow(clippy::many_single_char_names)] // b, l, a, z, m as in the kernel and the bisection
     fn synthetic(sh: &CheckShape, seed: u64) -> Vec<u128> {
         use malachite::base::num::arithmetic::traits::Pow;
@@ -5511,6 +5518,30 @@ mod tests {
             .min(root_above(sh.s2, 2))
             .min(root_above(sh.s3, 3));
         let mut ns = crate::join_check::tests::adversarial(b, l);
+        // The band's ends, and the last n whose square or cube stays below a
+        // power of b (their top digits run to b − 1: the longest carries).
+        let (r2, r3) = (root_above(sh.s2, 2), root_above(sh.s3, 3));
+        ns.extend([lo, lo + 1, hi - 1, hi - 2, r2 - 1, r3 - 1]);
+        // The ends with their low i digits all b − 1 or all 0.
+        for i in 1..l {
+            let p = bb.pow(i);
+            for e in [lo, hi - 1] {
+                ns.extend([e / p * p, e / p * p + p - 1, e / p * p + p]);
+            }
+        }
+        // The ends' top digits over a low half of all b − 1, all 0, or 0 and
+        // b − 1 alternating (either way round).
+        let h = l / 2;
+        let alt = |first: u32| -> u128 {
+            (0..h).fold(0u128, |a, j| {
+                a + bb.pow(j) * u128::from(if (j + first).is_multiple_of(2) { b - 1 } else { 0 })
+            })
+        };
+        let p = bb.pow(h);
+        for e in [lo, hi - 1] {
+            let top = e / p * p;
+            ns.extend([top, top + p - 1, top + alt(0), top + alt(1)]);
+        }
         let mut r = seed | 1;
         let mut next = || {
             r ^= r << 13;
@@ -5528,7 +5559,8 @@ mod tests {
                 u32::try_from(x.to_digits_asc(&b).len()).expect("digits")
             };
             let nat = malachite::natural::Natural::from(n);
-            n / bb.pow(sh.f0) < 1 << 64
+            (lo..hi).contains(&n)
+                && n / bb.pow(sh.f0) < 1 << 64
                 && nd(&nat * &nat) == sh.s2
                 && nd(&nat * &nat * &nat) == sh.s3
         };
@@ -5538,14 +5570,18 @@ mod tests {
         ns
     }
 
-    /// The check kernel against the CPU, entry by entry (count mode: every
-    /// lane through all of n³, no gate) and n by n (probe mode: n rebuilt
-    /// from its limbs), on the real survivor lists of every window, of the
-    /// production fields at 1e14 and of the b57 frontier field, and on a
-    /// synthetic list of adversarial and random n of each field's shape.
-    /// The other tests compare hit lists, which are empty everywhere but at
-    /// base 10, so a check that rejected too much would pass them; this one
-    /// compares what the check computes for every survivor.
+    /// The check kernel against the CPU, entry by entry, on the real
+    /// survivor lists of b10's window, every window and the production
+    /// fields at 1e14 (with the b57 frontier field's partitions 0, 1000 and
+    /// 3248), and on a synthetic list of adversarial, edge and random n of
+    /// each distinct shape. Count mode (the gate bypassed: every lane builds
+    /// all of n³) compares every entry's distinct digits, gate and digit
+    /// mask; gated mode, on a grid of a few cubes so every plane takes work
+    /// many times, the same with the gate applied as the hits mode applies
+    /// it; probe mode every n rebuilt from its limbs. The other tests compare
+    /// hit lists, which are empty everywhere but at base 10, so a check that
+    /// rejected too much would pass them; this one compares what the check
+    /// computes for every survivor.
     // The field list (base, range, parameters, partitions), then each field's
     // real and synthetic lists in turn.
     #[allow(clippy::type_complexity, clippy::too_many_lines)]
@@ -5555,9 +5591,7 @@ mod tests {
         for &(b, s, e, t, k, p) in WINDOWS {
             fields.push((b, s, e, JoinParams { t, k, p }, None));
         }
-        let mut prod = PLAN_FIELDS.to_vec();
-        prod.push((57, FRONTIER_57, 100_000_000_000_000));
-        for (b, s, size) in prod {
+        for &(b, s, size) in PLAN_FIELDS {
             let range = FieldSize::new(s, s + size);
             let jp = crate::overlap_join::join_params_for(b, &range).expect("a join field");
             let parts = if b == 57 && s == FRONTIER_57 {
@@ -5567,8 +5601,10 @@ mod tests {
             };
             fields.push((b, s, s + size, jp, Some(parts)));
         }
-        let (mut entries, mut passed, mut synth) = (0usize, 0usize, 0usize);
+        let mut shapes = std::collections::HashSet::new();
+        let (mut entries, mut passed, mut synth, mut lists) = (0usize, 0usize, 0usize, 0usize);
         for (b, s, e, jp, parts) in fields {
+            let production = parts.is_some();
             let fs = FieldSetup::new(b, s, e, jp).expect("field setup");
             let parts = parts.unwrap_or_else(|| {
                 let live = live_partitions(&fs);
@@ -5583,32 +5619,31 @@ mod tests {
             let sh = dev.check;
             let rec_len = TOP_REC_WORDS as usize * dev.max_slots * dev.ntlay as usize;
             let what = format!("b{b} [{s}, {e}) {jp:?}");
+            let mut field_entries = 0;
             for batch in parts.chunks(dev.max_slots) {
                 let rec = dev.launch_batch(batch, false).expect("launch");
-                let ns = read_list(&dev, &rec);
+                // A batch the device did not run in full must not pass as
+                // an empty list.
+                dev.ensure_ran(&dev.read_u32(&rec.ran).expect("ran"), &rec.expect)
+                    .expect("every kernel of the batch ran");
+                let ns = dev.read_list(&rec).expect("the batch's list");
                 let lw = 2 * dev.list_cap as usize;
-                let (got, cubes) = run_check(
-                    &dev,
-                    &dev.list,
-                    lw,
-                    &dev.top_rec,
-                    rec_len,
-                    ns.len(),
-                    CHECK_COUNT,
-                );
-                assert_eq!(cubes, CHECK_CUBES, "{what}: check cubes");
-                passed += assert_counts(&sh, &ns, &got, &what);
-                let (got, _) = run_check(
-                    &dev,
-                    &dev.list,
-                    lw,
-                    &dev.top_rec,
-                    rec_len,
-                    ns.len(),
-                    CHECK_PROBE,
-                );
-                assert_probe(ns.clone(), &got, &what);
-                entries += ns.len();
+                let run = |cubes: u32, mode: u32| {
+                    run_check(&dev, cubes, &dev.list, lw, &dev.top_rec, rec_len, ns.len(), mode)
+                };
+                passed += assert_counts(&sh, &ns, &run(CHECK_CUBES, CHECK_COUNT), false, &what);
+                assert_counts(&sh, &ns, &run(3, CHECK_GATED), true, &what);
+                assert_probe(ns.clone(), &run(CHECK_CUBES, CHECK_PROBE), &what);
+                field_entries += ns.len();
+                lists += 1;
+            }
+            assert!(
+                !production || field_entries > 0,
+                "{what}: no survivors on the production field's partitions"
+            );
+            entries += field_entries;
+            if !shapes.insert(sh) {
+                continue; // this shape's synthetic list ran already
             }
             // A synthetic list: record i holds n_i's prefix and residue.
             let ns = synthetic(&sh, (u64::from(b) << 32) | u64::from(sh.f0 * 16 + sh.k2));
@@ -5627,26 +5662,13 @@ mod tests {
                 client.create(cubecl::bytes::Bytes::from_elems(list.clone())),
                 client.create(cubecl::bytes::Bytes::from_elems(recs.clone())),
             );
-            let (got, _) = run_check(
-                &dev,
-                &lh,
-                list.len(),
-                &rh,
-                recs.len(),
-                ns.len(),
-                CHECK_COUNT,
-            );
-            passed += assert_counts(&sh, &ns, &got, &format!("{what} synthetic"));
-            let (got, _) = run_check(
-                &dev,
-                &lh,
-                list.len(),
-                &rh,
-                recs.len(),
-                ns.len(),
-                CHECK_PROBE,
-            );
-            assert_probe(ns.clone(), &got, &format!("{what} synthetic"));
+            let run = |cubes: u32, mode: u32| {
+                run_check(&dev, cubes, &lh, list.len(), &rh, recs.len(), ns.len(), mode)
+            };
+            let syn = format!("{what} synthetic");
+            passed += assert_counts(&sh, &ns, &run(CHECK_CUBES, CHECK_COUNT), false, &syn);
+            assert_counts(&sh, &ns, &run(1, CHECK_GATED), true, &syn);
+            assert_probe(ns.clone(), &run(CHECK_CUBES, CHECK_PROBE), &syn);
             synth += ns.len();
             println!(
                 "{name}: b{b} {sh:?} counts agree ({} synthetic n, H {})",
@@ -5659,8 +5681,9 @@ mod tests {
             "{entries} / {synth} / {passed}"
         );
         println!(
-            "{name}: check counts agree on {entries} list entries and {synth} synthetic n \
-             ({passed} past the gate)"
+            "{name}: check counts agree on {lists} lists, {entries} list entries and {synth} \
+             synthetic n over {} shapes ({passed} past the gate)",
+            shapes.len()
         );
     }
 

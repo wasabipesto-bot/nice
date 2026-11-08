@@ -1,5 +1,5 @@
-//! The overlap join's full check (`cubecl_join::check_kernel`): its shape,
-//! its constants, and a host mirror of its arithmetic.
+//! The overlap join's full check (`cubecl_join::check_kernel`): its shape
+//! and its constants, and (in the tests) a host mirror of its arithmetic.
 //!
 //! A survivor of the join is `n = P·b^f0 + r0`, with `P` from its top's
 //! record, whose word 6 is `w6 = P mod b^(k2 − f0)`. The check writes `n` in
@@ -25,7 +25,7 @@ pub const GATE_DIGITS: u32 = 10;
 /// `m = ⌈2^(32+s) / d⌉ < 2^32` (as `2^s < d`). With `e = m·d − 2^(32+s)`,
 /// `0 < e < d < 2^(s+1)`, and `x·m / 2^(32+s) = x/d + x·e / (d·2^(32+s))`,
 /// whose second term is below `1/d` when `x·e < 2^(32+s)`, which holds for
-/// `x < 2^31`: the quotient is exact ([`magic_bound`] is where that
+/// `x < 2^31`: the quotient is exact (the tests' `magic_bound` is where that
 /// sufficient condition ends, at or above 2^31 for every divisor).
 ///
 /// # Panics
@@ -47,9 +47,10 @@ pub const fn magic(d: u32) -> (u32, u32) {
 
 /// The first `x` the sufficient condition `x·e < 2^(32+s)` of [`magic`]
 /// fails at for divisor `d` (at least 2^31).
+#[cfg(test)]
 #[must_use]
 #[allow(clippy::cast_lossless)] // `u64::from` is not const
-pub const fn magic_bound(d: u32) -> u64 {
+pub(crate) const fn magic_bound(d: u32) -> u64 {
     let (m, s) = magic(d);
     let e = m as u64 * d as u64 - (1u64 << (32 + s));
     (1u64 << (32 + s)).div_ceil(e)
@@ -57,8 +58,9 @@ pub const fn magic_bound(d: u32) -> u64 {
 
 /// `⌊x / d⌋` as the kernel computes it: [`magic`], or a shift for a power
 /// of two.
+#[cfg(test)]
 #[must_use]
-pub fn qdiv(x: u32, d: u32) -> u32 {
+pub(crate) fn qdiv(x: u32, d: u32) -> u32 {
     if d.is_power_of_two() {
         return x >> d.trailing_zeros();
     }
@@ -189,31 +191,35 @@ impl CheckShape {
 }
 
 /// What the kernel computes for one survivor (the mirror's output).
+#[cfg(test)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Mirror {
+pub(crate) struct Mirror {
     /// `n`, `n²` and `n³` in base-b² limbs, least significant first.
-    pub nn: Vec<u32>,
-    pub sq: Vec<u32>,
-    pub cu: Vec<u32>,
+    pub(crate) nn: Vec<u32>,
+    pub(crate) sq: Vec<u32>,
+    pub(crate) cu: Vec<u32>,
     /// Digits of `n²`, those the gate sees (`n²` and `n³`'s low `2·gl`
     /// digits), and all of `n²` and `n³`'s, as bits.
-    pub sq_mask: u64,
-    pub gate_mask: u64,
-    pub mask: u64,
+    pub(crate) sq_mask: u64,
+    pub(crate) gate_mask: u64,
+    pub(crate) mask: u64,
 }
 
+#[cfg(test)]
 impl Mirror {
     /// Whether the survivor passes the gate.
     #[must_use]
-    pub fn gate(&self, sh: &CheckShape) -> bool {
+    pub(crate) fn gate(&self, sh: &CheckShape) -> bool {
         self.gate_mask.count_ones() == sh.s2 + 2 * sh.gl()
     }
 }
 
+#[cfg(test)]
 fn add(x: u32, y: u32) -> u32 {
     x.checked_add(y).expect("a column below 2^31")
 }
 
+#[cfg(test)]
 fn mul(x: u32, y: u32) -> u32 {
     x.checked_mul(y).expect("a product below 2^31")
 }
@@ -225,6 +231,7 @@ fn mul(x: u32, y: u32) -> u32 {
 /// # Panics
 /// On an overflow, or a part that does not fit its digits: a shape or a
 /// survivor outside the kernel's bounds.
+#[cfg(test)]
 #[must_use]
 // The kernel's names: b, bb, nl, ql, cl, gl, x, q, v; its steps in order.
 #[allow(
@@ -232,7 +239,7 @@ fn mul(x: u32, y: u32) -> u32 {
     clippy::similar_names,
     clippy::too_many_lines
 )]
-pub fn mirror(sh: &CheckShape, p: u64, w6: u32, r0: u32) -> Mirror {
+pub(crate) fn mirror(sh: &CheckShape, p: u64, w6: u32, r0: u32) -> Mirror {
     let (b, bb) = (sh.b, sh.b * sh.b);
     let (nl, ql, cl, gl) = (
         sh.nl() as usize,
@@ -379,10 +386,11 @@ pub fn mirror(sh: &CheckShape, p: u64, w6: u32, r0: u32) -> Mirror {
 
 /// `(⌊v / d⌋, v mod d)` for a u64 `v` and `d <= 4096`, as the kernel takes a
 /// wide `H` apart: long division over 16-bit chunks, each dividend below
-/// `d·2^16 <= 2^28`, by [`qdiv`].
+/// `d·2^16 <= 2^28`, by `qdiv`.
+#[cfg(test)]
 #[must_use]
 #[allow(clippy::many_single_char_names)] // the kernel's names
-pub fn wide_div(v: u64, d: u32) -> (u64, u32) {
+pub(crate) fn wide_div(v: u64, d: u32) -> (u64, u32) {
     let mut rem = 0u32;
     let mut q = 0u64;
     for i in (0..4).rev() {
@@ -576,9 +584,10 @@ pub(crate) mod tests {
     /// What the check decides about `n` in shape `sh`, from `Natural`
     /// digits: the distinct digits of n² and n³ (as
     /// `get_num_unique_digits`), whether the gate passes (n²'s digits and
-    /// n³'s low `2·gl` distinct), and the digit mask.
+    /// n³'s low `2·gl` distinct), the digit mask, and the gate's digits as
+    /// a mask (n²'s and n³'s low `2·gl`).
     #[cfg_attr(not(feature = "cubecl"), allow(dead_code))] // the device tests' reference
-    pub(crate) fn reference(sh: &CheckShape, n: u128) -> (u32, bool, u64) {
+    pub(crate) fn reference(sh: &CheckShape, n: u128) -> (u32, bool, u64, u64) {
         let b = sh.b;
         let nat = Natural::from(n);
         let (d2, d3) = (digits(&(&nat * &nat), b), digits(&(&nat * &nat * &nat), b));
@@ -595,8 +604,9 @@ pub(crate) mod tests {
         }
         let mut seen = d2.clone();
         seen.extend_from_slice(&d3[..2 * sh.gl() as usize]);
+        let gate_mask = seen.iter().fold(0u64, |a, &x| a | 1u64 << x);
         seen.sort_unstable();
-        (uniq, seen.windows(2).all(|w| w[0] != w[1]), mask)
+        (uniq, seen.windows(2).all(|w| w[0] != w[1]), mask, gate_mask)
     }
 
     /// The mirror against `Natural` digits for `n` in shape `sh`: every limb
@@ -717,11 +727,12 @@ pub(crate) mod tests {
         assert!(runs > 20_000, "{runs} shapes tried");
     }
 
-    /// The gate against the full check on `n` whose square has distinct
-    /// digits (where it decides something): small bases, where those are
-    /// common, every shape; and the known nice number.
+    /// The gate against its definition (n²'s digits and n³'s low `2·gl`
+    /// distinct) on `n` whose square has distinct digits, where it decides
+    /// something: small bases, where those are common, every shape. And the
+    /// known nice number passes it (no other nice number is in range).
     #[test]
-    fn gate_is_a_necessary_condition_of_the_full_check() {
+    fn gate_matches_its_definition() {
         let sh = CheckShape::new(10, 2, 4, 6, 0, 3, GATE_DIGITS).unwrap();
         let m = mirror(&sh, 69, 69, 0);
         assert!(m.gate(&sh) && m.mask.count_ones() == 10, "69 in base 10");
