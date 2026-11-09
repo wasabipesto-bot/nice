@@ -93,14 +93,17 @@ pub const TRANSPOSE_MIN: u32 = 192;
 /// than a partial batch needs and more registers; 1 re-walks the digits per
 /// chunk).
 const AND_GROUP: u32 = 4;
-/// Words of the transposed table `t_tr` (L54: a power of two, so an index
-/// masked to it is provably in range).
+/// Words of [`join_kernel`]'s transposed masks, `t_tr`: 64 digits for each
+/// chunk of 32 tops.
 const TR_WORDS: u32 = TOP_CAP / 32 * 64;
-const _: () = assert!(TR_WORDS.is_power_of_two() && AND_GROUP == 4);
 // The transposed copy maps thread u to chunk u / 32 of the batch, and the
-// groups tile the batch's chunks.
+// groups tile the batch's chunks. The AND masks its `t_tr` index to the
+// table, so the table's size is a power of two.
 const _: () = assert!(
-    JOIN_WG == TOP_CAP && TOP_CAP.is_multiple_of(32 * AND_GROUP) && TRANSPOSE_MIN <= TOP_CAP
+    JOIN_WG == TOP_CAP
+        && TOP_CAP.is_multiple_of(32 * AND_GROUP)
+        && TRANSPOSE_MIN <= TOP_CAP
+        && TR_WORDS.is_power_of_two()
 );
 /// Prefilter survivors staged in shared memory before a flush to the global
 /// list.
@@ -499,7 +502,6 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
-        #[comptime] and_form: u32,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -552,28 +554,7 @@ mod kernels {
         // The batch's masks digit-major: bit i of `t_tr[c·64 + d]` is set iff
         // top 32c + i has the digit at mask bit d (digit d, or digit 63 - d
         // where `lean` holds the masks bit-reversed, see the doc above).
-        let mut t_tr = SharedMemory::<u32>::new(comptime!((TOP_CAP / 32 * 64) as usize));
-        // L54 form 3: chunk 4g + k of the batch at t4k[g·64 + d].
-        let mut t4a = SharedMemory::<u32>::new(comptime!(if and_form == 3 {
-            (TOP_CAP / 32 / AND_GROUP * 64) as usize
-        } else {
-            1
-        }));
-        let mut t4b = SharedMemory::<u32>::new(comptime!(if and_form == 3 {
-            (TOP_CAP / 32 / AND_GROUP * 64) as usize
-        } else {
-            1
-        }));
-        let mut t4c = SharedMemory::<u32>::new(comptime!(if and_form == 3 {
-            (TOP_CAP / 32 / AND_GROUP * 64) as usize
-        } else {
-            1
-        }));
-        let mut t4d = SharedMemory::<u32>::new(comptime!(if and_form == 3 {
-            (TOP_CAP / 32 / AND_GROUP * 64) as usize
-        } else {
-            1
-        }));
+        let mut t_tr = SharedMemory::<u32>::new(comptime!(TR_WORDS as usize));
         let mut s_t = SharedMemory::<u32>::new(comptime!(SURV_SH_CAP as usize));
         let mut s_r = SharedMemory::<u32>::new(comptime!(SURV_SH_CAP as usize));
         let mut s_cnt = SharedMemory::<Atomic<u32>>::new(1usize);
@@ -724,26 +705,8 @@ mod kernels {
                             w1 &= vm;
                         }
                     }
-                    if comptime!(and_form == 3) {
-                        let k4 = cc % 4u32;
-                        let r4 = (cc / 4u32) * 64u32 + dl;
-                        if k4 == 0u32 {
-                            t4a[r4 as usize] = w0;
-                            t4a[(r4 + 32u32) as usize] = w1;
-                        } else if k4 == 1u32 {
-                            t4b[r4 as usize] = w0;
-                            t4b[(r4 + 32u32) as usize] = w1;
-                        } else if k4 == 2u32 {
-                            t4c[r4 as usize] = w0;
-                            t4c[(r4 + 32u32) as usize] = w1;
-                        } else {
-                            t4d[r4 as usize] = w0;
-                            t4d[(r4 + 32u32) as usize] = w1;
-                        }
-                    } else {
-                        t_tr[(cc * 64u32 + dl) as usize] = w0;
-                        t_tr[(cc * 64u32 + 32u32 + dl) as usize] = w1;
-                    }
+                    t_tr[(cc * 64u32 + dl) as usize] = w0;
+                    t_tr[(cc * 64u32 + 32u32 + dl) as usize] = w1;
                 }
                 sync_cube();
 
@@ -880,73 +843,44 @@ mod kernels {
                                 for i in 0..comptime!(ag * ept) {
                                     acc[i as usize] = 0u32;
                                 }
-                                let ab = if comptime!(and_form == 3) {
-                                    cb * 16u32
-                                } else {
-                                    cb * 64u32
-                                };
+                                let ab = cb * 64u32;
                                 #[unroll]
                                 for j in 0..ept {
-                                    // The entry's digits, low word first; an
-                                    // empty slot (vv = 0) has none.
+                                    // The entry's digits: the low word's set
+                                    // bits, then the high word's (x takes y
+                                    // once it is empty, and the rows move to
+                                    // the upper 32); an empty slot (vv = 0)
+                                    // has none. One word to walk at a time
+                                    // keeps the per-digit choice of word out
+                                    // of the loop.
                                     let mut x = mlo[j as usize] & vv[j as usize];
                                     let mut y = mhi[j as usize] & vv[j as usize];
-                                    if comptime!(and_form < 2) {
-                                        while (x | y) != 0u32 {
-                                            let lo = x != 0u32;
-                                            let v = select(lo, x, y);
-                                            // v != 0: its lowest set bit.
-                                            let d = (v.find_first_set() - 1u32)
-                                                + select(lo, 0u32, 32u32);
-                                            let v1 = v & (v - 1u32);
-                                            x = select(lo, v1, x);
-                                            y = select(lo, y, v1);
-                                            let a = if comptime!(and_form == 1) {
-                                                (ab + d) & comptime!(TR_WORDS - 1)
-                                            } else {
-                                                ab + d
-                                            };
-                                            #[unroll]
-                                            for c in 0..ag {
-                                                acc[comptime!(c * ept + j) as usize] |=
-                                                    t_tr[(a + comptime!(c * 64)) as usize];
-                                            }
-                                        }
-                                    } else {
-                                        // Walk x's bits, then y's: once x is
-                                        // empty it takes y (and y 0), and the
-                                        // row base moves to the high half.
-                                        let ab_hi = ab + 32u32;
-                                        let e0 = x == 0u32;
-                                        x = select(e0, y, x);
-                                        y = select(e0, 0u32, y);
-                                        let mut sb = select(e0, ab_hi, ab);
-                                        while x != 0u32 {
-                                            let bit = x.find_first_set() - 1u32;
-                                            let x1 = x & (x - 1u32);
-                                            let e = x1 == 0u32;
-                                            let a = if comptime!(and_form == 2) {
-                                                (sb + bit) & comptime!(TR_WORDS - 1)
-                                            } else {
-                                                sb + bit
-                                            };
-                                            x = select(e, y, x1);
-                                            y = select(e, 0u32, y);
-                                            sb = select(e, ab_hi, sb);
-                                            if comptime!(and_form == 2) {
-                                                #[unroll]
-                                                for c in 0..ag {
-                                                    acc[comptime!(c * ept + j) as usize] |=
-                                                        t_tr[(a + comptime!(c * 64)) as usize];
-                                                }
-                                            } else {
-                                                acc[j as usize] |= t4a[a as usize];
-                                                acc[comptime!(ept + j) as usize] |= t4b[a as usize];
-                                                acc[comptime!(2 * ept + j) as usize] |=
-                                                    t4c[a as usize];
-                                                acc[comptime!(3 * ept + j) as usize] |=
-                                                    t4d[a as usize];
-                                            }
+                                    let ab_hi = ab + 32u32;
+                                    let e0 = x == 0u32;
+                                    x = select(e0, y, x);
+                                    y = select(e0, 0u32, y);
+                                    let mut row = select(e0, ab_hi, ab);
+                                    while x != 0u32 {
+                                        // x != 0: its lowest set bit.
+                                        let d = x.find_first_set() - 1u32;
+                                        let x1 = x & (x - 1u32);
+                                        let e = x1 == 0u32;
+                                        // Masking the index to the table
+                                        // changes nothing (row + d + 64c is
+                                        // below TR_WORDS), but it lets the
+                                        // compiler prove that adding 64c
+                                        // cannot wrap: the group's four loads
+                                        // then share one address and take
+                                        // 64c as their offset, instead of
+                                        // each forming its own.
+                                        let a = (row + d) & comptime!(TR_WORDS - 1);
+                                        x = select(e, y, x1);
+                                        y = select(e, 0u32, y);
+                                        row = select(e, ab_hi, row);
+                                        #[unroll]
+                                        for c in 0..ag {
+                                            acc[comptime!(c * ept + j) as usize] |=
+                                                t_tr[(a + comptime!(c * 64)) as usize];
                                         }
                                     }
                                 }
@@ -3299,8 +3233,6 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
-    /// L54: the transposed AND's digit-loop form (`NICE_EXP_AND_FORM`).
-    and_form: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -3546,10 +3478,6 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
-            and_form: std::env::var("NICE_EXP_AND_FORM")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0),
             limbs,
             chunk_digits,
             chunk_div,
@@ -3870,7 +3798,6 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k,
                 self.k2,
                 self.walk_sync,
-                self.and_form,
             );
         }
         unsafe {
