@@ -1,0 +1,76 @@
+### 06:58:49 perf record base b60e16 [60 1157209632114824200908 1e16 1 2] load 1.41 2.49 2.19
+b60 [1157209632114824200908, +1e16) JoinParams { t: 9, k: 6, p: 2 }: 1 slices, slice 0; setup 2.829s; 3600 partitions, running 2 on 1 thread(s)
+wall 5.254s; 2626.986 ms/partition/thread; survivors 67581214 checked 4283749 hits 0
+totals: cycles 8.9096e+09 instructions 2.2983e+10 IPC 2.58 branch-misses 3.7884e+07 (1.65 per 1k instr)
+  %cyc   %ins   %brm   IPC brm/ki  symbol
+ 61.27  62.46  61.03  2.63   1.61  _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin3run
+ 18.65  17.88  19.45  2.47   1.79  _RNvNtCsfS6klqF1jUl_11nice_common8cpu_join10pass1_avx2
+ 14.76  14.34  15.86  2.51   1.82  _RNvNtCsfS6klqF1jUl_11nice_common14client_process26get_is_nice_with_known_lsd
+  1.72   1.76   0.00  2.64   0.00  _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort8unstable9quicksort9quicksortNtNtCsfS6klqF1jUl_11nice_com
+  0.86   1.11   0.83  3.33   1.23  _RNvMs_NtCsfS6klqF1jUl_11nice_common10cpu_top_fdNtB4_10TopFdSetup9to_digits
+  0.67   0.65   0.74  2.50   1.88  _RNvNtCsfS6klqF1jUl_11nice_common10cpu_top_fd3sum
+  0.51   0.40   0.39  2.02   1.61  _RNvMs3_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_5Div649divrem_w4
+  0.40   0.61   0.47  3.93   1.27  0x000000000016212e
+  0.17   0.09   0.07  1.37   1.28  _RNvNtCsfS6klqF1jUl_11nice_common10cpu_top_fd10shl_digits
+  0.13   0.08   0.14  1.59   2.88  __umodti3
+  0.10   0.06   0.08  1.55   2.20  0x00000000001621f8
+  0.10   0.09   0.08  2.32   1.47  0x0000000000162138
+  0.06   0.07   0.00  3.01   0.00  _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort6shared5pivot11median3_recNtNtCsfS6klqF1jUl_11nice_common
+  0.06   0.00   0.09  0.00   0.00  0x0000000000162132
+### 06:58:57 perf record pr b60e16 [60 1157209632114824200908 1e16 1 2] load 1.35 2.44 2.17
+b60 [1157209632114824200908, +1e16) JoinParams { t: 9, k: 6, p: 2 }: 1 slices, slice 0; setup 2.851s; 3600 partitions, running 2 on 1 thread(s)
+wall 4.830s; 2414.805 ms/partition/thread; survivors 67581214 checked 4283749 hits 0
+totals: cycles 7.9367e+09 instructions 2.3312e+10 IPC 2.94 branch-misses 3.4053e+07 (1.46 per 1k instr)
+  %cyc   %ins   %brm   IPC brm/ki  symbol
+ 67.11  67.37  64.81  2.95   1.41  _RNvMs3_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin3run
+ 21.53  20.80  24.73  2.84   1.74  _RNvNtCsfS6klqF1jUl_11nice_common8cpu_join10pass1_avx2
+  4.88   5.69   6.53  3.42   1.68  _RNvMs3_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin10full_check
+  1.83   1.85   0.16  2.97   0.13  _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort8unstable9quicksort9quicksortNtNtCsfS6klqF1jUl_11nice_com
+  1.21   1.02   0.74  2.48   1.06  _RNvMs_NtCsfS6klqF1jUl_11nice_common10cpu_top_fdNtB4_10TopFdSetup9to_digits
+  1.11   1.09   0.79  2.88   1.06  _RNvNtCsfS6klqF1jUl_11nice_common10cpu_top_fd3sum
+  0.61   0.56   0.52  2.70   1.36  _RNvMs3_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_5Div649divrem_w4
+  0.49   0.61   0.63  3.66   1.51  0x000000000016212e
+  0.15   0.21   0.09  4.11   0.63  0x00000000001621f8
+  0.10   0.14   0.15  4.11   1.57  _RNvNtCsfS6klqF1jUl_11nice_common10cpu_top_fd10shl_digits
+  0.10   0.18   0.09  5.29   0.73  __umodti3
+  0.08   0.10   0.09  3.67   1.31  0x0000000000162138
+  0.08   0.14   0.00  5.14   0.00  __udivti3
+  0.05   0.00   0.00  0.00   0.00  0x0000000000162124
+### 06:59:05 perf record base b62e17s0 [62 4473066762334864396992 1e17 1 2 0] load 1.30 2.39 2.16
+b62 [4473066762334864396992, +1e17) JoinParams { t: 10, k: 6, p: 2 }: 7 slices, slice 0; setup 2.761s; 3844 partitions, running 2 on 1 thread(s)
+wall 4.947s; 2473.411 ms/partition/thread; survivors 68691583 checked 4089399 hits 0
+totals: cycles 8.2237e+09 instructions 2.1245e+10 IPC 2.58 branch-misses 3.1432e+07 (1.48 per 1k instr)
+  %cyc   %ins   %brm   IPC brm/ki  symbol
+ 60.96  60.96  60.75  2.58   1.47  _RNvMs2_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin3run
+ 16.08  14.90  17.11  2.39   1.70  _RNvNtCsfS6klqF1jUl_11nice_common14client_process26get_is_nice_with_known_lsd
+ 14.29  14.53  15.33  2.63   1.56  _RNvNtCsfS6klqF1jUl_11nice_common8cpu_join10pass1_avx2
+  2.13   2.39   2.07  2.90   1.28  _RNvMs_NtCsfS6klqF1jUl_11nice_common10cpu_top_fdNtB4_10TopFdSetup9to_digits
+  1.54   1.72   1.57  2.89   1.35  _RNvNtCsfS6klqF1jUl_11nice_common10cpu_top_fd3sum
+  1.54   1.52   0.10  2.55   0.10  _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort8unstable9quicksort9quicksortNtNtCsfS6klqF1jUl_11nice_com
+  0.93   0.89   0.64  2.47   1.06  _RNvMs3_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_5Div649divrem_w4
+  0.71   1.11   0.72  4.04   0.96  0x000000000016212e
+  0.33   0.33   0.21  2.58   0.94  __umodti3
+  0.27   0.23   0.24  2.20   1.54  _RNvNtCsfS6klqF1jUl_11nice_common10cpu_top_fd10shl_digits
+  0.15   0.35   0.06  6.03   0.25  0x00000000001621f8
+  0.14   0.16   0.16  2.95   1.48  0x0000000000162138
+  0.13   0.09   0.07  1.79   1.15  0x0000000000162132
+  0.11   0.14   0.00  3.29   0.00  0x0000000000162120
+### 06:59:14 perf record pr b62e17s0 [62 4473066762334864396992 1e17 1 2 0] load 1.27 2.37 2.15
+b62 [4473066762334864396992, +1e17) JoinParams { t: 10, k: 6, p: 2 }: 7 slices, slice 0; setup 2.723s; 3844 partitions, running 2 on 1 thread(s)
+wall 4.286s; 2143.120 ms/partition/thread; survivors 68691583 checked 4089399 hits 0
+totals: cycles 6.8254e+09 instructions 2.0487e+10 IPC 3.00 branch-misses 2.6458e+07 (1.29 per 1k instr)
+  %cyc   %ins   %brm   IPC brm/ki  symbol
+ 67.29  67.45  66.87  3.01   1.28  _RNvMs3_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin3run
+ 17.62  16.91  20.23  2.88   1.55  _RNvNtCsfS6klqF1jUl_11nice_common8cpu_join10pass1_avx2
+  4.70   5.37   6.20  3.43   1.49  _RNvMs3_NtCsfS6klqF1jUl_11nice_common8cpu_joinNtB5_7CpuJoin10full_check
+  2.29   2.53   2.00  3.32   1.02  _RNvMs_NtCsfS6klqF1jUl_11nice_common10cpu_top_fdNtB4_10TopFdSetup9to_digits
+  2.08   1.89   1.38  2.73   0.94  _RNvNtCsfS6klqF1jUl_11nice_common10cpu_top_fd3sum
+  1.79   1.59   0.06  2.67   0.05  _RINvNtNtNtNtCskADBYZwJmSU_4core5slice4sort8unstable9quicksort9quicksortNtNtCsfS6klqF1jUl_11nice_com
+  1.29   1.55   0.92  3.61   0.77  0x000000000016212e
+  1.00   0.87   0.91  2.61   1.35  _RNvMs3_NtCsfS6klqF1jUl_11nice_common12overlap_joinNtB5_5Div649divrem_w4
+  0.25   0.24   0.16  2.88   0.86  _RNvNtCsfS6klqF1jUl_11nice_common10cpu_top_fd10shl_digits
+  0.18   0.35   0.18  5.84   0.66  0x00000000001621f8
+  0.18   0.41   0.14  6.84   0.44  __umodti3
+  0.16   0.12   0.08  2.25   0.86  __udivti3
+  0.16   0.06   0.00  1.13   0.00  0x0000000000162132
+  0.10   0.00   0.00  0.00   0.00  0x00000000001621fc

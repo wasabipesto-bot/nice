@@ -15,6 +15,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   lands as a third commit on #249; kill < ×1.02), **L54/L55** AND codegen fold + register pin (box
   `l54-andgen`, instance 59842997; kill: no fold in CubeCL or A/B < ×1.03), **L56** CPU seeded check
   PR branch on L52 (ivory; kill < ×1.05 on top of L52). Hard stops 12:30 UTC.
+- **L54/L55 done (08:40 UTC): the AND's address fold works (30 → 20 SASS per digit, −28 % of the
+  AND's issue) but buys only ×1.008–1.018 under a 130 W cap (denser issue lowers the clock) →
+  parked as a ready rider; the register pin is not expressible in CubeCL (upstream patch of 25
+  lines written; the 1-in-7 spill lottery comes from CubeCL's randomised shared-array order).**
+  Box l54-andgen destroyed (2.5 h).
 
 ## 2026-11-08 (day 12; routine fired 04:41 UTC)
 

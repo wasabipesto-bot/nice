@@ -1,0 +1,26 @@
+Overlap join: sort the top layer off the device thread
+
+JoinDevice::new sorted each slice's top layer by group (the static
+bucket order's counting sort) on the thread that drives the device,
+after the previous slice's last read and before this slice's first
+launch, so the device sat idle through it: 2.3 s of a b62 1e17 field
+(11 slices) and 0.4 s of a b60 1e16 field on a 2.2 GHz Broadwell host.
+The thread that prepares the next slice's setup while the current one
+runs did not sort it.
+
+- sorted_layer moves to join_plan and the device stage takes the layer
+  ready: plan_join sorts the first slice's (the client plans a field
+  beside the device's work on the previous one), and the thread that
+  prepares each later slice's setup sorts that slice's.
+- The layer is ascending and its prefixes mostly a few apart (more
+  than 99.8 % of steps are below b on the fields measured), so each
+  prefix's residues mod b, b - 1 and b^(k2 - f0 - p) come from the
+  previous prefix's by adding the difference; u64 divisions are left
+  for the larger gaps, and the class mod b - 1 is a table lookup. The
+  sort takes half the time it did; the rest is the scatter.
+- The same words and offsets: the host test pins them, now also on a
+  reversed layer, where every residue comes from a division.
+
+x1.022 at b62 1e17 and x1.016 at b60 1e16 (RTX 3080 at 150 W).
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>

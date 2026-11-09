@@ -1,0 +1,57 @@
+# L53 A/B: B = 87958fd (#249 head), N = 87958fd + the layer-sort commit; device s/field and wall s/field
+
+## b62 1e17, 1 field
+| round | side | device s/field | wall s/field | setup s (mean/field) | MHz | W | join kernel | spill re-runs | survivors / checked | exact |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | B | 98.331 | 100.166 | 15.949 | 1234 | 149 | 48r | 0 | 1,020,844,021,499 / 62,584,252,554 | yes |
+| 1 | N | 101.407 | 103.546 | 17.176 | 1150 | 150 | 48r | 1 | 1,020,844,021,499 / 62,584,252,554 | yes |
+| 2 | B | 104.531 | 106.360 | 15.961 | 1158 | 149 | 48r | 0 | 1,020,844,021,499 / 62,584,252,554 | yes |
+| 2 | N | 103.238 | 105.277 | 17.145 | 1131 | 150 | 46r | 1 | 1,020,844,021,499 / 62,584,252,554 | yes |
+| 3 | B | 102.325 | 104.167 | 16.085 | 1155 | 149 | 48r | 0 | 1,020,844,021,499 / 62,584,252,554 | yes |
+| 3 | N | 100.699 | 102.707 | 17.020 | 1166 | 150 | 48r | 0 | 1,020,844,021,499 / 62,584,252,554 | yes |
+- **device**: B 102.325 s (98.33, 104.53, 102.33), N 101.407 s (101.41, 103.24, 100.70): **x1.009** (per round 0.970, 1.013, 1.016)
+- **wall**: B 104.167 s (100.17, 106.36, 104.17), N 103.546 s (103.55, 105.28, 102.71): **x1.006** (per round 0.967, 1.010, 1.014)
+- **clock-normalised** (s x mean SM MHz): device x1.036 (per round 1.040, 1.036, 1.007), wall x1.034; MHz B 1158 / N 1150
+
+## b60 1e16, 2 fields
+| round | side | device s/field | wall s/field | setup s (mean/field) | MHz | W | join kernel | spill re-runs | survivors / checked | exact |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | B | 20.773 | 21.722 | 2.407 | 1106 | 150 | 47r | 0 | 460,847,952,346 / 30,871,838,404 | yes |
+| 1 | N | 20.418 | 21.496 | 2.624 | 1086 | 150 | 48r | 0 | 460,847,952,346 / 30,871,838,404 | yes |
+| 2 | B | 20.464 | 21.429 | 2.434 | 1227 | 147 | 48r | 1 | 460,847,952,346 / 30,871,838,404 | yes |
+| 2 | N | 20.007 | 21.094 | 2.564 | 1149 | 150 | 46r | 0 | 460,847,952,346 / 30,871,838,404 | yes |
+| 3 | B | 20.458 | 21.406 | 2.458 | 1112 | 149 | 48r | 0 | 460,847,952,346 / 30,871,838,404 | yes |
+| 3 | N | 19.981 | 21.060 | 2.667 | 1112 | 150 | 48r | 1 | 460,847,952,346 / 30,871,838,404 | yes |
+- **device**: B 20.464 s (20.77, 20.46, 20.46), N 20.007 s (20.42, 20.01, 19.98): **x1.023** (per round 1.017, 1.023, 1.024)
+- **wall**: B 21.429 s (21.72, 21.43, 21.41), N 21.094 s (21.50, 21.09, 21.06): **x1.016** (per round 1.011, 1.016, 1.016)
+- **clock-normalised** (s x mean SM MHz): device x1.037 (per round 1.037, 1.092, 1.024), wall x1.030; MHz B 1112 / N 1112
+
+## b62 1e16, 2 fields
+| round | side | device s/field | wall s/field | setup s (mean/field) | MHz | W | join kernel | spill re-runs | survivors / checked | exact |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | B | 8.746 | 9.647 | 1.309 | 1155 | 150 | 48r | 1 | 163,513,599,082 / 10,027,698,695 | yes |
+| 1 | N | 8.533 | 9.568 | 1.438 | 1150 | 150 | 46r | 0 | 163,513,599,082 / 10,027,698,695 | yes |
+| 2 | B | 8.524 | 9.428 | 1.313 | 1140 | 150 | 47r | 0 | 163,513,599,082 / 10,027,698,695 | yes |
+| 2 | N | 8.374 | 9.373 | 1.401 | 1160 | 150 | 46r | 1 | 163,513,599,082 / 10,027,698,695 | yes |
+- **device**: B 8.635 s (8.75, 8.52), N 8.454 s (8.53, 8.37): **x1.021** (per round 1.025, 1.018)
+- **wall**: B 9.538 s (9.65, 9.43), N 9.470 s (9.57, 9.37): **x1.007** (per round 1.008, 1.006)
+- **clock-normalised** (s x mean SM MHz): device x1.015 (per round 1.029, 1.000), wall x1.001; MHz B 1148 / N 1155
+
+## b64 1e16, 2 fields
+| round | side | device s/field | wall s/field | setup s (mean/field) | MHz | W | join kernel | spill re-runs | survivors / checked | exact |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | B | 28.151 | 28.972 | 1.691 | 1130 | 150 | 48r | 0 | 787,584,956,227 / 47,900,853,327 | yes |
+| 1 | N | 27.993 | 28.916 | 1.811 | 1117 | 150 | 46r | 0 | 787,584,956,227 / 47,900,853,327 | yes |
+| 2 | B | 27.548 | 28.373 | 1.698 | 1161 | 150 | 47r | 0 | 787,584,956,227 / 47,900,853,327 | yes |
+| 2 | N | 26.464 | 27.383 | 1.804 | 1252 | 148 | 47r | 0 | 787,584,956,227 / 47,900,853,327 | yes |
+- **device**: B 27.849 s (28.15, 27.55), N 27.228 s (27.99, 26.46): **x1.023** (per round 1.006, 1.041)
+- **wall**: B 28.672 s (28.97, 28.37), N 28.149 s (28.92, 27.38): **x1.019** (per round 1.002, 1.036)
+- **clock-normalised** (s x mean SM MHz): device x0.992 (per round 1.018, 0.965), wall x0.988; MHz B 1146 / N 1184
+
+spill-variant processes re-run: 6: ab_B_e16_b60_r2_spill0, ab_B_e16_b62_r1_spill0, ab_N_e16_b60_r3_spill0, ab_N_e16_b62_r2_spill0, ab_N_e17_b62_r1_spill0, ab_N_e17_b62_r2_spill0
+
+## sort_timing.log
+- L53 FIELD b62 size=1e17 slices=11 prefixes=30636533 old=2.052s new=1.021s ratio=2.0 slow=47854 (0.16%) sub_range_total=13.232s plan_join=2.026s (first layer 0.1310s) slice0_clone=0.0394s all_equal=1
+- L53 FIELD b60 size=1e16 slices=2 prefixes=5281726 old=0.368s new=0.177s ratio=2.1 slow=10113 (0.19%) sub_range_total=0.461s plan_join=2.016s (first layer 0.1473s) slice0_clone=0.0475s all_equal=1
+- L53 FIELD b62 size=1e16 slices=2 prefixes=3620628 old=0.237s new=0.120s ratio=2.0 slow=5618 (0.16%) sub_range_total=0.064s plan_join=2.033s (first layer 0.1240s) slice0_clone=0.0397s all_equal=1
+- L53 FIELD b64 size=1e16 slices=1 prefixes=3053841 old=0.209s new=0.102s ratio=2.0 slow=5024 (0.16%) sub_range_total=0.053s plan_join=1.738s (first layer 0.1016s) slice0_clone=0.0334s all_equal=1

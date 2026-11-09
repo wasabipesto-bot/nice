@@ -1,0 +1,43 @@
+CPU overlap join: seed the full check with the digits the join proved
+
+A survivor that passes the prefilter went through the client's full
+check, which squares and cubes n as 256-bit numbers and divides out
+every digit from position 3 up, although the join has already proved
+more: the digits of n² and n³ below k2 (the bottom's mask and the
+prefilter's four, all distinct), and, for a top whose certificate sits
+at k2 or above, its common high digits. The check now starts from
+those and converts only the digits in between.
+
+- Base::cert_parts and the stepped certificate return the certificate
+  with its common digits apart from the ones the closure adds (Cert),
+  and each power's lowest common position. A closure digit is not
+  taken as known: it sits at the position whose digit is d or d + 1,
+  below the common ones, and that position is converted like any other.
+  A top keeps the common digits and the positions where its check stops
+  only where it gates the prefilter (every certified position >= k2);
+  Top stays 48 bytes (its gmask becomes a flag, pc a byte).
+- cpu_check: n's base-b² limbs from P and r0 (one 64-bit multiply-high
+  quotient splits P, four more give the low limbs); n² by schoolbook
+  columns of u32 products, written out per column, normalised by a
+  multiply-high quotient by b² and split by one by b, both exact for
+  every input below 2^31; two digits a column without a branch, a
+  branch every other column; n³ = n²·n the same way when n²'s middle
+  passes. Fields outside the column form's bounds (none in production)
+  take the same digits by long division.
+
+It decides the same predicate as the client's check: n² and n³'s
+digits are distinct exactly when the middle digits are distinct and new
+against the known ones, which are distinct and disjoint. The pairs and
+every count are unchanged.
+
+Tests: the quotients' bounds for every divisor, block by block over
+their inputs (and every x below 2^31 opt-in); the column form's digits
+against malachite at every base 3-64 and every shape, with any ends; the
+seeded check's verdict and its count mode against get_is_nice and
+get_num_unique_digits on the near-nice n of bases 10-22 (69 among them),
+band edges and adversarial n of bases 23-64; every checked survivor of
+the test windows and of two partitions of each production field (opt-in:
+the timed shapes), with its known digits against the true ones; the
+certificate's parts against the reference and the stepped ones.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>

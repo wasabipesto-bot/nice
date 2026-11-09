@@ -1,0 +1,36 @@
+### 06:34:00 new and touched tests with output (cpu_check, cpu_join survivors, certificates) (head 7012e985; dirty: ?? bin/ ?? common/examples/ ; load 2.17 1.63 1.30)
+   Compiling nice_common v3.4.8-dev (/home/claude/projects/nice/.worktrees/l56-seeded-check/common)
+    Finished `release` profile [optimized] target(s) in 51.23s
+     Running unittests src/lib.rs (target/release/deps/nice_common-abeca64b56f629f8)
+
+running 12 tests
+test cpu_check::tests::magic_quotients_are_exact_everywhere ... ignored, exhaustive, minutes on every core; NICE_TEST_CPU_CHECK_EXHAUSTIVE=1
+test cpu_check::tests::production_shapes_take_the_columns ... ok
+test cpu_check::tests::sixty_nine_is_nice ... ok
+test cpu_join::tests::cpu_join_finds_69_in_base_10 ... ok
+test cpu_join::tests::cpu_join_matches_the_reference_on_the_test_windows ... ok
+b42 JoinParams { t: 6, k: 6, p: 2 }: 25 partitions, 468727 tops
+test cpu_check::tests::the_columns_take_the_digits_of_the_square_and_the_cube ... ok
+b42 [9682651996416, +1e13) slice 0, 2 partitions: 18491 checked survivors (18491 with their top's digits) exact in 0.1s
+b50 JoinParams { t: 7, k: 6, p: 2 }: 25 partitions, 1521618 tops
+298153 decided (12 nice), 81 near-nice n at bases 10-22
+test cpu_check::tests::the_seeded_check_decides_what_the_full_check_decides ... ok
+b50 [62082117268529817, +1e14) slice 0, 2 partitions: 650120 checked survivors (650120 with their top's digits) exact in 1.9s
+1876 setups: 1860723 blocks certified (413250 kept, 243907 seeds), 3654 clipped left out
+test cpu_top_fd::tests::stepped_certificates_equal_the_divided_ones ... ok
+b57 JoinParams { t: 9, k: 6, p: 2 }: 25 partitions, 692904 tops
+b60 JoinParams { t: 9, k: 6, p: 2 }: 25 partitions, 260942 tops
+b57 [28151599893042801193, +1e14) slice 0, 2 partitions: 163500 checked survivors (163500 with their top's digits) exact in 0.7s
+b60 [1366405974057412100454, +1e14) slice 0, 2 partitions: 46474 checked survivors (46474 with their top's digits) exact in 0.3s
+b62 [7997740455941656911841, +1e14) slice 0, 2 partitions: 45090 checked survivors (45090 with their top's digits) exact in 0.2s
+b62 JoinParams { t: 10, k: 6, p: 2 }: 25 partitions, 429898 tops
+b64 JoinParams { t: 10, k: 6, p: 2 }: 25 partitions, 324758 tops
+test cpu_join::tests::stepped_tops_equal_divided_tops_on_production_fields ... ok
+b64 [41242006262957161709568, +1e14) slice 0, 2 partitions: 164685 checked survivors (164685 with their top's digits) exact in 0.8s
+test cpu_join::tests::the_full_check_is_exact_on_production_survivors ... ok
+test cpu_check::tests::magic_quotients_are_exact_on_the_checks_inputs ... ok
+test overlap_join::tests::the_fast_certificate_matches_the_reference ... ok
+
+test result: ok. 11 passed; 0 failed; 1 ignored; 0 measured; 192 filtered out; finished in 7.33s
+
+exit 0

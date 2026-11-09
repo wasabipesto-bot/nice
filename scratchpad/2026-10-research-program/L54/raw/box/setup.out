@@ -1,0 +1,18 @@
++ L=/root/l54/logs
++ mkdir -p /root/l54/logs /root/l54/bin /root/l54/src /root/l54/run /root/l54/ptx /root/l54/sass /root/l54/cu
++ cd /root/nice
++ git fetch -q origin pr/top-fd-round2 exp/join-and-codegen
++ git worktree add -q --detach /root/l54/src/B origin/pr/top-fd-round2
++ git worktree add -q -B exp/join-and-codegen /root/l54/src/X origin/exp/join-and-codegen
++ for t in B X
++ cd /root/l54/src/B
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'B d813aead Overlap join: carry the FD top certificates'\'' bounds across partitions 84e90ac04d87e298008d7cf56c3630d6  common/src/cubecl_join.rs'
++ for t in B X
++ cd /root/l54/src/X
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'X d813aead Overlap join: carry the FD top certificates'\'' bounds across partitions 84e90ac04d87e298008d7cf56c3630d6  common/src/cubecl_join.rs'
++ nvidia-smi
++ nvidia-smi -q -d POWER,CLOCK

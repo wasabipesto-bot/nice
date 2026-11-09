@@ -5,6 +5,34 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L54.1 / L55.1 Transposed-AND codegen and the register pin (2026-11-09, agent; `L54/RESULTS.md`, `L54/raw/` (box dumps, `analysis_*.txt`, `l55/`); branch `exp/join-and-codegen` 19702e1 = form 2 in PR form on d813aea, forms behind `NICE_EXP_AND_FORM` in d91447a)
+
+SASS per digit in the AND loop (b62 = b60; identical across 5 shared layouts): d813aea **30**
+(8 loads/ORs, 8 address, 11 bit iteration, 3 recomputed invariants); form 1 fold-only (index
+masked with `& (TR_WORDS − 1)`, which gives NVRTC the no-wrap proof offline nvcc already assumes)
+**24**; form 2 fold + walk the low mask word then the high **20**; form 3 form 2 with 4 shared arrays
+per chunk group **19**; per (warp, 4-chunk group) 848 → 704 / 614 / 590 (−17 / −28 / −30 %). The
+leaner bit loop (highest-bit / `trailing_zeros` / `clz` forms) costs the same as `BREV`+`FLO`+
+`x&(x−1)` or more. **A/B vs d813aea (RTX 3080 at 130 W, 3 interleaved rounds):** form 1 ×1.009 /
+×1.016 (b62 1e17 / b60 1e16); form 2 ×1.008 (0.963/1.012/1.008; ×1.012 without the cold-card
+round) / ×1.018; form 3 ×1.016 / ×1.020; b62 1e16 ×1.010–1.018; b64 ×1.005–1.009. Cycle ratios
+unusable (per-process clock means scatter ±6 % at 742–944 MHz on 5-s samples). Likely cause: at
+130 W denser issue lowers the clock; a quarter to half of the predicted ~3.5 % of cycles shows in
+wall time. **Record only: no form reaches ×1.03.** Register variants recorded: d813aea 46–48 with
+the 40 + 24 B spill variant in 1 of 12 timed processes (re-run), 3 of 24 kernels in a 1e14 run;
+forms 2/3 47–48, no spill in 48 kernels (even on the layout where d813aea spills; not
+guaranteed). Exact: form 2's tree passes parity incl. b50/b54, the FD-vs-top test, certificate
+test, dense fields, whole b42, 1e14 COMPARE (= L34's counts), lavapipe naga + SPIR-V 8/8, lint
+14/0, fmt/clippy ×3 → **form 2 is a ready rider for a future join PR** (applies unchanged on
+#249's head; one `use` line differs on #246). **L55 not feasible in CubeCL 0.10/0.11.3:** only
+`__launch_bounds__(cube_dim)` is emitted, NVRTC options are hard-coded, `cuModuleLoadData` has no
+JIT options, no PTX hook, `__maxnreg__` is rejected beside `__launch_bounds__`. Smallest upstream
+patch: a `min_cubes_per_sm` kernel option plumbed like `cluster_dim` → `#[cube(launch_unchecked,
+min_cubes_per_sm = 5)]` emits `__launch_bounds__(256, 5)`; 25 lines over 6 files
+(`L54/raw/l55/cubecl-0.10-min-cubes-per-sm.patch`); sm_75 warns and ignores. **Root cause of the
+1-in-7 lottery: CubeCL places shared arrays in `HashSet` order, randomised per process** → a
+deterministic order would also remove that A/B noise. Box 2.5 h.
+
 ## L52.2 Two-pass scan: review fixes and the AVX-512 path executed on a Zen 5 host (2026-11-08; `L52/REVIEW.md`, `L52/PR-RESULTS.md` "Review follow-up", `L52/raw/avx512/`; head 1cce00d = one commit on #248)
 
 Review (all seven planted bugs caught by the new test; portable + AVX2 correct by test, AVX-512

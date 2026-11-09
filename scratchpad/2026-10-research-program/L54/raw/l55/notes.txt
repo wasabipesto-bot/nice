@@ -1,0 +1,24 @@
+L55 checks on the L54 box (nvcc / ptxas 12.8, 2026-11-09)
+
+Three one-line kernels:
+  lb1.cu: extern "C" __global__ void __launch_bounds__(256, 5) k(unsigned* p) { p[threadIdx.x] += 1; }
+  lb2.cu: extern "C" __global__ void __launch_bounds__(256) __maxnreg__(48) k(unsigned* p) { p[threadIdx.x] += 1; }
+  lb3.cu: extern "C" __global__ void __maxnreg__(48) k(unsigned* p) { p[threadIdx.x] += 1; }
+
+nvcc -ptx -arch=sm_86 (and sm_75):
+  lb1: .maxntid 256, 1, 1 / .minnctapersm 5
+  lb2: error: The __launch_bounds__ and __maxnreg__ qualifiers cannot be applied to the same kernel
+  lb3: .maxnreg 48
+CubeCL 0.10/0.11.3 always emits __launch_bounds__(cube_dim), so a register cap must be its second argument.
+
+ptxas -arch=sm_XX -v lb1.ptx:
+  sm_75: ptxas warning : Value of threads per SM for entry k is out of range. .minnctapersm will be ignored  (compiles)
+  sm_86, sm_89: compiles, no warning
+
+Shared-memory layouts of five d813aea processes (b62 join_kernel; array index @ byte offset in dynamic_shared_mem;
+CubeCL's SharedLiveness places them in HashSet order, std RandomState per process). t_tr = shared_memory_9:
+B0 t_tr=shared_memory_9 at byte [4]; layout: 13@4132 5@4136 12@0 10@11304 3@15400 8@2052 2@3108 6@5160 14@16424 11@6184 4@16476 16@16460 15@18524 7@10280 0@17500 1@2084 9@4 
+B1 t_tr=shared_memory_9 at byte [40]; layout: 11@12380 6@4140 9@40 3@5164 7@10284 4@3116 15@12332 13@3112 16@12364 8@18524 14@4 2@11308 5@16476 0@17500 1@2088 12@0 10@6188 
+B2 t_tr=shared_memory_9 at byte [12376]; layout: 3@1028 1@2084 4@4 5@5208 10@14460 8@5176 6@6232 14@14424 0@11352 7@3124 16@3108 2@4152 11@7256 9@12376 15@2052 12@0 13@4148 
+B3 t_tr=shared_memory_9 at byte [4132]; layout: 4@3076 11@14412 14@12324 5@12360 15@18524 13@13384 8@4100 12@0 7@13388 3@11300 9@4132 16@18508 6@2052 1@6180 0@1028 10@7204 2@4 
+B4 t_tr=shared_memory_9 at byte [15480]; layout: 6@8260 14@15444 4@13380 2@14404 11@4164 12@0 15@4 13@17528 5@17532 8@3108 10@9284 9@15480 16@15428 0@3140 1@2084 3@36 7@1060 
