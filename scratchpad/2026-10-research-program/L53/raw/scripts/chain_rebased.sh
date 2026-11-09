@@ -2,12 +2,13 @@
 # chain_rebased.sh: the two held branches rebased onto the new #249 head (trees R2 = pr/top-fd-round2, CD = pr/check-d):
 # build each (gpu), then host unit tests (join_plan::, cubecl_join::), the 1e14 compare at b57/60/62/64, CPU-reference
 # parity, and on CD check-d's own device test (whose JoinDevice::new call took the layer argument in the rebase);
-# then fmt and clippy -D warnings on nice_common (default; --features gpu) for each. After lint_C.done and x_C.done.
+# then fmt and clippy -D warnings on nice_common (default; --features gpu) for each. Builds after the lavapipe builds
+# (lvp_C.built; 7.7 GB of RAM), device tests after x_C.done.
 L=/root/l53/logs; T=/root/l53/test.sh; R=/root/l53/run.sh
-until [ -e $L/lint_C.done ]; do sleep 15; done
+until [ -e $L/lvp_C.built ]; do sleep 15; done
 echo RB_START $(date -u +%T)
 for t in R2 CD; do NICEN=10 J=6 bash /root/l53/build.sh $t $t | tail -2; done
-until [ -e $L/x_B_topfd.done ]; do sleep 15; done
+until [ -e $L/x_C.done ]; do sleep 15; done
 for t in R2 CD; do
   export SRCD=$t
   ( cd /root/l53/src/$t && LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu NICE_BUILD_SHA=test /root/l53/bin/$t join_plan:: ; \

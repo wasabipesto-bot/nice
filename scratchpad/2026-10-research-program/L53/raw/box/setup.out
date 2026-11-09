@@ -1,0 +1,11 @@
++ L=/root/l53/logs
++ mkdir -p /root/l53/logs /root/l53/bin /root/l53/src /root/l53/run /root/l53/ptx
++ cd /root/nice
++ git fetch -q origin pr/join-static-buckets
++ git worktree add -q --detach /root/l53/src/B 87958fd
++ cd /root/l53/src/B
+++ git log --oneline -1
+++ md5sum common/src/cubecl_join.rs
++ echo 'B 87958fd9 Overlap join: check the survivor stage once per top batch 8f6f46e3d1dc19165547f84ca6d1f8c3  common/src/cubecl_join.rs'
++ nvidia-smi
++ nvidia-smi -q -d POWER,CLOCK

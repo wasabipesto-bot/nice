@@ -20,6 +20,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   parked as a ready rider; the register pin is not expressible in CubeCL (upstream patch of 25
   lines written; the 1-in-7 spill lottery comes from CubeCL's randomised shared-array order).**
   Box l54-andgen destroyed (2.5 h).
+- **L53 landed (08:50 UTC, L53.1): #249 → 80a103e** (third commit: the layer sort runs in
+  `plan_join`/the prep thread instead of on the device thread, and steps residues instead of
+  dividing): ×1.022 b62 1e17 / ×1.016 b60 by same-process alternation (the separate-process A/B
+  cannot resolve 2 % at ±4 % clock scatter), output word-for-word identical. Held branches
+  rebased onto it: `pr/top-fd-round2` 5d0c8cf, `pr/check-d` e28b79f (two small conflicts
+  resolved; tests pass). #249's GitHub body updated and commented. Box l53-sort destroyed (2.6 h).
 
 ## 2026-11-08 (day 12; routine fired 04:41 UTC)
 

@@ -54,8 +54,20 @@ The same suite also passed on the first head 7012e98 (`raw/void/7012e98-tests/`)
 
 ## Process, timeline (UTC), cleanup
 
-TIMELINE
+- 05:45 brief read; `df -h /` 15 GB free (13 GB during the work, peak target 2.2 GB); 05:51 worktree `.worktrees/l56-seeded-check` on a new local branch `pr/cpu-join-seeded-check` at `1cce00d`, `CARGO_TARGET_DIR` inside it; L52's harness copied in as the uncommitted `common/examples/l52_ab.rs`.
+- 05:51–05:57 base binaries (`raw/build-base.log`). The first base build ran while I made my first source edits, so I restored the pristine sources and rebuilt (05:55); the two builds' binaries are byte-identical (md5 `b274b8d9…` harness, `7345e2e2…` client), and the client embeds `1cce00d`.
+- 05:57–06:28 implementation. In-place checks on the way (b60 1e16, 1 thread, single runs): the first column form (runtime loops) ×1.05–1.06 and 47 ns a check on recorded survivors; writing the n² columns out (macro) → 29 ns, ×1.09–1.13 in place; the V3 form with the same seeds stayed at ~51 ns (`raw/check-bench-pre.txt`).
+- 06:30 commit `7012e985`, pushed over SSH; PR binaries built (`raw/build-pr.log`; the client embeds the commit).
+- 06:32–06:45 chain, first run: tests all ok (`raw/void/7012e98-tests/`), perf (`raw/void/perf-runs-7012e98.txt`) showed `Check::nice` out of line and a 0.7 % symbol `Take<Enumerate<Zip<…Magic64…>>>::nth`: the clippy-driven iterator form of the limb-split loop (`skip(1)`) compiled to a call. Stopped in the main A/B's round 1 (`raw/void/ab-runs-7012e98-aborted.txt`).
+- 06:46–06:49 fix: back to an index loop (`#[allow(clippy::needless_range_loop)]` with a comment), `Check::nice` `#[inline(always)]` (now inside `full_check`), the column test prints its count; module tests, clippy, fmt; `commit --amend` → `5bab136e`; `push --force-with-lease=…:7012e985` over SSH; PR binaries rebuilt (md5 `30615df0…` harness, `5cf50fe5…` client; client embeds `5bab136e`).
+- 06:49–08:4x chain on `5bab136` (`raw/scripts/chain.sh`, `raw/chain.log`): tests 06:49–06:57, perf 06:58–07:00, main A/B 07:00–07:22, NiceMark 07:23–07:48, 1-thread whole fields 07:49–WHOLEEND. Every run under `nice -n 19`; gates at 1-min load ≤ 2 (≤ 1.5 for perf); no round marked DISCARD; other sessions' processes at run starts ≤ 1 core (one 4-thread b62 PR run started with 0.64 of a core taken).
+- POSTLINE
 
 ## Files
 
-FILES
+- `L56/PR-BODY.md`, this file.
+- `raw/build-base.log`, `raw/build-pr.log` (cargo output, md5s), `raw/build-variants.log`, `raw/commit-msg.txt`.
+- `raw/unit-tests.txt`, `unit-tests-new.txt`, `unit-tests-checkref.txt`, `unit-tests-prodref.txt`, `unit-tests-fullfield.txt`, `unit-tests-debug.txt`, `unit-tests-exhaustive.txt`, `clippy-default.txt`.
+- `raw/perf-runs.txt` (perf record + per-symbol shares), `raw/perfstat-runs.txt` (counters), `raw/ab-runs.txt` + `ab-summary.txt`, `raw/ab-runs-whole1t.txt` + `ab-summary-whole1t.txt`, `raw/nicemark-r*-{base,pr}.json/.stderr`, `nicemark-runs.txt`, `nicemark-summary.txt`, `raw/ab-variants.txt` (+ `vartable.py` output in this file), `raw/check-bench.txt`, `raw/check-bench-pre.txt` (before the commit), `raw/chain.log`.
+- `raw/void/`: the first head's tests, perf and the aborted A/B.
+- `raw/scripts/`: `build.sh`, `tests.sh`, `perf.sh`, `run_ab.sh`, `run_nicemark.sh`, `chain.sh`, `post.sh`, `variants.py` (the scratch variants), `l56_scratch_bench.rs` (the recorded-survivor bench, appended to `cpu_join.rs` only while it ran), `l52_ab.rs` (L52's harness), `perfsym.py` (L50's), `table.py` / `nm_table.py` / `perftable.py` (L52's), `vartable.py`.

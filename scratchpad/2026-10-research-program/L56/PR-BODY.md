@@ -86,9 +86,21 @@ WHOLE1T
 
 - The instruction count barely moves: the column form executes about as many instructions per check as the old long divisions (its 6–8 columns of products and quotients against ~10 digits of a chain of 64-bit divisions by a constant), but they are independent of each other, where every digit of the old check waited on the last one's quotient. IPC rises from 2.8 to 3.1–3.2.
 
-NICEMARK
+NiceMark nice-only on the CPU (`nice_client niceonly --benchmark --threads 4 --benchmark-secs 150 --benchmark-json`, no `--gpu`), 4 rounds alternating, every run started at a 1-min load of ≤ 2.0 (1.93–2.00) with no other process above a fifth of a core; medians; the scenario rows are numbers/s; "per round" is this PR's over the base's:
 
-**The check alone** on recorded survivors (every checked survivor of the first 2 sampled partitions, 4.28 M at b60 1e16 and 4.09 M at b62 1e17 slice 0, each check fed the digits the join records for it; a scratch harness, 3 repetitions; ns a check):
+| | two-pass scan (rounds) | this PR (rounds) | speed-up | per round |
+|---|---|---|---|---|
+| **score** | 1091.0 (1092.0, 1090.0, 1081.5, 1120.2) | 1259.6 (1277.7, 1241.2, 1263.6, 1255.7) | **×1.155** | 1.170, 1.139, 1.168, 1.121 |
+| b58 MSD-weak (1e15 field, 4 threads) | 2.682e12 | 3.195e12 | ×1.191 | 1.226, 1.144, 1.352, 1.137 |
+| b58 MSD-weak, 1 thread | 7.241e11 | 8.396e11 | ×1.160 | 1.183, 1.178, 1.149, 1.129 |
+| b58 MSD-strong | 1.514e13 | 1.674e13 | ×1.106 | 1.177, 1.123, 1.090, 1.079 |
+| b60 MSD-weak (sampled) | 6.705e12 | 7.421e12 | ×1.107 | 1.112, 1.083, 1.102, 1.121 |
+| b62 MSD-weak (sampled) | 7.179e12 | 8.241e12 | ×1.148 | 1.155, 1.167, 1.166, 1.139 |
+
+- The base's score (1091.0) is the two-pass scan PR's own measurement on this machine (1091.0).
+- NiceMark samples partitions for a fixed time, so the two sides sampled different numbers of partitions and their counts are not comparable; within a side, runs that sampled the same partitions agree.
+
+**The check alone** on recorded survivors (every checked survivor of the first 2 sampled partitions, 4.28 M at b60 1e16 and 4.09 M at b62 1e17 slice 0, each check fed the digits the join records for it; a test-only harness outside this PR, 3 repetitions; ns a check):
 
 CHECKBENCH
 

@@ -1,0 +1,31 @@
+   Compiling syn v1.0.109
+    Checking cubecl-opt v0.10.0
+    Checking tracel-rspirv v0.12.1+sdk-1.4.341.0
+   Compiling cubecl-wgpu v0.10.0
+   Compiling cubecl v0.10.0
+   Compiling nice_common v3.4.8-dev (/root/l53/src/C/common)
+    Checking cubecl-cpp v0.10.0
+    Checking cubecl-cuda v0.10.0
+   Compiling c2rust-bitfields-derive v0.20.0
+    Checking c2rust-bitfields v0.20.0
+    Checking tracel-ash v0.39.5+sdk1.4.357
+    Checking cubecl-spirv v0.10.0
+error: binding's name is too similar to existing binding
+    --> common/src/cubecl_join.rs:3817:13
+     |
+3817 |         let later = field.slices.get(i + 1).filter(|_| i + 1 < count);
+     |             ^^^^^
+     |
+note: existing binding defined here
+    --> common/src/cubecl_join.rs:3800:18
+     |
+3800 |         let (fs, layer) = if i == 0 {
+     |                  ^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#similar_names
+     = note: `-D clippy::similar-names` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::similar_names)]`
+
+error: could not compile `nice_common` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nice_common` (lib test) due to 1 previous error
+clippy gpu+spirv rc=101

@@ -5,6 +5,32 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L53.1 #249's top-layer sort off the device thread: third commit 80a103e (2026-11-09, agent; `L53/RESULTS.md`, `L53/raw/`; #249 head 80a103e; held branches rebased: `pr/top-fd-round2` 5d0c8cf, `pr/check-d` e28b79f)
+
+On 87958fd `sorted_layer` ran at the top of `run_slice` inside `JoinDevice::new`, on the device
+thread, after the previous slice's batches had all been read back → the GPU idled through 11
+sorts per b62 1e17 field; the prep thread only computed the next slice's `sub_range`; slice 0's
+sort was not in `plan_join` either. Fix: `sorted_layer` → `join_plan`; `plan_join` sorts slice 0
+(the client already overlaps it with the previous field); the prep thread sorts later slices;
+`JoinDevice::new` only uploads; residues step from the previous prefix by addition (99.8 % of
+steps < b), u64 division only after larger gaps. Sort time (b62 1e17 field): 2.05 s standalone /
+2.28 s in place → 1.02 s off the device thread (device thread keeps a 0.03–0.05 s copy of slice
+0's layer, never waits); b60 1e16 0.37 / 0.41 → 0.18 s. **A/B (RTX 3080 at 150 W, E5-2630 v4):**
+separate processes (3 rounds; 6 of 26 processes spilled and were re-run; clocks ±4 % between
+processes): device time ×1.009 / ×1.023 / ×1.021 / ×1.023 (b62 1e17 / b60 / b62 1e16 / b64), wall
+×1.006 / 1.016 / 1.007 / 1.019; **same process alternating old/new path (shared kernel image and
+temperature): b62 1e17 ×1.022 (1.020–1.024), b60 ×1.016, b62 1e16 ×1.020, b64 (one slice) ×1.007.**
+Below the ×1.03–1.04 estimate because this box's field is 103 s (150 W) and the sort 2.28 s; on
+L51's box ≈ ×1.027 (estimate). Exact: new sort output and `goff` word-for-word = #249's on every
+slice of four fields (30.6 M prefixes); every timed count; 1e14 COMPARE; dense; whole b42; parity;
+certificate test; #249's sentinel FD-vs-top test (237,948,545 tops — this box cuts the b60 1e16
+test field's slices differently from L46's 237,907,266; 87958fd gives the same here); host test
+also on a reversed layer (21 fields, 582,884 buckets); lavapipe 8/8 ×2; lint 14/0; fmt/clippy ×3.
+Rebases conflicted after all (round 2: `top_fd_runs` adjacent to the removed `sorted_layer` +
+CHANGELOG; check-d: `check_counts` calls `JoinDevice::new`, which now takes the layer); both pass
+unit tests, 1e14 COMPARE, parity (and check-d its count test). #249's body updated (three
+commits) and a comment posted. Box 2.6 h.
+
 ## L54.1 / L55.1 Transposed-AND codegen and the register pin (2026-11-09, agent; `L54/RESULTS.md`, `L54/raw/` (box dumps, `analysis_*.txt`, `l55/`); branch `exp/join-and-codegen` 19702e1 = form 2 in PR form on d813aea, forms behind `NICE_EXP_AND_FORM` in d91447a)
 
 SASS per digit in the AND loop (b62 = b60; identical across 5 shared layouts): d813aea **30**

@@ -1,4 +1,4 @@
-Stacked on #246 (itself on #241): their commits are the base of this branch; the new work is the last two commits. The first (the static bucket order) is the main change; the second checks the join's survivor stage once per top batch (its own section below).
+Stacked on #246 (itself on #241): their commits are the base of this branch; the new work is the last three commits. The first (the static bucket order) is the main change; the second checks the join's survivor stage once per top batch, and the third sorts the top layer off the thread that drives the device (each has its own section below).
 
 ## What
 
@@ -7,7 +7,7 @@ Each batch's top stage used to bucket the tops in three steps. The top kernels c
 This PR orders the top layer once per slice instead, so that every slot's buckets come out as contiguous runs of records:
 
 - **A top's buckets depend on the slot only through a rotation.** A top `P = P0·b^p + v` of slot v goes to bucket `(key, (root − pc) mod (b−1))` for each root, with `pc = (c0 + v) mod (b−1)`, `c0 = P0 mod (b−1)` (`b^p ≡ 1 mod b−1`) and `key = P0 mod b` at the key level (else 0). Key and c0 are fixed by the prefix. Call `g = key·(b−1) + c0` the prefix's group (`nb` groups, as many as buckets). For every slot, bucket `(key, cls)` holds exactly the kept tops of one group per root, group `(key, (root − cls − v) mod (b−1))`.
-- **Host:** `JoinDevice::new` sorts the slice's top layer by group (a counting sort, stable) and uploads each group's first index `goff[g]` (`nb + 1` words). The tlay entry carries `g` and `goff[g]` in the two words that held `P0 mod (b−1)` and the key.
+- **Host:** the slice's top layer is sorted by group once (a counting sort, stable; since the third commit it runs in `plan_join` for slice 0 and on the prep thread for later slices, see below) and `JoinDevice::new` uploads it with each group's first index `goff[g]` (`nb + 1` words). The tlay entry carries `g` and `goff[g]` in the two words that held `P0 mod (b−1)` and the key.
 - **Top kernels:** a kept top goes into its group's segment of the slot's records, at `slot·ntlay + goff[g] + at`, where `at` comes from one counter per (slot, group), `grp_cnt` (the per-batch scratch `bucket_cnt` was, same size). `top_fd_kernel` takes one atomic per plane: a plane of sorted prefixes is almost always of one group, and a plane that straddles two takes one per kept lane. `top_kernel` takes one per top, inside its branch. A prefix gives at most one top per slot, so a segment cannot overflow.
 - **Join:** work item w is bucket `w mod nb` of slot `w / nb` (no `work` array). Threads `r < nroots` read their group's offset and count, and thread 0 places the segments in shared memory. The batch load maps bucket position q to its segment and reads record `start + q − cum`. Consecutive threads now read consecutive 32-byte records instead of gathering them by id through `tl`. A batch still takes up to 256 tops across segment boundaries, so batch sizes (and the transposed-AND threshold) are as before. The work item's list offset, entry base, entry count and key digit are kept in shared memory and read once per wave, which keeps the kernel within 48 registers.
 - **Gone:** `top_scan_kernel`, `top_fill_kernel`, `tl`, `top_b`, `work`, `cursor` and the per-slot top count. That is two launches per batch, and `nroots` counting atomics per kept top in the top kernels. `STAGES` goes from 6 to 4.
@@ -125,8 +125,31 @@ The join kernel stages the pairs that pass the prefilter in shared memory and wr
 - Both commits together against #246: about ×1.19 at b62 1e17 (100.38 → 83.86 s) and ×1.18 at b60 1e16 (19.675 → 16.745 s), from runs in two A/B sessions on the same box.
 - Exactness on the two commits (the GPU runs used the same kernel code; since then only comments, one variable name and the tests changed): the 1e14 compare at b57/60/62/64, `cubecl_cuda_join_matches_the_cpu_reference`, both dense fields, the whole b42 field, the FD-vs-top-kernel and certificate device tests (same totals as above), lavapipe with naga and direct SPIR-V (8 passed each), the WGSL lint (14 shaders, 0 flagged), fmt and clippy ×3. Every timed field has the counts above in every round.
 
+## Third commit: the top layer sorted off the device thread
+
+The first commit sorts each slice's top layer in `JoinDevice::new`, on the thread that drives the device. That runs after the previous slice's last read and before this slice's first launch, so the device sits idle through it: 2.3 s of a b62 1e17 field (11 slices) and 0.4 s of a b60 1e16 field on the host below. The thread that prepares the next slice's setup while the current one runs did not sort it.
+
+- **Where it runs now.** `sorted_layer` moves to `join_plan`, and the device stage gets the layer ready-made. `plan_join` sorts the field's first slice; the client runs it beside the device's work on the previous field. The thread that prepares each later slice's setup now sorts that slice too. The device thread only uploads the layer. A refit after a refused layout and the overflow re-run still sort on the device thread, as before.
+- **Cheaper.** The layer is ascending, and more than 99.8 % of its steps are below b. So each prefix's residues mod b, b − 1 and b^(k2 − f0 − p) come from the previous prefix's by an addition, and only a larger gap divides. The sort takes half the time (2.05 → 1.02 s per b62 1e17 field, timed alone); the rest is the counting sort's scatter.
+- **Exactness.** The same permutation, words and offsets. On every slice of the four fields below, the new sort's words and offsets equal the old one's (30.6 M prefixes at b62 1e17). The host test checks them against the division form, now also on a reversed layer, where every residue comes from a division. Counts are unchanged in every run.
+
+**Measured** on an RTX 3080 at a **150 W** cap with a 2.2 GHz Xeon E5-2630 v4 host (a different box from the tables above). Separate processes could not resolve 2 %: the card's clock moved 1,086–1,252 MHz between processes at the cap. So one process ran the same field repeatedly, alternating the first two commits' path (the sort on the device thread, copied verbatim) with this commit's. Both sides share the kernel images and the card's temperature. Each field is compared with the mean of its two neighbours (median, with the range):
+
+| field | fields run | sort on the device thread before | s/field before → after | speed-up (range) |
+|---|---|---|---|---|
+| **b62 1e17** | 7 | 2.28 s | 103.86 → 101.73 | **×1.022** (1.020–1.024) |
+| **b60 1e16** | 13 | 0.41 s | 20.34 → 20.04 | **×1.016** (1.013–1.019) |
+| b62 1e16 | 21 | 0.27 s | 11.56 → 11.33 | ×1.020 (1.015–1.038) |
+| b64 1e16 (one slice) | 9 | 0.23 s | 27.80 → 27.62 | ×1.007 (1.005–1.008) |
+
+- The device thread never waited for the slice-preparing thread, before or after.
+- A separate-process A/B against the second commit (3 interleaved rounds at b62 1e17 and b60 1e16, 2 at the others, spill-free join kernels only) gave the same direction within the clock spread: b62 1e17 ×1.009 in time and ×1.036 in cycles; b60 1e16 ×1.023 / ×1.037.
+- The gain is host time: on a faster CPU the sort costs less and the gain shrinks; on a faster GPU it grows.
+- Exactness on this commit, on that box: the 1e14 compare at b57/60/62/64, `cubecl_cuda_join_matches_the_cpu_reference`, both dense fields, the whole b42 field, the certificate test and the FD-vs-top-kernel test with its sentinel (its first device run: 26 fields, 279 batches, 237,948,545 tops, the same as the second commit's on that box) all give the counts above; lavapipe with naga and direct SPIR-V (8 passed each, the FD test on 21 fields / 142 batches / 1,018,088 tops); the WGSL lint (14 shaders, 0 flagged); fmt and clippy ×3. Every timed field has the counts above.
+
 ## Not in this PR
 
 - **No CPU change.** The CPU join forms each partition's buckets on the host and is unaffected.
+- **The slices' device buffers are still created per slice**, on the device thread (about 0.1 s a slice, 1 % of a b62 1e17 field). Reusing them across slices is a separate change.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
