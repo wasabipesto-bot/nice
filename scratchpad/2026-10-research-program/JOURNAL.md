@@ -45,6 +45,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   on the branch with 1.2 M verdicts incl. `true` at every limb count; body/doc corrections; the
   timed binary's code is byte-identical). Tests 197 + 22. Fourth reviewed branch held at the cap.
   Day: 2 boxes ($0.55), 5 agents (all Opus), director ~5 h.
+- 11:50 UTC: no rerun of #249's two 504-failed jobs → **CI retriggered by a message-only amend of
+  the third commit** (#249 → 9d9e2e9, tree identical to 80a103e); held branches rebased with
+  identical trees: `pr/top-fd-round2` 4336a18, `pr/check-d` d8390d9.
 
 ## 2026-11-08 (day 12; routine fired 04:41 UTC)
 
