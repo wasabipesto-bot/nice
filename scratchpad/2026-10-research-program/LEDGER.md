@@ -8,7 +8,23 @@ EXPERIMENTS.md and the per-lead directories. BACKLOG numbers refer to
 Reopening: closed items may be reopened with a written reason for what the earlier
 verdict missed (user, 2026-10-28).
 
-## Active and queued
+## Tracks since the director change (2026-11-09)
+
+Evidence and the operation model: `../2026-11-fresh-eyes/NOTES.md`. Every lead is priced as
+$/base at the frontier (and Δλ); kernel trims under ×1.10 are parked, not PR'd.
+
+| id | lead | track | status | expected | cost | kill criterion | last update |
+|---|---|---|---|---|---|---|---|
+| N1 | **Transversal join**: work units keyed by the shared middle digits π (all leading digits), bottoms 9 deep, tops at f0 4; every list entry built once per base instead of once per field | T1 compute | modelled 2026-11-09 (counts by Monte Carlo at b60/62/64, costs from the measured b62 profile); next: exact small-base prototype + tile microbenchmark, then a proposal | ≈ ×3 per base at b62/b64 (×2.5–4); MB-sized units | 3–4 days to a proposal, ~$3 | projected < ×2 on a whole b62 base, or model off by > 30 % against the prototype | 2026-11-09 |
+| N2 | **Second pass of the single-pass nice-only bases** (50–58 at CL 1; b60 as it finishes) by a different algorithm than the first pass; exposure analysis first (client versions per field, #222, #228, the 2024 b47/48 import) | T2 integrity | idea; read-only analysis next, then a proposal (server data is the user's) | CL 2 below the frontier; Δλ ≈ λ(50–58) × P(miss) | ≈ $15–25 today, a few $ after N1 | exposure analysis shows every CL 1 field was searched by a version with no known defect and the user declines | 2026-11-09 |
+| N3 | Server work unit for N1: a virtual coordinate that orders n by π first, so fields stay ranges | T1 | idea; proposal only (huge change, user decision) | enables N1 | 1 day to write | N1 killed | 2026-11-09 |
+| N5 | **Adversarial review of the no-shortcut argument** (NOTES §2: ≤ 2 output digits per fixed digit, lattice windows 1 per digit, repetend families need b < 10) + near-miss structure mining on the detailed data | T3 theory | argument written; one Opus reviewer next | a loophole, or a closed question in writing | 1–2 agent-days, $0 | reviewer finds no gap and the mining shows no structure beyond the local-density model | 2026-11-09 |
+| N6 | Child-only top certificates (truncated FD on the certificate window) | T1 | idea; only matters if f0 3 returns after N1 | tops ÷5 | — | — | 2026-11-09 |
+| N7 | u64 chunks for the transposed AND on CUDA | T1 | idea; the dense AND is ~70 % of the time after N1 | ≤ ×1.4 after N1 | — | — | 2026-11-09 |
+| N8 | Browser WebGPU nice-only client on N1's units | outreach | idea, after N1 | free compute | — | — | 2026-11-09 |
+| T4 | Delivery: rebase and open the four held reviewed branches (`pr/top-fd-round2`, `pr/check-d`, `pr/cpu-join-two-pass-scan`, `pr/cpu-join-seeded-check`) | T4 | queued for 2026-11-10 | GPU ×1.13 + ×1.09, CPU ×1.24 + ×1.12 at b62/b60 | 0.5 day | — | 2026-11-09 |
+
+## Active and queued (the kernel series, 2026-10-28 → 11-09)
 
 | id | lead | path | status | expected | cost | kill criterion | last update |
 |---|---|---|---|---|---|---|---|

@@ -4,6 +4,39 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-09 evening: director change (user request), fresh-eyes review
+
+- **Handover.** The user moved the program into a new session (`session_014g2dyZ4dAhZFch4nmKWPyZ`,
+  "Daily autonomous nice research migration") and asked for a review with fresh eyes before the
+  next cycle. The old routine `trig_012YG24kD3dwPtQAheLqir5F` is disabled; the new routine and
+  its prompt are in `ROUTINE.md`. The old director session is not woken any more.
+- **State inherited.** The user merged #241, #246, #247, #248, #249 today (19:37–20:05 UTC);
+  no program PR is open. Four reviewed branches wait: `pr/top-fd-round2` (4336a18),
+  `pr/check-d` (d8390d9), `pr/cpu-join-two-pass-scan` (1cce00d), `pr/cpu-join-seeded-check`
+  (0fc06a0); each needs a rebase onto main c0c357a before opening. b60 is 75 % searched, b62
+  not started. Vast November research $10.29.
+- **Review** (`../2026-11-fresh-eyes/NOTES.md`): (1) everything reachable (rest of b60, b62,
+  b64, b65) sums to λ ≈ 0.19 %; λ/cost falls ≈ ×0.45 per base and ×10 of compute buys about
+  one base, so no kernel work changes the odds' order of magnitude. (2) No sub-exhaustive
+  method in sight: digit-local search learns ≤ 2 output digits per fixed digit of n and the
+  other ≈ 3L arrive at once; lattice windows buy 1 per digit; argument written down to be
+  attacked. (3) The join's macro shape (f0 3, k 6, p 2) was never re-derived: an operation
+  model calibrated on the measured b62 profile says units keyed by the shared middle digits
+  with 9-digit bottoms and f0 4 cost ≈ a third of today's time per base (×2.5–4), with MB-sized
+  units. k 10 loses to memory traffic; the field prune and deep bottoms compete for the same
+  digits. (4) Bases 50–58 are single-pass nice-only (CL 1); a second pass by the join costs
+  ≈ $15–25 today.
+- **Plan (default until the user redirects):** tracks instead of three kernel leads a day.
+  T1 transversal join: exact small-base prototype of the decomposition + tile microbenchmark on
+  a 3080 → proposal with measured numbers (kill < ×2 projected on a b62 base). T2 integrity:
+  read-only exposure analysis of CL 1 fields → proposal. T3 theory: adversarial review of the
+  no-shortcut argument; near-miss structure mining. T4 delivery: rebase and open the four held
+  branches (reviewed, measured, within the cap). Kernel trims under ×1.10 are parked, not PR'd.
+  Subagents stay Opus (implementation, review) and Sonnet (surveys), fewer and longer.
+- Questions put to the user in the handover report: whether a change of the server's work unit
+  is on the table; whether to buy a second pass of b50–60; what to optimise for beyond the
+  search itself; subagent models; opening all four held branches.
+
 ## 2026-11-09 (day 13; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; November research $10.29 (fleet $15.38); credit $35.65;

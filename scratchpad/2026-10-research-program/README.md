@@ -17,9 +17,13 @@ director session can be replaced from it at any time.
 
 1. `python3 vast.py reconcile`; `gh pr list --repo wasabipesto/nice`; read the user's
    replies since the last report.
-2. Read the last two journal entries and the ledger; pick at most two active leads.
-3. Execute under the posture (heavy+ since 2026-11-05: ~8 h director time, ≤20 subagents on Opus/Sonnet, three leads a day, a reviewer agent on every PR branch;
-   no nested agents). Vast only via `vast.py create`. CPU work on ivory under
+2. Read the journal head (the current plan) and the Tracks table at the top of the ledger.
+   Since the director change on 2026-11-09 the day is organised by tracks (T1 the join's
+   macro shape, T2 integrity, T3 theory, T4 delivery), not by three kernel leads; every lead is
+   priced as $/base at the frontier, and kernel trims under ×1.10 are parked, not PR'd. The
+   operation model is `../2026-11-fresh-eyes/NOTES.md`.
+3. Execute: few, fully briefed subagents on Opus (implementation, review) or Sonnet (surveys),
+   a reviewer agent on every PR branch, no nested agents. Vast only via `vast.py create`. CPU work on ivory under
    `nice -n 19`; `df -h /` first (ivory has filled before; `/tmp` is a 3.8 GB tmpfs).
    Code in worktrees under `.worktrees/`; beware shared target-dir collisions between
    same-version worktrees (`cargo clean -p nice_common -p nice_client` before compared
@@ -48,6 +52,7 @@ cap, rentals below the credit floor, the user's machines.
 
 ## Rotation
 
-When context passes ~60 % or after 4 weeks: write a handover entry in the journal,
-create a new session, and point the routine's `persistent_session_id` at it
-(`update_trigger`). Record the new id in `ROUTINE.md`.
+When context passes ~60 % or after 4 weeks: write a handover entry in the journal, start a
+new session, create a new scheduled task from it (`update_trigger` cannot repoint a task at
+another session) and disable the old one. Record both ids in `ROUTINE.md`. Done once, on
+2026-11-09, at the user's request.
