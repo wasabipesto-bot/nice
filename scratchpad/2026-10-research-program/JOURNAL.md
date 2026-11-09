@@ -30,6 +30,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   threads), NiceMark CPU ×1.155, the check's share 15–16 % → 5 %; seeds only pre-closure certificate
   digits (L47's warning honoured); exact position by position on 19.65 M survivors.** Reviewer
   launched; fourth held branch (CPU chain: #247 → #248 → two-pass scan → seeded check).
+- 09:15 UTC: **#249 at 80a103e: 23 pass, 2 red = GitHub 504s** (the clippy job's checkout and the
+  wasm job's wasm-pack download failed before any build step). Not ours; commented asking for a
+  rerun (I cannot rerun upstream workflows). The other four open PRs stay green.
 
 ## 2026-11-08 (day 12; routine fired 04:41 UTC)
 
