@@ -59,12 +59,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     the sampled searched b60 fields were searched only by pre-fix AMD / NVIDIA builds.
   - Telemetry carries `survivors` and `checked` per field. A survivor that overruns the stage
     moves from `survivors` to `checked` (documented, timing dependent), so for two runs of one
-    field R = Δsurvivors + Δchecked/(1 − pass) should be ≈ 0. **AMD and NVIDIA: 0 of 264
-    same-build pairs beyond 1e-6 of the field's survivors** (two AMD-vs-hand-CUDA pairs at
-    2.2e-6). The race left no measurable trace there. The second pass of b50–58 is dropped.
-  - **Apple M4 (mayalaran), builds 9a4f7406 and 2709d3f9 (before #222 and #228): 69 of 82
-    pairs against AMD or NVIDIA runs of the same field account for fewer survivors, median
-    ≈ 1e-4 of the field, up to 6.4e-4 (1.25e-3 across dev builds), never more.** Two M4 runs
+    field R = Δsurvivors + Δchecked/(1 − pass) should be ≈ 0. **AMD and NVIDIA, identical builds: 0 of 224
+    same-device pairs beyond 1e-6 of the field's survivors (max 7e-7); 73 AMD-vs-NVIDIA pairs
+    all within 2.2e-6.** The race left no measurable trace there. The second pass of b50–58 is dropped.
+  - **Apple M4 (mayalaran), builds 9a4f7406 and 2709d3f9 (before #222 and #228): 61 of 74
+    identical-build pairs against AMD or NVIDIA runs of the same field account for fewer
+    survivors (median 6.7e-5 of the field, quartiles 3e-6 / 2.4e-4, max 6.4e-4; up to 1.25e-3
+    across dev builds), never more.** Two M4 runs
     of one field agree with each other to ≤ 4e-6 (4 pairs), so the deficit is mostly
     deterministic: a compile-level defect (the #228 pattern, which the changelog calls harmless
     at bases 57–64) fits better than the race. Telemetry cannot tell lost survivors from
