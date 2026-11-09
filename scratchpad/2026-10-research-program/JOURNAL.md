@@ -33,6 +33,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - 09:15 UTC: **#249 at 80a103e: 23 pass, 2 red = GitHub 504s** (the clippy job's checkout and the
   wasm job's wasm-pack download failed before any build step). Not ours; commented asking for a
   rerun (I cannot rerun upstream workflows). The other four open PRs stay green.
+- **Review of `pr/cpu-join-seeded-check` (09:25 UTC, `L56/REVIEW.md`): merge with small fixes, no
+  soundness defect** (every seeded digit set is true for every n in its block; closure digits
+  excluded by construction; Magic bounds exact). **Medium: the hit-deciding path `Check::nice` never
+  returns true in any test but 69 — two early-exit mutants pass the suite and would drop every
+  production hit**; the reviewer wrote a property test (verdict vs count mode, 1.2 M verdicts) that
+  catches both. Sent to the L56 agent with the body corrections (b58 share claim, b40 exponent,
+  (b²)^(2·nl), the V3 comparison, the top-seeding's ×1.01–1.02 stated early) and a rename.
 
 ## 2026-11-08 (day 12; routine fired 04:41 UTC)
 
