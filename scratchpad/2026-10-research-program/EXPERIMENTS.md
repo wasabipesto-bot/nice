@@ -5,6 +5,35 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## L56.1 CPU seeded full check: PR branch (2026-11-09, agent; `L56/PR-RESULTS.md`, `L56/PR-BODY.md`, `L56/raw/`; `pr/cpu-join-seeded-check` 5c218b7 = one commit on L52's 1cce00d)
+
+The check treats three digit sets as known: positions 0..k of n², n³ (the bottom's mask as
+listed), positions k..k2 (the prefilter's four digits recomputed with the same `Fx::digits` /
+`mid_values`), and the top's **pre-closure** common certificate digits (new `Cert::common`) only
+where the seed flag is set (floor ≥ k2; every production survivor) — closure-forced digits are
+never seeded (L47's warning). The middle digits come from design D's base-b² column form with its
+own limb split (P split at b^10 with one 64-bit mul-high; `join_check` not imported since it lives
+on the GPU stack; the PR's `Magic` uses the same construction and tests; merge proposed once both
+land). **A/B vs 1cce00d (ivory Zen 2, 3 interleaved rounds; 1 / 4 threads):** b60 1e16 ×1.117
+(1743 → 1560 ms) / ×1.139; b62 1e17 slice 0 ×1.136 (1693 → 1491 ms) / ×1.109; b58 1e15 ×1.168 /
+×1.167; whole b60 1e14 ×1.090 / 1.069, b62 ×1.088 / 1.106, b64 ×1.119 / 1.110; counts identical in
+every run. **NiceMark CPU 4 rounds ×1.155 (1091.0 → 1259.6; rounds 1.12–1.17).** perf (1 thread):
+check share 14.8 → 4.9 % (b60), 16.1 → 4.7 % (b62); per check 119 → 36 ns / 133 → 34 ns; cycles
+−8.6 / −12.7 %, IPC 2.85 → 3.12 / 2.79 → 3.17. On 4.28 M / 4.09 M recorded survivors: old 125.5 /
+131.6 ns; column form with top digits 28.5 / 29.3 ns (×4.4–4.5); column form low digits only
+38.2 / 41.0; L50's V3 form 50.3 / 50.8; digits converted before the verdict 9.6–9.8 → 1.8; 96 % of
+checks decided within the first four middle digits. Tests: every checked survivor (test windows +
+2 partitions of each PLAN field in CI; 4 partitions of each timed shape opt-in
+`NICE_TEST_CPU_CHECK_REF`, 19.65 M survivors): seeds = true digits at exactly those positions and
+disjoint, middle digits match position by position (count mode), distinct count =
+`get_num_unique_digits`, repeat flag and verdict = `get_is_nice`; column digits vs malachite on
+274,661 (n, shape) pairs at bases 3–64; 298,153 verdicts on near-nice / band-edge / adversarial n
+incl. b10's 69; quotient exactness by closed-form bound + block checks in CI, exhaustive x < 2³¹
+for 114 divisors opt-in (493 s); debug build with overflow checks passes; certificate parts vs
+the reference and the stepped certificates; suite 196 + 22; `NICE_TEST_CPU_JOIN_REF=3`; whole b42;
+fmt; clippy. (An out-of-line `Iterator::nth` from a clippy-driven `skip(1)` cost 0.7 % and was
+fixed before the measured head.) → reviewer; held at the cap (4th held branch).
+
 ## L53.1 #249's top-layer sort off the device thread: third commit 80a103e (2026-11-09, agent; `L53/RESULTS.md`, `L53/raw/`; #249 head 80a103e; held branches rebased: `pr/top-fd-round2` 5d0c8cf, `pr/check-d` e28b79f)
 
 On 87958fd `sorted_layer` ran at the top of `run_slice` inside `JoinDevice::new`, on the device

@@ -26,6 +26,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   cannot resolve 2 % at ±4 % clock scatter), output word-for-word identical. Held branches
   rebased onto it: `pr/top-fd-round2` 5d0c8cf, `pr/check-d` e28b79f (two small conflicts
   resolved; tests pass). #249's GitHub body updated and commented. Box l53-sort destroyed (2.6 h).
+- **L56 PR-ready (09:00 UTC, L56.1): CPU seeded check ×1.11–1.14 at production shapes (1 and 4
+  threads), NiceMark CPU ×1.155, the check's share 15–16 % → 5 %; seeds only pre-closure certificate
+  digits (L47's warning honoured); exact position by position on 19.65 M survivors.** Reviewer
+  launched; fourth held branch (CPU chain: #247 → #248 → two-pass scan → seeded check).
 
 ## 2026-11-08 (day 12; routine fired 04:41 UTC)
 
