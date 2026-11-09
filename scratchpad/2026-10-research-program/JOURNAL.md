@@ -48,6 +48,7 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - 11:50 UTC: no rerun of #249's two 504-failed jobs → **CI retriggered by a message-only amend of
   the third commit** (#249 → 9d9e2e9, tree identical to 80a103e); held branches rebased with
   identical trees: `pr/top-fd-round2` 4336a18, `pr/check-d` d8390d9.
+- 12:52 UTC: **#249 fully green at 9d9e2e9** (25 pass, 3 skipped; the two 504 jobs passed on the rerun). All five open PRs green; no comments; nothing merged.
 
 ## 2026-11-08 (day 12; routine fired 04:41 UTC)
 
