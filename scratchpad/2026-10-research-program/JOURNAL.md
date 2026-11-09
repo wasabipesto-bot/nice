@@ -37,6 +37,44 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   is on the table; whether to buy a second pass of b50–60; what to optimise for beyond the
   search itself; subagent models; opening all four held branches.
 
+## 2026-11-09 late evening: the user's answers; Apple M4 survivor deficit found in telemetry
+
+- **The user's answers.** (1) Changing the server's work unit is tentatively on the table, but
+  the bar for N1 is **×3** per base, not ×2; record the result either way (they may revisit if
+  other leads fail). (2) They saw no reason for a second pass of b50–58 and asked whether a new
+  unsoundness bug had been found. (3) Odds per dollar is a good metric but must not blind me;
+  a verified negative result is very useful; write-ups and outreach are disprioritised (other
+  agents do them): note such items in the daily report only. (4) The four held branches: hold
+  if they are kernel-only and under ×1.5 combined; open if over, or for another reason.
+- **Held branches stay held:** GPU pair ×1.23 at b62 1e17 (×1.127 × ×1.088; ×1.25 b60), CPU pair
+  ×1.38–1.45 (NiceMark CPU ×1.46). Both chains are kernel work under ×1.5. One non-speed item
+  inside `pr/check-d`: main's suite compares only hit lists, empty everywhere but b10's 69, so an
+  over-rejecting check kernel passes it; the per-survivor device test needs a count mode in the
+  check kernel. Offered to the user as a separate small integrity PR.
+- **Exposure check that the question prompted** (`../2026-11-fresh-eyes/exposure_pairs.py`,
+  `exposure_analyze.py`, data `exposure_b60*.json`; read-only, primary-key and field_id lookups
+  on data.nicenumbers.net; 3,600 b60 fields, 3,860 join submissions with telemetry):
+  - v3.4.6 (10-08 → 10-31) shipped the join without #222; the PR's own text says the race can
+    drop survivors before the full check, and the changelog does not list it. 36 % + 12 % of
+    the sampled searched b60 fields were searched only by pre-fix AMD / NVIDIA builds.
+  - Telemetry carries `survivors` and `checked` per field. A survivor that overruns the stage
+    moves from `survivors` to `checked` (documented, timing dependent), so for two runs of one
+    field R = Δsurvivors + Δchecked/(1 − pass) should be ≈ 0. **AMD and NVIDIA: 0 of 264
+    same-build pairs beyond 1e-6 of the field's survivors** (two AMD-vs-hand-CUDA pairs at
+    2.2e-6). The race left no measurable trace there. The second pass of b50–58 is dropped.
+  - **Apple M4 (mayalaran), builds 9a4f7406 and 2709d3f9 (before #222 and #228): 69 of 82
+    pairs against AMD or NVIDIA runs of the same field account for fewer survivors, median
+    ≈ 1e-4 of the field, up to 6.4e-4 (1.25e-3 across dev builds), never more.** Two M4 runs
+    of one field agree with each other to ≤ 4e-6 (4 pairs), so the deficit is mostly
+    deterministic: a compile-level defect (the #228 pattern, which the changelog calls harmless
+    at bases 57–64) fits better than the race. Telemetry cannot tell lost survivors from
+    miscounted ones. After both fixes (6f060a94): 2 cross-build pairs, +5e-8 and +1.3e-6.
+  - Exposure: 3.6 % of the sampled searched b60 fields have only a pre-fix M4 run (≈ 4,400
+    fields, ≈ $2 of GPU time to redo); b57/b58 M4 share not yet counted. Effect on the odds
+    ≈ 1e-9; it matters for a verified "none below base N".
+- Asked the user for: ~2 h on mayalaran (same fields on current main and on v3.4.6 ± #228 to
+  name the cause), and whether to re-queue pre-fix M4-only fields (server action, theirs).
+
 ## 2026-11-09 (day 13; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; November research $10.29 (fleet $15.38); credit $35.65;
