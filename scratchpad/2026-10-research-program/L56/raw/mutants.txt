@@ -1,0 +1,41 @@
+### 09:47:02 mutant M4: exit after n² column 3 (verdict path only)
+433c433
+<                         if !COUNT && $j % 2 == 1 && sc.repeat {
+---
+>                         if !COUNT && $j % 2 == 1 && (sc.repeat || $j == 3) {
+test cpu_check::tests::magic_quotients_are_exact_everywhere ... ignored, exhaustive, minutes on every core; NICE_TEST_CPU_CHECK_EXHAUSTIVE=1
+test cpu_check::tests::sixty_nine_is_nice ... ok
+test cpu_check::tests::production_shapes_take_the_columns ... ok
+test cpu_check::tests::the_verdict_agrees_with_count_mode_on_any_mask ... FAILED
+test cpu_join::tests::cpu_join_finds_69_in_base_10 ... ok
+test cpu_join::tests::cpu_join_matches_the_reference_on_the_test_windows ... ok
+test cpu_check::tests::the_columns_take_the_digits_of_the_square_and_the_cube ... ok
+test cpu_check::tests::the_seeded_check_decides_what_the_full_check_decides ... ok
+test cpu_join::tests::the_full_check_is_exact_on_production_survivors ... ok
+test cpu_check::tests::magic_quotients_are_exact_on_the_checks_inputs ... ok
+thread 'cpu_check::tests::the_verdict_agrees_with_count_mode_on_any_mask' (826621) panicked at common/src/cpu_check.rs:818:29:
+assertion `left == right` failed: b3 n = 80 f0 2 k2 7 ends [8, 8] seen 0xe793505cf7397f62
+  left: false
+ right: true
+test result: FAILED. 8 passed; 1 failed; 1 ignored; 0 measured; 195 filtered out; finished in 6.59s
+### 09:48:01 mutant M4b: exit after n² column 5 (verdict path only)
+433c433
+<                         if !COUNT && $j % 2 == 1 && sc.repeat {
+---
+>                         if !COUNT && $j % 2 == 1 && (sc.repeat || $j == 5) {
+test cpu_check::tests::magic_quotients_are_exact_everywhere ... ignored, exhaustive, minutes on every core; NICE_TEST_CPU_CHECK_EXHAUSTIVE=1
+test cpu_check::tests::production_shapes_take_the_columns ... ok
+test cpu_check::tests::sixty_nine_is_nice ... ok
+test cpu_check::tests::the_verdict_agrees_with_count_mode_on_any_mask ... FAILED
+test cpu_join::tests::cpu_join_finds_69_in_base_10 ... ok
+test cpu_join::tests::cpu_join_matches_the_reference_on_the_test_windows ... ok
+test cpu_check::tests::the_columns_take_the_digits_of_the_square_and_the_cube ... ok
+test cpu_check::tests::the_seeded_check_decides_what_the_full_check_decides ... ok
+test cpu_join::tests::the_full_check_is_exact_on_production_survivors ... ok
+test cpu_check::tests::magic_quotients_are_exact_on_the_checks_inputs ... ok
+thread 'cpu_check::tests::the_verdict_agrees_with_count_mode_on_any_mask' (827418) panicked at common/src/cpu_check.rs:818:29:
+assertion `left == right` failed: b3 n = 270 f0 3 k2 8 ends [11, 8] seen 0xa2228357b428cc78
+  left: false
+ right: true
+test result: FAILED. 8 passed; 1 failed; 1 ignored; 0 measured; 195 filtered out; finished in 6.65s
+### 09:49:01 restored: 

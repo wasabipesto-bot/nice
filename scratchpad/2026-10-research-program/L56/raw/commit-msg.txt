@@ -17,10 +17,10 @@ those and converts only the digits in between.
   only where it gates the prefilter (every certified position >= k2);
   Top stays 48 bytes (its gmask becomes a flag, pc a byte).
 - cpu_check: n's base-b² limbs from P and r0 (one 64-bit multiply-high
-  quotient splits P, four more give the low limbs); n² by schoolbook
-  columns of u32 products, written out per column, normalised by a
-  multiply-high quotient by b² and split by one by b, both exact for
-  every input below 2^31; two digits a column without a branch, a
+  quotient splits P, three or four more give the low limbs); n² by
+  schoolbook columns of u32 products, written out per column, normalised
+  by a multiply-high quotient by b² and split by one by b, both exact
+  for every input below 2^31; two digits a column without a branch, a
   branch every other column; n³ = n²·n the same way when n²'s middle
   passes. Fields outside the column form's bounds (none in production)
   take the same digits by long division.
@@ -33,7 +33,9 @@ every count are unchanged.
 Tests: the quotients' bounds for every divisor, block by block over
 their inputs (and every x below 2^31 opt-in); the column form's digits
 against malachite at every base 3-64 and every shape, with any ends; the
-seeded check's verdict and its count mode against get_is_nice and
+verdict path against count mode on any mask, so that it answers true at
+every limb count; the seeded check's verdict and its count mode against
+get_is_nice and
 get_num_unique_digits on the near-nice n of bases 10-22 (69 among them),
 band edges and adversarial n of bases 23-64; every checked survivor of
 the test windows and of two partitions of each production field (opt-in:

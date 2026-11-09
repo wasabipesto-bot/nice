@@ -40,6 +40,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   production hit**; the reviewer wrote a property test (verdict vs count mode, 1.2 M verdicts) that
   catches both. Sent to the L56 agent with the body corrections (b58 share claim, b40 exponent,
   (b²)^(2·nl), the V3 comparison, the top-seeding's ×1.01–1.02 stated early) and a rename.
+- **L56 fixes done (10:40 UTC): `pr/cpu-join-seeded-check` → 0fc06a0** (the property test
+  `the_verdict_agrees_with_count_mode_on_any_mask` fails under both early-exit mutants and passes
+  on the branch with 1.2 M verdicts incl. `true` at every limb count; body/doc corrections; the
+  timed binary's code is byte-identical). Tests 197 + 22. Fourth reviewed branch held at the cap.
+  Day: 2 boxes ($0.55), 5 agents (all Opus), director ~5 h.
 
 ## 2026-11-08 (day 12; routine fired 04:41 UTC)
 
