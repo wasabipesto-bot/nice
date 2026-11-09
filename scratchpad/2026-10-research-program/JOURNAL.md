@@ -4,6 +4,18 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-09 (day 13; routine fired 04:41 UTC)
+
+- **Reconcile:** no research instances; November research $10.29 (fleet $15.38); credit $35.65;
+  ivory 15 GB free. Five program PRs open and green at the cap, nothing merged since 11-03, no
+  comments, no user messages; three reviewed branches held (`pr/top-fd-round2` d813aea,
+  `pr/check-d` 7d6956f, `pr/cpu-join-two-pass-scan` 1cce00d); main = 6f060a9. Five 7-day
+  worktrees removed (24 remain).
+- Leads today: **L53** #249's host sort off the device thread (box `l53-sort`, instance 59842980;
+  lands as a third commit on #249; kill < ×1.02), **L54/L55** AND codegen fold + register pin (box
+  `l54-andgen`, instance 59842997; kill: no fold in CubeCL or A/B < ×1.03), **L56** CPU seeded check
+  PR branch on L52 (ivory; kill < ×1.05 on top of L52). Hard stops 12:30 UTC.
+
 ## 2026-11-08 (day 12; routine fired 04:41 UTC)
 
 - **Reconcile:** no research instances; November research $9.26 (fleet $13.48); credit $38.59;
