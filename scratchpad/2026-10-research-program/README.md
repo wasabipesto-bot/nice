@@ -20,7 +20,7 @@ director session can be replaced from it at any time.
 2. Read the journal head (the current plan) and the Tracks table at the top of the ledger.
    Since the director change on 2026-11-09 the day is organised by tracks (T1 the join's
    macro shape, T2 integrity, T3 theory, T4 delivery), not by three kernel leads; every lead is
-   priced as $/base at the frontier, and kernel trims under ×1.10 are parked, not PR'd. The
+   priced as $/base at the frontier (the PR bar is in "Working without the user" below). The
    operation model is `../2026-11-fresh-eyes/NOTES.md`.
 3. Execute: few, fully briefed subagents on Opus (implementation, review) or Sonnet (surveys),
    a reviewer agent on every PR branch, no nested agents. Vast only via `vast.py create`. CPU work on ivory under
@@ -48,8 +48,11 @@ cap, rentals below the credit floor, the user's machines.
 The user checks in when they can and may miss several days. Decide inside the rails without
 asking; keep questions rare and never blocking; reports short enough to skim after a gap.
 Standing order: keep looking at high-level strategies; if none pan out, continue with
-optimisations. Kernel work is opened as a PR chain only when its combined measured gain is
-≥ ×1.5 (or it fixes a defect). A server rearchitecture is not wanted (N1 parked). Write-ups and
+optimisations. A server rearchitecture is not wanted (N1 parked).
+**PR bar (the user, 2026-11-10, correcting my reading of the ×1.5 question, which only gauged
+urgency):** one discrete change per PR, never several combined into one (separate stacked PRs
+are fine); ≥ ×1.05 for a simple change up to ≥ ×1.10 for a very large one, measured by
+PROPOSAL §5, or a defect fix. Write-ups and
 outreach belong to other agents: note such items in the report only.
 
 ## Channels

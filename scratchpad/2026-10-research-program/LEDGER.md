@@ -11,7 +11,7 @@ verdict missed (user, 2026-10-28).
 ## Tracks since the director change (2026-11-09)
 
 Evidence and the operation model: `../2026-11-fresh-eyes/NOTES.md`. Every lead is priced as
-$/base at the frontier (and Δλ); kernel trims under ×1.10 are parked, not PR'd.
+$/base at the frontier (and Δλ). PR bar: ×1.05 (simple) to ×1.10 (very large), one discrete change per PR (the user, 2026-11-10).
 
 | id | lead | track | status | expected | cost | kill criterion | last update |
 |---|---|---|---|---|---|---|---|
@@ -26,7 +26,7 @@ $/base at the frontier (and Δλ); kernel trims under ×1.10 are parked, not PR'
 | N6 | Child-only top certificates (truncated FD on the certificate window) | T1 | idea; only matters if f0 3 returns after N1 | tops ÷5 | — | — | 2026-11-09 |
 | N7 | u64 chunks for the transposed AND on CUDA | T1 | idea; the dense AND is ~70 % of the time after N1 | ≤ ×1.4 after N1 | — | — | 2026-11-09 |
 | N8 | Browser WebGPU nice-only client on N1's units | outreach | idea, after N1 | free compute | — | — | 2026-11-09 |
-| T4 | Delivery: the four held reviewed branches (`pr/top-fd-round2`, `pr/check-d`, `pr/cpu-join-two-pass-scan`, `pr/cpu-join-seeded-check`) | T4 | **held by the user's rule (2026-11-09): kernel-only PRs wait unless a chain is ≥ ×1.5 combined or has another reason**; GPU pair ×1.23 b62 1e17, CPU pair ×1.38–1.45; candidate integrity item: a count mode + per-survivor device test for main's check kernel (asked) | GPU ×1.23, CPU ×1.4 | rebase when opened | — | 2026-11-09 |
+| T4 | Delivery: the four held reviewed branches | T4 | **opened 2026-11-10 as #250 (GPU top-certificate bounds, ×1.127 b62 1e17), #251 (GPU check in base-b² limbs, ×1.088, stacked on #250), #252 (CPU two-pass scan, ×1.24–1.27), #253 (CPU seeded check, ×1.11–1.14, stacked on #252)** after the user corrected the PR bar (×1.05 simple to ×1.10 very large, one discrete change per PR); watch CI and review comments | GPU ×1.23, CPU ×1.4 together | — | — | 2026-11-10 |
 
 ## Active and queued (the kernel series, 2026-10-28 → 11-09)
 

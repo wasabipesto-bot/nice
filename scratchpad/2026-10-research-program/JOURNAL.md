@@ -37,6 +37,30 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   is on the table; whether to buy a second pass of b50–60; what to optimise for beyond the
   search itself; subagent models; opening all four held branches.
 
+## 2026-11-10 15:00 UTC: the user's PR bar corrected; the four held branches opened as #250–#253
+
+- **Correction from the user:** the bar for an individual PR is ×1.05 for a simple change up to
+  ×1.10 for a very large one; discrete changes are not to be combined into one PR; the ×1.5
+  question only gauged the held branches' overall impact and urgency; the four held branches
+  "would probably be appropriate for PRs". My "chain at ≥ ×1.5" reading and my own "park under
+  ×1.10" line are withdrawn (README, the routine's prompt and memory updated).
+- **Opened, each one commit on main c0c357a or on its predecessor:**
+  **#250** GPU top certificates carry their bounds across partitions (×1.127 b62 1e17, ×1.112 b60;
+  `pr/top-fd-round2` ee30303); **#251** GPU full check in base-b² limbs (×1.088 / ×1.124; stacked
+  on #250; `pr/check-d` a97e3d7); **#252** CPU two-pass AND scan (×1.24–1.27; 
+  `pr/cpu-join-two-pass-scan` 35dc530); **#253** CPU seeded full check (×1.11–1.14; stacked on
+  #252; `pr/cpu-join-seeded-check` 47859f7). All four were reviewed before the hold.
+- Rebase method: each held commit cherry-picked onto main (only CHANGELOG conflicts); the files
+  each PR touches are byte-identical to the measured trees (checked with `git diff`); fmt clean;
+  nice_common tests 190 / 197 pass on the CPU branches; the GPU branches compile with the
+  cubecl feature (their device tests ran on the measured trees; upstream CI runs lavapipe).
+  Changelog lines carry their own PR numbers (predicted and confirmed). Bodies: the prepared
+  ones with the stacking line replaced by a rebase note.
+- Under the corrected bar the parked list is worth a second look, one PR each: N11 (the walk's
+  per-chunk floor, ≤ ×1.06, to be measured), the CPU roadmap's remaining items (FD round 2 est.
+  ×1.06–1.12, vectorised pass 2 est. ×1.05–1.10); L32/L43/L54/N12 measure under ×1.05 at
+  production fields; L40 breaks the no-scenario-below-×0.98 rule.
+
 ## 2026-11-10 later: the user's reply to the first report (standing guidance)
 
 - **N1 stays parked, more firmly.** Anvil is the user's best large CPU supply (cost notes in
