@@ -37,6 +37,49 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   is on the table; whether to buy a second pass of b50–60; what to optimise for beyond the
   search itself; subagent models; opening all four held branches.
 
+## 2026-11-10 01:03–01:38 UTC: M4 window; the deficit is the #222 flush race, and it loses candidates
+
+The user granted mayalaran for 3 h (used 35 min; work dir and watchdog removed, nothing left),
+asked for a count of affected fields from the public API (re-search under $5 → they consider
+disqualifying), and asked whether I still endorse the check-kernel count test (they found it
+brittle). Evidence: `../2026-11-fresh-eyes/m4-run/` (logs, the two diagnostic tests),
+`census_apple.py`, `census_summary.py`, `census_summary.json`, `m4_prefix_join_submissions.csv`.
+
+- **Reproduced.** The M4 is on macOS 27.2 now (Metal division bug fixed in the OS), and v3.4.6
+  still comes up short against the exact CPU join on b60 field 206954951: 1.05 M of 1.80e9
+  survivors unaccounted on 32 partitions (5.8e-4, five repetitions 5.6–5.8e-4; October
+  telemetry said 5.7e-4). So the cause is not the compiler.
+- **Cause = #222.** v3.4.6 + only the barrier commit 7155c49c: unaccounted 1–2 k of 1.80e9
+  (≤ 1e-6, the accounting's precision).
+- **Candidates are really lost.** List-level comparison (the list handed to the full check vs
+  the CPU reference's prefilter survivors): v3.4.6 misses **1,779 of 4,364,944** must-check
+  candidates on 8 partitions of slice 0 (4.1e-4); with the barrier **0**. b58 1e15 field: 2,228
+  of 9.2 M missing (2.4e-4), counts 8.7e-5 and 5.5e-4 on two fields.
+- **b57 (1e14 fields) is clean on v3.4.6:** five whole fields within 3e-7 (the precision), and
+  0 of 20.9 M + 0 of 3.3 M candidates missing on two fields' lists. Mechanism agrees: work
+  items there have under 32 tops, one chunk, no between-chunk flush decision.
+- **Current main is clean on the M4:** exact equality with the CPU join (survivors and checked)
+  on five b60 fields, 32–256 partitions each, every repetition; 27.6e9 survivors compared.
+  Since #236 the counts are exact and deterministic (no stage overrun in the accounting).
+- **Why it never showed on AMD/NVIDIA:** timing. On the M4 the stage overruns ~100× more often
+  (1.7e-3 of survivors against 2e-5), and the racy flush decision goes wrong constantly.
+- **Census (public API, id-range scans with a telemetry filter, 7 min):** all Apple join
+  submissions are mayalaran's. Fields whose only qualified nice-only search is a pre-fix M4
+  join run: **b57 12,103 (1.2e18 numbers, clean by the above), b58 4,415 (4.4e18), b60 3,954
+  (3.95e19)**. Re-search of b58 + b60: ≈ $6.2 at the cost model's v3.4.6 prices; production
+  telemetry shows no clear v3.4.7 gain on the fleet's GPUs, so ≈ $6 on the deployed v3.4.7;
+  ≈ $2.5–3 on a build of current main (demoux: 33 s → 16 s per b60 field from 3.4.6 to
+  3.4.8-dev); or ~20 h of demoux at no Vast cost.
+- **Gotcha:** on the Mac a second tree of the same version reused the first tree's test
+  binary (`secs=0`); the label string check caught it. `cargo clean -p nice_common` before
+  every build that is compared.
+- **Check-kernel count test:** withdrawn. Read in full: it hand-builds the kernel's private
+  record layout and depends on three test-only kernel modes, so it tests a variant of the
+  kernel and breaks on any layout change. What found today's defect was differential checking
+  on production-shaped work. On main the join's (survivors, checked) are exact, so repeat or
+  spot-check submissions of a field must agree to the unit: a production invariant that
+  needs no kernel hooks. Idea recorded as N9 (proposal only).
+
 ## 2026-11-09 late evening: the user's answers; Apple M4 survivor deficit found in telemetry
 
 - **The user's answers.** (1) Changing the server's work unit is tentatively on the table, but
