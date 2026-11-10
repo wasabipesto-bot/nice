@@ -35,7 +35,7 @@ use crate::FieldSize;
 use crate::client_process::{get_is_nice, get_is_nice_with_known_lsd};
 use crate::cpu_top_fd::{TopFd, TopFdSetup};
 use crate::overlap_join::{
-    Div64, FieldSetup, JoinParams, join_params_for, join_slices, join_verdict, ndigits,
+    Div64, FieldSetup, JoinParams, W4, join_params_for, join_slices, join_verdict, ndigits,
     prefix_block,
 };
 use anyhow::Result;
@@ -76,6 +76,58 @@ impl PartitionResult {
         self.hits.extend(other.hits);
         self.survivors += other.survivors;
         self.checked += other.checked;
+    }
+}
+
+/// Experiment only (N1): how far a pair that passed the AND goes, so the
+/// timing runs can split the survivor path off the scan by difference.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SurvMode {
+    /// The in-range test, the prefilter and the full check (production).
+    Full,
+    /// The in-range test and the prefilter; prefilter survivors are counted
+    /// as `checked` but not checked.
+    NoCheck,
+    /// The in-range test only.
+    AndOnly,
+}
+
+/// Experiment only (N1): operation counts and phase times of partitions.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct JoinCounts {
+    /// Top slots certified (partition-extended top-layer prefixes inside
+    /// the field), and of those the certified tops.
+    pub top_tests: u64,
+    pub tops: u64,
+    /// Bottom-list residues (mod `b^f0`) the extension visited, those it
+    /// kept through the fixed digits below `k − 1`, and the listed bottoms
+    /// (valid at all `k` digits, summed over keys).
+    pub bottom_cands: u64,
+    pub bottoms_ext: u64,
+    pub bottoms: u64,
+    /// ANDs performed (top × class bottoms over every root).
+    pub ands: u64,
+    /// Seconds in tops, the bottom extension, listing, and the scans with
+    /// their survivor paths.
+    pub t_tops: f64,
+    pub t_extend: f64,
+    pub t_list: f64,
+    pub t_scan: f64,
+}
+
+impl JoinCounts {
+    /// Add another run's counts to these.
+    pub fn add(&mut self, o: &JoinCounts) {
+        self.top_tests += o.top_tests;
+        self.tops += o.tops;
+        self.bottom_cands += o.bottom_cands;
+        self.bottoms_ext += o.bottoms_ext;
+        self.bottoms += o.bottoms;
+        self.ands += o.ands;
+        self.t_tops += o.t_tops;
+        self.t_extend += o.t_extend;
+        self.t_list += o.t_list;
+        self.t_scan += o.t_scan;
     }
 }
 
@@ -347,6 +399,18 @@ pub struct CpuJoin {
     /// block; `None` if the field's digit arrays would not fit them (then
     /// `Base::cert` certifies every block).
     fd: Option<TopFdSetup>,
+    /// Experiment only (N1): `r³` of an extended residue does not fit
+    /// `u128`, so [`Self::extend`] takes 256-bit words.
+    wide: bool,
+    /// Experiment only (N1, task 5): the bottom list's residues `r0` (mod
+    /// `b^f0`) prepared once per base for [`Self::extend_affine`]:
+    /// `⌊r0²/b^f0⌋`, `⌊r0³/b^f0⌋` and `r0²`, each mod `b^G` (`G = k2 −
+    /// f0`), in `bp_r`'s order; and `b^G`'s divider. `None`: the exact
+    /// extension ([`Self::extend`]).
+    ext_pre: Option<(Vec<[u64; 3]>, Div64, u64)>,
+    /// Experiment only (N1): how far a pair that passed the AND goes
+    /// ([`SurvMode`]); `Full` everywhere but the timing runs.
+    pub mode: SurvMode,
     /// The AND scan may use AVX2 (detected at run time).
     #[cfg(target_arch = "x86_64")]
     avx2: bool,
@@ -373,7 +437,27 @@ impl CpuJoin {
     /// # Errors
     /// A field or parameters the join cannot take (see `FieldSetup::new`).
     pub fn new(base: u32, range: &FieldSize, jp: JoinParams) -> Result<Self> {
-        let mut fs = FieldSetup::new(base, range.start(), range.end(), jp)?;
+        Self::from_setup(FieldSetup::new(base, range.start(), range.end(), jp)?)
+    }
+
+    /// Experiment only (N1): the CPU join at a shape the GPU cannot run
+    /// (`FieldSetup::new_experiment`), such as `(L − 4, 9, 5)` over a
+    /// base's whole range, one partition value at a time.
+    ///
+    /// # Errors
+    /// As [`Self::new`].
+    pub fn new_experiment(base: u32, range: &FieldSize, jp: JoinParams) -> Result<Self> {
+        Self::from_setup(FieldSetup::new_experiment(
+            base,
+            range.start(),
+            range.end(),
+            jp,
+        )?)
+    }
+
+    fn from_setup(mut fs: FieldSetup) -> Result<Self> {
+        let base = fs.b;
+        let jp = fs.jp;
         let b = u64::from(base);
         let k = jp.k;
         let mid = fs.k2 - k;
@@ -416,6 +500,10 @@ impl CpuJoin {
             fx: Fx::new(base),
             lean: mid == 2 && k > mid,
             fd,
+            // r³ for a residue below b^(k−1) past u128 (k = 9 at base 62).
+            wide: fs.base.powu(k - 1).checked_pow(3).is_none(),
+            mode: SurvMode::Full,
+            ext_pre: None,
             #[cfg(target_arch = "x86_64")]
             avx2: std::arch::is_x86_feature_detected!("avx2"),
             #[cfg(target_arch = "x86_64")]
@@ -485,7 +573,33 @@ impl CpuJoin {
         (v / self.fs.b.pow(i)) % self.fs.b
     }
 
-    fn run(&self, v: u32, sc: &mut Scratch, mut record: Option<&mut Vec<u128>>) -> PartitionResult {
+    fn run(&self, v: u32, sc: &mut Scratch, record: Option<&mut Vec<u128>>) -> PartitionResult {
+        self.run_counted(v, sc, record, None)
+    }
+
+    /// Experiment only (N1): partition `v` with its operation counts and
+    /// phase times added to `counts`, and its prefilter survivors to
+    /// `record` if given.
+    pub fn run_partition_counted(
+        &self,
+        v: u32,
+        sc: &mut Scratch,
+        record: Option<&mut Vec<u128>>,
+        counts: &mut JoinCounts,
+    ) -> PartitionResult {
+        self.run_counted(v, sc, record, Some(counts))
+    }
+
+    // One loop with the counters optional: the production path passes
+    // `None` and pays a predictable branch per key and per class scan.
+    #[allow(clippy::too_many_lines, clippy::cast_possible_truncation)]
+    fn run_counted(
+        &self,
+        v: u32,
+        sc: &mut Scratch,
+        mut record: Option<&mut Vec<u128>>,
+        mut counts: Option<&mut JoinCounts>,
+    ) -> PartitionResult {
         let mut out = PartitionResult::default();
         let m1 = self.fs.m1;
         let roots = &self.fs.base.roots;
@@ -500,14 +614,31 @@ impl CpuJoin {
             if lo == hi {
                 continue;
             }
+            let clock = counts.as_ref().map(|_| std::time::Instant::now());
             self.tops(v, &self.fs.tlay[lo..hi], &mut sc.tops);
+            if let (Some(c), Some(t)) = (counts.as_deref_mut(), clock) {
+                c.t_tops += t.elapsed().as_secs_f64();
+                c.top_tests += self.slots(v, &self.fs.tlay[lo..hi]);
+                c.tops += sc.tops.len() as u64;
+            }
             if sc.tops.is_empty() {
                 continue;
             }
             if !extended {
-                self.extend(v, &mut sc.ext);
+                let clock = counts.as_ref().map(|_| std::time::Instant::now());
+                if self.ext_pre.is_some() {
+                    self.extend_affine(v, &mut sc.ext);
+                } else {
+                    self.extend(v, &mut sc.ext);
+                }
                 extended = true;
+                if let (Some(c), Some(t)) = (counts.as_deref_mut(), clock) {
+                    c.t_extend += t.elapsed().as_secs_f64();
+                    c.bottom_cands += self.fs.bp_r.len() as u64;
+                    c.bottoms_ext += sc.ext.idx.len() as u64;
+                }
             }
+            let clock = counts.as_ref().map(|_| std::time::Instant::now());
             sc.tops.sort_unstable_by_key(|t| t.pc);
             // The last bottom digit: the key itself, or the partition's last.
             let d = if self.fs.key_level {
@@ -516,10 +647,17 @@ impl CpuJoin {
                 self.partition_digit(v, self.fs.jp.p - 1)
             };
             self.list(d, &mut sc.ext, &mut sc.masks, &mut sc.info, &mut sc.offs);
+            if let (Some(c), Some(t)) = (counts.as_deref_mut(), clock) {
+                c.t_list += t.elapsed().as_secs_f64();
+                c.bottoms += sc.masks.len() as u64;
+            }
+            let clock = counts.as_ref().map(|_| std::time::Instant::now());
+            let mut ands = 0u64;
             for top in &sc.tops {
                 for &root in roots {
                     let c = ((root + m1 - top.pc) % m1) as usize;
                     let (lo, hi) = (sc.offs[c] as usize, sc.offs[c + 1] as usize);
+                    ands += (hi - lo) as u64;
                     let pass = Pass {
                         top,
                         d,
@@ -529,8 +667,25 @@ impl CpuJoin {
                     self.scan(&pass, &sc.masks[lo..hi], &mut out, &mut record);
                 }
             }
+            if let (Some(c), Some(t)) = (counts.as_deref_mut(), clock) {
+                c.t_scan += t.elapsed().as_secs_f64();
+                c.ands += ands;
+            }
         }
         out
+    }
+
+    /// The top slots [`Self::tops`] certifies for partition `v` over
+    /// `layer`: its prefixes extended by `v` that lie in the field.
+    fn slots(&self, v: u32, layer: &[(u128, u64)]) -> u64 {
+        let fs = &self.fs;
+        layer
+            .iter()
+            .filter(|&&(p0, _)| {
+                let p = p0 * fs.nparts + u128::from(v);
+                p >= fs.plo && p <= fs.phi
+            })
+            .count() as u64
     }
 
     /// The partition's tops from the top-layer prefixes `layer` (all of one
@@ -597,6 +752,123 @@ impl CpuJoin {
     /// the partition's last digit, which [`Self::list`] adds). Residues
     /// whose digits repeat, or meet the field's certificate (which every
     /// top's mask contains), are dropped here, once for every key.
+    /// Experiment only (N1, task 5): prepare [`Self::extend_affine`] (once
+    /// per base: the per-residue terms of the bottom list). Returns the
+    /// seconds it took.
+    ///
+    /// # Panics
+    /// If `b^G` is past `2^48/b` (`G = k2 − f0`).
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn enable_affine_extend(&mut self) -> f64 {
+        let t = std::time::Instant::now();
+        let fs = &self.fs;
+        let g = fs.k2 - fs.f0;
+        let bg = u64::from(fs.b).pow(g);
+        // The digits come off by `SmallDiv::divrem`, exact below 2^48/b.
+        assert!(bg <= (1 << 48) / u64::from(fs.b), "b^G = {bg} too wide");
+        let dg = Div64::new(bg);
+        let wf = fs.base.powu(fs.f0) as u64;
+        let df = Div64::new(wf);
+        let pre = fs
+            .bp_r
+            .iter()
+            .map(|&r0| {
+                let r = u128::from(r0);
+                let r2 = r * r;
+                let mut r3 = W4::mul_u128_u128(r2, r);
+                df.divrem_w4(&mut r3);
+                let a3 = dg.divrem_w4(&mut r3);
+                let (q2, _) = df.divrem_u128(r2);
+                [dg.divrem_u128(q2).1, a3, dg.divrem_u128(r2).1]
+            })
+            .collect();
+        self.ext_pre = Some((pre, dg, bg));
+        t.elapsed().as_secs_f64()
+    }
+
+    /// Experiment only (N1, task 5): [`Self::extend`] with the partition's
+    /// fixed digits added by affine updates of the per-base terms instead
+    /// of exact powers: for `r = r0 + V·b^f0` (`V` the fixed digits),
+    /// `⌊r²/b^f0⌋ = ⌊r0²/b^f0⌋ + 2·r0·V + V²·b^f0` and `⌊r³/b^f0⌋ =
+    /// ⌊r0³/b^f0⌋ + 3·r0²·V + 3·r0·V²·b^f0 + V³·b^(2f0)`, mod `b^G`, whose
+    /// digits are `n`'s output digits `f0..k2`. The same rows as
+    /// [`Self::extend`].
+    #[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
+    fn extend_affine(&self, v: u32, ext: &mut Ext) {
+        let fs = &self.fs;
+        let (pre, dg, bg) = self.ext_pre.as_ref().expect("enable_affine_extend");
+        let (bg, dg) = (*bg, *dg);
+        let (b, k, f0) = (u64::from(fs.b), self.k, fs.f0);
+        let fixed = k - 1 - f0;
+        let mut vv = 0u64;
+        for i in 0..fixed {
+            vv += u64::from(self.partition_digit(v, i)) * b.pow(i);
+        }
+        let wf = b.pow(f0);
+        let add = vv * wf;
+        let red = |x: u128| dg.divrem_u128(x).1;
+        // Per-unit terms: V²·b^f0, V³·b^(2f0) and V²·b^f0 again for the
+        // cube's 3·r0·V²·b^f0 (as r0 times it).
+        let v2f = red(u128::from(vv) * u128::from(vv) * u128::from(wf));
+        let v3f = red(u128::from(red(u128::from(vv) * u128::from(vv) * u128::from(vv))) * u128::from(wf) * u128::from(wf));
+        let fc = fs.fc;
+        let sb = self.sb;
+        let bk1f = b.pow(fixed);
+        ext.clear();
+        for c in 0..fs.m1 as usize {
+            ext.seg.push(ext.idx.len() as u32);
+            for idx in fs.seg[c]..fs.seg[c + 1] {
+                let (r0, m0) = (fs.bp_r[idx as usize], fs.bp_m[idx as usize]);
+                let [a2, a3, s] = pre[idx as usize];
+                let r0w = u64::from(r0);
+                let y2 = red(u128::from(a2 + 2 * r0w * vv + v2f));
+                let y3 = red(
+                    u128::from(a3)
+                        + 3 * (u128::from(s) * u128::from(vv) + u128::from(r0w) * u128::from(v2f))
+                        + u128::from(v3f),
+                );
+                let mut mask = m0;
+                let (mut x2, mut x3) = (y2, y3);
+                for _ in 0..fixed {
+                    let (q2, g2) = sb.divrem(x2);
+                    let (q3, g3) = sb.divrem(x3);
+                    x2 = q2;
+                    x3 = q3;
+                    let bits = (1u64 << g2) | (1u64 << g3);
+                    if g2 == g3 || (mask | fc) & bits != 0 {
+                        mask = DEAD;
+                        break;
+                    }
+                    mask |= bits;
+                }
+                if mask == DEAD {
+                    continue;
+                }
+                debug_assert!(x2 < self.big_m && x3 < self.big_m && bg / bk1f == self.big_m);
+                let r = u64::from(r0) + add;
+                let rm = r % self.big_m;
+                let (q2, q3) = (x2 as u32, x3 as u32);
+                ext.idx.push(idx);
+                ext.mask.push(mask);
+                ext.q2.push(q2);
+                ext.q3.push(q3);
+                ext.t2.push(q2);
+                ext.t3.push(q3);
+                ext.c2.push((2 * rm % self.big_m) as u32);
+                ext.c3
+                    .push((3 * (rm * rm % self.big_m) % self.big_m) as u32);
+                ext.c3b
+                    .push((3 * rm % self.big_m * self.e1 % self.big_m) as u32);
+                let rho = r % self.bmid;
+                ext.rho.push(rho as u32);
+                ext.p2.push((2 * rho % self.bmid) as u32);
+                ext.p3
+                    .push((3 * (rho * rho % self.bmid) % self.bmid) as u32);
+            }
+        }
+        ext.seg.push(ext.idx.len() as u32);
+    }
+
     // Narrowed: b^f0 and the list's length (at most b^f0) are below 2^32,
     // r below b^(k-1) < 2^40, and every column below M <= 2^18.
     #[allow(clippy::cast_possible_truncation)]
@@ -616,9 +888,17 @@ impl CpuJoin {
             for idx in fs.seg[c]..fs.seg[c + 1] {
                 let (r0, m0) = (fs.bp_r[idx as usize], fs.bp_m[idx as usize]);
                 let r = u128::from(r0) + add;
-                let (r2, r3) = (r * r, r * r * r);
+                let r2 = r * r;
                 let (q2, lo2) = self.div_k1.divrem_u128(r2);
-                let (q3, lo3) = self.div_k1.divrem_u128(r3);
+                let (q3, lo3) = if self.wide {
+                    // N1 experiment: r³ in 256 bits; only its value mod M
+                    // above b^(k−1) is kept.
+                    let mut r3 = W4::mul_u128_u128(r2, r);
+                    let lo3 = self.div_k1.divrem_w4(&mut r3);
+                    (u128::from(self.div_m.divrem_w4(&mut r3)), lo3)
+                } else {
+                    self.div_k1.divrem_u128(r * r * r)
+                };
                 // Output digits at positions f0..k-1 of r² and r³: fixed now.
                 let mut mask = m0;
                 let (mut x2, mut x3) = (lo2 / below_f0, lo3 / below_f0);
@@ -890,6 +1170,13 @@ impl CpuJoin {
             return;
         }
         out.survivors += 1;
+        if self.mode == SurvMode::AndOnly {
+            // The AND survivors themselves are what `record` collects here.
+            if let Some(rec) = record.as_deref_mut() {
+                rec.push(top.p * self.fs.w + u128::from(r0));
+            }
+            return;
+        }
         let ext = pass.ext;
         let pass_mid = if self.lean {
             self.prefilter(top, bmask, info.carries, ext.p2[row], ext.p3[row])
@@ -905,6 +1192,9 @@ impl CpuJoin {
         let n = top.p * self.fs.w + u128::from(r0);
         if let Some(rec) = record.as_deref_mut() {
             rec.push(n);
+        }
+        if self.mode == SurvMode::NoCheck {
+            return;
         }
         // With f0 = 3 (the production parameters) the bottom list's own
         // mask is the low three digits of both powers, which the check skips.
@@ -964,6 +1254,9 @@ struct Pass<'a> {
     ext: &'a Ext,
     info: &'a [Info],
 }
+
+#[cfg(test)]
+mod n1;
 
 #[cfg(test)]
 mod tests {

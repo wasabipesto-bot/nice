@@ -179,6 +179,25 @@ impl JoinParams {
             && b.checked_pow(3 * k).is_some()
             && k > f0
     }
+
+    /// Experiment only (N1, the "transversal" shape): whether the CPU join
+    /// and the reference can run these parameters at digit length `l`. The
+    /// GPU's limits are dropped: a bottom residue `b^k` must fit `u64`
+    /// (not 40 bits), its cube need not fit `u128` (the arithmetic is wide
+    /// or modular), and the prefilter needs only `b^mid < 2^32` (not
+    /// `P mod b^(k2 − f0)`). Never used by the client or the GPU.
+    #[must_use]
+    #[allow(clippy::many_single_char_names)]
+    pub fn supported_experiment(&self, base: u32, l: u32) -> bool {
+        let (t, k, p) = (self.t, self.k, self.p);
+        if base > JOIN_MAX_BASE || t + k <= l || t > l || k >= l {
+            return false;
+        }
+        let f0 = l - t;
+        let o = t + k - l;
+        let b = u128::from(base);
+        p <= o && o - p <= 1 && b.pow(k) < 1 << 63 && b.pow(f0) < 1 << 32 && k > f0
+    }
 }
 
 /// Why a nice-only field takes the stride path instead of the overlap join.
@@ -923,8 +942,11 @@ impl Base {
         };
         let (mut u2, mut u3, mut s2, mut s3) = (0u128, 0u128, 0u128, 0u128);
         if j > 0 {
+            // Digit j of r³ needs r³ mod b^(j + 1) only: r² mod b^(j + 1)
+            // times r stays below b^(2j + 1), where r³ itself may not fit
+            // u128 (k = 9 at base 62). The same digits as the plain cube.
             let r2 = r * r;
-            let r3 = r2 * r;
+            let r3 = (r2 % self.pow[j as usize + 1]) * r;
             u2 = (r2 / self.pow[j as usize]) % b;
             u3 = (r3 / self.pow[j as usize]) % b;
             let r0 = r % b;
@@ -1009,13 +1031,34 @@ impl FieldSetup {
     /// this length, `n` of 2^96 or more, or no room for the prefilter.
     #[allow(clippy::many_single_char_names)] // b, s, e, t, k, o, w as in `overlap_join`
     pub fn new(b: u32, s: u128, e: u128, jp: JoinParams) -> Result<Self> {
+        Self::new_inner(b, s, e, jp, false)
+    }
+
+    /// Experiment only (N1): [`Self::new`] under
+    /// [`JoinParams::supported_experiment`]'s limits, for the CPU join and
+    /// the reference at shapes the GPU cannot run (such as `(L − 4, 9, 5)`
+    /// over a base's whole range). The prefilter then needs only `b^mid <
+    /// 2^32`.
+    ///
+    /// # Errors
+    /// As [`Self::new`].
+    pub fn new_experiment(b: u32, s: u128, e: u128, jp: JoinParams) -> Result<Self> {
+        Self::new_inner(b, s, e, jp, true)
+    }
+
+    #[allow(clippy::many_single_char_names)]
+    fn new_inner(b: u32, s: u128, e: u128, jp: JoinParams, experiment: bool) -> Result<Self> {
         let t0 = Instant::now();
         ensure!(s < e, "empty field");
         let base = Base::try_new(b, s, e - 1)
             .ok_or_else(|| anyhow!("[{s}, {e}) crosses a digit-length boundary in base {b}"))?;
         let l = base.l;
         ensure!(
-            jp.supported(b, l),
+            if experiment {
+                jp.supported_experiment(b, l)
+            } else {
+                jp.supported(b, l)
+            },
             "{jp:?} not supported at base {b}, L = {l}"
         );
         ensure!(e - 1 < 1 << 96, "device tops need n < 2^96");
@@ -1041,9 +1084,14 @@ impl FieldSetup {
         // The prefilter tests digits k..k2 too; it needs both powers to have
         // at least k2 digits and P mod b^(k2 - f0) to fit u32.
         let mut mid = 2;
-        while mid > 0
-            && (k + mid > base.s2 || u64::from(b).pow(k + mid - f0) >= 1 << 32 || k + mid > 12)
-        {
+        let too_deep = |mid: u32| {
+            if experiment {
+                k + mid > base.s2 || u64::from(b).pow(mid) >= 1 << 32
+            } else {
+                k + mid > base.s2 || u64::from(b).pow(k + mid - f0) >= 1 << 32 || k + mid > 12
+            }
+        };
+        while mid > 0 && too_deep(mid) {
             mid -= 1;
         }
         // The device stage always prefilters (every field the gate takes, and
@@ -1460,6 +1508,43 @@ pub(crate) mod test_fields {
             }
             x2 /= b;
             x3 /= b;
+        }
+        true
+    }
+
+    /// N1 experiment: [`mid_mirror`] with the digits of n² and n³ read off
+    /// 256-bit words, for prefilter depths whose `r³ mod b^k2` would not
+    /// fit u128 (k2 = 11 at base 62).
+    #[allow(clippy::many_single_char_names)]
+    pub(crate) fn mid_mirror_wide(fs: &FieldSetup, n: u128) -> bool {
+        let p = n / fs.w;
+        let a = (p * fs.w).max(fs.s);
+        let ee = (p * fs.w + fs.w - 1).min(fs.e - 1);
+        let floor = if a == p * fs.w && ee == p * fs.w + fs.w - 1 {
+            fs.full_floor
+        } else {
+            fs.base.cert_floor(a, ee, fs.jp.k)
+        };
+        let mut seen = 0u64;
+        if floor >= fs.k2 {
+            seen = fs
+                .base
+                .cert(a, ee, fs.jp.k)
+                .expect("a survivor's top is certified");
+        }
+        let n2 = super::W4::mul_u128_u128(n, n);
+        let n3 = n2.mul_u128(n);
+        let (mut d2, mut d3) = ([0u8; super::DIGIT_BUF], [0u8; super::DIGIT_BUF]);
+        fs.base.digits_w(n2, fs.base.s2, &mut d2);
+        fs.base.digits_w(n3, fs.base.s3, &mut d3);
+        for i in 0..fs.k2 as usize {
+            for d in [d2[i], d3[i]] {
+                let bit = 1u64 << d;
+                if seen & bit != 0 {
+                    return false;
+                }
+                seen |= bit;
+            }
         }
         true
     }
