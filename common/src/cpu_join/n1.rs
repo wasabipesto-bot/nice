@@ -253,17 +253,39 @@ fn n1_whole_base_units_are_exact_at_small_bases() {
     }
 }
 
-/// Task 2(b) at base 40 (L = 8): shape (f0 3, k 7, p 4), 40^4 units against
-/// the reference unit by unit, and the reference at (5, 4, 2) over the
-/// whole base. Long: `N1_B40=1`.
+/// Task 2(b) at base 40 (L = 8): shape (f0 3, k 7, p 4); `N1_B40` random
+/// units of the 40^4 (every one would take hours) against the reference
+/// unit by unit (AND survivors, prefilter survivors, hits, stepped tops).
 #[test]
 #[ignore = "N1 experiment; long"]
 fn n1_whole_base_units_are_exact_at_base_40() {
-    if std::env::var("N1_B40").is_err() {
+    let Ok(n) = std::env::var("N1_B40") else {
         return;
+    };
+    let n: usize = n.parse().expect("N1_B40: a unit count");
+    let t = Instant::now();
+    let range = whole(40);
+    let jp = shape(8, 3, 7);
+    let mut join = CpuJoin::new_experiment(40, &range, jp).expect("setup");
+    let mut plain = CpuJoin::new_experiment(40, &range, jp).expect("setup");
+    plain.fd = None;
+    let mut sc = Scratch::default();
+    let (mut and, mut pre, mut hits) = (0, 0, 0);
+    for v in sample(0x40, join.partitions(), n) {
+        assert_eq!(all_tops(&join, v), all_tops(&plain, v), "b40 v {v}: tops");
+        let got = cpu_unit(&mut join, v, &mut sc);
+        let want = ref_unit(&join, v);
+        assert_eq!(got, want, "b40 {jp:?} v {v}");
+        and += got.and.len();
+        pre += got.pre.len();
+        hits += got.hits.len();
     }
-    let line = whole_base_exact(40, shape(8, 3, 7), JoinParams { t: 5, k: 4, p: 2 }, false);
-    println!("N1 EXACT {line}");
+    println!(
+        "N1 EXACT b40 {jp:?}: {n} random units of {}: {and} AND survivors, {pre} prefilter \
+         survivors, {hits} hits: fast join == reference on every unit [{:.0}s]",
+        join.partitions(),
+        t.elapsed().as_secs_f64()
+    );
 }
 
 /// Task 2(c): `N1_EXACT_PARTS` (default 20) random partition values of the
@@ -333,10 +355,13 @@ fn measure(join: &mut CpuJoin, v: u32, sc: &mut Scratch) -> Measured {
     let mut total = [0.0; 3];
     let mut counts = JoinCounts::default();
     let mut res = PartitionResult::default();
-    for (i, mode) in [SurvMode::Full, SurvMode::NoCheck, SurvMode::AndOnly]
-        .into_iter()
-        .enumerate()
-    {
+    // `N1_FULL_ONLY`: the full mode only (no split of the survivor path).
+    let modes: &[SurvMode] = if std::env::var("N1_FULL_ONLY").is_ok() {
+        &[SurvMode::Full]
+    } else {
+        &[SurvMode::Full, SurvMode::NoCheck, SurvMode::AndOnly]
+    };
+    for (i, &mode) in modes.iter().enumerate() {
         join.mode = mode;
         let mut c = JoinCounts::default();
         let t = Instant::now();
