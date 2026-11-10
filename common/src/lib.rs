@@ -31,6 +31,8 @@ pub mod join_plan;
 pub mod lsd_filter;
 pub mod msd_prefix_filter;
 pub mod number_stats;
+#[cfg(all(test, feature = "cubecl-cuda"))]
+mod n1_tile;
 pub mod overlap_join;
 pub mod progress;
 pub mod residue_filter;
