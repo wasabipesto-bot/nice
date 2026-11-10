@@ -1,0 +1,36 @@
+== basics ==
+b=62 L=13 W=9.543e+21 R=2 A=3.129e+20 lambda=4.47e-04 p_nice/adm=1.43e-24
+   P_24 = 5.781e-03  -> A*P = 1.81e+18
+   P_26 = 2.114e-03  -> A*P = 6.62e+17
+   P_32 = 5.220e-05  -> A*P = 1.63e+16
+   P_48 = 3.332e-12  -> A*P = 1.04e+09
+b=64 L=13 W=3.778e+22 R=8 A=4.797e+21 lambda=9.73e-04 p_nice/adm=2.03e-25
+   P_24 = 6.974e-03  -> A*P = 3.35e+19
+   P_26 = 2.656e-03  -> A*P = 1.27e+19
+   P_32 = 7.682e-05  -> A*P = 3.69e+17
+   P_48 = 1.219e-11  -> A*P = 5.85e+10
+
+== D/E: log10 cost per expected nice number (uniform model, admissible n) ==
+b    L  log10(lambda) brute  o=0:2L  P(2L-2)^2  P(4L-4)  today-like(P_T*P_B, t=L-3,k=6)
+ 62  13     -3.3    23.8    21.6      19.8     13.0     22.2
+ 64  13     -3.0    24.7    22.5      20.8     14.4     23.1
+ 80  16     -2.8    31.5    28.8      26.4     18.4     29.5
+100  20     -1.2    40.0    36.5      33.4     22.8     37.4
+130  26      0.5    52.9    48.2      43.8     29.5     49.2
+150  30      1.8    61.5    55.9      50.8     34.0     57.0
+200  40      7.0    83.0    75.4      68.3     45.2     76.6
+300  60     20.5   126.2   114.5     103.3     67.6    115.8
+
+== C: gap + lattice variant at b62 (t+k = L-g, one lattice call per AND-passing (T,R)) ==
+g=1 t=10 k=2: pairs/n=3.38e-02 lattice calls/n=8.62e-03 outputs/n=1.14e-02  time/n at 100ns/call+5ns/out = 918890.3 fs (join: 24 fs)
+g=1 t=8 k=4: pairs/n=7.06e-02 lattice calls/n=8.62e-03 outputs/n=1.14e-02  time/n at 100ns/call+5ns/out = 918890.3 fs (join: 24 fs)
+g=1 t=6 k=6: pairs/n=7.93e-02 lattice calls/n=8.62e-03 outputs/n=1.14e-02  time/n at 100ns/call+5ns/out = 918890.3 fs (join: 24 fs)
+g=2 t=9 k=2: pairs/n=9.91e-04 lattice calls/n=3.03e-04 outputs/n=1.79e-02  time/n at 100ns/call+5ns/out = 119998.1 fs (join: 24 fs)
+g=2 t=7 k=4: pairs/n=1.75e-03 lattice calls/n=3.03e-04 outputs/n=1.79e-02  time/n at 100ns/call+5ns/out = 119998.1 fs (join: 24 fs)
+g=2 t=5 k=6: pairs/n=1.69e-03 lattice calls/n=3.03e-04 outputs/n=1.79e-02  time/n at 100ns/call+5ns/out = 119998.1 fs (join: 24 fs)
+g=3 t=8 k=2: pairs/n=2.67e-05 lattice calls/n=9.70e-06 outputs/n=2.80e-02  time/n at 100ns/call+5ns/out = 141158.5 fs (join: 24 fs)
+g=3 t=6 k=4: pairs/n=4.02e-05 lattice calls/n=9.70e-06 outputs/n=2.80e-02  time/n at 100ns/call+5ns/out = 141158.5 fs (join: 24 fs)
+g=3 t=4 k=6: pairs/n=3.34e-05 lattice calls/n=9.70e-06 outputs/n=2.80e-02  time/n at 100ns/call+5ns/out = 141158.5 fs (join: 24 fs)
+g=4 t=7 k=2: pairs/n=6.61e-07 lattice calls/n=2.84e-07 outputs/n=4.36e-02  time/n at 100ns/call+5ns/out = 218010.9 fs (join: 24 fs)
+g=4 t=5 k=4: pairs/n=8.54e-07 lattice calls/n=2.84e-07 outputs/n=4.36e-02  time/n at 100ns/call+5ns/out = 218010.9 fs (join: 24 fs)
+g=4 t=3 k=6: pairs/n=6.15e-07 lattice calls/n=2.84e-07 outputs/n=4.36e-02  time/n at 100ns/call+5ns/out = 218010.9 fs (join: 24 fs)

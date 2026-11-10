@@ -5,6 +5,110 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## N1.C1 The CPU join at the transversal shape: exact prototype, counts, timing (2026-11-10, agent; `N1/cpu/RESULTS.md`, `N1/cpu/raw/` (run logs A–D, `analyze.py` summaries); fork branch `exp/n1-transversal-cpu` a32d78c from c0c357a; ivory, one EPYC-Rome vCPU, `nice -n 19`)
+
+Change: experiment-only constructors (`JoinParams::supported_experiment`, `FieldSetup::new_experiment`,
+`CpuJoin::new_experiment`), r³ mod b^(j+1) in `bot_dfs`, 256-bit r³ in `extend`, counters; +389/−11
+in `overlap_join.rs`/`cpu_join.rs` plus a 567-line test module. `for_length` untouched. Exact: every
+partition value of whole-base units at b10–b34 equals the reference `join_range` (survivor sets,
+prefilter sets, hits), brute force to b30, 69 at b10; 30,000 random b40 units; 20 b54 and 6 b62
+production-shape units (2.8e7 AND survivors, 1.0e6 prefilter survivors); the suite's 188 tests pass.
+
+Counts per admissible n (measured; base mean of today's shape from 10 field locations):
+
+| | b60 today / new | b62 today / new | b64 today / new |
+|---|---|---|---|
+| AND pairs | 1.05e-2 / 8.63e-3 | 6.7e-3 / 7.56e-3 | 3.5e-3 / 6.84e-3 |
+| AND survivors | 3.8e-4 / 2.33e-5 | 2.5e-4 / 1.39e-5 | 1.5e-4 / 1.07e-5 |
+| full checks | 2.4e-5 / 8.7e-7 | 1.5e-5 / 5.0e-7 | 9.6e-6 / 3.9e-7 |
+
+My Monte Carlo: P_T and P_B within 3 %, pairs −5 % / −5 % / +20 %; its k 9 survivor column was
+noise (8 and 2 events). Today's cost per admissible n varies ×2.7 between fields at b60; 2 of 10
+sampled b62 fields and 4 of 10 at b64 are empty; the mid-base field is 22 % dearer than the mean at
+b62. The bottom side is 8.0e15 residue *visits* per b62 base (95 ns exact, 44 ns affine on this
+core), not 1.5e15; a unit of four partition digits with the fifth as the key shares one extension
+across 62 values and removes it.
+
+CPU seconds per admissible n, one thread (3 rounds, spread < 3 %):
+
+| | b60 | b62 | b64 |
+|---|---|---|---|
+| today, mean of 10 fields | 2.25e-11 | 1.55e-11 | 6.81e-12 |
+| (L − 4, 9, 5), affine extension | 7.62e-12 | 3.52e-12 | 3.62e-12 |
+| (L − 4, 9, 4) + key digit (two-level) | 3.46e-12 | 2.65e-12 | ≈ 3.5e-12 (derived) |
+| ratio, two-level vs today's mean | ×6.5 | ×5.9 | ≈ ×1.9 |
+
+Mostly a cheaper AND, not fewer: 0.25–0.43 ns per AND against 1.0–1.15 ns (class lists of ~15,000
+bottoms instead of ~300, 0.18 % of ANDs survive instead of 4.2 %). b64 is the weak base (twice
+today's mean pairs: today's shape skips its empty fields and prunes by field).
+
+**Director's re-projection of the GPU case** with these counts and a base-mean baseline (today
+14.8 fs per admissible n at b62 on the 340 W card, 18.9 on the mid field; b64 ≈ 9.2 fs):
+
+| chunk words | b62 | b62, walk floor removed (unmeasured) | b64 | b64, walk floor removed |
+|---|---|---|---|---|
+| u32 (portable) | ×2.45 | ×2.87 | ×1.76 | ×2.08 |
+| u64, 4 chunks | ×2.90 | ×3.51 | ×2.10 | ×2.57 |
+| u64, reverse orientation | ×3.18 | ×3.93 | ×2.32 | ×2.91 |
+
+**Conclusion: on the CPU the new shape is measured at ×6 at b60/b62 and ≈ ×2 at b64; on GPUs it
+projects at the ×3 bar at b62 (CUDA only) and under it at b64, where most of the remaining cost is.**
+
+## N1.G1 Dense-phase cost per pair at other join shapes (2026-11-10, agent; `N1/gpu-tile/RESULTS.md`, `N1/gpu-tile/raw/` (`projection.txt`, `tables.txt`, `tsize.txt`, box logs, `n1_tile.rs`); fork branch `exp/n1-gpu-tile` c81875f; box 60024264, RTX 3080 at 340 W, 1.46 h, ~$0.18)
+
+Calibration on real data (L51's profile tree 14f87cd, `join_kernel` byte-identical to c0c357a; b62
+1e17 field at 7226266762397899821056, all 3,844 partitions, 3 interleaved rounds, no spill variant):
+2.4655e13 AND pairs, 9.534e11 AND survivors (3.87 %), 5.80e10 full checks per field; dense phase
+0.563 ps per pair (base 0.261 + AND 0.302); survivor path 17.4 ps per survivor (walk 5.6, prefilter
+11.7); main unprofiled 61.93 s per field → 5.91e6 s per base on this card. (My estimates: pairs
+−5 %, survivors +42 % on this field; my 0.8 ps / 36 ps were the 180 W box's.)
+
+Synthetic tile harness (contiguous bottom lists; reproduces production's dense cost only to −19 %:
+base −7 %, AND −30 %, the gap traced to buckets and remainders under 192 tops taking the per-top
+AND at 0.85–0.97 ps per pair; projections scale base ×1.07 and AND ×1.43):
+
+| tile (tops × entries) | orientation | chunk word | D_B 12 | D_B 18 | D_B 20 |
+|---|---|---|---|---|---|
+| 471 × 336 (today's mean) | today | u32 | 0.455 | 0.570 | 0.609 |
+| 1,460 × 14,750 (f0 4, k 9) | today | u32 | 0.322 | 0.410 | 0.437 |
+| 1,460 × 14,750 | today | u64, 4 chunks a pass | 0.272 | 0.323 | 0.339 |
+| 1,460 × 14,750 | reverse | u32 | 0.400 | 0.410 | 0.407 |
+| 1,460 × 14,750 | reverse | u64, 4 chunks a pass | 0.292 | 0.295 | 0.293 |
+| 24 × 7,200 (k 10) | today / reverse | u32 | 1.11 / 3.39 | 1.11 / 3.39 | 1.11 / 3.40 |
+
+(ps per pair, spreads ±1–3 %, counts identical across variants.) The AND part scales with the
+entry's digits (17–18 fs per digit in u32, 10–14 in u64); the per-wave base does not and falls 2.4×
+in the big tile, so 18 digits in the big tile cost no more than 12 in today's. u64 pays only with 4
+chunks a pass. k 10's 24-top tiles cost ×2.7–11 the big tile's: dead.
+
+Survivor path with the real walk and prefilter: 0.13–0.15 ps per pair + 14 ps × pass rate (fits
+production to −1.4 % at 3.87 %). At the new 0.34 % it is 0.18 ps per pair = 54 ps per survivor:
+survivors ÷ 10.8 buys the survivor path only ÷ 3.3. The floor is per-chunk machinery (ballots, the
+flush decision and its barriers), not survivor work.
+
+Whole-base b62 projection (central / uncalibrated harness; counts from NOTES §3; other overhead 2 %):
+
+| shape | u32 | u64, 4 chunks | u64, reverse |
+|---|---|---|---|
+| f0 4, k 9 | ×2.56 / ×3.08 | ×3.01 / ×3.53 | ×3.20 / ×3.58 |
+| f0 3, k 9, full FD top tests | ×2.81 / ×3.11 | ×3.19 / ×3.43 | ×3.05 / ×3.24 |
+| f0 3, k 9, child certificates at 0.45 of a test (instruction estimate) | ×3.50 / ×3.97 | ×4.09 / ×4.51 | ×3.87 / ×4.19 |
+
+New total at (f0 4, k 9, u32): dense 66 %, survivor path 22 %, everything else 12 %.
+**Conclusion: at the user's ×3 bar, not over it. Portable u32 misses (×2.6–2.8); CUDA u64 clears
+narrowly and inside the projection's own uncertainty; only f0 3 with cheap child certificates, an
+unbuilt kernel, is clearly past it.**
+
+## N5.1 Adversarial review of the no-shortcut argument (2026-11-10, agent, no hardware; `N5/REVIEW.md`, `N5/raw/` (`psj_mc.py`, `model.py`, `psj_floor.py`, `gap64.py` and outputs); ~25 CPU-seconds)
+
+No hole that changes the exponent. Step 1 of the argument corrected: a pair with overlap o knows
+2(L + o) digits. Prefix–suffix join model: flat floor ≈ 2e18 AND-units at b62, 1.6e19 at b64;
+output-sensitive floor 3.4e17 / 1.6e18; information floor 4e10 / 5e11 (unreachable: list building).
+The uniform-digit model holds within 10–20 % down to joint pass rates of 1e-6 (tops measured/model
+0.87–0.94 at b62, bottoms 0.76–0.95). Lattice prescription ×3000–5000 worse than the join; partial
+edge digits ≤ ×1.01 per base; cost per expected find at b150 ≥ 1e34 even with free lists and a
+perfect join. One open engineering idea (digit-key indexed pairing, N10).
+
 ## L56.1 CPU seeded full check: PR branch (2026-11-09, agent; `L56/PR-RESULTS.md`, `L56/PR-BODY.md`, `L56/raw/`; `pr/cpu-join-seeded-check` 5c218b7 = one commit on L52's 1cce00d)
 
 The check treats three digit sets as known: positions 0..k of n², n³ (the bottom's mask as

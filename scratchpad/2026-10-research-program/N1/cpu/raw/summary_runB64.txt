@@ -1,0 +1,44 @@
+
+== b64 4-9 JoinParams { t: 9, k: 9, p: 5 } (f0 4, k 9, p 5); units 8, admissible/unit 4.4679e+12, setup 2.71s
+  per admissible n: top tests 3.522e-07  tops 5.168e-08  (P_T 0.1101)  bottom cands 2.081e-06  ext 4.237e-07  bottoms 2.333e-07 (P_B 0.0621)
+                    ANDs 6.840e-03  AND survivors 1.068e-05 (381709654 events)  prefilter survivors = full checks 3.918e-07  hits 0
+   MC: P_T 1.101e-01 vs MC 1.134e-01 (-3%)
+       P_B 6.213e-02 vs MC 6.224e-02 (-0%)
+       pairs(no prune) 6.840e-03 vs MC 5.720e-03 (+20%)
+       AND survivors 1.068e-05 vs MC 6.667e-06 (+60%)  <-- >30%
+  CPU s per admissible n (rounds: 3): median 3.524e-12  min 3.489e-12  max 3.531e-12
+  per unit (all rounds): min 3.293e-12  median 3.524e-12  max 3.702e-12  CV 3.4%
+  phases (median, %% of total): tops 4.15e-14 (1%)  extend 1.98e-13 (6%)  list 8.94e-15 (0%)  scan 3.27e-12 (93%)  and 2.96e-12 (84%)  prefilter 3.88e-13 (11%)  check -7.86e-14 (-2%)  other 1.05e-15 (0%)
+
+== b64 4-9a JoinParams { t: 9, k: 9, p: 5 } (f0 4, k 9, p 5); units 8, admissible/unit 4.4679e+12, setup 3.11s
+  per admissible n: top tests 3.522e-07  tops 5.168e-08  (P_T 0.1101)  bottom cands 2.081e-06  ext 4.237e-07  bottoms 2.333e-07 (P_B 0.0621)
+                    ANDs 6.840e-03  AND survivors 1.068e-05 (381709654 events)  prefilter survivors = full checks 3.918e-07  hits 0
+   MC: P_T 1.101e-01 vs MC 1.134e-01 (-3%)
+       P_B 6.213e-02 vs MC 6.224e-02 (-0%)
+       pairs(no prune) 6.840e-03 vs MC 5.720e-03 (+20%)
+       AND survivors 1.068e-05 vs MC 6.667e-06 (+60%)  <-- >30%
+  CPU s per admissible n (rounds: 3): median 3.615e-12  min 3.496e-12  max 3.616e-12
+  per unit (all rounds): min 3.220e-12  median 3.533e-12  max 4.121e-12  CV 7.0%
+  phases (median, %% of total): tops 4.21e-14 (1%)  extend 9.40e-14 (3%)  list 8.89e-15 (0%)  scan 3.47e-12 (96%)  and 2.93e-12 (81%)  prefilter 5.55e-13 (15%)  check -2.46e-14 (-1%)  other 1.05e-15 (0%)
+
+== b64 today@0.55 JoinParams { t: 10, k: 6, p: 2 } (f0 3, k 6, p 2); units 8, admissible/unit 3.1002e+11, setup 1.74s
+  per admissible n: top tests 8.830e-06  tops 2.764e-06  (P_T 0.0920)  bottom cands 2.900e-07  ext 1.036e-07  bottoms 3.500e-06 (P_B 0.0647)
+                    ANDs 5.950e-03  AND survivors 2.686e-04 (666165188 events)  prefilter survivors = full checks 1.665e-05  hits 0
+   MC: P_T 9.200e-02 vs MC 6.210e-02 (+48%)  <-- >30%
+       P_B 6.468e-02 vs MC 2.903e-01 (-78%)  <-- >30%
+       pairs(no prune) 5.950e-03 vs MC 1.549e-02 (-62%)  <-- >30%
+       pairs(prune m9) 5.950e-03 vs MC 4.453e-03 (+34%)  <-- >30%; m10 5.950e-03 vs MC 7.200e-03 (-17%)
+       AND survivors 2.686e-04 vs MC 2.067e-04 (+30%)
+  CPU s per admissible n (rounds: 3): median 1.201e-11  min 1.197e-11  max 1.211e-11
+  per unit (all rounds): min 1.164e-11  median 1.203e-11  max 1.232e-11  CV 1.5%
+  phases (median, %% of total): tops 1.65e-12 (14%)  extend 1.77e-14 (0%)  list 1.17e-13 (1%)  scan 1.02e-11 (85%)  and 6.83e-12 (57%)  prefilter 1.70e-12 (14%)  check 1.67e-12 (14%)  other 2.09e-14 (0%)
+
+== ratios (shape / today), CPU s per admissible n, per round
+  b64 4-9: ratio median 0.293 (min 0.288, max 0.295) -> speed-up x3.41 (x3.39-x3.47)
+  b64 4-9a: ratio median 0.299 (min 0.291, max 0.302) -> speed-up x3.35 (x3.31-x3.43)
+
+== today's shape by field location (today@x), CPU s and counts per admissible n
+  b64 @0.55: 1.201e-11 s  P_T 0.0920  ANDs 5.950e-03  AND surv 2.686e-04  checks 1.665e-05  tops 2.764e-06
+  b64 mean over 1 locations: 1.201e-11 s; P_T 9.200e-02  ands 5.950e-03  survivors 2.686e-04  checked 1.665e-05  tops 2.764e-06  top_tests 8.830e-06
+    4-9: 3.524e-12 s -> ratio to the location mean 0.293 (x3.41)
+    4-9a: 3.615e-12 s -> ratio to the location mean 0.301 (x3.32)

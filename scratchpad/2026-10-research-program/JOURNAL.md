@@ -72,6 +72,67 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     costed algorithm sketch, or the argument tightened. Kill: no gap found → closed in writing.
   - T4 stays held (the user's ×1.5 rule). N9 waits for the user's word.
 
+- **N5 review back (06:10 UTC, `N5/REVIEW.md`, 20 min, 204 k tokens): no hole that changes the
+  exponent; my step 1 was wrong as stated and is replaced by a sharper model.**
+  - Correction: a (top, bottom) pair with overlap o knows 2(L + o) digits, not 2L; with
+    t = k = L − 1 only ≈ 4e10 n would survive at b62. Information is not the bottleneck, building
+    the lists is. The right frame is a **prefix–suffix join model** (prefix nodes, suffix nodes,
+    pair tests, full checks): flat floor ≈ 2e18 AND-units at b62 (1.6e19 at b64), ≈ ×4.5 under
+    today's ≈ 9e18 in the same weights; with non-disjoint pairs skipped for free 3.4e17 / 1.6e18
+    (another ×6 / ×10, of which digit-key indexing may reach ×2–2.5 on the pair term); the
+    information floor (4e10 / 5e11) is unreachable because the depth-(L − 1) lists cost W/b nodes.
+  - Dead with numbers: bilinear and three-way splits, n mod m views, bit-level structure at b64
+    (partial digits at the edges prune ≤ 8 % of the last level, ≤ ×1.01 per base), k-list /
+    dissection / representations (no additive structure beyond the digit sum, already the hash
+    key), lattice prescription (×3000–5000 worse than the join), large bases (cost per expected
+    find depends on b only and grows in every column: 1e22 at b62, 1e57 at b150, ≥ 1e34 even with
+    free lists and a perfect join).
+  - Its Monte Carlo confirms the uniform-digit model within 10–20 % down to joint pass rates of
+    1e-6, deep overlap included.
+  - Open, engineering only: **X1** digit-key indexed pairing (sort a unit's tops by their pattern
+    on the 10–14 most frequent digits; a bottom visits only disjoint key groups): pair term ÷2–2.5,
+    ×1.1–1.2 per base today, ×1.3–1.6 at N1's shape; a CPU day; only if N1 survives.
+  - Its own strongest objection: the model class is the reviewer's; no new congruence was tested.
+  **Verdict: N5 closed in writing.** What is left to gain is constant factors inside the
+  prefix–suffix join: N1 (≈ ×2.3–3.1), X1 on top of it, both bounded by ≈ ×4.5 (flat) and
+  ≈ ×27 (output-sensitive) under today.
+
+- **N1-GPU back (07:13 UTC, `N1/gpu-tile/RESULTS.md`; box 60024264 destroyed after 1.46 h,
+  ~$0.18):** calibration on a real b62 1e17 field: 2.47e13 pairs, 9.5e11 AND survivors, dense
+  0.563 ps per pair, survivor path 17.4 ps per survivor, 61.9 s per field on a 340 W 3080. In the
+  new big tile an 18-digit entry costs no more per pair than a 12-digit one in today's tile (the
+  per-wave base falls 2.4×); u64 chunk words pay only with 4 chunks a pass (−16–25 %); k 10's
+  small tiles are dead. The survivor path has a per-pair floor (0.13–0.15 ps of per-chunk
+  machinery), so ÷10.8 survivors buys only ÷3.3. Projection: (f0 4, k 9) ×2.56 u32, ×3.0–3.2 u64;
+  (f0 3, k 9) ×2.8 / ×3.2, ×3.5–4.1 with child certificates at an estimated 0.45 of a test. The
+  harness matched production's dense cost to −19 % only (small buckets take the per-top AND).
+- **N1-CPU back (08:15 UTC, `N1/cpu/RESULTS.md`, branch `exp/n1-transversal-cpu` a32d78c):** the
+  CPU join runs (L − 4, 9, 5) on whole-base units with ~400 changed lines, exactly (reference
+  and brute force at b10–b34, 30,000 b40 units, b54/b62 production-shape units). Measured counts:
+  my P_T, P_B and pairs hold (−5 %, −5 %, +20 %); survivors are ÷14–18 and checks ÷25–31 of
+  today's base mean. Measured CPU time per admissible n against today's mean: ×3.0 / ×4.1 / ×1.8
+  (b60 / b62 / b64) for the 5-digit unit with an affine extension, **×6.5 / ×5.9 / ≈ ×1.9 with
+  four partition digits plus a key digit**. The gain is a cheaper AND (long class lists, few
+  survivors), not fewer ANDs. Corrections to my model: the bottom side is 8.0e15 visits per b62
+  base, not 1.5e15; today's cost varies ×2.7 by field location and the mid-base field is 22 %
+  dearer than the mean; b64 is the weak base.
+- **GPU case re-projected with the measured counts and a base-mean baseline** (EXPERIMENTS N1.C1):
+  b62 ×2.45 (u32) / ×2.9–3.2 (u64); b64 ×1.8 / ×2.1–2.3. A walk tuned for sparse survivors
+  would add ~×1.2 (unmeasured).
+- **Verdict on N1 (the user's ×3 bar): parked, not killed.** GPUs, which do all of today's
+  nice-only work, sit at the bar at b62 on CUDA only and under it at b64, where 90 % of the
+  reachable cost is. The CPU result clears the bar at b60/b62 and is a working, exact prototype;
+  it matters only with a large free CPU supply (b62 ≈ 155k Zen-3 core-hours at the new shape
+  against ≈ 900k today, derived). No server-change proposal is written; the numbers stay on
+  record for the user, as asked. Two trims for today's GPU kernel fell out (the walk's per-chunk
+  floor, ≈ 6 % of a field; buckets under 192 tops on the slow AND path, ≈ 4 %): parked as N11, N12.
+- Day: 3 agents (Opus; 204 k + 360 k + 377 k tokens), 1 box, $0.18; director ~3 h.
+- **Tomorrow:** base 64 becomes the primary optimisation target (≈ 90 % of the reachable cost;
+  every profile so far was at b62 or b60): one GPU profile of a b64 field (shares, empty
+  fields, the 8 residue classes, what a power-of-two base allows; kill: no lever ≥ ×1.10 found
+  → record only). Confirm b60's reset fields are all re-searched. Lighter days (1–2 agents)
+  unless the user reopens N1. Asked the user: free CPU supply (N1's reopen condition), N9.
+
 ## 2026-11-10 ~02:00 UTC: disqualification SQL for the user
 
 - The user asked for a SQL file setting `disqualified` on the pre-fix M4 join submissions of b58

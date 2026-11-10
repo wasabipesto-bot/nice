@@ -107,3 +107,19 @@ Kill criterion for N1: tile microbenchmark + exact small-base prototype project 
 - N6 child-only top certificates (truncated FD on the certificate window) if f0 3 returns.
 - N7 u64 chunks for the transposed AND on CUDA (the AND is ~70 % of the time after N1).
 - N8 a browser WebGPU nice-only client becomes natural after N1 (MB-sized units).
+
+## 5. Corrections after the first measurements (2026-11-10)
+
+Evidence: `../2026-10-research-program/EXPERIMENTS.md` N1.G1, N1.C1, N5.1.
+- §2 step 1 was wrong as stated: a pair with overlap o knows 2(L + o) digits. The right frame is
+  the prefix–suffix join model of `N5/REVIEW.md` (flat floor ≈ ×4.5 under today at b62;
+  information is not the bottleneck, list building is).
+- §3: P_T, P_B and pairs hold within 5 % (20 % at b64); the k 9 survivor column was noise (true
+  1.39e-5 at b62); the bottom side is 8.0e15 visits per b62 base unless the unit is four
+  partition digits plus a key digit; the cost per pair depends on the tile (cheaper in the big
+  tile on both CPU and GPU); the survivor path has a per-pair floor on GPUs; today's cost must be
+  taken as a base mean, not one field (the mid-base field is 22 % dearer at b62); b64 gains about
+  half of what b62 does.
+- Outcome: CPU ×6 at b60/b62 measured; GPU ×2.5–3.2 at b62 and ≈ ×2 at b64 projected. Parked at
+  the user's ×3 bar.
+
