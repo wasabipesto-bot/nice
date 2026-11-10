@@ -56,6 +56,8 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   cubecl feature (their device tests ran on the measured trees; upstream CI runs lavapipe).
   Changelog lines carry their own PR numbers (predicted and confirmed). Bodies: the prepared
   ones with the stacking line replaced by a rebase note.
+- 16:35 UTC: **#250, #251, #252, #253 all green** (25 pass, 3 skipped each, macOS included); mergeable,
+  no comments yet.
 - Under the corrected bar the parked list is worth a second look, one PR each: N11 (the walk's
   per-chunk floor, ≤ ×1.06, to be measured), the CPU roadmap's remaining items (FD round 2 est.
   ×1.06–1.12, vectorised pass 2 est. ×1.05–1.10); L32/L43/L54/N12 measure under ×1.05 at
