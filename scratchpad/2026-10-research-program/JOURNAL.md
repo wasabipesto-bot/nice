@@ -37,6 +37,41 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   is on the table; whether to buy a second pass of b50–60; what to optimise for beyond the
   search itself; subagent models; opening all four held branches.
 
+## 2026-11-10 (first cycle of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $10.81 of $30 (fleet $17.09); credit
+  $33.42; ivory 9.5 GB free. No program PR open; main = c0c357a. No new user message since the
+  SQL hand-over.
+- **The user ran the SQL** (verified through the public API at 05:45 UTC): 120 of 120 sampled
+  listed submissions are disqualified; all 319 sampled b58 reset fields are back at check level 1,
+  b60 69 of 281; re-searched by demoux (3.4.8-dev), the fleet (3.4.7) and mayalaran (3.4.8-dev,
+  fixed build). b58 shows 100 % again.
+- **Refined N1 arithmetic before spending on it:** a bottom mask of 2k digits costs the
+  transposed AND 2k loads per (entry, chunk of 32), so k 9 makes the AND-only part ×1.5 dearer
+  per pair; with today's shares (base 11, AND 15, survivors 30, check 12, tops 23, setup 5) the
+  (f0 4, k 9) unit is ≈ 42 % of today → ×2.4 with u32 chunk words, ≈ ×3.2 with u64 words on
+  CUDA; (f0 3, k 9) ≈ ×2.6 / ×3.1, and ×3.4 / ×4.3 if child-only top certificates cost a
+  third of a full one. So the ×3 bar needs u64 chunks and/or cheap child certificates; the
+  honest prior is 35–45 % to clear it. The cheapest decisive test is the dense phase's cost per
+  pair at 18-digit entries, both word widths, in the new tile shape.
+- **Also noticed:** the reference join already takes any (t, k, p): the transversal unit is
+  `join_range` over a base's whole range with (L − 4, 9, 5) and one partition value. Soundness is
+  inherited; only widths (the residue's cube past u128, u32 casts) stand between the CPU join and
+  the new shape.
+- **Leads today** (kill criteria written before starting):
+  - **N1-GPU tile microbenchmark** (agent, one RTX 3080, ≤ 5 h): dense-phase cost per pair at
+    12/18/20-digit entries, u32 vs u64 chunk words, both orientations, today's and the new tile
+    shapes; the harness must first reproduce production's cost at today's shape within 20 %.
+    **Kill N1 on GPUs if no variant projects ≥ ×3 on a whole b62 base** with the counts of
+    NOTES §3; record the numbers either way (the user's instruction).
+  - **N1-CPU prototype** (agent, ivory): the CPU join at (L − 4, 9, 5) on a base's whole range for
+    sampled partition values; exactness against the reference and brute force on small bases;
+    exact operation counts against my Monte Carlo (flag > 30 % off); measured CPU seconds per
+    admissible number against today's shape. Supporting evidence, not the kill test.
+  - **N5 adversarial review** of the no-shortcut argument (agent, no hardware): a loophole with a
+    costed algorithm sketch, or the argument tightened. Kill: no gap found → closed in writing.
+  - T4 stays held (the user's ×1.5 rule). N9 waits for the user's word.
+
 ## 2026-11-10 ~02:00 UTC: disqualification SQL for the user
 
 - The user asked for a SQL file setting `disqualified` on the pre-fix M4 join submissions of b58
