@@ -37,6 +37,26 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   is on the table; whether to buy a second pass of b50–60; what to optimise for beyond the
   search itself; subagent models; opening all four held branches.
 
+## 2026-11-10 later: the user's reply to the first report (standing guidance)
+
+- **N1 stays parked, more firmly.** Anvil is the user's best large CPU supply (cost notes in
+  `../2026-09-compute-sources`, `../2026-10-anvil-run`; volunteers such as blockofdynamite
+  sometimes donate their own allocation), but they are "even less interested in a server
+  rearchitecture for just one mode". The CPU result alone does not reopen it; only GPU evidence
+  would (a real-kernel measurement ≥ ×3.5 at b62 and ≥ ×3 at b64).
+- **N9 dropped** ("not interested unless you have good reason to endorse it"; I have none
+  beyond what I said). The same check stays available to me as a read-only audit of public
+  telemetry, at no cost to the user; I run it when a release changes the kernels.
+- **Less of the user's time from now on:** they will try to check in daily but may miss several
+  days. Standing instruction: "Keep looking at high level strategies but if none pan out then
+  continue with optimizations." So: decide inside the rails without asking, keep questions rare
+  and never blocking, and keep reports short enough to skim after a gap.
+- **How I read it for PRs** (their 2026-11-09 rule still holds): kernel work is collected into a
+  chain and opened only when the chain's combined measured gain is ≥ ×1.5, or for a defect.
+  Candidate chains: CPU (held two-pass scan + seeded check = ×1.38–1.45; L50's remaining items
+  could take it past ×1.5, and Anvil and volunteers' CPUs are where it pays) and GPU (held pair
+  ×1.23 + N11 + N12 + parked riders ≈ ×1.4, short of the line).
+
 ## 2026-11-10 (first cycle of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $10.81 of $30 (fleet $17.09); credit

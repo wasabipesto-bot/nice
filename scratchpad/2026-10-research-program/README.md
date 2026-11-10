@@ -43,6 +43,15 @@ Never without asking: live fleet (config, crontab, `~/fleet-run`), server, schem
 data corrections, deploys, merges, upstream `main`, destructive git, spend above the
 cap, rentals below the credit floor, the user's machines.
 
+## Working without the user (2026-11-10)
+
+The user checks in when they can and may miss several days. Decide inside the rails without
+asking; keep questions rare and never blocking; reports short enough to skim after a gap.
+Standing order: keep looking at high-level strategies; if none pan out, continue with
+optimisations. Kernel work is opened as a PR chain only when its combined measured gain is
+≥ ×1.5 (or it fixes a defect). A server rearchitecture is not wanted (N1 parked). Write-ups and
+outreach belong to other agents: note such items in the report only.
+
 ## Channels
 
 - Daily report: this session's reply.
