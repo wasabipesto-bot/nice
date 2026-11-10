@@ -37,6 +37,23 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   is on the table; whether to buy a second pass of b50–60; what to optimise for beyond the
   search itself; subagent models; opening all four held branches.
 
+## 2026-11-10 ~02:00 UTC: disqualification SQL for the user
+
+- The user asked for a SQL file setting `disqualified` on the pre-fix M4 join submissions of b58
+  and b60, to be followed by `jobs --full`. Delivered:
+  `../2026-11-fresh-eyes/disqualify_m4_prefix_join_b58_b60.sql` (one transaction; 11,473
+  submissions by explicit id with a description check that aborts on any mismatch; then the
+  check_level 1 → 0 reset of the 8,369 listed fields left with no qualified submission).
+- **Flagged to the user:** `nice_jobs --full` re-evaluates consensus only for fields with detailed
+  submissions (`get_fields_in_base_with_detailed_subs`), b58/b60 have none, and nice-only claims
+  select `check_level = 0` by ascending id (`bulk_claim_fields`, no cursor), so without the reset
+  step nothing would be re-issued. The reset is in the file as STEP 3.
+- List cross-checked by a second API scan keyed on the username (`verify_m4_list.py`): identical;
+  no M4 nice-only submission on b58/b60 lacks telemetry; the 4,370 post-fix (6f060a94) ones are
+  excluded. Tested on a throwaway postgres:17 with a synthetic copy of the affected rows:
+  UPDATE 11473 / UPDATE 8369, bystanders untouched, idempotent, a mismatched row aborts with no
+  change. Running it is the user's action.
+
 ## 2026-11-10 01:03–01:38 UTC: M4 window; the deficit is the #222 flush race, and it loses candidates
 
 The user granted mayalaran for 3 h (used 35 min; work dir and watchdog removed, nothing left),
