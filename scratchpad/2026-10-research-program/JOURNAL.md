@@ -101,7 +101,22 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   I left alone (deleting branches is the user's call). Future briefs say: fixes as new commits.
 - Box 60171046 destroyed after 5.66 h (~$0.62). Independent reviewer launched on the branch
   (`B64/REVIEW.md`); the PR (#254 expected, the fifth open one) is opened once the review is in.
-- Day: 2 agents (Opus; profile + PR preparation 618 k tokens, reviewer running), 1 box.
+- **Review back (12:10 UTC, `B64/REVIEW.md`): open after small fixes; nothing unsound at b = 64**
+  (the reviewer mirrored the packed-digit step in Python against big integers: adds with all-63
+  digits, seed + 200 steps, ~25,600 certificates per configuration, the c0/dm re-form). Fixes
+  applied: the body's wrong chunk divisor (4096, not 2^30) and "exact for any divisor"; the
+  parity window at b64 only seeds (body reworded; a stepping parity window is listed under "Not
+  in this PR"); the survivor-bound doc now names b64's 75–80 % fill; the wgpu estimate replaced
+  by "faster, by less, not measured"; the per-field split of the 1e16 gain (×1.02 and ×1.11);
+  internal wording removed. **The reviewer's stricter planner assertion failed when I ran it**
+  (b64's mid-band fields plan 16 partitions either way: the middle of b64's band is sparse), so
+  the test now takes b64 fields 55 % into the band and asserts growth unless the cap binds, and
+  growth for at least one b64 field (7 → 14 at 1e16). Re-run on ivory: `join_plan`'s 9 tests,
+  fmt, clippy on nice_common with the cubecl feature.
+- **PR #254 opened (12:35 UTC)**: one commit 69c514d on #250's head, branch `pr/top-fd-base64`
+  (a new name, a plain push). Five program PRs open = the cap. Stale fork branches left alone:
+  `pr/top-fd-pow2`, `-v2`, `-v3`, `-final`.
+- Day: 2 agents (Opus; profile + PR preparation 618 k tokens, reviewer 252 k), 1 box.
 - **Tomorrow:** the review's outcome and the PR; realized gains on demoux whenever a build
   changes; if a demoux window is granted, N13 (profile and retune the wgpu path on the 9070 XT);
   otherwise the next CPU roadmap item as a reviewed branch (CPU FD round 2 or the vectorised

@@ -13,12 +13,15 @@ that FD had measured slower. With #250's FD kernel that is no longer true, so th
   (`clip_vs`), and on CUDA #250's denser batch plan (`SURV_PER_PREFIX_VRAM`), which gives b64 batches 11–13 partitions
   per launch instead of 5–7.
 - Tests:
-  - the planner test `vram_budgets_get_larger_batches_in_the_same_slices` takes b64 1e16 and 1e17 into its loop
-    instead of asserting that b64's plan is unchanged;
+  - the planner test `vram_budgets_get_larger_batches_in_the_same_slices` no longer asserts that b64's plan is
+    unchanged. It takes b64 1e16 and 1e17 fields from a dense part of the band (55 % in; the middle of b64's band is
+    sparse) and asserts that the denser plan gives every field more partitions per launch unless the 16-partition cap
+    already binds, and that it does so for at least one b64 field (the 1e16 one: 7 → 14);
   - a new host test, `top_fd_runs_at_base_64`, pins `top_fd_runs` true for production-shaped b64 fields (1e16 and 1e17,
     the first and last slice of each);
   - the join parity test (`check_all`) now reports for every window whether its tops went through FD, and asserts it
-    for the b64 window.
+    for the b64 window. That window has one top prefix, so every slot there is a seed: it pins that FD runs at b64, not
+    FD's stepping. The stepped path at b64 is pinned by `top_fd_matches_the_top_kernel` and by the dense compares below.
 
 No kernel changes. Nothing changes at any other base.
 
@@ -39,9 +42,11 @@ FD's arithmetic is base-generic, and nothing in it assumes b is not a power of t
   - `top_fd_fits` requires b ≤ 128 for this and b ≤ 64 for the u64 digit masks. At b = 64 the bias is 192: a byte
     without a carry is in [192, 255], a byte with one is in [0, 63].
   - The early exits ("a word plus the bias and no carry comes back unchanged") hold for the same reason.
-- **The divisions.** The seeds' `fd_digits_trim` and the certificate's digit scan divide by `chunk_div` = b^cd and by b
-  at comptime. At b64 these are 2^30 and 2^6, so shifts and masks.
-  - The split16 long division is exact for any constant divisor.
+- **The divisions.** The seeds' `fd_digits_trim` divides by `chunk_div` = b^cd from the split16 constants
+  (`chunk_constants_u16`: b^cd < 2^16, on every device), and the certificate's digit scan by b, both at comptime. At
+  b64 these are 4096 = 2^12 (cd = 2) and 2^6, so shifts and masks.
+  - The split16 long division is exact for any constant divisor below 2^16: each step divides `(r << 16) | limb`,
+    which is below 2^32.
   - The limb trim relies on "x < b^m needs at most `pow_limbs16(b, m)` limbs". That holds for b^m = 2^(6m): `pow_limbs16`
     counts 2^(6m)'s own limbs, at least as many as any smaller value needs.
 - **The digit count.** `ndig_fast`'s constants come from `ndig_magic(64, …)`; a test checks them for every base 10–64.
@@ -51,6 +56,11 @@ FD's arithmetic is base-generic, and nothing in it assumes b is not a power of t
   `top_kernel` at b64: a b64 window and a b64 1e14 field (plus a b64 1e16 field in the CUDA variant). It forces the FD
   path itself, independent of `top_fd_runs`, and passes on this branch (CUDA and lavapipe).
 - **Clipped blocks** go to `top_kernel` beside FD as at the other bases; 23 of the comparison's 279 batches had one.
+- **The plan on CUDA.** With FD on, b64 batches are planned for one prefilter survivor per prefix and partition
+  (`SURV_PER_PREFIX_VRAM`), like the other FD bases. b64 is the densest of them: in the runs below its batches were
+  75–80 % full on average on a 10 GB card (about 1.6 survivors per prefix and partition), and none of about 7,000
+  batches overflowed. A batch that does overflow is re-run at half size, as before: that costs time, not results. The
+  constant's doc now says so. wgpu and HIP plans are unchanged (the denser plan is CUDA-only).
 
 ## Measurements
 
@@ -59,8 +69,8 @@ FD's arithmetic is base-generic, and nothing in it assumes b is not a power of t
 **Method:**
 - #250 (`ee30303`) and this PR, same box, two binaries.
 - Rounds interleaved, the order alternating between rounds, nothing else on the GPU.
-- Harness: `cubecl_cuda_join_throughput_fixed_fields` after one 1e14 warm-up field per process, given a list of b64
-  production fields: 58557331862957161709568 at 1e17, and 51001531862957161709568 + 58557331862957161709568 at 1e16.
+- Harness: `cubecl_cuda_join_throughput_fixed_fields` after one 1e14 warm-up field per process, patched to take a
+  list of field starts (the patch is not in this PR), on b64 production-shaped fields: 58557331862957161709568 at 1e17, and 51001531862957161709568 + 58557331862957161709568 at 1e16.
   These are 0.35 and 0.55 of the b64 range; both are heavier than the base's mean field.
 - Each process's `join_kernel` was replayed through the driver's JIT: 46–48 registers, no spill, in every run.
 - Seconds are each process's wall time for its fields.
@@ -71,19 +81,23 @@ FD's arithmetic is base-generic, and nothing in it assumes b is not a power of t
 | b64 1e16 × 2 (0.35, 0.55), 3 rounds | 34.65, 34.74, 34.69 | 32.79, 32.78, 32.80 | ×1.057, ×1.060, ×1.058 | **×1.058** |
 | b62 1e17 (7997740455941656911841), 2 rounds | 58.26, 58.13 | 58.98 (*), 58.16 | ×0.988 (*), ×0.999 | unchanged |
 
-(*) That process's driver JIT compiled the known 40-register spill variant of `join_kernel` (40 registers + 24 B),
-which costs about 3 % on its own. The spill-free re-run is ×0.999, as expected: nothing at b62 changes.
+(*) That process's driver JIT compiled the known 40-register spill variant of `join_kernel` (40 registers + 24 B).
+The spill-free re-run is ×0.999, as expected: nothing at b62 changes.
 
-**Without #250 (main `c0c357a` with only the gate removed; one binary, the gate as a switch):** b64 1e17 ×1.061
+The two 1e16 fields gain unevenly (device seconds per field): the one at 0.35 goes 18.2 → 17.8 s (×1.02), the one at
+0.55 goes 15.3 → 13.8 s (×1.11). The 1e17 row is the field at 0.55 alone; on top of #251 the 1e17 field at 0.05
+gained ×1.14 as well (below).
+
+**Without #250 (main `c0c357a` with only the constant flipped, one binary):** b64 1e17 ×1.061
 (144.97 → 136.63 s, 1 round), b64 1e16 ×1.021, ×1.041 (2 rounds). Main has neither #250's faster FD step nor its denser CUDA
 plan (its b64 batches keep 5–6 partitions per launch with FD on), so the gain is smaller there; this PR is stacked on
 #250.
 
-**On top of #251 as well** (#250 + #251, the same switch, the same card, an earlier session): b64 1e17 ×1.141 (0.55
+**On top of #251 as well** (#250 + #251 with the constant flipped, the same card, an earlier run): b64 1e17 ×1.141 (0.55
 field), then ×1.129 and ×1.125 (0.05 + 0.55 fields); b64 1e16 ×1.039, ×1.067, ×1.065. That is the same absolute saving
 or a little more, on a field whose check costs less.
 
-**Where the gain comes from** (the 1e17 field, profiled: #250's kernels with per-phase timers, the gate as a switch, one
+**Where the gain comes from** (the 1e17 field, profiled: #250's kernels with per-phase timers, the constant flipped, one
 process each): with FD on, the top phase falls from 24.10 s to 10.84 s
 (0.230 → 0.104 ns per test), launches halve (5,846 → 3,061) and inputs/bucket fall by ~0.5 s; the join and the check do
 not move (±2 %). The profiled field falls from 144.0 to 129.7 s (×1.110), and ~93 % of that saving is the top
@@ -91,9 +105,8 @@ phase itself.
 
 **What other GPUs should expect:** the denser plan (more partitions per launch) is CUDA-only, and on CUDA it is part of
 the top phase's gain too, since FD re-seeds each prefix once per launch. On wgpu (Vulkan, Metal, DX12) the plan keeps
-5–7 partitions per launch, so one FD slot in 5–7 is a seed instead of one in 11–13. Using the ~2.4× seed cost measured
-for #250, that puts FD at about 0.116 ns per test instead of 0.104, still about half of `top_kernel`'s: roughly
-×1.07–1.09 at 1e17 where the top phase is a similar share (an estimate; not run on a wgpu GPU).
+5–7 partitions per launch, so one FD slot in 5–7 is a seed instead of one in 11–13. FD is expected to be faster there
+too, but by less. It was not measured on any non-CUDA GPU, and NiceMark has no b64 scenario that would show it.
 
 **NiceMark** is not affected by construction: its nice-only scenarios are b58, b60 and b62, where `top_fd_runs` returns
 what it returned before.
@@ -112,6 +125,9 @@ what it returned before.
   - Every timed run gave the same counts on both sides: b64 1e17 3,092,989,872,066 / 191,683,594,021; 1e16
     687,610,801,525 / 42,436,400,204.
 - **Host:** the `join_plan`, `cubecl_join` and `overlap_join` unit tests, the two new or changed ones included.
+  - The planner test's fields and assertion were tightened after the device runs above; `join_plan`'s 9 tests,
+    `cargo fmt` and clippy on `nice_common` with the `cubecl` feature were re-run on that final commit. The kernels and
+    the plan code are the tested ones.
 - **lavapipe (Mesa 25.2):** every wgpu test of `cubecl_join` passes with naga and with CubeCL's SPIR-V compiler (8
   each); the b64 window reports FD tops on both.
 - **WGSL lint:** CI's `wgsl_dump_for_lint` + `scripts/wgsl-lint.py` with the workflow's `--require` list: clean.
@@ -125,3 +141,7 @@ what it returned before.
 
 - FD-specific tuning at b64 (the FD kernel's cube size, `TOP_FD_MIN_UNITS`): not measured.
 - A wgpu or Metal timing of b64.
+- A parity window in which FD steps (and does not only seed) against the CPU join. None of `check_all`'s windows has
+  enough top prefixes for that; forcing one slot group in `check_window` would do it and needs a device run.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
