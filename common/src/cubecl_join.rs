@@ -5791,9 +5791,20 @@ mod tests {
                 .expect("a base with throughput fields (57, 58, 60, 62, 64)");
             let warm = FieldSize::new(start - warm_size, start);
             run_routed(ctx, base, &warm);
-            let fields: Vec<FieldSize> = (0..n)
-                .map(|i| FieldSize::new(start + i * size, start + (i + 1) * size))
-                .collect();
+            let fields: Vec<FieldSize> = match std::env::var("NICE_TEST_JOIN_LIST") {
+                Ok(l) => l
+                    .split(',')
+                    .filter(|x| !x.trim().is_empty())
+                    .map(|x| {
+                        let s0: u128 = x.trim().replace('_', "").parse().expect("a start");
+                        FieldSize::new(s0, s0 + size)
+                    })
+                    .collect(),
+                Err(_) => (0..n)
+                    .map(|i| FieldSize::new(start + i * size, start + (i + 1) * size))
+                    .collect(),
+            };
+            let n = fields.len() as u128;
             let lookahead = FIELDS_IN_FLIGHT.saturating_sub(1);
             let t = std::time::Instant::now();
             let (mut queued, mut found) = (std::collections::VecDeque::new(), Vec::new());
@@ -5807,6 +5818,33 @@ mod tests {
                 let (res, stats) = ctx.finish(ticket).expect("finish");
                 found.extend(res.nice_numbers.iter().map(|x| x.number));
                 per_field.push((stats, last_join_stats(ctx).expect("join stats")));
+                {
+                    let (ns, js) = per_field.last().expect("pushed");
+                    eprintln!(
+                        "FIELD i={} at={:.3} msd={:.3} device={:.3} total={:.3} launches={} | jsetup={:.3} \
+                         jdevice={:.3} jwait={:.3} slices={} partitions={} batches={} slots={} min_slots={} \
+                         survivors={} checked={} retried={} splits={} refused={}",
+                        per_field.len() - 1,
+                        t.elapsed().as_secs_f64(),
+                        ns.msd_secs,
+                        ns.device_secs,
+                        ns.total_secs,
+                        ns.launches,
+                        js.setup_secs,
+                        js.device_secs,
+                        js.device_wait_secs,
+                        js.slices,
+                        js.partitions,
+                        js.batches,
+                        js.slots,
+                        js.min_slots,
+                        js.survivors,
+                        js.checked,
+                        js.retried_partitions,
+                        js.splits,
+                        js.refused,
+                    );
+                }
             };
             for f in &fields {
                 let NiceonlyStarted::Queued(ticket) = begin_niceonly(ctx, f, base).expect("begin")
