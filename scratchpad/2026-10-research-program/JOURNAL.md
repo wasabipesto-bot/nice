@@ -37,6 +37,43 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   is on the table; whether to buy a second pass of b50–60; what to optimise for beyond the
   search itself; subagent models; opening all four held branches.
 
+## 2026-11-11 (cycle 2 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $10.97 of $30 (fleet $18.73); credit
+  $31.62; ivory 9.4 GB free. **#250–#253 open, all green, mergeable, no comments, not merged**
+  (4 of 5 PR slots used); main = c0c357a. No user message since yesterday's PR-bar correction.
+- **b60's reset fields are all re-searched** (600 of 600 sampled at check level 1); b58 100 %, b60
+  80.7 %, b62 not started.
+- **Who is searching (latest 60k submission ids, 583 nice-only fields):** demoux 474 and mayalaran
+  59 on main (c0c357a, 3.4.8-dev), **the fleet 50 on v3.4.7** (8bd154b). The paid fleet is on
+  the release of 10-31, which lacks #235–#241, #246, #249: by the PRs' own A/B numbers main is
+  ≈ ×2.4 that release at b60 1e16 (×1.80 × 1.06 × 1.122 × 1.154, multiplied, not re-measured as
+  one). A release is the user's ops step; flagged at the top of today's report.
+- **Leads today** (kill criteria first):
+  - **B64 profile and roadmap** (agent, one RTX 3080, ≤ 6 h): b64 is ≈ 90 % of the reachable cost
+    and has never been profiled on its own (the FD top kernel is off at power-of-two bases, 40 %
+    of 1e16 fields are empty, 8 residue classes). Shares and per-operation costs on production-
+    shaped fields at ≥ 10 locations, 1e16 against 1e17 fields, a constants retune at b64, what
+    b = 2^6 allows. **Kill: no lever ≥ ×1.05 at b64 → record the profile only.**
+  - **N11, the walk's per-pair floor** (same agent and box, after the profile): what the
+    0.13–0.15 ps per pair consists of and whether a small change removes part of it.
+    **Kill: < ×1.05 at b62 1e17 and b60 1e16, or any NiceMark scenario below ×0.98.**
+
+- **Who does the search, and what the merged work did there (06:30 UTC, EXPERIMENTS T2.1; public
+  telemetry only):** over 11-09/10 demoux (RX 9070 XT, wgpu on Vulkan, main) submitted **81 %**
+  of the nice-only fields, the fleet 13 % (≈ 20 GPU-hours a day, on v3.4.7), mayalaran 6 %.
+  demoux's own history gives the realized gain of each deployed build as a discontinuity
+  between adjacent fields: the 11-03 batch ×2.11 [2.08, 2.14] (NVIDIA A/B ×1.80), **the 11-09
+  batch (#241, #246, #249) ×1.17 [1.16, 1.18] against ×1.37–1.39 on CUDA.** So CUDA A/Bs do
+  not predict the card that does four fifths of the work, CUDA-only gains reach 13 % of the
+  search, and the wgpu path cannot be measured on Vast (no AMD offers; Vulkan does not start in
+  Vast containers). #250's denser plan is CUDA-only and its ballot append is gated off on
+  64-lane subgroups, so its ×1.127 will be smaller on demoux.
+- **Consequences:** price leads on the production mix, not in fleet dollars (README updated);
+  measure every deploy's realized gain on demoux from telemetry; ask the user for a demoux
+  window to profile and retune the wgpu path there (N13). Pace, derived: b60 ends in ≈ 3 days,
+  b62 ≈ 2 months, b64 ≈ 1.5 years at the current mix.
+
 ## 2026-11-10 15:00 UTC: the user's PR bar corrected; the four held branches opened as #250–#253
 
 - **Correction from the user:** the bar for an individual PR is ×1.05 for a simple change up to

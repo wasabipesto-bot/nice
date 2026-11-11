@@ -5,6 +5,32 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T2.1 Who does the search, and what each deployed build did on demoux (2026-11-11, director, public telemetry; `../2026-11-fresh-eyes/demoux_history.py`, `demoux_history.json` (115,022 rows), `recent_niceonly.json`)
+
+Nice-only fields submitted on 2026-11-09 and 11-10 (23,705 fields): **demoux (RX 9070 XT, wgpu on
+Vulkan, main c0c357a) 81 %**, the fleet (NVIDIA, v3.4.7, ≈ 20 GPU-hours a day on 3060/4060-class
+cards) 13 %, mayalaran (M4, main) 6 %. Median seconds per non-empty b60 1e16 field: demoux 11,
+fleet RTX 4060 30, RTX 3060 74, M4 100–115.
+
+Realized gain on demoux at each build switch (median seconds per non-empty b60 field, the last
+1,500 fields before against the first 1,500 after, adjacent in the base; bootstrap 95 % interval):
+
+| switch on demoux | what landed | realized | NVIDIA A/B at b60 (product of the PRs' own numbers) |
+|---|---|---|---|
+| 9a4f740 → c72e2c6 (10-28) | #203 and others | ×1.17 (400-field window) | — |
+| c72e2c6 → 8c088a2 (10-29) | #215, #216 | ×1.14 (400-field window) | ×1.10–1.25, ×1.04–1.26 |
+| 8c088a2 → 6f060a9 (11-03) | #235–#240 (with #222, #228) | **×2.11 [2.08, 2.14]** | ×1.80 |
+| 6f060a9 → c0c357a (11-09) | #241, #246, #249 | **×1.17 [1.16, 1.18]** | ×1.37–1.39 |
+
+v3.4.6 → main on demoux: 33.4 s → 11.6 s per field over the segments (×2.9; ×3.3 as the product of
+the switches). **The last batch delivered less than half of its CUDA-measured gain on the card
+that does 81 % of the work.** AMD cards cannot be rented on Vast and Vulkan does not start in Vast
+containers (earlier notes), so the wgpu path can only be measured on demoux or after the fact
+from telemetry.
+
+Pace at the current mix (derived): b60 (80.7 %) ends in ≈ 3 days; b62 ≈ 2 months (≈ 53 days if the
+fleet ran main); b64 ≈ 1.5 years.
+
 ## N1.C1 The CPU join at the transversal shape: exact prototype, counts, timing (2026-11-10, agent; `N1/cpu/RESULTS.md`, `N1/cpu/raw/` (run logs A–D, `analyze.py` summaries); fork branch `exp/n1-transversal-cpu` a32d78c from c0c357a; ivory, one EPYC-Rome vCPU, `nice -n 19`)
 
 Change: experiment-only constructors (`JoinParams::supported_experiment`, `FieldSetup::new_experiment`,

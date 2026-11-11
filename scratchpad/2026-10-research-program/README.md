@@ -43,6 +43,15 @@ Never without asking: live fleet (config, crontab, `~/fleet-run`), server, schem
 data corrections, deploys, merges, upstream `main`, destructive git, spend above the
 cap, rentals below the credit floor, the user's machines.
 
+## Where the search runs (2026-11-11, EXPERIMENTS T2.1)
+
+demoux (the user's RX 9070 XT, wgpu on Vulkan, built from main) does ≈ 81 % of the nice-only
+fields, the NVIDIA fleet ≈ 13 % (on the last release), the M4 ≈ 6 %. Price a lead by what it does
+on that mix: a CUDA-only gain reaches 13 % of the search. Gains measured on NVIDIA do not carry
+over reliably (the 11-09 batch: ×1.37 on CUDA, ×1.17 on demoux). After every deploy, measure the
+realized gain on demoux from telemetry (`../2026-11-fresh-eyes/demoux_history.py`). The wgpu
+path cannot be measured on Vast; it needs a demoux window (ask) or the after-the-fact telemetry.
+
 ## Working without the user (2026-11-10)
 
 The user checks in when they can and may miss several days. Decide inside the rails without
