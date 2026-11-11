@@ -51,6 +51,8 @@ on that mix: a CUDA-only gain reaches 13 % of the search. Gains measured on NVID
 over reliably (the 11-09 batch: ×1.37 on CUDA, ×1.17 on demoux). After every deploy, measure the
 realized gain on demoux from telemetry (`../2026-11-fresh-eyes/demoux_history.py`). The wgpu
 path cannot be measured on Vast; it needs a demoux window (ask) or the after-the-fact telemetry.
+Measured there on 2026-11-11 (EXPERIMENTS N13.1): #250 ×1.04, #251 ×1.13, #254 ×1.09 at b64; the
+join's base is a third of a field on this card (N16); workspace recipe and rules in `N13/BRIEF.md`.
 
 ## Working without the user (2026-11-10)
 

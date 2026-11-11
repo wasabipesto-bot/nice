@@ -5,6 +5,57 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## N13.1 The open PRs, the profile and a retune on demoux's RX 9070 XT (2026-11-11 12:45–14:54 UTC, agent on the user's machine with the production client stopped; `N13/RESULTS.md`, `N13/raw/` (`demoux/`, `demoux-final/`, `scripts/`, `analysis.txt`))
+
+Card at its 304 W cap; `cargo test --release -p nice_common --features gpu,cubecl-spirv` (reports
+`wgpu<spirv>`, production's path). A/A noise 0.2 %; rounds within a tree 0.3–1.4 %; counts
+identical in every run and exact against the CPU join on b60, b62 and b64 fields.
+
+| field (3 interleaved rounds) | main → #250 | #250 → #251 | main → #251 | #250 → #254 |
+|---|---|---|---|---|
+| b62 1e17 at 0.45 | ×1.041 | ×1.127 | ×1.173 | |
+| b62 1e17 at 0.55 (+ the empty 0.35) | ×1.040 | ×1.107 | ×1.150 | |
+| b60 1e16 at 0.55 + 0.85 | ×1.031 | ×1.138 | ×1.178 | |
+| b64 1e17 at 0.55 | | | | ×1.096 |
+| b64 1e16 at 0.55 | | | | ×1.088 |
+
+#250's denser plan is CUDA-only, so here only its cheaper stepped slot counts. Main's seconds per
+field: b62 1e17 at 0.45 75.7 s (RTX 3080 at 300 W: 66.7 s); the card runs the join at ≈ 0.87–0.95 ×
+that 3080.
+
+Shares (b62 1e17 / b60 1e16; the join's parts from whole-field totals per ablation mode, because
+the per-phase timers leak between phases on wgpu):
+
+| phase | 9070 XT | RTX 3080 (L51) |
+|---|---|---|
+| top certificates (FD) | 22 % / 19 % | 23 % / 18 % |
+| join | 53 % / 56 % | 56 % / 59 % |
+| · AND | 13 % / 17 % | 15 % / 15 % |
+| · walk rounds + prefilter | 4 % / 5 % | 29 % / 33 % |
+| · base (batch loads, transposed copy, entry waves) | ≈ 36 % / ≈ 33 % (derived) | 11 % / 11 % |
+| check (main's kernel) | 17 % / 19 % | 12 % / 14 % |
+
+Per operation: survivor path ≈ 0.11–0.15 ps per pair (3080: 0.67), join base ≈ 1.0 ps per pair
+(0.26), check 0.20 ns (0.11), FD top test 0.14–0.15 ns (0.158).
+
+Retune (b62 1e17 at 0.45 / b60 1e16 at 0.55):
+
+| change | b62 | b60 | rounds |
+|---|---|---|---|
+| `TOP_CAP` 128 with `TRANSPOSE_MIN` 96 | ×1.039 | ×1.051 | 3 |
+| CUDA's denser plan on this adapter (12 / 9 partitions per launch instead of 7 / 4; fits the 2 GiB budget) | ×1.039 | ×1.044 | 3 |
+| both | ×1.078 | ×1.106 | 3 |
+| `AND_GROUP` 8 · `TRANSPOSE_MIN` 128 | ×1.022 · ×1.018 | ×1.012 · ×1.022 | 3 |
+| naga instead of SPIR-V | ×1.02 | ×1.00 | 2 |
+| per-round plane barrier in the walk | ×1.00 | ×1.00 | 2 |
+| wide u64 chunks | ×0.94 | ×0.93 | 2 |
+| EPT 1 / 3 · `AND_GROUP` 2 · `TRANSPOSE_MIN` 256 · `TOP_CAP` 512 | ×0.96 / ×0.98 · ×0.96 · ×0.95 · ×0.87 | ×0.97 / ×0.98 · ×0.96 · ×0.98 · ×0.89 | 2 |
+
+The driver reports 32–64-lane subgroups, so the one-ballot append is off here (not forced on).
+**Conclusion: #251 is the big one on this card (×1.13–1.14; main → #251 ×1.17–1.18); #254 holds
+at b64 (×1.09–1.10); two tunings are worth ×1.08–1.11 together; the join's base is a third of the
+field here at four times NVIDIA's cost per pair and is the block to open next.**
+
 ## B64.1 First profile of base-64 fields; the walk's per-pair floor (2026-11-11, agent; `B64/RESULTS.md`, `B64/raw/` (`analysis.txt`, box logs, scripts); fork branch `exp/b64-profile` 44eee52; box 60171046, RTX 3080 at 300 W)
 
 Base means over 10 fields at 0.05–0.95 of the range (seconds per admissible n; 3–4 rounds):

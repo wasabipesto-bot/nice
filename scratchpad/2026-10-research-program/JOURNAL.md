@@ -134,6 +134,24 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   device-specific bottleneck in the profile.** I never start the production client; one ntfy
   when the machine is clean.
 
+- **demoux window closed at 14:57 UTC (2 h 15 min of the 4 h), EXPERIMENTS N13.1.** Workspace
+  removed, watchdog stopped, no process of ours left, `/opt/nice` and `~/.cargo` untouched, the
+  production client still stopped (not mine to start); one ntfy sent. Results on the 9070 XT,
+  noise 0.2 %:
+  - **Open PRs:** #250 ×1.03–1.04 (its denser plan is CUDA-only), **#251 ×1.13–1.14 on top
+    (main → #251 ×1.17–1.18 at b62 1e17 and b60 1e16)**, #254 ×1.09–1.10 at b64. Merging #250 and
+    #251 is worth more to the search than anything else on the table.
+  - **Profile:** tops and AND as on NVIDIA; the survivor path is nearly free here (4–5 % against
+    29–33 %); **the join's base is ≈ a third of the field at ≈ 4× NVIDIA's cost per pair**; the
+    check costs 2× per check (hence #251's larger gain).
+  - **Retune:** `TOP_CAP` 128 ×1.04–1.05 and CUDA's denser plan on this adapter ×1.04; **together
+    ×1.078 (b62) / ×1.106 (b60)**. Each alone sits just under the ×1.05 bar at b62; TOP_CAP needs
+    a per-device value (128 loses 4 % on NVIDIA). Nothing else ≥ 3 %; wide u64 chunks lose 6–7 %.
+  - Not reached: what in the join's base is slow, a budget above 2 GiB, the ballot append forced
+    on, retunes at b64.
+  **Verdict on N13's kill criterion: not killed** (a device-specific bottleneck and two
+  measured tunings). New leads N14–N16.
+
 ## 2026-11-10 15:00 UTC: the user's PR bar corrected; the four held branches opened as #250–#253
 
 - **Correction from the user:** the bar for an individual PR is ×1.05 for a simple change up to
