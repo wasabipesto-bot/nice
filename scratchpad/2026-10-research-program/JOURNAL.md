@@ -116,6 +116,7 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **PR #254 opened (12:35 UTC)**: one commit 69c514d on #250's head, branch `pr/top-fd-base64`
   (a new name, a plain push). Five program PRs open = the cap. Stale fork branches left alone:
   `pr/top-fd-pow2`, `-v2`, `-v3`, `-final`.
+- 13:21 UTC: **#254 fully green** (25 pass, 3 skipped, macOS included).
 - Day: 2 agents (Opus; profile + PR preparation 618 k tokens, reviewer 252 k), 1 box.
 - **Tomorrow:** the review's outcome and the PR; realized gains on demoux whenever a build
   changes; if a demoux window is granted, N13 (profile and retune the wgpu path on the 9070 XT);
