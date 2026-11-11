@@ -74,6 +74,18 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   window to profile and retune the wgpu path there (N13). Pace, derived: b60 ends in ≈ 3 days,
   b62 ≈ 2 months, b64 ≈ 1.5 years at the current mix.
 
+- **B64 profile back (10:20 UTC, `B64/RESULTS.md`, EXPERIMENTS B64.1):** b64 costs 6.5e-15 s per
+  admissible n on main (82 s per 1e17 field on a 300 W 3080), **≈ 7.8 × b62 for the whole base**;
+  3 in 10 fields empty; the survivor path is the largest block (38–40 %), tops 17–18 % with the
+  FD kernel off. **One lever, measured: the FD top kernel switched on at b64 is ×1.13 on 1e17
+  fields** (×1.04–1.07 on 1e16), exact; the "measured slower" gate predates FD round 2 (#250).
+  Field size: insert b64 at 1e17 (≈ 3–4 %, an ops note for the user). No constants retune ≥ 3 %.
+  **N11 closed:** the walk's floor is its round structure; no small change reaches ×1.03.
+- 10:30 UTC: the same agent uses the box's remaining time to prepare `pr/top-fd-pow2` (one commit
+  on #250's head: the gate removed, a b64 device test, lavapipe both compilers, lint, the A/B on
+  main-only as well, and how much of the gain is the CUDA-only denser plan). A reviewer follows;
+  the PR would be the fifth open one.
+
 ## 2026-11-10 15:00 UTC: the user's PR bar corrected; the four held branches opened as #250–#253
 
 - **Correction from the user:** the bar for an individual PR is ×1.05 for a simple change up to

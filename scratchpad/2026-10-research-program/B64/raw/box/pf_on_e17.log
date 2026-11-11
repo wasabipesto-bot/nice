@@ -1,0 +1,12 @@
+START pf_on_e17 09:49:14 bases=64 n=1 size=1e17 env=[NICE_EXP_FD_POW2=1 NICE_EXP_GPU_PROFILE=1 NICE_EXP_JOIN_ABL=0 NICE_TEST_JOIN_LIST=58557331862957161709568 ] PTXFROM=fresh bin=EF md5=feb90318
+
+running 1 test
+test cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields ... GPU_PROFILE base=64 start=58557331762957161709568 end=58557331862957161709568 size=100000000000000 slices=1 partitions=4096 batches=256 slots=16 min_slots=16 retried=0 splits=0 | setup=0.0423 device_wall=4.1425 upload=2.1848 inputs=0.0195 top=2.2009 bucket=0.1900 join=0.7059 check=0.2314 read=0.0037 probe=0.7752 unattributed=-2.1709 | top_fd=1.1822 top_clip=1.0187 clip_launches=2 null=0.0018 up_host=0.0027 up_sort=0.0024 up_dev=0.0072 up_warm=2.1750 | ntlay=37160 nbp=77234 tops=47602115 listed=2969259682 pairs=68467780310 padded_pairs=194978263040 live_buckets=16515072 buckets=16515072 survivors=4895731395 checked=303289477 spilled=0 hits=0
+GPU_PROFILE base=64 start=58557331862957161709568 end=58557431862957161709568 size=100000000000000000 slices=10 partitions=4096 batches=3061 slots=13 min_slots=11 retried=0 splits=0 | setup=8.6513 device_wall=138.0212 upload=2.2691 inputs=0.2946 top=10.8373 bucket=1.6411 join=98.8943 check=15.7521 read=0.0499 probe=7.8757 unattributed=0.3752 | top_fd=10.8368 top_clip=0.0005 clip_launches=2 null=0.0321 up_host=1.6052 up_sort=1.6044 up_dev=0.6634 up_warm=0.0004 | ntlay=25448847 nbp=914023 tops=32558854772 listed=46679650416 pairs=75277824209788 padded_pairs=133361069146112 live_buckets=165150720 buckets=165150720 survivors=3092989872066 checked=191683594021 spilled=0 hits=0
+FIELD i=0 at=139.099 msd=8.651 device=138.021 total=138.092 launches=3061 | jsetup=8.651 jdevice=138.021 jwait=0.000 slices=10 partitions=4096 batches=3061 slots=13 min_slots=11 survivors=3092989872066 checked=191683594021 retried=0 splits=0 refused=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=64 fields=1 in_flight=2 secs=139.10 per_field=139.099 rate=7.189e14 n/s | setup=8.651s device=138.021s wall=138.092s batches=3061 slots=13 plan_mib=2431 | empty_top=0 retried=0 splits=0 survivors=3092989872066 checked=191683594021 found=0 | peak_in_use_mib=0 peak_reserved_mib=9
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 278 filtered out; finished in 143.50s
+
+END pf_on_e17 09:51:38 rc=0

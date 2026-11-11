@@ -5,6 +5,43 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## B64.1 First profile of base-64 fields; the walk's per-pair floor (2026-11-11, agent; `B64/RESULTS.md`, `B64/raw/` (`analysis.txt`, box logs, scripts); fork branch `exp/b64-profile` 44eee52; box 60171046, RTX 3080 at 300 W)
+
+Base means over 10 fields at 0.05–0.95 of the range (seconds per admissible n; 3–4 rounds):
+
+| | main c0c357a | stack a97e3d7 (#250 + #251) | stack over main |
+|---|---|---|---|
+| b64 1e17 | 6.46e-15 (82.0 s per field) | 6.16e-15 (78.2 s) | ×1.049 |
+| b64 1e16 | 7.47e-15 (9.48 s) | 7.02e-15 (8.91 s) | ×1.064 |
+| b62 1e17 (1 round) | 1.47e-14 (48.2 s) | 1.21e-14 (39.6 s) | ×1.22 |
+
+Whole base on this card (derived): b64 2.96e7 s on the stack, b62 3.78e6 s: **b64 ≈ 7.8 × b62**.
+3 of 10 b64 fields are empty at both sizes (2 of 10 at b62); an empty field costs ≈ 1.1 s with the
+GPU idle. Shares of a b64 field on main: top certificates 17–18 % (the FD kernel is off at
+power-of-two bases), join 67–68 % (base 12, AND 17, walk 13, prefilter + stage 25: the survivor
+path is 38–40 %), check 11 % (≈ 6.5 % on the stack), setup + bucket + rest ≈ 4 %. b64 buckets hold
+≈ 1,400–1,750 tops × 220–330 entries (b62: ≈ 470 × 330). No division survives at b64 (shifts and
+masks); one `mul_hi` in the lean prefilter remains (1–2 %, estimate).
+
+- **Field size:** the 1e16 tiles of a 1e17 field cost the same within ±1 % with identical counts;
+  1e16 pays the idle second per empty field ten times as often: **insert b64 at 1e17, ≈ 3–4 %**.
+- **Constants:** no retune moves b64 by ≥ 3 % (`TRANSPOSE_MIN` 128, `SURV_FLUSH` 768, `AND_GROUP` 8
+  within ±2 %; EPT 1 or 3, `AND_GROUP` 2, `TOP_CAP` 128 lose 4–6 %; `TOP_CAP` 512 ×0.87 with spills).
+- **The FD top kernel switched on at b64** (`TOP_FD_AT_POW2_BASES`, on the stack): **×1.141 /
+  ×1.129 / ×1.125 on b64 1e17** (3 interleaved rounds), ×1.039 / ×1.067 / ×1.065 on 1e16; exact on
+  the dense compare against the CPU join; top test 0.230 → 0.104 ns, top share 16.7 → 8.4 %,
+  launches halve (the plan puts 11–13 partitions per launch instead of 5–7: #250's denser plan,
+  CUDA only). The gate dates from FD round 1 ("measured slower").
+- **Walk floor (N11):** it is the walk's round structure (a ~41-instruction round runs while any
+  of 32 lanes has a bit left), ≈ 0.09 ps per pair; one walk over both entry slots ×1.00 at b62
+  1e17, b60 1e16 and b64 1e16; without the per-round plane barrier ×0.88–0.90. **No small change
+  reaches ×1.03: closed.**
+
+Roadmap at b64 1e17: FD on ×1.13 (measured, one constant) · insert at 1e17 ×1.03–1.04 (server
+config) · #251 ×1.05–1.06 (in review) · survivor path (38–43 % of the field) ≈ ×1.12 (estimate,
+very large; L37's compaction lost) · binary stepping of the tops ≈ ×1.04–1.05 after FD
+(instruction count, medium to large) · shift form of the walk's digit extraction ×1.01–1.02.
+
 ## T2.1 Who does the search, and what each deployed build did on demoux (2026-11-11, director, public telemetry; `../2026-11-fresh-eyes/demoux_history.py`, `demoux_history.json` (115,022 rows), `recent_niceonly.json`)
 
 Nice-only fields submitted on 2026-11-09 and 11-10 (23,705 fields): **demoux (RX 9070 XT, wgpu on

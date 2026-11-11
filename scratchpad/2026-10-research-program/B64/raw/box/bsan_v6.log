@@ -1,0 +1,14 @@
+START bsan_v6 07:49:16 bases=62,64 n=1 size=1e14 env=[NICE_EXP_JOIN_STAGE=6 ] bin=E3 md5=3c272c53
+
+running 1 test
+test cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields ... FIELD i=0 at=0.458 msd=0.041 device=0.416 total=0.416 launches=241 | jsetup=0.041 jdevice=0.416 jwait=0.000 slices=1 partitions=3844 batches=241 slots=16 min_slots=16 survivors=1439469648 checked=88159810 retried=0 splits=0 refused=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=62 fields=1 in_flight=2 secs=0.46 per_field=0.458 rate=2.185e14 n/s | setup=0.041s device=0.416s wall=0.416s batches=241 slots=16 plan_mib=1358 | empty_top=0 retried=0 splits=0 survivors=1439469648 checked=88159810 found=0 | peak_in_use_mib=0 peak_reserved_mib=9
+STRIDE base=62 fields=1 secs=10.76 per_field=10.764 (one at a time) found=0
+FIELD i=0 at=0.605 msd=0.040 device=0.564 total=0.564 launches=256 | jsetup=0.040 jdevice=0.564 jwait=0.000 slices=1 partitions=4096 batches=256 slots=16 min_slots=16 survivors=5702041796 checked=346647759 retried=0 splits=0 refused=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=64 fields=1 in_flight=2 secs=0.60 per_field=0.605 rate=1.653e14 n/s | setup=0.040s device=0.564s wall=0.564s batches=256 slots=16 plan_mib=1388 | empty_top=0 retried=0 splits=0 survivors=5702041796 checked=346647759 found=0 | peak_in_use_mib=0 peak_reserved_mib=9
+STRIDE base=64 fields=1 secs=28.99 per_field=28.994 (one at a time) found=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 278 filtered out; finished in 46.56s
+
+END bsan_v6 07:50:02 rc=0
