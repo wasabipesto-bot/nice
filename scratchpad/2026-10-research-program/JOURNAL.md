@@ -122,6 +122,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   otherwise the next CPU roadmap item as a reviewed branch (CPU FD round 2 or the vectorised
   pass 2), held until a PR slot frees.
 
+- **12:40 UTC: the user granted demoux for 4 hours at most** and stopped its production client
+  (last submission 12:42:02 UTC; no `nice_client` process, GPU idle). So the window is clean but
+  costs the search its main engine: finish early. Workspace `/tmp/claude-exp-2026-11-11-amd`
+  (tmpfs) with a private cargo home, a clone of the fork, a PID-registering `run.sh` and a
+  watchdog that wipes it at 16:30 UTC; agent hard stop 16:00 UTC (`N13/BRIEF.md`): (A) what #250,
+  #251 and #254 do on the 9070 XT, with an A/A noise floor; (B) the profile shares there next to
+  the 3080's; (C) the retune (constants, the plan budget, subgroup size and the ballot gate, the
+  walk barrier, SPIR-V against naga). **Kill for N13: no lever ≥ ×1.05 on this card and no
+  device-specific bottleneck in the profile.** I never start the production client; one ntfy
+  when the machine is clean.
+
 ## 2026-11-10 15:00 UTC: the user's PR bar corrected; the four held branches opened as #250–#253
 
 - **Correction from the user:** the bar for an individual PR is ×1.05 for a simple change up to
