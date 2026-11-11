@@ -1,0 +1,31 @@
+Diff in /root/b64/src/P/common/src/cubecl_join.rs:4685:
+         for &(b, s, e, t, k, p) in WINDOWS {
+             let fd = check_window(client, b, s, e, JoinParams { t, k, p }, None);
+             // A power-of-two base's tops go through the FD kernel too.
+-            assert!(fd || b != 64, "b{b} [{s}, {e}): the FD kernel certifies the tops");
++            assert!(
++                fd || b != 64,
++                "b{b} [{s}, {e}): the FD kernel certifies the tops"
++            );
+             println!("{name}: b{b} [{s}, {e}) ({t},{k},{p}) agrees (FD tops: {fd})");
+         }
+         let field = FieldSize::new(FRONTIER_57, FRONTIER_57 + 100_000_000_000_000);
+Diff in /root/b64/src/P/common/src/join_plan.rs:851:
+             let range = mid_band(64, size);
+             let field = plan_join(64, &range, lim).expect("the join takes it");
+             assert!(crate::cubecl_join::top_fd_runs(&field.fs), "b64 {size:e}");
+-            for sl in [field.slices.first(), field.slices.last()].into_iter().flatten() {
++            for sl in [field.slices.first(), field.slices.last()]
++                .into_iter()
++                .flatten()
++            {
+                 let fs = field.fs.sub_range(sl.start(), sl.end()).expect("slice");
+                 assert!(
+                     crate::cubecl_join::top_fd_runs(&fs),
+Diff in /root/b64/src/P/common/src/join_plan.rs:858:
+-                    "b64 {size:e} slice at {}", sl.start()
++                    "b64 {size:e} slice at {}",
++                    sl.start()
+                 );
+             }
+         }

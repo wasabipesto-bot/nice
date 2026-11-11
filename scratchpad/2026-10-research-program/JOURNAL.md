@@ -86,6 +86,27 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   main-only as well, and how much of the gain is the CUDA-only denser plan). A reviewer follows;
   the PR would be the fifth open one.
 
+- **FD-at-b64 PR branch ready (11:20 UTC, `B64/PR-RESULTS.md`, `B64/PR-BODY.md`):** one commit on
+  #250's head (3 files, +57 / −32: the gate removed, a host test pinning FD at b64, the planner
+  test extended, `check_all` asserting FD ran for the b64 window). Against #250's head on a 300 W
+  3080, 3 interleaved rounds: **b64 1e17 ×1.090, b64 1e16 ×1.058, b62 unchanged**; on main alone
+  (FD round 1, no denser plan) ×1.06 / ×1.02–1.04; ≈ 93 % of the saving is the top phase itself;
+  wgpu estimate ×1.07–1.09 at 1e17 (not measured on a wgpu GPU). Exact on dense compares
+  (b64 1e16 and 1e17 against the CPU join); CUDA device tests, lavapipe with both compilers, the
+  WGSL lint, fmt and clippy pass.
+- **Branch name:** the agent's fixed commit sits on fork `pr/top-fd-pow2-final` (5e10c9c). Its
+  session refused the force-push that would have moved `pr/top-fd-pow2` (an unformatted first
+  push, f96a068), so it pushed new names instead. I did not force-push on its behalf; the PR will
+  use the `-final` branch, and `pr/top-fd-pow2`, `-v2`, `-v3` are stale branches on the fork that
+  I left alone (deleting branches is the user's call). Future briefs say: fixes as new commits.
+- Box 60171046 destroyed after 5.66 h (~$0.62). Independent reviewer launched on the branch
+  (`B64/REVIEW.md`); the PR (#254 expected, the fifth open one) is opened once the review is in.
+- Day: 2 agents (Opus; profile + PR preparation 618 k tokens, reviewer running), 1 box.
+- **Tomorrow:** the review's outcome and the PR; realized gains on demoux whenever a build
+  changes; if a demoux window is granted, N13 (profile and retune the wgpu path on the 9070 XT);
+  otherwise the next CPU roadmap item as a reviewed branch (CPU FD round 2 or the vectorised
+  pass 2), held until a PR slot frees.
+
 ## 2026-11-10 15:00 UTC: the user's PR bar corrected; the four held branches opened as #250–#253
 
 - **Correction from the user:** the bar for an individual PR is ×1.05 for a simple change up to
