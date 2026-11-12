@@ -47,6 +47,17 @@ setmode() {
     s1) export NICE_EXP_SLOTS=1;; s2) export NICE_EXP_SLOTS=2;; s4) export NICE_EXP_SLOTS=4;;
     vram) export NICE_EXP_VRAM=1;;
     tcvram) export NICE_EXP_JOIN_TCAP=128 NICE_EXP_JOIN_TMIN=96 NICE_EXP_VRAM=1;;
+    # --- added by the director for the 2026-11-12 window (combinations and a smaller stage; counts checked per run)
+    sc128) export NICE_EXP_JOIN_SCAP=128 NICE_EXP_JOIN_FLUSH=64;;                      # stage 1 KiB
+    tcsc256) export NICE_EXP_JOIN_TCAP=128 NICE_EXP_JOIN_TMIN=96 NICE_EXP_JOIN_SCAP=256 NICE_EXP_JOIN_FLUSH=128;;
+    scvram) export NICE_EXP_JOIN_SCAP=256 NICE_EXP_JOIN_FLUSH=128 NICE_EXP_VRAM=1;;
+    all3) export NICE_EXP_JOIN_TCAP=128 NICE_EXP_JOIN_TMIN=96 NICE_EXP_JOIN_SCAP=512 NICE_EXP_JOIN_FLUSH=256 NICE_EXP_VRAM=1;;
+    all3b) export NICE_EXP_JOIN_TCAP=128 NICE_EXP_JOIN_TMIN=96 NICE_EXP_JOIN_SCAP=256 NICE_EXP_JOIN_FLUSH=128 NICE_EXP_VRAM=1;;
+    # --- N20 probe (binary P = exp/n20-mul-probe): four extra operations per walked pair, timing only by intent, counts unchanged
+    p_m32) export NICE_EXP_JOIN_DBL=256;;    # two 32-bit low + two 32-bit high multiplies
+    p_m24) export NICE_EXP_JOIN_DBL=512;;    # the same chain on operands masked to 24 bits
+    p_m0) export NICE_EXP_JOIN_DBL=1024;;    # the same chain with additions (the probe's own overhead)
+    pfsh) export NICE_EXP_JOIN_DBL=2048;;    # the lean prefilter's digits by shifts at a power-of-two base (b64), exact
     *) echo "unknown mode $1" >&2; return 1;;
   esac
 }

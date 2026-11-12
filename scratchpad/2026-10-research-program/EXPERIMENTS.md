@@ -5,6 +5,59 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## N17.1 The RX 9070 XT at its operating point: profile by doubling, the tunings in three rounds, base 64 (2026-11-12 15:28–17:09 UTC, director, second demoux window, 101 of 120 minutes; `N16/raw/demoux/` (193 files), `N16/raw/demoux_analysis.txt`, scripts `N16/raw/scripts/go_dir1.sh`, `go_dir2.sh`, `go_dir3.sh`, `chain_geox.sh`, `modes.sh`; binaries: N16 = fork `exp/n16-join-base` 32e9e19, P = `exp/n20-mul-probe` f049415, M = main a7a59c1, D = `exp/n14-wgpu-dense-plan-v2` bb58878)
+
+`python3 -I N16/raw/scripts/analyze.py N16/raw/demoux 3150 300`. Production's build path
+(`--features gpu,cubecl-spirv`), production client stopped by the user, every run unprofiled,
+99–100 % busy at 303–304 W and 3.03–3.19 GHz, counts exact in every exact mode. Base spread
+within a chain 0.0–0.8 % (1.2 % in the first chain, whose first run was the fastest).
+
+**Profile by doubling** (a part executed twice at full load; share = Δ seconds ÷ base):
+
+| part | 9070 XT b62 1e17 (73.5 s) | RTX 3080 b62 | 9070 XT b64 1e17 (151.6 s) | RTX 3080 b64 |
+|---|---|---|---|---|
+| prefilter | **25.9 %** (0.68 ps per pair) | 15.9 % (0.35) | **30.4 %** | 20.8 % |
+| check kernel (main's of 11-09) | **16.3 %** | 11.3 % | **17.5 %** | 11.0 % |
+| AND | 11.1 % | 14.6 % | 10.5 % | 14.6 % |
+| walk rounds | 6.1 % | 9.1 % | 8.0 % | 12.6 % |
+| transposed copy | 0.9 % | 4.6 % | | |
+| batch loads, entry-wave loads, barriers | −0.2 %, −0.5 %, +0.1 % | 1.4 %, 0.0 %, 0.1 % | | |
+
+Removal, unprofiled, b60 1e16 (13.10 s; clocks 2.8–3.2 GHz in these 4–7 s runs): prefilter 27.6 %,
+stage + check 19.3 %, AND 11.6 %, walk 5.6 %, entry waves and below 5.3 %; dispatch only 4.0 s.
+The per-phase profile mode costs +17.9 % here (86 % busy). **Verdict: NVIDIA's profile with a
+prefilter and a check that cost ≈ 2× per pair; the fixed per-batch parts are ≈ 1 %. N16's
+premise is dead for good.**
+
+**Tunings, three rotated rounds each** (tree E + switches; ÷ the round's own base):
+
+| variant | b62 1e17 | b60 1e16 | b64 1e17 (1 round) | RTX 3080 (N16.1) |
+|---|---|---|---|---|
+| survivor stage 512 entries, flush at 256 (`sc512`) | ×1.055, 1.056, 1.060 → **×1.056** | ×1.057, 1.056, 1.056 → **×1.056** | ×1.062 (stage 256) | ×0.999 b60, ×0.994 b62 |
+| denser plan (`vram`) | ×1.032, 1.035, 1.036 → ×1.035 | ×1.045, 1.047, 1.038 → ×1.045 | no-op on tree E (FD off there) | already on |
+| stage 512 + `TOP_CAP` 128 + denser plan (`all3`) | ×1.111, 1.114, 1.123 → **×1.114** | ×1.134, 1.139, 1.139 → **×1.139** | ×1.080 (= stage + `TOP_CAP`) | — |
+
+One-round screen at b60 (base 13.08 s): stage 512 / 256 / 128 ×1.063 / 1.048 / 1.054; `TOP_CAP`
+128 ×1.054; stage 512 + `TOP_CAP` 128 ×1.085; stage 256 + denser plan ×1.103; work group 128 /
+64 threads ×0.83 / ×0.64 (H2 dead); seconds = 11.83 + 0.87 ms × batches (1, 2, 4 partitions per
+launch). b64 1e17 screen (base 150.33 s): stage 256 ×1.062, stage 512 + `TOP_CAP` 128 ×1.075.
+**After the stage, `TOP_CAP` 128 adds only ×1.01–1.03 and needs a per-device value.**
+
+**The denser plan behind its device rule, on today's main** (M a7a59c1 against D bb58878, one
+round): the rule engages on RADV (625 against 1,350 batches at b60, 4,458 against 7,959 at b62,
+3,944 against 7,076 at b64); **b60 ×1.053, b62 ×1.045, b64 ×1.004** (135.23 → 134.70 s).
+
+**Base 64, the prefilter's two digits as shifts** (`pfsh`, exact identity at b = 2^6, binary P):
+150.16 → 142.90 s, **×1.051**, counts identical (one round). Today's main at b64 1e17: 135.23 s
+(tree E without #254: 150.2–151.6 s, so #254 is ×1.11–1.12 on this card).
+
+**Multiply probe** (binary P, b62, one round; four extra operations per walked pair): additions
++5.7 %, two 32-bit low + two 32-bit high multiplies +6.9 %, the same with 24-bit-masked operands
++4.3 % (the driver's dump shows the two low multiplies became `v_mul_u32_u24`, the high ones stayed
+32-bit). **Not resolved: the variants differ by less than a single round's layout noise; what the
+probe does show is that eight or nine extra instructions in the walk loop cost 4–7 % of a
+field on this card.**
+
 ## N16.1 A harness for the 9070 XT's profile; the RTX 3080 by doubling and by removal; what ACO generates (2026-11-12, agent; `N16/RESULTS.md`, `N16/WINDOW-PLAN.md`, `N16/raw/` (`sorted/` = the tables' logs, `scripts/`, `taskA.txt`, `taskC.txt`, `box/spv_dumps.tar.zst`); fork branches `exp/n16-join-base` 32e9e19 (from 44eee52) and `exp/n14-wgpu-dense-plan` 464be8b (on main 5b1d627); box 60317813, RTX 3080 at 280 W on a Ryzen 5 5600X, 3.59 h, $0.47; box 60315324 unusable, 0.44 h, $0.05)
 
 `python3 -I N16/raw/scripts/analyze.py N16/raw/sorted` prints every row with clock, power, busy % and

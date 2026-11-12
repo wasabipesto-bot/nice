@@ -1,0 +1,230 @@
+== [ab-ge-] b60: base runs ab-ge-c_b60_r1 13.08s 3162MHz 302W, ab-ge-c_b60_r2 13.05s 3168MHz 303W, ab-ge-c_b60_r3 13.06s 3164MHz 302W  | operating point 3150 MHz 300 W | base counts 190770281868 / 12786993080
+   base spread: mean 13.06 s, min 13.05, max 13.08 (0.2 %)
+   mode        r     secs    MHz     W busy Δs vs base  % base ps/pair  counts  batches launches  point
+   all3        1    11.53   3071   300  100      -1.55  -11.9%  -0.384  exact      625     2502  ok
+   all3        2    11.46   3063   302  100      -1.59  -12.2%  -0.394  exact      625     2502  ok
+   all3        3    11.47   3061   303   99      -1.59  -12.2%  -0.394  exact      625     2502  ok
+   c           1    13.08   3162   302   99      +0.00   +0.0%       -  exact     1350     5402  ok
+   c           2    13.05   3168   303   99      +0.00   +0.0%       -  exact     1350     5402  ok
+   c           3    13.06   3164   302   99      +0.00   +0.0%       -  exact     1350     5402  ok
+   sc512       1    12.38   3106   304   99      -0.70   -5.4%  -0.173  exact     1350     5402  ok
+   sc512       2    12.36   3112   303   99      -0.69   -5.3%  -0.171  exact     1350     5402  ok
+   sc512       3    12.37   3113   303   99      -0.69   -5.3%  -0.171  exact     1350     5402  ok
+   vram        1    12.52   3162   301  100      -0.56   -4.3%  -0.139  exact      625     2502  ok
+   vram        2    12.46   3157   303  100      -0.59   -4.5%  -0.146  exact      625     2502  ok
+   vram        3    12.58   3161   300   99      -0.48   -3.7%  -0.119  exact      625     2502  ok
+   per mode, mean % of base over rounds: all3 -12.1% (n=3), sc512 -5.3% (n=3), vram -4.2% (n=3)
+   host accounting (process sums over the timed fields):
+     ab-ge-all3_b60_r1      batches=625 launches=2502 fences_pending=625 reads=2 encode=10.723s (create 0.012 launch 0.005 flush 10.705) fence=0.007s wait=0.001s read=0.036s | per batch encode 17.157 ms wait 0.002 ms | wall 11.53s
+     ab-ge-all3_b60_r2      batches=625 launches=2502 fences_pending=625 reads=2 encode=10.658s (create 0.013 launch 0.006 flush 10.639) fence=0.006s wait=0.001s read=0.036s | per batch encode 17.053 ms wait 0.002 ms | wall 11.46s
+     ab-ge-all3_b60_r3      batches=625 launches=2502 fences_pending=625 reads=2 encode=10.664s (create 0.014 launch 0.006 flush 10.644) fence=0.006s wait=0.001s read=0.036s | per batch encode 17.062 ms wait 0.002 ms | wall 11.47s
+     ab-ge-c_b60_r1         batches=1350 launches=5402 fences_pending=1350 reads=2 encode=12.277s (create 0.013 launch 0.010 flush 12.254) fence=0.012s wait=0.001s read=0.023s | per batch encode 9.094 ms wait 0.001 ms | wall 13.08s
+     ab-ge-c_b60_r2         batches=1350 launches=5402 fences_pending=1350 reads=2 encode=12.256s (create 0.013 launch 0.010 flush 12.233) fence=0.012s wait=0.001s read=0.023s | per batch encode 9.079 ms wait 0.001 ms | wall 13.05s
+     ab-ge-c_b60_r3         batches=1350 launches=5402 fences_pending=1350 reads=2 encode=12.239s (create 0.015 launch 0.011 flush 12.213) fence=0.014s wait=0.002s read=0.023s | per batch encode 9.066 ms wait 0.001 ms | wall 13.06s
+     ab-ge-sc512_b60_r1     batches=1350 launches=5402 fences_pending=1350 reads=2 encode=11.573s (create 0.013 launch 0.010 flush 11.550) fence=0.014s wait=0.001s read=0.022s | per batch encode 8.573 ms wait 0.001 ms | wall 12.38s
+     ab-ge-sc512_b60_r2     batches=1350 launches=5402 fences_pending=1350 reads=2 encode=11.552s (create 0.013 launch 0.010 flush 11.529) fence=0.011s wait=0.001s read=0.022s | per batch encode 8.557 ms wait 0.001 ms | wall 12.36s
+     ab-ge-sc512_b60_r3     batches=1350 launches=5402 fences_pending=1350 reads=2 encode=11.558s (create 0.015 launch 0.011 flush 11.532) fence=0.012s wait=0.002s read=0.022s | per batch encode 8.561 ms wait 0.001 ms | wall 12.37s
+     ab-ge-vram_b60_r1      batches=625 launches=2502 fences_pending=625 reads=2 encode=11.710s (create 0.012 launch 0.005 flush 11.692) fence=0.006s wait=0.001s read=0.039s | per batch encode 18.736 ms wait 0.002 ms | wall 12.52s
+     ab-ge-vram_b60_r2      batches=625 launches=2502 fences_pending=625 reads=2 encode=11.641s (create 0.012 launch 0.006 flush 11.623) fence=0.009s wait=0.001s read=0.039s | per batch encode 18.626 ms wait 0.002 ms | wall 12.46s
+     ab-ge-vram_b60_r3      batches=625 launches=2502 fences_pending=625 reads=2 encode=11.768s (create 0.012 launch 0.006 flush 11.750) fence=0.007s wait=0.001s read=0.040s | per batch encode 18.829 ms wait 0.002 ms | wall 12.58s
+   launches: secs = 12.05 + 0.749 ms x batches  (fit over 6 runs: c 1350:13.08, c 1350:13.05, c 1350:13.06, vram 625:12.52, vram 625:12.46, vram 625:12.58)
+
+== [ab-ge-] b62: base runs ab-ge-c_b62_r1 73.52s 3136MHz 304W, ab-ge-c_b62_r2 73.79s 3131MHz 303W, ab-ge-c_b62_r3 74.03s 3134MHz 304W  | operating point 3150 MHz 300 W | base counts 1097114812011 / 66862268894
+   base spread: mean 73.78 s, min 73.52, max 74.03 (0.7 %)
+   mode        r     secs    MHz     W busy Δs vs base  % base ps/pair  counts  batches launches  point
+   all3        1    66.15   3034   303   99      -7.37  -10.0%  -0.264  exact     4458    17834  OFF-POINT
+   all3        2    66.22   3037   303   99      -7.57  -10.3%  -0.271  exact     4458    17834  OFF-POINT
+   all3        3    65.94   3035   304   99      -8.09  -10.9%  -0.290  exact     4458    17834  OFF-POINT
+   c           1    73.52   3136   304   99      +0.00   +0.0%       -  exact     7959    31838  ok
+   c           2    73.79   3131   303   99      +0.00   +0.0%       -  exact     7959    31838  ok
+   c           3    74.03   3134   304   99      +0.00   +0.0%       -  exact     7959    31838  ok
+   sc512       1    69.68   3083   304   99      -3.84   -5.2%  -0.138  exact     7959    31838  ok
+   sc512       2    69.88   3084   303   99      -3.91   -5.3%  -0.140  exact     7959    31838  ok
+   sc512       3    69.83   3084   304   99      -4.20   -5.7%  -0.151  exact     7959    31838  ok
+   vram        1    71.22   3123   303  100      -2.30   -3.1%  -0.082  exact     4458    17834  ok
+   vram        2    71.31   3129   304  100      -2.48   -3.4%  -0.089  exact     4458    17834  ok
+   vram        3    71.46   3127   304  100      -2.57   -3.5%  -0.092  exact     4458    17834  ok
+   per mode, mean % of base over rounds: all3 -10.4% (n=3), sc512 -5.4% (n=3), vram -3.3% (n=3)
+   host accounting (process sums over the timed fields):
+     ab-ge-all3_b62_r1      batches=4458 launches=17834 fences_pending=4458 reads=14 encode=64.682s (create 0.090 launch 0.037 flush 64.554) fence=0.041s wait=0.005s read=0.110s | per batch encode 14.509 ms wait 0.001 ms | wall 66.15s
+     ab-ge-all3_b62_r2      batches=4458 launches=17834 fences_pending=4458 reads=14 encode=64.752s (create 0.094 launch 0.039 flush 64.618) fence=0.043s wait=0.005s read=0.110s | per batch encode 14.525 ms wait 0.001 ms | wall 66.22s
+     ab-ge-all3_b62_r3      batches=4458 launches=17834 fences_pending=4458 reads=14 encode=64.483s (create 0.088 launch 0.037 flush 64.357) fence=0.041s wait=0.005s read=0.109s | per batch encode 14.465 ms wait 0.001 ms | wall 65.94s
+     ab-ge-c_b62_r1         batches=7959 launches=31838 fences_pending=7959 reads=14 encode=72.010s (create 0.098 launch 0.061 flush 71.849) fence=0.070s wait=0.008s read=0.121s | per batch encode 9.048 ms wait 0.001 ms | wall 73.52s
+     ab-ge-c_b62_r2         batches=7959 launches=31838 fences_pending=7959 reads=14 encode=72.283s (create 0.098 launch 0.058 flush 72.125) fence=0.068s wait=0.008s read=0.119s | per batch encode 9.082 ms wait 0.001 ms | wall 73.79s
+     ab-ge-c_b62_r3         batches=7959 launches=31838 fences_pending=7959 reads=14 encode=72.506s (create 0.104 launch 0.062 flush 72.339) fence=0.068s wait=0.008s read=0.120s | per batch encode 9.110 ms wait 0.001 ms | wall 74.03s
+     ab-ge-sc512_b62_r1     batches=7959 launches=31838 fences_pending=7959 reads=14 encode=68.154s (create 0.095 launch 0.060 flush 67.997) fence=0.069s wait=0.008s read=0.118s | per batch encode 8.563 ms wait 0.001 ms | wall 69.68s
+     ab-ge-sc512_b62_r2     batches=7959 launches=31838 fences_pending=7959 reads=14 encode=68.382s (create 0.093 launch 0.058 flush 68.230) fence=0.067s wait=0.008s read=0.119s | per batch encode 8.592 ms wait 0.001 ms | wall 69.88s
+     ab-ge-sc512_b62_r3     batches=7959 launches=31838 fences_pending=7959 reads=14 encode=68.252s (create 0.102 launch 0.063 flush 68.085) fence=0.093s wait=0.039s read=0.119s | per batch encode 8.575 ms wait 0.005 ms | wall 69.83s
+     ab-ge-vram_b62_r1      batches=4458 launches=17834 fences_pending=4458 reads=14 encode=69.734s (create 0.091 launch 0.037 flush 69.604) fence=0.046s wait=0.005s read=0.117s | per batch encode 15.642 ms wait 0.001 ms | wall 71.22s
+     ab-ge-vram_b62_r2      batches=4458 launches=17834 fences_pending=4458 reads=14 encode=69.829s (create 0.091 launch 0.038 flush 69.699) fence=0.046s wait=0.005s read=0.118s | per batch encode 15.664 ms wait 0.001 ms | wall 71.31s
+     ab-ge-vram_b62_r3      batches=4458 launches=17834 fences_pending=4458 reads=14 encode=69.970s (create 0.093 launch 0.038 flush 69.838) fence=0.045s wait=0.005s read=0.118s | per batch encode 15.695 ms wait 0.001 ms | wall 71.46s
+   launches: secs = 68.21 + 0.700 ms x batches  (fit over 6 runs: c 7959:73.52, c 7959:73.79, c 7959:74.03, vram 4458:71.22, vram 4458:71.31, vram 4458:71.46)
+
+== [ge-] b60: base runs ge-c2_b60_r1 13.02s 3168MHz 304W, ge-c3_b60_r1 13.07s 3164MHz 302W, ge-c_b60_r1 13.10s 3157MHz 303W, ge-c_nohost_b60_r1 13.12s 3166MHz 303W  | operating point 3150 MHz 300 W | base counts 190770281868 / 12786993080
+   base spread: mean 13.08 s, min 13.02, max 13.12 (0.8 %)
+   mode        r     secs    MHz     W busy Δs vs base  % base ps/pair  counts  batches launches  point
+   all3        1    11.41   3072   302   99      -1.67  -12.8%  -0.413  exact      625     2502  ok
+   all3b       1    11.40   3062   304   99      -1.68  -12.8%  -0.416  exact      625     2502  ok
+   c2          1    13.02   3168   304   99      -0.06   -0.4%       -  exact     1350     5402  ok
+   c3          1    13.07   3164   302   99      -0.01   -0.1%       -  exact     1350     5402  ok
+   c           1    13.10   3157   303   99      +0.02   +0.2%       -  exact     1350     5402  ok
+   c_nohost    1    13.12   3166   303   99      +0.04   +0.3%       -  exact     1350        -  ok
+   s1          1    18.14   3181   301   96      +5.06  +38.7%   1.254  exact     7200    28802  ok
+   s2          1    14.81   3175   302   98      +1.73  +13.2%   0.429  exact     3600    14402  ok
+   s4          1    13.26   3154   294   99      +0.18   +1.4%   0.045  exact     1800     7202  ok
+   sc128       1    12.41   3083   304   99      -0.67   -5.1%  -0.165  exact     1350     5402  ok
+   sc256       1    12.48   3112   304   99      -0.60   -4.6%  -0.148  exact     1350     5402  ok
+   sc512       1    12.31   3113   304   98      -0.77   -5.9%  -0.190  exact     1350     5402  ok
+   scvram      1    11.86   3101   303   99      -1.22   -9.3%  -0.302  exact      625     2502  ok
+   tc128       1    12.41   3110   304   99      -0.67   -5.1%  -0.165  exact     1350     5402  ok
+   tcsc256     1    12.08   3075   303   99      -1.00   -7.6%  -0.247  exact     1350     5402  ok
+   tcsc        1    12.06   3080   303   99      -1.02   -7.8%  -0.252  exact     1350     5402  ok
+   vram        1    12.45   3160   303  100      -0.63   -4.8%  -0.155  exact      625     2502  ok
+   wg128       1    15.75   3239   285   99      +2.67  +20.4%   0.662  exact     1350     5402  ok
+   wg128tc     1    13.80   3190   302   99      +0.72   +5.5%   0.179  exact     1350     5402  ok
+   wg64        1    20.43   3264   242   99      +7.35  +56.2%   1.822  exact     1350     5402  OFF-POINT
+   wg64tc      1    16.62   3236   289   99      +3.54  +27.1%   0.878  exact     1350     5402  ok
+   per mode, mean % of base over rounds: all3 -12.8% (n=1), all3b -12.8% (n=1), s1 +38.7% (n=1), s2 +13.2% (n=1), s4 +1.4% (n=1), sc128 -5.1% (n=1), sc256 -4.6% (n=1), sc512 -5.9% (n=1), scvram -9.3% (n=1), tc128 -5.1% (n=1), tcsc256 -7.6% (n=1), tcsc -7.8% (n=1), vram -4.8% (n=1), wg128 +20.4% (n=1), wg128tc +5.5% (n=1), wg64 +56.2% (n=1), wg64tc +27.1% (n=1)
+   host accounting (process sums over the timed fields):
+     ge-all3_b60_r1         batches=625 launches=2502 fences_pending=625 reads=2 encode=10.603s (create 0.013 launch 0.006 flush 10.583) fence=0.006s wait=0.001s read=0.036s | per batch encode 16.965 ms wait 0.002 ms | wall 11.41s
+     ge-all3b_b60_r1        batches=625 launches=2502 fences_pending=625 reads=2 encode=10.590s (create 0.013 launch 0.006 flush 10.572) fence=0.006s wait=0.001s read=0.036s | per batch encode 16.944 ms wait 0.002 ms | wall 11.40s
+     ge-c2_b60_r1           batches=1350 launches=5402 fences_pending=1350 reads=2 encode=12.203s (create 0.014 launch 0.011 flush 12.177) fence=0.014s wait=0.002s read=0.023s | per batch encode 9.039 ms wait 0.001 ms | wall 13.02s
+     ge-c3_b60_r1           batches=1350 launches=5402 fences_pending=1350 reads=2 encode=12.262s (create 0.015 launch 0.011 flush 12.236) fence=0.012s wait=0.002s read=0.023s | per batch encode 9.083 ms wait 0.001 ms | wall 13.07s
+     ge-c_b60_r1            batches=1350 launches=5402 fences_pending=1350 reads=2 encode=12.291s (create 0.015 launch 0.011 flush 12.265) fence=0.012s wait=0.002s read=0.023s | per batch encode 9.104 ms wait 0.001 ms | wall 13.10s
+     ge-s1_b60_r1           batches=7200 launches=28802 fences_pending=7200 reads=2 encode=16.823s (create 0.042 launch 0.057 flush 16.721) fence=0.063s wait=0.008s read=0.456s | per batch encode 2.337 ms wait 0.001 ms | wall 18.14s
+     ge-s2_b60_r1           batches=3600 launches=14402 fences_pending=3600 reads=2 encode=13.901s (create 0.022 launch 0.024 flush 13.855) fence=0.028s wait=0.003s read=0.103s | per batch encode 3.861 ms wait 0.001 ms | wall 14.81s
+     ge-s4_b60_r1           batches=1800 launches=7202 fences_pending=1800 reads=2 encode=12.450s (create 0.015 launch 0.013 flush 12.421) fence=0.020s wait=0.002s read=0.030s | per batch encode 6.917 ms wait 0.001 ms | wall 13.26s
+     ge-sc128_b60_r1        batches=1350 launches=5402 fences_pending=1350 reads=2 encode=11.606s (create 0.014 launch 0.010 flush 11.581) fence=0.013s wait=0.001s read=0.022s | per batch encode 8.597 ms wait 0.001 ms | wall 12.41s
+     ge-sc256_b60_r1        batches=1350 launches=5402 fences_pending=1350 reads=2 encode=11.647s (create 0.013 launch 0.010 flush 11.625) fence=0.013s wait=0.001s read=0.022s | per batch encode 8.627 ms wait 0.001 ms | wall 12.48s
+     ge-sc512_b60_r1        batches=1350 launches=5402 fences_pending=1350 reads=2 encode=11.501s (create 0.013 launch 0.010 flush 11.478) fence=0.020s wait=0.001s read=0.022s | per batch encode 8.519 ms wait 0.001 ms | wall 12.31s
+     ge-scvram_b60_r1       batches=625 launches=2502 fences_pending=625 reads=2 encode=11.042s (create 0.013 launch 0.006 flush 11.023) fence=0.007s wait=0.001s read=0.037s | per batch encode 17.667 ms wait 0.002 ms | wall 11.86s
+     ge-tc128_b60_r1        batches=1350 launches=5402 fences_pending=1350 reads=2 encode=11.606s (create 0.014 launch 0.010 flush 11.582) fence=0.012s wait=0.001s read=0.023s | per batch encode 8.597 ms wait 0.001 ms | wall 12.41s
+     ge-tcsc256_b60_r1      batches=1350 launches=5402 fences_pending=1350 reads=2 encode=11.273s (create 0.013 launch 0.010 flush 11.249) fence=0.013s wait=0.001s read=0.022s | per batch encode 8.350 ms wait 0.001 ms | wall 12.08s
+     ge-tcsc_b60_r1         batches=1350 launches=5402 fences_pending=1350 reads=2 encode=11.257s (create 0.014 launch 0.010 flush 11.232) fence=0.016s wait=0.001s read=0.021s | per batch encode 8.339 ms wait 0.001 ms | wall 12.06s
+     ge-vram_b60_r1         batches=625 launches=2502 fences_pending=625 reads=2 encode=11.634s (create 0.014 launch 0.006 flush 11.613) fence=0.007s wait=0.001s read=0.039s | per batch encode 18.614 ms wait 0.002 ms | wall 12.45s
+     ge-wg128_b60_r1        batches=1350 launches=5402 fences_pending=1350 reads=2 encode=14.936s (create 0.014 launch 0.010 flush 14.911) fence=0.015s wait=0.001s read=0.028s | per batch encode 11.064 ms wait 0.001 ms | wall 15.75s
+     ge-wg128tc_b60_r1      batches=1350 launches=5402 fences_pending=1350 reads=2 encode=12.978s (create 0.013 launch 0.010 flush 12.954) fence=0.014s wait=0.001s read=0.024s | per batch encode 9.613 ms wait 0.001 ms | wall 13.80s
+     ge-wg64_b60_r1         batches=1350 launches=5402 fences_pending=1350 reads=2 encode=19.623s (create 0.015 launch 0.011 flush 19.597) fence=0.015s wait=0.002s read=0.034s | per batch encode 14.536 ms wait 0.001 ms | wall 20.43s
+     ge-wg64tc_b60_r1       batches=1350 launches=5402 fences_pending=1350 reads=2 encode=15.814s (create 0.014 launch 0.011 flush 15.788) fence=0.012s wait=0.002s read=0.029s | per batch encode 11.714 ms wait 0.001 ms | wall 16.62s
+   launches: secs = 11.85 + 0.864 ms x batches  (fit over 7 runs: c2 1350:13.02, c3 1350:13.07, c 1350:13.10, s1 7200:18.14, s2 3600:14.81, s4 1800:13.26, vram 625:12.45)
+
+== [ge-] b64: base runs ge-c_b64_r1 150.33s 3125MHz 304W  | operating point 3150 MHz 300 W | base counts 3092989872066 / 191683594021
+   mode        r     secs    MHz     W busy Δs vs base  % base ps/pair  counts  batches launches  point
+   all3        1   139.16   2996   303  100     -11.17   -7.4%       -  exact     7076    28304  OFF-POINT
+   c           1   150.33   3125   304  100      +0.00   +0.0%       -  exact     7076    28304  ok
+   sc256       1   141.53   3059   303  100      -8.80   -5.9%       -  exact     7076    28304  ok
+   tcsc        1   139.82   2997   303  100     -10.51   -7.0%       -  exact     7076    28304  OFF-POINT
+   vram        1   152.12   3122   304  100      +1.79   +1.2%       -  exact     7076    28304  ok
+   per mode, mean % of base over rounds: all3 -7.4% (n=1), sc256 -5.9% (n=1), tcsc -7.0% (n=1), vram +1.2% (n=1)
+   host accounting (process sums over the timed fields):
+     ge-all3_b64_r1         batches=7076 launches=28304 fences_pending=7076 reads=12 encode=137.595s (create 0.136 launch 0.076 flush 137.380) fence=0.083s wait=0.085s read=0.153s | per batch encode 19.445 ms wait 0.012 ms | wall 139.16s
+     ge-c_b64_r1            batches=7076 launches=28304 fences_pending=7076 reads=12 encode=148.857s (create 0.116 launch 0.067 flush 148.672) fence=0.077s wait=0.010s read=0.156s | per batch encode 21.037 ms wait 0.001 ms | wall 150.33s
+     ge-sc256_b64_r1        batches=7076 launches=28304 fences_pending=7076 reads=12 encode=139.950s (create 0.137 launch 0.075 flush 139.735) fence=0.078s wait=0.099s read=0.152s | per batch encode 19.778 ms wait 0.014 ms | wall 141.53s
+     ge-tcsc_b64_r1         batches=7076 launches=28304 fences_pending=7076 reads=12 encode=138.326s (create 0.136 launch 0.076 flush 138.111) fence=0.070s wait=0.011s read=0.148s | per batch encode 19.549 ms wait 0.002 ms | wall 139.82s
+     ge-vram_b64_r1         batches=7076 launches=28304 fences_pending=7076 reads=12 encode=150.570s (create 0.120 launch 0.069 flush 150.379) fence=0.085s wait=0.010s read=0.161s | per batch encode 21.279 ms wait 0.001 ms | wall 152.12s
+
+== [must] b62: base runs c2_b62_r1 73.77s 3151MHz 304W, c3_b62_r1 73.80s 3140MHz 304W, info_b62_r1 72.94s 3175MHz 304W  | operating point 3150 MHz 300 W | base counts 1097114812011 / 66862268894
+   base spread: mean 73.50 s, min 72.94, max 73.80 (1.2 %)
+   mode        r     secs    MHz     W busy Δs vs base  % base ps/pair  counts  batches launches  point
+   c2          1    73.77   3151   304   99      +0.27   +0.4%       -  exact     7959    31838  ok
+   c3          1    73.80   3140   304   99      +0.30   +0.4%       -  exact     7959    31838  ok
+   d_and       1    81.65   3144   303   99      +8.15  +11.1%   0.292  exact     7959    31838  ok
+   d_bar       1    73.55   3140   303   99      +0.05   +0.1%   0.002  exact     7959    31838  ok
+   d_check     1    85.47   3138   304   99     +11.97  +16.3%   0.429  exact     7959    39797  ok
+   d_copy      1    74.16   3139   304   99      +0.66   +0.9%   0.024  exact     7959    31838  ok
+   d_load      1    73.37   3141   304   99      -0.13   -0.2%  -0.005  exact     7959    31838  ok
+   d_pf        1    92.52   3189   304   99     +19.02  +25.9%   0.682  exact     7959    31838  ok
+   d_walk      1    77.99   3168   303   99      +4.49   +6.1%   0.161  exact     7959    31838  ok
+   d_wave      1    73.17   3141   303   99      -0.33   -0.5%  -0.012  exact     7959    31838  ok
+   info        1    72.94   3175   304   99      -0.56   -0.8%       -  exact     7959    31838  ok
+   per mode, mean % of base over rounds: d_and +11.1% (n=1), d_bar +0.1% (n=1), d_check +16.3% (n=1), d_copy +0.9% (n=1), d_load -0.2% (n=1), d_pf +25.9% (n=1), d_walk +6.1% (n=1), d_wave -0.5% (n=1)
+   host accounting (process sums over the timed fields):
+     c2_b62_r1              batches=7959 launches=31838 fences_pending=7959 reads=14 encode=72.255s (create 0.110 launch 0.066 flush 72.076) fence=0.070s wait=0.009s read=0.116s | per batch encode 9.078 ms wait 0.001 ms | wall 73.77s
+     c3_b62_r1              batches=7959 launches=31838 fences_pending=7959 reads=14 encode=72.291s (create 0.094 launch 0.059 flush 72.136) fence=0.075s wait=0.008s read=0.119s | per batch encode 9.083 ms wait 0.001 ms | wall 73.80s
+     d_and_b62_r1           batches=7959 launches=31838 fences_pending=7959 reads=14 encode=80.128s (create 0.119 launch 0.071 flush 79.936) fence=0.069s wait=0.010s read=0.119s | per batch encode 10.068 ms wait 0.001 ms | wall 81.65s
+     d_bar_b62_r1           batches=7959 launches=31838 fences_pending=7959 reads=14 encode=72.025s (create 0.104 launch 0.064 flush 71.855) fence=0.074s wait=0.009s read=0.120s | per batch encode 9.050 ms wait 0.001 ms | wall 73.55s
+     d_check_b62_r1         batches=7959 launches=39797 fences_pending=7959 reads=14 encode=83.929s (create 0.110 launch 0.077 flush 83.740) fence=0.073s wait=0.009s read=0.120s | per batch encode 10.545 ms wait 0.001 ms | wall 85.47s
+     d_copy_b62_r1          batches=7959 launches=31838 fences_pending=7959 reads=14 encode=72.649s (create 0.101 launch 0.062 flush 72.484) fence=0.075s wait=0.008s read=0.116s | per batch encode 9.128 ms wait 0.001 ms | wall 74.16s
+     d_load_b62_r1          batches=7959 launches=31838 fences_pending=7959 reads=14 encode=71.868s (create 0.093 launch 0.058 flush 71.715) fence=0.071s wait=0.008s read=0.119s | per batch encode 9.030 ms wait 0.001 ms | wall 73.37s
+     d_pf_b62_r1            batches=7959 launches=31838 fences_pending=7959 reads=14 encode=91.012s (create 0.121 launch 0.072 flush 90.816) fence=0.072s wait=0.011s read=0.126s | per batch encode 11.435 ms wait 0.001 ms | wall 92.52s
+     d_walk_b62_r1          batches=7959 launches=31838 fences_pending=7959 reads=14 encode=76.477s (create 0.102 launch 0.062 flush 76.311) fence=0.069s wait=0.009s read=0.120s | per batch encode 9.609 ms wait 0.001 ms | wall 77.99s
+     d_wave_b62_r1          batches=7959 launches=31838 fences_pending=7959 reads=14 encode=71.654s (create 0.100 launch 0.062 flush 71.490) fence=0.072s wait=0.008s read=0.118s | per batch encode 9.003 ms wait 0.001 ms | wall 73.17s
+     info_b62_r1            batches=7959 launches=31838 fences_pending=7959 reads=14 encode=71.452s (create 0.115 launch 0.068 flush 71.266) fence=0.070s wait=0.010s read=0.121s | per batch encode 8.978 ms wait 0.001 ms | wall 72.94s
+
+== [must] b64: base runs c2_b64_r1 151.58s 3122MHz 304W, c_b64_r1 151.52s 3134MHz 304W  | operating point 3150 MHz 300 W | base counts 3092989872066 / 191683594021
+   base spread: mean 151.55 s, min 151.52, max 151.58 (0.0 %)
+   mode        r     secs    MHz     W busy Δs vs base  % base ps/pair  counts  batches launches  point
+   c2          1   151.58   3122   304  100      +0.03   +0.0%       -  exact     7076    28304  ok
+   c           1   151.52   3134   304  100      -0.03   -0.0%       -  exact     7076    28304  ok
+   d_and       1   167.52   3108   304  100     +15.97  +10.5%       -  exact     7076    28304  ok
+   d_check     1   178.09   3094   304  100     +26.54  +17.5%       -  exact     7076    35380  ok
+   d_pf        1   197.58   3156   304  100     +46.03  +30.4%       -  exact     7076    28304  ok
+   d_walk      1   163.70   3122   304  100     +12.15   +8.0%       -  exact     7076    28304  ok
+   per mode, mean % of base over rounds: d_and +10.5% (n=1), d_check +17.5% (n=1), d_pf +30.4% (n=1), d_walk +8.0% (n=1)
+   host accounting (process sums over the timed fields):
+     c2_b64_r1              batches=7076 launches=28304 fences_pending=7076 reads=12 encode=150.039s (create 0.112 launch 0.066 flush 149.858) fence=0.087s wait=0.081s read=0.157s | per batch encode 21.204 ms wait 0.011 ms | wall 151.58s
+     c_b64_r1               batches=7076 launches=28304 fences_pending=7076 reads=12 encode=150.030s (create 0.140 launch 0.078 flush 149.809) fence=0.072s wait=0.012s read=0.157s | per batch encode 21.203 ms wait 0.002 ms | wall 151.52s
+     d_and_b64_r1           batches=7076 launches=28304 fences_pending=7076 reads=12 encode=166.016s (create 0.138 launch 0.077 flush 165.797) fence=0.082s wait=0.012s read=0.168s | per batch encode 23.462 ms wait 0.002 ms | wall 167.52s
+     d_check_b64_r1         batches=7076 launches=35380 fences_pending=7076 reads=12 encode=176.556s (create 0.137 launch 0.088 flush 176.329) fence=0.084s wait=0.012s read=0.174s | per batch encode 24.951 ms wait 0.002 ms | wall 178.09s
+     d_pf_b64_r1            batches=7076 launches=28304 fences_pending=7076 reads=12 encode=196.047s (create 0.150 launch 0.081 flush 195.813) fence=0.074s wait=0.013s read=0.185s | per batch encode 27.706 ms wait 0.002 ms | wall 197.58s
+     d_walk_b64_r1          batches=7076 launches=28304 fences_pending=7076 reads=12 encode=162.201s (create 0.128 launch 0.073 flush 161.997) fence=0.079s wait=0.011s read=0.163s | per batch encode 22.923 ms wait 0.002 ms | wall 163.70s
+
+== [pr-ge-] b62: base runs pr-ge-c_b62_r1 73.80s 3134MHz 303W  | operating point 3150 MHz 300 W | base counts 1097114812011 / 66862268894
+   mode        r     secs    MHz     W busy Δs vs base  % base ps/pair  counts  batches launches  point
+   c           1    73.80   3134   303   99      +0.00   +0.0%       -  exact     7959    31838  ok
+   p_m0        1    78.00   3124   303   99      +4.20   +5.7%   0.151  exact     7959    31838  ok
+   p_m24       1    76.96   3122   303   99      +3.16   +4.3%   0.113  exact     7959    31838  ok
+   p_m32       1    78.91   3153   304   99      +5.11   +6.9%   0.183  exact     7959    31838  ok
+   per mode, mean % of base over rounds: p_m0 +5.7% (n=1), p_m24 +4.3% (n=1), p_m32 +6.9% (n=1)
+   host accounting (process sums over the timed fields):
+     pr-ge-c_b62_r1         batches=7959 launches=31838 fences_pending=7959 reads=14 encode=72.269s (create 0.105 launch 0.063 flush 72.099) fence=0.068s wait=0.009s read=0.119s | per batch encode 9.080 ms wait 0.001 ms | wall 73.80s
+     pr-ge-p_m0_b62_r1      batches=7959 launches=31838 fences_pending=7959 reads=14 encode=76.493s (create 0.098 launch 0.060 flush 76.332) fence=0.066s wait=0.008s read=0.120s | per batch encode 9.611 ms wait 0.001 ms | wall 78.00s
+     pr-ge-p_m24_b62_r1     batches=7959 launches=31838 fences_pending=7959 reads=14 encode=75.462s (create 0.097 launch 0.060 flush 75.303) fence=0.073s wait=0.008s read=0.119s | per batch encode 9.481 ms wait 0.001 ms | wall 76.96s
+     pr-ge-p_m32_b62_r1     batches=7959 launches=31838 fences_pending=7959 reads=14 encode=77.374s (create 0.097 launch 0.060 flush 77.215) fence=0.076s wait=0.008s read=0.123s | per batch encode 9.722 ms wait 0.001 ms | wall 78.91s
+
+== [pr-ge-] b64: base runs pr-ge-c_b64_r1 150.16s 3140MHz 304W  | operating point 3150 MHz 300 W | base counts 3092989872066 / 191683594021
+   mode        r     secs    MHz     W busy Δs vs base  % base ps/pair  counts  batches launches  point
+   c           1   150.16   3140   304  100      +0.00   +0.0%       -  exact     7076    28304  ok
+   pfsh        1   142.90   3094   304  100      -7.26   -4.8%       -  exact     7076    28304  ok
+   per mode, mean % of base over rounds: pfsh -4.8% (n=1)
+   host accounting (process sums over the timed fields):
+     pr-ge-c_b64_r1         batches=7076 launches=28304 fences_pending=7076 reads=12 encode=148.653s (create 0.107 launch 0.063 flush 148.481) fence=0.080s wait=0.008s read=0.156s | per batch encode 21.008 ms wait 0.001 ms | wall 150.16s
+     pr-ge-pfsh_b64_r1      batches=7076 launches=28304 fences_pending=7076 reads=12 encode=141.426s (create 0.128 launch 0.074 flush 141.222) fence=0.081s wait=0.010s read=0.152s | per batch encode 19.987 ms wait 0.001 ms | wall 142.90s
+
+== [sv-] b60: base runs sv-c2_b60_r1 13.10s 3174MHz 302W, sv-c_b60_r1 13.10s 3166MHz 300W  | operating point 3150 MHz 300 W | base counts 190770281868 / 12786993080
+   base spread: mean 13.10 s, min 13.10, max 13.10 (0.0 %)
+   mode        r     secs    MHz     W busy Δs vs base  % base ps/pair  counts  batches launches  point
+   c2          1    13.10   3174   302   99      +0.00   +0.0%       -  exact     1350     5402  ok
+   c           1    13.10   3166   300   99      +0.00   +0.0%       -  exact     1350     5402  ok
+   prof_c      1    15.44   3236   286   86      +2.34  +17.9%   0.580  exact     1350     5402  ok
+   r_a         1     6.23   3000   296   98      -6.87  -52.4%  -1.702  DIFF 190770281868/0    1350     5402  OFF-POINT
+   r_b         1     6.96   3033   235   98      -6.14  -46.9%  -1.521  DIFF 190770281868/0    1350     5402  OFF-POINT
+   r_p         1    10.57   3173   293   99      -2.53  -19.3%  -0.627  DIFF 190770281868/0    1350     5402  ok
+   r_s5        1     4.02   3080   304   95      -9.08  -69.3%  -2.250  DIFF 0/0    1350     5402  ok
+   r_s6        1     4.05   3063   303   96      -9.05  -69.1%  -2.242  DIFF 0/0    1350     5402  ok
+   r_s7        1     4.31   3020   259   97      -8.79  -67.1%  -2.178  DIFF 0/0    1350     5402  OFF-POINT
+   r_s8        1     4.39   3007   270   96      -8.71  -66.5%  -2.158  DIFF 0/0    1350     5402  OFF-POINT
+   r_z         1     4.71   2796   198   98      -8.39  -64.0%  -2.079  DIFF 0/0    1350     5402  OFF-POINT
+   per mode, mean % of base over rounds: prof_c +17.9% (n=1), r_a -52.4% (n=1), r_b -46.9% (n=1), r_p -19.3% (n=1), r_s5 -69.3% (n=1), r_s6 -69.1% (n=1), r_s7 -67.1% (n=1), r_s8 -66.5% (n=1), r_z -64.0% (n=1)
+   host accounting (process sums over the timed fields):
+     sv-c2_b60_r1           batches=1350 launches=5402 fences_pending=1350 reads=2 encode=12.294s (create 0.014 launch 0.010 flush 12.269) fence=0.011s wait=0.002s read=0.023s | per batch encode 9.107 ms wait 0.001 ms | wall 13.10s
+     sv-c_b60_r1            batches=1350 launches=5402 fences_pending=1350 reads=2 encode=12.289s (create 0.016 launch 0.012 flush 12.261) fence=0.012s wait=0.002s read=0.023s | per batch encode 9.103 ms wait 0.001 ms | wall 13.10s
+     sv-prof_c_b60_r1       batches=1350 launches=5402 fences_pending=1350 reads=2 encode=14.498s (create 0.013 launch 11.869 flush 0.274) fence=0.109s wait=0.001s read=0.020s | per batch encode 10.739 ms wait 0.001 ms | wall 15.44s
+     sv-r_a_b60_r1          batches=1350 launches=5402 fences_pending=1350 reads=2 encode=5.429s (create 0.014 launch 0.010 flush 5.405) fence=0.010s wait=0.001s read=0.020s | per batch encode 4.021 ms wait 0.001 ms | wall 6.23s
+     sv-r_b_b60_r1          batches=1350 launches=5402 fences_pending=1350 reads=2 encode=6.150s (create 0.014 launch 0.010 flush 6.125) fence=0.011s wait=0.001s read=0.020s | per batch encode 4.556 ms wait 0.001 ms | wall 6.96s
+     sv-r_p_b60_r1          batches=1350 launches=5402 fences_pending=1350 reads=2 encode=9.758s (create 0.016 launch 0.012 flush 9.730) fence=0.012s wait=0.002s read=0.021s | per batch encode 7.228 ms wait 0.001 ms | wall 10.57s
+     sv-r_s5_b60_r1         batches=1350 launches=5402 fences_pending=1350 reads=2 encode=3.212s (create 0.013 launch 0.009 flush 3.189) fence=0.010s wait=0.001s read=0.020s | per batch encode 2.379 ms wait 0.001 ms | wall 4.02s
+     sv-r_s6_b60_r1         batches=1350 launches=5402 fences_pending=1350 reads=2 encode=3.245s (create 0.012 launch 0.009 flush 3.224) fence=0.010s wait=0.001s read=0.020s | per batch encode 2.404 ms wait 0.001 ms | wall 4.05s
+     sv-r_s7_b60_r1         batches=1350 launches=5402 fences_pending=1350 reads=2 encode=3.505s (create 0.012 launch 0.009 flush 3.484) fence=0.009s wait=0.001s read=0.019s | per batch encode 2.596 ms wait 0.001 ms | wall 4.31s
+     sv-r_s8_b60_r1         batches=1350 launches=5402 fences_pending=1350 reads=2 encode=3.577s (create 0.012 launch 0.009 flush 3.555) fence=0.010s wait=0.001s read=0.020s | per batch encode 2.650 ms wait 0.001 ms | wall 4.39s
+     sv-r_z_b60_r1          batches=1350 launches=5402 fences_pending=1350 reads=2 encode=3.878s (create 0.012 launch 0.009 flush 3.856) fence=0.010s wait=0.001s read=0.022s | per batch encode 2.873 ms wait 0.001 ms | wall 4.71s
+
+== Task D: main (M) against exp/n14-wgpu-dense-plan (D)
+   b60 r1: M 13.01s (3168MHz 302W, 1350 batches) D 12.36s (3190MHz 303W, 625 batches) x1.053 counts same
+   b62 r1: M 72.65s (3144MHz 304W, 7959 batches) D 69.55s (3155MHz 304W, 4458 batches) x1.045 counts same
+   b64 r1: M 135.23s (3167MHz 304W, 7076 batches) D 134.70s (3156MHz 303W, 3944 batches) x1.004 counts same
+== Device lines
+   EXP_INFO runtime=wgpu<spirv> max_page_size=2147483644 plane_size_min=32 plane_size_max=64 plane=EnumSet(Ops | Sync | NonUniformControlFlow) limits=JoinLimits { max_binding: 2147483644, budget: 2147483644, vram_budget: false }
+   EXP_PLANE wg=128 plane_dim=64 cube_dim=128 plane_sum1=64
+   EXP_PLANE wg=256 plane_dim=64 cube_dim=256 plane_sum1=64
+   EXP_PLANE wg=64 plane_dim=64 cube_dim=64 plane_sum1=64

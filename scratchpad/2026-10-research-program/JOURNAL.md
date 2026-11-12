@@ -76,6 +76,48 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     estimate.
 - **Plan from here:** ask for the window (≤ 90 min, card to itself). With it: the profile, N19,
   N14's A/B, b64 rows. Without it: a reviewer on N14's branch; N19 cannot be measured elsewhere.
+- **15:27 UTC: the user granted a 120-minute demoux window** (production client already stopped,
+  card idle) **and said my use of the token budget has been low, asking how I size a session.**
+  Honest answer: by habit, not by a number (one lead, one agent, one box a day; the routine's
+  "use few" and my own "lighter days" note of 11-10). The Vast cap is what binds (≈ $0.95 a day
+  left), not tokens. From now: several tracks in parallel, weighted to work that is heavy in
+  tokens and light in GPU-hours (audits, design, reviews, CPU work, theory).
+- **The user merged #252, #254 (12:12–12:14 UTC) and #253 (14:56 UTC); main = a7a59c1.** #251 then
+  conflicted (changelog; one struct doc comment that #254 reworded): replayed onto main, resolved
+  to #251's fields with main's wording, fmt + clippy (cubecl) + `join_check` (5 tests) + `join_plan`
+  (9 tests) on ivory, merge commit bc9d87c pushed plainly; body's first line updated. One PR open.
+- **Window (15:28–17:28 UTC), workspace `/tmp/claude-exp-2026-11-12-amd`, watchdog wipe 17:27, no
+  run starts after 17:12.** My own driver instead of `go_window.sh`, actionable rows first:
+  stage 1 = build, the doubling profile (b62, b64), a b60 screen of the shared-memory, plan and
+  geometry variants (with combinations I added to `modes.sh`), removal unprofiled at b60, a b64
+  screen; stage 2 = three rotated rounds of the screen's winners at b62 and b60, then the
+  denser-plan binary (does its device rule engage on RADV?). First rows at full clock (3.14–3.19
+  GHz, 304 W, exact): **prefilter +26.8 % of a b62 field when doubled (RTX 3080: 15.9 %), check
+  +17.2 % (11.3 %), AND +11.9 % (14.6 %), walk +6.9 % (9.1 %).**
+- **Second track started 15:41 UTC (T2.3):** a sampled exact re-verification of b58/b60 nice-only
+  submissions by (device, build) cell on box 60374124 (agent, `T2/BRIEF.md`); production API
+  blocked on the box before any client runs. Kill: none needed (an audit); stop at 21:30 UTC.
+- **17:09 UTC: window closed after 101 of 120 minutes (N17.1).** Workspace removed, my watchdog
+  stopped by PID, nothing of mine left, production client still stopped (one ntfy sent). A harness
+  auth interruption at ~15:58 UTC killed the audit agent mid-run (resumed 16:01) and cost the
+  window nothing (the card ran from scripts). Results, all at 303–304 W with exact counts:
+  - **Profile:** prefilter 26 % (b62) / 30 % (b64) of a field, check 16–17 %, AND 11 %, walk 6–8 %,
+    per-batch parts ≈ 1 %. The card pays about twice NVIDIA's cost per pair for the prefilter and
+    the check and matches it elsewhere.
+  - **N19 confirmed:** a 512-entry survivor stage is ×1.056 at b62 and b60 (three rounds), ×1.062
+    at b64 (stage 256), neutral on the RTX 3080. PR candidate.
+  - **N20 (new, found during the window):** at base 64 the prefilter's digits are bit fields;
+    as shifts ×1.051 at b64, exact. PR candidate.
+  - **N14:** the rule engages on RADV; ×1.035–1.045 at b62, ×1.045–1.053 at b60, **×1.004 at b64**:
+    held. **N15 dropped** (after the stage it adds ×1.01–1.03). All three together ×1.114 (b62) /
+    ×1.139 (b60).
+  - Multiply probe unresolved (variants within layout noise); it does price the walk loop:
+    ≈ 0.5 % of a field per instruction on this card → N21.
+  - #254 is ×1.11–1.12 at b64 on this card (main 135.2 s against 150–151.6 s without it).
+- **Next (tomorrow's cycle, several tracks):** PR branches for N19 and N20 (CUDA NiceMark and
+  three rounds on a box, lavapipe, reviewer each); N21 design agent with the offline ACO compile;
+  the audit's result (T2.3, running until 21:30 UTC); realized gains on demoux once it rebuilds
+  from main (#250, #252–#254 are in).
 - **Lesson (README updated):** on a card whose clock follows its load, never compare runs with
   work removed; log clock and power beside every timing and reject runs off the operating point.
   I passed the N13 agent's explanation on without opening the samples it had recorded.
