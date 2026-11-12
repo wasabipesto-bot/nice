@@ -1144,6 +1144,7 @@ mod kernels {
                                             t_glo[jt2 as usize],
                                             t_ghi[jt2 as usize],
                                             base,
+                                            comptime!(dbl & 2048 != 0),
                                         )
                                     } else {
                                         walk_pf(
@@ -1175,6 +1176,7 @@ mod kernels {
                                             t_glo[jz as usize],
                                             t_ghi[jz as usize],
                                             base,
+                                            comptime!(dbl & 2048 != 0),
                                         );
                                         pass = pass && p2;
                                     }
@@ -3336,13 +3338,30 @@ mod kernels {
         tlo: u32,
         thi: u32,
         #[comptime] base: u32,
+        #[comptime] sh: bool,
     ) -> bool {
         let f2 = ah2 + p2 * dh;
         let f3 = ah3 + p3 * dh;
-        let h2 = u32::mul_hi(f2, base);
-        let g2 = u32::mul_hi(f2 * base, base);
-        let h3 = u32::mul_hi(f3, base);
-        let g3 = u32::mul_hi(f3 * base, base);
+        let mut h2 = 0u32;
+        let mut g2 = 0u32;
+        let mut h3 = 0u32;
+        let mut g3 = 0u32;
+        if comptime!(sh && base.is_power_of_two()) {
+            // N20 (2026-11-12): at b = 2^lg the two leading base-b digits of the
+            // 32-bit fraction f are bit fields: floor(f·b / 2^32) = f >> (32 - lg)
+            // and floor((f·b mod 2^32)·b / 2^32) = (f << lg) >> (32 - lg).
+            let lg = comptime!(base.trailing_zeros());
+            let up = comptime!(32 - base.trailing_zeros());
+            h2 = f2 >> up;
+            g2 = (f2 << lg) >> up;
+            h3 = f3 >> up;
+            g3 = (f3 << lg) >> up;
+        } else {
+            h2 = u32::mul_hi(f2, base);
+            g2 = u32::mul_hi(f2 * base, base);
+            h3 = u32::mul_hi(f3, base);
+            g3 = u32::mul_hi(f3 * base, base);
+        }
         let seen = (u64::cast_from(mhi | thi) << 32u64) | u64::cast_from(mlo | tlo);
         let hit = u32::cast_from((seen << u64::cast_from(g2)) >> 32u64)
             | u32::cast_from((seen << u64::cast_from(g3)) >> 32u64)
