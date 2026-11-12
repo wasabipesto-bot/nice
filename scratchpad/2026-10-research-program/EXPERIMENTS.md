@@ -5,6 +5,31 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## PRP.1 The 512-entry survivor stage and the base-64 prefilter shifts as branches on main: exactness and CUDA regression (2026-11-12 17:13–20:45 UTC, agent; `PRP/RESULTS.md`, `PRP/PR-BODY-stage.md`, `PRP/PR-BODY-shift.md`, `PRP/raw/` (`ab_table.txt`, `nm_table.txt`, box logs, scripts); fork branches `pr/join-survivor-stage-512` 0d84d0a and `pr/join-prefilter-shift-pow2` 93a7ef6, each one commit on main a7a59c1; box 60383994, RTX 3080 at 320 W, 3.53 h, ~$0.42)
+
+M = main, S = stage 512 / flush 256, F = shift form. Four rotated rounds, counts identical in
+every run, each run started at ≤ 60 °C (the card throttles when runs are back to back: the first
+A/B attempt was discarded for that), register variant recorded per process.
+
+| field (main ÷ branch, median of 4) | S | F |
+|---|---|---|
+| b62 1e17 | ×1.000 | ×0.997 (same code as main: A/A) |
+| b60 1e16 | ×0.998 | ×1.000 (A/A) |
+| b64 1e17 (card in thermal slowdown on both sides) | ×0.997 | **×1.019** (1.012, 1.013, 1.024, 1.036) |
+| b64 1e16 × 2 | ×1.000 | **×1.016** (1.016, 1.011, 1.017, 1.020) |
+| NiceMark score, 4 rounds | ×0.999 (lowest scenario round 0.987) | ×1.002 (no b64 scenario: A/A) |
+
+Exactness: dense compares against the CPU join pass (S: b60 1e16 48 partitions, b62 1e17 32; F:
+b64 1e16 48, b64 1e17 32); CUDA device suite 7/7 for both (F's first run failed on a buffer
+allocation while other jobs held the card's memory; alone 7/7); lavapipe 8/8 with naga and with
+SPIR-V for S, F and M; host tests 247 / 248. **Stage overflow:** a throwaway build with a 16-entry
+stage sends 124 M of 135 M checked pairs (b60) down the direct path and the counts still equal
+the CPU join's; at 512 / 256 the direct path takes 93,908 pairs at b60, 0 at b62, 79 at b64.
+**F at other bases:** the canonicalised CUDA source of all kernels at b58, b60, b62 is identical
+to main's; the b64 join kernel differs in 12 lines (the multiplies became shifts). The CPU
+join's prefilter was left alone (its base is a runtime value; a shift form there was 3.5 %
+slower).
+
 ## N17.1 The RX 9070 XT at its operating point: profile by doubling, the tunings in three rounds, base 64 (2026-11-12 15:28–17:09 UTC, director, second demoux window, 101 of 120 minutes; `N16/raw/demoux/` (193 files), `N16/raw/demoux_analysis.txt`, scripts `N16/raw/scripts/go_dir1.sh`, `go_dir2.sh`, `go_dir3.sh`, `chain_geox.sh`, `modes.sh`; binaries: N16 = fork `exp/n16-join-base` 32e9e19, P = `exp/n20-mul-probe` f049415, M = main a7a59c1, D = `exp/n14-wgpu-dense-plan-v2` bb58878)
 
 `python3 -I N16/raw/scripts/analyze.py N16/raw/demoux 3150 300`. Production's build path

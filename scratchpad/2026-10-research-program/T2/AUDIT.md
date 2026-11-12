@@ -1,7 +1,8 @@
 # T2.3 audit: sampled re-verification of nice-only submissions, bases 58 and 60 (2026-11-12)
 
-STATE AT HAND-BACK (18:2x UTC): the box went offline at ~18:03 UTC mid-run (Vast status "offline", ssh refused); everything
-it produced up to 18:02 is on ivory under `raw/box/`. b58 is essentially done; b60 is mostly NOT re-run (section 7).
+Two boxes: 60374124 (15:38–18:03 UTC, went offline mid-run; its outputs up to 18:02 are in `raw/box/`) and the
+replacement 60389955 (RTX 3080, 380 W cap, 16 threads; 18:22–21:5x UTC; outputs in `raw/box2/`), which ran the base-60
+queues in the prepared order. Final state: section 7.
 Labels: **[measured]** read off the API or a run,
 **[derived]** computed from measured numbers, **[assumed]** stated without a measurement.
 
@@ -43,8 +44,14 @@ table `raw/census_table.md`.
   (GPU backend auto = what the NVIDIA fleet ran; the join runs on CubeCL CUDA). The submitted telemetry's
   `build_sha` was checked per row by the comparison.
 - Builds: 9a4f7406 (v3.4.6), 8c088a28, c72e2c6f, cb38b917, 18cba8bc, 8bd154bc (v3.4.7), 6f060a94, c0c357ae
-  (current demoux main) all built and ran. 9bde4a87 was not built (its 20-field cell was compared against
-  c0c357ae, see rules).
+  (current demoux main) built and ran (8bd154bc's binary only on the first box, unused). 9bde4a87 was not built (its
+  cell was compared against c0c357ae, see rules).
+- Replacement box 60389955: the same hosts block applied and proven with failing curls at 18:22 UTC before any build
+  (appended to `raw/proof_hosts_block.txt`); only the builds its queues needed; each target directory deleted when its
+  queue finished (`raw/chain4.sh`, `raw/builds4.sh`, log `raw/box2/runs.log`). The 9a4f7406 queue was re-ordered so any
+  prefix holds the cells in proportion to their share of the base (key (i + ½)/share within each cell's already
+  shuffled, time-stratified list; field 206956667 first): `raw/QE2_9a4f_b60_byshare.json`. Small cells therefore get
+  few or no fields in a short run.
 
 
 
@@ -125,7 +132,13 @@ table `raw/census_table.md`.
    (the second term covers q ≠ p when either run overran a lot). The same rule flags 3 of 11,087 census same-build
    pairs (section 6).
 3. **overrun model vs c0c357ae** (8bd154bc, 9bde4a87): T, P = c0c357ae's exact counts; x = T − survivors must be ≥ 0
-   and |checked − P − x(1 − P/T)| ≤ 5·sqrt(x·p(1 − p)) + 2.
+   and |d| = |checked − P − x(1 − P/T)| ≤ 5·sqrt(x·p(1 − p)) + 2 + 0.06·p(1 − p)·x.
+   **Rule change during the run, stated openly:** the first version had no 0.06 term. On the first 58 b60 fields it
+   flagged 34, all with d < 0 growing with x: the overflowing survivors pass the prefilter slightly more often than
+   the average (q/p − 1 = +0.1 % to +1 %, measured on those fields; the fleet's v3.4.7 cards overflow 1e-4–4e-3 of a
+   field's survivors), so d ≈ −x(q − p) sits 5–27 σ below zero without any loss. I added the same 0.06 band rule 2
+   uses; with it all match. What this costs: a loss of up to ≈ 0.06·p·x survivors (≈ 1e-5 of the field at the
+   largest overflows seen, 4e-3) would hide in a heavily overflowed field; the M4 defect (median 6.7e-5) would not.
 
 A lost candidate lowers I (a deficit); the #222 race's stale-entry checks raise checked (an excess). Caveat: per #222's
 own text the race can also overwrite list entries, which loses candidates *without* changing the counts, so for

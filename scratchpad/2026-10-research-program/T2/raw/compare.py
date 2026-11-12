@@ -10,7 +10,9 @@ Their counters are timing dependent (a survivor that overruns the stage leaves `
 is fully checked without the prefilter), so the same build does not reproduce them even on one device. Reference
 = the exact counts (T survivors, P checked) of c0c357ae on the same field. With p = P/T, a lossless run has
 x = T - surv >= 0 overrun survivors and checked = P + x(1-p) +- binomial noise; d = chk - P - x(1-p),
-sigma = sqrt(x p (1-p)). Verdict: match iff x >= 0 and |d| <= 5 sigma + 2.
+sigma = sqrt(x p (1-p)). Verdict: match iff x >= 0 and |d| <= 5 sigma + 2 + 0.06 p (1-p) x: the overrun
+survivors' own pass rate q is not p (measured on the replacement box: q/p - 1 = +0.1 to +1 %, so d ~ -x(q-p)
+sits many sigma below 0 when x is large); the 0.06 band is the same one rule 2 uses.
 
 INVARIANT vs OWN BUILD for 9a4f7406 8c088a28 c72e2c6f 18cba8bc cb38b917 (their counters mean something else:
 census ratios 0.82-0.93 against later builds): re-run with the same build on the 3080 (itself timing dependent);
@@ -25,16 +27,16 @@ ORACLE = {"8bd154bc", "9bde4a87"}
 R_TOL = 3e-7
 samp = json.load(open("sample.json"))
 rerun = collections.defaultdict(list)
-for fn in sorted(glob.glob("box/out_*.jsonl")):
+for fn in sorted(glob.glob("box/out_*.jsonl") + glob.glob("box2/out_*.jsonl")):
     for line in open(fn):
         d = json.loads(line)
         if d["claim_id"] == 1: continue
         t = d.get("telemetry") or {}; p = t.get("pipeline") or {}; j = p.get("join") or {}
-        rerun[(d["claim_id"], (t.get("build_sha") or "")[:8])].append(dict(src=fn.split("/")[-1][4:-6], surv=j.get("survivors"), chk=j.get("checked"),
+        rerun[(d["claim_id"], (t.get("build_sha") or "")[:8])].append(dict(src=fn.split("/")[-2] + "/" + fn.split("/")[-1][4:-6], surv=j.get("survivors"), chk=j.get("checked"),
             route=p.get("route"), nice=d.get("nice_numbers")))
 def model(surv, chk, T, P):
     p = P / T; x = T - surv; dd = chk - P - x * (1 - p); sig = math.sqrt(max(x, 0) * p * (1 - p))
-    ok = x >= 0 and abs(dd) <= 5 * sig + 2
+    ok = x >= 0 and abs(dd) <= 5 * sig + 2 + 0.06 * p * (1 - p) * x
     D = ((surv + chk / (1 - p)) - (T + P / (1 - p))) / T
     return ok, x, dd, sig, D
 def judge(c, r):

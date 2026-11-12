@@ -41,8 +41,12 @@ for f in fields:
     for t in ['S', 'F']:
         rs = sorted({k[2] for k in R if k[1] == f and k[0] == t and ('M', f, k[2]) in R})
         q = [R[('M', f, r)]['secs'] / R[(t, f, r)]['secs'] for r in rs]
+        sp = lambda x: '24' in x['regs'].split('+')[-1]  # the 40-register variant with 24 B of spills
+        mark = ['*' if sp(R[('M', f, r)]) or sp(R[(t, f, r)]) else '' for r in rs]
         if q:
-            print(f"   M/{t}: per round " + ', '.join(f'{x:.3f}' for x in q) + f"  -> median x{st.median(q):.3f}" +
+            clean = [x for x, m in zip(q, mark) if not m]
+            print(f"   M/{t}: per round " + ', '.join(f'{x:.3f}{m}' for x, m in zip(q, mark)) + f"  -> median x{st.median(q):.3f}" +
+                  (f", spill-free rounds x{st.median(clean):.3f} (n={len(clean)})" if clean and len(clean) < len(q) else '') +
                   f"  (M {st.median(R[('M', f, r)]['secs'] for r in rs):.2f} s, {t} {st.median(R[(t, f, r)]['secs'] for r in rs):.2f} s)")
 if len(sys.argv) > 2:
     N = {}

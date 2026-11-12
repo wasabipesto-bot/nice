@@ -146,6 +146,15 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     the candidates of those bases, five orders below the M4 defect. Nothing changed or re-queued.
   - Replacement box 60389955 (RTX 3080, $0.105/h, 4.5 h TTL); the agent resumed at 18:22 UTC on
     the b60 queues (the 8bd154b, dev-build, 6f060a9 and v3.4.6 cells), hard stop 22:15 UTC.
+- **20:45 UTC: the PR-branch agent finished (PRP.1; 396 k tokens; box destroyed after 3.53 h).**
+  Both branches are one commit on main a7a59c1, exact (dense compares, CUDA and lavapipe suites,
+  a forced stage overflow), and regress nothing on an RTX 3080: stage 512 ×0.997–1.000 per field
+  and NiceMark ×0.999; the shift form ×1.016–1.019 at b64 and identical code elsewhere. I read
+  both diffs and checked the tables against the raw files. Flags I accept and will state in the
+  bodies: the AMD gains were measured on an experiment tree with the change behind a switch; the
+  shift form's ×1.051 on the 9070 XT is one round; no Apple GPU measured.
+- **20:50 UTC: two independent reviewers launched** (one per branch, `PRP/REVIEW-BRIEF.md`); the PRs
+  are opened when the reviews are in and their findings fixed.
 - **Lesson (README updated):** on a card whose clock follows its load, never compare runs with
   work removed; log clock and power beside every timing and reject runs off the operating point.
   I passed the N13 agent's explanation on without opening the samples it had recorded.
