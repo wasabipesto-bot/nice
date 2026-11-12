@@ -118,6 +118,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   three rounds on a box, lavapipe, reviewer each); N21 design agent with the offline ACO compile;
   the audit's result (T2.3, running until 21:30 UTC); realized gains on demoux once it rebuilds
   from main (#250, #252–#254 are in).
+- **17:13 UTC: third track started (PRP):** an agent on box 60383994 turns N19 and N20 into
+  one-commit branches on main (`pr/join-survivor-stage-512`, `pr/join-prefilter-shift-pow2`) with
+  dense compares, CUDA A/B and NiceMark against main, lavapipe, and PR bodies (`PRP/BRIEF.md`; hard
+  stop 22:45 UTC). Reviewers and opening follow in tomorrow's cycle. #251 green at bc9d87c. demoux
+  has not resumed production yet (last submission 15:12 UTC, still on c0c357a). Fallback reminder
+  22:55 UTC collects both agents and destroys the boxes.
 - **Lesson (README updated):** on a card whose clock follows its load, never compare runs with
   work removed; log clock and power beside every timing and reject runs off the operating point.
   I passed the N13 agent's explanation on without opening the samples it had recorded.
