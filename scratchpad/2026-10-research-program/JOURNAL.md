@@ -124,6 +124,28 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   stop 22:45 UTC). Reviewers and opening follow in tomorrow's cycle. #251 green at bc9d87c. demoux
   has not resumed production yet (last submission 15:12 UTC, still on c0c357a). Fallback reminder
   22:55 UTC collects both agents and destroys the boxes.
+- **18:19 UTC: the audit agent handed back early** (263 k tokens): its box 60374124 went offline at
+  18:03 UTC (host fault; destroyed after 2.68 h, ~$0.31). Interim result (`T2/AUDIT.md`), which I
+  checked against the API for the flagged submissions before recording:
+  - **Mechanism:** the real client of each build against a local stub of claim and submit, the
+    production hosts blocked on the box and proven; current main reproduces demoux's counters
+    exactly on 59/59 b58 and 149/149 b60 fields and the M4's on 20/20.
+  - **Method finding:** the two counters are exact and repeatable only from #236 on (6f060a9,
+    c0c357a); on older builds stage overruns move survivors into `checked` run by run, so the
+    audit compares a conserved combination there.
+  - **b58: 0 mismatches in the re-runs; 96 % of the range in cells clean at a ≤ 5.1 % per-field
+    bound (74 % at ≤ 2.1 %)**; 2.0 % (Anvil, v3.4.6, no telemetry) cannot be checked by counters.
+  - **b60:** only the c0c357a cells were re-run before the box died (9070 XT 149/149, M4 20/20).
+  - **A finding from the census itself:** among 11,087 same-build pairs of pre-#236 submissions,
+    three have more checks than the conserved quantity allows, all on v3.4.6 at b60: a GTX 1080
+    (+5.3 M checks, 3.3e-5 of the field's survivors), a TITAN Xp (+2.3 M, 2.8e-5) and the 9070 XT
+    (+10,006; that submission also reports 16 retried partitions, so it may be the retry path's
+    accounting). So something like the #222 race did fire outside Apple, about once in 10,000
+    fields; each such field has a second, consistent submission. Whether an event also lost
+    entries cannot be seen in counts. Rough size if it did, at the same 3e-5: about 3e-9 of
+    the candidates of those bases, five orders below the M4 defect. Nothing changed or re-queued.
+  - Replacement box 60389955 (RTX 3080, $0.105/h, 4.5 h TTL); the agent resumed at 18:22 UTC on
+    the b60 queues (the 8bd154b, dev-build, 6f060a9 and v3.4.6 cells), hard stop 22:15 UTC.
 - **Lesson (README updated):** on a card whose clock follows its load, never compare runs with
   work removed; log clock and power beside every timing and reject runs off the operating point.
   I passed the N13 agent's explanation on without opening the samples it had recorded.
