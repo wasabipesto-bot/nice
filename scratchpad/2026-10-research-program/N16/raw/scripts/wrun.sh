@@ -8,8 +8,11 @@ NAME=$1; B=$2; MODE=$3; BASE=$4; SIZE=$5; LIST=$6
 setmode "$MODE" || exit 1
 smp() {
   if [ "$DEV" = cuda ]; then
-    nvidia-smi --query-gpu=utilization.gpu,clocks.sm,power.draw,power.limit,temperature.gpu --format=csv,noheader,nounits -lms 2000 |
-      while IFS=', ' read u c p l t; do echo "$(date -u +%T) busy=$u sclk=$c pw=$p cap=$l temp=$t load=$(cut -d' ' -f1 /proc/loadavg)"; done
+    while true; do
+      nvidia-smi --query-gpu=utilization.gpu,clocks.sm,power.draw,power.limit,temperature.gpu --format=csv,noheader,nounits |
+        { IFS=', ' read u c p l t; echo "$(date -u +%T) busy=$u sclk=$c pw=$p cap=$l temp=$t load=$(cut -d' ' -f1 /proc/loadavg)"; }
+      sleep 2
+    done
   else
     D=$(ls -d /sys/class/drm/card*/device 2>/dev/null | while read d; do [ -e $d/gpu_busy_percent ] && echo $d; done | head -1)
     HW=$(ls -d $D/hwmon/hwmon* 2>/dev/null | head -1)
@@ -32,7 +35,5 @@ NICE_TEST_JOIN_FIELDS=1 NICE_TEST_JOIN_SIZE=$SIZE NICE_TEST_JOIN_BASES=$BASE NIC
   NICE_TEST_JOIN_LIST=$LIST "$BIN/$B" --ignored --exact $HARNESS --nocapture --test-threads 1 >> "$OUT/$NAME.log" 2>&1
 RC=$?
 echo "END $NAME $(date -u +%T) rc=$RC" >> "$OUT/$NAME.log"
-kill $MON 2>/dev/null; [ "$DEV" = cuda ] && sleep 0.2
-# the nvidia-smi child of the subshell
-pkill -P $MON 2>/dev/null
+kill $MON 2>/dev/null
 echo "$(date -u +%T) $NAME rc=$RC $(grep -h 'JOIN THROUGHPUT' "$OUT/$NAME.log" | grep -o 'secs=[0-9.]*\|survivors=[0-9]*\|checked=[0-9]*\|batches=[0-9]*' | tr '\n' ' ')"

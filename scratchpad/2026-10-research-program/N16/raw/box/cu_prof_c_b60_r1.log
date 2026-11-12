@@ -1,0 +1,13 @@
+START cu_prof_c_b60_r1 06:36:49 dev=cuda mode=prof_c base=60 size=1e15 list=1447429612114824200908 env=[NICE_EXP_GPU_PROFILE=1 NICE_EXP_HOSTACC=1 ] bin=N16 md5=125cc005
+
+running 1 test
+test cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields ... GPU_PROFILE base=60 start=1447429512114824200908 end=1447429612114824200908 size=100000000000000 slices=1 partitions=3600 batches=225 slots=16 min_slots=16 retried=0 splits=0 | setup=0.0359 device_wall=2.4721 upload=1.4628 inputs=0.0159 top=1.4865 bucket=0.1474 join=0.5136 check=0.1373 read=0.0027 probe=0.1546 unattributed=-1.4501 | top_fd=0.7335 top_clip=0.7530 clip_launches=3 null=0.0015 up_host=0.0019 up_sort=0.0016 up_dev=0.0073 up_warm=1.4536 | ntlay=66318 nbp=86419 tops=86052666 listed=4035603764 pairs=54500108360 padded_pairs=88117929984 live_buckets=12744000 buckets=12744000 survivors=2752483403 checked=184517714 spilled=0 hits=0
+GPU_PROFILE base=60 start=1447429612114824200908 end=1447430612114824200908 size=1000000000000000 slices=1 partitions=3600 batches=225 slots=16 min_slots=16 retried=0 splits=0 | setup=0.1164 device_wall=1.3406 upload=0.0229 inputs=0.0158 top=0.1872 bucket=0.0934 join=0.7105 check=0.1406 read=0.0027 probe=0.1465 unattributed=0.0195 | top_fd=0.1865 top_clip=0.0007 clip_launches=3 null=0.0015 up_host=0.0111 up_sort=0.0111 up_dev=0.0115 up_warm=0.0002 | ntlay=496519 nbp=69609 tops=647084065 listed=2854052231 pairs=289832388935 padded_pairs=662614082560 live_buckets=12744000 buckets=12744000 survivors=17607551963 checked=1180249359 spilled=0 hits=0
+FIELD i=0 at=1.458 msd=0.116 device=1.341 total=1.341 launches=225 | jsetup=0.116 jdevice=1.341 jwait=0.000 slices=1 partitions=3600 batches=225 slots=16 min_slots=16 survivors=17607551963 checked=1180249359 retried=0 splits=0 refused=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=60 fields=1 in_flight=2 secs=1.46 per_field=1.458 rate=6.860e14 n/s | setup=0.116s device=1.341s wall=1.341s batches=225 slots=16 plan_mib=1537 | empty_top=0 retried=0 splits=0 survivors=17607551963 checked=1180249359 found=0 | peak_in_use_mib=0 peak_reserved_mib=11
+HOSTACC batches=225 launches=902 fences_pending=0 reads=1 encode_s=1.297 fence_s=0.018 wait_s=0.000 read_s=0.003 fields=1
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 279 filtered out; finished in 4.16s
+
+END cu_prof_c_b60_r1 06:36:53 rc=0

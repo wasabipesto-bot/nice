@@ -49,6 +49,8 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   280 W on a Ryzen 5 5600X, $0.122/h, 6.5 h TTL), ssh verified before handing it over; the start-up
   script now creates `READY` only if the clone and fetch succeed. `vast.py create <offer id>`
   needs `--gpu` beside the id, or the offer is not in the first page of the search.
+- 06:51 UTC: **#251–#254 all green on their merge commits** (25 pass, 3 skipped each; mergeable,
+  clean; no comments or reviews).
 - **Lesson (README updated):** on a card whose clock follows its load, never compare runs with
   work removed; log clock and power beside every timing and reject runs off the operating point.
   I passed the N13 agent's explanation on without opening the samples it had recorded.
