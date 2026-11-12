@@ -1607,6 +1607,7 @@ impl CubeclContext {
             // DX12 on Windows, and reports need to know which API actually
             // ran.
             let info = setup.adapter.get_info();
+            crate::cubecl_join::note_wgpu_adapter(&info.name, &format!("{:?}", info.device_type));
             let client = cubecl::wgpu::WgpuRuntime::client(&device);
             let device_name = format!(
                 "{} ({:?}, {})",
@@ -1645,6 +1646,7 @@ impl CubeclContext {
             )
             .await;
             let info = setup.adapter.get_info();
+            crate::cubecl_join::note_wgpu_adapter(&info.name, &format!("{:?}", info.device_type));
             let client = cubecl::wgpu::WgpuRuntime::client(&device);
             let device_name = format!(
                 "{} ({:?}, {})",
