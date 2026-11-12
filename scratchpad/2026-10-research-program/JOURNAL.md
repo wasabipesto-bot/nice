@@ -51,6 +51,31 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   needs `--gpu` beside the id, or the offer is not in the first page of the search.
 - 06:51 UTC: **#251–#254 all green on their merge commits** (25 pass, 3 skipped each; mergeable,
   clean; no comments or reviews).
+- **09:53 UTC: the harness agent finished (N16.1; 582 k tokens); box destroyed after 3.59 h
+  ($0.47).** I re-ran its analysis on the raw logs (clock and power beside every row) before
+  recording anything.
+  - **Task A confirms the correction and bounds it honestly:** base 7–13 %, AND 12–19 %, walk
+    5–6 %, prefilter 15–28 %, survivor path 21–35 %. My morning figures were the scaled end of
+    each range and I called them "good to a few points": too tight; the report is amended.
+  - **Harness:** `exp/n16-join-base` 32e9e19: exact doubling modes for every part, finer removal
+    cuts, work-group size decoupled from `TOP_CAP`, the survivor stage's size, top-append ballot
+    forms, a partitions-per-launch cap, host launch accounting; every run logs clock, power and
+    busy % and the analysis flags runs off the operating point. Exact modes pass the dense compare
+    on CUDA and lavapipe. `N16/WINDOW-PLAN.md`: one script, must-haves by 0:45, hard end 1:24.
+  - **RTX 3080 by doubling** (b62 / b64 1e17): prefilter 15.9 / 20.8 %, AND 14.6 / 14.6 %, check
+    11.3 / 11.0 %, walk 9.1 / 12.6 %, copy 4.6 %; removal agrees within 1–3 points and with L51.
+    The 3080 keeps its clock in light modes: **the NVIDIA shares (L51, B64) stand.**
+  - **What ACO generates for RDNA4:** wave64, clean code, but **18.9 KiB of shared memory per work
+    group caps occupancy at 12 waves per SIMD**; `TOP_CAP` 128 or a 256-entry survivor stage
+    gives 18, both 24. This would explain `TOP_CAP` 128's unexplained gain on demoux, and the
+    stage size is neutral on NVIDIA, so it needs no per-device rule: **new lead N19**, tested by
+    three rows of the window plan.
+  - **N14's candidate branch** `exp/n14-wgpu-dense-plan` 464be8b (discrete wgpu adapters with a
+    2 GiB budget); not reviewed, no PR; the window measures it.
+  - Side note for NVIDIA (N18, parked): CubeCL's CUDA fence is synchronous; ≤ ×1.04 at b62, an
+    estimate.
+- **Plan from here:** ask for the window (≤ 90 min, card to itself). With it: the profile, N19,
+  N14's A/B, b64 rows. Without it: a reviewer on N14's branch; N19 cannot be measured elsewhere.
 - **Lesson (README updated):** on a card whose clock follows its load, never compare runs with
   work removed; log clock and power beside every timing and reject runs off the operating point.
   I passed the N13 agent's explanation on without opening the samples it had recorded.

@@ -6,7 +6,7 @@
 setmode() {
   for k in NICE_EXP_JOIN_ABL NICE_EXP_JOIN_DBL NICE_EXP_JOIN_WG NICE_EXP_JOIN_TCAP NICE_EXP_JOIN_TMIN \
            NICE_EXP_JOIN_AG NICE_EXP_JOIN_EPT NICE_EXP_SLOTS NICE_EXP_VRAM NICE_EXP_WALK_SYNC NICE_EXP_BALLOT \
-           NICE_EXP_GPU_PROFILE NICE_EXP_INFO NICE_EXP_HOSTACC; do unset $k; done
+           NICE_EXP_GPU_PROFILE NICE_EXP_INFO NICE_EXP_HOSTACC NICE_EXP_JOIN_SCAP NICE_EXP_JOIN_FLUSH; do unset $k; done
   export NICE_EXP_HOSTACC=1
   case $1 in
     c|c[0-9]) ;;                                                   # production kernel (tree E's), exact
@@ -39,6 +39,10 @@ setmode() {
     wg128tc) export NICE_EXP_JOIN_WG=128 NICE_EXP_JOIN_TCAP=128 NICE_EXP_JOIN_TMIN=96;; # JOIN_WG == TOP_CAP at 128
     wg128e4) export NICE_EXP_JOIN_WG=128 NICE_EXP_JOIN_EPT=4;;                          # 512 entries a wave, as wg 256
     wg64tc) export NICE_EXP_JOIN_WG=64 NICE_EXP_JOIN_TCAP=64 NICE_EXP_JOIN_TMIN=48 NICE_EXP_JOIN_AG=2;;
+    # --- shared-memory occupancy (Task C: on RDNA4 the join's cube is LDS-bound, 18.5 KiB -> 12 waves/SIMD), exact
+    sc512) export NICE_EXP_JOIN_SCAP=512 NICE_EXP_JOIN_FLUSH=256;;                     # stage 4 KiB (-> 14.5 KiB)
+    sc256) export NICE_EXP_JOIN_SCAP=256 NICE_EXP_JOIN_FLUSH=128;;                     # stage 2 KiB (-> 12.5 KiB)
+    tcsc) export NICE_EXP_JOIN_TCAP=128 NICE_EXP_JOIN_TMIN=96 NICE_EXP_JOIN_SCAP=512 NICE_EXP_JOIN_FLUSH=256;;
     # --- launches (H1): partitions per launch and the denser plan
     s1) export NICE_EXP_SLOTS=1;; s2) export NICE_EXP_SLOTS=2;; s4) export NICE_EXP_SLOTS=4;;
     vram) export NICE_EXP_VRAM=1;;

@@ -14,7 +14,7 @@ smp() {
       sleep 2
     done
   else
-    D=$(ls -d /sys/class/drm/card*/device 2>/dev/null | while read d; do [ -e $d/gpu_busy_percent ] && echo $d; done | head -1)
+    D=$(ls -d ${DRM:-/sys/class/drm}/card*/device 2>/dev/null | while read d; do [ -e $d/gpu_busy_percent ] && echo $d; done | head -1)
     HW=$(ls -d $D/hwmon/hwmon* 2>/dev/null | head -1)
     while true; do
       if [ -n "$D" ]; then

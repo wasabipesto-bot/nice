@@ -5,7 +5,7 @@
 . "${SCRIPTS:-$(dirname "$0")}/env.sh"
 . "$SCRIPTS/modes.sh"
 : "${XFIELD:=62:$F62:1e17}" "${NX:=2}" "${NB:=N16}"
-for m in ${1:-c d_load d_copy d_and d_walk d_pf d_check d_wave d_bar wsync bal0 bal2 bal1 tc128 wg128 wg64 wg128tc wg128e4 wg64tc vram}; do
+for m in ${1:-c d_load d_copy d_and d_walk d_pf d_check d_wave d_bar wsync bal0 bal2 bal1 tc128 sc512 sc256 tcsc wg128 wg64 wg128tc wg128e4 wg64tc vram}; do
   [ -e "$W/stop" ] && exit 0
   setmode $m
   n=${XPFX:-x}_$m

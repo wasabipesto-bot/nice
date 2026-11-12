@@ -1,0 +1,49 @@
+Diff in /root/n16/wt/D/common/src/cubecl_join.rs:6631:
+         let big = JoinLimits::for_buffer(4 << 30);
+         let small = JoinLimits::for_buffer(128 << 20);
+         for (name, ty, lim, want) in [
+-            ("AMD Radeon RX 9070 XT (RADV GFX1201)", "DiscreteGpu", radv, true),
++            (
++                "AMD Radeon RX 9070 XT (RADV GFX1201)",
++                "DiscreteGpu",
++                radv,
++                true,
++            ),
+             ("NVIDIA GeForce RTX 3080", "DiscreteGpu", radv, true),
+-            ("Intel(R) Arc(tm) A770 Graphics (DG2)", "DiscreteGpu", radv, true),
++            (
++                "Intel(R) Arc(tm) A770 Graphics (DG2)",
++                "DiscreteGpu",
++                radv,
++                true,
++            ),
+             ("Apple M4", "IntegratedGpu", radv, false),
+-            ("AMD Radeon 780M (RADV PHOENIX)", "IntegratedGpu", radv, false),
++            (
++                "AMD Radeon 780M (RADV PHOENIX)",
++                "IntegratedGpu",
++                radv,
++                false,
++            ),
+             ("llvmpipe (LLVM 19.1.7, 256 bits)", "Cpu", small, false),
+-            ("llvmpipe (LLVM 19.1.7, 256 bits)", "DiscreteGpu", small, false),
++            (
++                "llvmpipe (LLVM 19.1.7, 256 bits)",
++                "DiscreteGpu",
++                small,
++                false,
++            ),
+             ("Microsoft Basic Render Driver", "VirtualGpu", radv, false),
+             ("Apple Paravirtual device", "VirtualGpu", radv, false),
+             ("Unknown", "Other", radv, false),
+Diff in /root/n16/wt/D/common/src/cubecl_join.rs:6644:
+-            ("NVIDIA GeForce RTX 3060 (Vulkan)", "DiscreteGpu", big, false),
++            (
++                "NVIDIA GeForce RTX 3060 (Vulkan)",
++                "DiscreteGpu",
++                big,
++                false,
++            ),
+         ] {
+             assert_eq!(wgpu_dense_plan(name, ty, lim), want, "{name} {ty} {lim:?}");
+         }

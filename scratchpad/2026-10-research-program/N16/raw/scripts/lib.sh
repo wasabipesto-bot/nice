@@ -5,10 +5,13 @@
 : "${SZ62:=1e17}" "${SZ64:=1e17}" "${SZ60:=1e16}" "${PFX:=}" "${NB:=N16}"
 one() {
   [ -e "$W/stop" ] && { echo "stopped by $W/stop"; exit 0; }
-  m=$1; t=$2; r=$3; b=${4:-$NB}
-  case $t in
+  # END_AT (epoch seconds): no run starts after it (the window's hard end minus the longest run).
+  [ "$(date +%s)" -ge "${END_AT:-99999999999}" ] && { echo "stopped at END_AT $(date -u +%T)"; exit 0; }
+  # (names with a leading underscore: a shell function shares the caller's variables)
+  _m=$1; _t=$2; _r=$3; _b=${4:-$NB}
+  case $_t in
     b62) set -- 62 $SZ62 $F62;; b64) set -- 64 $SZ64 $F64;; b60) set -- 60 $SZ60 $F60;;
-    *) echo "unknown tag $t"; return 1;;
+    *) echo "unknown tag $_t"; return 1;;
   esac
-  sh "$SCRIPTS/wrun.sh" "${PFX}${m}_${t}_r$r" "$b" "$m" "$@"
+  sh "$SCRIPTS/wrun.sh" "${PFX}${_m}_${_t}_r$_r" "$_b" "$_m" "$@"
 }

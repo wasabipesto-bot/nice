@@ -5,6 +5,68 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## N16.1 A harness for the 9070 XT's profile; the RTX 3080 by doubling and by removal; what ACO generates (2026-11-12, agent; `N16/RESULTS.md`, `N16/WINDOW-PLAN.md`, `N16/raw/` (`sorted/` = the tables' logs, `scripts/`, `taskA.txt`, `taskC.txt`, `box/spv_dumps.tar.zst`); fork branches `exp/n16-join-base` 32e9e19 (from 44eee52) and `exp/n14-wgpu-dense-plan` 464be8b (on main 5b1d627); box 60317813, RTX 3080 at 280 W on a Ryzen 5 5600X, 3.59 h, $0.47; box 60315324 unusable, 0.44 h, $0.05)
+
+`python3 -I N16/raw/scripts/analyze.py N16/raw/sorted` prints every row with clock, power, busy % and
+counts (re-run by the director: tables reproduce; every row at 1,740–1,935 MHz and 277–280 W).
+
+**The 9070 XT's profile from N13's logs, bounded** (`N16/raw/scripts/taskA.py`; J = differences of each
+mode's own join timer, JS = the same scaled by the run's top phase; the truth lies between), b62 1e17:
+base 7–13 % (0.20–0.38 ps per pair; 3080 0.26), AND 12–19 %, walk 5–6 %, **prefilter 15–28 %**,
+survivor path 21–35 %, check 17 %, top 22 %. (N13.2's single figures are the JS end of each range.)
+
+**RTX 3080 at 280 W, CUDA, unprofiled; "doubling" = the part executed twice at full load, counts
+exact, cost = Δ seconds ÷ base** (b62 1e17 at 0.45, base 61.97 s, 2 rounds; b64 1e17 at 0.55, base
+143.12 s, 2 rounds):
+
+| part | b62 1e17 | b64 1e17 | by removal at b62 (unprofiled) | L51 (180 W, removal) |
+|---|---|---|---|---|
+| prefilter | 15.9 % | 20.8 % | walk + prefilter 28.4 % | 19.8 % |
+| AND | 14.6 % | 14.6 % | 16.6 % | 14.9 % |
+| check kernel | 11.3 % | 11.0 % | stage + check 12.2 % | 12.0 % |
+| walk rounds | 9.1 % | 12.6 % | (above) | 9.2 % |
+| transposed copy | 4.6 % | | | (base 10.9 %) |
+| batch loads / entry-wave loads (cached second read: lower bounds) | 1.4 % / 0.0 % | | | |
+| barriers (6 more per item and batch) | 0.1 % | | | |
+
+The two instruments agree within 1–3 points, and with L51. **On the 3080 the clock stays or rises
+in the light modes** (z 1,740, a 1,725, p 1,800 MHz against c's 1,740–1,770, all at 279 W): L51's
+and B64's NVIDIA shares stand. Profiled mode costs +3.2 % there and keeps its clock.
+
+**Launches on CUDA** (`NICE_EXP_HOSTACC`, `NICE_EXP_SLOTS`): seconds = 11.03 + 0.78 ms × batches at
+b60 1e16 (7 runs), 59.6 + 0.84 ms × batches at b62 1e17 (4 runs). Every launch fence completes
+inside `client.sync()` (0 of 2,615 pending); host time in `launch_batch` 0.92–1.00 ms per batch at
+b62 (2.4–2.6 s, ≈ 4 % of the field, nearly all in CubeCL's flush), 0.2 ms at b60 and b64. Whether
+that is GPU idle time is the agent's reading, not measured (busy reads 99 % at b62, 92 % at one
+partition per launch): **estimate only, ≤ ×1.04 on NVIDIA.**
+
+**Geometry and occupancy on CUDA (exact, b60 1e16 / b62 1e17):** `TOP_CAP` 128 +3.1–4.3 % / +3.5 %
+slower; survivor stage 512 or 256 entries +0.1 % / +0.6 % (neutral); both +3.2 % / +2.4 %; work
+group 128 +9–12 %, 64 +31–38 %; top-append ballot forms within ±1 %.
+
+**What ACO (Mesa 25.2.7, null GFX1201 device, CubeCL's SPIR-V compiled with a small pipeline
+program) generates for the join kernel:** wave64; 1,357 instructions; no spills, clamps or emulated
+64-bit; 16 barriers (0 at a 64-thread work group); **18.9 KiB of LDS per work group, which caps
+occupancy at 12 waves per SIMD (ACO's estimate)**; `TOP_CAP` 128 → 13.8 KiB, 18 waves; stage 512 →
+14.8 KiB, 16; stage 256 → 12.8 KiB, 18; `TOP_CAP` 128 + stage 512 → 9.7 KiB, 24. The transposed
+AND waits on four LDS loads per digit (latency-bound unless enough waves hide it). A walk round
+with the prefilter is ≈ 113 instructions per entry slot (≈ 66 on NVIDIA). The FD top append's
+scans already compile to a ballot. **Hypothesis this gives (not measured on the card): `TOP_CAP`
+128's ×1.04–1.05 there is occupancy, so a smaller survivor stage, neutral on NVIDIA, should win
+there too.**
+
+**Task D** (`exp/n14-wgpu-dense-plan` 464be8b): the denser plan for a wgpu adapter reported as
+`DiscreteGpu`, not a software rasterizer by name, budget ≤ 2 GiB. wgpu exposes no memory size, so
+this is a class rule: it cannot tell a 4 GB discrete card from a 16 GB one. 11-case unit test,
+fmt, clippy, 7 lavapipe device tests pass; on CUDA both binaries take the denser plan (A/A
+×0.98–1.02).
+
+**Validation of the harness:** dense compare against the CPU join for every exact mode on CUDA
+(b60 1e16: 23 modes; b62 1e17: 15) and on lavapipe with the SPIR-V compiler (22 of 23; `wsync` is
+not run by lavapipe and fails its dispatch check instead of miscounting). `go_window.sh` dry-run
+twice on the box, the second from a fresh clone at the final head (builds 167 / 168 / 166 s at
+`-j 8` on a 5600X); `END_AT` and the stop file tested.
+
 ## T2.2 Can production telemetry bound a per-launch cost on demoux? (2026-11-12, director, public API; `../2026-11-fresh-eyes/launch_regression.py`, `demoux_launches_1112.json` (6,567 demoux nice-only fields, 11-11 03:37 → 11-12 00:53 local, build c0c357a, b60 1e16, two fields in flight))
 
 `uv run --with numpy python launch_regression.py`. 8.7 % of the fields are empty (0 launches,

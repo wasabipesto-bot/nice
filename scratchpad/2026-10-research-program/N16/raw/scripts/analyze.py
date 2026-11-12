@@ -35,25 +35,29 @@ for p in sorted(glob.glob(f'{D}/*_r[0-9].log')):
     m = re.match(r'(.*?)_(b\d\d)_r(\d)$', n)
     if not m: continue
     head, tag, r = m.groups()
+    # set: the chain's prefix (PFX0 + chain-): 'sv-', 'ge-', 'DM-', 'lp.sv-'; names without one are the must chain's
+    if '-' in head: cset, mode = head.rsplit('-', 1); cset += '-'
+    elif '.' in head: cset, mode = head.split('.', 1)[0] + '.must', head.split('.', 1)[1]
+    else: cset, mode = 'must', head
     t = open(p, errors='replace').read()
     tp = [kv(l) for l in t.splitlines() if 'JOIN THROUGHPUT' in l]
     ha = [kv(l) for l in t.splitlines() if l.startswith('HOSTACC')]
     if not tp:
         print(f'  {n}: no result ({"panicked" if "panicked" in t else "incomplete"})'); continue
     g = gpu(p[:-4] + '.gpu') or (0, 0, 0, 0)
-    mode = head.split('_', 1)[1] if head.startswith(('DM_', 'DD_')) else head
-    runs.append(dict(n=n, mode=mode, tag=tag, r=int(r), secs=float(tp[-1]['secs']), surv=int(tp[-1]['survivors']),
+    runs.append(dict(n=n, mode=mode, set=cset, tag=tag, r=int(r), secs=float(tp[-1]['secs']), surv=int(tp[-1]['survivors']),
                      chk=int(tp[-1]['checked']), batches=float(tp[-1]['batches']), slots=tp[-1]['slots'],
                      mhz=g[0], w=g[1], busy=g[2], ns=g[3], ha=ha[-1] if ha else {}, bin=head))
 isbase = lambda m: re.fullmatch(r'(c\d?|info|c_nohost)', m) is not None
-for tag in sorted({x['tag'] for x in runs}):
-    R = [x for x in runs if x['tag'] == tag and not x['n'].startswith(('DM_', 'DD_'))]
+isD = lambda x: re.search(r'(^|\.)D[MD]-$', x['set']) is not None
+for cset, tag in sorted({(x['set'], x['tag']) for x in runs}):
+    R = [x for x in runs if x['tag'] == tag and x['set'] == cset and not isD(x)]
     if not R: continue
     B = [x for x in R if isbase(x['mode'])]
     if not B: continue
     ref = REF or (st.median(x['mhz'] for x in B), st.median(x['w'] for x in B))
     cnt = (B[0]['surv'], B[0]['chk'])
-    print(f'== {tag}: base runs ' + ', '.join(f"{x['n']} {x['secs']:.2f}s {x['mhz']:.0f}MHz {x['w']:.0f}W" for x in B) +
+    print(f'== [{cset}] {tag}: base runs ' + ', '.join(f"{x['n']} {x['secs']:.2f}s {x['mhz']:.0f}MHz {x['w']:.0f}W" for x in B) +
           f'  | operating point {ref[0]:.0f} MHz {ref[1]:.0f} W | base counts {cnt[0]} / {cnt[1]}')
     if len(B) > 1:
         bs = [x['secs'] for x in B]
@@ -78,7 +82,7 @@ for tag in sorted({x['tag'] for x in runs}):
         for x in H:
             h = x['ha']; b = max(float(h.get('batches', 1)), 1)
             print(f"     {x['n']:22s} batches={h.get('batches')} launches={h.get('launches')} fences_pending={h.get('fences_pending')} reads={h.get('reads')} "
-                  f"encode={h.get('encode_s')}s fence={h.get('fence_s')}s wait={h.get('wait_s')}s read={h.get('read_s')}s "
+                  f"encode={h.get('encode_s')}s (create {h.get('create_s', '-')} launch {h.get('launch_s', '-')} flush {h.get('flush_s', '-')}) fence={h.get('fence_s')}s wait={h.get('wait_s')}s read={h.get('read_s')}s "
                   f"| per batch encode {1e3*float(h.get('encode_s', 0))/b:.3f} ms wait {1e3*float(h.get('wait_s', 0))/b:.3f} ms | wall {x['secs']:.2f}s")
     # launches: secs against batches (modes c, s1, s2, s4, vram)
     L = [x for x in R if re.fullmatch(r'(c\d?|info|s\d|vram)', x['mode'])]
@@ -89,13 +93,13 @@ for tag in sorted({x['tag'] for x in runs}):
         print(f'   launches: secs = {my - sl*mx:.2f} + {1e3*sl:.3f} ms x batches  (fit over {len(L)} runs: ' +
               ', '.join(f"{x['mode']} {x['batches']:.0f}:{x['secs']:.2f}" for x in L) + ')')
     print()
-DM = [x for x in runs if x['n'].startswith(('DM_', 'DD_'))]
+DM = [x for x in runs if isD(x)]
 if DM:
     print('== Task D: main (M) against exp/n14-wgpu-dense-plan (D)')
     for tag in sorted({x['tag'] for x in DM}):
         for r in sorted({x['r'] for x in DM}):
-            m = [x for x in DM if x['tag'] == tag and x['r'] == r and x['n'].startswith('DM_')]
-            d = [x for x in DM if x['tag'] == tag and x['r'] == r and x['n'].startswith('DD_')]
+            m = [x for x in DM if x['tag'] == tag and x['r'] == r and x['set'].endswith('DM-')]
+            d = [x for x in DM if x['tag'] == tag and x['r'] == r and x['set'].endswith('DD-')]
             if m and d:
                 print(f"   {tag} r{r}: M {m[0]['secs']:.2f}s ({m[0]['mhz']:.0f}MHz {m[0]['w']:.0f}W, {m[0]['batches']:.0f} batches) "
                       f"D {d[0]['secs']:.2f}s ({d[0]['mhz']:.0f}MHz {d[0]['w']:.0f}W, {d[0]['batches']:.0f} batches) x{m[0]['secs']/d[0]['secs']:.3f} "

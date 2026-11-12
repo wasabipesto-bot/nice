@@ -33,7 +33,9 @@ director session can be replaced from it at any time.
 
 ## PRs
 
-Open immediately once the 5 % protocol and exactness pass; the report lists them. Bodies:
+Open immediately once the 5 % protocol and exactness pass; the report lists them. After another PR
+merges, bring a branch up to date with a merge commit and a plain push: the harness refuses
+force-pushes, lease or not (2026-11-12). Bodies:
 what, why, soundness, measurements, exactness, short "Not in this PR"; no mention of the
 program, the scratchpad or fork-only write-ups; no reference re-pinning (ops does it).
 
@@ -56,7 +58,8 @@ workspace recipe and rules in `N13/BRIEF.md`. **That card's clock follows its lo
 with work removed (ablation modes, light kernels) drops to half clock and a third of the power, so
 compare only runs whose `.gpu` samples show ≈ 3.15 GHz and ≈ 300 W, and measure a part's cost by
 adding work at full load, not by removing it. Its corrected profile is NVIDIA's with a dearer
-check and prefilter (the "base is a third of a field" claim of 11-11 was an artefact).
+check and prefilter (the "base is a third of a field" claim of 11-11 was an artefact). The harness for
+that card is fork `exp/n16-join-base` with `N16/WINDOW-PLAN.md` (doubling modes, clock check).
 
 ## Working without the user (2026-11-10)
 

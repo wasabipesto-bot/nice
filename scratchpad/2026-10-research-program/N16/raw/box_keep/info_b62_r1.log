@@ -1,0 +1,19 @@
+START info_b62_r1 06:49:09 dev=cuda mode=info base=62 size=1e17 list=7520566762397899821056 env=[NICE_EXP_HOSTACC=1 NICE_EXP_INFO=1 ] bin=N16 md5=125cc005
+
+running 1 test
+test cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields ... EXP_INFO runtime=cuda max_page_size=3121774592 plane_size_min=32 plane_size_max=32 plane=EnumSet(Ops | Sync | NonUniformControlFlow) limits=JoinLimits { max_binding: 3121774592, budget: 3121774592, vram_budget: false }
+EXP_PLANE wg=256 plane_dim=32 cube_dim=256 plane_sum1=32
+EXP_PLANE wg=128 plane_dim=32 cube_dim=128 plane_sum1=32
+EXP_PLANE wg=64 plane_dim=32 cube_dim=64 plane_sum1=32
+EXP_INFO runtime=cuda max_page_size=3121774592 plane_size_min=32 plane_size_max=32 plane=EnumSet(Ops | Sync | NonUniformControlFlow) limits=JoinLimits { max_binding: 3121774592, budget: 3121774592, vram_budget: false }
+EXP_PLANE wg=256 plane_dim=32 cube_dim=256 plane_sum1=32
+EXP_PLANE wg=128 plane_dim=32 cube_dim=128 plane_sum1=32
+EXP_PLANE wg=64 plane_dim=32 cube_dim=64 plane_sum1=32
+FIELD i=0 at=60.776 msd=6.483 device=60.119 total=60.184 launches=2615 | jsetup=6.483 jdevice=60.119 jwait=0.000 slices=9 partitions=3844 batches=2615 slots=16 min_slots=12 survivors=1097114812011 checked=66862268894 retried=0 splits=0 refused=0
+JOIN THROUGHPUT device=NVIDIA GeForce RTX 3080 base=62 fields=1 in_flight=2 secs=60.78 per_field=60.776 rate=1.645e15 n/s | setup=6.483s device=60.119s wall=60.184s batches=2615 slots=16 plan_mib=2889 | empty_top=0 retried=0 splits=0 survivors=1097114812011 checked=66862268894 found=0 | peak_in_use_mib=0 peak_reserved_mib=11
+HOSTACC batches=2615 launches=10462 fences_pending=0 reads=9 encode_s=2.408 fence_s=56.150 wait_s=0.000 read_s=0.047 fields=1
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 279 filtered out; finished in 61.15s
+
+END info_b62_r1 06:50:11 rc=0

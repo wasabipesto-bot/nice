@@ -1,0 +1,42 @@
+   Compiling nice_common v3.4.8-dev (/root/n16/wt/N16/common)
+warning: value assigned to `n` is never read
+    --> common/src/cubecl_join.rs:2029:21
+     |
+2029 |         let mut n = 0u32;
+     |                     ^^^^ this value is reassigned later and never used
+...
+2049 |             n = plane_sum(kc);
+     |             ----------------- `n` is overwritten here before the previous value is read
+     |
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `pre` is never read
+    --> common/src/cubecl_join.rs:2030:23
+     |
+2030 |         let mut pre = 0u32;
+     |                       ^^^^ this value is reassigned later and never used
+...
+2050 |             pre = plane_exclusive_sum(kc);
+     |             ----------------------------- `pre` is overwritten here before the previous value is read
+
+warning: function `reset` is never used
+    --> common/src/cubecl_join.rs:3493:12
+     |
+3493 |     pub fn reset() {
+     |            ^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `line` is never used
+    --> common/src/cubecl_join.rs:3499:12
+     |
+3499 |     pub fn line() -> String {
+     |            ^^^^
+
+warning: `nice_common` (lib) generated 4 warnings
+warning: `nice_common` (lib test) generated 2 warnings (2 duplicates)
+    Finished `release` profile [optimized] target(s) in 1m 56s
+  Executable unittests src/lib.rs (/root/n16/target-N16/release/deps/nice_common-0b4345595ac8814e)
+  Executable tests/claim_queries.rs (/root/n16/target-N16/release/deps/claim_queries-096a08ccc49e0f30)
+  Executable tests/notable_numbers_cache.rs (/root/n16/target-N16/release/deps/notable_numbers_cache-00ced11411c5731a)
+  Executable tests/search_caches.rs (/root/n16/target-N16/release/deps/search_caches-7237ac32267d164a)
