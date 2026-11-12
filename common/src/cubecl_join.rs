@@ -1178,6 +1178,44 @@ mod kernels {
                                         );
                                         pass = pass && p2;
                                     }
+                                    if comptime!(dbl & 1792 != 0 && lean) {
+                                        // N20 probe (2026-11-12): four extra operations per
+                                        // walked pair on values the prefilter already holds,
+                                        // folded in through `zz` (0). Bit 256: two 32-bit low
+                                        // and two 32-bit high multiplies. Bit 512: the same
+                                        // chain on operands masked to 24 bits (the compiler
+                                        // may then pick 24-bit multiplies). Bit 1024: the same
+                                        // chain with additions, the probe's own overhead.
+                                        let pa = t_dm[jt2 as usize];
+                                        let pb = ac[j as usize];
+                                        let pc_ = ac3[j as usize];
+                                        let mut q = 0u32;
+                                        if comptime!(dbl & 256 != 0) {
+                                            let q1 = pa * pb;
+                                            let q2 = u32::mul_hi(q1, pa);
+                                            let q3 = (q2 ^ pb) * pc_;
+                                            q = u32::mul_hi(q3, q1);
+                                        }
+                                        if comptime!(dbl & 512 != 0) {
+                                            let a = pa & 16777215u32;
+                                            let b = pb & 16777215u32;
+                                            let c = pc_ & 16777215u32;
+                                            let q1 = (a * b) & 16777215u32;
+                                            let q2 = u32::mul_hi(q1, a);
+                                            let q3 = (((q2 ^ b) & 16777215u32) * c) & 16777215u32;
+                                            q = u32::mul_hi(q3, q1);
+                                        }
+                                        if comptime!(dbl & 1024 != 0) {
+                                            let a = pa & 16777215u32;
+                                            let b = pb & 16777215u32;
+                                            let c = pc_ & 16777215u32;
+                                            let q1 = (a + b) & 16777215u32;
+                                            let q2 = (q1 + a) >> 8u32;
+                                            let q3 = (((q2 ^ b) & 16777215u32) + c) & 16777215u32;
+                                            q = (q3 + q1) >> 8u32;
+                                        }
+                                        pass = pass && ((q & zz) == 0u32);
+                                    }
                                     if comptime!(abl == 3) {
                                         if pass {
                                             npf += 1u32;
