@@ -173,7 +173,7 @@ pub use kernels::{bucket_kernel, check_kernel, join_kernel, top_fd_kernel, top_k
 )]
 mod kernels {
     use super::{
-        DEAD_MASK, JOIN_WG, MAX_ROOTS, SURV_SH_CAP, TOP_REC_WORDS,
+        DEAD_MASK, JOIN_WG, MAX_ROOTS, TOP_REC_WORDS,
     };
     use crate::cubecl_backend::candidate_check;
     use crate::cubecl_detailed_fd::fd_add_top;
@@ -516,6 +516,7 @@ mod kernels {
         #[comptime] stg: u32,
         #[comptime] wg: u32,
         #[comptime] dbl: u32,
+        #[comptime] scap: u32,
         zz: u32,
     ) {
         // N16 (experimental, `NICE_EXP_JOIN_WG`, `NICE_EXP_JOIN_DBL`,
@@ -596,8 +597,8 @@ mod kernels {
         // top 32c + i has the digit at mask bit d (digit d, or digit 63 - d
         // where `lean` holds the masks bit-reversed, see the doc above).
         let mut t_tr = SharedMemory::<u32>::new(comptime!((tcap / 32 * 64) as usize));
-        let mut s_t = SharedMemory::<u32>::new(comptime!(SURV_SH_CAP as usize));
-        let mut s_r = SharedMemory::<u32>::new(comptime!(SURV_SH_CAP as usize));
+        let mut s_t = SharedMemory::<u32>::new(comptime!(scap as usize));
+        let mut s_r = SharedMemory::<u32>::new(comptime!(scap as usize));
         let mut s_cnt = SharedMemory::<Atomic<u32>>::new(1usize);
         let mut s_base = SharedMemory::<u32>::new(1usize);
         // The work item's tops (see the work item below): segment r holds
@@ -1183,7 +1184,7 @@ mod kernels {
                                         }
                                     } else if pass {
                                         let at = s_cnt[0].fetch_add(1u32);
-                                        if at < SURV_SH_CAP {
+                                        if at < scap {
                                             s_t[at as usize] = t_id[jt2 as usize];
                                             s_r[at as usize] = r0;
                                         } else {
@@ -1240,6 +1241,7 @@ mod kernels {
                             surv_count,
                             surv_cap,
                             sc,
+                            scap,
                         );
                         sync_cube();
                     }
@@ -1268,6 +1270,7 @@ mod kernels {
                         surv_count,
                         surv_cap,
                         sc,
+                        scap,
                     );
                     sync_cube();
                 }
@@ -1286,6 +1289,7 @@ mod kernels {
                 surv_count,
                 surv_cap,
                 sc,
+                scap,
             );
         }
         if comptime!(abl == 1 || abl == 2 || abl == 4) {
@@ -3337,10 +3341,11 @@ mod kernels {
         out_count: &mut Array<Atomic<u32>>,
         out_cap: u32,
         sc: u32,
+        #[comptime] scap: u32,
     ) {
         let mut n = sc;
-        if n > SURV_SH_CAP {
-            n = SURV_SH_CAP; // the rest went to `out` from the walk
+        if n > scap {
+            n = scap; // the rest went to `out` from the walk
         }
         if UNIT_POS_X == 0u32 {
             s_base[0] = out_count[0].fetch_add(n);
@@ -3699,6 +3704,8 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// parts (`NICE_EXP_JOIN_DBL`, see [`DBL_HELP`]).
     wg: u32,
     dbl: u32,
+    /// N16: the shared survivor stage's entries (`NICE_EXP_JOIN_SCAP`).
+    scap: u32,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -3983,6 +3990,7 @@ impl<R: Runtime> JoinDevice<R> {
             fd_wg: exp_env("NICE_EXP_FD_WG", JOIN_WG),
             wg: exp_env("NICE_EXP_JOIN_WG", JOIN_WG),
             dbl: exp_env("NICE_EXP_JOIN_DBL", 0),
+            scap: exp_env("NICE_EXP_JOIN_SCAP", SURV_SH_CAP),
             limbs,
             chunk_digits,
             chunk_div,
@@ -4440,6 +4448,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.stg,
                 self.wg,
                 self.dbl,
+                self.scap,
                 0u32,
             );
             if let Some(t) = pt {
