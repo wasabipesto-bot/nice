@@ -16,7 +16,7 @@ h = F >> (32 - s)         g = (F << s) >> (32 - s)
 The kernel now uses the shift form when its comptime base is a power of two and the multiply form otherwise. Base 64
 is the only power-of-two base the join takes, so this changes the join kernel at b64 and nowhere else.
 
-- `walk_pf_lean`: the four digits chosen at comptime (`base.is_power_of_two()`); its doc says so.
+- `walk_pf_lean`: the four digits chosen at comptime (`base >= 2 && base.is_power_of_two()`); its doc says so.
 - A new host test, `fx_digits_are_bit_fields_at_powers_of_two`, checks the identity against the multiply form at
   b = 2, 4, …, 256: on 0, 1, 2, the extremes, the first 4,096 multiples of 2^(32 − s) and of 2^(32 − 2s) (where the
   two digits change) each ±1, and 10^6 random fractions.
@@ -86,7 +86,7 @@ NiceMark has no b64 scenario, so it cannot show this change.
 **RX 9070 XT (RADV, Vulkan, CubeCL's SPIR-V compiler, 304 W cap)**, measured earlier on an experiment build with the
 same change behind an environment variable (the switch picks the form at comptime, so the shift form compiles to the
 kernel this PR compiles at b64): b64 1e17, **150.16 → 142.90 s, ×1.051**, counts identical, at the card's operating
-point. **One round only**; base runs of the same field spread 0.0–0.8 % in that hour. That build did not include #254,
+point. **One round only**; the base runs of that field in that hour were 150.16–151.58 s (0.9 %), and the shift run sat at a slightly lower clock than its base run (3,094 against 3,140 MHz), so the clock does not explain the gain. That build did not include #254,
 so its b64 field took 150 s where today's main takes about 135 s on that card; if the 7.3 s saving carries over, that
 is about ×1.05–1.06 on today's main (an estimate, not measured).
 

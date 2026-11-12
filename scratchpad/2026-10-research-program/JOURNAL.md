@@ -155,6 +155,20 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   shift form's ×1.051 on the 9070 XT is one round; no Apple GPU measured.
 - **20:50 UTC: two independent reviewers launched** (one per branch, `PRP/REVIEW-BRIEF.md`); the PRs
   are opened when the reviews are in and their findings fixed.
+- **20:55 UTC: PR #255 opened** (base-64 prefilter shifts; `pr/join-prefilter-shift-pow2`, head
+  42d2afd = the measured commit 93a7ef6 + a guard that keeps base 1 out of the shift form + the
+  changelog number). Review (`PRP/REVIEW-shift.md`): open as is; exhaustive check of all 2^32
+  fractions at base 64 by the reviewer; its two optional points applied (the guard; the body's
+  noise sentence now quotes the b64 base range, 0.9 %). The body says plainly that the 9070 XT's
+  ×1.051 is one round on an experiment build and that NVIDIA gains ×1.016–1.019.
+- **21:10 UTC: PR #256 opened** (512-entry survivor stage; `pr/join-survivor-stage-512` = the
+  measured commit 0d84d0a + the review's fixes + the changelog number). Review
+  (`PRP/REVIEW-stage.md`): open after wording fixes; correct by construction (the reviewer modelled
+  the stage protocol in Python, 9,000 random cases, every pair counted once). Applied: the doc
+  comment now says what was measured and credits the occupancy figures to Mesa's compiler; a
+  constant assertion that the flush level fits the stage; the body's clock and power ranges for
+  this PR's runs only, the direct-path sentence, how the experiment build differs, a Turing note
+  (not measured). Three program PRs open: #251, #255, #256.
 - **Lesson (README updated):** on a card whose clock follows its load, never compare runs with
   work removed; log clock and power beside every timing and reject runs off the operating point.
   I passed the N13 agent's explanation on without opening the samples it had recorded.

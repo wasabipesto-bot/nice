@@ -3,21 +3,23 @@
 The join kernel stages the pairs that pass its prefilter in shared memory, two arrays of `SURV_SH_CAP` words per work
 group, and writes the stage to the survivor list once it holds `SURV_FLUSH` entries. This PR halves both:
 `SURV_SH_CAP` 1024 → 512 and `SURV_FLUSH` 512 → 256 (still half the stage). The constants' docs now say what the size
-trades and why it is 512. No other code changes.
+trades and why it is 512, and a constant assertion keeps the flush level within the stage. No other code changes.
 
 ## Why
 
 The stage is 8 KiB of the work group's shared memory with 1,024 entries, 4 KiB with 512. On AMD's RDNA4 the work
 group's shared memory is what limits how many of them run at once: the join kernel uses 18.9 KiB per work group with
-the 1,024-entry stage, which the compiler (Mesa's ACO, for the RX 9070 XT) puts at 12 waves per SIMD; with 512 entries
+the 1,024-entry stage as the compiler lays it out (18.1 KiB of declared arrays), which that compiler (Mesa's ACO, for the
+RX 9070 XT) puts at 12 waves per SIMD; with 512 entries
 it is 14.8 KiB and 16 waves, a third more. The AND waits on several shared-memory loads per digit, and more waves in
 flight hide more of that latency (that is the reading of the compiler's output; the card was not profiled at that
 level).
 
 On NVIDIA the kernel is bound by its registers, not its shared memory: at 46–48 registers a 256-thread block fits 5
 times per SM on an RTX 3080 (sm_86), and the shared memory (18.1 KiB per block on CUDA, 14.1 KiB with this PR, plus 1 KiB
-reserved per block, against 100 KiB per SM) allowed 5 before and allows 6 now. So NVIDIA should not move, and does
-not (below).
+reserved per block, against 100 KiB per SM) allowed 5 before and allows 6 now. So an RTX 3080 should not move, and does
+not (below). On cards with 64 KiB of shared memory per SM (Turing) the smaller stage allows 4 blocks instead of 3;
+that was not measured.
 
 ## Soundness
 
@@ -44,16 +46,17 @@ full stage in the dense compare against the CPU join (`cubecl_cuda_join_matches_
 
 With 1,024 / 512 the same count, taken on an earlier version of the kernel, was 0 at b60 1e16 and b62 1e17 (whole
 fields). With a 16-entry stage over 90 % of the survivors went the direct path and the hits and both survivor counts
-still matched the CPU join's exactly. How many pairs go direct depends on how the device schedules the work groups;
-the RX 9070 XT's runs below had identical counts in every round.
+still matched the CPU join's exactly. How many pairs go direct is set by the batch plan, and was counted on the
+RTX 3080 only.
 
 ## Measurements
 
 **RX 9070 XT (RADV, Vulkan, CubeCL's SPIR-V compiler, 304 W cap)**, measured earlier on an experiment build: main's
 join kernel with the two sizes switched by an environment variable (the switch compiles the same kernel this constant
-change does), in a tree whose other stages are not exactly today's main. Three rotated rounds, each ratio against the
-same round's run with the 1,024-entry stage, counts identical in every run, every run at the card's operating point
-(3.03–3.19 GHz, 303–304 W):
+change does). That build's join kernel is main's apart from such switches; its top-certificate stage is older
+(without #250 and #254), so the join is a slightly larger share of a field on today's main. Three rotated rounds, each
+ratio against the same round's run with the 1,024-entry stage, hit and survivor counts identical in every run, every
+run at the card's power cap (3.08–3.17 GHz, 302–304 W; the 512-entry runs sat 50–80 MHz below the base runs):
 
 | field | per round | median |
 |---|---|---|
@@ -79,7 +82,7 @@ middle two.
 | b64 1e16 × 2 | 30.08, 30.00, 30.06, 30.22 | 30.07, 30.20, 29.53, 30.20 | ×1.000, ×0.993, ×1.018, ×1.001 | **×1.000** |
 
 Neutral, as the occupancy arithmetic above says; the lowest single round is ×0.989. Clocks and power per run: b62
-1,725–1,785 MHz at 288–307 W, b60 1,800–1,830 MHz at 317–319 W, b64 1e16 1,785–1,808 MHz at 318–319 W; the b64 1e17
+1,725–1,785 MHz at 288–302 W, b60 1,800–1,830 MHz at 318–319 W, b64 1e16 1,785–1,808 MHz at 318–319 W; the b64 1e17
 runs (145 s) heat the card into thermal slowdown and settle at 1,560–1,630 MHz and 245–256 W on both sides. Fields:
 b62 1e17 at 7520566762397899821056, b60 1e16 at 1447429612114824200908, b64 1e17 at 58557331862957161709568, b64 1e16
 at the same start (two consecutive fields). Every run of a field gave the same counts on both sides.
