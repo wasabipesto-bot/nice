@@ -3445,7 +3445,19 @@ fn u32_words(x: u128) -> [u32; 4] {
 /// ([`JoinLimits::vram_budget`]).
 pub(crate) fn limits_of<R: Runtime>(client: &ComputeClient<R>) -> JoinLimits {
     let lim = JoinLimits::for_buffer(client.properties().memory.max_page_size);
-    if R::name(client).contains("cuda") {
+    if exp_env("NICE_EXP_INFO", 0) == 1 {
+        let pr = client.properties();
+        eprintln!(
+            "EXP_INFO runtime={} max_page_size={} plane_size_min={} plane_size_max={} plane={:?} limits={:?}",
+            R::name(client),
+            pr.memory.max_page_size,
+            pr.hardware.plane_size_min,
+            pr.hardware.plane_size_max,
+            pr.features.plane,
+            lim
+        );
+    }
+    if R::name(client).contains("cuda") || exp_env("NICE_EXP_VRAM", 0) == 1 {
         lim.with_vram_budget()
     } else {
         lim
@@ -3743,7 +3755,7 @@ impl<R: Runtime> JoinDevice<R> {
             key_level: fs.key_level,
             // Only CUDA has independent thread scheduling to correct for, and
             // WGSL has no plane barrier.
-            walk_sync: R::name(client).contains("cuda")
+            walk_sync: (R::name(client).contains("cuda") || exp_env("NICE_EXP_WALK_SYNC", 0) == 1)
                 && client
                     .properties()
                     .features
@@ -5521,6 +5533,64 @@ mod tests {
         let CubeclContext::Cuda { client, .. } = ctx else {
             unreachable!("new_cuda is CUDA")
         };
+        let (b, dense, size) = std::env::var("NICE_TEST_JOIN_DENSE_FIELD").map_or(
+            (58, crate::join_plan::tests::DENSE_58, 1_000_000_000_000_000),
+            |v| {
+                let x: Vec<&str> = v.split(':').map(str::trim).collect();
+                (
+                    x[0].parse().expect("NICE_TEST_JOIN_DENSE_FIELD: a base"),
+                    x[1].parse().expect("NICE_TEST_JOIN_DENSE_FIELD: a start"),
+                    x[2].parse::<f64>()
+                        .expect("NICE_TEST_JOIN_DENSE_FIELD: a size") as u128,
+                )
+            },
+        );
+        let range = FieldSize::new(dense, dense + size);
+        let field =
+            crate::join_plan::plan_join(b, &range, limits_of(&client)).expect("a join field");
+        let total = u32::try_from(field.fs.nparts).unwrap();
+        let parts: Vec<u32> = (0..n).map(|i| i * total / n.max(1)).collect();
+        let t0 = Instant::now();
+        let (hits, st) =
+            run_slices(&client, &field, 1, &parts, &JoinCeiling::default()).expect("device run");
+        let gpu_secs = t0.elapsed().as_secs_f64();
+        let cpu =
+            crate::cpu_join::CpuJoin::new(b, &field.slices[0], field.fs.jp).expect("cpu setup");
+        let mut sc = crate::cpu_join::Scratch::default();
+        let mut want = crate::cpu_join::PartitionResult::default();
+        for &v in &parts {
+            want.add(cpu.run_partition(v, &mut sc));
+        }
+        want.hits.sort_unstable();
+        let got: Vec<u128> = hits.iter().map(|h| h.number).collect();
+        println!(
+            "b{b} [{dense}, +{size}), {n} partitions: {} slice(s), {} per launch (fewest {}), \
+             {} re-run; survivors {} checked {} on the device in {gpu_secs:.2}s",
+            field.slices.len(),
+            st.slots,
+            st.min_slots,
+            st.retried_partitions,
+            st.survivors,
+            st.checked
+        );
+        assert_eq!(got, want.hits, "hits differ");
+        assert_eq!(
+            (st.survivors, st.checked),
+            (want.survivors, want.checked),
+            "join or prefilter survivors differ from the CPU join's"
+        );
+    }
+
+    #[test]
+        #[ignore = "requires a wgpu device; opt-in, NICE_TEST_JOIN_DENSE=partitions"]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    fn wgpu_join_matches_the_cpu_join_on_a_dense_field() {
+        let Ok(n) = std::env::var("NICE_TEST_JOIN_DENSE") else {
+            eprintln!("skipping: set NICE_TEST_JOIN_DENSE to a partition count");
+            return;
+        };
+        let n: u32 = n.parse().expect("NICE_TEST_JOIN_DENSE: a count");
+        let (client, _) = client();
         let (b, dense, size) = std::env::var("NICE_TEST_JOIN_DENSE_FIELD").map_or(
             (58, crate::join_plan::tests::DENSE_58, 1_000_000_000_000_000),
             |v| {
