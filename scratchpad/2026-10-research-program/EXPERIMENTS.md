@@ -5,6 +5,71 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T2.2 Can production telemetry bound a per-launch cost on demoux? (2026-11-12, director, public API; `../2026-11-fresh-eyes/launch_regression.py`, `demoux_launches_1112.json` (6,567 demoux nice-only fields, 11-11 03:37 → 11-12 00:53 local, build c0c357a, b60 1e16, two fields in flight))
+
+`uv run --with numpy python launch_regression.py`. 8.7 % of the fields are empty (0 launches,
+1 ms). Non-empty: median join 12.15 s, 1,170 launches, 9.9 ms per launch; plans of 4, 5, 6, 7, 8
+and 16 partitions per launch occur. `run_secs = a + α·survivors + γ·launches`: γ = 2.64 ± 0.04 ms
+per launch (R² 0.975), which would be 28 % of a 1,350-launch field; but corr(survivors, launches)
+= 0.85, the plan follows the field's density, and the per-group lines are not monotone in the
+launch count (at 1.5e11 survivors: 10.9 s at 1,350 launches, 11.1–11.2 s at 1,120–1,170, 9.9 s at
+1,080, 8.9 s at 450–720). **Verdict: an upper bound only (≤ 2.6 ms per launch); telemetry cannot
+separate launch cost from FD seeds and field shape.** A forced partitions-per-launch sweep on the
+card can (in the window harness).
+
+## T4.1 The open PRs after #250's merge (2026-11-12, director; worktree `.worktrees/rebase-1112`, local branches `rb/*` (cherry-picks onto 5b1d627) and `mg/*` (merges))
+
+#250 merged 01:57 UTC as 5b1d627, tree-identical to ee30303. Cherry-picks onto it: #251 and #254
+clean, #252 changelog only, #253 clean on the new #252. `git diff` of each result against its
+measured tree outside `CHANGELOG.md`: #251 and #254 identical; #252 and #253 differ by exactly
+#250's diff (sha1 of the diff text equal to `git diff c0c357a 5b1d627`'s). The force-push of these
+was refused, so each PR branch got a merge commit resolved to the cherry-pick's tree (`git diff
+--quiet rb/X mg/X`): **#251 a70b012, #252 7269d61, #253 43b448b (merges the new #252), #254
+f812a02**; plain pushes; all MERGEABLE; CI re-running at 05:56 UTC.
+
+## N13.2 Correction to N13.1's profile: the ablation runs were at half clock (2026-11-12, director, yesterday's raw logs; `N13/raw/scripts/clock_check.py` → `N13/raw/clock_check.txt`)
+
+`python3 N13/raw/scripts/clock_check.py N13/raw/demoux`. The `.gpu` samples (busy %, clock, power
+every 5 s) of the profiled runs on the RX 9070 XT, medians per run, b62 1e17 at 0.45 (b60 1e16
+pair in brackets where it differs):
+
+| mode (profiled, `NICE_EXP_JOIN_ABL`) | clock | power | top phase | join phase | join ÷ field, as timed | join rescaled by the run's top phase |
+|---|---|---|---|---|---|---|
+| c, full | 3226 MHz | 294 W | 18.2 s | 43.3 s | 53.2 % | 53.2 % |
+| p, no stage/check | 3141 | 244 | 18.5 | 42.8 | 52.5 % | 51.7 % |
+| b, AND + walk | 1932 | 103 | 28.7 | 30.6 | 37.6 % | 23.9 % |
+| a, AND only | 1599 | 95 | 30.9 | 25.8 | 31.7 % | 18.7 % |
+| z, no AND | 1464 | 89 | 35.2 | 10.7 | 13.2 % | 6.8 % |
+
+The card's clock follows its load: with the join's later parts off it ran at 45–60 % of its
+clock and a third of its power, and the unchanged top phase took up to 1.93 × as long. N13.1
+read that as a timer leak and took the join's parts from differences of whole-field totals
+(a − z, b − a, p − b), i.e. from runs at different clocks. Of the 126 unprofiled runs (the PR
+A/Bs and the retune) 125 sat at 99–100 % busy, 3.14–3.2 GHz, 304 W: **those numbers stand.** The
+exception is the first naga run at b60 (69 % busy, 2.85 GHz, 212 W), so naga's ×1.00 at b60 is a
+lower bound.
+
+Corrected shares of the profiled field (rescaled by each run's top phase; rough, the bucket
+phase does not scale by the same factor), b62 1e17 / b60 1e16, next to L51's RTX 3080:
+
+| part | 9070 XT, corrected | bound that needs no rescaling | N13.1 said | RTX 3080 (L51) |
+|---|---|---|---|---|
+| join base | **6.8 % / 6.3 %** (0.20 / 0.19 ps per pair) | ≤ 13.2 % / 12.9 % (mode z's own join timer at half clock) | ≈ 36 % / 33 % | 10.9 % / 10.5 % (0.26 ps) |
+| AND | 11.9 % / 11.5 % (0.35 ps per pair) | base + AND ≤ 31.7 % / 33.3 % | 13 % / 17 % | 14.9 % / 15.0 % |
+| walk rounds | 5.2 % / 6.3 % | | 3 % / 0 % | 9.2 % / 9.0 % |
+| **prefilter** | **27.8 % / 29.9 %** (≈ 21 ps per AND survivor) | walk + prefilter + stage ≥ 21.5 % / 22.3 % | 1 % / 5 % | 19.8 % / 23.5 % |
+| stage | 1.5 % / 1.6 % | | | 1.1 % / 0.9 % |
+| check (main's; mode c, full clock) | 17.0 % / 18.8 % (0.207 / 0.199 ns) | measured | same | 12.0 % / 14.4 % |
+| top FD (mode c) | 22.4 % / 18.8 % | measured | same | 22.8 % / 18.4 % |
+
+**Verdict: the 9070 XT's profile is NVIDIA's, with a dearer check and prefilter. "The join's
+base is a third of the field at 4 × NVIDIA's cost per pair" and "the survivor path is nearly
+free here" are both wrong** (N16's premise falls). What stands from N13.1: section A (the open
+PRs), section C (the retune), the mode-c phase shares, the per-check and per-top-test costs.
+Open: a profile of the join's parts on that card taken at its operating point (work added at
+full load instead of removed), and whether L51's and B64's ablation shares on NVIDIA were taken
+at full clock (today's agent checks on the box).
+
 ## N13.1 The open PRs, the profile and a retune on demoux's RX 9070 XT (2026-11-11 12:45–14:54 UTC, agent on the user's machine with the production client stopped; `N13/RESULTS.md`, `N13/raw/` (`demoux/`, `demoux-final/`, `scripts/`, `analysis.txt`))
 
 Card at its 304 W cap; `cargo test --release -p nice_common --features gpu,cubecl-spirv` (reports
@@ -23,8 +88,8 @@ identical in every run and exact against the CPU join on b60, b62 and b64 fields
 field: b62 1e17 at 0.45 75.7 s (RTX 3080 at 300 W: 66.7 s); the card runs the join at ≈ 0.87–0.95 ×
 that 3080.
 
-Shares (b62 1e17 / b60 1e16; the join's parts from whole-field totals per ablation mode, because
-the per-phase timers leak between phases on wgpu):
+**Superseded by N13.2 (2026-11-12): the join's parts below were taken from runs at half clock; the base and
+survivor-path rows are wrong.** Shares as first reported (b62 1e17 / b60 1e16; the join's parts from whole-field totals per ablation mode):
 
 | phase | 9070 XT | RTX 3080 (L51) |
 |---|---|---|

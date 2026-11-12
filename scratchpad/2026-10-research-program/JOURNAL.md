@@ -4,6 +4,49 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-12 (cycle 3 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $11.59 of $30 (fleet $21.01); credit
+  $28.73; ivory 7.6 GB free. No user message since the demoux grant. No day missed.
+- **#250 merged by the user (01:57 UTC, main = 5b1d627, tree-identical to the branch).** #251–#254
+  all conflicted with it (the changelog; #251 and #254 also carried #250's commit). A lease-guarded
+  force-push of the rebased commits to my own PR branches was **refused by the harness** ("Git
+  Destructive"), so the branches were brought up to date with **merge commits and plain pushes**
+  instead: #251 a70b012, #252 7269d61, #253 43b448b, #254 f812a02. Each merge result is
+  byte-identical to the rebased cherry-pick, and outside the changelog to the measured tree
+  (#252/#253 differ from theirs by exactly #250's own diff). All four MERGEABLE; bodies of #251 and
+  #254 updated (no longer "stacked on #250"). Standing rule from now: PR branches are updated by
+  merge commits, never rewritten.
+- **Deploys:** none. demoux resumed production at ≈ 15:50 UTC on 11-11 on c0c357a (pre-#250, ≈ 350
+  fields an hour), the M4 on c0c357a, the fleet still on v3.4.7. Nothing to measure yet; #250 is
+  worth ×1.03–1.04 on demoux when it rebuilds. b60 86.0 %; ends ≈ 11-14.
+- **Lead of the day, N16 (the join's base on the 9070 XT): preparing the window.** Kill criterion
+  (ledger): the split shows the cost spread evenly with no single cause. Agent (Opus) + box
+  60315324 (RTX 3080, $0.107/h, 7 h TTL): a harness that splits the base, validated on CUDA and
+  lavapipe; an offline ACO dump (time-boxed); a candidate branch for N14; `N16/BRIEF.md`.
+- **06:00 UTC: N16's premise is false; yesterday's profile of the 9070 XT was mis-derived
+  (EXPERIMENTS N13.2).** While checking whether production telemetry could bound a per-launch
+  cost (it cannot: launches, density and plan shape are confounded; pooled slope 2.6 ms per
+  launch, an upper bound only; `../2026-11-fresh-eyes/launch_regression.py`), I read the `.gpu`
+  samples of yesterday's runs: **in the profiled ablation modes the card ran at 1.46–1.93 GHz and
+  89–103 W instead of 3.2 GHz and ≈ 300 W** (its clock follows its load). The N13 agent took the
+  growing top timer for a sync artefact and derived the join's parts from differences of
+  whole-field totals, i.e. across clocks. Rescaled by each run's own top phase: **base 6–7 % of a
+  field (at most 13 % with no rescaling at all), AND 12 %, walk 5–6 %, prefilter 28–30 %, check
+  17–19 %.** So the card's profile is NVIDIA's with a dearer check and prefilter; "base a third of
+  the field" and "survivor path nearly free" are wrong, and I reported both to the user on 11-11.
+  The PR A/Bs and the retune (N14, N15) ran at full clock and stand. **N16 closed; N17 opened**: a
+  profile taken at the card's operating point (work added at full load, not removed), then the
+  largest block there (by the corrected numbers the prefilter).
+- **Agent redirected (two messages, 06:00 UTC):** Task A verifies the correction from the logs;
+  the harness's primary instrument becomes doubling modes with clock and power logged and
+  checked per run; removal modes unprofiled as a second instrument; the same clock check for the
+  RTX 3080 (were L51's and B64's ablation shares at full clock?); survivor-path and top-append
+  switches; the window plan's first 45 minutes are the corrected profile at b62 and b64.
+- **Lesson (README updated):** on a card whose clock follows its load, never compare runs with
+  work removed; log clock and power beside every timing and reject runs off the operating point.
+  I passed the N13 agent's explanation on without opening the samples it had recorded.
+
 ## 2026-11-09 evening: director change (user request), fresh-eyes review
 
 - **Handover.** The user moved the program into a new session (`session_014g2dyZ4dAhZFch4nmKWPyZ`,

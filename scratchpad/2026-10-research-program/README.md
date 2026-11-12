@@ -51,8 +51,12 @@ on that mix: a CUDA-only gain reaches 13 % of the search. Gains measured on NVID
 over reliably (the 11-09 batch: ×1.37 on CUDA, ×1.17 on demoux). After every deploy, measure the
 realized gain on demoux from telemetry (`../2026-11-fresh-eyes/demoux_history.py`). The wgpu
 path cannot be measured on Vast; it needs a demoux window (ask) or the after-the-fact telemetry.
-Measured there on 2026-11-11 (EXPERIMENTS N13.1): #250 ×1.04, #251 ×1.13, #254 ×1.09 at b64; the
-join's base is a third of a field on this card (N16); workspace recipe and rules in `N13/BRIEF.md`.
+Measured there on 2026-11-11 (EXPERIMENTS N13.1): #250 ×1.04, #251 ×1.13, #254 ×1.09 at b64;
+workspace recipe and rules in `N13/BRIEF.md`. **That card's clock follows its load** (N13.2): a run
+with work removed (ablation modes, light kernels) drops to half clock and a third of the power, so
+compare only runs whose `.gpu` samples show ≈ 3.15 GHz and ≈ 300 W, and measure a part's cost by
+adding work at full load, not by removing it. Its corrected profile is NVIDIA's with a dearer
+check and prefilter (the "base is a third of a field" claim of 11-11 was an artefact).
 
 ## Working without the user (2026-11-10)
 

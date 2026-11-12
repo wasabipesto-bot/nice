@@ -1,0 +1,22 @@
+
+b62: profiled field (mode c, probe excluded) 81.43 s, pairs 2.7898e+13, batches 7959
+mode  busy   MHz     W |   top  bucket   join  check  wall-probe | scale | join*scale  share  ps/pair | join unscaled share
+c       88   3226   294 |  18.21   3.17   43.31  13.85     81.43  | 1.000 |    43.31   53.2%   1.553 |  53.2%
+c2      87   3226   292 |  18.10   3.23   42.67  13.68     80.46  | 1.006 |    42.91   52.7%   1.538 |  52.4%
+p       86   3141   244 |  18.50   3.18   42.77   1.91     68.35  | 0.984 |    42.09   51.7%   1.509 |  52.5%
+b       85   1932   103 |  28.67   4.09   30.60   1.97     67.35  | 0.635 |    19.43   23.9%   0.697 |  37.6%
+a       86   1599    95 |  30.92   4.25   25.82   2.07     65.18  | 0.589 |    15.21   18.7%   0.545 |  31.7%
+z       84   1464    89 |  35.20   4.50   10.72   1.99     54.49  | 0.517 |     5.55    6.8%   0.199 |  13.2%
+rescaled parts: base 5.55 (6.8%)  AND 9.66 (11.9%)  walk 4.23 (5.2%)  prefilter 22.66 (27.8%)  stage 1.22 (1.5%)  check 13.85 (17.0%, 0.207 ns)
+bounds without rescaling (each mode's own join timer is an upper bound at a lower clock): base <= 13.2%; base+AND <= 31.7%; so walk+prefilter+stage >= 21.5%
+
+b60: profiled field (mode c, probe excluded) 28.14 s, pairs 9.2253e+12, batches 2700
+mode  busy   MHz     W |   top  bucket   join  check  wall-probe | scale | join*scale  share  ps/pair | join unscaled share
+c       88   3231   289 |   5.28   0.96   15.65   5.28     28.14  | 1.000 |    15.65   55.6%   1.697 |  55.6%
+c2      88   3236   288 |   5.20   0.95   15.32   5.16     27.53  | 1.016 |    15.56   55.3%   1.687 |  54.4%
+p       86   3222   268 |   5.39   0.99   15.51   0.67     23.24  | 0.980 |    15.21   54.1%   1.649 |  55.1%
+b       86   1886   100 |   8.44   1.17   10.86   0.71     21.87  | 0.626 |     6.80   24.2%   0.737 |  38.6%
+a       86   1628    94 |   9.84   1.22    9.37   0.70     21.84  | 0.537 |     5.03   17.9%   0.546 |  33.3%
+z       82   1464    88 |  10.73   1.26    3.62   0.68     17.00  | 0.492 |     1.78    6.3%   0.193 |  12.9%
+rescaled parts: base 1.78 (6.3%)  AND 3.25 (11.5%)  walk 1.76 (6.3%)  prefilter 8.42 (29.9%)  stage 0.44 (1.6%)  check 5.28 (18.8%, 0.199 ns)
+bounds without rescaling (each mode's own join timer is an upper bound at a lower clock): base <= 12.9%; base+AND <= 33.3%; so walk+prefilter+stage >= 22.3%
