@@ -169,6 +169,21 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   constant assertion that the flush level fits the stage; the body's clock and power ranges for
   this PR's runs only, the direct-path sentence, how the experiment build differs, a Turing note
   (not measured). Three program PRs open: #251, #255, #256.
+- **21:46 UTC: the audit finished (EXPERIMENTS T2.3; 313 k tokens in all; second box destroyed
+  after 3.46 h).** 0 mismatches in 1,662 re-run comparisons. b60: 79 % of the range in cells clean
+  at ≤ 5 % per field (46 % at ≤ 2 %). The three census pairs are settled by same-build re-runs: in
+  each, one v3.4.6 submission has surplus checks and the other is right. 89,158 b58 and 64,590 b60
+  fields have only a pre-#222 submission; expected lost share ≈ 4e-9 if an event loses what it
+  duplicates. Put to the user as a decision, with my recommendation to accept the residual.
+- **21:48 UTC: #251, #255, #256 all green and mergeable** (25 pass, 3 skipped each; no comments).
+  Both reminders deleted (nothing left to collect). No research instance is running. Vast today
+  ≈ $2.1 over six boxes (two were host faults); month $13.3 invoiced of $30.
+- **Day:** 6 agents (harness 582 k, audit 313 k, PR branches 396 k, two reviewers 133 k + 142 k;
+  all Opus), two demoux-window stages run by me.
+- **Tomorrow:** realized gains on demoux once it rebuilds from main; N21 (the walk and prefilter
+  loop on RDNA4: design with the offline ACO compile, CUDA regression); a reviewer on N14's branch
+  only if the user wants it for b60/b62; merge-ups as PRs land; B64-4 (the stepping parity
+  window, test-only); the CPU roadmap item if a slot and a quiet box allow.
 - **Lesson (README updated):** on a card whose clock follows its load, never compare runs with
   work removed; log clock and power beside every timing and reject runs off the operating point.
   I passed the N13 agent's explanation on without opening the samples it had recorded.

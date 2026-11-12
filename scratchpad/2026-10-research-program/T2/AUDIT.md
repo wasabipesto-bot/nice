@@ -1,7 +1,7 @@
 # T2.3 audit: sampled re-verification of nice-only submissions, bases 58 and 60 (2026-11-12)
 
 Two boxes: 60374124 (15:38–18:03 UTC, went offline mid-run; its outputs up to 18:02 are in `raw/box/`) and the
-replacement 60389955 (RTX 3080, 380 W cap, 16 threads; 18:22–21:5x UTC; outputs in `raw/box2/`), which ran the base-60
+replacement 60389955 (RTX 3080, 380 W cap, 16 threads; 18:22–21:46 UTC; outputs in `raw/box2/`), which ran the base-60
 queues in the prepared order. Final state: section 7.
 Labels: **[measured]** read off the API or a run,
 **[derived]** computed from measured numbers, **[assumed]** stated without a measurement.
@@ -170,102 +170,113 @@ invariant held on all of them (max |r|/tol 0.40, max |r| 2.1e-7) [measured].
 | 58 | RTX 4060, 8bd154bc | overrun model vs c0c357ae | 0.80 % | 745 | 693 | 3 (20) | 3 | 0 | 63.2 % |
 | 58 | RTX 3060 Ti, 9a4f7406 | invariant vs same build | 0.32 % | 299 | 282 | 20 (20) | 20 | 0 | 13.9 % |
 | 58 | A100-SXM4-40GB, 9a4f7406 | invariant vs same build | 0.28 % | 261 | 218 | 20 (20) | 20 | 0 | 13.9 % |
-| 58 | Apple M4 [Metal, wgpu<wgsl>], 6f060a94 | exact, same build | 0.27 % | 255 | 238 | 0 (20) | 0 | 0 | — |
+| 58 | Apple M4 [Metal, wgpu<wgsl>], 6f060a94 | exact, same build | 0.27 % | 255 | 238 | 9 (20) | 9 | 0 | 28.3 % |
 | 58 | CPU/none, 9a4f7406 | invariant vs same build | 0.24 % | 226 | 214 | 19 (20) | 19 | 0 | 14.6 % |
 | 58 | GTX 1070, 9a4f7406 | invariant vs same build | 0.01 % | 7 | 5 | 5 (5) | 5 | 0 | 45.1 % |
-| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], 9a4f7406 | invariant vs same build | 32.14 % | 52,093 | 44,386 | 3 (149) | 3 | 0 | 63.2 % |
-| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], 6f060a94 | exact, same build | 23.27 % | 37,714 | 34,189 | 0 (149) | 0 | 0 | — |
+| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], 9a4f7406 | invariant vs same build | 32.14 % | 52,093 | 44,386 | 149 (149) | 149 | 0 | 2.0 % |
+| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], 6f060a94 | exact, same build | 23.27 % | 37,714 | 34,189 | 65 (149) | 65 | 0 | 4.5 % |
 | 60 | RX 9070 XT [Vulkan, wgpu<spirv>], c0c357ae | exact, same build | 13.86 % | 22,458 | 20,462 | 149 (149) | 149 | 0 | 2.0 % |
-| 60 | RTX 3060, 8bd154bc | overrun model vs c0c357ae | 6.55 % | 10,610 | 10,176 | 0 (59) | 0 | 0 | — |
-| 60 | Apple M4 [Metal, wgpu<wgsl>], 6f060a94 | exact, same build | 3.03 % | 4,917 | 4,805 | 0 (59) | 0 | 0 | — |
-| 60 | GTX 1070, 9a4f7406 | invariant vs same build | 2.88 % | 4,669 | 4,226 | 1 (59) | 1 | 0 | 95.0 % |
-| 60 | RTX 4060, 8bd154bc | overrun model vs c0c357ae | 2.82 % | 4,570 | 4,263 | 0 (59) | 0 | 0 | — |
-| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], 8c088a28 | invariant vs same build | 2.37 % | 3,845 | 3,432 | 0 (59) | 0 | 0 | — |
-| 60 | RTX 2070, 9a4f7406 | invariant vs same build | 2.16 % | 3,508 | 2,822 | 1 (59) | 1 | 0 | 95.0 % |
-| 60 | RTX 4060, 9a4f7406 | invariant vs same build | 1.87 % | 3,028 | 2,748 | 2 (59) | 2 | 0 | 77.6 % |
-| 60 | TITAN Xp, 9a4f7406 | invariant vs same build | 1.29 % | 2,091 | 2,029 | 1 (59) | 1 | 0 | 95.0 % |
-| 60 | RTX A2000, 9a4f7406 | invariant vs same build | 1.03 % | 1,662 | 1,445 | 1 (59) | 1 | 0 | 95.0 % |
-| 60 | RTX 3060, 9a4f7406 | invariant vs same build | 0.98 % | 1,585 | 1,469 | 0 (20) | 0 | 0 | — |
+| 60 | RTX 3060, 8bd154bc | overrun model vs c0c357ae | 6.55 % | 10,610 | 10,176 | 59 (59) | 59 | 0 | 5.0 % |
+| 60 | Apple M4 [Metal, wgpu<wgsl>], 6f060a94 | exact, same build | 3.03 % | 4,917 | 4,805 | 26 (59) | 26 | 0 | 10.9 % |
+| 60 | GTX 1070, 9a4f7406 | invariant vs same build | 2.88 % | 4,669 | 4,226 | 26 (59) | 26 | 0 | 10.9 % |
+| 60 | RTX 4060, 8bd154bc | overrun model vs c0c357ae | 2.82 % | 4,570 | 4,263 | 59 (59) | 59 | 0 | 5.0 % |
+| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], 8c088a28 | invariant vs same build | 2.37 % | 3,845 | 3,432 | 30 (59) | 30 | 0 | 9.5 % |
+| 60 | RTX 2070, 9a4f7406 | invariant vs same build | 2.16 % | 3,508 | 2,822 | 20 (59) | 20 | 0 | 13.9 % |
+| 60 | RTX 4060, 9a4f7406 | invariant vs same build | 1.87 % | 3,028 | 2,748 | 20 (59) | 20 | 0 | 13.9 % |
+| 60 | TITAN Xp, 9a4f7406 | invariant vs same build | 1.29 % | 2,091 | 2,029 | 12 (59) | 12 | 0 | 22.1 % |
+| 60 | RTX A2000, 9a4f7406 | invariant vs same build | 1.03 % | 1,662 | 1,445 | 10 (59) | 10 | 0 | 25.9 % |
+| 60 | RTX 3060, 9a4f7406 | invariant vs same build | 0.98 % | 1,585 | 1,469 | 9 (20) | 9 | 0 | 28.3 % |
 | 60 | Apple M4 [Metal, wgpu<wgsl>], c0c357ae | exact, same build | 0.94 % | 1,529 | 1,505 | 20 (20) | 20 | 0 | 13.9 % |
-| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], c72e2c6f | invariant vs same build | 0.91 % | 1,468 | 1,448 | 0 (20) | 0 | 0 | — |
-| 60 | GTX 1080 Ti, 9a4f7406 | invariant vs same build | 0.70 % | 1,127 | 1,082 | 1 (20) | 1 | 0 | 95.0 % |
-| 60 | RTX 2070, 8bd154bc | overrun model vs c0c357ae | 0.37 % | 596 | 586 | 0 (20) | 0 | 0 | — |
-| 60 | RTX 3050, 8bd154bc | overrun model vs c0c357ae | 0.31 % | 502 | 496 | 0 (20) | 0 | 0 | — |
-| 60 | GTX 1080, 9a4f7406 | invariant vs same build | 0.29 % | 462 | 425 | 0 (20) | 0 | 0 | — |
-| 60 | GTX 1650, 9a4f7406 | invariant vs same build | 0.18 % | 288 | 264 | 0 (20) | 0 | 0 | — |
-| 60 | GTX 1080 Ti, 8bd154bc | overrun model vs c0c357ae | 0.17 % | 278 | 240 | 0 (20) | 0 | 0 | — |
-| 60 | RTX 3070, 9a4f7406 | invariant vs same build | 0.09 % | 150 | 139 | 0 (20) | 0 | 0 | — |
-| 60 | RTX 3060 Ti, 8bd154bc | overrun model vs c0c357ae | 0.09 % | 144 | 140 | 0 (20) | 0 | 0 | — |
-| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], 18cba8bc | invariant vs same build | 0.07 % | 107 | 107 | 0 (20) | 0 | 0 | — |
-| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], 9bde4a87 | overrun model vs c0c357ae | 0.06 % | 97 | 97 | 0 (20) | 0 | 0 | — |
+| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], c72e2c6f | invariant vs same build | 0.91 % | 1,468 | 1,448 | 10 (20) | 10 | 0 | 25.9 % |
+| 60 | GTX 1080 Ti, 9a4f7406 | invariant vs same build | 0.70 % | 1,127 | 1,082 | 7 (20) | 7 | 0 | 34.8 % |
+| 60 | RTX 2070, 8bd154bc | overrun model vs c0c357ae | 0.37 % | 596 | 586 | 20 (20) | 20 | 0 | 13.9 % |
+| 60 | RTX 3050, 8bd154bc | overrun model vs c0c357ae | 0.31 % | 502 | 496 | 20 (20) | 20 | 0 | 13.9 % |
+| 60 | GTX 1080, 9a4f7406 | invariant vs same build | 0.29 % | 462 | 425 | 3 (20) | 3 | 0 | 63.2 % |
+| 60 | GTX 1650, 9a4f7406 | invariant vs same build | 0.18 % | 288 | 264 | 2 (20) | 2 | 0 | 77.6 % |
+| 60 | GTX 1080 Ti, 8bd154bc | overrun model vs c0c357ae | 0.17 % | 278 | 240 | 20 (20) | 20 | 0 | 13.9 % |
+| 60 | RTX 3070, 9a4f7406 | invariant vs same build | 0.09 % | 150 | 139 | 1 (20) | 1 | 0 | 95.0 % |
+| 60 | RTX 3060 Ti, 8bd154bc | overrun model vs c0c357ae | 0.09 % | 144 | 140 | 20 (20) | 20 | 0 | 13.9 % |
+| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], 18cba8bc | invariant vs same build | 0.07 % | 107 | 107 | 10 (20) | 10 | 0 | 25.9 % |
+| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], 9bde4a87 | overrun model vs c0c357ae | 0.06 % | 97 | 97 | 20 (20) | 20 | 0 | 13.9 % |
 | 60 | GTX 1660 Ti, 9a4f7406 | invariant vs same build | 0.01 % | 15 | 15 | 0 (15) | 0 | 0 | — |
-| 60 | RTX 3070, 8bd154bc | overrun model vs c0c357ae | 0.01 % | 13 | 13 | 0 (13) | 0 | 0 | — |
-| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], cb38b917 | invariant vs same build | 0.01 % | 12 | 12 | 0 (12) | 0 | 0 | — |
+| 60 | RTX 3070, 8bd154bc | overrun model vs c0c357ae | 0.01 % | 13 | 13 | 13 (13) | 13 | 0 | 20.6 % |
+| 60 | RX 9070 XT [Vulkan, wgpu<spirv>], cb38b917 | invariant vs same build | 0.01 % | 12 | 12 | 6 (12) | 6 | 0 | 39.3 % |
 | 60 | RTX 3050, 9a4f7406 | invariant vs same build | 0.00 % | 3 | 3 | 0 (3) | 0 | 0 | — |
 
 Bound = 95 % one-sided upper bound on the cell's per-field rate of counter disagreement given zero mismatches
-(1 − 0.05^(1/n)) [derived]; it bounds fields that disagree, not candidates.
-Sample: `raw/make_sample.py` (seed 20261112, time-stratified, written before any run: `raw/sample.json`, queues
-`raw/queue_*.json`). Every sampled field ran with its cell's build except the 8bd154bc b58 cell (rule 3).
+(1 − 0.05^(1/n)) [derived]; it bounds fields that disagree, not candidates. Sample: `raw/make_sample.py` (seed 20261112,
+time-stratified, written before any run: `raw/sample.json`, queues `raw/queue_*.json`, `raw/Q*.json`). Every sampled
+field ran with its cell's own build, except the 8bd154bc and 9bde4a87 cells (rule 3, against c0c357ae).
 
-**Mismatches in the re-runs: none** (0 of 1,026 compared submissions: 795 under rule 2, 228 under rule 1, 3 under rule 3)
-[measured, `raw/compare.txt`, `raw/compare_detail.jsonl`].
+**Mismatches in the re-runs: none.** 0 of 1,662 compared submissions (1,100 under rule 2, 328 under rule 1, 234 under
+rule 3) [measured, `raw/compare.txt`, `raw/compare_detail.jsonl`]. Largest |r|/tolerance under rule 2: 0.69.
 
-**Census-level same-build cross-check (free, not a random sample)** — `raw/dup_rule.py` → `raw/dup_rule.txt`,
+**Census-level same-build cross-check (free, not a random sample)**: `raw/dup_rule.py` → `raw/dup_rule.txt`,
 `raw/pair_cover.py` → `raw/pair_cover.txt`. Of 11,087 same-build pairs of qualified submissions on pre-#236 builds,
-3 break the invariant, all on 9a4f7406 b60, **all excesses of `checked`** (the #222 race's stale-entry signature), on
-three device families, none Apple:
+3 break the invariant, all on 9a4f7406 b60, all excesses of `checked`, on three device families, none Apple. All three
+are now settled by a 9a4f7406 re-run on a 3080:
 
-| field | the off submission | the other submission | my 9a4f7406 re-run (3080) |
-|---|---|---|---|
-| 206943130 | 268729348 wp-vast-fleet GTX 1080: surv 172,426,289,017 chk 11,297,004,429 (r = +3.29e-5 vs re-run) | 268719456 demoux 9070 XT: 172,466,274,343 / 11,254,321,048 (r = −1.05e-7, matches) | 172,440,774,765 / 11,278,169,780 |
-| 206950836 | 269917800 wp-vast-fleet TITAN Xp: 88,600,810,065 / 5,791,565,076 (r = +2.83e-5) | 269893752 same card class: 88,600,810,128 / 5,789,219,256 (r = +4.1e-9, matches) | 88,600,622,909 / 5,789,393,904 |
-| 206956667 | 270992509 demoux 9070 XT: 8,126,941,029 / 536,352,273 (checked +10,006 over the other with survivors −15) | 270982919 demoux 9070 XT: 8,126,941,044 / 536,342,267 | not re-run (box lost; it headed the b60 queue) |
+| field | off submission (excess) | other submission | 9a4f7406 re-run (3080) | verdict |
+|---|---|---|---|---|
+| 206943130 | 268729348, GTX 1080 (fleet): 172,426,289,017 / 11,297,004,429, r = +3.29e-5 | 268719456, 9070 XT (demoux), r = −1.05e-7 | 172,440,774,765 / 11,278,169,780 | demoux's run is consistent; the GTX 1080's has ≈ +5.4e6 surplus checked entries |
+| 206950836 | 269917800, TITAN Xp (fleet): 88,600,810,065 / 5,791,565,076, r = +2.83e-5 | 269893752, TITAN Xp, r = +4.1e-9 | 88,600,622,909 / 5,789,393,904 | the first run is consistent; the second has ≈ +2.35e6 surplus checked |
+| 206956667 | 270992509, 9070 XT (demoux), retried_partitions = 16: 8,126,941,029 / 536,352,273, r = +1.32e-6 (tol 3e-7) | 270982919, 9070 XT, retried 0: 8,126,941,044 / 536,342,267, r = −8e-10 | 8,126,941,159 / 536,342,166, retried 0 | the retried-0 run matches the re-run to the overflow arithmetic (115 overflowed survivors, +101 checked); the other has 130 overflowed survivors but +10,107 checked, ≈ 9,990 surplus |
 
-Reading: on v3.4.6 the #222 race fired in production on a GTX 1080, a TITAN Xp and the RX 9070 XT, not only on the M4
-(the 2026-11-09 exposure note's "no measurable trace on AMD/NVIDIA" used a cruder statistic). Detectable rate ≈ 3 per
-11,087 pairs ≈ 1.4e-4 per submission [derived]; applied to the ~95k b60 and ~88k b58 9a4f7406 submissions that is of
-order 10 fields per base [derived, rough]. Each such event may also have overwritten list entries (lost candidates)
-that counts cannot show. All three fields have a second, consistent qualified submission, so each is covered. No
-other cell shows a single disagreement in its census pairs (8c088a28 1,094 subs with a partner, 8bd154bc 1,665,
-6f060a94 911, c0c357ae 250, c72e2c6f 560, ...; `raw/pair_cover.txt`). Nothing was changed, re-queued or reported anywhere.
+On 206956667's retries (the director's question): in 9a4f7406 a batch whose `checked` count overflows the list is
+dropped from the tally and run again in smaller batches (`run_pass`/`run_partition`); the counted totals of the re-run
+are clean by construction, so the retry path itself should not add 10,000 checks. The other two runs of the field did not
+overflow at all. My reading: a surplus of checked entries is what the #222 race produces (a lone plane's flush writes
+stale entries), and the same surplus can push a batch's count past the list end, which would explain the 16 retries as
+a consequence rather than the cause. This is inference from the code, not a measurement: the counters cannot separate a
+race event from an unknown retry-path accounting fault, and the retried batches' own counts are not in the telemetry.
+In all three cases the field has another, consistent qualified submission, so each field is covered.
 
-The three b60 pairs that my first, cruder tolerance (|r| > 3e-6 with the pair's own p) also flagged (206953754,
-206954374, 206956663) are explained by large overruns: the three runs of 206953754 (9070 XT, GTX 1070, 3080 re-run)
-lie on one line in (survivors, checked) to 1.5e-4 in slope, i.e. lossless with q = 0.066 against p = 0.069 [measured].
+No other cell shows a single disagreeing census pair (8c088a28 1,094 submissions with a same-build partner, 8bd154bc
+1,665, 6f060a94 911, c0c357ae 250, c72e2c6f 560, ...). Nothing was changed, re-queued or reported anywhere.
 
 ## 7. Bottom line
 
-**Base 58** (all 93,573 fields searched): 74.1 % of the range lies in cells verified clean at a ≤ 2.1 % per-field bound
-(9070 XT, TITAN Xp, RTX 2070 on 9a4f7406); 22.0 % in cells clean at ≤ 5.1 % (RTX 3060, 4060, A2000, 4060 Ti,
-GTX 1080 Ti on 9a4f7406; 9070 XT on c0c357ae); 0.85 % in small cells clean at 14–45 % (3060 Ti, A100, the 9a4f7406
-CPU cell, GTX 1070); 0.80 % (RTX 4060, 8bd154bc) only 3 fields; 0.27 % (M4, 6f060a94) not re-run; **2.03 % (anvil,
-1,901 fields, v3.4.6 without telemetry) cannot be checked by counters at all**. Caveat for 93 % of b58 (pre-#222
-builds): a race event that only overwrote entries is invisible to counters; the census suggests such events are rare
-(~1e-4 per field) but not absent.
+**Base 58** (all 93,573 fields searched; `raw/bottom_line.py`): 74.1 % of the range lies in cells verified clean at a
+≤ 2.1 % per-field bound (9070 XT, TITAN Xp, RTX 2070 on 9a4f7406); 22.0 % at ≤ 5.1 % (RTX 3060, 4060, A2000, 4060 Ti,
+GTX 1080 Ti on 9a4f7406; 9070 XT on c0c357ae); 0.84 % at 14–15 % (3060 Ti, A100, the 9a4f7406 CPU cell); 1.08 % with
+few fields (RTX 4060 on 8bd154bc 3, M4 on 6f060a94 9, GTX 1070 5); **2.03 % (anvil, 1,901 fields, v3.4.6 without
+telemetry) cannot be checked by counters.**
 
-**Base 60** (146,268 of 162,076 fields searched, 90.2 % of the range): verified by re-run only the c0c357ae cells:
-9070 XT 13.9 % of the range at ≤ 2.0 %, M4 0.94 % at ≤ 13.9 %. **Not verified by re-run** (box lost at 18:03 UTC):
-9a4f7406 cells ≈ 47 % of the range (10 fields run, all clean), 6f060a94 cells 26.3 %, 8bd154bc cells 10.6 %,
-8c088a28 2.4 %, c72e2c6f 0.9 %, the rest < 0.3 %. For those only the census same-build pairs speak: 6f060a94 exact on all
-461 pairs; pre-#236 builds 3 race excesses in 11,087 pairs (above). 9.8 % of the range is not searched yet.
+**Base 60** (146,268 of 162,076 fields searched = 90.2 % of the range; shares below are of the whole base):
+46.0 % in cells clean at ≤ 2.0 % (9070 XT on 9a4f7406 149/149, 9070 XT on c0c357ae 149/149); 32.6 % at ≤ 5.0 %
+(9070 XT on 6f060a94 65 fields, 4.5 %; RTX 3060 and 4060 on 8bd154bc, 59/59 each); 2.4 % at 9.5 % (8c088a28); 11.9 % at
+10.9–13.9 % (M4 on 6f060a94, GTX 1070 / RTX 2070 / RTX 4060 on 9a4f7406, the M4 on c0c357ae, small 8bd154bc and 9bde4a87
+cells); 5.5 % in cells with few fields (TITAN Xp 12, A2000 10, 3060 9, 1080 Ti 7 on 9a4f7406; c72e2c6f 10; and smaller);
+0.01 % not re-run (GTX 1660 Ti, RTX 3050 on 9a4f7406). 9.8 % of the range is not searched yet.
 
-## 8. What could not be checked, and what remains
+**Zero mismatches anywhere.** No (device, build) cell in either base shows the kind of systematic deficit the M4 had.
 
-- The anvil no-telemetry b58 cell (2.03 %): no counters; only a full re-search would cover it.
-- Pre-#222 builds (9a4f7406 and the three dev builds): counter-silent overwrite losses (section 4 caveat).
-- b60 re-runs, in the prepared order (queues on ivory, ready to run unchanged on any CUDA box with the same scripts):
-  `raw/QC1_oracle_8bd1_9bde.json` (231 fields, c0c357ae, ≈ 9 s each), `raw/QD_<build>.json` (56 fields of
-  8c088a28/c72e2c6f/18cba8bc/cb38b917, own builds, ≈ 30 s), `raw/Q3s_6f06.json` (100 fields, 6f060a94, ≈ 12 s; full
-  sample `raw/Q3_6f06.json` 228), `raw/QE_9a4f_b60.json` (553 fields of 9a4f7406, ≈ 37 s each on a 3080 = 5.7 h;
-  field 206956667 first). Sequence and commands: `raw/chain3.sh`, `raw/run_queue.sh`, `raw/box_build.sh`.
-- b58: the remaining 22 of 787 9a4f7406 sample fields and 17 of 20 8bd154bc ones; the M4 6f060a94 cell (20).
+## 8. What the race events imply, and what could not be checked
+
+- **Field with one pre-#222 submission** (9a4f7406, 8c088a28, c72e2c6f, cb38b917; `raw/pre222_only.py`: b58 89,158 fields,
+  95.3 % of the range incl. the anvil cell; b60 64,590 fields, 39.9 %). What can be said: its cell shows no systematic
+  loss (the bounds above), and its own counters, where sampled, satisfy the lossless invariant. The race's visible
+  signature (surplus checked) appears in ≈ 3 of 11,087 same-build census pairs, ≈ 1.4e-4 per submission [derived],
+  so order 10 fields per base carry a race event [derived, rough]. What cannot be said: that this particular field was
+  searched completely. Per #222 a race event can also overwrite list entries reserved by another flush, which loses
+  candidates without changing the counts; a run with such a loss and no surplus is indistinguishable from a clean one
+  by telemetry. The residual risk per such field is therefore roughly "≈ 1e-4 chance of an event, and an event may
+  skip some candidates", unbounded by counters. Only a search with a #222 build closes it. For a *verified* "none
+  below 62" that means re-searching the pre-#222-only fields (b58 ≈ all of it, b60 ≈ 40 %), or accepting the residual
+  explicitly. User decision; nothing was queued.
+- Fields with a pre-#222 submission and a consistent second one (e.g. the three above) are covered by the second.
+- Builds with #222 but not #236 (8bd154bc, 18cba8bc, 9bde4a87): race-free; counters timing dependent but consistent.
+- Not checkable: the anvil no-telemetry b58 cell (2.03 %).
+- Not run: GTX 1660 Ti and RTX 3050 on 9a4f7406 at b60 (0.01 %); remainders of cells listed with n < target.
+- Rule 3's tolerance was widened during the run (section 4), which hides losses up to ≈ 1e-5 of a heavily overflowed
+  field in the 8bd154bc/9bde4a87 cells.
 
 ## 9. Files
 
 `raw/`: census (`census_fields.py`, `census_subs.py`, `census_cells.py`, `census_table.md`, `fields_b58_b60.json`,
-`subs_b58_b60.json`), sample (`make_sample.py`, `sample.json`, `queue_*.json`, `Q*.json`), box side (`stub_api.py`,
-`run_queue.sh`, `box_build.sh`, `chain*.sh`, `extract.py`, `proof_hosts_block.txt`), raw outputs (`box/out_*.jsonl` =
-every submission body the clients sent to the stub, `box/client_*.log`, `box/stub_*.log`, `box/runs.log`),
-analysis (`compare.py` → `compare.txt`, `compare.json`, `compare_detail.jsonl`, `cell_table.md`; `dupcheck.py`,
-`dup_invariant.py`, `dup_rule.py`, `pair_cover.py` with their `.txt` outputs; `outlier_pairs_9a4f.json`).
+`subs_b58_b60.json`, `pre222_only.py/.txt`), sample (`make_sample.py`, `sample.json`, `queue_*.json`, `Q*.json`,
+`QE2_9a4f_b60_byshare.json`), box side (`stub_api.py`, `run_queue.sh`, `box_build.sh`, `builds4.sh`, `chain*.sh`,
+`extract.py`, `proof_hosts_block.txt`), raw outputs (`box/` first box, `box2/` replacement: `out_*.jsonl` = every
+submission body the clients sent to the stub, `client_*.log`, `stub_*.log`, `runs.log`), analysis (`compare.py` →
+`compare.txt`, `compare.json`, `compare_detail.jsonl`, `cell_table.md`, `bottom_line.py`; `dupcheck.py`,
+`dup_invariant.py`, `dup_rule.py`, `pair_cover.py`, `crossbuild.py` with their `.txt` outputs; `outlier_pairs_9a4f.json`).

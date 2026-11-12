@@ -5,6 +5,40 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T2.3 Sampled exact re-verification of nice-only submissions by device and build, bases 58 and 60 (2026-11-12 15:41–21:46 UTC, agent; `T2/AUDIT.md`, `T2/raw/` (census, `sample.json`, queues, `compare.txt`, `cell_table.md`, `dup_rule.txt`, `pre222_only.txt`, `proof_hosts_block.txt`, `box/`, `box2/`); boxes 60374124 (went offline at 18:03, 2.68 h) and 60389955 (3.46 h), RTX 3080, ~$0.71 together)
+
+Mechanism: the real client of each build, compiled from its commit, against a local stub of the
+claim and submit endpoints; the production hosts mapped to 127.0.0.1 on each box and proven
+unreachable before any client ran; the census from ivory by bounded id ranges. Validation: current
+main reproduces demoux's counters exactly on 59/59 b58 and 149/149 b60 fields and the M4's on 20/20.
+
+Census: b58 93,573 fields, all searched; b60 162,076 fields, 90.2 % searched; 11,473 submissions
+disqualified (the M4 set). Counters (`survivors`, `checked`) are exact and repeatable only from
+#236 on; older builds move stage overruns from one counter to the other run by run, so there
+the audit compares the conserved combination survivors + checked ÷ (1 − pass rate) with a
+tolerance that grows with the overrun (for 8bd154b / 9bde4a8 against main's exact counts; a loss
+below ≈ 1e-5 of a heavily overrun field could hide there).
+
+**Re-runs: 0 mismatches in 1,662 comparisons** (1,100 same old build, 328 exact, 234 against
+main's counts). 95 % upper bound on a cell's per-field disagreement rate:
+
+| | ≤ 2.1 % | ≤ 5.1 % | 9.5–14 % | weaker or not checked |
+|---|---|---|---|---|
+| b58, share of the range | 74.1 % | 22.0 % | 0.85 % (to 45 %) | 0.8 % (3 fields); M4 0.27 % not run; **Anvil 2.03 %: no telemetry, not checkable** |
+| b60, share of the range | 46.0 % | 32.6 % | 14.3 % | 5.5 %; 9.8 % of the base not searched yet |
+
+**Census finding (not a random sample): 3 of 11,087 same-build pairs of pre-#236 submissions
+break the conserved quantity, all v3.4.6 (9a4f740) at b60, all with surplus checks:** field
+206943130, GTX 1080, +5.4 M checks (3.3e-5 of the field's survivors); 206950836, TITAN Xp,
++2.35 M (2.8e-5); 206956667, RX 9070 XT, +9,990 (1.3e-6; that run also retried 16 partitions).
+In each pair the other submission agrees with a same-build re-run on the 3080 (director's own
+API lookups confirm the three pairs). Reading: the #222 flush race fired outside Apple at about
+1.4e-4 per submission. Per #222 an event can also overwrite list entries, which counts cannot
+show. **Fields with only a pre-#222 submission: 89,158 at b58 (95.3 % of the range) and 64,590
+at b60 (39.9 %).** If an event loses as many entries as it duplicates, the expected lost share
+of those bases' candidates is ≈ 1.4e-4 × 3e-5 ≈ 4e-9 [derived, assumption stated]. Nothing was
+changed, re-queued or reported anywhere.
+
 ## PRP.1 The 512-entry survivor stage and the base-64 prefilter shifts as branches on main: exactness and CUDA regression (2026-11-12 17:13–20:45 UTC, agent; `PRP/RESULTS.md`, `PRP/PR-BODY-stage.md`, `PRP/PR-BODY-shift.md`, `PRP/raw/` (`ab_table.txt`, `nm_table.txt`, box logs, scripts); fork branches `pr/join-survivor-stage-512` 0d84d0a and `pr/join-prefilter-shift-pow2` 93a7ef6, each one commit on main a7a59c1; box 60383994, RTX 3080 at 320 W, 3.53 h, ~$0.42)
 
 M = main, S = stage 512 / flush 256, F = shift form. Four rotated rounds, counts identical in
