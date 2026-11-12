@@ -42,8 +42,9 @@ learned without the card.** You do not touch demoux.
 
 ## The box
 
-Instance **60315324** (`nice-research-n16-prep`, RTX 3080, 7 h TTL from ~06:10 UTC). From
-`~/projects/nice/scratchpad/2026-10-research-program`: `python3 vast.py ssh 60315324` prints the
+Instance **60317813** (`nice-research-n16-prep2`, RTX 3080 at 280 W, Ryzen 5 5600X; 6.5 h TTL from
+06:19 UTC; it replaces 60315324, whose sshd refused every key and which was destroyed at 06:18). From
+`~/projects/nice/scratchpad/2026-10-research-program`: `python3 vast.py ssh 60317813` prints the
 ssh command; wait for `/root/READY`. `/root/nice` is a clone of the fork with remote `upstream`
 fetched. All builds and runs happen there (ivory has 7.6 GB free: no builds on ivory). lavapipe
 (`mesa-vulkan-drivers`) gives the wgpu path on the box, as earlier work did ("lavapipe with both

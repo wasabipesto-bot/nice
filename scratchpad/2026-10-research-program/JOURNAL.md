@@ -22,7 +22,7 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   worth ×1.03–1.04 on demoux when it rebuilds. b60 86.0 %; ends ≈ 11-14.
 - **Lead of the day, N16 (the join's base on the 9070 XT): preparing the window.** Kill criterion
   (ledger): the split shows the cost spread evenly with no single cause. Agent (Opus) + box
-  60315324 (RTX 3080, $0.107/h, 7 h TTL): a harness that splits the base, validated on CUDA and
+  60315324 (RTX 3080, $0.107/h, 7 h TTL; replaced at 06:18, see below): a harness that splits the base, validated on CUDA and
   lavapipe; an offline ACO dump (time-boxed); a candidate branch for N14; `N16/BRIEF.md`.
 - **06:00 UTC: N16's premise is false; yesterday's profile of the 9070 XT was mis-derived
   (EXPERIMENTS N13.2).** While checking whether production telemetry could bound a per-launch
@@ -43,6 +43,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   checked per run; removal modes unprofiled as a second instrument; the same clock check for the
   RTX 3080 (were L51's and B64's ablation shares at full clock?); survivor-path and top-append
   switches; the window plan's first 45 minutes are the corrected profile at b62 and b64.
+- **06:18 UTC: box 60315324 replaced.** Its sshd refused every key (bad ownership on
+  `authorized_keys`, a host fault) and its start-up clone failed while `READY` was still touched
+  (my script chained with `;`). Destroyed after 0.44 h (~$0.05); replacement 60317813 (RTX 3080 at
+  280 W on a Ryzen 5 5600X, $0.122/h, 6.5 h TTL), ssh verified before handing it over; the start-up
+  script now creates `READY` only if the clone and fetch succeed. `vast.py create <offer id>`
+  needs `--gpu` beside the id, or the offer is not in the first page of the search.
 - **Lesson (README updated):** on a card whose clock follows its load, never compare runs with
   work removed; log clock and power beside every timing and reject runs off the operating point.
   I passed the N13 agent's explanation on without opening the samples it had recorded.
