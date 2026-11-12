@@ -3483,6 +3483,10 @@ pub(crate) mod hostacc {
     pub static FENCE_NS: AtomicU64 = AtomicU64::new(0);
     pub static WAIT_NS: AtomicU64 = AtomicU64::new(0);
     pub static READ_NS: AtomicU64 = AtomicU64::new(0);
+    /// `launch_batch` split: buffer creation, kernel launches, flush.
+    pub static CREATE_NS: AtomicU64 = AtomicU64::new(0);
+    pub static LAUNCH_NS: AtomicU64 = AtomicU64::new(0);
+    pub static FLUSH_NS: AtomicU64 = AtomicU64::new(0);
     pub fn on() -> bool {
         static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
         *ON.get_or_init(|| super::exp_env("NICE_EXP_HOSTACC", 0) == 1)
@@ -3491,7 +3495,10 @@ pub(crate) mod hostacc {
         c.fetch_add(v, Relaxed);
     }
     pub fn reset() {
-        for c in [&BATCHES, &LAUNCHES, &FENCES, &READS, &ENC_NS, &FENCE_NS, &WAIT_NS, &READ_NS] {
+        for c in [
+            &BATCHES, &LAUNCHES, &FENCES, &READS, &ENC_NS, &FENCE_NS, &WAIT_NS, &READ_NS, &CREATE_NS,
+            &LAUNCH_NS, &FLUSH_NS,
+        ] {
             c.store(0, Relaxed);
         }
     }
@@ -3501,7 +3508,7 @@ pub(crate) mod hostacc {
         let s = |c: &AtomicU64| c.load(Relaxed) as f64 * 1e-9;
         format!(
             "HOSTACC batches={} launches={} fences_pending={} reads={} encode_s={:.3} fence_s={:.3} \
-             wait_s={:.3} read_s={:.3}",
+             wait_s={:.3} read_s={:.3} (encode: create_s={:.3} launch_s={:.3} flush_s={:.3})",
             g(&BATCHES),
             g(&LAUNCHES),
             g(&FENCES),
@@ -3509,7 +3516,10 @@ pub(crate) mod hostacc {
             s(&ENC_NS),
             s(&FENCE_NS),
             s(&WAIT_NS),
-            s(&READ_NS)
+            s(&READ_NS),
+            s(&CREATE_NS),
+            s(&LAUNCH_NS),
+            s(&FLUSH_NS)
         )
     }
 }
@@ -4328,6 +4338,7 @@ impl<R: Runtime> JoinDevice<R> {
         } else {
             None
         };
+        let ha_t0 = Instant::now();
         let vs_h = c.create(cubecl::bytes::Bytes::from_elems(vs.to_vec()));
         // Kept tops per (slot, group), which the top stage appends.
         let grp_cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; nslots * nb]));
@@ -4350,6 +4361,10 @@ impl<R: Runtime> JoinDevice<R> {
         ];
         let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; expect.len()]));
         let nran = expect.len();
+        let ha_t1 = Instant::now();
+        if hostacc::on() {
+            hostacc::add(&hostacc::CREATE_NS, (ha_t1 - ha_t0).as_nanos() as u64);
+        }
         #[cfg(test)]
         if self.bytes > tests::REFUSE_ABOVE.with(std::cell::Cell::get) {
             // A device that runs nothing of a layout this large.
@@ -4486,7 +4501,12 @@ impl<R: Runtime> JoinDevice<R> {
             );
             }
         }
+        let ha_t2 = Instant::now();
         c.flush().map_err(|e| anyhow!("flush failed: {e:?}"))?;
+        if hostacc::on() {
+            hostacc::add(&hostacc::LAUNCH_NS, (ha_t2 - ha_t1).as_nanos() as u64);
+            hostacc::add(&hostacc::FLUSH_NS, ha_t2.elapsed().as_nanos() as u64);
+        }
         if let Some(t) = pt {
             self.prof_mark(t, |p, s| p.check_secs += s)?;
         }
