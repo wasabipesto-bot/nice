@@ -102,6 +102,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   8d11e0b's, so the speed numbers stand. CI is re-running on the new head (this also re-runs the
   Windows job that lost its network this morning); a reminder at 14:10 UTC checks it and then
   tells the user #251 is ready again. Box 60499346 destroyed after 0.54 h. No instance running.
+- **14:48 UTC: #251 is green on 1f41d64** (25 pass, 3 skipped, mergeable, clean; the Windows job
+  passed on the re-run), as are #255 and #256; no comments or reviews from the maintainer; main
+  unchanged (a7a59c1). #251 is ready again; its 64-lane hand-out path is the one thing not yet
+  run on real hardware (the 45-minute demoux window was requested). No instance running.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 
