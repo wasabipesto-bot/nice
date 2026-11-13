@@ -5,6 +5,45 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## CKF.1 PR #251's check kernel on partly filled planes: reproduced, fixed, verified (2026-11-13 06:32–09:15 UTC, agent; `CKF/RESULTS.md`, `CKF/PR-BODY-DELTA.md`, `CKF/raw/` (`repro/make_repro.py`, `0001-fix.patch`, box logs and outputs); fork `pr/check-d` 8d11e0b on bc9d87c; box 60460107, RTX 3080 at 180 W, 2.89 h, ~$0.31)
+
+**Reproduced on a real device:** bc9d87c's check kernel launched in count mode on one CUDA
+block of 100 threads (a 4-lane last warp) or 48 threads (a 16-lane warp) skips entries: 34,296 of
+218,772 over seven shapes, with the work counter ending where full warps would put it. Not
+reproducible on lavapipe (its last subgroup runs all 8 lanes). Production's 256-thread blocks are
+full on CUDA; this is what a partly filled Vulkan subgroup would do. (CubeCL 0.10's CUDA and HIP
+backends compute the lane as position mod `PLANE_DIM`, so blocks that are not a multiple of 32
+get wrong lanes after the first block: an upstream CubeCL defect, test-only for us.)
+
+**Fix (8d11e0b):** `take_entries` lets the lanes that run a take decide it: with planes of at
+most 32 lanes one ballot gives the lanes, their count, each lane's rank and the leader (lowest
+set bit), whose `fetch_add(count)` reaches the others by a shuffle from its lane; with wider
+planes an exclusive scan and a sum over the active lanes. Nothing depends on `PLANE_DIM` or on
+lane 0. The kernel also counts the entries it checked and sums their indices; the host
+(`ensure_checked`) compares both with the list after every check launch and fails the field on
+a mismatch (an error, not a retry; nothing is submitted).
+
+| field (RTX 3080, 180 W, interleaved, cooled before each run, counts identical) | PR head bc9d87c | fix 8d11e0b | fix against PR head | fix against main a7a59c1 |
+|---|---|---|---|---|
+| b62 1e17 | 71.97 s | 72.03 s | +0.09 % | ×1.084 |
+| b60 1e16 (two fields, seconds per field) | 9.197 | 9.216 | +0.21 % | ×1.094 |
+| b64 1e17 | 149.73 | 149.39 | −0.23 % | ×1.060 |
+
+Exactness on the fix: the partly-filled regression test (84 runs on CUDA; both forms at 100, 48
+and 256 threads on lavapipe with WGSL and SPIR-V); the check's count, gated and probe modes
+(1,168,717 list entries, 22 shapes) on CUDA in ballot and forced scan form and on lavapipe; dense
+compares against the CPU join at b60 1e16, b62 1e17, b64 1e17; the full wgpu suite on lavapipe
+with both compilers; a skip-one-entry test mode makes `run_field` fail with "checked 138 of the
+139 survivors". **Not run on real hardware: the scan form on 64-lane planes (the RX 9070 XT's
+path), Metal, HIP.** The check kernel's registers rose from 39 to 47 at b62/b64 with no effect
+at field level. CI on 8d11e0b: 24 pass, 1 fail (the Windows job lost its network connection
+while installing the toolchain; tests and the GPU build of the same job passed).
+
+**Same assumption on main, not fixed here:** `top_slot` (the top kernels' append) broadcasts
+lane 0's group and lets only lane 0 take the atomic (verified by reading). A Vulkan plane
+without an active lane 0 would overwrite tops. 256-thread groups give full planes on every
+device in production today.
+
 ## N6.1 Can the join test fewer top certificates? Exact counts on the CPU (2026-11-13 05:50–06:47 UTC, agent, ivory, two threads; `N6/RESULTS.md`, `N6/raw/` (`main_b{60,62,64}_s{1,2}.log`, `summary_b*.txt`, `analyze.py`, `run_main.sh`); fork branch `exp/n6-top-counts` 21908a7 (`common/src/overlap_join/n6.rs`, `common/examples/n6_top_counts.rs`))
 
 Sample per base: two seeds × 48 field locations stratified over the base × 25 random b^6 blocks,

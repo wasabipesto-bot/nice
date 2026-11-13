@@ -1,0 +1,400 @@
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::smoke_kernel::SmokeKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::smoke_kernel::SmokeKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 1,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: SmokeKernelInfo {
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct info_st {
+    uint32 static_meta[2];
+};
+
+
+extern "C" __global__ void __launch_bounds__(1)smoke_kernel (
+    uint32* buffer_0, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+const bool l_0 = absoluteIdx.x == uint32(0);
+if (l_0) {
+buffer_0[uint32(0)] = uint32(42);
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_join::kernels::check_kernel::CheckKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_join::kernels::check_kernel::CheckKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 100,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: CheckKernelInfo {
+        sh: CheckShape {
+            b: 10,
+            l: 2,
+            s2: 4,
+            s3: 6,
+            f0: 0,
+            k2: 3,
+            g: 10,
+        },
+        mode: 2,
+        ballot: true,
+        surv: ArrayCompilationArg {
+            inplace: None,
+        },
+        surv_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        top_rec: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_out: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        ran: ArrayCompilationArg {
+            inplace: None,
+        },
+        surv_cap: (),
+        nice_cap: (),
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct __align__(16) uint32_4 {
+    uint32 i_0;
+    uint32 i_1;
+    uint32 i_2;
+    uint32 i_3;
+};
+struct info_st {
+    uint32 scalars_uint32[2];uint32 static_meta[12];
+};
+
+
+extern "C" __global__ void __launch_bounds__(100)check_kernel (
+    const uint32* __restrict__ buffer_0, uint32* buffer_1, const uint32* __restrict__ buffer_2, uint32* buffer_3, uint32* buffer_4, uint32* buffer_5, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+uint32 idxGlobal = (
+                absoluteIdx.z * gridDim.x * blockDim.x * gridDim.y * blockDim.y)
+                + (absoluteIdx.y * gridDim.x * blockDim.x)
+                + absoluteIdx.x;
+uint32 warpSizeChecked = min(warpSize, blockDim.x * blockDim.y * blockDim.z);
+uint32 l_arr_4[2];
+
+uint32 l_arr_64[1];
+
+uint32 l_arr_67[2];
+
+uint64 l_mut_68;
+bool l_mut_46;
+uint32 l_mut_2;
+uint32 l_mut_5;
+uint32 l_mut_23;
+uint32 l_mut_24;
+uint32 l_mut_25;
+uint32 l_mut_28;
+uint32 l_mut_65;
+uint32 l_mut_66;
+uint32* l_0 = &buffer_1[uint32(0)];
+const uint32 l_1 = atomicAdd(l_0, uint32(0));
+l_mut_2 = l_1;
+const bool l_3 = l_mut_2 > info.scalars_uint32[0];
+if (l_3) {
+l_mut_2 = info.scalars_uint32[0];
+}
+l_mut_5 = uint32(0);
+
+const uint32_4 l_6 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_7 = l_6.i_0;
+const uint32 l_8 = uint32(1) << uint32(idxGlobal) % warpSize;
+const uint32 l_9 = l_8 - uint32(1);
+const uint32 l_10 = l_7 & l_9;
+const uint32 l_11 = uint32(__popc(l_10));
+const bool l_12 = l_11 == uint32(0);
+if (l_12) {
+const uint32 l_13 = uint32(__popc(l_7));
+uint32* l_14 = &buffer_5[uint32(4)];
+const uint32 l_15 = atomicAdd(l_14, l_13);
+l_mut_5 = l_15;
+}
+const uint32 l_16 = l_7 - uint32(1);
+const uint32 l_17 = l_7 ^ l_16;
+const uint32 l_18 = uint32(__popc(l_17));
+const uint32 l_19 = l_18 - uint32(1);
+const uint32 l_20 = { __shfl_sync(-1, l_mut_5, l_19) };
+l_arr_4[uint32(0)] = l_20;
+l_arr_4[uint32(1)] = l_11;
+const uint32 l_21 = l_arr_4[uint32(0)];
+l_mut_5 = l_21;
+const uint32 l_22 = l_arr_4[uint32(1)];
+l_mut_23 = l_22;
+l_mut_24 = uint32(0);
+l_mut_25 = uint32(0);
+while (true) {
+const bool l_26 = l_mut_5 < l_mut_2;
+const bool l_27 = !l_26;
+if (l_27) {
+break;}
+l_mut_28 = uint32(0);
+
+const uint32_4 l_29 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_30 = l_29.i_0;
+const uint32 l_31 = uint32(1) << uint32(idxGlobal) % warpSize;
+const uint32 l_32 = l_31 - uint32(1);
+const uint32 l_33 = l_30 & l_32;
+const uint32 l_34 = uint32(__popc(l_33));
+const bool l_35 = l_34 == uint32(0);
+if (l_35) {
+const uint32 l_36 = uint32(__popc(l_30));
+uint32* l_37 = &buffer_5[uint32(4)];
+const uint32 l_38 = atomicAdd(l_37, l_36);
+l_mut_28 = l_38;
+}
+const uint32 l_39 = l_30 - uint32(1);
+const uint32 l_40 = l_30 ^ l_39;
+const uint32 l_41 = uint32(__popc(l_40));
+const uint32 l_42 = l_41 - uint32(1);
+const uint32 l_43 = { __shfl_sync(-1, l_mut_28, l_42) };
+l_arr_4[uint32(0)] = l_43;
+l_arr_4[uint32(1)] = l_34;
+const uint32 l_44 = l_mut_5 + l_mut_23;
+const bool l_45 = l_44 < l_mut_2;
+l_mut_46 = l_45;
+if (l_mut_46) {
+l_mut_24 = l_mut_24 + uint32(1);
+l_mut_25 = l_mut_25 + l_44;
+const uint32 l_47 = uint32(2) * l_44;
+const uint32 l_48 = buffer_0[l_47];
+const uint32 l_49 = uint32(2) * l_44;
+const uint32 l_50 = l_49 + uint32(1);
+const uint32 l_51 = buffer_0[l_50];
+const uint32 l_52 = uint32(8) * l_48;
+const uint32 l_53 = buffer_2[l_52];
+const uint32 l_54 = l_52 + uint32(1);
+const uint32 l_55 = buffer_2[l_54];
+const uint32 l_56 = l_52 + uint32(6);
+const uint32 l_57 = buffer_2[l_56];
+const uint64 l_58 = uint64(l_55);
+const uint64 l_59 = l_58 << uint64(32);
+const uint64 l_60 = uint64(l_53);
+const uint64 l_61 = l_59 | l_60;
+const uint64 l_62 = uint64(l_57);
+const uint64 l_63 = l_61 - l_62;
+l_mut_28 = l_51;
+l_mut_65 = uint32(0);
+l_mut_28 = l_mut_65;
+l_mut_65 = l_57;
+l_mut_66 = l_mut_28;
+l_arr_64[uint32(0)] = l_mut_65;
+l_mut_28 = l_mut_66;
+l_mut_66 = uint32(0);
+l_mut_68 = uint64(0);
+l_mut_65 = uint32(0);
+const uint32 l_69 = l_mut_65 * uint32(2);
+const uint32 l_70 = l_mut_66 + l_69;
+l_mut_65 = l_70;
+const uint32 l_71 = l_arr_64[uint32(0)];
+const uint32 l_72 = l_arr_64[uint32(0)];
+const uint32 l_73 = l_71 * l_72;
+l_mut_65 = l_mut_65 + l_73;
+const uint32 l_74 = __umulhi(l_mut_65, uint32(2748779070));
+const uint32 l_75 = l_74 >> uint32(6);
+const uint32 l_76 = l_75 * uint32(100);
+const uint32 l_77 = l_mut_65 - l_76;
+l_arr_67[uint32(0)] = l_77;
+l_mut_66 = l_75;
+const uint32 l_78 = __umulhi(l_77, uint32(3435973837));
+const uint32 l_79 = l_78 >> uint32(3);
+const uint32 l_80 = l_79 * uint32(10);
+const uint32 l_81 = l_77 - l_80;
+const uint64 l_82 = uint64(l_81);
+const uint64 l_83 = uint64(1) << l_82;
+const uint64 l_84 = l_mut_68 | l_83;
+const uint64 l_85 = uint64(l_79);
+const uint64 l_86 = uint64(1) << l_85;
+const uint64 l_87 = l_84 | l_86;
+l_mut_68 = l_87;
+l_mut_65 = uint32(0);
+const uint32 l_88 = l_mut_65 * uint32(2);
+const uint32 l_89 = l_mut_66 + l_88;
+l_mut_65 = l_89;
+l_arr_67[uint32(1)] = l_mut_65;
+const uint32 l_90 = __umulhi(l_mut_65, uint32(3435973837));
+const uint32 l_91 = l_90 >> uint32(3);
+const uint32 l_92 = l_91 * uint32(10);
+const uint32 l_93 = l_mut_65 - l_92;
+const uint64 l_94 = uint64(l_93);
+const uint64 l_95 = uint64(1) << l_94;
+const uint64 l_96 = l_mut_68 | l_95;
+const uint64 l_97 = uint64(l_91);
+const uint64 l_98 = uint64(1) << l_97;
+const uint64 l_99 = l_96 | l_98;
+l_mut_68 = l_99;
+l_mut_66 = uint32(0);
+l_mut_65 = l_mut_66;
+const uint32 l_100 = l_arr_67[uint32(0)];
+const uint32 l_101 = l_arr_64[uint32(0)];
+const uint32 l_102 = l_100 * l_101;
+l_mut_65 = l_mut_65 + l_102;
+const uint32 l_103 = __umulhi(l_mut_65, uint32(2748779070));
+const uint32 l_104 = l_103 >> uint32(6);
+l_mut_66 = l_104;
+const uint32 l_105 = l_104 * uint32(100);
+const uint32 l_106 = l_mut_65 - l_105;
+const uint32 l_107 = __umulhi(l_106, uint32(3435973837));
+const uint32 l_108 = l_107 >> uint32(3);
+const uint32 l_109 = l_108 * uint32(10);
+const uint32 l_110 = l_106 - l_109;
+const uint64 l_111 = uint64(l_110);
+const uint64 l_112 = uint64(1) << l_111;
+const uint64 l_113 = l_mut_68 | l_112;
+const uint64 l_114 = uint64(l_108);
+const uint64 l_115 = uint64(1) << l_114;
+const uint64 l_116 = l_113 | l_115;
+l_mut_68 = l_116;
+l_mut_65 = l_mut_66;
+const uint32 l_117 = l_arr_67[uint32(1)];
+const uint32 l_118 = l_arr_64[uint32(0)];
+const uint32 l_119 = l_117 * l_118;
+l_mut_65 = l_mut_65 + l_119;
+const uint32 l_120 = __umulhi(l_mut_65, uint32(2748779070));
+const uint32 l_121 = l_120 >> uint32(6);
+l_mut_66 = l_121;
+const uint32 l_122 = l_121 * uint32(100);
+const uint32 l_123 = l_mut_65 - l_122;
+const uint32 l_124 = __umulhi(l_123, uint32(3435973837));
+const uint32 l_125 = l_124 >> uint32(3);
+const uint32 l_126 = l_125 * uint32(10);
+const uint32 l_127 = l_123 - l_126;
+const uint64 l_128 = uint64(l_127);
+const uint64 l_129 = uint64(1) << l_128;
+const uint64 l_130 = l_mut_68 | l_129;
+const uint64 l_131 = uint64(l_125);
+const uint64 l_132 = uint64(1) << l_131;
+const uint64 l_133 = l_130 | l_132;
+l_mut_68 = l_133;
+const uint32 l_134 = uint32(l_mut_68);
+const uint32 l_135 = uint32(__popc(l_134));
+const uint64 l_136 = l_mut_68 >> uint64(32);
+const uint32 l_137 = uint32(l_136);
+const uint32 l_138 = uint32(__popc(l_137));
+const uint32 l_139 = l_135 + l_138;
+const bool l_140 = l_139 == uint32(8);
+const bool l_141 = l_140 || bool(true);
+if (l_141) {
+l_mut_65 = l_mut_66;
+const uint32 l_142 = __umulhi(l_mut_65, uint32(3435973837));
+const uint32 l_143 = l_142 >> uint32(3);
+const uint32 l_144 = l_143 * uint32(10);
+const uint32 l_145 = l_mut_65 - l_144;
+const uint64 l_146 = uint64(l_145);
+const uint64 l_147 = uint64(1) << l_146;
+const uint64 l_148 = l_mut_68 | l_147;
+const uint64 l_149 = uint64(l_143);
+const uint64 l_150 = uint64(1) << l_149;
+const uint64 l_151 = l_148 | l_150;
+l_mut_68 = l_151;
+}
+const uint32 l_152 = uint32(l_mut_68);
+const uint32 l_153 = uint32(__popc(l_152));
+const uint64 l_154 = l_mut_68 >> uint64(32);
+const uint32 l_155 = uint32(l_154);
+const uint32 l_156 = uint32(__popc(l_155));
+const uint32 l_157 = l_153 + l_156;
+const uint32 l_158 = uint32(4) * l_44;
+buffer_3[l_158] = l_157;
+l_mut_65 = uint32(0);
+if (l_140) {
+l_mut_65 = uint32(1);
+}
+const uint32 l_159 = l_158 + uint32(1);
+buffer_3[l_159] = l_mut_65;
+const uint32 l_160 = l_158 + uint32(2);
+const uint32 l_161 = uint32(l_mut_68);
+buffer_3[l_160] = l_161;
+const uint32 l_162 = l_158 + uint32(3);
+const uint64 l_163 = l_mut_68 >> uint64(32);
+const uint32 l_164 = uint32(l_163);
+buffer_3[l_162] = l_164;
+}
+const uint32 l_165 = l_arr_4[uint32(0)];
+l_mut_5 = l_165;
+const uint32 l_166 = l_arr_4[uint32(1)];
+l_mut_23 = l_166;
+}
+const bool l_167 = l_mut_24 > uint32(0);
+if (l_167) {
+uint32* l_168 = &buffer_5[uint32(5)];
+const uint32 l_169 = atomicAdd(l_168, l_mut_24);
+uint32* l_170 = &buffer_5[uint32(6)];
+const uint32 l_171 = atomicAdd(l_170, l_mut_25);
+}
+__syncthreads();
+
+const bool l_172 = threadIdx.x == uint32(0);
+if (l_172) {
+uint32* l_173 = &buffer_5[uint32(3)];
+const uint32 l_174 = atomicAdd(l_173, uint32(1));
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+

@@ -5,7 +5,7 @@
 . "${SCRIPTS:-$(dirname "$0")}/env.sh"
 S=$SCRIPTS
 : "${END_AT:?set END_AT}"
-: "${M62:=0 9 8 1}" "${M64:=0 9}" "${M60:=0 9 8 1}" "${R62:=1 2 3}" "${R64:=1 2}" "${R60:=1}"
+: "${M62:=0 9 137 8}" "${M64:=0 9}" "${M60:=0 9 8 1}" "${R62:=1 2 3}" "${R64:=1 2}" "${R60:=1}"
 echo "GO_START $(date -u +%T) dev=$DEV END_AT=$(date -u -d @$END_AT +%T 2>/dev/null || echo $END_AT)"
 sh $S/build.sh >> $OUT/builds.out 2>&1; tail -2 $OUT/builds.out; grep -q "has the N21" $OUT/builds.out || { echo "BUILD FAILED"; exit 1; }
 chain() { # TAG BASE SIZE START "MODES" "ROUNDS"

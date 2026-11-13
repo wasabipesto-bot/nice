@@ -1,13 +1,13 @@
 # N21 window environment, sourced by every script here. Override any of these in the caller's environment.
 #   W        workspace (demoux: /tmp/claude-exp-<date>-amd as the window's brief names it; the box: /root/win)
 #   DEV      wgpu (the RX 9070 XT; lavapipe on the box) or cuda (the box's RTX 3080)
-#   COMMIT   the exp/n21-walk-loop commit the window builds
+#   COMMIT   the exp/n21-walk-loop commit the window builds (2d3e10d3: the binary every N21 number comes from)
 : "${W:?set W}"
 : "${SCRIPTS:=$W/scripts}"
 : "${OUT:=$W/out}"
 : "${BIN:=$W/bin}"
 : "${DEV:=wgpu}"
-: "${COMMIT:=origin/exp/n21-walk-loop}"
+: "${COMMIT:=2d3e10d3}"
 mkdir -p "$OUT" "$BIN"
 export NICE_BUILD_SHA=test
 command -v cargo > /dev/null 2>&1 || { [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"; }

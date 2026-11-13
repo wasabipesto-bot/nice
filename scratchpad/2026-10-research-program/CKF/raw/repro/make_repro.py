@@ -48,8 +48,11 @@ rep("""    #[test]
         rh: &Handle,
         rw: usize,
         n: usize,
-    ) -> (Vec<usize>, u32) {
+    ) -> (Vec<usize>, u32, u32) {
         let c = &dev.client;
+        // CubeCL's CUDA lane is the grid position mod 32: right only in the first cube when a cube is not a
+        // multiple of 32 (a cubes is forced to one there).
+        let cubes = if R::name(c).contains("cuda") && wg % 32 != 0 { 1 } else { cubes };
         let words = 4 * n.max(1);
         let out = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; words]));
         let oc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
@@ -63,7 +66,7 @@ rep("""    #[test]
         assert_eq!(ran[3], cubes, "check cubes run");
         let out = dev.read_u32(&out).expect("out");
         let skipped = (0..n).filter(|&i| out[4 * i..4 * i + 4] == [0; 4]).collect();
-        (skipped, ran[STAGES])
+        (skipped, ran[STAGES], cubes)
     }
 
     fn repro_partial_planes<R: Runtime>(client: &ComputeClient<R>, name: &str) {
@@ -102,7 +105,7 @@ rep("""    #[test]
             let rh = client.create(cubecl::bytes::Bytes::from_elems(recs));
             for wg in [JOIN_WG, 100, 48] {
                 for cubes in [1, 3, CHECK_CUBES] {
-                    let (skipped, counter) = repro_run(&dev, cubes, wg, &lh, lw, &rh, rw, ns.len());
+                    let (skipped, counter, cubes) = repro_run(&dev, cubes, wg, &lh, lw, &rh, rw, ns.len());
                     println!(
                         "REPRO {name} b{b} {sh:?} cubes={cubes} wg={wg} entries={} skipped={} \
                          counter={counter} first_skipped={:?}",

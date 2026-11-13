@@ -1,0 +1,28 @@
+Overlap join: hand out check entries to whatever lanes run, and count them
+
+The check kernel took its entries one plane at a time: lane 0 took
+PLANE_DIM entries and lane i checked entry cur + i. That covers every
+entry only on a full plane that has a lane 0. CUDA and Metal guarantee
+full planes for 256-thread cubes; Vulkan does not (wgpu does not ask for
+full subgroups). On a cube of 100 or 48 threads, where the last warp is
+partly filled, the old kernel left 896 of 4,044 and 1,008 of 4,044
+entries unchecked on CUDA, and nothing noticed.
+
+- take_entries: the lanes that run a take decide it among themselves.
+  With a ballot (planes of at most 32 lanes): its first word is the set of
+  lanes taking part, so the count, each lane's rank and the leader (the
+  lowest such lane) come from it, and the leader's counter value reaches
+  the others by a shuffle from that lane. Without (wider planes): an
+  exclusive scan and a sum of 1 over the active lanes, and the leader's
+  value as a sum. No PLANE_DIM, no lane 0.
+- The kernel counts the entries it checked and sums their indices into
+  two more words of `ran`; the host compares both with the list's
+  min(checked, list_cap) entries after every batch and re-run, and a
+  mismatch is an error (the field fails), never fewer candidates.
+- Tests: the check's count, gated and probe modes also on cubes that end
+  in a partly filled plane and with the scan form; a new test of every
+  shape on cubes of 100, 48 and 256 threads in both forms; a test-only
+  mode that skips the first entry, which must fail the field in a batch
+  pass and in a partition's re-run.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

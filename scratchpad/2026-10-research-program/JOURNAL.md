@@ -53,6 +53,18 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   (group certificates, then today's kernel) costs 0.58–0.63 of today's top work. Field level:
   ≈ ×1.09 at b60/b62, ≈ ×1.035 at b64. **Parked at its kill line**; the summary tables check out
   against the raw files. The ÷5 I had pencilled in on 11-09 does not exist.
+- **09:15 UTC: the #251 fix is pushed (EXPERIMENTS CKF.1; 390 k tokens; box destroyed after 2.89 h).**
+  The agent first reproduced the skip on a real device (a CUDA block of 100 or 48 threads has a
+  partly filled warp: 34,296 of 218,772 entries never checked), then replaced the hand-out with
+  one decided by the lanes that actually run (ballot form up to 32 lanes, scan form wider), added
+  a kernel-side count and index sum, and a host check that fails the field on a mismatch. Cost
+  +0.1 % against the PR head. I read the diff: the logic is as described. One CI job is red on
+  the new commit (Windows lost its network connection while installing the toolchain; not the
+  code); the next commit re-runs it. **An independent reviewer is running on 8d11e0b
+  (`CKF/REVIEW-BRIEF.md`).** The scan form, which is the 9070 XT's path, has not run on 64-lane
+  hardware: the review is asked what its correctness there rests on.
+- **Same assumption on main (new T2.6):** `top_slot` depends on lane 0 the same way (verified by
+  reading). No production device is affected; a small fix PR with a regression test is queued.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 

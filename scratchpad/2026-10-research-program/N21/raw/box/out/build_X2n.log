@@ -1,0 +1,75 @@
+   Compiling cubecl-wgpu v0.10.0
+   Compiling cubecl v0.10.0
+   Compiling cubecl-opt v0.10.0
+   Compiling nice_common v3.4.8-dev (/root/n21/wt/E/common)
+   Compiling cubecl-cpp v0.10.0
+   Compiling cubecl-cuda v0.10.0
+warning: value assigned to `h2` is never read
+    --> common/src/cubecl_join.rs:3109:22
+     |
+3109 |         let mut h2 = 0u32;
+     |                      ^^^^ this value is reassigned later and never used
+...
+3126 |             h2 = u32::mul_hi(f2, base);
+     |             -------------------------- `h2` is overwritten here before the previous value is read
+     |
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `g2` is never read
+    --> common/src/cubecl_join.rs:3110:22
+     |
+3110 |         let mut g2 = 0u32;
+     |                      ^^^^ this value is reassigned later and never used
+...
+3127 |             g2 = u32::mul_hi(f2 * base, base);
+     |             --------------------------------- `g2` is overwritten here before the previous value is read
+
+warning: value assigned to `h3` is never read
+    --> common/src/cubecl_join.rs:3111:22
+     |
+3111 |         let mut h3 = 0u32;
+     |                      ^^^^ this value is reassigned later and never used
+...
+3128 |             h3 = u32::mul_hi(f3, base);
+     |             -------------------------- `h3` is overwritten here before the previous value is read
+
+warning: value assigned to `g3` is never read
+    --> common/src/cubecl_join.rs:3112:22
+     |
+3112 |         let mut g3 = 0u32;
+     |                      ^^^^ this value is reassigned later and never used
+...
+3129 |             g3 = u32::mul_hi(f3 * base, base);
+     |             --------------------------------- `g3` is overwritten here before the previous value is read
+
+warning: value assigned to `alo` is never read
+    --> common/src/cubecl_join.rs:3140:27
+     |
+3140 |               let mut alo = 0u32;
+     |                             ^^^^ this value is reassigned later and never used
+...
+3162 | /                 alo = select(g2 < 32u32, 0u32, b2)
+3163 | |                     | select(g3 < 32u32, 0u32, b3)
+3164 | |                     | select(h2 < 32u32, 0u32, c2)
+3165 | |                     | select(h3 < 32u32, 0u32, c3);
+     | |__________________________________________________- `alo` is overwritten here before the previous value is read
+
+warning: value assigned to `ahi` is never read
+    --> common/src/cubecl_join.rs:3141:27
+     |
+3141 |               let mut ahi = 0u32;
+     |                             ^^^^ this value is reassigned later and never used
+...
+3158 | /                 ahi = select(g2 < 32u32, b2, 0u32)
+3159 | |                     | select(g3 < 32u32, b3, 0u32)
+3160 | |                     | select(h2 < 32u32, c2, 0u32)
+3161 | |                     | select(h3 < 32u32, c3, 0u32);
+     | |__________________________________________________- `ahi` is overwritten here before the previous value is read
+
+warning: `nice_common` (lib) generated 6 warnings
+warning: `nice_common` (lib test) generated 6 warnings (6 duplicates)
+    Finished `release` profile [optimized] target(s) in 3m 15s
+  Executable unittests src/lib.rs (/root/n21/target-E/release/deps/nice_common-65f48ba0f10ea286)
+  Executable tests/claim_queries.rs (/root/n21/target-E/release/deps/claim_queries-e4b747199a45a297)
+  Executable tests/notable_numbers_cache.rs (/root/n21/target-E/release/deps/notable_numbers_cache-6e6f0b2b11979b02)
+  Executable tests/search_caches.rs (/root/n21/target-E/release/deps/search_caches-613a81442ffd6279)

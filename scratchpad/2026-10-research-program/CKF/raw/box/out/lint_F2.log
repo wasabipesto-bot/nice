@@ -1,0 +1,73 @@
+FMT_OK
+     = help: to override `-D warnings` add `#[allow(clippy::many_single_char_names)]`
+
+error: 6 bindings with single-character names in scope
+    --> common/src/cubecl_join.rs:5164:14
+     |
+5164 |         let (b, s, e, t, k, p) = WINDOWS[0];
+     |              ^  ^  ^  ^  ^  ^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+
+    Checking nice_client v3.4.8-dev (/root/ckf/wt/fix/client)
+    Checking nice_jobs v3.4.8-dev (/root/ckf/wt/fix/jobs)
+    Checking nice_api v3.4.8-dev (/root/ckf/wt/fix/api)
+    Checking nice-wasm-client v3.4.8-dev (/root/ckf/wt/fix/wasm-client)
+error: item in documentation is missing backticks
+    --> common/src/cubecl_join.rs:5898:38
+     |
+5898 |     /// `fs`'s field: record i holds n_i's prefix and residue. Returns the n,
+     |                                      ^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_markdown
+     = note: `-D clippy::doc-markdown` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::doc_markdown)]`
+help: try
+     |
+5898 -     /// `fs`'s field: record i holds n_i's prefix and residue. Returns the n,
+5898 +     /// `fs`'s field: record i holds `n_i`'s prefix and residue. Returns the n,
+     |
+
+error: could not compile `nice_common` (lib test) due to 3 previous errors
+CLIPPY1 101
+    --> common/src/cubecl_join.rs:5164:14
+     |
+5164 |         let (b, s, e, t, k, p) = WINDOWS[0];
+     |              ^  ^  ^  ^  ^  ^
+...
+5175 |             let v = live_partitions(&field.fs)
+     |                 ^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+     = note: `-D clippy::many-single-char-names` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::many_single_char_names)]`
+
+error: 6 bindings with single-character names in scope
+    --> common/src/cubecl_join.rs:5164:14
+     |
+5164 |         let (b, s, e, t, k, p) = WINDOWS[0];
+     |              ^  ^  ^  ^  ^  ^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#many_single_char_names
+
+    Checking nice_jobs v3.4.8-dev (/root/ckf/wt/fix/jobs)
+    Checking nice-wasm-client v3.4.8-dev (/root/ckf/wt/fix/wasm-client)
+    Checking nice_api v3.4.8-dev (/root/ckf/wt/fix/api)
+    Checking nice_client v3.4.8-dev (/root/ckf/wt/fix/client)
+error: item in documentation is missing backticks
+    --> common/src/cubecl_join.rs:5898:38
+     |
+5898 |     /// `fs`'s field: record i holds n_i's prefix and residue. Returns the n,
+     |                                      ^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#doc_markdown
+     = note: `-D clippy::doc-markdown` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::doc_markdown)]`
+help: try
+     |
+5898 -     /// `fs`'s field: record i holds n_i's prefix and residue. Returns the n,
+5898 +     /// `fs`'s field: record i holds `n_i`'s prefix and residue. Returns the n,
+     |
+
+error: could not compile `nice_common` (lib test) due to 3 previous errors
+CLIPPY2 101
