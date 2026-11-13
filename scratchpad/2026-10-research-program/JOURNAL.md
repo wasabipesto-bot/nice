@@ -139,6 +139,9 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   clippy with -D warnings and the host tests pass under Rust 1.100.0) and an independent reviewer
   started (`N21/PR/REVIEW-BRIEF.md`). In the background on ivory: fmt and clippy under 1.100.0 for
   #251, #255 and #256, each merged with today's main.
+- 16:42 UTC: **#251, #255 and #256 each merge cleanly with today's main and pass fmt and clippy
+  (-D warnings, `nice_common` with the cubecl feature) under Rust 1.100.0** on ivory. No merge
+  commits pushed: nothing to fix, and their CI would only re-run what was just checked.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 
