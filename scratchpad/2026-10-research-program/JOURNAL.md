@@ -31,6 +31,22 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     unnoticed: buffers, concurrency, filters, device failures, bookkeeping); agent, reading and
     host models only, `T2/SOUNDNESS-BRIEF.md`. An audit: no kill criterion; a real loss path
     is handed back at once.
+- **06:25 UTC: the soundness audit handed back (EXPERIMENTS T2.4; 477 k tokens, 35 minutes).** No
+  loss path in production. **One real gap, in my own open PR #251:** the new check kernel takes
+  `PLANE_DIM` entries per plane leader and lane i checks entry `cur + i`, which skips entries on
+  a plane that is not full. CUDA and Metal guarantee full planes, Vulkan does not. I read the
+  kernel (check-d 3310–3325) and agree. No measured device is known to be affected (the 3080,
+  the 9070 XT's dense compares, lavapipe), but the dense compares cannot see a skipped check
+  (real fields have no hits), so "not known" is weak for RADV.
+  - I tried to mark #251 as a draft and comment on it; **the harness refused both ("External
+    System Writes")**. I did not work around it: one ntfy to the user asking not to merge #251
+    yet, and the same at the top of the report.
+  - **CKF started 06:32 UTC** (agent, box 60460107, RTX 3080 at 180 W, 5.5 h TTL): reproduce on a
+    CUDA group that is not a multiple of 32, rank-based hand-out, a kernel-side count of checked
+    entries that the host verifies, tests on CUDA and lavapipe, cost ≤ 2 %, new commits on
+    `pr/check-d`. A reviewer follows before I call #251 ready again.
+  - The audit's gap 1 (a wrong-computing device is invisible; NiceMark records the exact
+    counters and compares them with nothing) goes to the user as a proposal, not built.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 

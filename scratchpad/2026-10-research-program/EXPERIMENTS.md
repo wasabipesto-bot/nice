@@ -5,6 +5,31 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T2.4 Soundness audit of the GPU join: can a candidate be lost unnoticed? (2026-11-13 05:50–06:25 UTC, agent, no device; `T2/SOUNDNESS.md`, `T2/models/` (`stage_model.py`, `plane_models.py`, `prefilter_chain.py`, two audit test patches and their outputs); main a7a59c1 and fork heads `pr/check-d` bc9d87c, `pr/join-prefilter-shift-pow2` 42d2afd, `pr/join-survivor-stage-512` 0f6794a)
+
+**No path found that loses a candidate in production today.** Rests on: a full read of kernels and
+host against five headings (buffers and counters, concurrency, rejecting filters, device
+failures, bookkeeping); a model of the survivor stage and flush (0 of 900 random schedules lose
+or duplicate on main's protocol and on the 512-entry stage; the pre-#222 protocol fails 36 of
+900, so the model sees that class); a big-integer mirror of the per-pair digit chain at the
+production shape (0 mismatches on 42,712 n over the 20 bases 40–64 with a band; three single
+mutations give 404–4,646); two audit tests (every 32-bit index product at the planner's largest
+layouts < 2^30; 1,400 pruned top-layer prefixes have no certified child among 5.3e6); the
+repository's certificate and CPU-join reference tests on real b58–64 tops and b42–64 fields.
+
+Gaps, by severity:
+
+| # | where | what | status |
+|---|---|---|---|
+| 1 | production, by design | a device that runs every work group but computes wrongly is not detected (`ensure_ran` sees only groups that did not finish); #222 and the Metal miscompile were of this kind. The join's two counters are exact functions of the field, so a known-answer check is cheap: NiceMark records them on every box and compares them with nothing | a proposal for the user (a feature, not built) |
+| 2 | **`pr/check-d` (PR #251) only** | **the new check kernel hands out `PLANE_DIM` entries per plane leader and lane i takes entry `cur + i`: a plane with fewer active lanes skips entries silently** (model: 31 of 32 lanes leaves 3,125 of 100,000 unchecked). Full planes are guaranteed on CUDA and Metal, not on Vulkan (wgpu does not request them) | **confirmed by my own reading of the kernel; fix in progress (CKF)** |
+| 3 | theoretical | the survivor-list overflow detector is a 32-bit counter that could wrap at ≥ 2^32 prefilter survivors in one batch (measured densities are 30–100× below) | hardening idea |
+| 4 | loud, not silent | the top stage's grid can reach 65,536 groups in x at a 4 GiB wgpu budget if every prefix of a slice were certified | note |
+| 5 | note | `top_slot`'s ballot form trusts the runtime's reported plane width; CI no longer exercises the scan form that 64-lane devices use | a test idea |
+
+Not checkable without a device: that each kernel computes what its model computes on CUDA,
+RDNA4 and the M4; the scan form of `top_slot`; whether any fleet device runs partial planes.
+
 ## T2.5 Realized gain of main a7a59c1 on demoux, from telemetry (2026-11-13, director, public API; `../2026-11-fresh-eyes/realized_1113.py`, `recent_niceonly_1113.json`, `demoux_launches_1112.json`)
 
 `uv run --with numpy python realized_1113.py`. demoux, b60 1e16, two fields in flight: 8,232

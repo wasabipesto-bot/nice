@@ -1,0 +1,218 @@
+files ['main_b62_s1.log']
+fields 48 (field certificate fails: 8; length change: 0); units drawn 1200, grandparent and ancestors certified 431
+parents tested 26722, in layer 17433 (0.652); pair tests 67012452 = 17433 x 3844; pass 21771774 (0.3249), fail 0.6751
+cert cross-check: 9588150 checked, 0 mismatches
+failures: repeat 0.9802 closure 0.0198 | first repeat: n2-n2 0.332 n3-n3 0.180 n2-n3 0.469 | new-vs-parent 0.866 new-vs-new 0.114 parent-parent 0.000
+fewest top digits per power that show a repeat (share of repeat failures): 6:0.002 7:0.129 8:0.568 9:0.300
+n2 positions a pair certifies beyond its parent (share of pairs): 0:0.001 1:0.074 2:0.832 3:0.091 4:0.002
+  first repeat's new n2 digit, offset below the parent's lowest common position: 1:0.295 2:0.273 3:0.027 4:0.000 (per failure; total 0.597)
+n3 positions a pair certifies beyond its parent (share of pairs): 0:0.003 1:0.178 2:0.599 3:0.215 4:0.004 5:0.000
+  first repeat's new n3 digit, offset below the parent's lowest common position: 1:0.225 2:0.215 3:0.057 4:0.001 5:0.000 (per failure; total 0.498)
+along partitions: P(fail | previous fails) 0.9511, P(fail | previous passes) 0.1016
+sibling parents, same partition: P(fail | sibling fails) 0.6621, P(fail | sibling passes) 0.6639
+failing pairs by length of their run of consecutive failures: 1-1:0.014 2-3:0.028 4-7:0.040 8-15:0.091 16-31:0.089 32-63:0.039 64-127:0.048 128-255:0.078 256-511:0.095 512-1023:0.184 1024-2047:0.153 2048-4095:0.142
+parents by share of passing partitions (0: none; k: ((k-1)/10, k/10]): 0:0.011 1:0.056 2:0.092 3:0.203 4:0.339 5:0.249 6:0.050
+mean jump after a repeat failure (pairs proven failing beyond it): first repeat 220.3, best repeat 321.1
+
+scheme (central: sigma 1.8, eps 0.5) | tests/today | cost/today | exactness violations | 95% field-bootstrap of central cost | note
+  floor            0.358      - 0 [0.353,0.363]  passes + fail runs: fewest tests of any test-and-skip order
+  skip_lane        0.386  0.418 0 [0.407,0.428]  skip walk, each lane alone (no SIMT divergence): unreachable bound
+  g32              0.598  0.583 0 [0.578,0.587]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g31              0.598  0.583 0 [0.579,0.587]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g62-8            0.559  0.586 0 [0.576,0.594]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g248-16          0.586  0.587 0 [0.580,0.593]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g248-62-8        0.559  0.588 0 [0.578,0.596]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g62              0.611  0.590 0 [0.587,0.593]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g64              0.613  0.591 0 [0.588,0.594]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g248-62          0.611  0.592 0 [0.589,0.595]  two-pass, whole b^2 span (top stage decoupled from batches)
+  seg11            0.615  0.594 0 [0.589,0.599]  slow-digit segments: 16 roots + 5 runs per parent
+  g62-16           0.590  0.596 0 [0.590,0.602]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g16              0.600  0.597 0 [0.591,0.603]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g32-8            0.571  0.602 0 [0.592,0.610]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g8               0.594  0.611 0 [0.601,0.618]  two-pass, whole b^2 span (top stage decoupled from batches)
+  seg21            0.497  0.635 0 [0.618,0.652]  slow-digit segments: 302 roots + 132 runs per parent
+  g124             0.668  0.641 0 [0.630,0.653]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g16@b16          0.600  0.645 0 [0.638,0.651]  two-pass inside each 16-slot batch
+  g16-4            0.609  0.684 0 [0.672,0.694]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g496-62-16-4     0.602  0.689 0 [0.677,0.699]  two-pass, whole b^2 span (top stage decoupled from batches)
+  skip_pairs       0.386  0.690 0 [0.674,0.706]  every pair not jumped is a fresh cert (compacted list)
+  g248             0.733  0.700 0 [0.687,0.711]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g8@b16           0.594  0.706 0 [0.696,0.713]  two-pass inside each 16-slot batch
+  g4               0.662  0.709 0 [0.697,0.718]  two-pass, whole b^2 span (top stage decoupled from batches)
+  g16-4@b16        0.609  0.731 0 [0.719,0.742]  two-pass inside each 16-slot batch
+  seg10            0.784  0.749 0 [0.746,0.752]  slow-digit segments: 5 roots + 2 runs per parent
+  seg20            0.633  0.756 0 [0.740,0.772]  slow-digit segments: 291 roots + 118 runs per parent
+  seg01            0.800  0.767 0 [0.763,0.772]  slow-digit segments: 11 roots + 3 runs per parent
+  g496             0.817  0.779 0 [0.766,0.788]  two-pass, whole b^2 span (top stage decoupled from batches)
+  span16           0.509  0.816 0   warp per parent, 16 lanes over consecutive partitions, jump to the lanes' reach
+  seg12            0.541  0.885 0 [0.844,0.924]  slow-digit segments: 702 roots + 284 runs per parent
+  g4@b16           0.662  0.899 0 [0.888,0.908]  two-pass inside each 16-slot batch
+  span32           0.545  0.916 0   warp per parent, 32 lanes over consecutive partitions, jump to the lanes' reach
+  seg22            0.453  0.947 0 [0.895,0.995]  slow-digit segments: 988 roots + 380 runs per parent
+  seg00            1.000  0.953 0 [0.953,0.953]  slow-digit segments: 0 roots + 1 runs per parent
+  today_whole      1.000  0.953 0 [0.953,0.953]  today's tests, one seed per parent instead of per batch (decoupling alone)
+  today            1.000  1.000 0 [1.000,1.000]  one FD step per pair, seed per 16-slot batch
+  seg02            0.685  1.014 0 [0.975,1.053]  slow-digit segments: 698 roots + 258 runs per parent
+  skip_warp_full   0.614  1.137 0   skip walk, 32 random lanes in lockstep, whole span
+  skip_warp_b256   0.812  1.451 0   skip-until across 256-slot batches, 32 random lanes in lockstep
+  skip_warp_b64    0.940  1.593 0   skip-until across 64-slot batches, 32 random lanes in lockstep
+  skip_warp_b16    0.997  1.608 0   skip-until across 16-slot batches, 32 random lanes in lockstep
+  seg31            0.851  8.861 0 [8.216,9.488]  slow-digit segments: 18042 roots + 20 runs per parent
+  seg30            0.954  8.953 0 [8.309,9.578]  slow-digit segments: 18030 roots + 18 runs per parent
+  seg32            0.789  9.138 0 [8.474,9.773]  slow-digit segments: 18728 roots + 174 runs per parent
+  seg13            0.773 20.080 0 [18.451,21.593]  slow-digit segments: 43251 roots + 279 runs per parent
+  seg23            0.686 20.134 0 [18.494,21.654]  slow-digit segments: 43537 roots + 327 runs per parent
+  seg03            0.885 20.183 0 [18.554,21.696]  slow-digit segments: 43246 roots + 272 runs per parent
+  seg33            0.906 28.224 0 [26.061,30.239]  slow-digit segments: 61276 roots + 173 runs per parent
+
+scheme (pessimistic: sigma 3.0, eps 1.0) | tests/today | cost/today | exactness violations | 95% field-bootstrap of central cost | note
+  floor            0.358      - 0   passes + fail runs: fewest tests of any test-and-skip order
+  skip_lane        0.386  0.447 0   skip walk, each lane alone (no SIMT divergence): unreachable bound
+  seg11            0.615  0.560 0   slow-digit segments: 16 roots + 5 runs per parent
+  g62              0.611  0.561 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g64              0.613  0.562 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g32              0.598  0.563 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g31              0.598  0.564 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g248-62          0.611  0.566 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g248-16          0.586  0.588 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g16              0.600  0.593 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g62-16           0.590  0.604 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g124             0.668  0.604 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g62-8            0.559  0.621 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g248-62-8        0.559  0.627 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g8               0.594  0.633 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g32-8            0.571  0.644 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g248             0.733  0.657 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  seg10            0.784  0.701 0   slow-digit segments: 5 roots + 2 runs per parent
+  g16@b16          0.600  0.704 0   two-pass inside each 16-slot batch
+  seg21            0.497  0.713 0   slow-digit segments: 302 roots + 132 runs per parent
+  seg01            0.800  0.720 0   slow-digit segments: 11 roots + 3 runs per parent
+  g496             0.817  0.729 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g4               0.662  0.772 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g16-4            0.609  0.784 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g496-62-16-4     0.602  0.805 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  seg20            0.633  0.819 0   slow-digit segments: 291 roots + 118 runs per parent
+  g8@b16           0.594  0.855 0   two-pass inside each 16-slot batch
+  seg00            1.000  0.889 0   slow-digit segments: 0 roots + 1 runs per parent
+  today_whole      1.000  0.889 0   today's tests, one seed per parent instead of per batch (decoupling alone)
+  g16-4@b16        0.609  0.895 0   two-pass inside each 16-slot batch
+  today            1.000  1.000 0   one FD step per pair, seed per 16-slot batch
+  skip_pairs       0.386  1.082 0   every pair not jumped is a fresh cert (compacted list)
+  seg12            0.541  1.099 0   slow-digit segments: 702 roots + 284 runs per parent
+  span16           0.509  1.129 0   warp per parent, 16 lanes over consecutive partitions, jump to the lanes' reach
+  seg02            0.685  1.212 0   slow-digit segments: 698 roots + 258 runs per parent
+  g4@b16           0.662  1.216 0   two-pass inside each 16-slot batch
+  seg22            0.453  1.264 0   slow-digit segments: 988 roots + 380 runs per parent
+  span32           0.545  1.294 0   warp per parent, 32 lanes over consecutive partitions, jump to the lanes' reach
+  skip_warp_full   0.614  1.722 0   skip walk, 32 random lanes in lockstep, whole span
+  skip_warp_b256   0.812  2.156 0   skip-until across 256-slot batches, 32 random lanes in lockstep
+  skip_warp_b16    0.997  2.254 0   skip-until across 16-slot batches, 32 random lanes in lockstep
+  skip_warp_b64    0.940  2.303 0   skip-until across 64-slot batches, 32 random lanes in lockstep
+  seg31            0.851 13.282 0   slow-digit segments: 18042 roots + 20 runs per parent
+  seg30            0.954 13.365 0   slow-digit segments: 18030 roots + 18 runs per parent
+  seg32            0.789 13.773 0   slow-digit segments: 18728 roots + 174 runs per parent
+  seg13            0.773 30.820 0   slow-digit segments: 43251 roots + 279 runs per parent
+  seg03            0.885 30.914 0   slow-digit segments: 43246 roots + 272 runs per parent
+  seg23            0.686 30.963 0   slow-digit segments: 43537 roots + 327 runs per parent
+  seg33            0.906 43.394 0   slow-digit segments: 61276 roots + 173 runs per parent
+
+scheme (optimistic: sigma 1.4, eps 0.25) | tests/today | cost/today | exactness violations | 95% field-bootstrap of central cost | note
+  floor            0.358      - 0   passes + fail runs: fewest tests of any test-and-skip order
+  skip_lane        0.386  0.402 0   skip walk, each lane alone (no SIMT divergence): unreachable bound
+  skip_pairs       0.386  0.542 0   every pair not jumped is a fresh cert (compacted list)
+  g62-8            0.559  0.573 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g248-62-8        0.559  0.574 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g248-16          0.586  0.587 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g32-8            0.571  0.587 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g32              0.598  0.590 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g31              0.598  0.590 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g62-16           0.590  0.593 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g16              0.600  0.598 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g62              0.611  0.600 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g248-62          0.611  0.601 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g64              0.613  0.602 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g8               0.594  0.602 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  seg21            0.497  0.606 0   slow-digit segments: 302 roots + 132 runs per parent
+  seg11            0.615  0.606 0   slow-digit segments: 16 roots + 5 runs per parent
+  g16@b16          0.600  0.623 0   two-pass inside each 16-slot batch
+  g496-62-16-4     0.602  0.646 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g16-4            0.609  0.647 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g8@b16           0.594  0.651 0   two-pass inside each 16-slot batch
+  g124             0.668  0.654 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  span16           0.509  0.666 0   warp per parent, 16 lanes over consecutive partitions, jump to the lanes' reach
+  g16-4@b16        0.609  0.672 0   two-pass inside each 16-slot batch
+  g4               0.662  0.686 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  g248             0.733  0.716 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  seg20            0.633  0.733 0   slow-digit segments: 291 roots + 118 runs per parent
+  span32           0.545  0.735 0   warp per parent, 32 lanes over consecutive partitions, jump to the lanes' reach
+  seg10            0.784  0.767 0   slow-digit segments: 5 roots + 2 runs per parent
+  g4@b16           0.662  0.783 0   two-pass inside each 16-slot batch
+  seg01            0.800  0.785 0   slow-digit segments: 11 roots + 3 runs per parent
+  g496             0.817  0.797 0   two-pass, whole b^2 span (top stage decoupled from batches)
+  seg12            0.541  0.806 0   slow-digit segments: 702 roots + 284 runs per parent
+  seg22            0.453  0.831 0   slow-digit segments: 988 roots + 380 runs per parent
+  skip_warp_full   0.614  0.882 0   skip walk, 32 random lanes in lockstep, whole span
+  seg02            0.685  0.942 0   slow-digit segments: 698 roots + 258 runs per parent
+  seg00            1.000  0.976 0   slow-digit segments: 0 roots + 1 runs per parent
+  today_whole      1.000  0.976 0   today's tests, one seed per parent instead of per batch (decoupling alone)
+  today            1.000  1.000 0   one FD step per pair, seed per 16-slot batch
+  skip_warp_b256   0.812  1.139 0   skip-until across 256-slot batches, 32 random lanes in lockstep
+  skip_warp_b64    0.940  1.274 0   skip-until across 64-slot batches, 32 random lanes in lockstep
+  skip_warp_b16    0.997  1.310 0   skip-until across 16-slot batches, 32 random lanes in lockstep
+  seg31            0.851  7.243 0   slow-digit segments: 18042 roots + 20 runs per parent
+  seg30            0.954  7.339 0   slow-digit segments: 18030 roots + 18 runs per parent
+  seg32            0.789  7.442 0   slow-digit segments: 18728 roots + 174 runs per parent
+  seg13            0.773 16.150 0   slow-digit segments: 43251 roots + 279 runs per parent
+  seg23            0.686 16.172 0   slow-digit segments: 43537 roots + 327 runs per parent
+  seg03            0.885 16.258 0   slow-digit segments: 43246 roots + 272 runs per parent
+  seg33            0.906 22.674 0   slow-digit segments: 61276 roots + 173 runs per parent
+
+per field (central costs): frac | pair tests per unit drawn | pass rate | g32 | g16@b16 | seg11 | skip_lane
+  0.0101 empty (fc_ok=0)
+  0.0376 empty (fc_ok=0)
+  0.0547 empty (fc_ok=0)
+  0.0625 empty (fc_ok=0)
+  0.0978 49511 0.309 0.583 0.588 0.569 0.340
+  0.1127 97945 0.316 0.593 0.607 0.596 0.348
+  0.1363 51663 0.319 0.597 0.609 0.603 0.356
+  0.163 38286 0.313 0.583 0.602 0.564 0.353
+  0.1776 42899 0.321 0.598 0.619 0.585 0.364
+  0.1885 empty (fc_ok=0)
+  0.2108 61965 0.325 0.602 0.639 0.576 0.371
+  0.242 96100 0.324 0.599 0.630 0.596 0.378
+  0.2685 72113 0.320 0.591 0.636 0.567 0.376
+  0.2726 84568 0.327 0.602 0.645 0.579 0.386
+  0.298 70883 0.328 0.603 0.656 0.583 0.390
+  0.3292 47204 0.323 0.593 0.674 0.597 0.391
+  0.3416 65348 0.323 0.593 0.676 0.596 0.396
+  0.3723 47819 0.321 0.590 0.671 0.572 0.400
+  0.3944 empty (fc_ok=0)
+  0.4107 84876 0.316 0.578 0.658 0.581 0.401
+  0.4168 84414 0.328 0.597 0.677 0.625 0.417
+  0.45 53816 0.332 0.601 0.680 0.591 0.427
+  0.4771 58275 0.317 0.576 0.654 0.591 0.415
+  0.482 40439 0.321 0.582 0.660 0.583 0.420
+  0.5186 empty (fc_ok=0)
+  0.53 57506 0.315 0.568 0.644 0.557 0.421
+  0.5442 59659 0.332 0.596 0.671 0.603 0.445
+  0.5716 96715 0.329 0.591 0.666 0.590 0.446
+  0.5996 107017 0.323 0.579 0.654 0.586 0.441
+  0.6182 empty (fc_ok=0)
+  0.6346 71037 0.318 0.570 0.644 0.577 0.437
+  0.652 82877 0.337 0.598 0.672 0.607 0.462
+  0.6734 86567 0.315 0.558 0.630 0.585 0.427
+  0.7009 77188 0.329 0.579 0.650 0.593 0.446
+  0.7133 81339 0.334 0.589 0.660 0.601 0.457
+  0.7357 75804 0.325 0.572 0.642 0.593 0.447
+  0.7557 88104 0.330 0.580 0.650 0.608 0.454
+  0.7753 54739 0.323 0.567 0.635 0.591 0.441
+  0.8041 71652 0.327 0.570 0.638 0.590 0.443
+  0.8217 80416 0.325 0.566 0.635 0.592 0.440
+  0.8377 90103 0.330 0.572 0.639 0.624 0.443
+  0.87 52893 0.327 0.564 0.631 0.597 0.436
+  0.8878 26139 0.326 0.568 0.637 0.611 0.447
+  0.8988 42745 0.325 0.561 0.625 0.614 0.430
+  0.9188 59966 0.337 0.577 0.642 0.616 0.445
+  0.9409 72728 0.335 0.576 0.640 0.611 0.445
+  0.9715 20143 0.334 0.574 0.640 0.659 0.446
+  0.9927 77034 0.327 0.558 0.622 0.618 0.430

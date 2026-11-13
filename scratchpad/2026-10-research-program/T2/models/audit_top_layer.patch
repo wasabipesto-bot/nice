@@ -1,0 +1,86 @@
+diff --git a/common/src/overlap_join.rs b/common/src/overlap_join.rs
+index 9c6c5485..392f3be5 100644
+--- a/common/src/overlap_join.rs
++++ b/common/src/overlap_join.rs
+@@ -2341,3 +2341,81 @@ mod tests {
+         }
+     }
+ }
++
++/// T2.4 audit (not for merge): the top layer's prune at depth t - p keeps
++/// the ancestor of every partition-level top the join certifies, on
++/// production-shaped fields (every child of a dropped prefix fails its own
++/// certificate, and a sample of certified children has its prefix kept).
++#[cfg(test)]
++mod audit_t2_layer {
++    use super::*;
++
++    #[test]
++    #[ignore = "T2.4 audit"]
++    fn audit_t2_dropped_prefixes_have_no_certified_child() {
++        let mut x = 0x2545_F491_4F6C_DD1Du64;
++        let mut rnd = move || {
++            x ^= x << 13;
++            x ^= x >> 7;
++            x ^= x << 17;
++            x
++        };
++        for (b, s, size) in [
++            (58u32, 183_859_216_587_923_470_200u128, 1_000_000_000_000_000u128),
++            (60, 795_599_612_114_824_200_908, 1_000_000_000_000_000),
++            (62, 12_255_736_762_397_899_821_056, 1_000_000_000_000_000),
++            (64, 72_806_461_862_957_161_709_568, 1_000_000_000_000_000),
++            (57, test_fields::FRONTIER_57, 100_000_000_000_000),
++            (64, 41_242_006_262_957_161_709_568, 1_000_000_000_000_000),
++            (64, 52_125_117_810_081_128_433_988, 1_000_000_000_000_000),
++        ] {
++            let range = FieldSize::new(s, s + size);
++            let jp = join_params_for(b, &range).expect("a join field");
++            let fs = FieldSetup::new(b, s, s + size, jp).expect("setup");
++            let kept: std::collections::HashSet<u128> = fs.tlay.iter().map(|&(p, _)| p).collect();
++            let (p0lo, p0hi) = (fs.plo / fs.nparts, fs.phi / fs.nparts);
++            let span = p0hi - p0lo + 1;
++            let cert_of = |p: u128| {
++                let lo = p * fs.w;
++                let a = lo.max(fs.s);
++                let e = (lo + fs.w - 1).min(fs.e - 1);
++                fs.base.cert(a, e, jp.k)
++            };
++            let (mut dropped, mut children, mut certified, mut sampled) = (0u64, 0u64, 0u64, 0u64);
++            let mut tries = 0;
++            while dropped < 200 && tries < 200_000 {
++                tries += 1;
++                let p0 = p0lo + u128::from(rnd()) % span;
++                if kept.contains(&p0) {
++                    continue;
++                }
++                dropped += 1;
++                for v in 0..fs.nparts {
++                    let p = p0 * fs.nparts + v;
++                    if p < fs.plo || p > fs.phi {
++                        continue;
++                    }
++                    children += 1;
++                    assert!(
++                        cert_of(p).is_none(),
++                        "b{b}: prefix {p0} was dropped but its child {p} is certified"
++                    );
++                }
++            }
++            for _ in 0..200_000 {
++                let p = fs.plo + u128::from(rnd()) % (fs.phi - fs.plo + 1);
++                sampled += 1;
++                if cert_of(p).is_some() {
++                    certified += 1;
++                    assert!(kept.contains(&(p / fs.nparts)), "b{b}: top {p} certified, prefix dropped");
++                }
++            }
++            println!(
++                "b{b} [{s}, +{size:e}): top layer {} of {span} prefixes; {dropped} dropped prefixes, \
++                 {children} children, none certified; {certified} of {sampled} sampled tops certified, \
++                 every prefix kept",
++                fs.tlay.len()
++            );
++        }
++    }
++}

@@ -1,0 +1,107 @@
+diff --git a/common/src/join_plan.rs b/common/src/join_plan.rs
+index 6acdd384..92392614 100644
+--- a/common/src/join_plan.rs
++++ b/common/src/join_plan.rs
+@@ -943,3 +943,102 @@ pub(crate) mod tests {
+         assert_eq!(JoinPlan::for_field(&fs, lim), None);
+     }
+ }
++
++/// T2.4 audit (not for merge): the u32 index products of the join's kernels
++/// at the largest layouts the planner can give, every base 40-64, a range of
++/// device limits, with every top-layer prefix of a slice certified (the
++/// worst case: about a third to a half are).
++#[cfg(test)]
++mod audit_t2 {
++    use super::*;
++    use crate::overlap_join::{JOIN_MAX_BASE, JOIN_MIN_BASE, join_params_for};
++
++    #[test]
++    #[ignore = "T2.4 audit table"]
++    #[allow(clippy::cast_precision_loss)]
++    fn audit_t2_index_bounds() {
++        const G: u64 = 1 << 30;
++        let mut lims: Vec<(&str, JoinLimits)> = vec![];
++        for (name, buf) in [
++            ("wgpu 128M", 128u64 << 20),
++            ("wgpu 1G", G),
++            ("wgpu 2G", 2 * G),
++            ("wgpu 4G-1", 4 * G - 1),
++            ("wgpu 64-bit", u64::MAX),
++        ] {
++            lims.push((name, JoinLimits::for_buffer(buf)));
++        }
++        for (name, mem) in [("cuda 4G", 4u64), ("cuda 8G", 8), ("cuda 10G", 10), ("cuda 24G", 24), ("cuda 80G", 80)] {
++            lims.push((name, JoinLimits::for_buffer(mem * G / 4).with_vram_budget()));
++        }
++        let mut worst = [0u64; 6];
++        for base in JOIN_MIN_BASE..=JOIN_MAX_BASE {
++            let Ok(Some(r)) = crate::base_range::get_base_range_u128(base) else {
++                continue;
++            };
++            if r.range_end - r.range_start < 100_000_000_000_000 {
++                continue;
++            }
++            let s = r.range_start + (r.range_end - r.range_start) / 2;
++            let range = FieldSize::new(s, s + 100_000_000_000_000);
++            let Some(jp) = join_params_for(base, &range) else {
++                continue;
++            };
++            let block = crate::overlap_join::prefix_block(base, ndigits(range.last(), base), jp);
++            let first_end = (range.start() / block * block + block).min(range.end());
++            let Ok(probe) = FieldSetup::new(base, range.start(), first_end, jp) else {
++                continue;
++            };
++            let nbp = probe.bp_all.0.len() as u64;
++            let b = u64::from(base);
++            let w = probe.w as u64;
++            for (name, lim) in &lims {
++                let cap = max_slice_prefixes(&probe, *lim);
++                if cap == 0 {
++                    continue;
++                }
++                let mut fake = probe.clone();
++                fake.tlay = vec![(0, 0); cap];
++                let Some((plan, retry)) = JoinPlan::for_field(&fake, *lim) else {
++                    println!("b{base} {name}: cap {cap} has no plan");
++                    continue;
++                };
++                let ntl = cap as u64;
++                let slots = plan.slots as u64;
++                let rec = 8 * slots.max(retry.slots as u64) * ntl;
++                let lists = slots * b * nbp;
++                let list = 2 * u64::from(plan.list_cap.max(retry.list_cap));
++                let grid = ntl.div_ceil(256);
++                let nwork = slots * probe.nb as u64;
++                // Prefilter survivors per (top, partition) for a batch's
++                // u32 count to wrap: against b^f0, the most there can be.
++                let wrap = (1u64 << 32) as f64 / (slots * ntl) as f64;
++                println!(
++                    "b{base} {name:12}: prefixes {cap:>9} slots {slots:>2} list {:>10} retry {:>9} | \
++                     8*slots*ntl {rec:>11} slots*b*nbp {lists:>11} 2*list {list:>10} topgrid {grid:>6} \
++                     nwork {nwork:>6} | wrap at {wrap:>8.1}/top-partition (w = {w})",
++                    plan.list_cap, retry.list_cap
++                );
++                for (i, v) in [rec, lists, list, grid, nwork, (wrap * 1000.0) as u64].into_iter().enumerate() {
++                    if i == 5 {
++                        if worst[5] == 0 || v < worst[5] {
++                            worst[5] = v;
++                        }
++                    } else {
++                        worst[i] = worst[i].max(v);
++                    }
++                }
++                assert!(rec < 1 << 32 && lists < 1 << 32 && list < 1 << 32, "b{base} {name}");
++            }
++        }
++        println!(
++            "worst: 8*slots*ntl {} slots*b*nbp {} 2*list {} topgrid {} nwork {} min wrap density {:.1}",
++            worst[0],
++            worst[1],
++            worst[2],
++            worst[3],
++            worst[4],
++            worst[5] as f64 / 1000.0
++        );
++    }
++}
