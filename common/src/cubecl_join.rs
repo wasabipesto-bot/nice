@@ -558,8 +558,10 @@ mod kernels {
             SharedMemory::<u32>::new(comptime!(if lean && !n21_l { TOP_CAP as usize } else { 1 }));
         let mut t_ghi =
             SharedMemory::<u32>::new(comptime!(if lean && !n21_l { TOP_CAP as usize } else { 1 }));
-        let mut t_w =
-            SharedMemory::<u32>::new(comptime!(if n21_l { 4 * TOP_CAP as usize } else { 1 }));
+        let mut t_w = SharedMemory::<u32>::new_aligned(
+            comptime!(if n21_l { 4 * TOP_CAP as usize } else { 4 }),
+            16usize,
+        );
         // Per chunk of 32 tops: bit i set iff top i is clipped.
         let s_cw = SharedMemory::<Atomic<u32>>::new(comptime!((TOP_CAP / 32) as usize));
         // The batch's masks digit-major: bit i of `t_tr[c·64 + d]` is set iff
@@ -964,74 +966,78 @@ mod kernels {
                             let mut x = pm[j as usize] & vv[j as usize];
                             let r0 = rr[j as usize];
                             while plane_any(x != 0u32) {
-                                if x != 0u32 {
-                                    // N21 switch P (bit 1): x != 0 here, so its
-                                    // lowest set bit is find_first_set - 1, without
-                                    // trailing_zeros' select for x = 0.
-                                    let jt2 = if comptime!((n21 & 1) != 0) {
-                                        jc + (x.find_first_set() - 1u32)
-                                    } else {
-                                        jc + x.trailing_zeros()
-                                    };
-                                    x &= x - 1u32;
-                                    let pass = if comptime!(n21_l) {
-                                        let w4 = 4u32 * jt2;
-                                        walk_pf_lean(
-                                            ac[j as usize],
-                                            ac3[j as usize],
-                                            pc[j as usize],
-                                            pc3[j as usize],
-                                            t_w[w4 as usize],
-                                            mlo[j as usize],
-                                            mhi[j as usize],
-                                            t_w[(w4 + 1u32) as usize],
-                                            t_w[(w4 + 2u32) as usize],
-                                            base,
-                                            n21,
-                                        )
-                                    } else if comptime!(lean) {
-                                        walk_pf_lean(
-                                            ac[j as usize],
-                                            ac3[j as usize],
-                                            pc[j as usize],
-                                            pc3[j as usize],
-                                            t_dm[jt2 as usize],
-                                            mlo[j as usize],
-                                            mhi[j as usize],
-                                            t_glo[jt2 as usize],
-                                            t_ghi[jt2 as usize],
-                                            base,
-                                            n21,
-                                        )
-                                    } else {
-                                        walk_pf(
-                                            ac[j as usize],
-                                            pc[j as usize],
-                                            t_dm[jt2 as usize],
-                                            mlo[j as usize],
-                                            mhi[j as usize],
-                                            t_lo[jt2 as usize],
-                                            t_hi[jt2 as usize],
-                                            base,
-                                            k,
-                                            k2,
-                                        )
-                                    };
-                                    if pass {
-                                        let tid = if comptime!(n21_l) {
-                                            t_w[(4u32 * jt2 + 3u32) as usize]
+                                // N21 switch U (bit 32): two pops per round.
+                                #[unroll]
+                                for _u in 0..comptime!(if (n21 & 32) != 0 { 2u32 } else { 1u32 }) {
+                                    if x != 0u32 {
+                                        // N21 switch P (bit 1): x != 0 here, so its
+                                        // lowest set bit is find_first_set - 1, without
+                                        // trailing_zeros' select for x = 0.
+                                        let jt2 = if comptime!((n21 & 1) != 0) {
+                                            jc + (x.find_first_set() - 1u32)
                                         } else {
-                                            t_id[jt2 as usize]
+                                            jc + x.trailing_zeros()
                                         };
-                                        let at = s_cnt[0].fetch_add(1u32);
-                                        if at < SURV_SH_CAP {
-                                            s_t[at as usize] = tid;
-                                            s_r[at as usize] = r0;
+                                        x &= x - 1u32;
+                                        let pass = if comptime!(n21_l) {
+                                            let w4 = 4u32 * jt2;
+                                            walk_pf_lean(
+                                                ac[j as usize],
+                                                ac3[j as usize],
+                                                pc[j as usize],
+                                                pc3[j as usize],
+                                                t_w[w4 as usize],
+                                                mlo[j as usize],
+                                                mhi[j as usize],
+                                                t_w[(w4 + 1u32) as usize],
+                                                t_w[(w4 + 2u32) as usize],
+                                                base,
+                                                n21,
+                                            )
+                                        } else if comptime!(lean) {
+                                            walk_pf_lean(
+                                                ac[j as usize],
+                                                ac3[j as usize],
+                                                pc[j as usize],
+                                                pc3[j as usize],
+                                                t_dm[jt2 as usize],
+                                                mlo[j as usize],
+                                                mhi[j as usize],
+                                                t_glo[jt2 as usize],
+                                                t_ghi[jt2 as usize],
+                                                base,
+                                                n21,
+                                            )
                                         } else {
-                                            let g = surv_count[0].fetch_add(1u32);
-                                            if g < surv_cap {
-                                                surv[(2u32 * g) as usize] = tid;
-                                                surv[(2u32 * g + 1u32) as usize] = r0;
+                                            walk_pf(
+                                                ac[j as usize],
+                                                pc[j as usize],
+                                                t_dm[jt2 as usize],
+                                                mlo[j as usize],
+                                                mhi[j as usize],
+                                                t_lo[jt2 as usize],
+                                                t_hi[jt2 as usize],
+                                                base,
+                                                k,
+                                                k2,
+                                            )
+                                        };
+                                        if pass {
+                                            let tid = if comptime!(n21_l) {
+                                                t_w[(4u32 * jt2 + 3u32) as usize]
+                                            } else {
+                                                t_id[jt2 as usize]
+                                            };
+                                            let at = s_cnt[0].fetch_add(1u32);
+                                            if at < SURV_SH_CAP {
+                                                s_t[at as usize] = tid;
+                                                s_r[at as usize] = r0;
+                                            } else {
+                                                let g = surv_count[0].fetch_add(1u32);
+                                                if g < surv_cap {
+                                                    surv[(2u32 * g) as usize] = tid;
+                                                    surv[(2u32 * g + 1u32) as usize] = r0;
+                                                }
                                             }
                                         }
                                     }
