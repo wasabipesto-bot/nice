@@ -168,6 +168,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   as a small fix PR with a regression test; base 62's first telemetry; realized gains when
   demoux rebuilds; the user's open decisions (the pre-#222 residual; the NiceMark known-answer
   check). Keep Vast near $0.8 a day.
+- **18:31 UTC: #259's CI: 24 pass, 3 skipped, 1 fail, and the failure is the runner, not the
+  code** ("Build macOS-x86_64": the job was never acquired by a hosted runner after multiple
+  attempts; GitHub notes macOS capacity constraints). Format and clippy under Rust 1.100.0, the
+  lavapipe jobs with both compilers (the count form's first CI run on this commit), Metal on
+  macOS and the other builds all pass. I cannot re-run it (`gh run rerun` needs admin rights on
+  the repository) and pushed nothing; it re-runs on the next push or with the user's "Re-run
+  failed jobs". #251, #255, #256 unchanged: green, no comments, none merged; main still 41b4b40.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 
