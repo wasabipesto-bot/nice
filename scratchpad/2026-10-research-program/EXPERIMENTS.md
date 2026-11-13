@@ -5,6 +5,33 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## N21.1 A leaner walk and prefilter loop: exact variants, CUDA A/B, ACO instruction counts (2026-11-13 05:50–09:47 UTC, agent, cut off by a harness outage while finishing the write-up; `N21/RESULTS.md`, `N21/WINDOW-PLAN.md`, `N21/raw/` (`ab_table.txt`, `aco_table.txt`, box logs, dumps, `scripts/window/`); fork branches `exp/n21-walk-loop` (switches, base = main a7a59c1 + #255 + #256), candidates `exp/n21-popcount-test-wgpu` 3a4899e and `exp/n21-ffs-pop` be24d18, each one commit on main; box 60456234, RTX 3080 at 180 W, 7 h TTL, ~$0.84)
+
+The loop today (b62): on ACO for GFX1201 a walk round in which no lane passes is 59 instructions
+(52 ALU: 35 vector, 14 scalar, 3 shared-memory), plus 23 when a lane passes; on NVIDIA 42 SASS.
+Variants as comptime switches of one binary; the two that matter: **M**, the four-digit test as
+one population count (`popcount(A & !seen) == 4`, a set identity: the four digits are distinct
+and unseen iff that count is 4), and **P**, popping the next set bit without `trailing_zeros`'
+zero case.
+
+| | ACO, ALU instructions per no-pass round | RTX 3080 b62 1e17 (4 rounds) | b60 1e16 (3) | b64 1e17 (3) |
+|---|---|---|---|---|
+| today | 52 | 78.7 s | 14.75 s | 160.4 s |
+| M | 44 (−8) | | | |
+| P + M | 42 (−10) | ×0.989 | ×0.987 | ×0.981 |
+| P + M + B (b64 bit field) | 40 at b64 (−12) | ×0.989 | ×0.987 | ×0.980 |
+| P + M + D (append in a second walk) | 44, the 16-instruction pass path moved out | ×0.967 | ×0.980 | ×0.951 |
+
+Exact: an argument for every input per variant, host tests (exhaustive four-tuples over bases
+10–64 for M), dense compares against the CPU join on CUDA at b60 1e16, b62 1e17 and b64 1e17,
+lavapipe 8/8 with both compilers, for every switch and for both candidate binaries. **On NVIDIA
+nothing gains (M costs four more SASS instructions per round there), so the candidate applies M on
+every runtime but CUDA and leaves CUDA's kernel unchanged.** For the RX 9070 XT only counts
+exist: at N17's price of about half a percent of a field per instruction, P + M is ×1.03–1.05
+[estimate]. **Kill criterion: not met on the count (−10 ≥ 8), so the lead stays open, but its
+gain on the one card it is for is unmeasured.** A 30-minute window plan with tested scripts is
+in `N21/WINDOW-PLAN.md`.
+
 ## CKF.1 PR #251's check kernel on partly filled planes: reproduced, fixed, verified (2026-11-13 06:32–09:15 UTC, agent; `CKF/RESULTS.md`, `CKF/PR-BODY-DELTA.md`, `CKF/raw/` (`repro/make_repro.py`, `0001-fix.patch`, box logs and outputs); fork `pr/check-d` 8d11e0b on bc9d87c; box 60460107, RTX 3080 at 180 W, 2.89 h, ~$0.31)
 
 **Reproduced on a real device:** bc9d87c's check kernel launched in count mode on one CUDA

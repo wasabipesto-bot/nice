@@ -16,7 +16,7 @@ listed at the end. Everything else in the body is unchanged.
   a sum of 1, and the leader's start as a sum. The counter is a fifth word of the batch's `ran` buffer, which the
   cube counts do not read. The kernel also counts the entries it checked and sums their indices into two more words,
   and the host compares both with the list after every batch (see Soundness). The kernel launches 2048 cubes, more
-  than a GPU holds at once at its ~40 registers (a 3080 holds 408, an H100 792); cubes that start after the list is
+  than a GPU holds at once at its 39–47 registers (at 47, b62 and b64, 5 cubes per SM: a 3080 holds 340, an H100 660); cubes that start after the list is
   exhausted exit at once. The old grid-stride loop over 1024 cubes left a tail on every device.
 
 ## Soundness → replace the section with
@@ -34,7 +34,7 @@ The check computes the same base-b digits of n² and n³ by another route, and d
 
 ## Measurements → insert before the existing text
 
-**The complete hand-out and the host's count (this head against the previous one).** The same box and harness as below (RTX 3080 at the host's 180 W cap, driver 580.159.03): the previous head `bc9d87c` (B), this head (F) and main `a7a59c1` (M), each built before any timing, and one process per field after one 1e14 warm-up field. The fields are b62 1e17 at 7520566762397899821056 (1 field), b64 1e17 at 58557331862957161709568 (1 field) and b60 1e16 at 1447429612114824200908 (2 fields in flight). Three rounds were interleaved with the order rotated; b62 got three more (F B M, F B, B F). Before each run the card cooled to 40 °C, and nothing else ran. Every process's kernels were replayed through the driver's JIT for their registers. In 3 of 42 processes (two F and one B, all at b62) the JIT gave the unchanged join kernel a 40-register variant with 24 bytes of spills, which costs about 2.4 % of the field. Those are left out; with them, b62 is 72.019 s against 72.108 s. Median power was 179.5–179.9 W in every run.
+**The complete hand-out and the host's count (this head against the previous one).** The same box and harness as below (RTX 3080 at the host's 180 W cap, driver 580.159.03): the previous head `bc9d87c` (B), this head (F) and main `a7a59c1` (M), each built before any timing, and one process per field after one 1e14 warm-up field. The fields are b62 1e17 at 7520566762397899821056 (1 field), b64 1e17 at 58557331862957161709568 (1 field) and b60 1e16 at 1447429612114824200908 (2 fields in flight). Three rounds were interleaved with the order rotated; b62 got three more (F B M, F B, B F). Before each run the card cooled to 40 °C, and nothing else ran. Every process's kernels were replayed through the driver's JIT for their registers. In 3 of 42 processes (two F and one B, all at b62) the JIT gave the unchanged join kernel a 40-register variant with 24 bytes of spills, which costs about 2.4 % of the field. Those are left out; with them, b62 is 72.108 s for this head against 72.019 s for the previous one (+0.12 %). Median power was 179.5–179.9 W in every run.
 
 | field | previous head s/field (rounds) | this head | main | this head vs previous | vs main |
 |---|---|---|---|---|---|

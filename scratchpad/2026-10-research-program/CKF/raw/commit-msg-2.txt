@@ -1,0 +1,19 @@
+Overlap join: test the check's index sum, and show the partly filled planes
+
+- The host's comparison is a pure function, check_complete, with a unit
+  test: right count and sum pass (also on an overflowed list); one entry
+  skipped fails on the count; one entry checked twice in place of another
+  fails on the sum; the sum is the device's, mod 2^32, where it wraps.
+- A second test-only mode, CHECK_DUP_FIRST: the lane whose entry is the
+  list's second checks and counts the first, so the count is right and the
+  index sum one short. A pass of batches and a partition's re-run must both
+  fail with the index-sum error.
+- A third, CHECK_MIN_TAKE: each take's leader records the take's size, and
+  the partly-filled-plane test prints the smallest take per cube size (and
+  asserts it on CUDA: 4 lanes for 100-thread cubes, 16 for 48), so a log
+  shows whether a device really ran partly filled planes.
+
+The three are comptime bits of the check's mode, set only by tests; the
+production kernels compile without them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

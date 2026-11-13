@@ -81,6 +81,22 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   SPIR-V build and on CUDA) drains `PLANE_DIM` entries per round by position mod `PLANE_DIM`, and
   the cube-scoped queue has lane 0 write each plane's total. Neither has an end-to-end count.
   Full planes hold on every device in production; these are robustness gaps, not known losses.
+- **09:47 UTC: a harness outage (API 403) killed both running agents and ended my own turn; nobody
+  resumed them until the 12:50 UTC reminder.** Both boxes ran idle to their TTL (60456234 to
+  12:44, 60478814 to 12:35; ≈ $0.7 wasted). Lost: three hours on the #251 review fixes.
+  Not lost: the walk-loop agent had saved everything but one table row.
+- **12:55 UTC: recovery.** Fresh box 60499346 (RTX 3080, $0.10/h, 2.5 h TTL) and the CKF agent
+  resumed on the review fixes (hard stop 14:45 UTC, told to commit early). #251 is unchanged at
+  8d11e0b (not merged; no comments).
+- **N21 collected (EXPERIMENTS N21.1).** The digit test as one population count plus a cheaper
+  pop: −10 of 52 instructions per walk round on Mesa's compiler's count, exact; 1–2 % slower on
+  an RTX 3080, so the candidate branch changes every runtime but CUDA. On the 9070 XT the gain is
+  an estimate (×1.03–1.05). The kill line (≥ 8 instructions) is not met, so the lead stays open
+  pending a 30-minute window; under ×1.03 on the card it closes. Tables checked against the raw
+  files; one placeholder in the write-up replaced by a note.
+- **Lesson:** an outage that ends my turn leaves boxes burning to their TTL. From now on every
+  box gets a TTL only a little past its agent's hard stop, and agents are told to commit and copy
+  early.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 

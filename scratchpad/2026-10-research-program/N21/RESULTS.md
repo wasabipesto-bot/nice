@@ -28,7 +28,7 @@ GFX1201, not timings**; nothing here ran on that card.
 - **CUDA, RTX 3080 at 180 W** (§5; 3–4 interleaved rounds, ≤ 50 °C starts, counts identical): **nothing gains on
   NVIDIA.** P+M ×0.989 (b62), ×0.981 (b64), ×0.987 (b60): M is +4 SASS per round there (two `SHF` per one-hot on a
   32-bit machine; the compares it replaces are one predicate instruction each). D ×0.967 / ×0.951 / ×0.980, U
-  ×0.972, B neutral (×0.980 against P+M's ×0.981 at b64). @@PL@@
+  ×0.972, B neutral (×0.980 against P+M's ×0.981 at b64). (The P and L timing row was being filled in when the agent was cut off at 09:47 UTC by a harness outage; the per-round values are in `raw/ab_table.txt` and §5.)
 - **Estimate for the RX 9070 XT** (§6, not a measurement): P+M ×1.02–1.09, central ×1.03–1.05; M alone ×1.01–1.07.
 - **Candidates** (each one commit on main `a7a59c11`, no CHANGELOG line): **`exp/n21-popcount-test-wgpu` `3a4899ee`**
   (M on every runtime but CUDA; CUDA's kernel unchanged) and **`exp/n21-ffs-pop` `be24d187`** (P). Also pushed and
@@ -66,7 +66,8 @@ GFX1201, not timings**; nothing here ran on that card.
   on the box with ACO only (`taskC_build_mesa.sh`); the SPIR-V that CubeCL generates for the join kernel dumped on
   lavapipe by Xd (`CUBECL_DEBUG_SPIRV`, the production field shapes: b60 1e16, b62 1e17, b64 1e17 at N16's starts,
   `NICE_EXP_N21` per variant), and compiled for GFX1201 on RADV's null winsys (`pipec`, no required subgroup size, as
-  wgpu creates it: wave64) with `RADV_DEBUG=shaders,shaderstats`. Dumps: `raw/box/spv/<b|d><base>_<n21>/`.
+  wgpu creates it: wave64) with `RADV_DEBUG=shaders,shaderstats`. Dumps: `raw/box/spv/<b|d|z><base>_<n21>/` (b = binary
+  Xd, d = Xd4, z = Xd5).
 
 ## 2. The loop as it is (mode 0 = main + #255 + #256)
 
@@ -129,7 +130,7 @@ Per walk round of the first entry slot (the second is the same ±1). **ALU** = V
 lane passes (the waits and `s_delay_alu` hints excluded: they are ACO's scheduling, and they move with every change);
 **all** includes them. The pass path is what a round adds when some lane passes (with D: the round of the second walk,
 which runs only over the passing pairs' bits). Whole kernel: 96 VGPRs, 14,848 B of LDS, 16 waves per SIMD for every
-variant (LDS-bound as in N16; no variant changes occupancy). `raw/aco_table.txt` (`acotab.py`).
+variant (all 47 dumps; LDS-bound as in N16; no variant changes occupancy). `raw/aco_table.txt` (`acotab.py`).
 
 | variant (`NICE_EXP_N21`) | b62 all | VALU | SALU | LDS | waits | 32-bit mul | **ALU** | Δ ALU | pass path ALU |
 |---|---|---|---|---|---|---|---|---|---|
@@ -209,7 +210,8 @@ local memory and every mode-0 process to 47–48 + 0: there the popcount form's 
   the old membership test was one funnel shift per digit, and the six compares it removes were one `ISETP.EQ.OR` each.
   M's runs hold a slightly higher clock at the same 180 W (1,470 against 1,455 MHz) and are still slower.
 - **U forces the spill variant** (40 registers + 32–56 B in every process) and loses 3 %.
-- **D loses 2.4–3.5 %** (and its PTX draws the spill variant in 3 of 4 processes): on a 32-lane warp a round with a
+- **D loses 2–5 %** (b60 / b62 / b64: ×0.980 / ×0.967 / ×0.951; its PTX draws a spilling allocation in most
+  processes; the one spill-free b62 run is ×0.976): on a 32-lane warp a round with a
   passing lane is rarer than on a 64-lane wave, so moving the append out of the walk saves less than the second walk
   and the mask bookkeeping cost.
 
@@ -256,8 +258,8 @@ run of a field: b60 2,009,962,005 join survivors / 134,709,341 checked; b62 679,
 | binary | modes run (`NICE_EXP_N21`) | result |
 |---|---|---|
 | X (`82a6e4e2`) | 0, 1 (P), 2 (L, unaligned record), 4 (W), 8 (M), 15 (P+L+W+M) | 18 / 18 ok |
-| X4 (`2d3e10d3`) | 128 (D), 239 (P+L+W+M+U+B+D: every switch), 32 (U), 64 (B) | @@X4DENSE@@ |
-| CM, CP (the candidates' own code) | — | @@CDENSE@@ |
+| X4 (`2d3e10d3`) | 128 (D), 239 (P+L+W+M+U+B+D: every switch), 32 (U), 64 (B) | 12 / 12 ok |
+| CM, CP (the candidates' own code) | — | 6 / 6 ok |
 
 **lavapipe** (Mesa llvmpipe; every wgpu test of `cubecl_join`, `--skip cuda`: CPU-reference parity over the 17
 windows including b64's lean shape, FD tops, layouts, slices; `raw/box/logs/t/lvp_*.log`): **8/8 passed** for X4 with
