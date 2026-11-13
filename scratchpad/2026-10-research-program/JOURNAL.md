@@ -4,6 +4,36 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
+  $24.55; ivory 7.0 GB free. No day missed. No user message since the window grant. Main
+  unchanged (a7a59c1); **#251, #255, #256 open, all green and mergeable, no comments**; two
+  Dependabot PRs (#257, #258) are not mine.
+- **Deploy measured (EXPERIMENTS T2.5):** demoux resumed at ≈ 17:20 UTC on 11-12 on a7a59c1 (main
+  with #250, #252–#254). Realized gain over c0c357a at b60, by plan group at matched survivors,
+  hours when the card was not shared: **×1.029 [1.025–1.035]** (the window predicted ×1.03–1.04
+  for #250). In seven hours of 11-12 (20–23 and 01–03 UTC) the card was shared with another load
+  and its join seconds doubled; a naive comparison reads ×0.84. The M4 and the fleet did not
+  change build (c0c357a, v3.4.7). b60 92.0 % (+6.0 points in a day); ends ≈ 11-14. b62 is on the
+  server in 1e17 fields (95,430 of them).
+- **Plan, three tracks in parallel (the user's budget remark of 11-12), kill criteria first:**
+  - **N21, the walk and prefilter loop** (26–30 % of a field on demoux, 16–21 % on NVIDIA): exact
+    reformulations with fewer instructions per walked pair; CUDA A/B and offline ACO counts; agent
+    + box 60456234 (RTX 3080 at 180 W, $0.108/h, 7 h TTL), `N21/BRIEF.md`. **Kill: no exact
+    variant removes ≥ 8 instructions per round on ACO's count or gains ≥ ×1.03 on CUDA.**
+  - **N6, fewer top certificates** (a fifth of a field on every card; two thirds of the tests
+    fail): a counting study of group certificates on the CPU, no GPU; agent on ivory,
+    `N6/BRIEF.md`. This was parked as "only if f0 3 returns after N1"; N1 is parked, so f0 3 is
+    the shape we have. **Kill: no exact scheme removes ≥ 40 % of the top-test work net at b62
+    and b64.**
+  - **T2.4, soundness audit of today's GPU join** (every path that could lose a candidate
+    unnoticed: buffers, concurrency, filters, device failures, bookkeeping); agent, reading and
+    host models only, `T2/SOUNDNESS-BRIEF.md`. An audit: no kill criterion; a real loss path
+    is handed back at once.
+- Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
+  exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
+
 ## 2026-11-12 (cycle 3 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $11.59 of $30 (fleet $21.01); credit

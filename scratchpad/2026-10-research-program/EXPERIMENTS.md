@@ -5,6 +5,26 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T2.5 Realized gain of main a7a59c1 on demoux, from telemetry (2026-11-13, director, public API; `../2026-11-fresh-eyes/realized_1113.py`, `recent_niceonly_1113.json`, `demoux_launches_1112.json`)
+
+`uv run --with numpy python realized_1113.py`. demoux, b60 1e16, two fields in flight: 8,232
+non-empty fields on c0c357a (11-11 03:37 → 11-12 15:12 UTC) and 3,283 on a7a59c1 (from 11-12
+17:20 UTC). Within a plan group (same launch count) join seconds against survivors is a line;
+the builds' lines are compared at the group's pooled median survivors, bootstrap 95 %.
+
+| launches per field | fields old / new (clean hours) | seconds old → new | gain |
+|---|---|---|---|
+| 1,350 | 3,831 / 808 | 12.87 → 12.52 | ×1.028 [1.025, 1.030] |
+| 1,120 | 1,017 / 200 | 12.69 → 12.30 | ×1.031 [1.027, 1.035] |
+| 1,170 | 781 / 168 | 12.90 → 12.48 | ×1.034 [1.030, 1.038] |
+| 1,080 | 287 / 77 | 9.92 → 9.67 | ×1.026 [1.015, 1.037] |
+
+**×1.029 weighted** (#250 on this card; #252–#254 do not act at b60 on a GPU). "Clean hours" = an
+hour whose 1,350-launch fields have a 90th percentile of join seconds under 15 s: in seven hours
+of 11-12 (local 15–18 and 20–22) the card was shared with another load and the join seconds
+doubled (22–25 s), which makes the unfiltered comparison read ×0.843. **Rule for the future:
+filter shared-card hours before reading a realized gain.**
+
 ## T2.3 Sampled exact re-verification of nice-only submissions by device and build, bases 58 and 60 (2026-11-12 15:41–21:46 UTC, agent; `T2/AUDIT.md`, `T2/raw/` (census, `sample.json`, queues, `compare.txt`, `cell_table.md`, `dup_rule.txt`, `pre222_only.txt`, `proof_hosts_block.txt`, `box/`, `box2/`); boxes 60374124 (went offline at 18:03, 2.68 h) and 60389955 (3.46 h), RTX 3080, ~$0.71 together)
 
 Mechanism: the real client of each build, compiled from its commit, against a local stub of the
