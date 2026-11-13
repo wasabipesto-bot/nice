@@ -65,6 +65,22 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   hardware: the review is asked what its correctness there rests on.
 - **Same assumption on main (new T2.6):** `top_slot` depends on lane 0 the same way (verified by
   reading). No production device is affected; a small fix PR with a regression test is queued.
+- **09:33 UTC: the review of the #251 fix is in (`CKF/REVIEW.md`; 247 k tokens): ready after
+  small fixes.** The reviewer's own models (random and exhaustive) find the hand-out complete in
+  both forms for any lane population; deliberately broken assumptions (a 64-lane plane reported
+  as 32; lanes that do not reconverge) are always caught by the host check or hang, never pass.
+  Per backend, read in CubeCL's sources: ballot, shuffle and sums are over active lanes on WGSL,
+  SPIR-V and Metal; CUDA's ballot clears inactive lanes. The scan form on the 9070 XT rests on
+  Vulkan's definition of scans over active lanes and on the driver restoring the lane mask after
+  a branch; it has not run on 64-lane hardware. Findings: no test fails the index-sum half of
+  the host check (F1); the regression test only bites on CUDA, which CI does not run (F2); two
+  wording errors in the body delta (F4). **The CKF agent was resumed at 09:37 UTC on a fresh box
+  (60478814, 3 h TTL) to add the F1 test, fix the text and deliver a full PR body.**
+- **More of the same class on main (added to T2.6):** besides `top_slot`, the reviewer points at
+  the stride kernels in `cubecl_backend.rs`: the plane-scoped survivor queue (default on the
+  SPIR-V build and on CUDA) drains `PLANE_DIM` entries per round by position mod `PLANE_DIM`, and
+  the cube-scoped queue has lane 0 write each plane's total. Neither has an end-to-end count.
+  Full planes hold on every device in production; these are robustness gaps, not known losses.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 
