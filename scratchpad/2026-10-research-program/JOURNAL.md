@@ -106,6 +106,19 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   passed on the re-run), as are #255 and #256; no comments or reviews from the maintainer; main
   unchanged (a7a59c1). #251 is ready again; its 64-lane hand-out path is the one thing not yet
   run on real hardware (the 45-minute demoux window was requested). No instance running.
+- **15:39 UTC: the user granted a demoux window of at most one hour** (production client stopped,
+  card idle). Used 15:40–16:21 UTC (EXPERIMENTS N21.2 / CKF.3): workspace
+  `/tmp/claude-exp-2026-11-13-amd`, watchdog wipe at 16:38, my driver `go13.sh`: build #251's
+  fixed head and run its device tests while the other two binaries built in the background, then
+  the walk-loop variants, then #251 against main. Clean at 16:21 (workspace removed, watchdog
+  stopped by PID, one ntfy).
+  - **#251 on the card: 10 of 10 device tests pass, with partly filled 64-lane planes; ×1.12–1.13
+    over main at b62 and b60, ×1.135 at b64.** The PR body's wgpu paragraph now carries these.
+    Nothing about #251 is unverified any more.
+  - **Walk loop: the population-count test is ×1.037 at b62 (three rounds) and ×1.080 at b64;
+    with the cheaper pop ×1.049 and ×1.10.** A PR candidate for the long pole. An agent is
+    preparing the branch and a short body (`N21/PR/BRIEF.md`, hard stop 17:30 UTC); a reviewer
+    follows; then the PR (the fourth open one).
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 

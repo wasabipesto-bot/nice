@@ -89,7 +89,7 @@ NiceMark nice-only (`nice_client niceonly --gpu --benchmark --benchmark-secs 150
 | b60 MSD-weak (sampled) | 7.969e14 | 8.444e14 | ×1.060 |
 | b62 MSD-weak (sampled) | 9.658e14 | 1.024e15 | ×1.060 |
 
-**What a wgpu device should expect.** An earlier head of this branch, with the same check arithmetic and the previous hand-out, measured ×1.13–1.14 over the then-main on an RX 9070 XT (RADV, Vulkan, CubeCL's SPIR-V compiler) at b62 1e17 and b60 1e16, three interleaved rounds, counts identical: the check is a larger share of a field on that card than on NVIDIA. This head has not been run there. On 64-lane subgroups its hand-out takes the wide form (an exclusive scan and a sum), which has run on lavapipe, on CI's Metal runner and, forced, on CUDA with full warps, but not on 64-lane hardware. If that form went wrong on a device, the host's count would fail the field with an error; it would not report an empty result.
+**On an RX 9070 XT (RADV, Vulkan, CubeCL's SPIR-V compiler; 64-lane subgroups, so the wide form of the hand-out).** This head, on that card at its 304 W cap: every wgpu device test of `cubecl_join` passes (10 of 10), among them the check counts (65 lists, 1,168,717 entries, 84,652 synthetic n over 22 shapes) and the partly-filled-plane test, which there ran takes of 36 and 48 lanes of 64 with every entry checked once. Against main (`a7a59c1`), same harness and fields as below, counts identical, every run at 99–100 % busy and 303–305 W: b62 1e17 72.74 → 64.94 s and 73.33 → 65.09 s (**×1.120, ×1.127**); b60 1e16 13.05 → 11.56 s and 12.99 → 11.60 s (**×1.129, ×1.120**); b64 1e17 136.51 → 120.31 s (**×1.135**, one round). The check is a larger share of a field on that card than on NVIDIA.
 
 ## Exactness
 

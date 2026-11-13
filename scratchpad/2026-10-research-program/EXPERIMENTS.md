@@ -5,6 +5,35 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## N21.2 / CKF.3 Third demoux window: #251's device tests on the card, #251 against main, the walk-loop variants (2026-11-13 15:40–16:21 UTC, director, 41 of 60 minutes granted; `N21/WINDOW-RESULTS.md`, `N21/raw/demoux/` (55 files: `go.out`, `tests_C.log`, per-run `.log` and `.gpu`), driver `N21/raw/scripts/window13/go13.sh`; binaries C = fork `pr/check-d` 1f41d64, M = main a7a59c1, E = fork `exp/n21-walk-loop` 2d3e10d)
+
+RX 9070 XT (RADV, wgpu with CubeCL's SPIR-V compiler), production client stopped by the user;
+every timed run 99–100 % busy, 302–305 W, 3.00–3.17 GHz, counts identical per field.
+
+**#251's fixed head on the card: all 10 wgpu device tests of `cubecl_join` pass**, including the
+check counts (1,168,717 list entries over 22 shapes) and the partly-filled-plane test, which on
+this card's 64-lane planes ran takes of 36 and 48 lanes in the scan form with every entry
+checked once. **The path that had never run on 64-lane hardware has now run there.**
+
+| #251 fixed head against main | main (s) | head (s) | gain |
+|---|---|---|---|
+| b62 1e17 (2 rounds) | 72.74, 73.33 | 64.94, 65.09 | ×1.120, ×1.127 |
+| b60 1e16 (2 rounds) | 13.05, 12.99 | 11.56, 11.60 | ×1.129, ×1.120 |
+| b64 1e17 (1 round) | 136.51 | 120.31 | ×1.135 |
+
+| walk-loop variants (base = main + #255 + #256) | base (s) | population-count test | + cheaper pop |
+|---|---|---|---|
+| b62 1e17, 3 rotated rounds | 68.34, 68.58, 68.71 | ×1.040, ×1.034, ×1.037 → **×1.037** | ×1.045, ×1.049, ×1.050 → **×1.049** |
+| b64 1e17 | 117.80, 117.66 | **×1.080** (1 round) | **×1.100, ×1.097** (2 rounds) |
+
+The instruction-count estimate (×1.03–1.05) held at b62 and was beaten at b64, where the
+prefilter is a larger share and #255 has already removed its multiplies. #255 and #256 together
+are ×1.07 at b62 and ×1.16 at b64 on this card (main against the variants' base, same hour;
+derived). **Verdicts: #251 verified on the card; the population-count test is a PR candidate
+(×1.08 at the base that matters, ×1.037 at b62); the cheaper pop adds ×1.01–1.02 and stays a
+ready follow-up.** Window closed at 16:21 UTC: workspace removed, watchdog stopped by PID,
+nothing of mine left, one ntfy sent.
+
 ## CKF.2 The review's fixes on PR #251 (2026-11-13 12:55–13:25 UTC, agent; `CKF/REVIEW.md` (the independent review, with `CKF/review-model/`), `CKF/RESULTS.md` §7, `CKF/PR-BODY.md`, `CKF/raw/box2/`; fork `pr/check-d` 1f41d64 on 8d11e0b; box 60499346, RTX 3080, 0.54 h, ~$0.06; an earlier box, 60478814, was lost to the 09:47 outage)
 
 Review of 8d11e0b: the hand-out is complete and non-overlapping by construction in both forms
