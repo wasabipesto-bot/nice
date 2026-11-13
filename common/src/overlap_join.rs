@@ -51,6 +51,8 @@
 //! without it. A slice prunes by its own certificate, from the unpruned
 //! list.
 
+pub mod n6;
+
 use crate::FieldSize;
 use crate::client_process::get_is_nice;
 use anyhow::{Result, anyhow, ensure};
