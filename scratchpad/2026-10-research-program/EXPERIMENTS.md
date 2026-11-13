@@ -5,6 +5,28 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## N21.3 The population-count prefilter test as PR #259: review and device verification (2026-11-13 16:22–17:41 UTC; `N21/PR/` (`PR-BODY.md`, `NOTES.md`, `REVIEW.md` with `review-pfcheck.rs`, `VERIFY.md`, `raw-verify/`); fork `pr/join-prefilter-popcount-spirv` 3b77370 = 760512c (the change, on main 41b4b40) + c53d99f (the compare form's statements in main's order) + the changelog number; box 60522271, RTX 3080 at 280 W, 0.81 h, ~$0.08)
+
+Scope decision (director): the count form is compiled only on `wgpu<spirv>` (Vulkan through
+CubeCL's SPIR-V compiler), the one configuration it was measured to help; CUDA, Metal and WGSL
+keep the compares. Review: the reviewer's own exhaustive check (every digit 4-tuple below 64
+against every relevant mask setting, 768,289,920 cases) finds 0 mismatches against the old form
+as the kernel computes it. Verification on the box, branch c53d99f against main 41b4b40:
+
+| what | result |
+|---|---|
+| CUDA source of every production kernel at b62 1e17 and b64 1e17, normalised | identical to main's |
+| WGSL for naga (CI's lint dump, 14 shaders) | identical |
+| SPIR-V kernels on lavapipe | only the join kernel differs (2,020 → 1,983 instructions, `OpBitCount` 2 → 6) |
+| CUDA device tests of `cubecl_join` | 7 of 7 pass |
+| CUDA dense compare against the CPU join, 8 partitions each | equal at b62 1e17 and b64 1e17 |
+| lavapipe, SPIR-V compiler (count form) and naga (compares) | 8 of 8 pass each (5 run, 3 are opt-in) |
+| one interleaved check on CUDA, b62 1e17 | branch 65.03 s, main 64.99 and 64.88 s, counts identical |
+
+Lint and host tests pass under Rust 1.100.0 (main's new pin). PR #259 opened 17:41 UTC with the
+RX 9070 XT numbers of N21.2 (×1.037 at b62 in three rounds, ×1.080 at b64 in one), stated as
+measured on an experiment build on main + #255 + #256.
+
 ## N21.2 / CKF.3 Third demoux window: #251's device tests on the card, #251 against main, the walk-loop variants (2026-11-13 15:40–16:21 UTC, director, 41 of 60 minutes granted; `N21/WINDOW-RESULTS.md`, `N21/raw/demoux/` (55 files: `go.out`, `tests_C.log`, per-run `.log` and `.gpu`), driver `N21/raw/scripts/window13/go13.sh`; binaries C = fork `pr/check-d` 1f41d64, M = main a7a59c1, E = fork `exp/n21-walk-loop` 2d3e10d)
 
 RX 9070 XT (RADV, wgpu with CubeCL's SPIR-V compiler), production client stopped by the user;

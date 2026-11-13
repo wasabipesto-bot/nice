@@ -154,6 +154,20 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   branch against main (must be identical), the SPIR-V join kernel (must differ), and the device
   tests of this exact commit on CUDA and lavapipe with both compilers; `N21/PR/VERIFY.md`, hard
   stop 18:10 UTC. The PR is opened only if that holds. Fallback reminder 18:20 UTC.
+- **17:41 UTC: PR #259 opened** (EXPERIMENTS N21.3). The verification held: on this exact branch
+  the CUDA source of every production kernel and all 14 WGSL shaders are identical to main's,
+  only the SPIR-V join kernel differs, and the device tests pass on CUDA and on lavapipe with
+  both compilers. Box 60522271 destroyed after 0.81 h. Four program PRs open: #251, #255, #256,
+  #259 (#259 and #255 touch the same function and will need a merge when one lands). CI check on
+  #259 at 18:30 UTC.
+- **Day:** agents: soundness audit 477 k, top-certificate study 331 k, walk loop 400 k (est.; cut
+  off), #251 fix 500 k across four runs (fix, review fixes, verification of #259), its reviewer
+  247 k, #259's branch 173 k and its reviewer 157 k: about 2.3 M subagent tokens, all Opus. Vast
+  about $2.2 over six boxes ($0.7 of it burned by the 09:47 outage); month ≈ $15.4 of $30.
+- **Tomorrow:** merge-ups as PRs land; T2.6 (the lane-0 assumptions on main: `top_slot` first)
+  as a small fix PR with a regression test; base 62's first telemetry; realized gains when
+  demoux rebuilds; the user's open decisions (the pre-#222 residual; the NiceMark known-answer
+  check). Keep Vast near $0.8 a day.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 

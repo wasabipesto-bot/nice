@@ -72,15 +72,19 @@ The pass path (16 ALU), 96 VGPRs, 14,848 B of shared memory and 16 waves per SIM
   against random seen sets, plus 10^7 random tuples) and `lean_prefilter_matches_the_division_form` (10^6 random
   entries and tops per base 10–64 against the division form). All non-ignored `nice_common` tests, `cargo fmt` and
   `cargo clippy -p nice_common --all-targets --features cubecl -- -D warnings` pass on this branch with Rust 1.100.0.
-- **lavapipe (llvmpipe), which runs the count form:** every wgpu test of `cubecl_join` passes with CubeCL's SPIR-V
-  compiler and with naga (8 each; three are opt-in and return early). The parity test's b64 window runs
-  `walk_pf_lean` and compares its survivors batch by batch with the CPU reference.
-- **CUDA (RTX 3080), count form forced on in experiment builds:** the dense compare against the CPU join
-  (`cubecl_cuda_join_matches_the_cpu_join_on_a_dense_field`: hits and both survivor counts) is equal on b60 1e16, b62
-  1e17 and b64 1e17, and a build with the count form on every runtime passes the 7 CUDA device tests of `cubecl_join`.
-- **RX 9070 XT:** every timed run above gave the base's counts.
-
-This branch's own CUDA kernel was not run on a device.
+- **Other runtimes are unchanged, compared on this branch against main (`41b4b40`):** the CUDA source CubeCL generates
+  for every kernel of a production run (join, check, top, FD top, bucket) at b62 1e17 and b64 1e17 is identical after
+  normalising variable numbering and declaration order; the WGSL naga gets is identical for all 14 shaders of CI's lint
+  dump. With the SPIR-V compiler only the join kernel differs (2,020 → 1,983 instructions, `OpBitCount` 2 → 6).
+- **This branch on lavapipe (llvmpipe):** every wgpu test of `cubecl_join` passes with CubeCL's SPIR-V compiler, which
+  runs the count form, and with naga, which runs the compares (8 each; three are opt-in and return early). The parity
+  windows run `walk_pf_lean` and compare its survivors batch by batch with the CPU reference.
+- **This branch on CUDA (RTX 3080):** the 7 CUDA device tests of `cubecl_join` pass and the dense compare against the
+  CPU join is equal on 8 partitions each of b62 1e17 and b64 1e17 (the compares, as on main). One interleaved check at
+  b62 1e17: 65.03 s against main's 64.99 and 64.88 s, counts identical.
+- **The count form on real hardware, in experiment builds:** on the RX 9070 XT every timed run above gave the base's
+  counts; on CUDA, with the count forced on, the dense compare against the CPU join was equal on b60 1e16, b62 1e17 and
+  b64 1e17.
 
 ## Not in this PR
 
