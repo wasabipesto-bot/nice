@@ -47,6 +47,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     `pr/check-d`. A reviewer follows before I call #251 ready again.
   - The audit's gap 1 (a wrong-computing device is invisible; NiceMark records the exact
     counters and compares them with nothing) goes to the user as a proposal, not built.
+- **06:47 UTC: the top-certificate study handed back (EXPERIMENTS N6.1; 331 k tokens, no GPU).**
+  Exact counts on 4.1e8 pair tests: two thirds fail, in long runs along the partition axis, but
+  the floor for any exact scheme is 0.36 of today's tests, and the best scheme a GPU can run
+  (group certificates, then today's kernel) costs 0.58–0.63 of today's top work. Field level:
+  ≈ ×1.09 at b60/b62, ≈ ×1.035 at b64. **Parked at its kill line**; the summary tables check out
+  against the raw files. The ÷5 I had pencilled in on 11-09 does not exist.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 

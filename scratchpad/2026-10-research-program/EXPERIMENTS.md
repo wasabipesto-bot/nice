@@ -5,6 +5,34 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## N6.1 Can the join test fewer top certificates? Exact counts on the CPU (2026-11-13 05:50–06:47 UTC, agent, ivory, two threads; `N6/RESULTS.md`, `N6/raw/` (`main_b{60,62,64}_s{1,2}.log`, `summary_b*.txt`, `analyze.py`, `run_main.sh`); fork branch `exp/n6-top-counts` 21908a7 (`common/src/overlap_join/n6.rs`, `common/examples/n6_top_counts.rs`))
+
+Sample per base: two seeds × 48 field locations stratified over the base × 25 random b^6 blocks,
+every layer prefix at all b² partitions: 1.56e8 (b60 1e16), 1.25e8 (b62 1e17), 1.31e8 (b64 1e17)
+pair tests; seeds agree within 0.003 on every ratio; the study's certificate matches
+`Base::cert` on 5.9e7 checks; no scheme rejected a passing pair in 4.1e8.
+
+A test certifies 16–19 leading digits of n² and n³, of which the parent prefix already fixed
+12–15; the pair adds about two per power and fails when one repeats (98 % of failures; 85–87 %
+against a parent digit). Failures run along the partition axis (P(fail | previous fails) 0.94–0.96;
+64–70 % of failing pairs sit in runs of ≥ 128 partitions) and are independent across sibling
+prefixes.
+
+| b60 / b62 / b64 | |
+|---|---|
+| pairs passing | 0.349 / 0.325 / 0.312 |
+| fewest tests any exact test-and-skip order needs, ÷ today's | 0.373 / 0.357 / 0.351 |
+| best GPU-shaped scheme (pass 1 certifies groups of 16–32 partitions per prefix, then today's kernel on what is left), cost ÷ today's, group test priced at 1.8 steps | 0.52–0.55 / 0.58–0.60 / 0.57–0.59 |
+| the same with a passing pair's append priced at 0.2 of a test | — / 0.61–0.63 / 0.59–0.61 |
+| a skip walk per thread (CPU-shaped) | 0.40 / 0.42 / 0.43 |
+| a skip walk with 32 lanes in lockstep | 0.98 / 1.14 / 1.18 |
+
+**At field level (derived, GPU prices assumed): ≈ ×1.09 at b62 and b60 (top share 22 % and
+18.5 %), ≈ ×1.035 at b64 (top share 8.4 % since #254).** The kill line (≥ 40 % of the top work
+removed at b62 and b64) is met only at the most favourable pricing, by 0–3 points. **Verdict:
+parked, not prototyped**: the hoped-for ÷5 does not exist (the floor is ÷2.8), a two-kernel
+restructuring buys ×1.09 for the two months of base 62 and ×1.035 for base 64.
+
 ## T2.4 Soundness audit of the GPU join: can a candidate be lost unnoticed? (2026-11-13 05:50–06:25 UTC, agent, no device; `T2/SOUNDNESS.md`, `T2/models/` (`stage_model.py`, `plane_models.py`, `prefilter_chain.py`, two audit test patches and their outputs); main a7a59c1 and fork heads `pr/check-d` bc9d87c, `pr/join-prefilter-shift-pow2` 42d2afd, `pr/join-survivor-stage-512` 0f6794a)
 
 **No path found that loses a candidate in production today.** Rests on: a full read of kernels and

@@ -38,6 +38,13 @@ def parse(paths):
                     except ValueError:
                         d[k] = v
             d["_src"] = src
+            # At b64 configs() lists [b/2] = [32] and [b] = [64] twice (the
+            # same groups as [32], [64]): those keys hold exactly double.
+            if d.get("b") == 64:
+                for k in list(d):
+                    if (k.startswith("g32_") or k.startswith("g64_")) and isinstance(d[k], int):
+                        assert d[k] % 2 == 0, (k, d[k])
+                        d[k] //= 2
             (units if line.startswith("UNIT") else fields).append(d)
     return units, fields
 
@@ -73,6 +80,16 @@ def schemes(t, w, price):
         cost_r = tests + seeds * (sg - 1) + t["par_pass"] * (sg - 1)
         out[n] = dict(tests=tests / T0, cost=cost_r / today, viol=t.get(n + "_viol", 0),
                       note="two-pass, whole b^2 span (top stage decoupled from batches)")
+        if len(sizes) == 1 and sizes[0] % 16 == 0:
+            # pass 1 ahead of the batches: one thread per layer prefix walks
+            # its b²/g groups by FD (stride g; one seed per prefix) and sets a
+            # bit per passing group; each 16-slot batch then runs today's
+            # kernel (seed per batch) over the prefixes whose group bit is set,
+            # after a compaction (assumed 0.1 step per prefix and batch).
+            L1 = t.get(n + "_L1", 0)
+            cost_p = L0 + t["par_pass"] * (sg - 1) + L1 * (1 + (sg - 1) / 16) + 0.1 * T0 / 16
+            out[n + "pre"] = dict(tests=tests / T0, cost=cost_p / today, viol=t.get(n + "_viol", 0),
+                                  note="pass 1 (group bits) ahead of today's batches; batches unchanged")
         if all(16 % g == 0 for g in sizes):
             # inside today's 16-slot batches: a top-level group test is a fresh cert
             cost_b = (tests - L0) + L0 * sg + seeds * (sg - 1)
@@ -192,11 +209,13 @@ def main():
     for price in ("central", "pessimistic", "optimistic"):
         sc = schemes(t, w, price)
         print(f"\nscheme ({price}: sigma {PRICES[price][0]}, eps {PRICES[price][1]}) | tests/today | "
-              "cost/today | exactness violations | 95% field-bootstrap of central cost | note")
+              "cost/today | cost with append share alpha 0.2 of a passing test | exactness violations | 95% field-bootstrap of central cost | note")
         for k, v in sorted(sc.items(), key=lambda kv: (kv[1]["cost"] if kv[1]["cost"] is not None else kv[1]["tests"])):
             c = ci.get(k)
             cost = "-" if v["cost"] is None else f"{v['cost']:.3f}"
-            print(f"  {k:16s} {v['tests']:.3f} {cost:>6s} {v['viol']} "
+            pa = t["pass"] / T0
+            ca = "-" if v["cost"] is None else f"{(v['cost'] + 0.2 * pa) / (1 + 0.2 * pa):.3f}"
+            print(f"  {k:16s} {v['tests']:.3f} {cost:>6s} a0.2:{ca:>6s} {v['viol']} "
                   + (f"[{c[0]:.3f},{c[1]:.3f}]" if (c and price == 'central') else "") + f"  {v['note']}")
     # per field location
     print("\nper field (central costs): frac | pair tests per unit drawn | pass rate | g32 | g16@b16 | seg11 | skip_lane")
