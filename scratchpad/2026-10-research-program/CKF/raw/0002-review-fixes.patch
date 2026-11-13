@@ -1,4 +1,4 @@
-From 9f2632bc6de1db0c1122e6ac9b56d4f047c94fc9 Mon Sep 17 00:00:00 2001
+From 1f41d649d5b064c9ed7fd006b2ca59d0a557f53e Mon Sep 17 00:00:00 2001
 From: Claude <claude@example.com>
 Date: Fri, 13 Nov 2026 12:55:23 +0000
 Subject: [PATCH] Overlap join: test the check's index sum, and show the partly
@@ -22,11 +22,11 @@ production kernels compile without them.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- common/src/cubecl_join.rs | 287 ++++++++++++++++++++++++++++----------
- 1 file changed, 213 insertions(+), 74 deletions(-)
+ common/src/cubecl_join.rs | 288 ++++++++++++++++++++++++++++----------
+ 1 file changed, 214 insertions(+), 74 deletions(-)
 
 diff --git a/common/src/cubecl_join.rs b/common/src/cubecl_join.rs
-index 292192e5..63cfe360 100644
+index 292192e5..4d60c59d 100644
 --- a/common/src/cubecl_join.rs
 +++ b/common/src/cubecl_join.rs
 @@ -131,6 +131,14 @@ pub(crate) const CHECK_GATED: u32 = 3;
@@ -79,7 +79,7 @@ index 292192e5..63cfe360 100644
          let base = comptime!(sh.b);
          let l = comptime!(sh.l);
          let s2 = comptime!(sh.s2);
-@@ -3323,15 +3337,20 @@ mod kernels {
+@@ -3323,15 +3337,21 @@ mod kernels {
          }
          // tk: a take's first entry and this lane's rank in it.
          let mut tk = Array::<u32>::new(2usize);
@@ -94,16 +94,17 @@ index 292192e5..63cfe360 100644
 -            take_entries(ran, &mut tk, ballot);
 -            let i = cur + rank;
 +            take_entries(ran, &mut tk, ballot, min_take);
-+            let mut i = cur + rank;
-+            if comptime!(dup_first) {
-+                if i == 1u32 && 1u32 < count {
-+                    i = 0u32;
-+                }
-+            }
++            // (A comptime `if` as an expression, so the production modes
++            // compile exactly as without the test bit.)
++            let i = if comptime!(dup_first) {
++                select(cur + rank == 1u32 && 1u32 < count, 0u32, cur + rank)
++            } else {
++                cur + rank
++            };
              let mut live = i < count;
              if comptime!(skip_first) {
                  live = live && i != 0u32;
-@@ -3496,7 +3515,12 @@ mod kernels {
+@@ -3496,7 +3516,12 @@ mod kernels {
      /// Without (64- and 128-lane planes): an exclusive scan and a sum over
      /// the active lanes, and the leader's take as the sum of it and zeros.
      #[cube]
@@ -117,7 +118,7 @@ index 292192e5..63cfe360 100644
          let mut got = 0u32;
          if comptime!(ballot) {
              let bal = plane_ballot(true);
-@@ -3504,6 +3528,9 @@ mod kernels {
+@@ -3504,6 +3529,9 @@ mod kernels {
              let rank = (lanes & ((1u32 << UNIT_POS_PLANE) - 1u32)).count_ones();
              if rank == 0u32 {
                  got = ran[STAGES_U32 as usize].fetch_add(lanes.count_ones());
@@ -127,7 +128,7 @@ index 292192e5..63cfe360 100644
              }
              // The lowest lane taking part: the trailing zeros of `lanes`.
              let lead = (lanes ^ (lanes - 1u32)).count_ones() - 1u32;
-@@ -3514,6 +3541,9 @@ mod kernels {
+@@ -3514,6 +3542,9 @@ mod kernels {
              let lanes = plane_sum(1u32);
              if rank == 0u32 {
                  got = ran[STAGES_U32 as usize].fetch_add(lanes);
@@ -137,7 +138,7 @@ index 292192e5..63cfe360 100644
              }
              tk[0] = plane_sum(got);
              tk[1] = rank;
-@@ -4091,11 +4121,7 @@ impl<R: Runtime> JoinDevice<R> {
+@@ -4091,11 +4122,7 @@ impl<R: Runtime> JoinDevice<R> {
          }
          let mode = if probe { CHECK_PROBE } else { CHECK_HITS };
          #[cfg(test)]
@@ -150,7 +151,7 @@ index 292192e5..63cfe360 100644
          self.launch_check(
              CHECK_CUBES,
              JOIN_WG,
-@@ -4157,7 +4183,11 @@ impl<R: Runtime> JoinDevice<R> {
+@@ -4157,7 +4184,11 @@ impl<R: Runtime> JoinDevice<R> {
                  ArrayArg::from_raw_parts(recs.clone(), rec_words),
                  ArrayArg::from_raw_parts(out.0.clone(), out.1),
                  ArrayArg::from_raw_parts(out_count.clone(), 1),
@@ -163,7 +164,7 @@ index 292192e5..63cfe360 100644
                  cap,
                  out_cap,
                  self.check,
-@@ -4185,33 +4215,23 @@ impl<R: Runtime> JoinDevice<R> {
+@@ -4185,33 +4216,23 @@ impl<R: Runtime> JoinDevice<R> {
          })
      }
  
@@ -210,7 +211,7 @@ index 292192e5..63cfe360 100644
      }
  
      /// Whether a batch dropped prefilter survivors past the end of the list
-@@ -4291,6 +4311,35 @@ impl<R: Runtime> JoinDevice<R> {
+@@ -4291,6 +4312,35 @@ impl<R: Runtime> JoinDevice<R> {
      }
  }
  
@@ -246,7 +247,7 @@ index 292192e5..63cfe360 100644
  /// A batch the device did not run in full: a kernel finished fewer cubes
  /// than it was launched with, in a layout the device's limits allowed (see
  /// [`JoinCeiling`]).
-@@ -4962,10 +5011,13 @@ mod tests {
+@@ -4962,10 +5012,13 @@ mod tests {
          /// macOS runner's paravirtual Metal device, on this thread.
          pub(super) static REFUSE_ABOVE: std::cell::Cell<usize> =
              const { std::cell::Cell::new(usize::MAX) };
@@ -264,7 +265,7 @@ index 292192e5..63cfe360 100644
      }
  
      fn client() -> (ComputeClient<cubecl::wgpu::WgpuRuntime>, String) {
-@@ -5153,15 +5205,19 @@ mod tests {
+@@ -5153,15 +5206,19 @@ mod tests {
          check_skipped_entries(client, name);
      }
  
@@ -289,7 +290,7 @@ index 292192e5..63cfe360 100644
          for (b, s, e, jp) in [
              (10, 47, 100, JoinParams { t: 2, k: 1, p: 0 }),
              (
-@@ -5179,34 +5235,50 @@ mod tests {
+@@ -5179,34 +5236,50 @@ mod tests {
                  .expect("field setup")
                  .expect("a join field");
              let (want, st) = run_field(client, &field, &JoinCeiling::default()).expect("runs");
@@ -366,7 +367,7 @@ index 292192e5..63cfe360 100644
      }
  
      /// The re-run and refusal paths at the production shape (the b57
-@@ -5580,7 +5652,9 @@ mod tests {
+@@ -5580,7 +5653,9 @@ mod tests {
          let oc = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; 1]));
          let cap = u32::try_from(n).expect("a list fits u32");
          let cnt = c.create(cubecl::bytes::Bytes::from_elems(vec![cap]));
@@ -377,7 +378,7 @@ index 292192e5..63cfe360 100644
          dev.launch_check(
              cubes,
              wg,
-@@ -5594,9 +5668,10 @@ mod tests {
+@@ -5594,9 +5669,10 @@ mod tests {
              &ran,
              cap,
              cap,
@@ -389,7 +390,7 @@ index 292192e5..63cfe360 100644
          let out = dev.read_u32(&out).expect("out");
          let what = format!(
              "{} check, mode {mode}, {cubes} cubes of {wg}, {n} entries",
-@@ -5949,6 +6024,8 @@ mod tests {
+@@ -5949,6 +6025,8 @@ mod tests {
          let lim = device_limits(client, name);
          let mut shapes = std::collections::HashSet::new();
          let (mut runs, mut entries) = (0, 0);
@@ -398,7 +399,7 @@ index 292192e5..63cfe360 100644
          for (b, s, e, jp) in fields {
              let fs = FieldSetup::new(b, s, e, jp).expect("field setup");
              let plan = JoinPlan::new(&fs, lim, 1, 1 << 16, 1, lim.budget).expect("a layout fits");
-@@ -5963,6 +6040,7 @@ mod tests {
+@@ -5963,6 +6041,7 @@ mod tests {
                  dev.ballot = ballot;
                  for wg in [100, 48, JOIN_WG] {
                      let what = format!("b{b} {sh:?}, cubes of {wg}, ballot {ballot}");
@@ -406,7 +407,7 @@ index 292192e5..63cfe360 100644
                      for cubes in [1, 3, CHECK_CUBES] {
                          let got =
                              run_check(&dev, cubes, wg, &lh, lw, &rh, rw, ns.len(), CHECK_COUNT);
-@@ -5972,6 +6050,8 @@ mod tests {
+@@ -5972,6 +6051,8 @@ mod tests {
                      let got = run_check(&dev, 3, wg, &lh, lw, &rh, rw, ns.len(), CHECK_PROBE);
                      assert_probe(ns.clone(), &got, &what);
                      runs += 1;
@@ -415,7 +416,7 @@ index 292192e5..63cfe360 100644
                  }
              }
              entries += ns.len();
-@@ -5981,6 +6061,28 @@ mod tests {
+@@ -5981,6 +6062,28 @@ mod tests {
               shapes ({entries} synthetic n), take forms (ballot) {forms:?}",
              shapes.len()
          );
@@ -444,7 +445,7 @@ index 292192e5..63cfe360 100644
      }
  
      #[test]
-@@ -7587,6 +7689,43 @@ mod tests {
+@@ -7587,6 +7690,43 @@ mod tests {
          );
      }
  

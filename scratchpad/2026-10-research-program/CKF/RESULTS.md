@@ -35,9 +35,10 @@ way there (`fix_partial_cuda_1.log`, generated source in `raw/box/logs/dbg/F1_wg
 partly filled warp is only well-defined in cube 0; the tests launch one cube there. Production's cubes are 256 units,
 a multiple of 32 and 64, where the lowering is right.
 
-**lavapipe [M] (`repro_lvp.log`):** 0 of 218,772 skipped at 256, 100 and 48 units. llvmpipe runs a cube's last
-subgroup with all 8 lanes taking part (the work counter shows 13 takes of 8 for a 100-unit cube: 160 = 56 + 104), so
-its planes do not allow the defect to show. It is not a reproduction on lavapipe.
+**lavapipe [M] (`repro_lvp.log`):** 0 of 218,772 skipped at 256, 100 and 48 units, so it is not a reproduction on
+lavapipe. (Corrected in §7: my reading that llvmpipe runs the last subgroup full was wrong. The fixed kernel's
+smallest-take record shows takes of 4 lanes there, so the subgroup ops do see a partly filled plane. Why the old
+kernel still got those entries checked was not investigated.)
 
 ## 2. The fix
 
@@ -196,3 +197,78 @@ tried to bring it back to 39.
 - Whole-workspace `cargo test` (CI `test-workspace`) not run. The commit touches only `common/src/cubecl_join.rs`.
 - The PR body still says the check has 39-40 registers ("Code" and "Registers" paragraphs). The delta corrects that
   (47 at b62/b64).
+
+## 7. Review fixes (2026-11-13, afternoon): commit `1f41d649`
+
+The independent review (`REVIEW.md`) found the hand-out complete and the host check sound. Fixed here: F1, F2 and F4.
+Box 60499346 (RTX 3080, 260 W cap, 16 threads). An earlier box (60478814) expired before its logs were copied; its
+results, on a binary byte-identical to an intermediate state (md5 66b63094), are transcribed in
+`raw/box2/lost-box-60478814-summary.txt`. Logs: `raw/box2/logs/`, scripts `raw/box2/scripts/`, identity check
+`raw/box2/ident-summary.txt`.
+
+**What was added (tests only; production behaviour unchanged):**
+- **F1, host unit test:** `check_complete` is now a free function of `(done, sum, checked, list_cap)`. `ensure_checked`
+  calls it and adds the base to the message. Count errors and sum errors have distinct messages. The unit test
+  `check_complete_wants_every_listed_entry_once` covers:
+  - an exact count and sum;
+  - an overflowed list (`listed = list_cap`);
+  - one entry skipped (fails on the count);
+  - one entry checked twice in place of another (count right, fails on the sum);
+  - missing words;
+  - the sum past its wrap (100,000 entries → 704,982,704 = 4,999,950,000 − 2^32);
+  - the largest list, 2^26 entries, summed with wrapping u32 as the device sums it, and that sum minus 1.
+- **F1, device test:** a second test-only mode bit, `CHECK_DUP_FIRST`. The lane whose entry is index 1 checks and
+  counts index 0, so the count is right and the sum is short by 1. `check_skipped_entries` now runs both bits; each
+  must fail `run_field` and the partition re-run with its own message.
+  - b10's single survivor runs the skip mode only.
+  - b20 runs both. Its dup error reads "the indices of the 139 survivors the check kernel checked sum to 9590
+    (mod 2^32), not 9591".
+- **F2:** a third test bit, `CHECK_MIN_TAKE`. Each take's leader `fetch_min`s its size into an extra `ran` word that
+  only `run_check` allocates. `check_partial_planes` prints the smallest take per (form, cube size), and asserts it
+  on CUDA (4 at 100 units, 16 at 48, 32 at 256).
+  - **lavapipe shows takes of 4 lanes at 100 units**, so partly filled subgroups do run there. That corrects §1's
+    inference.
+- The test bits are comptime mode bits. `launch_batch` adds them only under `#[cfg(test)]`, from a thread-local.
+  - The dup index is a comptime `if` *expression*. A first version used `let mut i`, which added a variable copy to
+    the production kernel; the check below caught it.
+
+**Production kernels byte-identical? Yes, up to CubeCL's own per-process noise [M]** (`raw/scripts/ident.sh`,
+`kdiff.py`). Inputs:
+- the full compilation log of a production run of 8d11e0be and of this head (the dense compare, one partition of
+  b60 1e16, so `launch_batch` in hits mode);
+- the WGSL of CI's `wgsl_dump_for_lint`.
+
+Each kernel's compilation block was compared after renaming CubeCL's numbered variables in order of first use and
+sorting the declarations.
+- CUDA `check_kernel`, `bucket_kernel`, `top_kernel`, `top_fd_kernel` and `smoke_kernel`: identical.
+- All 10 WGSL shader kinds (14 shaders): identical.
+- CUDA `join_kernel` differs only in its shared-memory layout order. 8d11e0be against itself (two processes) differs
+  the same way, so it is per-process nondeterminism in CubeCL, likely also behind the per-process spill variant of §5.
+- The first version (with `let mut i`) showed as DIFFER in the CUDA and WGSL check kernel, so the comparison is
+  sensitive.
+
+**No speed runs needed.**
+
+**Runs on `1f41d649`'s tree (`674ce759`) [M]:**
+
+| run | result |
+|---|---|
+| CUDA `cubecl_cuda_check_takes_every_entry_on_partly_filled_warps` | ok, 84 runs; smallest take 4 / 16 / 32 at 100 / 48 / 256 |
+| CUDA `cubecl_cuda_join_matches_the_cpu_reference` (incl. both test bits on both paths) | ok |
+| CUDA `cubecl_cuda_check_counts_match_the_cpu` | ok, 64 lists, 1,168,717 entries, 84,652 synthetic n |
+| lavapipe WGSL, all 10 wgpu tests of `cubecl_join` | 10 passed; smallest take 4 at 100 units (both forms), 8 at 48 and 256 |
+| lavapipe SPIR-V (`gpu,cubecl-spirv`), same | 10 passed, same |
+| host tests `cargo test --release -p nice_common --features gpu --lib` | 253 passed (one new) |
+| `cargo fmt --all --check`; clippy `-D warnings` default and `nice_client/gpu,nice_client/cubecl-spirv` (1.99.1) | clean |
+
+**Pushed:** `1f41d649` on fork `pr/check-d` (fast-forward `8d11e0be..1f41d649`).
+
+**PR body:** `PR-BODY.md` is the complete replacement body, ready to paste. It is built by
+`raw/scripts/make_pr_body.py` from `raw/pr251-body-before.md` and `PR-BODY-DELTA.md`. F4 is fixed:
+- the register sentence uses 39–47 registers;
+- at 47 registers (b62, b64) a cube needs 47 → 48 × 256 = 12,288 registers, so 5 cubes fit in 65,536 per SM: a
+  3080 holds 5 × 68 = 340, an H100 5 × 132 = 660. The original 408/792 were 6 cubes per SM at ≤ 40 registers.
+- the all-process b62 sentence now reads "72.108 s for this head against 72.019 s".
+
+Not addressed: F3 (informational) and F6 (main's `top_slot` and niceonly stride queues: T2 follow-ups), as the review
+recommends.

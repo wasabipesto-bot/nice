@@ -5,6 +5,24 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## CKF.2 The review's fixes on PR #251 (2026-11-13 12:55–13:25 UTC, agent; `CKF/REVIEW.md` (the independent review, with `CKF/review-model/`), `CKF/RESULTS.md` §7, `CKF/PR-BODY.md`, `CKF/raw/box2/`; fork `pr/check-d` 1f41d64 on 8d11e0b; box 60499346, RTX 3080, 0.54 h, ~$0.06; an earlier box, 60478814, was lost to the 09:47 outage)
+
+Review of 8d11e0b: the hand-out is complete and non-overlapping by construction in both forms
+(the reviewer's own random and exhaustive models: 0 wrong hand-outs; 9,244 deliberately broken
+runs, none passes the host's count and index-sum check); the plane operations mean what the fix
+needs on CUDA, WGSL, SPIR-V and Metal (read in CubeCL 0.10's sources); `ensure_checked` runs on
+every production path and a mismatch is a hard error. Findings fixed in 1f41d64, tests only:
+a host unit test of the comparison (`check_complete`: exact, one skipped, one doubled for
+another, the sum's wrap mod 2^32, the largest list), a device test mode in which entry 1 is
+checked as entry 0 (count right, sum one short: "…sum to 9590 (mod 2^32), not 9591"), and the
+partly-filled test now records its smallest take (4 lanes at 100 threads, 16 at 48, 32 at 256 on
+CUDA; **lavapipe also shows takes of 4 lanes**, so it does run partly filled subgroups; why the
+old kernel still checked every entry there was not investigated). The production kernels of
+1f41d64 and 8d11e0b are identical after normalising CubeCL's variable numbering (CUDA sources of
+five kernels; all 14 WGSL shaders), so no speed runs were repeated. CUDA and lavapipe (both
+compilers) device tests, 253 host tests, fmt and clippy pass. PR body replaced with
+`CKF/PR-BODY.md` plus a paragraph on what a wgpu device should expect.
+
 ## N21.1 A leaner walk and prefilter loop: exact variants, CUDA A/B, ACO instruction counts (2026-11-13 05:50–09:47 UTC, agent, cut off by a harness outage while finishing the write-up; `N21/RESULTS.md`, `N21/WINDOW-PLAN.md`, `N21/raw/` (`ab_table.txt`, `aco_table.txt`, box logs, dumps, `scripts/window/`); fork branches `exp/n21-walk-loop` (switches, base = main a7a59c1 + #255 + #256), candidates `exp/n21-popcount-test-wgpu` 3a4899e and `exp/n21-ffs-pop` be24d18, each one commit on main; box 60456234, RTX 3080 at 180 W, 7 h TTL, ~$0.84)
 
 The loop today (b62): on ACO for GFX1201 a walk round in which no lane passes is 59 instructions

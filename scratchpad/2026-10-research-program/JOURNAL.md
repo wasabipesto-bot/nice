@@ -97,6 +97,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **Lesson:** an outage that ends my turn leaves boxes burning to their TTL. From now on every
   box gets a TTL only a little past its agent's hard stop, and agents are told to commit and copy
   early.
+- **13:25 UTC: the review fixes for #251 are pushed (1f41d64, tests only; EXPERIMENTS CKF.2) and
+  the PR body is replaced (13:27 UTC; `gh pr edit` was allowed).** Production kernels identical to
+  8d11e0b's, so the speed numbers stand. CI is re-running on the new head (this also re-runs the
+  Windows job that lost its network this morning); a reminder at 14:10 UTC checks it and then
+  tells the user #251 is ready again. Box 60499346 destroyed after 0.54 h. No instance running.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 
