@@ -142,6 +142,18 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - 16:42 UTC: **#251, #255 and #256 each merge cleanly with today's main and pass fmt and clippy
   (-D warnings, `nice_common` with the cubecl feature) under Rust 1.100.0** on ivory. No merge
   commits pushed: nothing to fix, and their CI would only re-run what was just checked.
+- **16:48 UTC: the review of the popcount branch is in (`N21/PR/REVIEW.md`; 157 k tokens): open
+  after body fixes; the code is correct** (the reviewer's own check: every digit 4-tuple below 64
+  against every relevant mask setting, 768 M cases, 0 mismatches against the old form as the
+  kernel computes it; a deliberately broken variant gives 254 M). The switch turns the count on
+  only for `wgpu<spirv>`. Its one code point (L1): with the count off, the statements were not in
+  main's order, so "other runtimes unchanged" was not literally true and NVVM is sensitive to
+  order here. Fixed in a second commit (c53d99f: the compare form's statements verbatim).
+- **16:53 UTC: verification on a box before opening** (60522271, RTX 3080, $0.10/h, 1.75 h TTL; the
+  CKF agent resumed, it has the kernel-comparison tooling): generated CUDA and WGSL kernels of the
+  branch against main (must be identical), the SPIR-V join kernel (must differ), and the device
+  tests of this exact commit on CUDA and lavapipe with both compilers; `N21/PR/VERIFY.md`, hard
+  stop 18:10 UTC. The PR is opened only if that holds. Fallback reminder 18:20 UTC.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 

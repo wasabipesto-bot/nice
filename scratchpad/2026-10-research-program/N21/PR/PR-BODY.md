@@ -37,7 +37,9 @@ and four non-memberships, for any four values below 64 and any `seen`. Per 32-bi
 ## Measurements
 
 **RX 9070 XT (RADV, Vulkan, CubeCL's SPIR-V compiler, 304 W cap)**, on an experiment build of main with #255 and #256
-applied and this change behind an environment variable. Throughput harness, one untimed warm-up field per process,
+applied and the count form behind an environment variable (the same test, written slightly differently; #255 and #256
+are still open, and on main alone base 64's digits are four multiply-highs, so the base-64 gain may be smaller there
+until #255 lands). Throughput harness, one untimed warm-up field per process,
 order rotated per round, every run at the power cap (302–305 W; median clocks 3.09–3.13 GHz at b62 on both sides,
 3.04 GHz base and 3.01 GHz count at b64), counts identical in every run of a field.
 
@@ -69,7 +71,7 @@ The pass path (16 ALU), 96 VGPRs, 14,848 B of shared memory and 16 waves per SIM
 - **Host:** the count form is asserted in `lean_membership_matches_the_masks` (every digit 4-tuple at every base 10–64
   against random seen sets, plus 10^7 random tuples) and `lean_prefilter_matches_the_division_form` (10^6 random
   entries and tops per base 10–64 against the division form). All non-ignored `nice_common` tests, `cargo fmt` and
-  `cargo clippy -p nice_common --all-targets --features cubecl -- -D warnings` (1.99.1) pass.
+  `cargo clippy -p nice_common --all-targets --features cubecl -- -D warnings` pass on this branch with Rust 1.100.0.
 - **lavapipe (llvmpipe), which runs the count form:** every wgpu test of `cubecl_join` passes with CubeCL's SPIR-V
   compiler and with naga (8 each; three are opt-in and return early). The parity test's b64 window runs
   `walk_pf_lean` and compares its survivors batch by batch with the CPU reference.
