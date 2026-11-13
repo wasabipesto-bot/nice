@@ -932,7 +932,10 @@ mod kernels {
                             let r0 = rr[j as usize];
                             while plane_any(x != 0u32) {
                                 if x != 0u32 {
-                                    let jt2 = jc + x.trailing_zeros();
+                                    // x != 0 here: its lowest set bit is
+                                    // find_first_set - 1, which needs no
+                                    // case for x = 0 (trailing_zeros' 32).
+                                    let jt2 = jc + (x.find_first_set() - 1u32);
                                     x &= x - 1u32;
                                     let pass = if comptime!(lean) {
                                         walk_pf_lean(
