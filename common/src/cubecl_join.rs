@@ -549,6 +549,7 @@ mod kernels {
         // 16-byte record per top (dh, glo, ghi, id), so the walk's three
         // loads can become one.
         let n21_l = comptime!(lean && (n21 & 2) != 0);
+        let n21_d = comptime!((n21 & 128) != 0);
         let mut t_id =
             SharedMemory::<u32>::new(comptime!(if n21_l { 1 } else { TOP_CAP as usize }));
         let mut t_dm =
@@ -965,6 +966,11 @@ mod kernels {
                         for j in 0..ept {
                             let mut x = pm[j as usize] & vv[j as usize];
                             let r0 = rr[j as usize];
+                            // N21 switch D (bit 128): the walk notes each pair that
+                            // passes the prefilter in `pmk` (its bit of the chunk),
+                            // and a second walk over those bits appends them, so the
+                            // append runs in the rounds of that walk only.
+                            let mut pmk = 0u32;
                             while plane_any(x != 0u32) {
                                 // N21 switch U (bit 32): two pops per round.
                                 #[unroll]
@@ -978,6 +984,7 @@ mod kernels {
                                         } else {
                                             jc + x.trailing_zeros()
                                         };
+                                        let xlow = x;
                                         x &= x - 1u32;
                                         let pass = if comptime!(n21_l) {
                                             let w4 = 4u32 * jt2;
@@ -1022,7 +1029,10 @@ mod kernels {
                                                 k2,
                                             )
                                         };
-                                        if pass {
+                                        if comptime!(n21_d) {
+                                            // N21 switch D: note the pair, append after the walk.
+                                            pmk |= select(pass, xlow ^ x, 0u32);
+                                        } else if pass {
                                             let tid = if comptime!(n21_l) {
                                                 t_w[(4u32 * jt2 + 3u32) as usize]
                                             } else {
@@ -1044,6 +1054,34 @@ mod kernels {
                                 }
                                 if walk_sync {
                                     sync_plane();
+                                }
+                            }
+                            if comptime!(n21_d) {
+                                let mut y = pmk;
+                                while plane_any(y != 0u32) {
+                                    if y != 0u32 {
+                                        let jt2 = jc + (y.find_first_set() - 1u32);
+                                        y &= y - 1u32;
+                                        let tid = if comptime!(n21_l) {
+                                            t_w[(4u32 * jt2 + 3u32) as usize]
+                                        } else {
+                                            t_id[jt2 as usize]
+                                        };
+                                        let at = s_cnt[0].fetch_add(1u32);
+                                        if at < SURV_SH_CAP {
+                                            s_t[at as usize] = tid;
+                                            s_r[at as usize] = r0;
+                                        } else {
+                                            let g = surv_count[0].fetch_add(1u32);
+                                            if g < surv_cap {
+                                                surv[(2u32 * g) as usize] = tid;
+                                                surv[(2u32 * g + 1u32) as usize] = r0;
+                                            }
+                                        }
+                                    }
+                                    if walk_sync {
+                                        sync_plane();
+                                    }
                                 }
                             }
                         }
