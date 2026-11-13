@@ -550,6 +550,11 @@ mod kernels {
         // loads can become one.
         let n21_l = comptime!(lean && (n21 & 2) != 0);
         let n21_d = comptime!((n21 & 128) != 0);
+        // N21 switch Z (bit 256, with D only): no per-lane branch in the walk;
+        // a lane without bits pops nothing (its popped bit is 0) and reads a
+        // valid slot of the chunk.
+        let n21_z = comptime!(n21_d && (n21 & 256) != 0);
+        let zmask = comptime!(if n21_z { 1u32 } else { 0u32 });
         let mut t_id =
             SharedMemory::<u32>::new(comptime!(if n21_l { 1 } else { TOP_CAP as usize }));
         let mut t_dm =
@@ -975,11 +980,13 @@ mod kernels {
                                 // N21 switch U (bit 32): two pops per round.
                                 #[unroll]
                                 for _u in 0..comptime!(if (n21 & 32) != 0 { 2u32 } else { 1u32 }) {
-                                    if x != 0u32 {
+                                    if (x | zmask) != 0u32 {
                                         // N21 switch P (bit 1): x != 0 here, so its
                                         // lowest set bit is find_first_set - 1, without
                                         // trailing_zeros' select for x = 0.
-                                        let jt2 = if comptime!((n21 & 1) != 0) {
+                                        let jt2 = if comptime!(n21_z) {
+                                            jc + ((x.find_first_set() - 1u32) & 31u32)
+                                        } else if comptime!((n21 & 1) != 0) {
                                             jc + (x.find_first_set() - 1u32)
                                         } else {
                                             jc + x.trailing_zeros()
