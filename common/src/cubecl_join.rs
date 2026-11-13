@@ -3110,7 +3110,15 @@ mod kernels {
         let mut g2 = 0u32;
         let mut h3 = 0u32;
         let mut g3 = 0u32;
-        if comptime!(pow2) {
+        if comptime!(pow2 && (n21 & 64) != 0) {
+            // N21 switch B (bit 64): (F << s) >> (32 - s) is the bit field
+            // F[32 - 2s, 32 - s), which one shift and a mask (one BFE where
+            // the target has it) extract.
+            h2 = f2 >> up;
+            g2 = (f2 >> comptime!(32 - 2 * s)) & comptime!(base - 1);
+            h3 = f3 >> up;
+            g3 = (f3 >> comptime!(32 - 2 * s)) & comptime!(base - 1);
+        } else if comptime!(pow2) {
             h2 = f2 >> up;
             g2 = (f2 << s) >> up;
             h3 = f3 >> up;
@@ -6542,6 +6550,23 @@ mod tests {
         }
         assert_eq!(fails, 0, "{fails} of {n} differ");
         assert!(pass > n / 50 && pass < n / 2, "{pass} of {n} pass");
+    }
+
+    /// N21 switch B: at b = 2^s (s <= 8) the low digit's bit field
+    /// `(F << s) >> (32 - s)` equals `(F >> (32 - 2s)) & (b - 1)` for every F
+    /// (both are bits 32 - 2s .. 32 - s of F); edges and 10^6 random F.
+    #[test]
+    #[allow(clippy::cast_possible_truncation)]
+    fn n21_pow2_low_digit_is_a_bit_field() {
+        let mut x = 0x2545_F491_4F6C_DD1Du64;
+        for s in 1u32..=8 {
+            let base = 1u32 << s;
+            let mut fs = vec![0u32, 1, u32::MAX, u32::MAX - 1, 1 << 31];
+            fs.extend((0..1_000_000).map(|_| (xorshift(&mut x) >> 7) as u32));
+            for f in fs {
+                assert_eq!((f << s) >> (32 - s), (f >> (32 - 2 * s)) & (base - 1));
+            }
+        }
     }
 
     /// N21 switch W: the high and low words of the widening product F·b are
