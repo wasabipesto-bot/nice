@@ -493,6 +493,7 @@ mod kernels {
         #[comptime] k: u32,
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
+        #[comptime] pf_count: bool,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -946,6 +947,7 @@ mod kernels {
                                             t_glo[jt2 as usize],
                                             t_ghi[jt2 as usize],
                                             base,
+                                            pf_count,
                                         )
                                     } else {
                                         walk_pf(
@@ -3010,8 +3012,14 @@ mod kernels {
     /// `(F·b mod 2^32)·b` are the two digits of `x mod b²` exactly. The masks
     /// are bit-reversed (digit d at bit 63 - d), so digit g is in `seen` iff
     /// bit 63 of `seen << g` is set: four shifts and a sign test, and six
-    /// compares for the digits' distinctness. `tlo`/`thi` are the top's
-    /// certificate if its seed flag is set, else 0.
+    /// compares for the digits' distinctness. With `count`, the same test
+    /// as one count: the four digits are distinct and none is in `seen` iff
+    /// the set of them minus `seen` has four elements, `popcount(A & !seen)
+    /// == 4` with `A` the OR of the digits' bits (four shifts, two counts
+    /// and a compare; fewer instructions than the compares on AMD's RDNA,
+    /// where each compare is a vector compare and a scalar OR, but more on
+    /// NVIDIA's, where the compares chain through one predicate). `tlo`/`thi`
+    /// are the top's certificate if its seed flag is set, else 0.
     #[cube]
     fn walk_pf_lean(
         ah2: u32,
@@ -3024,6 +3032,7 @@ mod kernels {
         tlo: u32,
         thi: u32,
         #[comptime] base: u32,
+        #[comptime] count: bool,
     ) -> bool {
         let f2 = ah2 + p2 * dh;
         let f3 = ah3 + p3 * dh;
@@ -3031,23 +3040,37 @@ mod kernels {
         let g2 = u32::mul_hi(f2 * base, base);
         let h3 = u32::mul_hi(f3, base);
         let g3 = u32::mul_hi(f3 * base, base);
-        let seen = (u64::cast_from(mhi | thi) << 32u64) | u64::cast_from(mlo | tlo);
-        let hit = u32::cast_from((seen << u64::cast_from(g2)) >> 32u64)
-            | u32::cast_from((seen << u64::cast_from(g3)) >> 32u64)
-            | u32::cast_from((seen << u64::cast_from(h2)) >> 32u64)
-            | u32::cast_from((seen << u64::cast_from(h3)) >> 32u64);
         let mut ok = true;
-        // Keep the sign test last in the chain: placed first, NVVM compiled it
-        // to a select and a byte extension in front of the compares.
-        if g2 == g3
-            || h2 == h3
-            || g2 == h2
-            || g2 == h3
-            || g3 == h2
-            || g3 == h3
-            || i32::cast_from(hit) < 0i32
-        {
-            ok = false;
+        if comptime!(count) {
+            // Every digit is below b <= 64, so each shift places one bit.
+            let top = 0x8000_0000_0000_0000u64;
+            let a = (top >> u64::cast_from(g2))
+                | (top >> u64::cast_from(g3))
+                | (top >> u64::cast_from(h2))
+                | (top >> u64::cast_from(h3));
+            let new = (u32::cast_from(a) & !(mlo | tlo)).count_ones()
+                + (u32::cast_from(a >> 32u64) & !(mhi | thi)).count_ones();
+            if new != 4u32 {
+                ok = false;
+            }
+        } else {
+            let seen = (u64::cast_from(mhi | thi) << 32u64) | u64::cast_from(mlo | tlo);
+            let hit = u32::cast_from((seen << u64::cast_from(g2)) >> 32u64)
+                | u32::cast_from((seen << u64::cast_from(g3)) >> 32u64)
+                | u32::cast_from((seen << u64::cast_from(h2)) >> 32u64)
+                | u32::cast_from((seen << u64::cast_from(h3)) >> 32u64);
+            // Keep the sign test last in the chain: placed first, NVVM compiled
+            // it to a select and a byte extension in front of the compares.
+            if g2 == g3
+                || h2 == h3
+                || g2 == h2
+                || g2 == h3
+                || g3 == h2
+                || g3 == h3
+                || i32::cast_from(hit) < 0i32
+            {
+                ok = false;
+            }
         }
         ok
     }
@@ -3207,6 +3230,9 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// End each round of the join kernel's set-bit walk with a plane
     /// barrier (CUDA only, see the walk).
     walk_sync: bool,
+    /// Test the prefilter's four digits by one population count
+    /// ([`walk_pf_lean`]), everywhere but on CUDA.
+    pf_count: bool,
     limbs: u32,
     chunk_digits: u32,
     chunk_div: u32,
@@ -3411,6 +3437,10 @@ impl<R: Runtime> JoinDevice<R> {
                     .features
                     .plane
                     .contains(cubecl::ir::features::Plane::Sync),
+            // The compares are one predicate instruction each on NVIDIA's
+            // hardware, and the count takes more shifts there; AMD's compiler
+            // spends a vector compare and a scalar instruction on each.
+            pf_count: !R::name(client).contains("cuda"),
             limbs,
             chunk_digits,
             chunk_div,
@@ -3731,6 +3761,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k,
                 self.k2,
                 self.walk_sync,
+                self.pf_count,
             );
         }
         unsafe {
@@ -6117,6 +6148,18 @@ mod tests {
         !(g2 == g3 || h2 == h3 || g2 == h2 || g2 == h3 || g3 == h2 || g3 == h3 || (hit as i32) < 0)
     }
 
+    /// [`walk_pf_lean`]'s digit test by count, word by word as the kernel
+    /// does it: the four digits' bits (digit d at bit 63 - d) outside the
+    /// bit-reversed `seen` must be four.
+    #[allow(clippy::cast_possible_truncation)]
+    fn pf_count(rseen: u64, g2: u32, g3: u32, h2: u32, h3: u32) -> bool {
+        let top = 1u64 << 63;
+        let a = (top >> g2) | (top >> g3) | (top >> h2) | (top >> h3);
+        let new = ((a as u32) & !(rseen as u32)).count_ones()
+            + (((a >> 32) as u32) & !((rseen >> 32) as u32)).count_ones();
+        new == 4
+    }
+
     fn xorshift(x: &mut u64) -> u64 {
         *x ^= *x << 13;
         *x ^= *x >> 7;
@@ -6246,7 +6289,8 @@ mod tests {
     }
 
     /// The lean membership test (bit-reversed masks, four shifts and a sign
-    /// test, six compares) is the four-mask test: every digit 4-tuple at
+    /// test, six compares) and its form by count are the four-mask test:
+    /// every digit 4-tuple at
     /// every base 10-64 against a random set of seen digits (about a quarter
     /// of the bits, as the entry's 12 and a top's certificate give), and 10^7
     /// random tuples against sets of every density.
@@ -6262,8 +6306,9 @@ mod tests {
                         for h3 in 0..base {
                             let seen = xorshift(&mut x) & xorshift(&mut x);
                             let want = pf_masks(seen, g2, g3, h2, h3);
-                            fails +=
-                                u64::from(want != pf_lean(seen.reverse_bits(), g2, g3, h2, h3));
+                            let rs = seen.reverse_bits();
+                            fails += u64::from(want != pf_lean(rs, g2, g3, h2, h3));
+                            fails += u64::from(want != pf_count(rs, g2, g3, h2, h3));
                             pass += u64::from(want);
                             n += 1;
                         }
@@ -6282,7 +6327,9 @@ mod tests {
             }
             seen &= u64::MAX >> (64 - base);
             let want = pf_masks(seen, g2, g3, h2, h3);
-            fails += u64::from(want != pf_lean(seen.reverse_bits(), g2, g3, h2, h3));
+            let rs = seen.reverse_bits();
+            fails += u64::from(want != pf_lean(rs, g2, g3, h2, h3));
+            fails += u64::from(want != pf_count(rs, g2, g3, h2, h3));
             pass += u64::from(want);
             n += 1;
         }
@@ -6328,6 +6375,11 @@ mod tests {
                 let gated = if flag { tm.reverse_bits() } else { 0 };
                 assert_eq!(
                     pf_lean(em.reverse_bits() | gated, g2, g3, h2, h3),
+                    want,
+                    "b{base}"
+                );
+                assert_eq!(
+                    pf_count(em.reverse_bits() | gated, g2, g3, h2, h3),
                     want,
                     "b{base}"
                 );
