@@ -21,6 +21,7 @@
 - Speed up the CPU overlap join's full check of each pair that passes the prefilter: it starts from the digits the join has already proved and computes only the ones in between, two at a time and without long division ([#253](https://github.com/wasabipesto/nice/pull/253)).
 - Speed up the GPU overlap join at base 64 by stepping its top certificates through consecutive partitions there too, as at every other base ([#254](https://github.com/wasabipesto/nice/pull/254)).
 - Speed up the GPU overlap join's middle-digit prefilter at base 64 by reading each pair's two digits off its fixed-point fraction with shifts instead of multiplications ([#255](https://github.com/wasabipesto/nice/pull/255)).
+- Speed up the GPU overlap join on AMD's RDNA4 cards by halving the shared-memory stage of the join's prefilter survivors to 512 entries, so that more of its work groups run at once ([#256](https://github.com/wasabipesto/nice/pull/256)).
 
 ## Nice v3.4.7
 
