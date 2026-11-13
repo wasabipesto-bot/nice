@@ -119,6 +119,26 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     with the cheaper pop ×1.049 and ×1.10.** A PR candidate for the long pole. An agent is
     preparing the branch and a short body (`N21/PR/BRIEF.md`, hard stop 17:30 UTC); a reviewer
     follows; then the PR (the fourth open one).
+- **16:32 UTC: the PR-branch agent handed back** (173 k tokens, no box): `pr/join-prefilter-popcount`
+  d32c5b4, the candidate's code with corrected comments and a changelog line; fmt, clippy and
+  233 host tests pass. Its honest gaps: the CUDA kernel's sameness rests on reading the comptime
+  switch; the card measured the experiment branch's wording of the same test on main + #255 +
+  #256; Metal, HIP and DX12 would get the new form unmeasured.
+- **My decision: narrow the switch to what was measured.** The count form is now compiled only
+  on `wgpu<spirv>` (Vulkan through CubeCL's SPIR-V compiler: demoux's configuration); CUDA,
+  Metal and WGSL keep today's code. The NVIDIA loss is a property of the instruction set, not of
+  the CUDA API, so "everything but CUDA" would also have slowed NVIDIA cards on Vulkan and
+  gambled on the M4. New branch `pr/join-prefilter-popcount-spirv` (one commit on today's main
+  41b4b40; the earlier branch name stays on the fork, unused). Body reworded.
+- **Main moved:** the user merged Dependabot's #258 (Rust 1.99.1 → 1.100.0) and #257 (cc) at about
+  16:25 UTC. 1.100.0 is now installed on ivory; the stale 4 GB cache in
+  `.worktrees/rebase-1112/target` was deleted first (8.1 GB free). The open PRs' last CI runs
+  predate the toolchain change: after the new branch is checked I lint each of them merged with
+  main under 1.100.0.
+- **16:41 UTC: `pr/join-prefilter-popcount-spirv` 760512c pushed** (one commit on main 41b4b40; fmt,
+  clippy with -D warnings and the host tests pass under Rust 1.100.0) and an independent reviewer
+  started (`N21/PR/REVIEW-BRIEF.md`). In the background on ivory: fmt and clippy under 1.100.0 for
+  #251, #255 and #256, each merged with today's main.
 - Not started today: B64-4 (the stepping parity window; the b64 dense compares on CUDA already
   exercised stepping twice), the CPU roadmap item, a reviewer for N14 (held).
 
