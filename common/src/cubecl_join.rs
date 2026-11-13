@@ -460,8 +460,8 @@ mod kernels {
     /// The digit masks are held bit-reversed in this kernel when the lean
     /// prefilter runs (`lean`: digit d at bit 63 - d), entries' and tops'
     /// alike, and so `t_tr`: the AND is the same disjointness test under any
-    /// labelling of the bits, and the prefilter reads digit g as the sign bit
-    /// of `hi32(seen << g)`. The global buffers (`ext_m`, `top_rec`) and every
+    /// labelling of the bits, and the prefilter puts digit g at bit `63 - g`
+    /// of the four digits' mask. The global buffers (`ext_m`, `top_rec`) and every
     /// other kernel keep digit d at bit d.
     #[cube(launch_unchecked)]
     pub fn join_kernel(
@@ -3007,11 +3007,14 @@ mod kernels {
     /// `C = ceil(2^32/b²)` (the entry's) and `dh = ceil(D·2^32/b²)` (the
     /// top's); then `F·b² = (x mod b²)·2^32 + Δ` with `Δ = A·(C·b² − 2^32) +
     /// P·(dh·b² − D·2^32) < 2b⁴ <= 2^25`, so the high words of `F·b` and of
-    /// `(F·b mod 2^32)·b` are the two digits of `x mod b²` exactly. The masks
-    /// are bit-reversed (digit d at bit 63 - d), so digit g is in `seen` iff
-    /// bit 63 of `seen << g` is set: four shifts and a sign test, and six
-    /// compares for the digits' distinctness. `tlo`/`thi` are the top's
-    /// certificate if its seed flag is set, else 0.
+    /// `(F·b mod 2^32)·b` are the two digits of `x mod b²` exactly. The four
+    /// digits must be distinct and none of them in `seen` (the masks, held
+    /// bit-reversed: digit d at bit 63 - d), which is to say the set of the
+    /// four digits minus `seen` has four elements: with `A` the OR of the
+    /// four digits' bits, `popcount(A & !seen) == 4`. That is four shifts, two
+    /// population counts and one compare, where testing membership and
+    /// distinctness apart took four shifts, a sign test and six compares.
+    /// `tlo`/`thi` are the top's certificate if its seed flag is set, else 0.
     #[cube]
     fn walk_pf_lean(
         ah2: u32,
@@ -3031,22 +3034,16 @@ mod kernels {
         let g2 = u32::mul_hi(f2 * base, base);
         let h3 = u32::mul_hi(f3, base);
         let g3 = u32::mul_hi(f3 * base, base);
-        let seen = (u64::cast_from(mhi | thi) << 32u64) | u64::cast_from(mlo | tlo);
-        let hit = u32::cast_from((seen << u64::cast_from(g2)) >> 32u64)
-            | u32::cast_from((seen << u64::cast_from(g3)) >> 32u64)
-            | u32::cast_from((seen << u64::cast_from(h2)) >> 32u64)
-            | u32::cast_from((seen << u64::cast_from(h3)) >> 32u64);
+        // Every digit is below b <= 64, so each shift places one bit.
+        let top = 0x8000_0000_0000_0000u64;
+        let a = (top >> u64::cast_from(g2))
+            | (top >> u64::cast_from(g3))
+            | (top >> u64::cast_from(h2))
+            | (top >> u64::cast_from(h3));
+        let new = (u32::cast_from(a) & !(mlo | tlo)).count_ones()
+            + (u32::cast_from(a >> 32u64) & !(mhi | thi)).count_ones();
         let mut ok = true;
-        // Keep the sign test last in the chain: placed first, NVVM compiled it
-        // to a select and a byte extension in front of the compares.
-        if g2 == g3
-            || h2 == h3
-            || g2 == h2
-            || g2 == h3
-            || g3 == h2
-            || g3 == h3
-            || i32::cast_from(hit) < 0i32
-        {
+        if new != 4u32 {
             ok = false;
         }
         ok
@@ -6108,13 +6105,16 @@ mod tests {
         !(g2 == g3 || h2 == h3 || seen & at_k != 0 || (seen | at_k) & at_k1 != 0)
     }
 
-    /// [`walk_pf_lean`]'s digit test on the bit-reversed `seen`: digit g is
-    /// in it iff the sign bit of `hi32(seen << g)` is set; six compares.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    /// [`walk_pf_lean`]'s digit test on the bit-reversed `seen`, word by
+    /// word as the kernel does it: the four digits' bits (digit d at bit 63 -
+    /// d) outside `seen` must be four.
+    #[allow(clippy::cast_possible_truncation)]
     fn pf_lean(rseen: u64, g2: u32, g3: u32, h2: u32, h3: u32) -> bool {
-        let hi = |g: u32| ((rseen << g) >> 32) as u32;
-        let hit = hi(g2) | hi(g3) | hi(h2) | hi(h3);
-        !(g2 == g3 || h2 == h3 || g2 == h2 || g2 == h3 || g3 == h2 || g3 == h3 || (hit as i32) < 0)
+        let top = 1u64 << 63;
+        let a = (top >> g2) | (top >> g3) | (top >> h2) | (top >> h3);
+        let new = ((a as u32) & !(rseen as u32)).count_ones()
+            + (((a >> 32) as u32) & !((rseen >> 32) as u32)).count_ones();
+        new == 4
     }
 
     fn xorshift(x: &mut u64) -> u64 {
@@ -6245,8 +6245,8 @@ mod tests {
         );
     }
 
-    /// The lean membership test (bit-reversed masks, four shifts and a sign
-    /// test, six compares) is the four-mask test: every digit 4-tuple at
+    /// The lean digit test (bit-reversed masks, the four digits' bits
+    /// outside `seen` counted) is the four-mask test: every digit 4-tuple at
     /// every base 10-64 against a random set of seen digits (about a quarter
     /// of the bits, as the entry's 12 and a top's certificate give), and 10^7
     /// random tuples against sets of every density.
