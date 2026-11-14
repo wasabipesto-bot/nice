@@ -187,7 +187,7 @@ with the binary order rotating per round, a load gate (1-min load ≤ 2) before 
 Binaries: `old` = 41b4b405, `new2` = the branch commit `b86e4389`, `old12` = 41b4b405 with `MAX_STEPS` 12
 only. **Counts identical in every run of every binary** (survivors / checked / hits below).
 
-**Final (`raw/ab2-runs.txt`, `raw/ab2-summary.txt`; 07:18–07:50 UTC; 6 rounds; seconds per run):**
+**Second build, `b86e4389` (`new2`; not the final code: the final code `d3630e30` is the §6 `ab3` table) (`raw/ab2-runs.txt`, `raw/ab2-summary.txt`; 07:18–07:50 UTC; 6 rounds; seconds per run):** *(relabelled 2026-11-14 afternoon, review finding L3; this table was headed "Final")*
 
 | shape | partitions | old (6 rounds) | new (6 rounds) | speed-up, medians | minimums | per round | counts |
 |---|---|---|---|---|---|---|---|

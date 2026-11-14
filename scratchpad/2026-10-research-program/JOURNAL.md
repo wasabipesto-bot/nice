@@ -118,6 +118,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   merged commits on main carry the same author and trailers. The PR's own CI run is the test of
   the pin.
 
+- **16:30 UTC: #261 is green (25 pass, 3 skipped).** Both pinned jobs ran on ubuntu-24.04
+  (CPU amd64: image 20261111.127.1; GPU amd64: 20261111.370.1) and passed their smoke tests; the
+  arm64 job as before on ubuntu-24.04-arm. No stale-cache trouble.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
