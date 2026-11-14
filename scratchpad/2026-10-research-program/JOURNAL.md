@@ -85,6 +85,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   the cap.** The Rust build-and-test workflow for 9c27023 is still pending behind the earlier
   commit's run; reminder at 12:50 UTC. The other four PRs: green, no comments, none merged.
 
+- **12:45 UTC: #260's Rust workflow is green** (all 16 build targets, format and clippy, the
+  workspace tests, the CUDA host tests). Its Linux jobs also ran on ubuntu-26.04 (image
+  20261111.196.1) and the glibc-floor assertions passed: the release binaries are built in the
+  cross containers, so only the GPU image job (which builds on the runner itself) is exposed to
+  the rollover. #260 = 25 pass, 1 fail (that job), 3 skipped. No merges, no comments on any of
+  the five; main still 41b4b40; CI fix branch still unopened (cap).
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
