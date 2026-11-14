@@ -261,6 +261,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   search resumes; a fresh look at high-level strategy (the demoux kernel queue is empty apart
   from the two under-bar branches).
 
+- **23:59 UTC: all seven open PRs are green and mergeable** (#251, #255, #256, #259, #260, #262,
+  #263; 25 checks each; #263 on ffcfcfc). No comments, nothing merged since #261, no box running.
+  Day closed.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
