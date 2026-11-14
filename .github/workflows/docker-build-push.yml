@@ -22,7 +22,10 @@ env:
 jobs:
     build-and-push-amd64:
         name: Build (amd64) + Push arch image
-        runs-on: ubuntu-latest
+        # Built on the runner and copied into the Debian trixie image of
+        # client/cpu.Dockerfile (glibc 2.41): pinned for the same reason as the
+        # GPU job below, and to the same release as the arm64 job.
+        runs-on: ubuntu-24.04
         permissions:
             contents: read
             packages: write
