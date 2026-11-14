@@ -2,10 +2,11 @@
 
 Reviewer: independent (not involved in writing the change), 2026-11-14, on ivory, CPU only.
 Reviewed: fork `exp/cpu-top-skip-squashed` = `e0bf513e` on upstream main `41b4b405` (same tree as
-`exp/cpu-top-skip` head `d3630e30`: tree `48f8212b` for both). Worktrees: `.worktrees/review-cpu2`
-(branch head, with two `#[path]` hook lines appended for my tests, not committed;
-`review/review-hooks-branch.patch`) and `.worktrees/review-cpu2-main` (`41b4b405` + one hook line,
-`review/review-hooks-main.patch`).
+`exp/cpu-top-skip` head `d3630e30`: tree `48f8212b` for both). Worktree `.worktrees/review-cpu2` (detached
+at the branch head; clean again: my test modules were attached by `#[path]` hook lines,
+`review/review-hooks-branch.patch`, reverted afterwards); a main worktree (`41b4b405` +
+`review/review-hooks-main.patch`) and a mutant worktree, both removed. Nothing was pushed or
+committed.
 
 ## Verdict
 
@@ -148,8 +149,85 @@ Independently of §2 of the write-up, from `Base::cert_parts` (`overlap_join.rs:
 
 ## What I verified, and how
 
-TBD
+All runs `nice -n 19`, at most two threads, `CARGO_TARGET_DIR=~/projects/nice/target`, release,
+CPU only (no GPU features). Code under `CPU2/review/`, outputs under `CPU2/review/out/`.
+
+1. **The branch's own tests and the existing CPU-join tests** (`cargo test --release -p
+   nice_common -- cpu_top_fd cpu_join`, `review/branch-tests.txt`): 22 passed, 5 ignored (opt-in),
+   0 failed, including the three new tests and `stepped_certificates_equal_the_divided_ones` at
+   `MAX_STEPS` 12. `cargo clippy -p nice_client -- -D warnings` clean.
+2. **The run bound against exact arithmetic** (`review/exact_run_check.rs`, a child module of
+   `cpu_top_fd` so it calls the private `run_of`; `out/exact-7-64.txt`, 3 min). Bases 7–64; per base
+   the whole band plus 3 random sub-fields; every `f0` with `w < 2^32`, `o` 1–2, `cap = f0 + o`;
+   `span` ∈ {1, b, b², 4096, 65535, 2^32−1}; 40 trials per setup, each a random certifiable position
+   `(j, i)` and a random block, from which I compute with malachite the digit boundary `T = (⌊a^j/b^i⌋
+   + 1)·b^i` and the last block `P*` whose `e^j < T`, then test the blocks `P*`, `P*+1`, `P*+2`,
+   `P*−1..4`, `P* − 2^t (±1)` for t < 48 and `P* − k·span`, i.e. blocks whose `e^j` sits just
+   below / at / above the boundary and at every scale of distance from it. For each I compare
+   `run_of` with the exact run (the count of blocks `P, P+1, …` with `e^j < T`) and the exact
+   "certified at `i`" (`i >= max(cap, ndig(e^j − a^j), h)` by big integers).
+   **29.9 M evaluations, 8.97 M at certified positions: 0 above the exact run**, 6.74 M (75 %)
+   exactly equal to it (capped at `span`); no evaluation at an uncertified position was above
+   either. On the same blocks, `cert(.., true)` failed 7.37 M times (3.52 M runs > 64), and **657 M
+   later blocks inside those runs re-certified by `Base::cert_parts`: all fail.**
+3. **Main against the branch, end to end** (`review/cmp_common.rs` + `cmp_main.rs` /
+   `cmp_branch.rs`, child modules of `cpu_join`). For every event, the partition's tops (count
+   and a hash of their `Debug` form, in order: the branch's through `CpuJoin::tops` with the
+   carried `next`, by a copy of `run`'s carry/reset rule; main's certifying every block) and
+   `run_partition`'s survivors, checked count and hits with the simulated thread's own long-lived
+   `Scratch` (the real `run`, on both). Schedules: rayon-like chunks of 1–24 partitions dealt to 3
+   threads, chunks swapped out of order, retries of the same partition, steps back by one, gaps
+   of 1–30 (crossing `RUN_GAP`), several joins (fields and slices) interleaved on the same thread
+   states; then each join again ascending on a fresh thread. **Outputs byte-identical** (sha256 in
+   `out/SHA256SUMS`):
+   - small bases (`out/*-small.txt.xz`): b10–b34, 3 random fields per base (offsets and sizes
+     50 k–3 M, not the author's start/middle/end), every supported `(t, k, p)` with `p` 0–2 and ≤ 2 M
+     prefix-partitions: 567 joins, 276,077 partition events, 5.82 M tops; 204,885 events worked
+     out runs, 2.03 M prefix entries were above their partition at entry (skip-eligible).
+   - production shapes (`out/*-production.txt`): b44, b48, b52, b57–b64 at 0 %, 7.1 %, 83 % and
+     the band's end, 1e14/1e15/1e16 fields (b44, b48 whole band, 2 slices at b48 and b52); 37
+     fields, 3,132 partition events, 892 M tops, 26.1 G survivors, 1.43 G checked, 774 M
+     skip-eligible entries; 17 of the fields have tops. Many of these fields have no tops (their
+     field certificate fails), b62 among them, so:
+   - fields hunted for tops (`out/*-hunt.txt`): 1e15 fields at b58, b60 (2), b62 (3), b63 (2),
+     b64 (3) and **1e17 fields at b62 (`4409579838396751579500`) and b64
+     (`39667873456105019795018`), first and last slice**, windows at the start, middle and end of
+     each slice: 13 fields, 1,017 events, 340 M tops, 15.0 G survivors, 0.90 G checked, 470 M
+     skip-eligible entries.
+   No field had a hit (none expected); identity is carried by the tops hashes and the counts.
+4. **The checks can see a bug** (mutation tests, mutants deleted afterwards): (a) the run
+   inflated by 2^-10 relative (`run_of`'s `(1 − 2^-40)` → `(1 + 2^-10)`): my exact check reports
+   violations at once (`out/mut-bound-exact.txt`, e.g. b22: run_of 21 > exact 20), and so does
+   the author's `a_failing_run_fails_at_every_block` (`out/mut-bound-author-test.txt`); (b) the
+   carried state allowed for a step back (`last < v` → `last != v`, in `run` and my copy): the
+   small-base comparison differs from main on 3,056 lines (`out/mut-state-small.txt.xz`).
+5. **The client change**: the only change is `map_init(Scratch::default, ..)` → a
+   `thread_local!` `RefCell<Scratch>` borrowed around `run_partition`; partition distribution
+   (`(0..parts).into_par_iter()`, the reduce, the progress tick) is unchanged. Re-entrancy,
+   panics, multiple fields and slices, resumes: see the rule's step 5 and Informational.
+6. **The write-up's numbers**: recomputed from `raw/ab3-runs.txt` and `raw/ab2-runs.txt`
+   (`review/recompute_ab.py`, output `review/out/recompute_ab.txt`): ab3 b60 ×1.132 (min ×1.124,
+   rounds 1.118–1.139), b62 ×1.140 (×1.139, 1.130–1.145), b64 ×1.009 (×1.008, 1.002–1.015); ab2
+   ×1.127 / ×1.135 / ×1.005 — all as reported, counts identical in every run of both files.
+   `tests-skip-full-v1.txt` matches §3 (334,914 / 142,224,583 / 4,096 / 127,054 / 52,075; 268
+   shapes, 1,168,507 tops, 788,862 not certified). The squashed commit's tree equals `d3630e30`'s
+   (`48f8212b`), so the `new3` timings are of the reviewed code. Only labelling issue: L3.
 
 ## What I could not verify
 
-TBD
+- **The speed-up at production thread counts.** The A/B is one thread over 12–32 contiguous
+  partitions of one slice per base; the client's per-thread scratch at ≥ 8 threads is untimed
+  (the author says so). Under rayon's splitting, a thread whose next partition is more than
+  `RUN_GAP` = 8 above its last loses the run analysis, and one below it loses the state, so the
+  gain at 64 threads could be noticeably below ×1.13; and memory (M1) is unmeasured.
+- **Whole fields.** Neither the author nor I ran a whole production field through both; my
+  comparison covers windows (start/middle/end of first and last slices) of 30 production-shape
+  fields with tops and whole joins only at b10–b34.
+- **Hits.** No compared field contains a nice number, so "hits identical" is vacuous here; the
+  tops and survivor/checked identity is what carries the claim (a skipped passing top would
+  change the tops hash).
+- I did not re-time anything (the machine allows two threads; my comparisons ran beside other
+  load), and did not run the GPU tests that use the CPU join as a reference.
+- b35–b40 were left out of the exhaustive small-base sweep: at b35 one enumerated shape needs
+  more memory than ivory has (the process was killed by the OOM killer); production shapes at
+  b44+ were covered instead.

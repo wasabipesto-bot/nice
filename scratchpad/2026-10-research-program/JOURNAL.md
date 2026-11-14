@@ -53,6 +53,14 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   word collides with the fix's account words when both are in. An independent reviewer is on
   f9a2501 (`T26/REVIEW-BRIEF.md`); the PR follows its findings.
 
+- **The CPU skip walk's review is in (`CPU2/REVIEW.md`): sound, no fix needed before a PR.** The
+  reviewer re-derived the rule, checked the f64 bound against exact big integers at digit
+  boundaries (never above the true run; 75 % exactly equal, so the check is sharp), and compared
+  main with the branch byte for byte under hostile schedules (out of order, retries, several
+  joins on one thread's state). One thing to settle if it is opened: the per-thread state is
+  about 10 MB a thread and is never freed (≈ 1.4 GB on a 128-thread node, up to 4 GiB at the
+  slice cap). The branch stays held.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
