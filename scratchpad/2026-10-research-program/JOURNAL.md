@@ -201,6 +201,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     their GPU image job runs on the fixed workflow. #251, #255, #256, #259 were green before the
     runner change and are left alone.
 
+- **20:45 UTC:** box 60693354 (image `ubuntu:26.04`) refused ssh keys ("bad ownership or modes
+  for file /root/.ssh/authorized_keys": the image, as with 60315324 on 11-12); destroyed after
+  0.19 h, replaced by 60694347 (default image, 20 cores, $0.067/h, TTL about 23:50 UTC) with an
+  Ubuntu 26.04 chroot for Mesa 26.0.8. **Do not rent plain distribution images on Vast: use the
+  default image and a chroot.** The engineer's leading hypothesis for #263's failure: lavapipe
+  on Mesa 26 advertises `VK_KHR_workgroup_memory_explicit_layout`, so cubecl-spirv lays shared
+  memory out explicitly through cubecl-opt's liveness allocator, which may let arrays share
+  bytes. If true it matters beyond lavapipe (RADV advertises that extension; the plane-scoped
+  queue is the 9070 XT's default): asked for the dumped offsets, the allocator's live ranges,
+  whether main's kernels are exposed, and a fix that does not rest on the allocator.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
