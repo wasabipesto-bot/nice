@@ -73,6 +73,18 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   what is left on demoux after the five PRs needs a window and waits for merges. If the search
   is still idle, say so again.
 
+- **11:35 UTC: #260's CI.** The GPU parity jobs pass on 9c27023 (lavapipe and Metal on macOS,
+  both running the new partly-filled-plane tests with lane 0 taken out: the kernel's first
+  Metal run). **One job is red and it is not the code:** "Build (amd64, GPU) + Push arch image"
+  fails its smoke test with `GLIBC_2.43 not found`. GitHub's `ubuntu-latest` now resolves to
+  Ubuntu 26.04 (glibc 2.43) for some jobs (this job's runner image: ubuntu-26.04 20261111.82.6;
+  yesterday's passing run of the same job on #259: ubuntu-24.04), while `client/gpu.Dockerfile`'s
+  base is Ubuntu 24.04, and the job builds its binary on the runner. It will hit main and every
+  PR as GitHub's rollout proceeds. A one-line fix (pin that job to `ubuntu-24.04`, with a
+  comment) is on fork branch `pr/ci-gpu-image-runner` 6f35812; **not opened: five PRs are open,
+  the cap.** The Rust build-and-test workflow for 9c27023 is still pending behind the earlier
+  commit's run; reminder at 12:50 UTC. The other four PRs: green, no comments, none merged.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
