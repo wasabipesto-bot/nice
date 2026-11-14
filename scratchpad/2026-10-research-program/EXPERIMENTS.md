@@ -5,6 +5,42 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T26B.2 #263's CI failure: cubecl-opt drops same-value atomic stores in a block (2026-11-14 20:26–23:35 UTC, engineer resumed and the reviewer resumed; `T26B/CI-FAIL.md`, `T26B/REVIEW2.md`, `T26B/CUBECL-ISSUE-DRAFT.md`, `T26B/ci-fail/` (CI's log), `T26B/raw/ci/` (`dump/` modules, `box/` logs, `add_mini.py`, `stores.py`), `T26B/review2-box/` (per-tree comparison tables, modules, probe kernel); fork `pr/stride-queue-any-plane` ffcfcfc = 85fe64a + changelog number + merge of main 54d0aac + comment fix + 165192b (the fix) + a comment; boxes 60693354 and 60694347 (host m16641 refuses ssh keys; 0.19 h + 0.34 h), 60696216 (RTX 3080 host, 48 threads, Ubuntu 26.04 chroot with Mesa 26.0.8, 2.36 h, ~$0.29))
+
+- **Symptom** [M]: CI's lavapipe job, SPIR-V step (llvmpipe LLVM 21.1.8, Mesa 26.0.8, ubuntu-26.04 runner), test
+  `cubecl_queues_check_every_survivor_on_partly_filled_planes`: 7 of 32 runs stopped by the account with impossible
+  values (b40 has 283 survivors: "3401", "182536111", "128849019 fewer"; "low words differ by 109 / 347"); twice in
+  two CI runs. WGSL step 32 of 32, Metal passes, older Mesa (25.2.8) passed for author and reviewer.
+- **Cause** [R][M]: `clear_queue_account` had unit 0 run four `store(0)` on a `SharedMemory<Atomic<u32>>` at indices
+  0–3. cubecl-opt 0.10 `MergeSameExpressions` (`passes/expression_merge.rs` `check_op`, lines 111–145) replaces a
+  later instruction of a basic block with a copy of an earlier one when their `operation`s are equal and operands
+  immutable; `Atomic::store` keeps its target in the instruction's *output* (`cubecl-core` `atomic.rs` line 45), so
+  two atomic stores of one value compare equal whatever they point at (I read both source places). The module kept
+  one `OpAtomicStore` (counted in `raw/ci/dump/mini_MS.log`: 1 for four stores of 7, 4 for 7/8/9/10; WGSL 4 and 4).
+  Account words 2–3 started with stale workgroup memory. Only cubecl-spirv runs the pass (cubecl-cpp: `shared_only`;
+  WGSL: no cubecl-opt).
+- **Class** (reviewer's probe kernel on Mesa 26.0.8, both compilers) [M]: lost in SPIR-V: several atomic stores of one
+  value in one block (one array, two shared arrays, a runtime value, two global atomics, shared plus global, an
+  unrolled loop). Kept: stores in separate blocks, plain stores, `fetch_add`, swap. A runtime index alone does not
+  protect (argued from source, not run).
+- **No survivor lost** [M]: a build that prints the account error and returns the hits anyway: 32 of 32 runs exact
+  against the host mirror while the account fired (`is_ci4_1.log`). At bec91fd CI's suite failed 3 of 4 times on the
+  box, once at cube 256; the test alone passed 5 of 5 (its own earlier launches leave the words at 0).
+- **Exposure** [M]: atomic operations in the SPIR-V module against the WGSL module per kernel variant: main 54d0aac
+  419 variants, the fix 425, `pr/top-slot-any-plane` ec6a43a 674, `pr/check-d` 1f41d64 623,
+  `pr/join-prefilter-popcount-spirv` 408: **none missing**. (`pr/join-survivor-stage-512` and
+  `pr/join-prefilter-shift-pow2` from source: no atomic operation added or moved.) The script flags all 16 pre-fix
+  `niceonly_kernel` variants. On an RX 9070 XT the pre-fix PR could have failed stride-walk fields spuriously
+  whenever workgroup memory was non-zero; no candidates lost. No RADV device was available (the module is the same
+  on every device).
+- **Fix** 165192b: units 0–3 clear one word each, a single store in a loop (cannot be merged; covers cubes of 1–3
+  units; ordered by the first cube barrier). Verified on Mesa 26.0.8: the test 20 × 32 exact per compiler (author),
+  5 × per compiler and CI's SPIR-V suite 3 × 28 of 28 (reviewer's own builds), fault tests, `just lint`; CUDA tests
+  on the box's 3080. CI green on 165192b (25 pass).
+- **Standing risk:** any future kernel that stores one value into two atomics in one block is silently miscompiled
+  on the SPIR-V runtime (the 9070 XT); no CUDA or WGSL test shows it. Options put to the user: a rule in the kernel
+  docs, a CI comparison of SPIR-V and WGSL atomic counts per kernel, the upstream report (draft ready).
+
 ## T26B.1 The stride walk's survivor queues without full-plane or lane-0 assumptions; PR #263 (2026-11-14 15:45–19:31 UTC, engineer and independent reviewer; `T26B/RESULTS.md`, `T26B/PR-BODY.md`, `T26B/REVIEW.md`, `T26B/raw/` (box logs, repro patches, host model, `ident_summary.txt`), `T26B/review-model/qmodel.py`, `T26B/review-box/`; fork `pr/stride-queue-any-plane` bf6cc8e = 85fe64a (one commit on main 41b4b40, 650 lines in `cubecl_backend.rs`) + the changelog number and a test comment; box 60665092, RTX 3080 at the host's 130 W cap, 3.78 h, ~$0.43)
 
 - **Reproduced on main** (test-only cube size, one cube, b50 window with 30,449 survivors) [M]: RTX 3080, plane-scoped
