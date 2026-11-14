@@ -92,6 +92,32 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   the rollover. #260 = 25 pass, 1 fail (that job), 3 skipped. No merges, no comments on any of
   the five; main still 41b4b40; CI fix branch still unopened (cap).
 
+- **15:35 UTC, the user:** "Remove the cap on open PRs, but in each report note the top 3 open
+  (mergable) PRs by urgency or expected value. Open any held PRs now." Applied: README and the
+  routine's prompt changed (no cap; top-3 line in every report). Held for the cap were (1) the
+  CI runner fix, (2) the CPU skip walk, (3) the stride kernels' queue fix (T2.6b, not yet
+  built). Not held for the cap, and so not opened: `exp/n21-ffs-pop` (+1–2 %) and the wgpu dense
+  plan N14 (×1.035–1.045 at b62 / b60, ×1.004 at b64), both under the ×1.05 bar; the user is told.
+  - CI fix: extended the branch (024cf43: also pin the CPU amd64 image job, which builds the
+    same way into Debian trixie and passes on 26.04 only by which symbols it references; fix the
+    Dockerfile comment). Body `CI1/PR-BODY.md`; Sonnet reviewer running (`CI1/REVIEW-BRIEF.md`).
+  - CPU skip walk: Opus engineer on `CPU2/PR-BRIEF.md` (M1 free the per-thread state, L1 shared
+    helper, L2 carried-state tests, **and the measurement the morning's work lacked: the real
+    client at 44 and 8 threads**, box 60665025, V100 host with 44 threads, $0.108/h, TTL 20:10
+    UTC). Kill: under ×1.05 at b62 with the real client at 44 threads → no PR. Hard stop 19:40.
+  - T2.6b: Opus engineer on `T26B/BRIEF.md` (box 60665092, RTX 3080, 20 cores, $0.108/h, TTL
+    21:15 UTC; hard stop 20:45). A first box (60664973, 4 cores) was released after a minute.
+  - Each gets an independent reviewer before I open it.
+
+- **15:55 UTC: PR #261 opened (the CI runner fix).** Sonnet review (`CI1/REVIEW.md`, 105 k
+  tokens): the diff and every log claim confirmed (GPU job failed on ubuntu-26.04 20261111.82.6
+  on both pushes of #260; the same job and main passed on 24.04 on 11-13; no other job copies a
+  runner-built binary into an older image). Its wording fixes applied to the body (no "rollout"
+  claim: state the two days' facts; the musl builds are native but static; one sentence on the
+  caches keyed by `runner.os`). Its finding on the commit trailer and author is not a fix: the
+  merged commits on main carry the same author and trailers. The PR's own CI run is the test of
+  the pin.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit

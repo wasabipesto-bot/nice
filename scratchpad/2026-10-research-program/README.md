@@ -33,7 +33,10 @@ director session can be replaced from it at any time.
 
 ## PRs
 
-Open immediately once the 5 % protocol and exactness pass; the report lists them. After another PR
+Open immediately once the 5 % protocol and exactness pass and the independent review is in.
+**No cap on open PRs** (the user removed the cap of 5 on 2026-11-14). **Every report names the top
+3 open, mergeable PRs by urgency or expected value**, one line each on why, plus any merge-order
+hazard among them. Branches under the gain bar stay unopened whatever the count. After another PR
 merges, bring a branch up to date with a merge commit and a plain push: the harness refuses
 force-pushes, lease or not (2026-11-12). Bodies:
 what, why, soundness, measurements, exactness, short "Not in this PR"; no mention of the
