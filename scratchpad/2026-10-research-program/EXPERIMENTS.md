@@ -5,6 +5,42 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T26.1 The FD top kernel's append without a lane-0 assumption; the four open PRs merged together (2026-11-14 05:46–10:07 UTC, agent; `T26/RESULTS.md`, `T26/PR-BODY.md`, `T26/raw/` (`repro/`, `model/`, `box/logs`, `box/out`, `box/ident`, `0001-top-slot-any-plane.patch`); fork `pr/top-slot-any-plane` f9a2501 (one commit on main 41b4b40) and `exp/integration-1114` (99b283a = main + #251 + #255 + #256 + #259; 8bcee21 = that + the fix); box 60601437, RTX 3080 at 260 W, 4.38 h, ~$0.49)
+
+**Reproduction:** only `top_fd_kernel` uses `top_slot`. With a test-only switch that takes each
+plane's lane 0 out of the call, main's `top_slot` on lavapipe (both compilers) goes wrong in 84
+of 276 runs and loses 8.9 M of 13.0 M kept tops (b57 1e14: 110,484 kept, 36,057 counted): no
+lane takes the plane's atomic, `grp_cnt` never counts the tops and they are written over other
+records. On CUDA a partly filled warp is always lanes 0..r−1, so main is correct there, and a
+lane 0 that sits out leaves CUDA's full-mask intrinsics undefined (the run hung). **So the loss
+was shown with a test-only divergence on lavapipe, not on any production launch.** A host model
+(random and exhaustive 8-lane populations) agrees.
+
+**Fix (f9a2501):** the leader is the lowest kept lane among the lanes that run the call (ballot
+form up to 32 lanes, scans over active lanes wider); one `fetch_add` per plane when its kept
+tops share a group, one per kept lane when they straddle groups, as before; the number of plane
+operations is unchanged. A per-batch account (tops written minus records reserved, and the same
+for record indices mod 2^32) is summed per work group and checked by the host after every batch
+and partition re-run (`ensure_appended`): a mismatch fails the field.
+
+| field (RTX 3080, 260 W, interleaved, card at idle temperature before each run, counts identical) | main (median) | fix | change |
+|---|---|---|---|
+| b62 1e17 (3 and 4 spill-free rounds) | 67.27 s | 67.42 s | +0.23 % |
+| b64 1e17 (5 rounds) | 138.03 s | 138.49 s | +0.33 % |
+
+Exactness on the fix: the partly-filled-plane test with lane 0 out (552 runs per compiler on
+lavapipe, 230 on CUDA), every CUDA and lavapipe test of `cubecl_join`, dense compares against
+the CPU join at b60 1e16, b62 1e17, b64 1e17, 248 host tests, fmt and clippy under 1.100.0; the
+generated CUDA and WGSL of every kernel except `top_fd_kernel` identical to main's. Not run: a
+64-lane device, Metal, HIP.
+
+**Integration of the four open PRs:** main + #251 + #255 + #256 + #259 (and the same plus the
+fix) pass lint, host tests (254 / 255), every CUDA test, lavapipe with both compilers and the
+dense compares with the same counts. Conflicts: the changelog (keep all lines in PR order);
+`walk_pf_lean` (#255's shift-form digits, then #259's count-or-compare test unchanged); and
+between #251 and the fix the `ran` array (#251's test-only smallest-take word is hard-coded at
+`ran[STAGES_U32 + 3]` and must move behind the fix's two account words).
+
 ## CPU2.1 A skip walk for the CPU join's top certificates (2026-11-14 05:46–08:57 UTC, agent, ivory, one thread; `CPU2/RESULTS.md`, `CPU2/raw/` (`profile_*.txt`, `ab*-runs.txt`, `ab*-summary.txt`, test logs, `rayon-runs.txt`, `bitreversed-order.txt`); fork branches `exp/cpu-top-skip` (two commits) and `exp/cpu-top-skip-squashed` e0bf513 (one commit on main 41b4b40; 600 changed lines in `cpu_join.rs`, `cpu_top_fd.rs`, `client/src/main.rs`))
 
 **Profile of the CPU join today** (main, three fields per base, three slices each, three

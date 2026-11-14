@@ -41,10 +41,10 @@ and `repro_*` tests run the FD kernel against `top_kernel` on the 17 test window
 What goes wrong, exactly (b57 1e14 first slice, 4 slots, 80,906 prefixes, cubes of 256, ballot form, WGSL): `top_kernel`
 keeps 110,484 tops; the FD kernel counts 36,057 in `grp_cnt` and loses **74,427**. The kept tops of every plane whose kept
 tops are all of one group (the usual case: the layer is sorted by group) are never counted, because the only lane allowed to
-take the plane's atomic (lane 0) is not running the call. They are written at `plane_broadcast(a0, 0) + rank`, i.e. at
-the start of their group's segment (the value llvmpipe returns for the inactive lane 0 is that lane's never-set
-register), where they overwrite records that per-lane atomics counted (every counted record still holds *a* kept top:
-`found = counted` in every run). The join reads only `grp_cnt[g]` records per group, so it never sees them: lost
+take the plane's atomic (lane 0) is not running the call. They are written at `plane_broadcast(a0, 0) + rank`, where
+`a0` is read from the inactive lane 0 (on llvmpipe apparently its unset register, so the start of the group's segment
+[A: inferred, not traced]), over records that other atomics counted (every counted record still holds *a* kept top:
+`found = counted` in every run [M]). The join reads only `grp_cnt[g]` records per group, so it never sees them: lost
 candidates, and nothing on the host counted the stage. Planes whose kept tops straddle groups take per-lane atomics and
 are unaffected (why 192 of the 276 lane-0-out runs, mostly the windows' small layers, stay right).
 
@@ -150,8 +150,8 @@ All on the commit's tree (box worktree `fix` at `f9a25017`; ivory `t26/top-slot`
 
 | run | device | result | log |
 |---|---|---|---|
-| `top_fd_appends_every_top_on_partly_filled_planes` (new): FD vs `top_kernel`, 23 fields (17 windows + 6 `PLAN_FIELDS` first slices), 2 batches each, cubes 100/48/256, ballot and scan forms, with and without `TOP_LANE0_OUT`; account zero in every run | lavapipe WGSL / SPIR-V | ok, 552 runs each, 6,492,699 tops; the same harness on main fails (§2) | `fix_lvp_partial_F.log`, `fix_lvp_partial_FS.log`, `lvp_F.log`, `lvp_FS.log` |
-| `cubecl_cuda_top_fd_appends_every_top_on_partly_filled_warps` (new): same, ballot form, one cube for 100/48 (layer cut to a window of 100 / 97 or 48 / 45 prefixes) | RTX 3080 | ok, 230 runs, 4,764,544 tops | `fix_cuda_partial_F.log`, `F_cuda_suite.log` |
+| `top_fd_appends_every_top_on_partly_filled_planes` (new): FD vs `top_kernel`, 23 fields (17 windows + 6 `PLAN_FIELDS` first slices), 2 batches each, cubes 100/48/256, ballot and scan forms, with and without `TOP_LANE0_OUT`; account zero in every run | lavapipe WGSL / SPIR-V | ok, 552 runs each, 6,492,699 tops; the same harness on main fails (§2) | `lvp_F.log`, `lvp_FS.log` (`fix_lvp_partial_F*.log`: an intermediate build, md5 21179f39, before the per-lane path was accounted) |
+| `cubecl_cuda_top_fd_appends_every_top_on_partly_filled_warps` (new): same, ballot form, one cube for 100/48 (layer cut to a window of 100 / 97 or 48 / 45 prefixes) | RTX 3080 | ok, 230 runs, 4,764,544 tops | `F_cuda_suite.log` (`fix_cuda_partial_F.log`: the intermediate build) |
 | `check_lost_tops` (new, in `check_all`): `TOP_SHORT_TAKE` / `TOP_DUP_RANK` fail `run_field` and a partition's re-run with the account's two messages; the field then runs as before | RTX 3080; lavapipe WGSL and SPIR-V | ok (CUDA: 112 tops / -94; lavapipe: 447 tops (= the b20 window's 3,576 prefixes / 8-lane planes) / -44) | `F_cuda_suite.log`, `lvp_F*.log` |
 | `cubecl_cuda_join_matches_the_cpu_reference` (b10, 17 windows, b57 frontier partitions, tight layouts, slices, refused layouts, production shape, lost tops) | RTX 3080 | ok | `F_cuda_suite.log` |
 | `cubecl_cuda_top_certificates_match_the_lockstep_scan_and_the_cpu` | RTX 3080 | ok (102,365 intervals, 33,582 kept) | `F_cuda_suite.log` |
@@ -179,7 +179,38 @@ selects it; CubeCL lowers its sums over all 32 lanes, though main's ran right th
 
 ## 6. Cost
 
-COST
+Method [M]: binaries M = upstream main `41b4b405` (md5 aacdc4a6) and F = the fix `f9a25017` (md5 2c8cb647), each
+built in its own tree and target dir before any timing (`raw/box/out/builds.txt`, which names the commit each was built
+from, trees clean). Harness `cubecl_cuda_join_throughput_fixed_fields` (`run.sh`): one untimed 1e14 warm-up field per
+process, then b62 1e17 at `7520566762397899821056` and b64 1e17 at `58557331862957161709568`, one field each. Rounds 1-3
+interleaved with the order rotated (M F / F M / M F, `chain.sh`); because F's b62 round 2 ran 2 % slow, b62 rounds 4
+(F M) and 5 (M F) were added (`chain2.sh`), and b64 rounds 4 and 5 later (`chain3.sh`, below). Before every run the card returned to its idle temperature (≤ 46 °C: this
+3080 idles at 41-45 °C and did not reach 42 within 5 min, so `cool.sh` waits for 46; 200-240 s per run). Nothing else
+ran on the box during the chains (the exactness runs finished before, the integration runs were queued behind the box
+lock). Per process: nvidia-smi every second (`.smi`), mean SM clock and median power over ≥ 90 % utilisation samples;
+each process's CubeCL PTX cache replayed through the driver's JIT (`ptxjit.py` → `raw/box/out/ptxjit.out`) for
+registers and spills. "device" = mean `run_field` device seconds per field. Survivors / checked / found identical in
+every run: b62 1,097,114,812,011 / 66,862,268,894 / 0; b64 3,092,989,872,066 / 191,683,594,021 / 0. Power 259.0-259.4 W
+median in every run (the 260 W cap); SM clock 1,735-1,758 MHz (b62), 1,722-1,736 MHz (b64). Full per-run table:
+`raw/box/out/analyze.out`.
+
+**Join kernel register variant [M]:** as in CKF, the driver JIT gives the (unchanged) join kernel 46-48 registers in
+most processes and a 40-register variant with 24 bytes of spills in some: b62 F r2, M r4 and M r5, each 1.2-2.0 % slower
+(68.1-68.6 s against 67.2-67.7 s). Like CKF, the table uses the spill-free processes. `top_fd_kernel`: 108 → 109
+registers at b62, 112 → 115 at b64, no spills either side.
+
+| field | M = main, s/field (spill-free rounds) | F = fix | fix vs main (medians) |
+|---|---|---|---|
+| **b62 1e17** | **67.269** (r1 67.381, r2 67.269, r3 67.226) | **67.422** (r1 67.651, r3 67.452, r4 67.391, r5 67.253) | **+0.23 %** (all 5 + 5 processes: 67.452 vs 67.381, +0.11 %) |
+| **b64 1e17** | **138.026** (r1 138.236, r2 138.315, r3 135.231, r4 137.934, r5 138.026) | **138.485** (138.605, 138.485, 139.883, 138.198, 138.087) | **+0.33 %** (rounds 1-3 only: +0.27 %) |
+
+Per round, M/F device time (< 1 = fix slower) [D]: b62 r1 0.9960, r3 0.9966 (both spill-free); cycles (s × MHz) 0.9904,
+0.9975. b64 r1 0.9973, r2 0.9988, **r3 0.9667**, r4 0.9981, r5 0.9996; cycles 0.9986, 0.9952, 0.9700, 0.9962, 0.9994.
+
+**Cost of the fix: +0.2-0.3 % of a field by the medians [M], under the 1 % bar.** b64 round 3 was 3.4 % apart (main's r3
+2.2 % faster than its own other rounds, the fix's 0.9 % slower than its own; both spill-free, same power), so b64 rounds 4
+(F M) and 5 (M F) were added after the integration runs (`chain3.sh`, same protocol, nothing else on the box): +0.19 % and
++0.04 %. Four of five b64 pairs and both spill-free b62 pairs agree within 0.4 %; r3 is this box's run-to-run spread.
 
 ## 7. Task 2: the four open PRs together
 
@@ -209,7 +240,26 @@ PR-number order (#251, #255, #256, #259), heads as briefed (`1f41d649`, `42d2afd
    `ensure_ran` and #251's `ensure_checked` after reading the counts (`run_pass` merged automatically in that order);
    `ensure_ran` keeps #251's `&ran[..STAGES.min(ran.len())]`. Whichever of #251 and this fix lands second needs this.
 
-TASK2_RUNS
+**Runs [M]** (binaries I1 = variant 1, md5 1d254819; I1S its SPIR-V build, edaa6eb4; I2 = variant 2, 97583468; I2S
+1383f99f; each built from its clean tree, `raw/box/out/builds.txt`). Each CUDA test in its own process (`ex.sh`).
+
+| run | variant 1 (`99b283ab`) | variant 2 (`8bcee21f`) |
+|---|---|---|
+| fmt + clippy `-D warnings` (default; `nice_client/gpu,nice_client/cubecl-spirv`), rustc 1.100.0 | clean (`lint_int1.log`) | clean (`lint_int2.log`) |
+| host tests (`cargo test --release -p nice_common --features gpu --lib`) | 254 passed, 58 ignored | 255 passed, 60 ignored |
+| `cubecl_cuda_join_matches_the_cpu_reference` (incl. #251's skipped/duplicated-entry test; on v2 also `check_lost_tops`) | ok | ok, with both PRs' fault tests (check: 138 of 139 / sum 9590; tops: 112 / -86) |
+| `cubecl_cuda_check_counts_match_the_cpu` (#251) | ok: 64 lists, 1,168,717 entries, 84,652 synthetic n, 3,047 past the gate | ok, same totals |
+| `cubecl_cuda_check_takes_every_entry_on_partly_filled_warps` (#251) | ok, 84 runs; smallest take 4 / 16 / 32 at cubes of 100 / 48 / 256 | ok, same |
+| `cubecl_cuda_top_certificates_match_the_lockstep_scan_and_the_cpu` | ok | ok |
+| `cubecl_cuda_top_fd_appends_every_top_on_partly_filled_warps` (this fix) | (not in v1) | ok, 230 runs, 4,764,544 tops |
+| `cubecl_cuda_top_fd_matches_the_top_kernel` (heavy) | ok: 26 fields, 279 batches, 423,104,943 tops | ok, same totals |
+| every wgpu test of `cubecl_join`, lavapipe WGSL | 10 passed (142 s) | 11 passed (292 s) |
+| the same, lavapipe SPIR-V | 10 passed (273 s) | 11 passed (592 s) |
+| dense vs CPU join, b60 1e16 / b62 1e17 / b64 1e17 (8 partitions) | ok: 334,071,589 / 22,383,910; 170,247,827 / 10,384,896; 697,596,881 / 43,247,716 | ok, the same counts |
+
+The dense counts equal main's and the fix's (§5), as they must: none of the four PRs or the fix changes what is a
+survivor. No failure on either variant, so there is no reproduction to report. Timing round of the integration build:
+not run (the box time went to the extra A/B rounds of §6).
 
 ## 8. Not done, caveats, what I would not sign off
 

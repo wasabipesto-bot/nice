@@ -43,6 +43,16 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   independent reviewer is on the branch now (`CPU2/REVIEW-BRIEF.md`), so it is review-clean if
   it is ever opened.** The summaries check out against the raw files.
 
+- **10:07 UTC: the top-append agent handed back (EXPERIMENTS T26.1; 517 k tokens; box destroyed
+  after 4.38 h, ~$0.49).** The loss is real when lane 0 is absent: on lavapipe, with a test-only
+  switch taking lane 0 out, main loses 8.9 M of 13.0 M kept tops. No production launch does
+  that. Fix f9a2501: leader = lowest kept lane, plus a per-batch account the host checks; cost
+  +0.2–0.3 %. I read the new `top_slot`; it is as described. **The four open PRs merged together
+  pass everything** (lint, host tests, CUDA, lavapipe with both compilers, dense compares), and
+  the conflict resolutions are written down, including one real one: #251's test-only counter
+  word collides with the fix's account words when both are in. An independent reviewer is on
+  f9a2501 (`T26/REVIEW-BRIEF.md`); the PR follows its findings.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit

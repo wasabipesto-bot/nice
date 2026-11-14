@@ -1,13 +1,13 @@
 ## What
 
-The GPU overlap join's FD top kernel appends its kept tops through `top_slot`, one atomic per plane (GPU subgroup). That append ran through lane 0: lane 0's group was tested, only lane 0 took the group counter's atomic, and its result was broadcast. This PR takes all three from the lanes that actually run the call, and lets the host check the stage.
+The GPU overlap join's FD top kernel appends its kept tops through `top_slot`, one atomic per plane (GPU subgroup). That append ran through lane 0: lane 0's group was tested, only lane 0 took the group counter's atomic, and its result was broadcast. This PR takes all three from the lanes that run the call, and lets the host check the stage.
 
 - **Leader = the lowest kept lane** of the lanes running the call. If every kept lane is of its group `g0`, the leader alone does `fetch_add(n)` and the result reaches the others from it. Planes of at most 32 lanes (`ballot_append`, as before) use one ballot: count and rank are popcounts, the leader is the lowest set bit, and `g0` and the result come by `plane_shuffle` from that lane. Wider planes use sums and an exclusive scan over the active lanes, where only the leader's term is nonzero. A plane whose kept tops straddle groups still takes one atomic per kept lane. The number of plane operations is unchanged (4 with the ballot, 5 with the scans).
 - **Account:** two new words in `ran`: the tops written minus the records reserved in `grp_cnt`, and the indices of the records written minus those reserved (mod 2^32), summed per cube in shared memory. After every batch (`run_pass`, `run_partition`) the host requires both to be zero (`top_complete`); otherwise the field fails and nothing is submitted.
 
 ## Why
 
-Vulkan does not promise full subgroups, and wgpu does not ask for them. On a plane without lane 0, no lane took the atomic: the kept tops were written at offsets other planes also use, never counted, and never read by the join, a silent loss of candidates. No production device is known to launch such planes (256-thread groups are full on CUDA, Metal and RADV), so this is a robustness fix. #251 removed the same assumption from the check kernel.
+Vulkan does not promise full subgroups, and wgpu does not ask for them. On a plane without lane 0, no lane took the atomic: the kept tops were written at offsets other planes also use, never counted, and never read by the join, a silent loss of candidates. No production device is known to launch such planes (256-thread groups are full on CUDA, Metal and RADV): a robustness fix. #251 removed the same assumption from the check kernel.
 
 ## Soundness
 
@@ -32,11 +32,18 @@ The generated CUDA and WGSL of every kernel other than `top_fd_kernel` are ident
 
 ## Cost
 
-COST
+RTX 3080 at its 260 W cap, `cubecl_cuda_join_throughput_fixed_fields`, one field each, main and this branch interleaved, card back at idle temperature before every run, identical survivors / checked / found in every run. Processes where the driver JIT gave the (unchanged) join kernel its 40-register spill variant (1-2 % slower, either side) are left out, as before.
+
+| field | main s/field (median, rounds) | this PR | change |
+|---|---|---|---|
+| b62 1e17 | 67.27 (67.38, 67.27, 67.23) | 67.42 (67.65, 67.45, 67.39, 67.25) | +0.2 % |
+| b64 1e17 | 138.03 (138.24, 138.32, 135.23, 137.93, 138.03) | 138.49 (138.61, 138.49, 139.88, 138.20, 138.09) | +0.3 % |
+
+`top_fd_kernel` goes from 108 to 109 registers at b62 and from 112 to 115 at b64. The third b64 pair is 3.4 % apart (main's run was 2.2 % faster than its other four); the other pairs agree within 0.4 %.
 
 ## Not in this PR
 
 - The join kernel's survivor count (telemetry only), the niceonly stride kernels' plane queues, and `top_kernel` (one atomic per top, no plane operations) are unchanged.
-- A device that runs planes without lane 0 has not been seen. The reproduction uses a test-only mode that makes lane 0 sit out.
+- No device has been seen running planes without lane 0; the reproduction makes lane 0 sit out in a test-only mode.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
