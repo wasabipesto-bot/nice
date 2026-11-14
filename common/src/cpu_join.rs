@@ -163,6 +163,27 @@ pub struct Scratch {
     last: Option<(u64, u32)>,
 }
 
+impl Scratch {
+    /// Starts partition `v` of the join `id` (with `len` top-layer
+    /// prefixes) on this scratch: [`Scratch::next`] carries over only from
+    /// an earlier partition of the same join, and is cleared otherwise
+    /// (another join, a retry, a step back, the first use). Whether the
+    /// partition works out its failing runs: only when it follows the last
+    /// one by at most [`RUN_GAP`].
+    fn enter(&mut self, id: u64, v: u32, len: usize) -> bool {
+        let (carry, runs) = match self.last {
+            Some((last_id, last)) if last_id == id && last < v => (true, v - last <= RUN_GAP),
+            _ => (false, false),
+        };
+        if !carry {
+            self.next.clear();
+            self.next.resize(len, 0);
+        }
+        self.last = Some((id, v));
+        runs
+    }
+}
+
 /// A top prefix of the partition: `n = P·b^f0 + r` for the bottom residues
 /// `r` (mod `b^f0`) in `rlo..rhi`.
 #[derive(Clone, Copy)]
@@ -631,15 +652,7 @@ impl CpuJoin {
         // only while the thread runs the join's partitions densely (a run
         // costs more than a certificate, and pays only in a later partition
         // of this thread that it covers).
-        let (carry, runs) = match sc.last {
-            Some((id, last)) if id == self.id && last < v => (true, v - last <= RUN_GAP),
-            _ => (false, false),
-        };
-        if !carry {
-            sc.next.clear();
-            sc.next.resize(self.fs.tlay.len(), 0);
-        }
-        sc.last = Some((self.id, v));
+        let runs = sc.enter(self.id, v, self.fs.tlay.len());
         // The bottoms are extended at the first key with a top, so a
         // partition without tops does no bottom work at all.
         let mut extended = false;
@@ -1726,6 +1739,171 @@ mod tests {
             walked += 1;
         }
         assert!(walked >= 6, "{walked} fields walked");
+    }
+
+    /// Partition `v`'s tops as a thread whose scratch is `sc` makes them in
+    /// [`CpuJoin::run`] (the same carry-over rule, [`Scratch::enter`]), and
+    /// how many unclipped blocks it did not certify.
+    fn carried_tops(join: &CpuJoin, v: u32, sc: &mut Scratch) -> (Vec<Top>, u64) {
+        let runs = sc.enter(join.id, v, join.fs.tlay.len());
+        skipped_tops(join, v, &mut sc.next, runs)
+    }
+
+    /// A schedule of the partitions `0..parts` of each of several joins on
+    /// `threads` threads, `(join, thread, v)` in time order, with what a
+    /// client's pool and its failures can do to it: rayon-like chunks of
+    /// 1-24 consecutive partitions dealt to random threads, sometimes in
+    /// descending order or with the chunks swapped, retries of a partition,
+    /// steps back by one, gaps of 1-30 (across [`RUN_GAP`]), and the joins
+    /// interleaved on the same threads.
+    // A few joins and threads.
+    #[allow(clippy::cast_possible_truncation)]
+    fn disorderly(parts: &[u32], threads: usize, rng: &mut u64) -> Vec<(usize, usize, u32)> {
+        let mut queues: Vec<Vec<(usize, u32)>> = Vec::new();
+        for &n in parts {
+            let mut v = 0;
+            let mut chunks: Vec<Vec<u32>> = Vec::new();
+            while v < n {
+                let len = (1 + below(rng, 24)).min(n - v);
+                let mut chunk: Vec<u32> = (v..v + len).collect();
+                match below(rng, 8) {
+                    0 => chunk.reverse(),
+                    1 => {
+                        let at = below(rng, len) as usize;
+                        chunk.insert(at, chunk[at]);
+                    }
+                    2 if v > 0 => chunk.insert(0, v - 1),
+                    3 => {
+                        let gap = 1 + below(rng, 30);
+                        chunk.retain(|&x| x < v + 1 || x > v + gap);
+                    }
+                    _ => {}
+                }
+                chunks.push(chunk);
+                v += len;
+            }
+            for i in 1..chunks.len() {
+                if below(rng, 6) == 0 {
+                    chunks.swap(i - 1, i);
+                }
+            }
+            queues.push(
+                chunks
+                    .into_iter()
+                    .flat_map(|c| {
+                        let t = below(rng, threads as u32) as usize;
+                        c.into_iter().map(move |v| (t, v))
+                    })
+                    .collect(),
+            );
+        }
+        // Interleave the joins' queues in random steps.
+        let mut out = Vec::new();
+        let mut at = vec![0usize; queues.len()];
+        while at.iter().zip(&queues).any(|(&i, q)| i < q.len()) {
+            let j = below(rng, queues.len() as u32) as usize;
+            let take = 1 + below(rng, 12) as usize;
+            for _ in 0..take {
+                if at[j] < queues[j].len() {
+                    let (t, v) = queues[j][at[j]];
+                    out.push((j, t, v));
+                    at[j] += 1;
+                }
+            }
+        }
+        out
+    }
+
+    /// The carried state on the paths the client's per-thread scratch takes
+    /// that an ascending walk does not: several joins interleaved on the
+    /// same threads, chunks out of order, retries, steps back and gaps
+    /// across [`RUN_GAP`]. Every event's tops equal the ones certifying
+    /// every block, and `run_partition` with the thread's long-lived
+    /// scratch gives what a fresh scratch gives. A rule that carried the
+    /// state into another join or back to an earlier partition skips
+    /// passing blocks here.
+    #[test]
+    fn the_carried_state_survives_any_order_of_joins_and_partitions() {
+        use crate::base_range::get_base_range_u128;
+        let mut rng = 0x5EED_CA11_ED00_0001u64;
+        let (mut events, mut skipped, mut resets, mut runs_on, mut gaps) =
+            (0u64, 0u64, 0u64, 0u64, 0u64);
+        let mut sets = 0;
+        for b in 10..=34u32 {
+            if sets == 10 {
+                break;
+            }
+            let Some(band) = get_base_range_u128(b).expect("base range") else {
+                continue;
+            };
+            // Two fields of the band and, for each, up to two join shapes
+            // with partitions: joins of different fields and shapes
+            // interleave on the same threads.
+            let size = band.size().min(300_000 + u128::from(b) * 10_000);
+            let mut joins = Vec::new();
+            for s in [band.start(), band.end() - size] {
+                let range = FieldSize::new(s, s + size);
+                let Some(base) = crate::overlap_join::Base::try_new(b, s, s + size - 1) else {
+                    continue;
+                };
+                let mut shapes = 0;
+                for t in 1..base.l {
+                    for k in 1..base.l {
+                        for p in [2, 1] {
+                            let jp = JoinParams { t, k, p };
+                            if shapes == 2 || !jp.supported(b, base.l) {
+                                continue;
+                            }
+                            let Ok(join) = CpuJoin::new(b, &range, jp) else {
+                                continue;
+                            };
+                            let work = join.fs.tlay.len() as u64 * u64::from(join.partitions());
+                            if join.fd.is_some()
+                                && join.partitions() >= 8
+                                && (5_000..=300_000).contains(&work)
+                            {
+                                joins.push(join);
+                                shapes += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            if joins.len() < 2 {
+                continue;
+            }
+            sets += 1;
+            let parts: Vec<u32> = joins.iter().map(CpuJoin::partitions).collect();
+            let threads = 3;
+            let mut tops_sc: Vec<Scratch> = (0..threads).map(|_| Scratch::default()).collect();
+            let mut run_sc: Vec<Scratch> = (0..threads).map(|_| Scratch::default()).collect();
+            let mut last: Vec<Option<(usize, u32)>> = vec![None; threads];
+            for (j, t, v) in disorderly(&parts, threads, &mut rng) {
+                let join = &joins[j];
+                let what = format!("b{b} join {j} thread {t} partition {v}");
+                match last[t] {
+                    Some((lj, lv)) if lj == j && lv < v => {
+                        runs_on += u64::from(v - lv <= RUN_GAP);
+                        gaps += u64::from(v - lv > RUN_GAP);
+                    }
+                    _ => resets += 1,
+                }
+                last[t] = Some((j, v));
+                let (got, sk) = carried_tops(join, v, &mut tops_sc[t]);
+                assert_eq!(got, all_tops(join, v), "{what}: tops");
+                assert_eq!(
+                    join.run_partition(v, &mut run_sc[t]),
+                    join.run_partition(v, &mut Scratch::default()),
+                    "{what}: results"
+                );
+                events += 1;
+                skipped += sk;
+            }
+        }
+        eprintln!(
+            "{sets} bases, {events} partition events ({resets} resets, {runs_on} within RUN_GAP, {gaps} beyond it): {skipped} blocks not certified"
+        );
+        assert!(sets >= 6 && skipped > 10_000 && resets > 500 && gaps > 100);
     }
 
     /// Opt-in (`NICE_TEST_CPU_SKIP_PROD=n`): the skip walk on `n`
