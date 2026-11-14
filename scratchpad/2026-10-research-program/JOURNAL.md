@@ -236,6 +236,31 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   store at one constant index or at runtime indices only.
   CI elsewhere: #260 green (25 pass) after the merge of main; #262 24 pass, one job pending.
 
+- **23:35 UTC: second review of #263 in; hold lifted.** (`T26B/REVIEW2.md`, 386 k tokens in all.)
+  The pass is cubecl-opt's `MergeSameExpressions`; the class is "several atomic stores of one
+  value in one basic block, whatever they point at" (probe kernel, both compilers); **no kernel
+  on main or in the open PRs loses an operation** (SPIR-V against WGSL atomic operations per
+  variant: main 419, #263 425, #260 674, #251 623, #259 408). The fix is right and immune (one
+  store in a loop). I read the two source places myself. Applied: the fix's doc comment now
+  states the class (ffcfcfc, `just lint` first), the PR body's status paragraph says "ready
+  again" with the cause, the evidence and the wider warning; "would have failed" softened to
+  "could have, whenever that memory was not zero". Box 60696216 destroyed after 2.36 h.
+  Upstream report drafted (`T26B/CUBECL-ISSUE-DRAFT.md`), not filed: the user's to file.
+  New ledger item T2.7 (the standing risk). CI: #262 green (25 pass) after the merge of main;
+  #260 green; #263's run on ffcfcfc (a comment only) is pending.
+  Vast today ≈ $1.61 (seven boxes, three of them minutes long); month ≈ $17.1 of $30. Agents
+  today: nine, two of them resumed; about 3.1 M subagent tokens.
+- **Lessons of the day:** (1) lint with `just lint`, never a narrower clippy; (2) a box that
+  refuses ssh keys is the host: rent on another machine id and log in myself before handing it
+  over; (3) device tests that pass on one Mesa are not CI: for a new kernel test, run it on
+  CI's Mesa (an Ubuntu 26.04 chroot works) before opening; (4) every `store` to an atomic in a
+  kernel: one per block or distinct values, until CubeCL fixes the pass.
+- **Tomorrow (final, supersedes the 19:31 line):** merge-ups as PRs land (#251/#260 `ran` words;
+  #255/#259 `walk_pf_lean`; changelog lines); T2.7's CI comparison only on the user's yes; T2.6c
+  (the join's survivor count without lane 0) as a small fix; base 62's first telemetry once the
+  search resumes; a fresh look at high-level strategy (the demoux kernel queue is empty apart
+  from the two under-bar branches).
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
