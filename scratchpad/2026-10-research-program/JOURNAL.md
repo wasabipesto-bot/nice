@@ -204,8 +204,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **20:45 UTC:** box 60693354 (image `ubuntu:26.04`) refused ssh keys ("bad ownership or modes
   for file /root/.ssh/authorized_keys": the image, as with 60315324 on 11-12); destroyed after
   0.19 h, replaced by 60694347 (default image, 20 cores, $0.067/h, TTL about 23:50 UTC) with an
-  Ubuntu 26.04 chroot for Mesa 26.0.8. **Do not rent plain distribution images on Vast: use the
-  default image and a chroot.** The engineer's leading hypothesis for #263's failure: lavapipe
+  Ubuntu 26.04 chroot for Mesa 26.0.8. (Corrected 21:05: not the image. The replacement, 60694347, sat on the same host machine
+  m16641 and refused keys the same way with the default image; destroyed after 0.34 h. **The
+  fault is that host: when a box refuses keys, rent on another machine id, and log in myself
+  before handing a box to an agent.** Third box 60696216 on m25433, RTX 3080, 48 threads,
+  $0.109/h, TTL about 00:00 UTC; ssh verified by me at 21:04.) The engineer's leading hypothesis for #263's failure: lavapipe
   on Mesa 26 advertises `VK_KHR_workgroup_memory_explicit_layout`, so cubecl-spirv lays shared
   memory out explicitly through cubecl-opt's liveness allocator, which may let arrays share
   bytes. If true it matters beyond lavapipe (RADV advertises that extension; the plane-scoped
