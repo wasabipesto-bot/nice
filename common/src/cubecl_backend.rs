@@ -4306,7 +4306,11 @@ mod tests {
     }
 
     /// The same on CUDA, one cube: cubes of 100, 48 and 36 units end in a
-    /// warp of 4, 16 and 4 lanes.
+    /// warp of 4, 16 and 4 lanes. CUDA always takes the ballot form.
+    /// `NICE_TEST_QUEUE_SCAN` adds the scan form, which is defined on CUDA
+    /// only for whole warps (CubeCL's CUDA scans read every lane): it is
+    /// exact at these sizes and loses survivors at others (a last warp of
+    /// 31, 17 or 9 lanes), where the account fails the field.
     #[test]
     #[cfg(feature = "cubecl-cuda")]
     #[ignore = "requires an NVIDIA device"]
