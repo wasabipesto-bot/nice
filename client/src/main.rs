@@ -867,17 +867,18 @@ thread_local! {
     /// thread still runs its partitions mostly in ascending order, and a
     /// [`Scratch`] carries the failing top certificates of one partition
     /// over to the thread's next (`cpu_join`). Freed when the field's join
-    /// ends ([`FreeJoinScratch`]).
+    /// ends ([`FreeJoinScratch`]). Nothing that runs under a borrow of it
+    /// may call into rayon: a thread that waits there can pick up another
+    /// partition, or the freeing broadcast, and borrow it a second time.
     static JOIN_SCRATCH: RefCell<Scratch> = RefCell::new(Scratch::default());
 }
 
 /// Frees every worker thread's [`JOIN_SCRATCH`] when dropped, so the
 /// join's per-thread buffers (`Scratch`'s docs: about 10 MB a thread at
-/// production shapes) are held only
-/// while a field's join runs, however it ends. The partitions run on the
-/// pool the caller is in (the client's global pool: fields are processed
-/// on a blocking thread outside it), and `rayon::broadcast` runs once on
-/// each of that pool's threads.
+/// production shapes) are held only while a field's join runs, however it
+/// ends. The partitions run on the pool the caller is in (the client's
+/// global pool, or the benchmark's one-thread pool), and `rayon::broadcast`
+/// runs once on each of that pool's threads.
 struct FreeJoinScratch;
 
 impl Drop for FreeJoinScratch {
