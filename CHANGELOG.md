@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Speed up the CPU overlap join by not re-testing a top prefix in the partitions where its last failed test shows it must fail again ([#NNN](https://github.com/wasabipesto/nice/pull/NNN)).
 - Time out API database statements after 30 seconds, so one stalled claim can no longer block detailed claims and the scheduled jobs ([#238](https://github.com/wasabipesto/nice/pull/238)).
 - Let the `Next` queue's cursor read past longer finished stretches before falling back to a full frontier search ([#238](https://github.com/wasabipesto/nice/pull/238)).
 - Speed up the GPU overlap join's test of each bottom entry against each top: for large batches of tops, transpose the tops' digit masks so that an entry's test against 32 tops is one OR per digit it has, instead of a test per top ([#239](https://github.com/wasabipesto/nice/pull/239)).
