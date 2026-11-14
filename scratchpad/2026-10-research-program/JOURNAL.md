@@ -4,6 +4,35 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-14 (cycle 5 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $14.98 of $30 (fleet $24.91); credit
+  $21.42; 17 days left (≈ $0.88 a day). No day missed. No user message since the window grant.
+  Main unchanged (41b4b40). **#251, #255, #256, #259 all green and mergeable, no comments, none
+  merged** (#259's macOS x86 job has since passed). ivory was at 94 %: stale build caches removed
+  (11 GB free).
+- **The nice-only search is idle.** demoux's last nice-only submission was at ≈ 21:55 UTC on 11-13
+  (build a7a59c1, unchanged, so no new realized gain to measure); the fleet's nice-only output
+  faded to zero by 03:00 UTC on 11-14; the M4 has been in detailed mode since 16:00 UTC on 11-13.
+  Base 60 stands at 97.9 % with 3,362 fields left (3,239 never claimed, 123 claimed at 00:23 UTC
+  and not submitted); base 62 has no claim yet. Probably the user's own doing (machines off,
+  fleet budget); not mine to touch. First line of the report.
+- **Plan (four PRs are waiting on the user, one slot left under the cap of five; Vast near
+  $0.5 today), kill criteria first:**
+  - **T2.6, `top_slot` without a lane-0 assumption** (the same class as yesterday's #251 gap, on
+    main): reproduce on a partly filled CUDA warp, fix by construction, a host check if cheap,
+    cost under 1 %; then **an integration check of the four open PR branches together** (each
+    was only tested alone; #255 and #259 touch the same function). Agent + box 60601437 (RTX
+    3080 at 260 W, $0.10/h, 5.25 h TTL), `T26/BRIEF.md`. A defect fix: no gain criterion; it is
+    dropped only if the assumption cannot be violated on any backend the code supports.
+  - **CPU2, the skip walk for the CPU join's top phase** (N6 found a per-prefix walk needs
+    0.40–0.43 of today's top tests; a GPU cannot run it, the CPU join can): profile first, then
+    an exact rule, implementation and timing on ivory. Agent, no box, `CPU2/BRIEF.md`. **Kill: the
+    top phase is under 8 % of a CPU field, or the gain is under ×1.05 at b62 and b64.** CPU
+    clients do none of the search today; this is for CPU allocations, and the user merged the
+    last two CPU PRs at once.
+  - No new GPU speed PR today: four are already waiting.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
