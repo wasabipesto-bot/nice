@@ -23,6 +23,7 @@
 - Speed up the GPU overlap join's full check of each survivor by squaring and cubing it in two-digit limbs taken straight from its top's record, with multiplications instead of divisions ([#251](https://github.com/wasabipesto/nice/pull/251)).
 - Speed up the GPU overlap join's middle-digit prefilter at base 64 by reading each pair's two digits off its fixed-point fraction with shifts instead of multiplications ([#255](https://github.com/wasabipesto/nice/pull/255)).
 - Speed up the GPU overlap join on AMD's RDNA4 cards by halving the shared-memory stage of the join's prefilter survivors to 512 entries, so that more of its work groups run at once ([#256](https://github.com/wasabipesto/nice/pull/256)).
+- Speed up the GPU overlap join's middle-digit prefilter on Vulkan with the SPIR-V compiler (measured on an AMD RX 9070 XT) by testing its four digits with one population count instead of six comparisons ([#259](https://github.com/wasabipesto/nice/pull/259)).
 
 ## Nice v3.4.7
 
