@@ -198,6 +198,7 @@ use clap::{ArgMatches, CommandFactory, FromArgMatches, Parser, ValueEnum};
 use env_logger::Env;
 use log::{LevelFilter, debug, error, info, warn};
 use rayon::prelude::*;
+use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -859,6 +860,16 @@ fn process_field_sync(
     }
 }
 
+thread_local! {
+    /// The CPU join's buffers, one per worker thread for the life of the
+    /// process rather than one per rayon job: rayon cuts a slice's
+    /// partitions into ranges down to single partitions on many threads,
+    /// while each thread still runs its partitions mostly in ascending
+    /// order, and a [`Scratch`] carries the failing top certificates of one
+    /// partition over to the thread's next (`cpu_join`).
+    static JOIN_SCRATCH: RefCell<Scratch> = RefCell::new(Scratch::default());
+}
+
 /// A nice-only field through the CPU overlap join, a slice at a time (one,
 /// below about 1e16), each slice's partitions on the thread pool. The
 /// field's progress counts partitions, every slice's. Returns its results
@@ -902,8 +913,8 @@ fn process_field_join(
         let t1 = Instant::now();
         let out = (0..join.partitions())
             .into_par_iter()
-            .map_init(Scratch::default, |scratch, v| {
-                let out = join.run_partition(v, scratch);
+            .map(|v| {
+                let out = JOIN_SCRATCH.with_borrow_mut(|scratch| join.run_partition(v, scratch));
                 progress.tick();
                 out
             })
