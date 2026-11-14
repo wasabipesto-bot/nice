@@ -1,0 +1,17 @@
+diff --git a/common/src/cpu_join.rs b/common/src/cpu_join.rs
+index e0fbf459..1b09adbd 100644
+--- a/common/src/cpu_join.rs
++++ b/common/src/cpu_join.rs
+@@ -175,10 +175,8 @@ impl Scratch {
+             Some((last_id, last)) if last_id == id && last < v => (true, v - last <= RUN_GAP),
+             _ => (false, false),
+         };
+-        if !carry {
+-            self.next.clear();
+-            self.next.resize(len, 0);
+-        }
++        let _ = carry;
++        self.next.resize(len, 0);
+         self.last = Some((id, v));
+         runs
+     }

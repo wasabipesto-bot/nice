@@ -3,6 +3,7 @@
 # test alone, then the L2 test (and the ascending skip-walk tests) on each mutant.
 source /root/.cargo/env
 O=/root/out
+(cd /root/rev && CARGO_TARGET_DIR=/root/t-rev cargo build --release -p nice_client > $O/build-rev.log 2>&1 && mkdir -p /root/bin/rev && cp /root/t-rev/release/nice_client /root/bin/rev/)
 cd /root/brtest
 CARGO_TARGET_DIR=/root/t-test cargo test --release -p nice_common -- --test-threads=40 > $O/tests-branch-full.txt 2>&1
 echo "exit $?" >> $O/tests-branch-full.txt

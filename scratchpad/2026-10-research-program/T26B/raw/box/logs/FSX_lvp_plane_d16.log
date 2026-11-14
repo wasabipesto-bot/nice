@@ -1,0 +1,42 @@
+START FSX_lvp_plane_d16 16:56:50 bin=FSX md5=f971f20c test=cubecl_queues_check_every_survivor_on_partly_filled_planes lvp=1 env=[NICE_TEST_QUEUE_PLANE_ANYWAY=1 NICE_TEST_QUEUE_DIMS=16]
+
+running 1 test
+test cubecl_backend::tests::cubecl_queues_check_every_survivor_on_partly_filled_planes ... llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>): the plane-scoped queue is not tested (plane barrier)
+b50 plane=false ballot=true cube=16 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=16 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=false cube=16 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=false cube=16 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=16 lanes/range=1: 30447 of 30449 survivors, 2 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=16 lanes/range=4: 30431 of 30449 survivors, 18 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=false cube=16 lanes/range=1: 30447 of 30449 survivors, 2 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=false cube=16 lanes/range=4: 30431 of 30449 survivors, 18 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=16 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=16 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=false cube=16 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=false cube=16 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=16 lanes/range=1: 282 of 283 survivors, 1 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=16 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=false cube=16 lanes/range=1: 282 of 283 survivors, 1 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=false cube=16 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+16 runs, 6 wrong
+
+thread 'cubecl_backend::tests::cubecl_queues_check_every_survivor_on_partly_filled_planes' (28917) panicked at common/src/cubecl_backend.rs:4306:9:
+6 wrong runs: [
+    "b50 plane=true ballot=true cube=16 lanes/range=1: 2 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=true cube=16 lanes/range=4: 18 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=false cube=16 lanes/range=1: 2 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=false cube=16 lanes/range=4: 18 missing, 0 duplicated, 0 extra",
+    "b40 plane=true ballot=true cube=16 lanes/range=1: 1 missing, 0 duplicated, 0 extra",
+    "b40 plane=true ballot=false cube=16 lanes/range=1: 1 missing, 0 duplicated, 0 extra",
+]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    cubecl_backend::tests::cubecl_queues_check_every_survivor_on_partly_filled_planes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 305 filtered out; finished in 3.32s
+
+END FSX_lvp_plane_d16 16:56:54 rc=101

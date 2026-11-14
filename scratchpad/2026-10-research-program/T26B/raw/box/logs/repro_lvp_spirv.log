@@ -1,0 +1,73 @@
+START repro_lvp_spirv 16:39:39 bin=RS md5=7eb1e31d test=repro_queues_check_every_survivor_on_partly_filled_planes lvp=1 env=[]
+
+running 1 test
+test cubecl_backend::tests::repro_queues_check_every_survivor_on_partly_filled_planes ... b50 plane=false ballot=true cube=256 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=256 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=100 lanes/range=1: 29232 of 30449 survivors, 1217 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=100 lanes/range=4: 29232 of 30449 survivors, 1217 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=48 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=48 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=36 lanes/range=1: 27067 of 30449 survivors, 3382 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=36 lanes/range=4: 27067 of 30449 survivors, 3382 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=256 lanes/range=1: 30116 of 30449 survivors, 333 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=256 lanes/range=4: 29981 of 30449 survivors, 468 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=100 lanes/range=1: 29732 of 30449 survivors, 717 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=100 lanes/range=4: 29684 of 30449 survivors, 765 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=48 lanes/range=1: 30392 of 30449 survivors, 57 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=48 lanes/range=4: 30363 of 30449 survivors, 86 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=36 lanes/range=1: 28719 of 30449 survivors, 1730 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=36 lanes/range=4: 28716 of 30449 survivors, 1733 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=256 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=256 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=100 lanes/range=1: 266 of 283 survivors, 17 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=100 lanes/range=4: 266 of 283 survivors, 17 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=48 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=48 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=36 lanes/range=1: 247 of 283 survivors, 36 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=36 lanes/range=4: 247 of 283 survivors, 36 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=256 lanes/range=1: 281 of 283 survivors, 2 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=256 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=100 lanes/range=1: 273 of 283 survivors, 10 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=100 lanes/range=4: 268 of 283 survivors, 15 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=48 lanes/range=1: 281 of 283 survivors, 2 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=48 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=36 lanes/range=1: 259 of 283 survivors, 24 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=36 lanes/range=4: 261 of 283 survivors, 22 missing, 0 duplicated, 0 extra
+32 runs, 22 wrong
+
+thread 'cubecl_backend::tests::repro_queues_check_every_survivor_on_partly_filled_planes' (19626) panicked at common/src/cubecl_backend.rs:3966:9:
+22 wrong runs: [
+    "b50 plane=false ballot=true cube=100 lanes/range=1: 1217 missing, 0 duplicated, 0 extra",
+    "b50 plane=false ballot=true cube=100 lanes/range=4: 1217 missing, 0 duplicated, 0 extra",
+    "b50 plane=false ballot=true cube=36 lanes/range=1: 3382 missing, 0 duplicated, 0 extra",
+    "b50 plane=false ballot=true cube=36 lanes/range=4: 3382 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=true cube=256 lanes/range=1: 333 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=true cube=256 lanes/range=4: 468 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=true cube=100 lanes/range=1: 717 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=true cube=100 lanes/range=4: 765 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=true cube=48 lanes/range=1: 57 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=true cube=48 lanes/range=4: 86 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=true cube=36 lanes/range=1: 1730 missing, 0 duplicated, 0 extra",
+    "b50 plane=true ballot=true cube=36 lanes/range=4: 1733 missing, 0 duplicated, 0 extra",
+    "b40 plane=false ballot=true cube=100 lanes/range=1: 17 missing, 0 duplicated, 0 extra",
+    "b40 plane=false ballot=true cube=100 lanes/range=4: 17 missing, 0 duplicated, 0 extra",
+    "b40 plane=false ballot=true cube=36 lanes/range=1: 36 missing, 0 duplicated, 0 extra",
+    "b40 plane=false ballot=true cube=36 lanes/range=4: 36 missing, 0 duplicated, 0 extra",
+    "b40 plane=true ballot=true cube=256 lanes/range=1: 2 missing, 0 duplicated, 0 extra",
+    "b40 plane=true ballot=true cube=100 lanes/range=1: 10 missing, 0 duplicated, 0 extra",
+    "b40 plane=true ballot=true cube=100 lanes/range=4: 15 missing, 0 duplicated, 0 extra",
+    "b40 plane=true ballot=true cube=48 lanes/range=1: 2 missing, 0 duplicated, 0 extra",
+    "b40 plane=true ballot=true cube=36 lanes/range=1: 24 missing, 0 duplicated, 0 extra",
+    "b40 plane=true ballot=true cube=36 lanes/range=4: 22 missing, 0 duplicated, 0 extra",
+]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    cubecl_backend::tests::repro_queues_check_every_survivor_on_partly_filled_planes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 302 filtered out; finished in 7.65s
+
+END repro_lvp_spirv 16:39:47 rc=101

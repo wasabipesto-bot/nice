@@ -1,0 +1,19 @@
+START FS_lvp_faults 16:35:30 bin=FS md5=cd49db53 test=cubecl_queue_faults_fail_the_field lvp=1 env=[]
+
+running 1 test
+test cubecl_backend::tests::cubecl_queue_faults_fail_the_field ... plane=false bits=1: stride walk b50: the survivor queues checked 6 fewer survivors than they queued
+plane=false bits=2: stride walk b50: the survivors the queues checked differ from those they queued (low words differ by 248052 mod 2^32)
+
+thread 'cubecl_backend::tests::cubecl_queue_faults_fail_the_field' (15935) panicked at common/src/cubecl_backend.rs:4329:22:
+a queue fault must fail the field: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    cubecl_backend::tests::cubecl_queue_faults_fail_the_field
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 304 filtered out; finished in 2.52s
+
+END FS_lvp_faults 16:35:33 rc=101

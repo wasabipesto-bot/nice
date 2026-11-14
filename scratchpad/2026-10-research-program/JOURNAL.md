@@ -122,6 +122,38 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   (CPU amd64: image 20261111.127.1; GPU amd64: 20261111.370.1) and passed their smoke tests; the
   arm64 job as before on ubuntu-24.04-arm. No stale-cache trouble.
 
+- **18:45 UTC: both engineers delivered; two independent reviewers started (Opus).**
+  - **CPU skip walk** (`CPU2/PR-RESULTS.md`, 304 k tokens; box 60665025 destroyed after 3.0 h,
+    about $0.33): fork `pr/cpu-join-top-skip` 3ba5766 (one commit on main; same tree as
+    `exp/cpu-top-skip-fixes` e2fe1f5 = e0bf513 + L1 helper + M1 free + L2 test + changelog).
+    **The real client, 42 threads (the box's CPU quota), interleaved, 3 rounds: ×1.105 at b62
+    1e17 (slice 0 of 7, all partitions; rounds 1.112, 1.101, 1.103), ×1.081 at b60 1e16 (whole
+    field); 8 threads (first 1,024 partitions): ×1.130 / ×1.104; b64 1e17 slice 0, 1 round:
+    ×1.013.** Counts identical. Peak RSS at 42 threads 360 → 706 MiB at b62 (8.5 MiB a thread),
+    freed after the join (196 MiB against main's 242). NiceMark CPU, 4 rounds: ×0.993–×1.016
+    per scenario. I checked the round table against `raw-pr/ab-summary.txt`. Above the ×1.05
+    stop line; at the ×1.10 bar for a large change at b62 only.
+    **Rule breach by the agent, reported by it:** NiceMark's latency probe sent 80
+    `GET /ping` to the production API from the box (the benchmark does that by design; nothing
+    claimed, submitted or uploaded; the timed runs used a local stand-in). Future briefs: point
+    NiceMark's API address at a closed local port. To the user in the report.
+  - **T2.6b** (`T26B/RESULTS.md`, 421 k tokens): fork `pr/stride-queue-any-plane` 85fe64a (one
+    commit on main, 650 lines in `cubecl_backend.rs`). Reproduced on main with test-only cube
+    sizes on the RTX 3080: of 30,449 survivors of a b50 window, the plane-scoped queue loses
+    1,064 / 5,072 / 2,958 at cubes of 100 / 48 / 36 units, the cube-scoped queue 1,217 / 10,152 /
+    3,382; lavapipe the same for the cube-scoped queue. Fix: ranks and takes from the running
+    lanes (ballot ≤ 32 lanes, scan wider), queue space by atomics from each plane's lowest
+    running lane, an account (queued − checked, and their low words) the host verifies.
+    Speed at the box's 130 W cap: ×1.14 / ×1.26 on b54 stride fields (ballots replace scan
+    chains), scan form forced +0.6 % / −1.8 %. **Caution before I repeat that number: main and
+    the fix ran at different clocks under the cap (fix 1,380–1,415 MHz at higher utilization,
+    main 1,123–1,159); the reviewer is asked to judge it.** No 64-lane or Apple device measured.
+  - Reviewers: `CPU2/PR-REVIEW-BRIEF.md` (the delta since the first review, the broadcast free's
+    safety, re-run of the morning's harness on the final tree, the body) and
+    `T26B/REVIEW-BRIEF.md` (own model of both queues, the account, device runs on the same box
+    until 20:45, the speed claim). ivory: cleared 12.5 GB of day-old debug artifacts from the
+    main checkout's cargo cache (18 GB free).
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
