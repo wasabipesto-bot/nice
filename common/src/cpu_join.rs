@@ -152,7 +152,11 @@ pub struct Scratch {
     /// For each top-layer prefix of the join `last` names, the first
     /// partition whose block can pass (saturated at `u16::MAX`; a lower
     /// bound): every partition from the last one it was certified at up to
-    /// that fails.
+    /// that fails. Two bytes a prefix of the slice, for every thread that
+    /// keeps a scratch across partitions: 4-5 M prefixes, about 10 MB, at
+    /// the production shapes (b60-b64), at most 32 MiB
+    /// ([`CPU_SLICE_PREFIXES`]). A caller that keeps a scratch per thread
+    /// should drop it when the join ends (the client does).
     next: Vec<u16>,
     /// The join (`CpuJoin::id`) and partition this thread ran last; `next`
     /// is only read for a later partition of the same join.

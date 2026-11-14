@@ -861,13 +861,29 @@ fn process_field_sync(
 }
 
 thread_local! {
-    /// The CPU join's buffers, one per worker thread for the life of the
-    /// process rather than one per rayon job: rayon cuts a slice's
-    /// partitions into ranges down to single partitions on many threads,
-    /// while each thread still runs its partitions mostly in ascending
-    /// order, and a [`Scratch`] carries the failing top certificates of one
-    /// partition over to the thread's next (`cpu_join`).
+    /// The CPU join's buffers, one per worker thread while a field's join
+    /// runs rather than one per rayon job: rayon cuts a slice's partitions
+    /// into ranges down to single partitions on many threads, while each
+    /// thread still runs its partitions mostly in ascending order, and a
+    /// [`Scratch`] carries the failing top certificates of one partition
+    /// over to the thread's next (`cpu_join`). Freed when the field's join
+    /// ends ([`FreeJoinScratch`]).
     static JOIN_SCRATCH: RefCell<Scratch> = RefCell::new(Scratch::default());
+}
+
+/// Frees every worker thread's [`JOIN_SCRATCH`] when dropped, so the
+/// join's per-thread buffers (`Scratch`'s docs: about 10 MB a thread at
+/// production shapes) are held only
+/// while a field's join runs, however it ends. The partitions run on the
+/// pool the caller is in (the client's global pool: fields are processed
+/// on a blocking thread outside it), and `rayon::broadcast` runs once on
+/// each of that pool's threads.
+struct FreeJoinScratch;
+
+impl Drop for FreeJoinScratch {
+    fn drop(&mut self) {
+        rayon::broadcast(|_| JOIN_SCRATCH.take());
+    }
 }
 
 /// A nice-only field through the CPU overlap join, a slice at a time (one,
@@ -887,6 +903,7 @@ fn process_field_join(
     };
     let mut hits: Vec<u128> = Vec::new();
     let mut field_progress = None;
+    let _free = FreeJoinScratch;
     for slice in slices {
         let t0 = Instant::now();
         let join = match CpuJoin::new(base, slice, jp) {
