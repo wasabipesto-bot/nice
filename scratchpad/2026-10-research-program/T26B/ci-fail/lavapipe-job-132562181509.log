@@ -1,0 +1,2029 @@
+﻿2026-11-14T19:43:19.4107605Z Current runner version: '2.338.2'
+##[group]Runner Image Provisioner
+Hosted Compute Agent
+Version: 20261103.629
+Commit: 15dbd9ccb5dbf34fae002b6ed1a2670f52df37bc
+Build Date: 2026-11-03T17:26:59Z
+Worker ID: {4fad15af-91d2-49d1-b2a6-cf468062d9e9}
+Region: eastus2
+Cloud: Azure
+##[endgroup]
+##[group]Operating System
+Ubuntu
+26.04.1
+LTS
+##[endgroup]
+##[group]Runner Image
+Image: ubuntu-26.04
+Version: 20261111.196.1
+Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261111.196/images/ubuntu/Ubuntu2604-Readme.md
+Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261111.196
+##[endgroup]
+##[group]GITHUB_TOKEN Permissions
+Contents: read
+Metadata: read
+Packages: read
+##[endgroup]
+Secret source: None
+Cache mode: write
+Prepare workflow directory
+Prepare all required actions
+Getting action download info
+Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+Download action repository 'actions/upload-artifact@v7' (SHA:cf430e030ddbb5b0abf93d22962f4752f3646cd9)
+Complete job name: cubecl on lavapipe (Linux)
+##[group]Run actions/checkout@v6
+with:
+  repository: wasabipesto/nice
+  token: ***
+  ssh-strict: true
+  ssh-user: git
+  persist-credentials: true
+  clean: true
+  sparse-checkout-cone-mode: true
+  fetch-depth: 1
+  fetch-tags: false
+  show-progress: true
+  lfs: false
+  submodules: false
+  set-safe-directory: true
+  allow-unsafe-pr-checkout: false
+env:
+  CARGO_TERM_COLOR: always
+  NICE_BUILD_SHA: 142ed1391bbb4ea480b9a28f254df6742c7669a7
+  RUST_BACKTRACE: 1
+##[endgroup]
+Syncing repository: wasabipesto/nice
+##[group]Getting Git version info
+Working directory is '/home/runner/work/nice/nice'
+[command]/usr/bin/git version
+git version 2.56.1
+##[endgroup]
+Temporarily overriding HOME='/home/runner/work/_temp/703d713a-f8f5-4923-93d1-624fa5def16b' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/nice/nice
+Deleting the contents of '/home/runner/work/nice/nice'
+##[group]Determining repository object format
+##[endgroup]
+##[group]Initializing the repository
+[command]/usr/bin/git init /home/runner/work/nice/nice
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in /home/runner/work/nice/nice/.git/
+[command]/usr/bin/git remote add origin https://github.com/wasabipesto/nice
+##[endgroup]
+##[group]Disabling automatic garbage collection
+[command]/usr/bin/git config --local gc.auto 0
+##[endgroup]
+##[group]Setting up auth
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Removing HTTP extra header
+[command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Removing includeIf entries pointing to credentials config files
+[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+[command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+[command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/nice/nice/.git.path /home/runner/work/_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/nice/nice/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+##[endgroup]
+##[group]Fetching the repository
+[command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +142ed1391bbb4ea480b9a28f254df6742c7669a7:refs/remotes/pull/263/merge
+From https://github.com/wasabipesto/nice
+ * [new ref]         142ed1391bbb4ea480b9a28f254df6742c7669a7 -> pull/263/merge
+##[endgroup]
+##[group]Determining the checkout info
+##[endgroup]
+[command]/usr/bin/git sparse-checkout disable
+[command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+##[group]Checking out the ref
+[command]/usr/bin/git checkout --progress --force refs/remotes/pull/263/merge
+Note: switching to 'refs/remotes/pull/263/merge'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD is now at 142ed13 Merge bf6cc8e1bdf69ebe7a85fb60addcdb679c91e9bf into 41b4b405889ec322977d8127cf4943f445d3d48a
+##[endgroup]
+[command]/usr/bin/git log -1 --format=%H
+142ed1391bbb4ea480b9a28f254df6742c7669a7
+##[group]Run sudo apt-get update -qq
+[36;1msudo apt-get update -qq[0m
+[36;1msudo apt-get install -y -qq mesa-vulkan-drivers libvulkan1 vulkan-tools[0m
+shell: /usr/bin/bash -e {0}
+env:
+  CARGO_TERM_COLOR: always
+  NICE_BUILD_SHA: 142ed1391bbb4ea480b9a28f254df6742c7669a7
+  RUST_BACKTRACE: 1
+##[endgroup]
+Selecting previously unselected package libdisplay-info3:amd64.
+(Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 213946 files and directories currently installed.)
+Preparing to unpack .../libdisplay-info3_0.3.0-1_amd64v3.deb ...
+Unpacking libdisplay-info3:amd64 (0.3.0-1) ...
+Selecting previously unselected package mesa-vulkan-drivers:amd64.
+Preparing to unpack .../mesa-vulkan-drivers_26.0.8-1ubuntu0.3_amd64v3.deb ...
+Unpacking mesa-vulkan-drivers:amd64 (26.0.8-1ubuntu0.3) ...
+Selecting previously unselected package vulkan-tools.
+Preparing to unpack .../vulkan-tools_1.4.341.0+dfsg1-1_amd64v3.deb ...
+Unpacking vulkan-tools (1.4.341.0+dfsg1-1) ...
+Setting up libdisplay-info3:amd64 (0.3.0-1) ...
+Setting up vulkan-tools (1.4.341.0+dfsg1-1) ...
+Setting up mesa-vulkan-drivers:amd64 (26.0.8-1ubuntu0.3) ...
+Processing triggers for man-db (2.13.1-1build1) ...
+Not building database; man-db/auto-update is not 'true'.
+Processing triggers for libc-bin (2.43-2ubuntu2.4) ...
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+
+Service restarts being deferred:
+ systemctl restart hosted-compute-agent.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+##[group]Run export VK_ICD_FILENAMES="$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)"
+[36;1mexport VK_ICD_FILENAMES="$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)"[0m
+[36;1mtest -n "$VK_ICD_FILENAMES" || { echo "no lavapipe ICD found"; exit 1; }[0m
+[36;1mvulkaninfo --summary | grep -A3 deviceName || true[0m
+[36;1mcargo test --release --features cubecl -p nice_common -- --ignored --nocapture[0m
+shell: /usr/bin/bash -e {0}
+env:
+  CARGO_TERM_COLOR: always
+  NICE_BUILD_SHA: 142ed1391bbb4ea480b9a28f254df6742c7669a7
+  RUST_BACKTRACE: 1
+##[endgroup]
+'DISPLAY' environment variable not set... skipping surface info
+	deviceName         = llvmpipe (LLVM 21.1.8, 256 bits)
+	driverID           = DRIVER_ID_MESA_LLVMPIPE
+	driverName         = llvmpipe
+	driverInfo         = Mesa 26.0.8-1ubuntu0.3 (LLVM 21.1.8)
+info: syncing channel updates for 1.100.0-x86_64-unknown-linux-gnu
+info: latest update on 2026-11-12 for version 1.100.0 (0ef1bc386 2026-11-09)
+info: downloading 5 components
+warn: the missing active toolchain `1.100.0-x86_64-unknown-linux-gnu` has been auto-installed
+warn: this might cause rustup commands to take longer time to finish than expected
+info: you may opt out with `RUSTUP_AUTO_INSTALL=0` or `rustup set auto-install disable`
+[1m[92m    Updating[0m crates.io index
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m adler2 v2.0.1
+[1m[92m  Downloaded[0m anstyle v1.0.14
+[1m[92m  Downloaded[0m anstyle-query v1.1.5
+[1m[92m  Downloaded[0m allocator-api2 v0.2.21
+[1m[92m  Downloaded[0m colorchoice v1.0.5
+[1m[92m  Downloaded[0m addr2line v0.25.1
+[1m[92m  Downloaded[0m anstyle-parse v1.0.0
+[1m[92m  Downloaded[0m anstream v1.0.0
+[1m[92m  Downloaded[0m anyhow v1.0.104
+[1m[92m  Downloaded[0m aho-corasick v1.1.5
+[1m[92m  Downloaded[0m arrayvec v0.7.8
+[1m[92m  Downloaded[0m cc v1.11.1
+[1m[92m  Downloaded[0m cfg_aliases v0.2.2
+[1m[92m  Downloaded[0m block-buffer v0.10.4
+[1m[92m  Downloaded[0m ciborium-ll v0.2.2
+[1m[92m  Downloaded[0m convert_case v0.10.0
+[1m[92m  Downloaded[0m cpufeatures v0.2.17
+[1m[92m  Downloaded[0m ahash v0.8.12
+[1m[92m  Downloaded[0m caseless v0.2.2
+[1m[92m  Downloaded[0m cfg-if v1.0.4
+[1m[92m  Downloaded[0m clang-sys v1.9.1
+[1m[92m  Downloaded[0m ash v0.38.0+1.3.281
+[1m[92m  Downloaded[0m fastrand v2.5.0
+[1m[92m  Downloaded[0m strsim v0.11.1
+[1m[92m  Downloaded[0m bytemuck v1.25.2
+[1m[92m  Downloaded[0m bytemuck_derive v1.12.0
+[1m[92m  Downloaded[0m ciborium v0.2.2
+[1m[92m  Downloaded[0m darling_core v0.21.3
+[1m[92m  Downloaded[0m cpufeatures v0.3.1
+[1m[92m  Downloaded[0m cubecl-core v0.10.0
+[1m[92m  Downloaded[0m dlib v0.5.3
+[1m[92m  Downloaded[0m ciborium-io v0.2.2
+[1m[92m  Downloaded[0m darling_core v0.23.0
+[1m[92m  Downloaded[0m derive_more v2.1.1
+[1m[92m  Downloaded[0m presser v0.3.1
+[1m[92m  Downloaded[0m convert_case v0.8.0
+[1m[92m  Downloaded[0m pkg-config v0.3.34
+[1m[92m  Downloaded[0m cubecl-std v0.10.0
+[1m[92m  Downloaded[0m enumset v1.1.14
+[1m[92m  Downloaded[0m bitflags v2.13.1
+[1m[92m  Downloaded[0m crypto-common v0.1.7
+[1m[92m  Downloaded[0m potential_utf v0.1.6
+[1m[92m  Downloaded[0m chacha20 v0.10.2
+[1m[92m  Downloaded[0m cexpr v0.6.0
+[1m[92m  Downloaded[0m dirs v6.0.0
+[1m[92m  Downloaded[0m profiling v1.0.18
+[1m[92m  Downloaded[0m darling_macro v0.21.3
+[1m[92m  Downloaded[0m pin-project-lite v0.2.17
+[1m[92m  Downloaded[0m float4 v0.2.0
+[1m[92m  Downloaded[0m base64 v0.22.1
+[1m[92m  Downloaded[0m clap_lex v1.1.0
+[1m[92m  Downloaded[0m embassy-futures v0.1.2
+[1m[92m  Downloaded[0m fixedbitset v0.5.7
+[1m[92m  Downloaded[0m quinn v0.11.11
+[1m[92m  Downloaded[0m prettyplease v0.2.37
+[1m[92m  Downloaded[0m proc-macro2 v1.0.107
+[1m[92m  Downloaded[0m dirs-sys v0.5.0
+[1m[92m  Downloaded[0m event-listener v5.4.2
+[1m[92m  Downloaded[0m float-ord v0.3.2
+[1m[92m  Downloaded[0m constcat v0.6.1
+[1m[92m  Downloaded[0m crossbeam-utils v0.8.22
+[1m[92m  Downloaded[0m cubecl-opt v0.10.0
+[1m[92m  Downloaded[0m cubecl-wgpu v0.10.0
+[1m[92m  Downloaded[0m derive_more-impl v2.1.1
+[1m[92m  Downloaded[0m portable-atomic v1.15.0
+[1m[92m  Downloaded[0m clap_derive v4.6.7
+[1m[92m  Downloaded[0m document-features v0.2.12
+[1m[92m  Downloaded[0m entities v1.0.1
+[1m[92m  Downloaded[0m equivalent v1.0.2
+[1m[92m  Downloaded[0m quinn-proto v0.11.17
+[1m[92m  Downloaded[0m quinn-udp v0.5.15
+[1m[92m  Downloaded[0m raw-window-handle v0.6.2
+[1m[92m  Downloaded[0m scopeguard v1.2.0
+[1m[92m  Downloaded[0m tracing v0.1.44
+[1m[92m  Downloaded[0m jobserver v0.1.35
+[1m[92m  Downloaded[0m semver v1.0.28
+[1m[92m  Downloaded[0m tinystr v0.8.4
+[1m[92m  Downloaded[0m darling_macro v0.23.0
+[1m[92m  Downloaded[0m env_logger v0.11.11
+[1m[92m  Downloaded[0m event-listener-strategy v0.5.4
+[1m[92m  Downloaded[0m find-msvc-tools v0.1.15
+[1m[92m  Downloaded[0m safe_arch v1.2.0
+[1m[92m  Downloaded[0m renderdoc-sys v1.1.0
+[1m[92m  Downloaded[0m tower-layer v0.3.3
+[1m[92m  Downloaded[0m tracing-log v0.2.0
+[1m[92m  Downloaded[0m cubecl-cpu v0.10.0
+[1m[92m  Downloaded[0m sync_wrapper v1.0.2
+[1m[92m  Downloaded[0m rand_pcg v0.10.2
+[1m[92m  Downloaded[0m same-file v1.0.6
+[1m[92m  Downloaded[0m rustc-hash v1.1.0
+[1m[92m  Downloaded[0m socket2 v0.6.5
+[1m[92m  Downloaded[0m thread_local v1.1.10
+[1m[92m  Downloaded[0m tracing-core v0.1.36
+[1m[92m  Downloaded[0m async-channel v2.5.0
+[1m[92m  Downloaded[0m codespan-reporting v0.13.1
+[1m[92m  Downloaded[0m displaydoc v0.2.7
+[1m[92m  Downloaded[0m enumset_derive v0.15.0
+[1m[92m  Downloaded[0m rustc-hash v2.1.3
+[1m[92m  Downloaded[0m serde_derive v1.0.229
+[1m[92m  Downloaded[0m synstructure v0.13.2
+[1m[92m  Downloaded[0m cubecl-macros-internal v0.10.0
+[1m[92m  Downloaded[0m derive-new v0.7.0
+[1m[92m  Downloaded[0m errno v0.3.14
+[1m[92m  Downloaded[0m rustc_version v0.4.1
+[1m[92m  Downloaded[0m sharded-slab v0.1.7
+[1m[92m  Downloaded[0m slab v0.4.12
+[1m[92m  Downloaded[0m subtle v2.6.1
+[1m[92m  Downloaded[0m tokio-util v0.7.19
+[1m[92m  Downloaded[0m toml_datetime v1.1.1+spec-1.1.0
+[1m[92m  Downloaded[0m toml_writer v1.1.2+spec-1.1.0
+[1m[92m  Downloaded[0m tower-service v0.3.3
+[1m[92m  Downloaded[0m tracel-mlir-rs-macros v20.1.4-7
+[1m[92m  Downloaded[0m type-map v0.5.1
+[1m[92m  Downloaded[0m atomic-waker v1.1.2
+[1m[92m  Downloaded[0m autocfg v1.5.1
+[1m[92m  Downloaded[0m digest v0.10.7
+[1m[92m  Downloaded[0m rustix v1.1.4
+[1m[92m  Downloaded[0m rustls v0.23.46
+[1m[92m  Downloaded[0m ryu v1.0.23
+[1m[92m  Downloaded[0m serde_bytes v0.11.19
+[1m[92m  Downloaded[0m shlex v2.0.1
+[1m[92m  Downloaded[0m sysinfo v0.38.4
+[1m[92m  Downloaded[0m test-log-macros v0.2.21
+[1m[92m  Downloaded[0m tynm v0.2.0
+[1m[92m  Downloaded[0m darling v0.23.0
+[1m[92m  Downloaded[0m env_filter v2.0.0
+[1m[92m  Downloaded[0m matchers v0.2.0
+[1m[92m  Downloaded[0m num_cpus v1.17.0
+[1m[92m  Downloaded[0m syn v2.0.119
+[1m[92m  Downloaded[0m utf8parse v0.2.2
+[1m[92m  Downloaded[0m bit-set v0.9.1
+[1m[92m  Downloaded[0m bytes v1.12.1
+[1m[92m  Downloaded[0m concurrent-queue v2.5.0
+[1m[92m  Downloaded[0m cubecl-zspace v0.10.0
+[1m[92m  Downloaded[0m darling v0.21.3
+[1m[92m  Downloaded[0m fnv v1.0.7
+[1m[92m  Downloaded[0m futures-task v0.3.34
+[1m[92m  Downloaded[0m percent-encoding v2.3.2
+[1m[92m  Downloaded[0m version_check v0.9.5
+[1m[92m  Downloaded[0m wgpu-naga-bridge v29.0.4
+[1m[92m  Downloaded[0m futures-io v0.3.34
+[1m[92m  Downloaded[0m hexf-parse v0.2.1
+[1m[92m  Downloaded[0m serde_urlencoded v0.7.1
+[1m[92m  Downloaded[0m tinyvec_macros v0.1.1
+[1m[92m  Downloaded[0m try-lock v0.2.5
+[1m[92m  Downloaded[0m variadics_please v1.1.0
+[1m[92m  Downloaded[0m yoke-derive v0.8.2
+[1m[92m  Downloaded[0m either v1.18.0
+[1m[92m  Downloaded[0m filetime v0.2.29
+[1m[92m  Downloaded[0m float8 v0.7.0
+[1m[92m  Downloaded[0m lock_api v0.4.14
+[1m[92m  Downloaded[0m malachite v0.14.0
+[1m[92m  Downloaded[0m cubecl-runtime v0.10.0
+[1m[92m  Downloaded[0m generic-array v0.14.7
+[1m[92m  Downloaded[0m http-body v1.1.0
+[1m[92m  Downloaded[0m itoa v1.0.18
+[1m[92m  Downloaded[0m bit-vec v0.9.1
+[1m[92m  Downloaded[0m cubecl-cuda v0.10.0
+[1m[92m  Downloaded[0m cubecl-hip v0.10.0
+[1m[92m  Downloaded[0m parking_lot_core v0.9.12
+[1m[92m  Downloaded[0m sha2 v0.10.9
+[1m[92m  Downloaded[0m unicode-normalization v0.1.25
+[1m[92m  Downloaded[0m walkdir v2.5.0
+[1m[92m  Downloaded[0m cubecl v0.10.0
+[1m[92m  Downloaded[0m cubecl-ir v0.10.0
+[1m[92m  Downloaded[0m cubecl-macros v0.10.0
+[1m[92m  Downloaded[0m num-traits v0.2.19
+[1m[92m  Downloaded[0m ordered-float v5.5.0
+[1m[92m  Downloaded[0m rustls-webpki v0.103.15
+[1m[92m  Downloaded[0m sanitize-filename v0.6.0
+[1m[92m  Downloaded[0m test-log v0.2.21
+[1m[92m  Downloaded[0m tinyvec v1.12.0
+[1m[92m  Downloaded[0m toml_parser v1.1.3+spec-1.1.0
+[1m[92m  Downloaded[0m tracel-tblgen-rs v20.1.4-7
+[1m[92m  Downloaded[0m unicode-ident v1.0.24
+[1m[92m  Downloaded[0m quote v1.0.47
+[1m[92m  Downloaded[0m getrandom v0.2.17
+[1m[92m  Downloaded[0m icu_provider v2.3.1
+[1m[92m  Downloaded[0m yoke v0.8.3
+[1m[92m  Downloaded[0m zerofrom-derive v0.1.7
+[1m[92m  Downloaded[0m cubecl-common v0.10.0
+[1m[92m  Downloaded[0m thiserror-impl v2.0.20
+[1m[92m  Downloaded[0m tokio-rustls v0.26.4
+[1m[92m  Downloaded[0m backtrace v0.3.76
+[1m[92m  Downloaded[0m clap v4.6.7
+[1m[92m  Downloaded[0m miniz_oxide v0.8.9
+[1m[92m  Downloaded[0m num-bigint v0.4.8
+[1m[92m  Downloaded[0m parking_lot v0.12.5
+[1m[92m  Downloaded[0m rand_core v0.10.1
+[1m[92m  Downloaded[0m rustc-demangle v0.1.28
+[1m[92m  Downloaded[0m rustls-pki-types v1.15.1
+[1m[92m  Downloaded[0m termcolor v1.4.1
+[1m[92m  Downloaded[0m cubecl-cpp v0.10.0
+[1m[92m  Downloaded[0m http v1.5.0
+[1m[92m  Downloaded[0m httparse v1.10.1
+[1m[92m  Downloaded[0m icu_properties v2.3.0
+[1m[92m  Downloaded[0m log v0.4.35
+[1m[92m  Downloaded[0m minimal-lexical v0.2.1
+[1m[92m  Downloaded[0m mio v1.2.2
+[1m[92m  Downloaded[0m nom v8.0.0
+[1m[92m  Downloaded[0m serde_spanned v1.1.1
+[1m[92m  Downloaded[0m shlex v1.3.0
+[1m[92m  Downloaded[0m slug v0.1.6
+[1m[92m  Downloaded[0m stable_deref_trait v1.2.1
+[1m[92m  Downloaded[0m static_assertions v1.1.0
+[1m[92m  Downloaded[0m typed-arena v2.0.2
+[1m[92m  Downloaded[0m unindent v0.2.4
+[1m[92m  Downloaded[0m xxhash-rust v0.8.18
+[1m[92m  Downloaded[0m zerocopy-derive v0.8.56
+[1m[92m  Downloaded[0m zerovec v0.11.8
+[1m[92m  Downloaded[0m bindgen v0.71.1
+[1m[92m  Downloaded[0m chrono v0.4.45
+[1m[92m  Downloaded[0m clap_builder v4.6.7
+[1m[92m  Downloaded[0m comrak v0.39.1
+[1m[92m  Downloaded[0m deunicode v1.6.2
+[1m[92m  Downloaded[0m futures-core v0.3.34
+[1m[92m  Downloaded[0m futures-util v0.3.34
+[1m[92m  Downloaded[0m hyper-rustls v0.27.9
+[1m[92m  Downloaded[0m icu_properties_data v2.3.0
+[1m[92m  Downloaded[0m is_terminal_polyfill v1.70.2
+[1m[92m  Downloaded[0m khronos-egl v6.0.0
+[1m[92m  Downloaded[0m parking v2.2.1
+[1m[92m  Downloaded[0m reqwest v0.12.28
+[1m[92m  Downloaded[0m serde_core v1.0.229
+[1m[92m  Downloaded[0m smallvec v1.15.2
+[1m[92m  Downloaded[0m spin v0.10.1
+[1m[92m  Downloaded[0m spirv v0.4.0+sdk-1.4.341.0
+[1m[92m  Downloaded[0m tar v0.4.46
+[1m[92m  Downloaded[0m test-log-core v0.2.21
+[1m[92m  Downloaded[0m thiserror v2.0.20
+[1m[92m  Downloaded[0m toml v1.1.4+spec-1.1.0
+[1m[92m  Downloaded[0m tracel-llvm-bundler v20.1.4-7
+[1m[92m  Downloaded[0m tracel-mlir-rs v20.1.4-7
+[1m[92m  Downloaded[0m web-time v1.1.0
+[1m[92m  Downloaded[0m zerofrom v0.1.8
+[1m[92m  Downloaded[0m gpu-descriptor-types v0.2.0
+[1m[92m  Downloaded[0m hyper v1.11.1
+[1m[92m  Downloaded[0m ident_case v1.0.1
+[1m[92m  Downloaded[0m lru-slab v0.1.2
+[1m[92m  Downloaded[0m rand v0.10.3
+[1m[92m  Downloaded[0m regex v1.13.1
+[1m[92m  Downloaded[0m serde v1.0.229
+[1m[92m  Downloaded[0m serde_json v1.0.154
+[1m[92m  Downloaded[0m stable-vec v0.4.3
+[1m[92m  Downloaded[0m tower v0.5.3
+[1m[92m  Downloaded[0m tower-http v0.6.11
+[1m[92m  Downloaded[0m tracel-mlir-sys v20.1.4-7
+[1m[92m  Downloaded[0m wgpu-types v29.0.4
+[1m[92m  Downloaded[0m zerocopy v0.8.56
+[1m[92m  Downloaded[0m foldhash v0.1.5
+[1m[92m  Downloaded[0m futures-lite v2.6.1
+[1m[92m  Downloaded[0m futures-sink v0.3.34
+[1m[92m  Downloaded[0m getrandom v0.4.3
+[1m[92m  Downloaded[0m tracing-subscriber v0.3.23
+[1m[92m  Downloaded[0m cudarc v0.19.10
+[1m[92m  Downloaded[0m h2 v0.4.19
+[1m[92m  Downloaded[0m regex-syntax v0.8.11
+[1m[92m  Downloaded[0m tracel-llvm v20.1.4-7
+[1m[92m  Downloaded[0m futures-channel v0.3.34
+[1m[92m  Downloaded[0m itertools v0.14.0
+[1m[92m  Downloaded[0m object v0.37.3
+[1m[92m  Downloaded[0m regex-automata v0.4.18
+[1m[92m  Downloaded[0m syn v3.0.4
+[1m[92m  Downloaded[0m itertools v0.13.0
+[1m[92m  Downloaded[0m malachite-q v0.14.0
+[1m[92m  Downloaded[0m md5 v0.8.1
+[1m[92m  Downloaded[0m xattr v1.6.1
+[1m[92m  Downloaded[0m foldhash v0.2.0
+[1m[92m  Downloaded[0m tokio v1.54.1
+[1m[92m  Downloaded[0m utf8_iter v1.0.4
+[1m[92m  Downloaded[0m petgraph v0.8.3
+[1m[92m  Downloaded[0m typenum v1.20.1
+[1m[92m  Downloaded[0m webpki-roots v1.0.9
+[1m[92m  Downloaded[0m gpu-allocator v0.28.0
+[1m[92m  Downloaded[0m libloading v0.9.0
+[1m[92m  Downloaded[0m nom v7.1.3
+[1m[92m  Downloaded[0m wide v1.7.1
+[1m[92m  Downloaded[0m glow v0.17.0
+[1m[92m  Downloaded[0m gpu-descriptor v0.3.2
+[1m[92m  Downloaded[0m inflections v1.1.1
+[1m[92m  Downloaded[0m libloading v0.8.9
+[1m[92m  Downloaded[0m libm v0.2.16
+[1m[92m  Downloaded[0m num v0.4.3
+[1m[92m  Downloaded[0m url v2.5.8
+[1m[92m  Downloaded[0m wgpu-hal v29.0.4
+[1m[92m  Downloaded[0m winnow v1.0.4
+[1m[92m  Downloaded[0m cubecl-hip-sys v7.14.6085000
+[1m[92m  Downloaded[0m naga v29.0.4
+[1m[92m  Downloaded[0m ring v0.17.14
+[1m[92m  Downloaded[0m hashbrown v0.16.1
+[1m[92m  Downloaded[0m heck v0.5.0
+[1m[92m  Downloaded[0m nu-ansi-term v0.50.3
+[1m[92m  Downloaded[0m num-complex v0.4.6
+[1m[92m  Downloaded[0m unicode-xid v0.2.6
+[1m[92m  Downloaded[0m untrusted v0.9.0
+[1m[92m  Downloaded[0m wgpu-core-deps-windows-linux-android v29.0.4
+[1m[92m  Downloaded[0m writeable v0.6.4
+[1m[92m  Downloaded[0m zeroize v1.9.0
+[1m[92m  Downloaded[0m glob v0.3.4
+[1m[92m  Downloaded[0m hashbrown v0.15.5
+[1m[92m  Downloaded[0m iana-time-zone v0.1.65
+[1m[92m  Downloaded[0m liblzma v0.4.8
+[1m[92m  Downloaded[0m malachite-base v0.14.0
+[1m[92m  Downloaded[0m num-integer v0.1.47
+[1m[92m  Downloaded[0m num-iter v0.1.46
+[1m[92m  Downloaded[0m paste v1.0.15
+[1m[92m  Downloaded[0m zmij v1.0.23
+[1m[92m  Downloaded[0m http-body-util v0.1.5
+[1m[92m  Downloaded[0m icu_locale_core v2.3.0
+[1m[92m  Downloaded[0m idna_adapter v1.2.2
+[1m[92m  Downloaded[0m unicode-segmentation v1.13.3
+[1m[92m  Downloaded[0m zerotrie v0.2.5
+[1m[92m  Downloaded[0m form_urlencoded v1.2.2
+[1m[92m  Downloaded[0m lazy_static v1.5.0
+[1m[92m  Downloaded[0m num-rational v0.4.2
+[1m[92m  Downloaded[0m unicode-width v0.2.2
+[1m[92m  Downloaded[0m unicode_categories v0.1.1
+[1m[92m  Downloaded[0m icu_collections v2.3.0
+[1m[92m  Downloaded[0m idna v1.1.0
+[1m[92m  Downloaded[0m libc v0.2.189
+[1m[92m  Downloaded[0m memchr v2.8.3
+[1m[92m  Downloaded[0m litrs v1.0.0
+[1m[92m  Downloaded[0m wgpu-core v29.0.4
+[1m[92m  Downloaded[0m gimli v0.32.3
+[1m[92m  Downloaded[0m wgpu v29.0.4
+[1m[92m  Downloaded[0m icu_normalizer v2.3.0
+[1m[92m  Downloaded[0m want v0.3.1
+[1m[92m  Downloaded[0m zerovec-derive v0.11.6
+[1m[92m  Downloaded[0m hyper-util v0.1.20
+[1m[92m  Downloaded[0m hashbrown v0.17.1
+[1m[92m  Downloaded[0m half v2.7.1
+[1m[92m  Downloaded[0m malachite-float v0.14.0
+[1m[92m  Downloaded[0m oneshot v0.2.1
+[1m[92m  Downloaded[0m wayland-sys v0.31.11
+[1m[92m  Downloaded[0m litemap v0.8.3
+[1m[92m  Downloaded[0m once_cell v1.21.4
+[1m[92m  Downloaded[0m option-ext v0.2.0
+[1m[92m  Downloaded[0m ipnet v2.12.1
+[1m[92m  Downloaded[0m icu_normalizer_data v2.3.0
+[1m[92m  Downloaded[0m indexmap v2.14.1
+[1m[92m  Downloaded[0m linux-raw-sys v0.12.1
+[1m[92m  Downloaded[0m liblzma-sys v0.4.8
+[1m[92m  Downloaded[0m malachite-nz v0.14.0
+[1m[92m   Compiling[0m proc-macro2 v1.0.107
+[1m[92m   Compiling[0m unicode-ident v1.0.24
+[1m[92m   Compiling[0m quote v1.0.47
+[1m[92m   Compiling[0m serde_core v1.0.229
+[1m[92m   Compiling[0m cfg_aliases v0.2.2
+[1m[92m   Compiling[0m libm v0.2.16
+[1m[92m   Compiling[0m cfg-if v1.0.4
+[1m[92m   Compiling[0m serde v1.0.229
+[1m[92m   Compiling[0m autocfg v1.5.1
+[1m[92m   Compiling[0m num-traits v0.2.19
+[1m[92m   Compiling[0m zerocopy v0.8.56
+[1m[92m   Compiling[0m syn v3.0.4
+[1m[92m   Compiling[0m syn v2.0.119
+[1m[92m   Compiling[0m libc v0.2.189
+[1m[92m   Compiling[0m equivalent v1.0.2
+[1m[92m   Compiling[0m foldhash v0.2.0
+[1m[92m   Compiling[0m allocator-api2 v0.2.21
+[1m[92m   Compiling[0m hashbrown v0.16.1
+[1m[92m   Compiling[0m log v0.4.35
+[1m[92m   Compiling[0m ident_case v1.0.1
+[1m[92m   Compiling[0m bitflags v2.13.1
+[1m[92m   Compiling[0m scopeguard v1.2.0
+[1m[92m   Compiling[0m parking_lot_core v0.9.12
+[1m[92m   Compiling[0m thiserror v2.0.20
+[1m[92m   Compiling[0m lock_api v0.4.14
+[1m[92m   Compiling[0m unicode-segmentation v1.13.3
+[1m[92m   Compiling[0m serde_derive v1.0.229
+[1m[92m   Compiling[0m bytemuck_derive v1.12.0
+[1m[92m   Compiling[0m thiserror-impl v2.0.20
+[1m[92m   Compiling[0m bytemuck v1.25.2
+[1m[92m   Compiling[0m zerocopy-derive v0.8.56
+[1m[92m   Compiling[0m once_cell v1.21.4
+[1m[92m   Compiling[0m convert_case v0.10.0
+[1m[92m   Compiling[0m unicode-xid v0.2.6
+[1m[92m   Compiling[0m memchr v2.8.3
+[1m[92m   Compiling[0m derive_more-impl v2.1.1
+[1m[92m   Compiling[0m libloading v0.8.9
+[1m[92m   Compiling[0m parking v2.2.1
+[1m[92m   Compiling[0m pin-project-lite v0.2.17
+[1m[92m   Compiling[0m fnv v1.0.7
+[1m[92m   Compiling[0m strsim v0.11.1
+[1m[92m   Compiling[0m darling_core v0.23.0
+[1m[92m   Compiling[0m smallvec v1.15.2
+[1m[92m   Compiling[0m parking_lot v0.12.5
+[1m[92m   Compiling[0m darling_core v0.21.3
+[1m[92m   Compiling[0m derive-new v0.7.0
+[1m[92m   Compiling[0m object v0.37.3
+[1m[92m   Compiling[0m rand_core v0.10.1
+[1m[92m   Compiling[0m zmij v1.0.23
+[1m[92m   Compiling[0m getrandom v0.4.3
+[1m[92m   Compiling[0m regex-syntax v0.8.11
+[1m[92m   Compiling[0m darling_macro v0.23.0
+[1m[92m   Compiling[0m naga v29.0.4
+[1m[92m   Compiling[0m gimli v0.32.3
+[1m[92m   Compiling[0m darling_macro v0.21.3
+[1m[92m   Compiling[0m half v2.7.1
+[1m[92m   Compiling[0m regex-automata v0.4.18
+[1m[92m   Compiling[0m serde_json v1.0.154
+[1m[92m   Compiling[0m crossbeam-utils v0.8.22
+[1m[92m   Compiling[0m cpufeatures v0.3.1
+[1m[92m   Compiling[0m bit-vec v0.9.1
+[1m[92m   Compiling[0m option-ext v0.2.0
+[1m[92m   Compiling[0m unicode-width v0.2.2
+[1m[92m   Compiling[0m ash v0.38.0+1.3.281
+[1m[92m   Compiling[0m winnow v1.0.4
+[1m[92m   Compiling[0m hashbrown v0.17.1
+[1m[92m   Compiling[0m futures-core v0.3.34
+[1m[92m   Compiling[0m pkg-config v0.3.34
+[1m[92m   Compiling[0m adler2 v2.0.1
+[1m[92m   Compiling[0m miniz_oxide v0.8.9
+[1m[92m   Compiling[0m indexmap v2.14.1
+[1m[92m   Compiling[0m wayland-sys v0.31.11
+[1m[92m   Compiling[0m regex v1.13.1
+[1m[92m   Compiling[0m toml_parser v1.1.3+spec-1.1.0
+[1m[92m   Compiling[0m addr2line v0.25.1
+[1m[92m   Compiling[0m codespan-reporting v0.13.1
+[1m[92m   Compiling[0m dirs-sys v0.5.0
+[1m[92m   Compiling[0m bit-set v0.9.1
+[1m[92m   Compiling[0m chacha20 v0.10.2
+[1m[92m   Compiling[0m darling v0.21.3
+[1m[92m   Compiling[0m darling v0.23.0
+[1m[92m   Compiling[0m nom v8.0.0
+[1m[92m   Compiling[0m spirv v0.4.0+sdk-1.4.341.0
+[1m[92m   Compiling[0m toml_datetime v1.1.1+spec-1.1.0
+[1m[92m   Compiling[0m serde_spanned v1.1.1
+[1m[92m   Compiling[0m cubecl-common v0.10.0
+[1m[92m   Compiling[0m futures-io v0.3.34
+[1m[92m   Compiling[0m hexf-parse v0.2.1
+[1m[92m   Compiling[0m version_check v0.9.5
+[1m[92m   Compiling[0m portable-atomic v1.15.0
+[1m[92m   Compiling[0m itoa v1.0.18
+[1m[92m   Compiling[0m prettyplease v0.2.37
+[1m[92m   Compiling[0m khronos-egl v6.0.0
+[1m[92m   Compiling[0m rustc-demangle v0.1.28
+[1m[92m   Compiling[0m arrayvec v0.7.8
+[1m[92m   Compiling[0m fastrand v2.5.0
+[1m[92m   Compiling[0m rustc-hash v1.1.0
+[1m[92m   Compiling[0m raw-window-handle v0.6.2
+[1m[92m   Compiling[0m foldhash v0.1.5
+[1m[92m   Compiling[0m toml_writer v1.1.2+spec-1.1.0
+[1m[92m   Compiling[0m hashbrown v0.15.5
+[1m[92m   Compiling[0m wgpu-types v29.0.4
+[1m[92m   Compiling[0m futures-lite v2.6.1
+[1m[92m   Compiling[0m toml v1.1.4+spec-1.1.0
+[1m[92m   Compiling[0m backtrace v0.3.76
+[1m[92m   Compiling[0m tynm v0.2.0
+[1m[92m   Compiling[0m ahash v0.8.12
+[1m[92m   Compiling[0m rand v0.10.3
+[1m[92m   Compiling[0m enumset_derive v0.15.0
+[1m[92m   Compiling[0m dirs v6.0.0
+[1m[92m   Compiling[0m sanitize-filename v0.6.0
+[1m[92m   Compiling[0m float8 v0.7.0
+[1m[92m   Compiling[0m derive_more v2.1.1
+[1m[92m   Compiling[0m event-listener v5.4.2
+[1m[92m   Compiling[0m dlib v0.5.3
+[1m[92m   Compiling[0m spin v0.10.1
+[1m[92m   Compiling[0m gpu-descriptor-types v0.2.0
+[1m[92m   Compiling[0m serde_bytes v0.11.19
+[1m[92m   Compiling[0m wgpu-hal v29.0.4
+[1m[92m   Compiling[0m oneshot v0.2.1
+[1m[92m   Compiling[0m presser v0.3.1
+[1m[92m   Compiling[0m embassy-futures v0.1.2
+[1m[92m   Compiling[0m web-time v1.1.0
+[1m[92m   Compiling[0m float4 v0.2.0
+[1m[92m   Compiling[0m xxhash-rust v0.8.18
+[1m[92m   Compiling[0m gpu-descriptor v0.3.2
+[1m[92m   Compiling[0m event-listener-strategy v0.5.4
+[1m[92m   Compiling[0m enumset v1.1.14
+[1m[92m   Compiling[0m concurrent-queue v2.5.0
+[1m[92m   Compiling[0m wgpu-naga-bridge v29.0.4
+[1m[92m   Compiling[0m cubecl-macros-internal v0.10.0
+[1m[92m   Compiling[0m variadics_please v1.1.0
+[1m[92m   Compiling[0m ordered-float v5.5.0
+[1m[92m   Compiling[0m cubecl-runtime v0.10.0
+[1m[92m   Compiling[0m utf8parse v0.2.2
+[1m[92m   Compiling[0m paste v1.0.15
+[1m[92m   Compiling[0m either v1.18.0
+[1m[92m   Compiling[0m profiling v1.0.18
+[1m[92m   Compiling[0m cubecl-macros v0.10.0
+[1m[92m   Compiling[0m renderdoc-sys v1.1.0
+[1m[92m   Compiling[0m glow v0.17.0
+[1m[92m   Compiling[0m float-ord v0.3.2
+[1m[92m   Compiling[0m cubecl-ir v0.10.0
+[1m[92m   Compiling[0m itertools v0.14.0
+[1m[92m   Compiling[0m anstyle-parse v1.0.0
+[1m[92m   Compiling[0m async-channel v2.5.0
+[1m[92m   Compiling[0m gpu-allocator v0.28.0
+[1m[92m   Compiling[0m cubecl-zspace v0.10.0
+[1m[92m   Compiling[0m safe_arch v1.2.0
+[1m[92m   Compiling[0m wgpu-core v29.0.4
+[1m[92m   Compiling[0m anstyle-query v1.1.5
+[1m[92m   Compiling[0m litrs v1.0.0
+[1m[92m   Compiling[0m malachite-nz v0.14.0
+[1m[92m   Compiling[0m md5 v0.8.1
+[1m[92m   Compiling[0m is_terminal_polyfill v1.70.2
+[1m[92m   Compiling[0m ryu v1.0.23
+[1m[92m   Compiling[0m anstyle v1.0.14
+[1m[92m   Compiling[0m inflections v1.1.1
+[1m[92m   Compiling[0m colorchoice v1.0.5
+[1m[92m   Compiling[0m anstream v1.0.0
+[1m[92m   Compiling[0m malachite-base v0.14.0
+[1m[92m   Compiling[0m wgpu-core-deps-windows-linux-android v29.0.4
+[1m[92m   Compiling[0m document-features v0.2.12
+[1m[92m   Compiling[0m wide v1.7.1
+[1m[92m   Compiling[0m wgpu v29.0.4
+[1m[92m   Compiling[0m cubecl-core v0.10.0
+[1m[92m   Compiling[0m cubecl-wgpu v0.10.0
+[1m[92m   Compiling[0m static_assertions v1.1.0
+[1m[92m   Compiling[0m cubecl v0.10.0
+[1m[92m   Compiling[0m anyhow v1.0.104
+[1m[92m   Compiling[0m clap_lex v1.1.0
+[1m[92m   Compiling[0m heck v0.5.0
+[1m[92m   Compiling[0m clap_derive v4.6.7
+[1m[92m   Compiling[0m clap_builder v4.6.7
+[1m[92m   Compiling[0m cubecl-std v0.10.0
+[1m[92m   Compiling[0m test-log-core v0.2.21
+[1m[92m   Compiling[0m env_filter v2.0.0
+[1m[92m   Compiling[0m nice_common v3.4.8-dev (/home/runner/work/nice/nice/common)
+[1m[92m   Compiling[0m iana-time-zone v0.1.65
+[1m[92m   Compiling[0m chrono v0.4.45
+[1m[92m   Compiling[0m env_logger v0.11.11
+[1m[92m   Compiling[0m test-log-macros v0.2.21
+[1m[92m   Compiling[0m clap v4.6.7
+[1m[92m   Compiling[0m test-log v0.2.21
+[1m[92m   Compiling[0m malachite-q v0.14.0
+[1m[92m   Compiling[0m malachite-float v0.14.0
+[1m[92m   Compiling[0m malachite v0.14.0
+[1m[92m    Finished[0m `release` profile [optimized] target(s) in 3m 12s
+[1m[92m     Running[0m unittests src/lib.rs (target/release/build/nice_common/fa5408b170498953/out/nice_common-fa5408b170498953)
+
+running 36 tests
+skipping: set NICE_TEST_CPU_CHECK_EXHAUSTIVE=1 to run every x below 2^31
+skipping: set NICE_TEST_JOIN_FULL_FIELD to run the whole-field comparison
+skipping: set NICE_TEST_CPU_JOIN to a partition stride
+test cpu_check::tests::magic_quotients_are_exact_everywhere ... ok
+test cpu_join::tests::cpu_join_matches_the_reference_on_a_whole_field ... ok
+test cpu_join::tests::cpu_join_partition_timing ... ok
+test cpu_join::tests::fx_digits_are_exact_everywhere ... ok
+skipping: set NICE_TEST_FX_EXHAUSTIVE to check every (A, P, D)
+skipping: set NICE_TEST_CPU_CHECK_REF to a partition count per field
+skipping: set NICE_TEST_CPU_JOIN_REF to a partition count per field
+test cpu_join::tests::the_full_check_is_exact_on_production_shapes ... ok
+test cpu_join::tests::cpu_join_matches_the_reference_on_production_fields ... ok
+skipping on software rasterizer: llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>)
+test cubecl_backend::tests::cubecl_detailed_survives_more_batches_than_the_task_cap ... ok
+test cubecl_backend::tests::cubecl_finds_69_in_base_10 ... ok
+base 10: [47, 100) agrees, 1 nice
+test cubecl_backend::tests::cubecl_niceonly_finds_69_in_base_10 ... ok
+base 12: [144, 330) agrees, 0 nice
+base 10: 1000000 candidates match the CPU exactly
+base 25: [3339797, 8339797) agrees, 0 nice
+test cubecl_backend::tests::cubecl_cross_filter_survivors_match_the_host_mirror ... ok
+base 40: [1916284264916, 1916289264916) agrees, 0 nice
+base 30: 396 of 159058 candidates survive (0.25%), device agrees
+plane=false bits=1: stride walk b50: the survivor queues checked 6 fewer survivors than they queued
+base 45: [212736390383970, 212736395383970) agrees, 0 nice
+base 40: 2000000 candidates match the CPU exactly
+plane=false bits=2: stride walk b50: the survivors the queues checked differ from those they queued (low words differ by 248052 mod 2^32)
+base 62: [3226266762397899821056, 3226266762397904821056) agrees, 0 nice
+base 62: 200000 candidates match the CPU exactly
+test cubecl_backend::tests::cubecl_queue_faults_fail_the_field ... ok
+base 80: [653245554420798943087177909799, 653245554420798943087182909799) agrees, 0 nice
+test cubecl_backend::tests::cubecl_matches_cpu_niceonly ... ok
+b50 plane=false ballot=true cube=256 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+base 80: 100000 candidates match the CPU exactly
+test cubecl_backend::tests::cubecl_matches_cpu_detailed ... ok
+skipping: set NICE_TEST_FIELDS to run the throughput harness
+test cubecl_backend::tests::pipeline_throughput_fixed_fields ... ok
+CUBECL_DEBUG_LOG is not set; no shaders to dump
+test cubecl_backend::tests::wgsl_dump_for_lint ... ok
+base 34: 2099 of 350205 candidates survive (0.60%), device agrees
+b50 plane=false ballot=true cube=256 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b40 range start: [1916284264916, 1916284464916) exact
+b50 plane=false ballot=true cube=100 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=100 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=48 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b40 range end: [6553599800000, 6553600000000) exact
+b50 plane=false ballot=true cube=48 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+base 40: 4472 of 288591 candidates survive (1.55%), device agrees
+test cubecl_backend::tests::cubecl_prefilter_survivors_match_the_host_mirror ... ok
+b10 [47, +53): exact
+b50 plane=false ballot=true cube=36 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b10 [47, +53): exact
+b10 [47, +53): exact
+b12 [144, +186): exact
+b12 [144, +186): exact
+b12 [144, +186): exact
+b50 plane=false ballot=true cube=36 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b13 [398, +212): exact
+b40 straddling the range start: [1916284164916, 1916284364916) exact
+b13 [398, +212): exact
+b50 plane=false ballot=false cube=256 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b13 [398, +212): exact
+b14 [734, +405): exact
+b14 [734, +405): exact
+b14 [734, +405): exact
+b15 [1369, +1024): exact
+b50 plane=false ballot=false cube=256 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b15 [2351, +1024): exact
+b40 random 0: [6425633780263, 6425633880263) exact
+b15 [2351, +1024): exact
+b17 [4913, +1024): exact
+b17 [8773, +1024): exact
+b50 plane=false ballot=false cube=100 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b17 [11609, +1024): exact
+b18 [15285, +1024): exact
+b50 plane=false ballot=false cube=100 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b18 [20014, +1024): exact
+b40 random 1: [4953809713011, 4953809813011) exact
+b18 [23720, +1024): exact
+b19 [29898, +1024): exact
+b19 [39368, +1024): exact
+b19 [47815, +1024): exact
+b50 plane=false ballot=false cube=48 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b20 [58945, +1024): exact
+b20 [109472, +1024): exact
+b40 random 2: [2081201753895, 2081201853895) exact
+b20 [158976, +1024): exact
+b50 plane=false ballot=false cube=48 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+bases 10-24 in full: 27 near-misses match the CPU exactly
+test cubecl_backend::tests::cubecl_reads_back_every_near_miss ... ok
+skipped: set NICE_METAL_DIV_REPRO=1 to run
+test cubecl_detailed_fd::tests::metal_half_shift_div_repro ... ok
+b22 [234256, +1024): exact
+b22 [445325, +1024): exact
+b22 [655371, +1024): exact
+b23 [795831, +1024): exact
+b50 plane=false ballot=false cube=36 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b23 [1068951, +1024): exact
+b23 [1341047, +1024): exact
+b24 [1625364, +1024): exact
+b40 random 3: [4709578618052, 4709578718052) exact
+b24 [2192926, +1024): exact
+b50 plane=false ballot=false cube=36 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b24 [2759464, +1024): exact
+b25 [3339797, +1024): exact
+b25 [6552711, +1024): exact
+b40 plane=false ballot=true cube=256 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b25 [9764601, +1024): exact
+b27 [14348907, +1024): exact
+b40 random 4: [3809383870253, 3809383970253) exact
+b40 plane=false ballot=true cube=256 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b27 [28697814, +1024): exact
+b27 [43045697, +1024): exact
+b28 [52260814, +1024): exact
+b28 [71664761, +1024): exact
+b40 plane=false ballot=true cube=100 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b28 [91067684, +1024): exact
+b40 plane=false ballot=true cube=100 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b29 [110455918, +1024): exact
+b29 [152031667, +1024): exact
+b40 random 5: [4037869222618, 4037869322618) exact
+b29 [193606392, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) (3,2,0) agrees (FD tops: true)
+b30 [234613921, +1024): exact
+b40 plane=false ballot=true cube=48 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b30 [481806960, +1024): exact
+b40 plane=false ballot=true cube=48 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b30 [728998976, +1024): exact
+b32 [1073741824, +1024): exact
+b40 plane=false ballot=true cube=36 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b32 [2241329813, +1024): exact
+b32 [3408916778, +1024): exact
+b40 plane=false ballot=true cube=36 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b33 [4142427847, +1024): exact
+b40 random 6: [4988998231660, 4988998331660) exact
+b33 [5780673250, +1024): exact
+b33 [7418917630, +1024): exact
+b34 [9007680237, +1024): exact
+b40 plane=false ballot=false cube=256 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b34 [12610266654, +1024): exact
+b34 [16212852048, +1024): exact
+b35 [19669212048, +1024): exact
+b40 plane=false ballot=false cube=256 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b35 [42004254461, +1024): exact
+b35 [64339295851, +1024): exact
+b37 [94931877133, +1024): exact
+b40 plane=false ballot=false cube=100 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b37 [205632976267, +1024): exact
+b40 random 7: [5208371428385, 5208371528385) exact
+b37 [316334074377, +1024): exact
+b40 plane=false ballot=false cube=100 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b38 [384662374829, +1024): exact
+b38 [544983697158, +1024): exact
+b38 [705305018464, +1024): exact
+b39 [857007362029, +1024): exact
+b39 [1217603586817, +1024): exact
+b40 plane=false ballot=false cube=48 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 dS gains digit 8 at 3276800000000: [3276799950000, 3276800050000) exact
+b39 [1578199810582, +1024): exact
+b40 [1916284264916, +1024): exact
+b40 [4234942132458, +1024): exact
+b40 plane=false ballot=false cube=48 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 [6553599998976, +1024): exact
+b42 [9682651996416, +1024): exact
+b42 [21669904164560, +1024): exact
+b40 plane=false ballot=false cube=36 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) (2,3,1) agrees (FD tops: true)
+b42 [33657156331681, +1024): exact
+b40 dC gains digit 16 at 3783722724161: [3783722674161, 3783722774161) exact
+b43 [40948418181959, +1024): exact
+b43 [58796536481029, +1024): exact
+b40 plane=false ballot=false cube=36 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+32 runs, 0 wrong
+test cubecl_backend::tests::cubecl_queues_check_every_survivor_on_partly_filled_planes ... ok
+b43 [76644654779075, +1024): exact
+b44 [93185373471696, +1024): exact
+b44 [134136716502590, +1024): exact
+b44 [175088059532460, +1024): exact
+b45 [212736390383970, +1024): exact
+b50 range start: [26507984537059635, 26507984537259635) exact
+b45 [484708516481047, +1024): exact
+b45 [756680642577101, +1024): exact
+b47 [1119130473102767, +1024): exact
+test cubecl_join::tests::cubecl_niceonly_keeps_join_and_stride_apart_by_ticket ... ok
+skipping: set NICE_TEST_FX_EXHAUSTIVE=1 to run every operand triple
+skipping: set NICE_TEST_JOIN_FULL_FIELD to run the whole-field comparison
+test cubecl_join::tests::fx_digits_are_exact_everywhere ... ok
+test cubecl_join::tests::join_matches_the_reference_on_a_whole_field ... ok
+b47 [2578938855756994, +1024): exact
+b47 [4038747238410198, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): limits JoinLimits { max_binding: 134217728, budget: 268435456, vram_budget: false }; 1 slice(s); plan JoinPlan { slots: 4, list_cap: 8388608, nice_cap: 1024, bytes: 211410284 }; re-run JoinPlan { slots: 1, list_cap: 16777216, nice_cap: 1024, bytes: 172732512 }
+b48 [4915694472847618, +1024): exact
+b50 range end: [97656249999800000, 97656250000000000) exact
+b48 [7143409997114014, +1024): exact
+b48 [9371125521379387, +1024): exact
+b49 [11398895185373143, +1024): exact
+b49 [16602098617313740, +1024): exact
+b49 [21805302049253314, +1024): exact
+partition 1000: CPU (1486824, 82672); production layout (1486824, 82672, 0 re-run, 0 refused, ceiling none); 4-slot layout (1486824, 82672)
+Memory Usage Report:
+  Number of allocations: 0
+  Bytes in use: 0 B
+  Bytes used for padding: 0 B
+  Total bytes reserved: 310.38 MB
+  Usage efficiency: 0.00%
+  Padding overhead: NaN%
+
+b50 [26507984537059635, +1024): exact
+b50 [62082117268529817, +1024): exact
+b50 straddling the range start: [26507984536959635, 26507984537159635) exact
+b50 [97656249999998976, +1024): exact
+test cubecl_join::tests::join_sample_runs_partitions_of_a_production_field ... ok
+skipping: set NICE_TEST_JOIN_FIELDS to run the throughput harness
+test cubecl_join::tests::join_throughput_fixed_fields ... ok
+b52 [144555105949057024, +1024): exact
+b52 [342054325839405870, +1024): exact
+b52 [539553545729753693, +1024): exact
+b53 [656927313525736563, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [60001, 150003) (2,3,1) agrees (FD tops: true)
+b50 random 0: [77320559545909699, 77320559546009699) exact
+b53 [965063658022480843, +1024): exact
+b53 [1273200002519224100, +1024): exact
+b54 [1549296280153679229, +1024): exact
+b54 [2280689072992922333, +1024): exact
+b54 [3012081865832164414, +1024): exact
+b50 random 1: [57139361221076770, 57139361221176770) exact
+b55 [3663267963587310490, +1024): exact
+b55 [8797250940070022432, +1024): exact
+b55 [13931233916552733351, +1024): exact
+b57 [20635899893042801193, +1024): exact
+b50 random 2: [76554967217975002, 76554967218075002) exact
+b57 [50026591988166461152, +1024): exact
+b57 [79417284083290120087, +1024): exact
+b58 [96720216587923470200, +1024): exact
+b58 [143506413985089978623, +1024): exact
+b58 [190292611382256486023, +1024): exact
+b59 [231631774300498175921, +1024): exact
+b59 [344328481072125413603, +1024): exact
+b59 [457025187843752650261, +1024): exact
+b60 [556029612114824200908, +1024): exact
+b50 random 3: [35122366101350975, 35122366101450975) exact
+b60 [1366405974057412100454, +1024): exact
+b60 [2176782335999999998976, +1024): exact
+b62 [3226266762397899821056, +1024): exact
+b62 [7997740455941656911841, +1024): exact
+b62 [12769214149485414001602, +1024): exact
+b63 [15554883995458128017102, +1024): exact
+b63 [23291552215635945429943, +1024): exact
+b63 [31028220435813762841760, +1024): exact
+b64 [37778931862957161709568, +1024): exact
+b50 random 4: [91830070712099535, 91830070712199535) exact
+b64 [56668397794435742564352, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b25 [3339797, 4339797) (4,3,1) agrees (FD tops: true)
+b64 [75557863725914323418112, +1024): exact
+test cubecl_detailed_fd::tests::cubecl_fd_seed_matches_cpu ... ok
+b50 random 5: [96223229869828648, 96223229869928648) exact
+b50 random 6: [35910417165221458, 35910417165321458) exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) (3,2,0): 2 batches (slots 4, 3576 prefixes) agree
+b50 random 7: [77052250941462492, 77052250941562492) exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): 102365 intervals, 33582 kept; 203413 of the powers scanned above c0, 69824 of them with the carry
+test cubecl_join::tests::top_certificates_match_the_lockstep_scan_and_the_cpu ... ok
+b50 dS gains digit 10 at 48828125000000000: [48828124999950000, 48828125000050000) exact
+b50 dC gains digit 20 at 56381862225549391: [56381862225499391, 56381862225599391) exact
+b10 full range (53 numbers): exact, 1 near-misses
+b12 full range (186 numbers): exact, 0 near-misses
+b13 full range (212 numbers): exact, 0 near-misses
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) (2,3,1): 7 batches (slots 4, 13 prefixes) agree
+b14 full range (405 numbers): exact, 0 near-misses
+b15 full range (2006 numbers): exact, 1 near-misses
+b17 full range (7720 numbers): exact, 2 near-misses
+b18 full range (9459 numbers): exact, 0 near-misses
+b19 full range (18941 numbers): exact, 0 near-misses
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [60001, 150003) (2,3,1): 7 batches (slots 4, 12 prefixes) agree
+b20 full range (101055 numbers): exact, 1 near-misses
+b22 full range (422139 numbers): exact, 10 near-misses
+b40: every window exact at every run shape
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b25 [3339797, 4339797) (4,3,1): 9 batches (slots 4, 1059 prefixes) agree
+b23 full range (546240 numbers): exact, 8 near-misses
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b25 [5000123, 5700456) (3,4,2): 4 batches (slots 4, 3 prefixes) agree
+b24 full range (1135124 numbers): exact, 4 near-misses
+bases 10-24: 27 near-misses
+test cubecl_detailed_fd::tests::cubecl_fd_matches_cpu_detailed ... ok
+b10 [47, +53): exact
+b10 [47, +53): exact
+b10 [47, +53): exact
+b12 [144, +186): exact
+b12 [144, +186): exact
+b12 [144, +186): exact
+b13 [398, +212): exact
+b13 [398, +212): exact
+b13 [398, +212): exact
+b14 [734, +405): exact
+b14 [734, +405): exact
+b14 [734, +405): exact
+b15 [1369, +1024): exact
+b15 [2351, +1024): exact
+b15 [2351, +1024): exact
+b17 [4913, +1024): exact
+b17 [8773, +1024): exact
+b17 [11609, +1024): exact
+b18 [15285, +1024): exact
+b18 [20014, +1024): exact
+b18 [23720, +1024): exact
+b19 [29898, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b30 [300000000, 301000000) (5,4,2): 4 batches (slots 4, 0 prefixes) agree
+b19 [39368, +1024): exact
+b19 [47815, +1024): exact
+b20 [58945, +1024): exact
+b20 [109472, +1024): exact
+b20 [158976, +1024): exact
+b22 [234256, +1024): exact
+b22 [445325, +1024): exact
+b22 [655371, +1024): exact
+b23 [795831, +1024): exact
+b23 [1068951, +1024): exact
+b23 [1341047, +1024): exact
+b24 [1625364, +1024): exact
+b24 [2192926, +1024): exact
+b24 [2759464, +1024): exact
+b25 [3339797, +1024): exact
+b25 [6552711, +1024): exact
+b25 [9764601, +1024): exact
+b27 [14348907, +1024): exact
+b27 [28697814, +1024): exact
+b27 [43045697, +1024): exact
+b28 [52260814, +1024): exact
+b28 [71664761, +1024): exact
+b28 [91067684, +1024): exact
+b29 [110455918, +1024): exact
+b29 [152031667, +1024): exact
+b29 [193606392, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b34 [12000000017, 12001000017) (5,5,2): 4 batches (slots 4, 0 prefixes) agree
+b30 [234613921, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b25 [5000123, 5700456) (3,4,2) agrees (FD tops: true)
+b30 [481806960, +1024): exact
+b30 [728998976, +1024): exact
+b32 [1073741824, +1024): exact
+b32 [2241329813, +1024): exact
+b32 [3408916778, +1024): exact
+b33 [4142427847, +1024): exact
+b33 [5780673250, +1024): exact
+b33 [7418917630, +1024): exact
+b34 [9007680237, +1024): exact
+b34 [12610266654, +1024): exact
+b34 [16212852048, +1024): exact
+b35 [19669212048, +1024): exact
+b35 [42004254461, +1024): exact
+b50: every window exact at every run shape
+b35 [64339295851, +1024): exact
+b37 [94931877133, +1024): exact
+b37 [205632976267, +1024): exact
+b10 full range (53 numbers): exact, 1 near-misses
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b40 [3000000000000, 3000002000000) (6,5,2): 4 batches (slots 4, 1 prefixes) agree
+b12 full range (186 numbers): exact, 0 near-misses
+b37 [316334074377, +1024): exact
+b38 [384662374829, +1024): exact
+b38 [544983697158, +1024): exact
+b38 [705305018464, +1024): exact
+b13 full range (212 numbers): exact, 0 near-misses
+b39 [857007362029, +1024): exact
+b39 [1217603586817, +1024): exact
+b39 [1578199810582, +1024): exact
+b40 [1916284264916, +1024): exact
+b14 full range (405 numbers): exact, 0 near-misses
+b40 [4234942132458, +1024): exact
+b40 [6553599998976, +1024): exact
+b42 [9682651996416, +1024): exact
+b15 full range (2006 numbers): exact, 1 near-misses
+b17 full range (7720 numbers): exact, 2 near-misses
+b42 [21669904164560, +1024): exact
+test cubecl_join::tests::cubecl_join_matches_the_cpu_reference has been running for over 60 seconds
+b42 [33657156331681, +1024): exact
+b43 [40948418181959, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b40 [3000000000000, 3000002000000) (7,4,2): 4 batches (slots 4, 4 prefixes) agree
+b43 [58796536481029, +1024): exact
+b18 full range (9459 numbers): exact, 0 near-misses
+b43 [76644654779075, +1024): exact
+b44 [93185373471696, +1024): exact
+b44 [134136716502590, +1024): exact
+b44 [175088059532460, +1024): exact
+b45 [212736390383970, +1024): exact
+b45 [484708516481047, +1024): exact
+b19 full range (18941 numbers): exact, 0 near-misses
+b45 [756680642577101, +1024): exact
+b47 [1119130473102767, +1024): exact
+b47 [2578938855756994, +1024): exact
+b20 full range (101055 numbers): exact, 1 near-misses
+b47 [4038747238410198, +1024): exact
+b48 [4915694472847618, +1024): exact
+b48 [7143409997114014, +1024): exact
+b48 [9371125521379387, +1024): exact
+b22 full range (422139 numbers): exact, 10 near-misses
+b49 [11398895185373143, +1024): exact
+b49 [16602098617313740, +1024): exact
+b49 [21805302049253314, +1024): exact
+b23 full range (546240 numbers): exact, 8 near-misses
+b50 [26507984537059635, +1024): exact
+b50 [62082117268529817, +1024): exact
+b50 [97656249999998976, +1024): exact
+b24 full range (1135124 numbers): exact, 4 near-misses
+b52 [144555105949057024, +1024): exact
+b52 [342054325839405870, +1024): exact
+b52 [539553545729753693, +1024): exact
+b53 [656927313525736563, +1024): exact
+b53 [965063658022480843, +1024): exact
+b53 [1273200002519224100, +1024): exact
+b54 [1549296280153679229, +1024): exact
+b54 [2280689072992922333, +1024): exact
+b54 [3012081865832164414, +1024): exact
+b55 [3663267963587310490, +1024): exact
+b55 [8797250940070022432, +1024): exact
+b55 [13931233916552733351, +1024): exact
+b57 [20635899893042801193, +1024): exact
+b57 [50026591988166461152, +1024): exact
+b57 [79417284083290120087, +1024): exact
+b58 [96720216587923470200, +1024): exact
+b58 [143506413985089978623, +1024): exact
+b25 full range (6425828 numbers): exact, 18 near-misses
+b58 [190292611382256486023, +1024): exact
+b59 [231631774300498175921, +1024): exact
+b59 [344328481072125413603, +1024): exact
+b59 [457025187843752650261, +1024): exact
+b60 [556029612114824200908, +1024): exact
+b60 [1366405974057412100454, +1024): exact
+b60 [2176782335999999998976, +1024): exact
+b62 [3226266762397899821056, +1024): exact
+b62 [7997740455941656911841, +1024): exact
+b62 [12769214149485414001602, +1024): exact
+b63 [15554883995458128017102, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b30 [300000000, 301000000) (5,4,2) agrees (FD tops: true)
+b63 [23291552215635945429943, +1024): exact
+b63 [31028220435813762841760, +1024): exact
+b64 [37778931862957161709568, +1024): exact
+b64 [56668397794435742564352, +1024): exact
+b64 [75557863725914323418112, +1024): exact
+test cubecl_web::tests::web_fd_seed_matches_cpu ... ok
+test cubecl_web::tests::web_kernel_finds_69_in_base_10 ... ok
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b50 [62082117268529817, 62082117268829817) (7,4,1): 15 batches (slots 4, 1 prefixes) agree
+base 10: 100000 candidates match the CPU exactly (both u32 kernels)
+b27: 12 windows exact
+base 40: 2000000 candidates match the CPU exactly (both u32 kernels)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b54 [2321864499473908801, 2321864499474208801) (8,4,1): 16 batches (slots 4, 1 prefixes) agree
+base 62: 200000 candidates match the CPU exactly (both u32 kernels)
+base 80: 100000 candidates match the CPU exactly (both u32 kernels)
+base 97: 50000 candidates match the CPU exactly (both u32 kernels)
+test cubecl_web::tests::web_kernel_matches_cpu_detailed ... ok
+b28: 14 windows exact
+--- single candidate ---
+cpu    nice_numbers: []
+web    nice_numbers: []
+native nice_numbers: []
+--- small window ---
+cpu    nice_numbers: [NiceNumberSimple { number: 20363742218601559, num_uniques: 45 }]
+web    nice_numbers: [NiceNumberSimple { number: 20363742218601559, num_uniques: 45 }]
+native nice_numbers: [NiceNumberSimple { number: 20363742218601559, num_uniques: 45 }]
+test cubecl_web::tests::web_kernel_near_miss_matches_cpu_at_base_49 ... ok
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b57 [30000000000000000000, 30000000000000300000) (10,4,1): 17 batches (slots 4, 0 prefixes) agree
+TIMING b40: division [219.15 221.55 218.04] med 219.15 | finite differences [83.87 62.79 34.56] med 62.79 | 3.49x
+TIMING b50: division [365.74 357.71 364.12] med 364.12 | finite differences [53.31 38.19 40.60] med 40.60 | 8.97x
+b29: 12 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b57 [20635899893042801193, 20635899893043101193) (9,5,1): 17 batches (slots 4, 0 prefixes) agree
+TIMING b60: division [512.72 555.02 460.97] med 512.72 | finite differences [41.90 39.93 39.90] med 39.93 | 12.84x
+test detailed_fd::tests::fd_timing ... ok
+b30: 14 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b57 [78920310198429586458, 78920310198429886458) (9,5,2): 4 batches (slots 4, 1 prefixes) agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b58 [114041927169846138720, 114041927169846438720) (10,4,2): 4 batches (slots 4, 1 prefixes) agree
+test cubecl_join::tests::top_fd_matches_the_top_kernel has been running for over 60 seconds
+cert on real tops b58: 15 kept (236 certified digits), 25 rejected, 2488608 locally viable numbers
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b60 [1573714731429953349518, 1573714731429953649518) (10,4,2): 4 batches (slots 4, 0 prefixes) agree
+cert on real tops b60: 13 kept (224 certified digits), 27 rejected, 2004501 locally viable numbers
+cert on real tops b62: 18 kept (313 certified digits), 22 rejected, 3422329 locally viable numbers
+b32: 12 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b64 [52125117810081128433988, 52125117810081128733988) (11,4,2): 4 batches (slots 4, 1 prefixes) agree
+cert on real tops b64: 12 kept (221 certified digits), 28 rejected, 2641694 locally viable numbers
+test overlap_join::tests::cert_is_sound_on_real_tops ... ok
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b34 [12000000017, 12001000017) (5,5,2) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b57 1e14 at 28151599893042801193, first slice: 4 batches (slots 4, 80906 prefixes) agree
+b33: 14 windows exact
+b34: 12 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b60 1e14 at 1366406074057412100454, first slice: 4 batches (slots 4, 61160 prefixes) agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b62 1e14 at 7997740455941656911841, first slice: 4 batches (slots 3, 53067 prefixes) agree
+b35: 14 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b64 1e14 at 41242006262957161709568, first slice: 4 batches (slots 2, 42039 prefixes) agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): top_fd (one slot group and several) = top_kernel on 21 fields, 142 batches (20 with a clipped block), 1018088 tops
+test cubecl_join::tests::top_fd_matches_the_top_kernel ... ok
+b37: 12 windows exact
+b38: 13 windows exact
+b39: 13 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b40 [3000000000000, 3000002000000) (6,5,2) agrees (FD tops: true)
+b42: 12 windows exact
+b43: 13 windows exact
+b44: 13 windows exact
+b45: 14 windows exact
+test cubecl_web::tests::web_fd_matches_cpu_detailed has been running for over 60 seconds
+b47: 12 windows exact
+b48: 13 windows exact
+b49: 13 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b40 [3000000000000, 3000002000000) (7,4,2) agrees (FD tops: true)
+b52: 12 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b50 [62082117268529817, 62082117268829817) (7,4,1) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b54 [2321864499473908801, 2321864499474208801) (8,4,1) agrees (FD tops: true)
+b53: 13 windows exact
+b54: 13 windows exact
+b55: 14 windows exact
+b57: 12 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b57 [30000000000000000000, 30000000000000300000) (10,4,1) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b57 [20635899893042801193, 20635899893043101193) (9,5,1) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b57 [78920310198429586458, 78920310198429886458) (9,5,2) agrees (FD tops: true)
+b58: 12 windows exact
+b59: 13 windows exact
+b60: 13 windows exact
+b62: 12 windows exact
+b63: 12 windows exact
+b64: 13 windows exact
+b40: partial runs exact
+b57: partial runs exact
+b49 near-miss window around 20363742218601559: exact
+b40 near-miss window around 1917398732423: exact
+430 windows exact
+test cubecl_web::tests::web_fd_matches_cpu_detailed ... ok
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b58 [114041927169846138720, 114041927169846438720) (10,4,2) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b60 [1573714731429953349518, 1573714731429953649518) (10,4,2) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b64 [52125117810081128433988, 52125117810081128733988) (11,4,2) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b57 frontier field JoinParams { t: 9, k: 6, p: 2 }, partitions 0, 1000, 3248 agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) JoinParams { t: 3, k: 2, p: 0 } tight layouts agree (1 partitions re-run, 110 splits)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (10 partitions re-run, 29 splits)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (8 partitions re-run, 20 splits)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } tight layouts agree (12 partitions re-run, 58 splits)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): 5 windows agree whole and in slices
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 8 MiB (buffers up to 8 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 4 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 1 MiB (buffers up to 1 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 0 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 64 MiB layout (1 refusals, ceiling 32 MiB)
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 8 MiB (buffers up to 8 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 4 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 1 MiB (buffers up to 1 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 0 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 64 MiB layout (1 refusals, ceiling 32 MiB)
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [80, 384, 9600, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [80, 384, 9600, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 8 MiB (buffers up to 8 MiB): its kernels finished [0, 0, 0, 0] of [80, 384, 9600, 1024] cubes; the join takes layouts of at most 4 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 1 MiB (buffers up to 1 MiB): its kernels finished [0, 0, 0, 0] of [80, 384, 9600, 1024] cubes; the join takes layouts of at most 0 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } agrees after the device refused a 64 MiB layout (1 refusals, ceiling 32 MiB)
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 196 MiB (buffers up to 121 MiB): its kernels finished [0, 0, 0, 0] of [18, 441, 441, 1024] cubes; the join takes layouts of at most 98 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 196 MiB (buffers up to 121 MiB): its kernels finished [0, 0, 0, 0] of [18, 441, 441, 1024] cubes; the join takes layouts of at most 98 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 83 MiB (buffers up to 54 MiB): its kernels finished [0, 0, 0, 0] of [8, 196, 196, 1024] cubes; the join takes layouts of at most 41 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 40 MiB (buffers up to 27 MiB): its kernels finished [0, 0, 0, 0] of [4, 98, 98, 1024] cubes; the join takes layouts of at most 20 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b50 [62082117268529817, 62082117268829817) JoinParams { t: 7, k: 4, p: 1 } agrees after the device refused a 196 MiB layout (1 refusals, ceiling 98 MiB)
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 199 MiB (buffers up to 125 MiB): its kernels finished [0, 0, 0, 0] of [6, 318, 318, 1024] cubes; the join takes layouts of at most 99 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 199 MiB (buffers up to 125 MiB): its kernels finished [0, 0, 0, 0] of [6, 318, 318, 1024] cubes; the join takes layouts of at most 99 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 93 MiB (buffers up to 62 MiB): its kernels finished [0, 0, 0, 0] of [3, 159, 159, 1024] cubes; the join takes layouts of at most 46 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 35 MiB (buffers up to 20 MiB): its kernels finished [0, 0, 0, 0] of [1, 53, 53, 1024] cubes; the join takes layouts of at most 17 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b54 [2321864499473908801, 2321864499474208801) JoinParams { t: 8, k: 4, p: 1 } agrees after the device refused a 199 MiB layout (1 refusals, ceiling 99 MiB)
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 201 MiB (buffers up to 116 MiB): its kernels finished [0, 0, 0, 0] of [634, 168, 9576, 1024] cubes; the join takes layouts of at most 100 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<wgsl>): b57 frontier partitions [0, 1000, 3248] agree in a tight layout (3 re-run, 6 splits) and after a refused one
+test cubecl_join::tests::cubecl_join_matches_the_cpu_reference ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 234 filtered out; finished in 149.29s
+
+[1m[92m     Running[0m tests/claim_queries.rs (target/release/build/nice_common/98bdb5edd16eebc0/out/claim_queries-98bdb5edd16eebc0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[1m[92m     Running[0m tests/notable_numbers_cache.rs (target/release/build/nice_common/ef3a609002302505/out/notable_numbers_cache-ef3a609002302505)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[1m[92m     Running[0m tests/search_caches.rs (target/release/build/nice_common/b19d243c59145b9e/out/search_caches-b19d243c59145b9e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[1m[92m   Doc-tests[0m nice_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+##[group]Run export VK_ICD_FILENAMES="$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)"
+[36;1mexport VK_ICD_FILENAMES="$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)"[0m
+[36;1mexport CUBECL_DEBUG_LOG="$RUNNER_TEMP/wgsl.log"[0m
+[36;1mcargo test --release --features cubecl -p nice_common --lib -- \[0m
+[36;1m    --ignored --exact cubecl_backend::tests::wgsl_dump_for_lint --nocapture[0m
+[36;1mpython3 scripts/wgsl-lint.py "$CUBECL_DEBUG_LOG" \[0m
+[36;1m    --require DetailedKernelU32@80 --require DetailedFdKernelU32@40 \[0m
+[36;1m    --require DetailedFdKernelU32@50 \[0m
+[36;1m    --require DetailedFdKernel@23 --require DetailedFdKernel@40 \[0m
+[36;1m    --require DetailedFdKernel@50 --require DetailedFdKernel@62 \[0m
+[36;1m    --require DetailedKernel@80 --require NiceonlyKernel@40 \[0m
+[36;1m    --require BucketKernel@57 --require JoinKernel@57 \[0m
+[36;1m    --require TopKernel@57 --require CheckKernel@57[0m
+shell: /usr/bin/bash -e {0}
+env:
+  CARGO_TERM_COLOR: always
+  NICE_BUILD_SHA: 142ed1391bbb4ea480b9a28f254df6742c7669a7
+  RUST_BACKTRACE: 1
+##[endgroup]
+[1m[92m    Finished[0m `release` profile [optimized] target(s) in 0.15s
+[1m[92m     Running[0m unittests src/lib.rs (target/release/build/nice_common/fa5408b170498953/out/nice_common-fa5408b170498953)
+
+running 1 test
+test cubecl_backend::tests::wgsl_dump_for_lint ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 269 filtered out; finished in 5.40s
+
+wgsl-lint: self-test passed (18 cases)
+wgsl-lint: 14 shaders (BucketKernel, CheckKernel, DetailedFdKernel, DetailedFdKernelU32, DetailedKernel, DetailedKernelU32, JoinKernel, NiceonlyKernel, TopFdKernel, TopKernel), 0 flagged sites
+##[group]Run export VK_ICD_FILENAMES="$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)"
+[36;1mexport VK_ICD_FILENAMES="$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)"[0m
+[36;1mcargo test --release --features cubecl-spirv -p nice_common -- --ignored --nocapture cubecl_[0m
+shell: /usr/bin/bash -e {0}
+env:
+  CARGO_TERM_COLOR: always
+  NICE_BUILD_SHA: 142ed1391bbb4ea480b9a28f254df6742c7669a7
+  RUST_BACKTRACE: 1
+##[endgroup]
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m c2rust-bitfields v0.20.0
+[1m[92m  Downloaded[0m c2rust-bitfields-derive v0.20.0
+[1m[92m  Downloaded[0m cubecl-spirv v0.10.0
+[1m[92m  Downloaded[0m syn v1.0.109
+[1m[92m  Downloaded[0m tracel-rspirv v0.12.1+sdk-1.4.341.0
+[1m[92m  Downloaded[0m tracel-ash v0.39.5+sdk1.4.357
+[1m[92m   Compiling[0m num-traits v0.2.19
+[1m[92m   Compiling[0m indexmap v2.14.1
+[1m[92m   Compiling[0m ciborium-io v0.2.2
+[1m[92m   Compiling[0m hashbrown v0.15.5
+[1m[92m   Compiling[0m cubecl-common v0.10.0
+[1m[92m   Compiling[0m syn v1.0.109
+[1m[92m   Compiling[0m rustc-hash v2.1.3
+[1m[92m   Compiling[0m gpu-descriptor v0.3.2
+[1m[92m   Compiling[0m fixedbitset v0.5.7
+[1m[92m   Compiling[0m half v2.7.1
+[1m[92m   Compiling[0m num-integer v0.1.47
+[1m[92m   Compiling[0m ordered-float v5.5.0
+[1m[92m   Compiling[0m ciborium-ll v0.2.2
+[1m[92m   Compiling[0m float8 v0.7.0
+[1m[92m   Compiling[0m naga v29.0.4
+[1m[92m   Compiling[0m ciborium v0.2.2
+[1m[92m   Compiling[0m num-bigint v0.4.8
+[1m[92m   Compiling[0m cubecl-ir v0.10.0
+[1m[92m   Compiling[0m num-rational v0.4.2
+[1m[92m   Compiling[0m num-iter v0.1.46
+[1m[92m   Compiling[0m num-complex v0.4.6
+[1m[92m   Compiling[0m num v0.4.3
+[1m[92m   Compiling[0m c2rust-bitfields-derive v0.20.0
+[1m[92m   Compiling[0m petgraph v0.8.3
+[1m[92m   Compiling[0m type-map v0.5.1
+[1m[92m   Compiling[0m stable-vec v0.4.3
+[1m[92m   Compiling[0m c2rust-bitfields v0.20.0
+[1m[92m   Compiling[0m tracel-rspirv v0.12.1+sdk-1.4.341.0
+[1m[92m   Compiling[0m cubecl-runtime v0.10.0
+[1m[92m   Compiling[0m cubecl-wgpu v0.10.0
+[1m[92m   Compiling[0m tracel-ash v0.39.5+sdk1.4.357
+[1m[92m   Compiling[0m wgpu-naga-bridge v29.0.4
+[1m[92m   Compiling[0m wgpu-hal v29.0.4
+[1m[92m   Compiling[0m cubecl-core v0.10.0
+[1m[92m   Compiling[0m wgpu-core-deps-windows-linux-android v29.0.4
+[1m[92m   Compiling[0m wgpu-core v29.0.4
+[1m[92m   Compiling[0m cubecl-opt v0.10.0
+[1m[92m   Compiling[0m cubecl-spirv v0.10.0
+[1m[92m   Compiling[0m wgpu v29.0.4
+[1m[92m   Compiling[0m cubecl v0.10.0
+[1m[92m   Compiling[0m cubecl-std v0.10.0
+[1m[92m   Compiling[0m nice_common v3.4.8-dev (/home/runner/work/nice/nice/common)
+[1m[92m   Compiling[0m chrono v0.4.45
+[1m[92m    Finished[0m `release` profile [optimized] target(s) in 2m 43s
+[1m[92m     Running[0m unittests src/lib.rs (target/release/build/nice_common/9d31a429e66f486c/out/nice_common-9d31a429e66f486c)
+
+running 28 tests
+skipping on software rasterizer: llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>)
+test cubecl_backend::tests::cubecl_detailed_survives_more_batches_than_the_task_cap ... ok
+test cubecl_backend::tests::cubecl_finds_69_in_base_10 ... ok
+base 10: [47, 100) agrees, 1 nice
+test cubecl_backend::tests::cubecl_niceonly_finds_69_in_base_10 ... ok
+base 10: 1000000 candidates match the CPU exactly
+base 12: [144, 330) agrees, 0 nice
+base 25: [3339797, 8339797) agrees, 0 nice
+base 40: [1916284264916, 1916289264916) agrees, 0 nice
+test cubecl_backend::tests::cubecl_cross_filter_survivors_match_the_host_mirror ... ok
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): the plane-scoped queue is not tested (plane barrier)
+base 45: [212736390383970, 212736395383970) agrees, 0 nice
+base 30: 396 of 159058 candidates survive (0.25%), device agrees
+base 40: 2000000 candidates match the CPU exactly
+plane=false bits=1: stride walk b50: the survivor queues checked 6 fewer survivors than they queued
+base 62: 200000 candidates match the CPU exactly
+plane=false bits=2: stride walk b50: the survivors the queues checked differ from those they queued (low words differ by 248052 mod 2^32)
+base 62: [3226266762397899821056, 3226266762397904821056) agrees, 0 nice
+test cubecl_backend::tests::cubecl_queue_faults_fail_the_field ... ok
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): the plane-scoped queue is not tested (plane barrier)
+base 80: [653245554420798943087177909799, 653245554420798943087182909799) agrees, 0 nice
+test cubecl_backend::tests::cubecl_matches_cpu_niceonly ... ok
+base 80: 100000 candidates match the CPU exactly
+test cubecl_backend::tests::cubecl_matches_cpu_detailed ... ok
+skipping: set NICE_TEST_FIELDS to run the throughput harness
+test cubecl_backend::tests::pipeline_throughput_fixed_fields ... ok
+CUBECL_DEBUG_LOG is not set; no shaders to dump
+test cubecl_backend::tests::wgsl_dump_for_lint ... ok
+b50 plane=false ballot=true cube=256 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+base 34: 2099 of 350205 candidates survive (0.60%), device agrees
+b50 plane=false ballot=true cube=256 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=100 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b40 range start: [1916284264916, 1916284464916) exact
+b50 plane=false ballot=true cube=100 lanes/range=4: FAILED: stride walk b50: the survivor queues checked 1 fewer survivors than they queued
+b50 plane=false ballot=true cube=48 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b40 range end: [6553599800000, 6553600000000) exact
+b50 plane=false ballot=true cube=48 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+base 40: 4472 of 288591 candidates survive (1.55%), device agrees
+test cubecl_backend::tests::cubecl_prefilter_survivors_match_the_host_mirror ... ok
+b10 [47, +53): exact
+b10 [47, +53): exact
+b10 [47, +53): exact
+b12 [144, +186): exact
+b12 [144, +186): exact
+b12 [144, +186): exact
+b50 plane=false ballot=true cube=36 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b13 [398, +212): exact
+b13 [398, +212): exact
+b13 [398, +212): exact
+b50 plane=false ballot=true cube=36 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b14 [734, +405): exact
+b14 [734, +405): exact
+b40 straddling the range start: [1916284164916, 1916284364916) exact
+b14 [734, +405): exact
+b50 plane=false ballot=false cube=256 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b15 [1369, +1024): exact
+b15 [2351, +1024): exact
+b15 [2351, +1024): exact
+b17 [4913, +1024): exact
+b17 [8773, +1024): exact
+b40 random 0: [6425633780263, 6425633880263) exact
+b50 plane=false ballot=false cube=256 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b17 [11609, +1024): exact
+b18 [15285, +1024): exact
+b18 [20014, +1024): exact
+b50 plane=false ballot=false cube=100 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b18 [23720, +1024): exact
+b19 [29898, +1024): exact
+b19 [39368, +1024): exact
+b19 [47815, +1024): exact
+b50 plane=false ballot=false cube=100 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b20 [58945, +1024): exact
+b20 [109472, +1024): exact
+b20 [158976, +1024): exact
+b50 plane=false ballot=false cube=48 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b22 [234256, +1024): exact
+b40 random 1: [4953809713011, 4953809813011) exact
+b22 [445325, +1024): exact
+b50 plane=false ballot=false cube=48 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b22 [655371, +1024): exact
+bases 10-24 in full: 27 near-misses match the CPU exactly
+test cubecl_backend::tests::cubecl_reads_back_every_near_miss ... ok
+skipped: set NICE_METAL_DIV_REPRO=1 to run
+test cubecl_detailed_fd::tests::metal_half_shift_div_repro ... ok
+b23 [795831, +1024): exact
+b23 [1068951, +1024): exact
+b23 [1341047, +1024): exact
+b50 plane=false ballot=false cube=36 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b24 [1625364, +1024): exact
+b24 [2192926, +1024): exact
+b24 [2759464, +1024): exact
+b40 random 2: [2081201753895, 2081201853895) exact
+b50 plane=false ballot=false cube=36 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b25 [3339797, +1024): exact
+b25 [6552711, +1024): exact
+b40 plane=false ballot=true cube=256 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b25 [9764601, +1024): exact
+b27 [14348907, +1024): exact
+b27 [28697814, +1024): exact
+b27 [43045697, +1024): exact
+b40 plane=false ballot=true cube=256 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b28 [52260814, +1024): exact
+b28 [71664761, +1024): exact
+b40 plane=false ballot=true cube=100 lanes/range=1: FAILED: stride walk b40: the survivor queues checked 3401 fewer survivors than they queued
+b40 random 3: [4709578618052, 4709578718052) exact
+b28 [91067684, +1024): exact
+b40 plane=false ballot=true cube=100 lanes/range=4: FAILED: stride walk b40: the survivor queues checked 1669 fewer survivors than they queued
+b29 [110455918, +1024): exact
+b40 plane=false ballot=true cube=48 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b29 [152031667, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) (3,2,0) agrees (FD tops: true)
+b29 [193606392, +1024): exact
+b30 [234613921, +1024): exact
+b30 [481806960, +1024): exact
+b40 plane=false ballot=true cube=48 lanes/range=4: FAILED: stride walk b40: the survivor queues checked 182536111 fewer survivors than they queued
+b30 [728998976, +1024): exact
+b40 random 4: [3809383870253, 3809383970253) exact
+b32 [1073741824, +1024): exact
+b32 [2241329813, +1024): exact
+b40 plane=false ballot=true cube=36 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b32 [3408916778, +1024): exact
+b33 [4142427847, +1024): exact
+b40 plane=false ballot=true cube=36 lanes/range=4: FAILED: stride walk b40: the survivor queues checked 128849019 fewer survivors than they queued
+b33 [5780673250, +1024): exact
+b40 plane=false ballot=false cube=256 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b33 [7418917630, +1024): exact
+b40 random 5: [4037869222618, 4037869322618) exact
+b40 plane=false ballot=false cube=256 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b34 [9007680237, +1024): exact
+b34 [12610266654, +1024): exact
+b34 [16212852048, +1024): exact
+b40 plane=false ballot=false cube=100 lanes/range=1: FAILED: stride walk b40: the survivors the queues checked differ from those they queued (low words differ by 109 mod 2^32)
+b35 [19669212048, +1024): exact
+b40 plane=false ballot=false cube=100 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b35 [42004254461, +1024): exact
+b35 [64339295851, +1024): exact
+b37 [94931877133, +1024): exact
+b40 plane=false ballot=false cube=48 lanes/range=1: FAILED: stride walk b40: the survivors the queues checked differ from those they queued (low words differ by 347 mod 2^32)
+b37 [205632976267, +1024): exact
+b40 plane=false ballot=false cube=48 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b37 [316334074377, +1024): exact
+b38 [384662374829, +1024): exact
+b40 plane=false ballot=false cube=36 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 random 6: [4988998231660, 4988998331660) exact
+b38 [544983697158, +1024): exact
+b38 [705305018464, +1024): exact
+b39 [857007362029, +1024): exact
+b40 plane=false ballot=false cube=36 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+32 runs, 7 wrong
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) (2,3,1) agrees (FD tops: true)
+b39 [1217603586817, +1024): exact
+
+thread 'cubecl_backend::tests::cubecl_queues_check_every_survivor_on_partly_filled_planes' (7713) panicked at common/src/cubecl_backend.rs:4305:9:
+7 wrong runs: [
+    "b50 plane=false ballot=true cube=100 lanes/range=4: stride walk b50: the survivor queues checked 1 fewer survivors than they queued",
+    "b40 plane=false ballot=true cube=100 lanes/range=1: stride walk b40: the survivor queues checked 3401 fewer survivors than they queued",
+    "b40 plane=false ballot=true cube=100 lanes/range=4: stride walk b40: the survivor queues checked 1669 fewer survivors than they queued",
+test cubecl_backend::tests::cubecl_queues_check_every_survivor_on_partly_filled_planes ... FAILED
+    "b40 plane=false ballot=true cube=48 lanes/range=4: stride walk b40: the survivor queues checked 182536111 fewer survivors than they queued",
+    "b40 plane=false ballot=true cube=36 lanes/range=4: stride walk b40: the survivor queues checked 128849019 fewer survivors than they queued",
+b39 [1578199810582, +1024): exact
+    "b40 plane=false ballot=false cube=100 lanes/range=1: stride walk b40: the survivors the queues checked differ from those they queued (low words differ by 109 mod 2^32)",
+    "b40 plane=false ballot=false cube=48 lanes/range=1: stride walk b40: the survivors the queues checked differ from those they queued (low words differ by 347 mod 2^32)",
+]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: <nice_common::cubecl_backend::tests::cubecl_queues_check_every_survivor_on_partly_filled_planes::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+b40 [1916284264916, +1024): exact
+b40 random 7: [5208371428385, 5208371528385) exact
+b40 [4234942132458, +1024): exact
+b40 [6553599998976, +1024): exact
+b42 [9682651996416, +1024): exact
+b42 [21669904164560, +1024): exact
+b42 [33657156331681, +1024): exact
+b43 [40948418181959, +1024): exact
+b43 [58796536481029, +1024): exact
+b40 dS gains digit 8 at 3276800000000: [3276799950000, 3276800050000) exact
+b43 [76644654779075, +1024): exact
+b44 [93185373471696, +1024): exact
+b44 [134136716502590, +1024): exact
+b44 [175088059532460, +1024): exact
+b45 [212736390383970, +1024): exact
+b45 [484708516481047, +1024): exact
+b40 dC gains digit 16 at 3783722724161: [3783722674161, 3783722774161) exact
+skipping: set NICE_TEST_FX_EXHAUSTIVE=1 to run every operand triple
+b45 [756680642577101, +1024): exact
+skipping: set NICE_TEST_JOIN_FULL_FIELD to run the whole-field comparison
+test cubecl_join::tests::cubecl_niceonly_keeps_join_and_stride_apart_by_ticket ... ok
+test cubecl_join::tests::fx_digits_are_exact_everywhere ... ok
+test cubecl_join::tests::join_matches_the_reference_on_a_whole_field ... ok
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): limits JoinLimits { max_binding: 134217728, budget: 268435456, vram_budget: false }; 1 slice(s); plan JoinPlan { slots: 4, list_cap: 8388608, nice_cap: 1024, bytes: 211410284 }; re-run JoinPlan { slots: 1, list_cap: 16777216, nice_cap: 1024, bytes: 172732512 }
+b47 [1119130473102767, +1024): exact
+b47 [2578938855756994, +1024): exact
+b47 [4038747238410198, +1024): exact
+b48 [4915694472847618, +1024): exact
+b48 [7143409997114014, +1024): exact
+partition 1000: CPU (1486824, 82672); production layout (1486824, 82672, 0 re-run, 0 refused, ceiling none); 4-slot layout (1486824, 82672)
+Memory Usage Report:
+  Number of allocations: 0
+  Bytes in use: 0 B
+  Bytes used for padding: 0 B
+  Total bytes reserved: 310.38 MB
+  Usage efficiency: 0.00%
+  Padding overhead: NaN%
+
+b48 [9371125521379387, +1024): exact
+b50 range start: [26507984537059635, 26507984537259635) exact
+b49 [11398895185373143, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [60001, 150003) (2,3,1) agrees (FD tops: true)
+b49 [16602098617313740, +1024): exact
+b49 [21805302049253314, +1024): exact
+b50 [26507984537059635, +1024): exact
+skipping: set NICE_TEST_JOIN_FIELDS to run the throughput harness
+test cubecl_join::tests::join_sample_runs_partitions_of_a_production_field ... ok
+test cubecl_join::tests::join_throughput_fixed_fields ... ok
+b50 [62082117268529817, +1024): exact
+b50 [97656249999998976, +1024): exact
+b50 range end: [97656249999800000, 97656250000000000) exact
+b52 [144555105949057024, +1024): exact
+b52 [342054325839405870, +1024): exact
+b52 [539553545729753693, +1024): exact
+b53 [656927313525736563, +1024): exact
+b53 [965063658022480843, +1024): exact
+b53 [1273200002519224100, +1024): exact
+b50 straddling the range start: [26507984536959635, 26507984537159635) exact
+b54 [1549296280153679229, +1024): exact
+b54 [2280689072992922333, +1024): exact
+b54 [3012081865832164414, +1024): exact
+b55 [3663267963587310490, +1024): exact
+b55 [8797250940070022432, +1024): exact
+b55 [13931233916552733351, +1024): exact
+b50 random 0: [77320559545909699, 77320559546009699) exact
+b57 [20635899893042801193, +1024): exact
+b57 [50026591988166461152, +1024): exact
+b57 [79417284083290120087, +1024): exact
+b58 [96720216587923470200, +1024): exact
+b58 [143506413985089978623, +1024): exact
+b58 [190292611382256486023, +1024): exact
+b59 [231631774300498175921, +1024): exact
+b50 random 1: [57139361221076770, 57139361221176770) exact
+b59 [344328481072125413603, +1024): exact
+b59 [457025187843752650261, +1024): exact
+b60 [556029612114824200908, +1024): exact
+b60 [1366405974057412100454, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b25 [3339797, 4339797) (4,3,1) agrees (FD tops: true)
+b60 [2176782335999999998976, +1024): exact
+test cubecl_detailed_fd::tests::cubecl_fd_matches_cpu_detailed has been running for over 60 seconds
+test cubecl_detailed_fd::tests::cubecl_fd_seed_matches_cpu has been running for over 60 seconds
+b62 [3226266762397899821056, +1024): exact
+test cubecl_join::tests::cubecl_join_matches_the_cpu_reference has been running for over 60 seconds
+b50 random 2: [76554967217975002, 76554967218075002) exact
+b62 [7997740455941656911841, +1024): exact
+b62 [12769214149485414001602, +1024): exact
+b63 [15554883995458128017102, +1024): exact
+b63 [23291552215635945429943, +1024): exact
+b50 random 3: [35122366101350975, 35122366101450975) exact
+b63 [31028220435813762841760, +1024): exact
+b64 [37778931862957161709568, +1024): exact
+test cubecl_join::tests::top_certificates_match_the_lockstep_scan_and_the_cpu has been running for over 60 seconds
+b64 [56668397794435742564352, +1024): exact
+b64 [75557863725914323418112, +1024): exact
+test cubecl_detailed_fd::tests::cubecl_fd_seed_matches_cpu ... ok
+b50 random 4: [91830070712099535, 91830070712199535) exact
+b50 random 5: [96223229869828648, 96223229869928648) exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) (3,2,0): 2 batches (slots 4, 3576 prefixes) agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): 102365 intervals, 33582 kept; 203413 of the powers scanned above c0, 69824 of them with the carry
+test cubecl_join::tests::top_certificates_match_the_lockstep_scan_and_the_cpu ... ok
+b50 random 6: [35910417165221458, 35910417165321458) exact
+b50 random 7: [77052250941462492, 77052250941562492) exact
+b50 dS gains digit 10 at 48828125000000000: [48828124999950000, 48828125000050000) exact
+b50 dC gains digit 20 at 56381862225549391: [56381862225499391, 56381862225599391) exact
+b10 full range (53 numbers): exact, 1 near-misses
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) (2,3,1): 7 batches (slots 4, 13 prefixes) agree
+b12 full range (186 numbers): exact, 0 near-misses
+b13 full range (212 numbers): exact, 0 near-misses
+b14 full range (405 numbers): exact, 0 near-misses
+b15 full range (2006 numbers): exact, 1 near-misses
+b17 full range (7720 numbers): exact, 2 near-misses
+b18 full range (9459 numbers): exact, 0 near-misses
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [60001, 150003) (2,3,1): 7 batches (slots 4, 12 prefixes) agree
+b19 full range (18941 numbers): exact, 0 near-misses
+b40: every window exact at every run shape
+b20 full range (101055 numbers): exact, 1 near-misses
+b22 full range (422139 numbers): exact, 10 near-misses
+b23 full range (546240 numbers): exact, 8 near-misses
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b25 [3339797, 4339797) (4,3,1): 9 batches (slots 4, 1059 prefixes) agree
+b24 full range (1135124 numbers): exact, 4 near-misses
+bases 10-24: 27 near-misses
+test cubecl_detailed_fd::tests::cubecl_fd_matches_cpu_detailed ... ok
+b10 [47, +53): exact
+b10 [47, +53): exact
+b10 [47, +53): exact
+b12 [144, +186): exact
+b12 [144, +186): exact
+b12 [144, +186): exact
+b13 [398, +212): exact
+b13 [398, +212): exact
+b13 [398, +212): exact
+b14 [734, +405): exact
+b14 [734, +405): exact
+b14 [734, +405): exact
+b15 [1369, +1024): exact
+b15 [2351, +1024): exact
+b15 [2351, +1024): exact
+b17 [4913, +1024): exact
+b17 [8773, +1024): exact
+b17 [11609, +1024): exact
+b18 [15285, +1024): exact
+b18 [20014, +1024): exact
+b18 [23720, +1024): exact
+b19 [29898, +1024): exact
+b19 [39368, +1024): exact
+b19 [47815, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b25 [5000123, 5700456) (3,4,2): 4 batches (slots 4, 3 prefixes) agree
+b20 [58945, +1024): exact
+b20 [109472, +1024): exact
+b20 [158976, +1024): exact
+b22 [234256, +1024): exact
+b22 [445325, +1024): exact
+b22 [655371, +1024): exact
+b23 [795831, +1024): exact
+b23 [1068951, +1024): exact
+b23 [1341047, +1024): exact
+b24 [1625364, +1024): exact
+b24 [2192926, +1024): exact
+b24 [2759464, +1024): exact
+b25 [3339797, +1024): exact
+b25 [6552711, +1024): exact
+b25 [9764601, +1024): exact
+b27 [14348907, +1024): exact
+b27 [28697814, +1024): exact
+b27 [43045697, +1024): exact
+b28 [52260814, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b25 [5000123, 5700456) (3,4,2) agrees (FD tops: true)
+b28 [71664761, +1024): exact
+b28 [91067684, +1024): exact
+b29 [110455918, +1024): exact
+b29 [152031667, +1024): exact
+b29 [193606392, +1024): exact
+b30 [234613921, +1024): exact
+b30 [481806960, +1024): exact
+b30 [728998976, +1024): exact
+b32 [1073741824, +1024): exact
+b32 [2241329813, +1024): exact
+b50: every window exact at every run shape
+b32 [3408916778, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b30 [300000000, 301000000) (5,4,2): 4 batches (slots 4, 0 prefixes) agree
+b33 [4142427847, +1024): exact
+b33 [5780673250, +1024): exact
+b10 full range (53 numbers): exact, 1 near-misses
+b33 [7418917630, +1024): exact
+b34 [9007680237, +1024): exact
+b34 [12610266654, +1024): exact
+b34 [16212852048, +1024): exact
+b12 full range (186 numbers): exact, 0 near-misses
+b35 [19669212048, +1024): exact
+b35 [42004254461, +1024): exact
+b35 [64339295851, +1024): exact
+b37 [94931877133, +1024): exact
+b13 full range (212 numbers): exact, 0 near-misses
+b37 [205632976267, +1024): exact
+b37 [316334074377, +1024): exact
+b38 [384662374829, +1024): exact
+b38 [544983697158, +1024): exact
+b14 full range (405 numbers): exact, 0 near-misses
+b38 [705305018464, +1024): exact
+b39 [857007362029, +1024): exact
+b39 [1217603586817, +1024): exact
+b39 [1578199810582, +1024): exact
+b15 full range (2006 numbers): exact, 1 near-misses
+b40 [1916284264916, +1024): exact
+b40 [4234942132458, +1024): exact
+b40 [6553599998976, +1024): exact
+b42 [9682651996416, +1024): exact
+b17 full range (7720 numbers): exact, 2 near-misses
+b42 [21669904164560, +1024): exact
+b42 [33657156331681, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b34 [12000000017, 12001000017) (5,5,2): 4 batches (slots 4, 0 prefixes) agree
+b43 [40948418181959, +1024): exact
+b43 [58796536481029, +1024): exact
+b43 [76644654779075, +1024): exact
+b18 full range (9459 numbers): exact, 0 near-misses
+b44 [93185373471696, +1024): exact
+b44 [134136716502590, +1024): exact
+b44 [175088059532460, +1024): exact
+b45 [212736390383970, +1024): exact
+b19 full range (18941 numbers): exact, 0 near-misses
+b45 [484708516481047, +1024): exact
+b45 [756680642577101, +1024): exact
+b47 [1119130473102767, +1024): exact
+b47 [2578938855756994, +1024): exact
+b47 [4038747238410198, +1024): exact
+b48 [4915694472847618, +1024): exact
+b48 [7143409997114014, +1024): exact
+b48 [9371125521379387, +1024): exact
+b49 [11398895185373143, +1024): exact
+b20 full range (101055 numbers): exact, 1 near-misses
+b49 [16602098617313740, +1024): exact
+b49 [21805302049253314, +1024): exact
+b50 [26507984537059635, +1024): exact
+b50 [62082117268529817, +1024): exact
+b50 [97656249999998976, +1024): exact
+b52 [144555105949057024, +1024): exact
+b52 [342054325839405870, +1024): exact
+b22 full range (422139 numbers): exact, 10 near-misses
+b52 [539553545729753693, +1024): exact
+b53 [656927313525736563, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b40 [3000000000000, 3000002000000) (6,5,2): 4 batches (slots 4, 1 prefixes) agree
+b53 [965063658022480843, +1024): exact
+test cubecl_join::tests::top_fd_matches_the_top_kernel has been running for over 60 seconds
+b53 [1273200002519224100, +1024): exact
+b54 [1549296280153679229, +1024): exact
+b23 full range (546240 numbers): exact, 8 near-misses
+b54 [2280689072992922333, +1024): exact
+b54 [3012081865832164414, +1024): exact
+b55 [3663267963587310490, +1024): exact
+b55 [8797250940070022432, +1024): exact
+b55 [13931233916552733351, +1024): exact
+b57 [20635899893042801193, +1024): exact
+b24 full range (1135124 numbers): exact, 4 near-misses
+b57 [50026591988166461152, +1024): exact
+b57 [79417284083290120087, +1024): exact
+b58 [96720216587923470200, +1024): exact
+b58 [143506413985089978623, +1024): exact
+b58 [190292611382256486023, +1024): exact
+b59 [231631774300498175921, +1024): exact
+b59 [344328481072125413603, +1024): exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b40 [3000000000000, 3000002000000) (7,4,2): 4 batches (slots 4, 4 prefixes) agree
+b59 [457025187843752650261, +1024): exact
+b60 [556029612114824200908, +1024): exact
+b60 [1366405974057412100454, +1024): exact
+b60 [2176782335999999998976, +1024): exact
+b62 [3226266762397899821056, +1024): exact
+b62 [7997740455941656911841, +1024): exact
+b25 full range (6425828 numbers): exact, 18 near-misses
+b62 [12769214149485414001602, +1024): exact
+b63 [15554883995458128017102, +1024): exact
+b63 [23291552215635945429943, +1024): exact
+b63 [31028220435813762841760, +1024): exact
+b64 [37778931862957161709568, +1024): exact
+b64 [56668397794435742564352, +1024): exact
+b64 [75557863725914323418112, +1024): exact
+test cubecl_web::tests::web_fd_seed_matches_cpu ... ok
+test cubecl_web::tests::web_kernel_finds_69_in_base_10 ... ok
+base 10: 100000 candidates match the CPU exactly (both u32 kernels)
+b27: 12 windows exact
+base 40: 2000000 candidates match the CPU exactly (both u32 kernels)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b30 [300000000, 301000000) (5,4,2) agrees (FD tops: true)
+base 62: 200000 candidates match the CPU exactly (both u32 kernels)
+base 80: 100000 candidates match the CPU exactly (both u32 kernels)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b50 [62082117268529817, 62082117268829817) (7,4,1): 15 batches (slots 4, 1 prefixes) agree
+base 97: 50000 candidates match the CPU exactly (both u32 kernels)
+test cubecl_web::tests::web_kernel_matches_cpu_detailed ... ok
+--- single candidate ---
+cpu    nice_numbers: []
+web    nice_numbers: []
+native nice_numbers: []
+--- small window ---
+cpu    nice_numbers: [NiceNumberSimple { number: 20363742218601559, num_uniques: 45 }]
+web    nice_numbers: [NiceNumberSimple { number: 20363742218601559, num_uniques: 45 }]
+native nice_numbers: [NiceNumberSimple { number: 20363742218601559, num_uniques: 45 }]
+test cubecl_web::tests::web_kernel_near_miss_matches_cpu_at_base_49 ... ok
+b28: 14 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b54 [2321864499473908801, 2321864499474208801) (8,4,1): 16 batches (slots 4, 1 prefixes) agree
+b29: 12 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b57 [30000000000000000000, 30000000000000300000) (10,4,1): 17 batches (slots 4, 0 prefixes) agree
+b30: 14 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b57 [20635899893042801193, 20635899893043101193) (9,5,1): 17 batches (slots 4, 0 prefixes) agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b57 [78920310198429586458, 78920310198429886458) (9,5,2): 4 batches (slots 4, 1 prefixes) agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b58 [114041927169846138720, 114041927169846438720) (10,4,2): 4 batches (slots 4, 1 prefixes) agree
+test cubecl_web::tests::web_fd_matches_cpu_detailed has been running for over 60 seconds
+b32: 12 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b60 [1573714731429953349518, 1573714731429953649518) (10,4,2): 4 batches (slots 4, 0 prefixes) agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b64 [52125117810081128433988, 52125117810081128733988) (11,4,2): 4 batches (slots 4, 1 prefixes) agree
+b33: 14 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b57 1e14 at 28151599893042801193, first slice: 4 batches (slots 4, 80906 prefixes) agree
+b34: 12 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b60 1e14 at 1366406074057412100454, first slice: 4 batches (slots 4, 61160 prefixes) agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b34 [12000000017, 12001000017) (5,5,2) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b62 1e14 at 7997740455941656911841, first slice: 4 batches (slots 3, 53067 prefixes) agree
+b35: 14 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b64 1e14 at 41242006262957161709568, first slice: 4 batches (slots 2, 42039 prefixes) agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): top_fd (one slot group and several) = top_kernel on 21 fields, 142 batches (20 with a clipped block), 1018088 tops
+test cubecl_join::tests::top_fd_matches_the_top_kernel ... ok
+b37: 12 windows exact
+b38: 13 windows exact
+b39: 13 windows exact
+b42: 12 windows exact
+b43: 13 windows exact
+b44: 13 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b40 [3000000000000, 3000002000000) (6,5,2) agrees (FD tops: true)
+b45: 14 windows exact
+b47: 12 windows exact
+b48: 13 windows exact
+b49: 13 windows exact
+b52: 12 windows exact
+b53: 13 windows exact
+b54: 13 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b40 [3000000000000, 3000002000000) (7,4,2) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b50 [62082117268529817, 62082117268829817) (7,4,1) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b54 [2321864499473908801, 2321864499474208801) (8,4,1) agrees (FD tops: true)
+b55: 14 windows exact
+b57: 12 windows exact
+b58: 12 windows exact
+b59: 13 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b57 [30000000000000000000, 30000000000000300000) (10,4,1) agrees (FD tops: true)
+b60: 13 windows exact
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b57 [20635899893042801193, 20635899893043101193) (9,5,1) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b57 [78920310198429586458, 78920310198429886458) (9,5,2) agrees (FD tops: true)
+b62: 12 windows exact
+b63: 12 windows exact
+b64: 13 windows exact
+b40: partial runs exact
+b57: partial runs exact
+b49 near-miss window around 20363742218601559: exact
+b40 near-miss window around 1917398732423: exact
+430 windows exact
+test cubecl_web::tests::web_fd_matches_cpu_detailed ... ok
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b58 [114041927169846138720, 114041927169846438720) (10,4,2) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b60 [1573714731429953349518, 1573714731429953649518) (10,4,2) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b64 [52125117810081128433988, 52125117810081128733988) (11,4,2) agrees (FD tops: true)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b57 frontier field JoinParams { t: 9, k: 6, p: 2 }, partitions 0, 1000, 3248 agree
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) JoinParams { t: 3, k: 2, p: 0 } tight layouts agree (1 partitions re-run, 110 splits)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (10 partitions re-run, 29 splits)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (8 partitions re-run, 20 splits)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } tight layouts agree (12 partitions re-run, 58 splits)
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): 5 windows agree whole and in slices
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 8 MiB (buffers up to 8 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 4 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 1 MiB (buffers up to 1 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 0 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 64 MiB layout (1 refusals, ceiling 32 MiB)
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 8 MiB (buffers up to 8 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 4 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 1 MiB (buffers up to 1 MiB): its kernels finished [0, 0, 0, 0] of [32, 304, 304, 1024] cubes; the join takes layouts of at most 0 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 64 MiB layout (1 refusals, ceiling 32 MiB)
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [80, 384, 9600, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 64 MiB (buffers up to 64 MiB): its kernels finished [0, 0, 0, 0] of [80, 384, 9600, 1024] cubes; the join takes layouts of at most 32 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 8 MiB (buffers up to 8 MiB): its kernels finished [0, 0, 0, 0] of [80, 384, 9600, 1024] cubes; the join takes layouts of at most 4 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 1 MiB (buffers up to 1 MiB): its kernels finished [0, 0, 0, 0] of [80, 384, 9600, 1024] cubes; the join takes layouts of at most 0 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } agrees after the device refused a 64 MiB layout (1 refusals, ceiling 32 MiB)
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 196 MiB (buffers up to 121 MiB): its kernels finished [0, 0, 0, 0] of [18, 441, 441, 1024] cubes; the join takes layouts of at most 98 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 196 MiB (buffers up to 121 MiB): its kernels finished [0, 0, 0, 0] of [18, 441, 441, 1024] cubes; the join takes layouts of at most 98 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 83 MiB (buffers up to 54 MiB): its kernels finished [0, 0, 0, 0] of [8, 196, 196, 1024] cubes; the join takes layouts of at most 41 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 40 MiB (buffers up to 27 MiB): its kernels finished [0, 0, 0, 0] of [4, 98, 98, 1024] cubes; the join takes layouts of at most 20 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b50 [62082117268529817, 62082117268829817) JoinParams { t: 7, k: 4, p: 1 } agrees after the device refused a 196 MiB layout (1 refusals, ceiling 98 MiB)
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 199 MiB (buffers up to 125 MiB): its kernels finished [0, 0, 0, 0] of [6, 318, 318, 1024] cubes; the join takes layouts of at most 99 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 199 MiB (buffers up to 125 MiB): its kernels finished [0, 0, 0, 0] of [6, 318, 318, 1024] cubes; the join takes layouts of at most 99 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 93 MiB (buffers up to 62 MiB): its kernels finished [0, 0, 0, 0] of [3, 159, 159, 1024] cubes; the join takes layouts of at most 46 MiB on this device from now on
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 35 MiB (buffers up to 20 MiB): its kernels finished [0, 0, 0, 0] of [1, 53, 53, 1024] cubes; the join takes layouts of at most 17 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b54 [2321864499473908801, 2321864499474208801) JoinParams { t: 8, k: 4, p: 1 } agrees after the device refused a 199 MiB layout (1 refusals, ceiling 99 MiB)
+[WARN  nice_common::cubecl_join] overlap join: the device did not run a batch in a layout of 201 MiB (buffers up to 116 MiB): its kernels finished [0, 0, 0, 0] of [634, 168, 9576, 1024] cubes; the join takes layouts of at most 100 MiB on this device from now on
+llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>): b57 frontier partitions [0, 1000, 3248] agree in a tight layout (3 re-run, 6 splits) and after a refused one
+test cubecl_join::tests::cubecl_join_matches_the_cpu_reference ... ok
+
+failures:
+
+failures:
+    cubecl_backend::tests::cubecl_queues_check_every_survivor_on_partly_filled_planes
+
+test result: FAILED. 27 passed; 1 failed; 0 ignored; 0 measured; 242 filtered out; finished in 267.27s
+
+[1m[91merror[0m: test failed, to rerun pass `-p nice_common --lib`
+##[error]Process completed with exit code 101.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.56.1
+Temporarily overriding HOME='/home/runner/work/_temp/b5cb3714-9375-4815-a13b-a07f96bcacde' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/nice/nice
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Removing HTTP extra header
+[command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Removing includeIf entries pointing to credentials config files
+[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+includeif.gitdir:/home/runner/work/nice/nice/.git.path
+includeif.gitdir:/home/runner/work/nice/nice/.git/worktrees/*.path
+includeif.gitdir:/github/workspace/.git.path
+includeif.gitdir:/github/workspace/.git/worktrees/*.path
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/nice/nice/.git.path
+/home/runner/work/_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/nice/nice/.git.path /home/runner/work/_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/nice/nice/.git/worktrees/*.path
+/home/runner/work/_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/nice/nice/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+/github/runner_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+/github/runner_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config
+[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Removing credentials config '/home/runner/work/_temp/git-credentials-ffedd67d-6b92-4ab2-b699-8ecd9e4ae2b6.config'
+Cleaning up orphan processes

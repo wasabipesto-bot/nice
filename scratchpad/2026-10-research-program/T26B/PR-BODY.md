@@ -1,3 +1,5 @@
+> **Status, 2026-11-14 20:40 UTC: please do not merge yet.** On this PR's first CI run the new test `cubecl_queues_check_every_survivor_on_partly_filled_planes` failed on lavapipe (Mesa 26.0.8) with the SPIR-V compiler: 7 of 32 runs, all on the cube-scoped queue at the test-only workgroup sizes (100, 48, 36 units), each stopped by the account ("checked N fewer survivors than they queued"). The 256-unit production size passed, and so did every run with the WGSL compiler and on Metal. The same test passed on an older Mesa before the PR was opened. Whether this is the queue or llvmpipe is being worked out on that Mesa version; the result follows here as a new commit or a note.
+
 ## What
 
 The GPU stride walk (`niceonly_kernel`) queues its cross filter's survivors in shared memory and checks them in dense

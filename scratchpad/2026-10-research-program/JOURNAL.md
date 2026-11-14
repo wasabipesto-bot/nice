@@ -181,6 +181,26 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   62's first telemetry once the search resumes; a fresh look at high-level strategy (the queue of
   kernel optimisations for demoux is empty apart from the two under-bar branches).
 
+- **20:40 UTC: #261 merged by the user (main = 54d0aac). #263's first CI run found a real
+  failure; hold notice on the PR; engineer resumed.**
+  - #263 "Format and clippy": my own comment commit (`CubeCL's` without backticks, in a test
+    compiled only under `cubecl-cuda`; I had linted with `--features cubecl`). Fixed (bec91fd);
+    `just lint` run on ivory first this time. **Lesson: lint with `just lint`, nothing less.**
+  - #263 "cubecl on lavapipe", SPIR-V step, Mesa 26.0.8 (CI's ubuntu-26.04):
+    `cubecl_queues_check_every_survivor_on_partly_filled_planes` 7 of 32 runs wrong, all
+    cube-scoped queue at cubes of 100 / 48 / 36 units, each stopped by the account with values
+    that cannot be survivor counts (b40 has 283 survivors; "3401", "182536111" =
+    ceil(0.0425·2^32), "128849019" = round(0.03·2^32) fewer; "low words differ by 109 / 347").
+    256-unit runs pass; the WGSL step passes 32 of 32; Metal passes; older Mesa passed for the
+    author and the reviewer. Log saved: `T26B/ci-fail/`. Cause unknown: the queue, its account,
+    or this llvmpipe. **PR body now opens with "please do not merge yet".**
+  - Box 60693354 (Ubuntu 26.04 image for Mesa 26.0.8, 20 cores, $0.067/h, TTL 23:55 UTC); the
+    T2.6b engineer resumed with `T26B/CI-FAIL-BRIEF.md` (reproduce, decide queue / llvmpipe /
+    test with evidence, fix by new commits, 20 clean repeats, hard stop 23:15).
+  - Merged main into #260, #262 and #263's branches (merge commits, only #261's two files) so
+    their GPU image job runs on the fixed workflow. #251, #255, #256, #259 were green before the
+    runner change and are left alone.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit
