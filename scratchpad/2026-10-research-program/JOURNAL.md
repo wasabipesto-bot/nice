@@ -215,6 +215,27 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   queue is the 9070 XT's default): asked for the dumped offsets, the allocator's live ranges,
   whether main's kernels are exposed, and a fix that does not rest on the allocator.
 
+- **22:35 UTC: #263's failure explained and fixed; CI green on 165192b (25 pass); hold stays
+  until an independent check.** Engineer's report (`T26B/CI-FAIL.md`, 578 k tokens in all; box
+  60696216 with an Ubuntu 26.04 chroot, Mesa 26.0.8 as CI): **cubecl-spirv's module kept only
+  one of the four `store(0)` at constant indices with which unit 0 cleared the queue's four
+  shared atomic words**, so the two account words started with stale workgroup memory; Mesa 26's
+  lavapipe reuses that memory between pipelines, older Mesa evidently did not. No survivor lost
+  (an investigation build returned the hits despite the account: 32 of 32 runs exact while the
+  account fired). CI-style suite failed 3 of 4 times at bec91fd on the box, once at cube 256.
+  A minimal kernel: four atomic stores of 7 → one `OpAtomicStore` (I counted it in
+  `raw/ci/dump/mini_MS.log`; device output `[7, 7, 0, 0]`), four different values → four; WGSL
+  keeps four; CUDA keeps four. My allocator hypothesis relayed from the engineer was wrong:
+  offsets never overlap. Fix: units 0–3 clear one word each at a runtime index. Verified on
+  Mesa 26.0.8: 20 × 32 exact with each compiler, CI's suites, `just lint`, the CUDA tests.
+  **Not established: which cubecl-opt pass does it and what class of operations it affects.**
+  That is a T2 question for production (the 9070 XT compiles everything through cubecl-spirv):
+  the earlier reviewer is resumed with `T26B/DELTA-REVIEW-BRIEF.md` (pin the pass, scan every
+  kernel on main and in the open PRs by dumped modules, check the fix, draft an upstream
+  report), on the same box until 23:45. My own grep: main's and the open PRs' join kernels
+  store at one constant index or at runtime indices only.
+  CI elsewhere: #260 green (25 pass) after the merge of main; #262 24 pass, one job pending.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit

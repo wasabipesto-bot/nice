@@ -1,0 +1,313 @@
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::mini_store_kernel::MiniStoreKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::mini_store_kernel::MiniStoreKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: MiniStoreKernelInfo {
+        distinct: false,
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+    },
+}
+source:
+```spirv
+; SPIR-V
+; Version: 1.6
+; Generator: rspirv
+; Bound: 57
+OpCapability Shader
+OpCapability VulkanMemoryModel
+OpCapability VulkanMemoryModelDeviceScope
+OpCapability GroupNonUniform
+OpCapability WorkgroupMemoryExplicitLayoutKHR
+OpExtension "SPV_KHR_workgroup_memory_explicit_layout"
+OpExtension "SPV_KHR_non_semantic_info"
+%16 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+OpMemoryModel Logical Vulkan
+OpEntryPoint GLCompute %19 "mini_store_kernel" %23 %5 %10 %13
+OpExecutionMode %19 LocalSize 64 1 1
+OpName %1 "u32"
+OpName %2 "array<u32>"
+OpName %5 "input(0)"
+OpName %8 "array<u32, 2>"
+OpName %10 "info"
+OpName %19 "mini_store_kernel"
+OpName %20 "setup"
+OpName %21 "bb0"
+OpName %22 "vec3<u32>"
+OpName %25 "UNIT_POS_X"
+OpName %26 "binding(1)"
+OpName %27 "bool"
+OpName %28 "bb2"
+OpName %29 "bb6"
+OpName %30 "ptr<Workgroup, u32>"
+OpName %35 "bb4"
+OpName %36 "bb7"
+OpName %38 "binding(8)"
+OpName %40 "ptr<StorageBuffer, u32>"
+OpName %43 "binding(10)"
+OpName %46 "binding(12)"
+OpName %50 "binding(14)"
+OpName %53 "array<u32, 4>"
+OpName %54 "struct<array<u32, 4>>"
+OpName %13 "shared(0)"
+OpName %56 "ptr<Input, vec3<u32>>"
+OpDecorate %2 ArrayStride 4
+OpDecorate %5 DescriptorSet 0
+OpDecorate %5 Binding 0
+OpDecorate %3 Block
+OpMemberDecorate %3 0 Offset 0
+OpDecorate %8 ArrayStride 4
+OpMemberDecorate %6 0 Offset 0
+OpDecorate %10 NonWritable
+OpDecorate %10 DescriptorSet 0
+OpDecorate %10 Binding 1
+OpDecorate %6 Block
+OpDecorate %53 ArrayStride 4
+OpDecorate %54 Block
+OpMemberDecorate %54 0 Offset 0
+OpDecorate %13 Aliased
+OpDecorate %23 BuiltIn LocalInvocationId
+%1 = OpTypeInt 32 0
+%2 = OpTypeRuntimeArray %1
+%3 = OpTypeStruct %2
+%4 = OpTypePointer StorageBuffer %3
+%5 = OpVariable  %4  StorageBuffer
+%7 = OpConstant  %1  2
+%8 = OpTypeArray %1 %7
+%6 = OpTypeStruct %8
+%9 = OpTypePointer Uniform %6
+%10 = OpVariable  %9  Uniform
+%11 = OpConstant  %1  64
+%12 = OpConstant  %1  1
+%14 = OpTypeVoid
+%15 = OpConstant  %1  0
+%17 = OpExtInst  %14  %16 8 %15 %14
+%18 = OpTypeFunction %14
+%22 = OpTypeVector %1 3
+%27 = OpTypeBool
+%30 = OpTypePointer Workgroup %1
+%32 = OpConstant  %1  7
+%33 = OpConstant  %1  260
+%34 = OpConstant  %1  264
+%39 = OpConstant  %1  258
+%40 = OpTypePointer StorageBuffer %1
+%48 = OpConstant  %1  3
+%52 = OpConstant  %1  4
+%53 = OpTypeArray %1 %52
+%54 = OpTypeStruct %53
+%55 = OpTypePointer Workgroup %54
+%13 = OpVariable  %55  Workgroup
+%56 = OpTypePointer Input %22
+%23 = OpVariable  %56  Input
+%19 = OpFunction  %14  None %18
+%20 = OpLabel
+%24 = OpLoad  %22  %23
+%25 = OpCompositeExtract  %1  %24 0
+OpBranch %21
+%21 = OpLabel
+%26 = OpIEqual  %27  %25 %15
+OpSelectionMerge %29 None
+OpBranchConditional %26 %28 %29
+%28 = OpLabel
+%31 = OpInBoundsAccessChain  %30  %13 %15 %15
+OpAtomicStore %31 %7 %33 %32
+OpBranch %29
+%29 = OpLabel
+OpControlBarrier %7 %7 %34
+OpSelectionMerge %36 None
+OpBranchConditional %26 %35 %36
+%35 = OpLabel
+%37 = OpInBoundsAccessChain  %30  %13 %15 %15
+%38 = OpAtomicLoad  %1  %37 %7 %39
+%41 = OpAccessChain  %40  %5 %15 %15
+OpStore %41 %38
+%42 = OpInBoundsAccessChain  %30  %13 %15 %12
+%43 = OpAtomicLoad  %1  %42 %7 %39
+%44 = OpAccessChain  %40  %5 %15 %12
+OpStore %44 %43
+%45 = OpInBoundsAccessChain  %30  %13 %15 %7
+%46 = OpAtomicLoad  %1  %45 %7 %39
+%47 = OpAccessChain  %40  %5 %15 %7
+OpStore %47 %46
+%49 = OpInBoundsAccessChain  %30  %13 %15 %48
+%50 = OpAtomicLoad  %1  %49 %7 %39
+%51 = OpAccessChain  %40  %5 %15 %48
+OpStore %51 %50
+OpBranch %36
+%36 = OpLabel
+OpReturn
+OpFunctionEnd
+```
+[END_KERNEL_COMPILATION]
+
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::mini_store_kernel::MiniStoreKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::mini_store_kernel::MiniStoreKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: MiniStoreKernelInfo {
+        distinct: true,
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+    },
+}
+source:
+```spirv
+; SPIR-V
+; Version: 1.6
+; Generator: rspirv
+; Bound: 63
+OpCapability Shader
+OpCapability VulkanMemoryModel
+OpCapability VulkanMemoryModelDeviceScope
+OpCapability GroupNonUniform
+OpCapability WorkgroupMemoryExplicitLayoutKHR
+OpExtension "SPV_KHR_workgroup_memory_explicit_layout"
+OpExtension "SPV_KHR_non_semantic_info"
+%16 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+OpMemoryModel Logical Vulkan
+OpEntryPoint GLCompute %19 "mini_store_kernel" %23 %5 %10 %13
+OpExecutionMode %19 LocalSize 64 1 1
+OpName %1 "u32"
+OpName %2 "array<u32>"
+OpName %5 "input(0)"
+OpName %8 "array<u32, 2>"
+OpName %10 "info"
+OpName %19 "mini_store_kernel"
+OpName %20 "setup"
+OpName %21 "bb0"
+OpName %22 "vec3<u32>"
+OpName %25 "UNIT_POS_X"
+OpName %26 "binding(1)"
+OpName %27 "bool"
+OpName %28 "bb2"
+OpName %29 "bb6"
+OpName %30 "ptr<Workgroup, u32>"
+OpName %42 "bb4"
+OpName %43 "bb7"
+OpName %45 "binding(8)"
+OpName %47 "ptr<StorageBuffer, u32>"
+OpName %50 "binding(10)"
+OpName %53 "binding(12)"
+OpName %56 "binding(14)"
+OpName %59 "array<u32, 4>"
+OpName %60 "struct<array<u32, 4>>"
+OpName %13 "shared(0)"
+OpName %62 "ptr<Input, vec3<u32>>"
+OpDecorate %2 ArrayStride 4
+OpDecorate %5 DescriptorSet 0
+OpDecorate %5 Binding 0
+OpDecorate %3 Block
+OpMemberDecorate %3 0 Offset 0
+OpDecorate %8 ArrayStride 4
+OpMemberDecorate %6 0 Offset 0
+OpDecorate %10 NonWritable
+OpDecorate %10 DescriptorSet 0
+OpDecorate %10 Binding 1
+OpDecorate %6 Block
+OpDecorate %59 ArrayStride 4
+OpDecorate %60 Block
+OpMemberDecorate %60 0 Offset 0
+OpDecorate %13 Aliased
+OpDecorate %23 BuiltIn LocalInvocationId
+%1 = OpTypeInt 32 0
+%2 = OpTypeRuntimeArray %1
+%3 = OpTypeStruct %2
+%4 = OpTypePointer StorageBuffer %3
+%5 = OpVariable  %4  StorageBuffer
+%7 = OpConstant  %1  2
+%8 = OpTypeArray %1 %7
+%6 = OpTypeStruct %8
+%9 = OpTypePointer Uniform %6
+%10 = OpVariable  %9  Uniform
+%11 = OpConstant  %1  64
+%12 = OpConstant  %1  1
+%14 = OpTypeVoid
+%15 = OpConstant  %1  0
+%17 = OpExtInst  %14  %16 8 %15 %14
+%18 = OpTypeFunction %14
+%22 = OpTypeVector %1 3
+%27 = OpTypeBool
+%30 = OpTypePointer Workgroup %1
+%32 = OpConstant  %1  7
+%33 = OpConstant  %1  260
+%35 = OpConstant  %1  8
+%37 = OpConstant  %1  9
+%38 = OpConstant  %1  3
+%40 = OpConstant  %1  10
+%41 = OpConstant  %1  264
+%46 = OpConstant  %1  258
+%47 = OpTypePointer StorageBuffer %1
+%58 = OpConstant  %1  4
+%59 = OpTypeArray %1 %58
+%60 = OpTypeStruct %59
+%61 = OpTypePointer Workgroup %60
+%13 = OpVariable  %61  Workgroup
+%62 = OpTypePointer Input %22
+%23 = OpVariable  %62  Input
+%19 = OpFunction  %14  None %18
+%20 = OpLabel
+%24 = OpLoad  %22  %23
+%25 = OpCompositeExtract  %1  %24 0
+OpBranch %21
+%21 = OpLabel
+%26 = OpIEqual  %27  %25 %15
+OpSelectionMerge %29 None
+OpBranchConditional %26 %28 %29
+%28 = OpLabel
+%31 = OpInBoundsAccessChain  %30  %13 %15 %15
+OpAtomicStore %31 %7 %33 %32
+%34 = OpInBoundsAccessChain  %30  %13 %15 %12
+OpAtomicStore %34 %7 %33 %35
+%36 = OpInBoundsAccessChain  %30  %13 %15 %7
+OpAtomicStore %36 %7 %33 %37
+%39 = OpInBoundsAccessChain  %30  %13 %15 %38
+OpAtomicStore %39 %7 %33 %40
+OpBranch %29
+%29 = OpLabel
+OpControlBarrier %7 %7 %41
+OpSelectionMerge %43 None
+OpBranchConditional %26 %42 %43
+%42 = OpLabel
+%44 = OpInBoundsAccessChain  %30  %13 %15 %15
+%45 = OpAtomicLoad  %1  %44 %7 %46
+%48 = OpAccessChain  %47  %5 %15 %15
+OpStore %48 %45
+%49 = OpInBoundsAccessChain  %30  %13 %15 %12
+%50 = OpAtomicLoad  %1  %49 %7 %46
+%51 = OpAccessChain  %47  %5 %15 %12
+OpStore %51 %50
+%52 = OpInBoundsAccessChain  %30  %13 %15 %7
+%53 = OpAtomicLoad  %1  %52 %7 %46
+%54 = OpAccessChain  %47  %5 %15 %7
+OpStore %54 %53
+%55 = OpInBoundsAccessChain  %30  %13 %15 %38
+%56 = OpAtomicLoad  %1  %55 %7 %46
+%57 = OpAccessChain  %47  %5 %15 %38
+OpStore %57 %56
+OpBranch %43
+%43 = OpLabel
+OpReturn
+OpFunctionEnd
+```
+[END_KERNEL_COMPILATION]
+

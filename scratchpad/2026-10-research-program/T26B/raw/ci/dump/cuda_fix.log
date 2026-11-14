@@ -1,0 +1,5808 @@
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::smoke_kernel::SmokeKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::smoke_kernel::SmokeKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 1,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: SmokeKernelInfo {
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct info_st {
+    uint32 static_meta[2];
+};
+
+
+extern "C" __global__ void __launch_bounds__(1)smoke_kernel (
+    uint32* buffer_0, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+const bool l_0 = absoluteIdx.x == uint32(0);
+if (l_0) {
+buffer_0[uint32(0)] = uint32(42);
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 256,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: NiceonlyKernelInfo {
+        base: 50,
+        limbs: 2,
+        chunk_digits: 2,
+        chunk_div: 2500,
+        wide_chunk: false,
+        stride_m: 6125000,
+        stride_r: 568272,
+        offset_chunk_bits: 8,
+        pre_limbs: 0,
+        pre_chunk_digits: 0,
+        pre_chunk_div: 0,
+        probe: false,
+        cross: true,
+        compact: true,
+        plane_scoped: true,
+        ballot: true,
+        test_bits: 1,
+        residues: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_offsets: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_lens: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_out: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        low_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        fs0: (),
+        fs1: (),
+        fs2: (),
+        fs3: (),
+        fs_mod_m: (),
+        num_ranges: (),
+        nice_cap: (),
+        lane_shift: (),
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct __align__(16) uint32_4 {
+    uint32 i_0;
+    uint32 i_1;
+    uint32 i_2;
+    uint32 i_3;
+};
+struct info_st {
+    uint32 scalars_uint32[8];uint32 static_meta[14];
+};
+
+
+extern "C" __global__ void __launch_bounds__(256)niceonly_kernel (
+    const uint32* __restrict__ buffer_0, const uint32* __restrict__ buffer_1, const uint32* __restrict__ buffer_2, uint32* buffer_3, uint32* buffer_4, const uint32* __restrict__ buffer_5, const uint32* __restrict__ buffer_6, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+uint32 idxGlobal = (
+                absoluteIdx.z * gridDim.x * blockDim.x * gridDim.y * blockDim.y)
+                + (absoluteIdx.y * gridDim.x * blockDim.x)
+                + absoluteIdx.x;
+uint32 warpSizeChecked = min(warpSize, blockDim.x * blockDim.y * blockDim.z);
+extern __shared__ __align__(8) uint8 dynamic_shared_mem[];
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_23 = reinterpret_cast<uint64*>(&dynamic_shared_mem[11280]);
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_22 = reinterpret_cast<uint64*>(&dynamic_shared_mem[7168]);
+// Shared array size: 1792, 7168 bytes
+uint32 *shared_memory_13 = reinterpret_cast<uint32*>(&dynamic_shared_mem[0]);
+// Shared array size: 4, 16 bytes
+uint32 *shared_memory_15 = reinterpret_cast<uint32*>(&dynamic_shared_mem[11264]);
+uint32 l_arr_197[2];
+
+uint32 l_arr_202[4];
+
+uint32 l_mut_16;
+uint32 l_mut_17;
+uint32 l_mut_18;
+uint32 l_mut_31;
+uint32 l_mut_36;
+uint32 l_mut_43;
+uint32 l_mut_52;
+uint32 l_mut_53;
+uint32 l_mut_79;
+uint32 l_mut_126;
+uint32 l_mut_295;
+uint64 l_mut_47;
+uint64 l_mut_48;
+uint64 l_mut_49;
+uint64 l_mut_50;
+uint64 l_mut_51;
+uint64 l_mut_73;
+uint64 l_mut_135;
+uint64 l_mut_146;
+int32 l_mut_257;
+int32 l_mut_267;
+int32 l_mut_445;
+bool l_mut_45;
+bool l_mut_46;
+bool l_mut_154;
+const uint32 l_0 = uint32(1) << info.scalars_uint32[7];
+const uint32 l_1 = l_0 - uint32(1);
+const uint32 l_2 = absoluteIdx.x & l_1;
+const uint32 l_3 = gridDim.x * blockDim.x;
+const uint32 l_4 = l_3 >> info.scalars_uint32[7];
+const uint64 l_5 = uint64(info.scalars_uint32[1]);
+const uint64 l_6 = l_5 << uint64(32);
+const uint64 l_7 = uint64(info.scalars_uint32[0]);
+const uint64 l_8 = l_6 | l_7;
+const uint64 l_9 = uint64(info.scalars_uint32[3]);
+const uint64 l_10 = l_9 << uint64(32);
+const uint64 l_11 = uint64(info.scalars_uint32[2]);
+const uint64 l_12 = l_10 | l_11;
+const uint32 l_14 = threadIdx.x * uint32(7);
+l_mut_16 = uint32(0);
+l_mut_17 = uint32(0);
+l_mut_18 = threadIdx.x;
+while (true) {
+const bool l_19 = l_mut_18 < uint32(4);
+const bool l_20 = !l_19;
+if (l_20) {
+break;}
+uint32* l_21 = &shared_memory_15[l_mut_18];
+uint32 _tmp_0 = atomicExch(l_21, uint32(0));
+l_mut_18 = l_mut_18 + blockDim.x;
+}
+__syncthreads();
+
+const uint32 l_24 = uint32(1) << uint32(idxGlobal) % warpSize;
+const uint32 l_25 = l_24 - uint32(1);
+
+const uint32_4 l_26 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_27 = l_26.i_0;
+const uint32 l_28 = l_27 & l_25;
+const uint32 l_29 = uint32(__popc(l_28));
+l_mut_18 = l_29;
+const uint32 l_30 = uint32(__popc(l_27));
+l_mut_31 = l_30;
+const uint32 l_32 = l_27 - uint32(1);
+const uint32 l_33 = l_27 ^ l_32;
+const uint32 l_34 = uint32(__popc(l_33));
+const uint32 l_35 = l_34 - uint32(1);
+l_mut_36 = uint32(0);
+const bool l_37 = l_mut_18 == uint32(0);
+if (l_37) {
+const uint32 l_38 = uint32(2) * l_mut_31;
+uint32* l_39 = &shared_memory_15[uint32(0)];
+const uint32 l_40 = atomicAdd(l_39, l_38);
+l_mut_36 = l_40;
+}
+const uint32 l_41 = { __shfl_sync(-1, l_mut_36, l_35) };
+const uint32 l_42 = absoluteIdx.x >> info.scalars_uint32[7];
+l_mut_43 = l_42;
+const bool l_44 = l_mut_43 < info.scalars_uint32[5];
+l_mut_45 = l_44;
+l_mut_46 = l_mut_45;
+l_mut_47 = uint64(0);
+l_mut_48 = uint64(0);
+l_mut_49 = uint64(0);
+l_mut_50 = uint64(0);
+l_mut_51 = uint64(0);
+l_mut_52 = uint32(0);
+l_mut_53 = uint32(0);
+while (true) {
+if (l_mut_46) {
+l_mut_46 = bool(false);
+const uint32 l_54 = uint32(2) * l_mut_43;
+const uint32 l_55 = buffer_1[l_54];
+const uint32 l_56 = uint32(2) * l_mut_43;
+const uint32 l_57 = l_56 + uint32(1);
+const uint32 l_58 = buffer_1[l_57];
+const uint64 l_59 = uint64(l_58);
+const uint64 l_60 = l_59 << uint64(32);
+const uint64 l_61 = uint64(l_55);
+const uint64 l_62 = l_60 | l_61;
+l_mut_47 = uint64(0);
+const uint32 l_63 = uint32(2) * l_mut_43;
+const uint32 l_64 = l_63 + uint32(1);
+const uint32 l_65 = buffer_6[l_64];
+const uint64 l_66 = uint64(l_65);
+const uint64 l_67 = l_66 << uint64(32);
+const uint32 l_68 = uint32(2) * l_mut_43;
+const uint32 l_69 = buffer_6[l_68];
+const uint64 l_70 = uint64(l_69);
+const uint64 l_71 = l_67 | l_70;
+l_mut_47 = l_71;
+const uint64 l_72 = l_8 + l_62;
+l_mut_73 = l_12;
+const bool l_74 = l_72 < l_8;
+if (l_74) {
+l_mut_73 = l_mut_73 + uint64(1);
+}
+const uint32 l_75 = buffer_2[l_mut_43];
+const uint64 l_76 = uint64(l_75);
+const uint64 l_77 = l_72 + l_76;
+l_mut_48 = l_77;
+l_mut_49 = l_mut_73;
+const bool l_78 = l_mut_48 < l_72;
+if (l_78) {
+l_mut_49 = l_mut_49 + uint64(1);
+}
+l_mut_79 = uint32(0);
+const uint32 l_80 = l_mut_79 << uint32(8);
+const uint32 l_81 = l_58 >> uint32(24);
+const uint32 l_82 = l_81 & uint32(255);
+const uint32 l_83 = l_80 | l_82;
+const uint32 l_84 = l_83 % uint32(6125000);
+l_mut_79 = l_84;
+const uint32 l_85 = l_mut_79 << uint32(8);
+const uint32 l_86 = l_58 >> uint32(16);
+const uint32 l_87 = l_86 & uint32(255);
+const uint32 l_88 = l_85 | l_87;
+const uint32 l_89 = l_88 % uint32(6125000);
+l_mut_79 = l_89;
+const uint32 l_90 = l_mut_79 << uint32(8);
+const uint32 l_91 = l_58 >> uint32(8);
+const uint32 l_92 = l_91 & uint32(255);
+const uint32 l_93 = l_90 | l_92;
+const uint32 l_94 = l_93 % uint32(6125000);
+l_mut_79 = l_94;
+const uint32 l_95 = l_mut_79 << uint32(8);
+const uint32 l_96 = l_58 >> uint32(0);
+const uint32 l_97 = l_96 & uint32(255);
+const uint32 l_98 = l_95 | l_97;
+const uint32 l_99 = l_98 % uint32(6125000);
+l_mut_79 = l_99;
+const uint32 l_100 = l_mut_79 << uint32(8);
+const uint32 l_101 = l_55 >> uint32(24);
+const uint32 l_102 = l_101 & uint32(255);
+const uint32 l_103 = l_100 | l_102;
+const uint32 l_104 = l_103 % uint32(6125000);
+l_mut_79 = l_104;
+const uint32 l_105 = l_mut_79 << uint32(8);
+const uint32 l_106 = l_55 >> uint32(16);
+const uint32 l_107 = l_106 & uint32(255);
+const uint32 l_108 = l_105 | l_107;
+const uint32 l_109 = l_108 % uint32(6125000);
+l_mut_79 = l_109;
+const uint32 l_110 = l_mut_79 << uint32(8);
+const uint32 l_111 = l_55 >> uint32(8);
+const uint32 l_112 = l_111 & uint32(255);
+const uint32 l_113 = l_110 | l_112;
+const uint32 l_114 = l_113 % uint32(6125000);
+l_mut_79 = l_114;
+const uint32 l_115 = l_mut_79 << uint32(8);
+const uint32 l_116 = l_55 >> uint32(0);
+const uint32 l_117 = l_116 & uint32(255);
+const uint32 l_118 = l_115 | l_117;
+const uint32 l_119 = l_118 % uint32(6125000);
+l_mut_79 = l_119;
+const uint32 l_120 = info.scalars_uint32[4] + l_mut_79;
+const uint32 l_121 = l_120 % uint32(6125000);
+const uint64 l_122 = uint64(l_121);
+const uint64 l_123 = l_72 - l_122;
+l_mut_50 = l_123;
+l_mut_51 = l_mut_73;
+const uint64 l_124 = uint64(l_121);
+const bool l_125 = l_72 < l_124;
+if (l_125) {
+l_mut_51 = l_mut_51 - uint64(1);
+}
+l_mut_79 = uint32(0);
+l_mut_126 = uint32(568272);
+while (true) {
+const bool l_127 = l_mut_79 < l_mut_126;
+const bool l_128 = !l_127;
+if (l_128) {
+break;}
+const uint32 l_129 = l_mut_79 + l_mut_126;
+const uint32 l_130 = l_129 >> uint32(1);
+const uint32 l_131 = buffer_0[l_130];
+const bool l_132 = l_131 < l_121;
+if (l_132) {
+const uint32 l_133 = l_130 + uint32(1);
+l_mut_79 = l_133;
+} else {
+l_mut_126 = l_130;
+}
+}
+const uint32 l_134 = l_mut_79 + l_2;
+l_mut_52 = l_134;
+}
+l_mut_126 = uint32(0);
+l_mut_73 = uint64(0);
+l_mut_135 = uint64(0);
+if (l_mut_45) {
+const uint32 l_136 = l_mut_52 / uint32(568272);
+const uint32 l_137 = l_136 * uint32(568272);
+const uint32 l_138 = l_mut_52 - l_137;
+const uint64 l_139 = uint64(l_136);
+const uint64 l_140 = uint64(uint32(6125000));
+const uint64 l_141 = l_139 * l_140;
+const uint32 l_142 = buffer_0[l_138];
+const uint64 l_143 = uint64(l_142);
+const uint64 l_144 = l_141 + l_143;
+const uint64 l_145 = l_mut_50 + l_144;
+l_mut_146 = l_mut_51;
+const bool l_147 = l_145 < l_mut_50;
+if (l_147) {
+l_mut_146 = l_mut_146 + uint64(1);
+}
+const bool l_148 = l_mut_146 > l_mut_49;
+const bool l_149 = l_mut_146 == l_mut_49;
+const bool l_150 = l_145 >= l_mut_48;
+const bool l_151 = l_149 && l_150;
+const bool l_152 = l_148 || l_151;
+if (l_152) {
+l_mut_43 = l_mut_43 + l_4;
+const bool l_153 = l_mut_43 < info.scalars_uint32[5];
+if (l_153) {
+l_mut_46 = bool(true);
+} else {
+l_mut_45 = bool(false);
+}
+} else {
+l_mut_154 = bool(false);
+const uint32 l_155 = uint32(2) * l_138;
+const uint32 l_156 = l_155 + uint32(1);
+const uint32 l_157 = buffer_5[l_156];
+const uint64 l_158 = uint64(l_157);
+const uint64 l_159 = l_158 << uint64(32);
+const uint32 l_160 = uint32(2) * l_138;
+const uint32 l_161 = buffer_5[l_160];
+const uint64 l_162 = uint64(l_161);
+const uint64 l_163 = l_159 | l_162;
+const uint64 l_164 = l_163 & l_mut_47;
+const bool l_165 = l_164 != uint64(0);
+if (l_165) {
+l_mut_154 = bool(true);
+}
+const bool l_166 = !l_mut_154;
+if (l_166) {
+l_mut_126 = uint32(1);
+l_mut_73 = l_145;
+l_mut_135 = l_mut_146;
+}
+l_mut_52 = l_mut_52 + l_0;
+}
+}
+const uint32 l_167 = l_mut_126 | uint32(65536);
+const bool l_168 = l_mut_126 != uint32(0);
+
+const uint32_4 l_169 = { __ballot_sync(-1, l_168), 0, 0, 0 };
+const uint32 l_170 = l_169.i_0;
+
+const uint32_4 l_171 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_172 = l_171.i_0;
+const uint32 l_173 = l_170 & l_25;
+const uint32 l_174 = uint32(__popc(l_173));
+const uint32 l_175 = uint32(__popc(l_170));
+const uint32 l_176 = l_172 & l_25;
+const uint32 l_177 = uint32(__popc(l_176));
+l_mut_18 = l_177;
+const uint32 l_178 = uint32(__popc(l_172));
+l_mut_31 = l_178;
+const bool l_179 = !l_mut_45;
+const bool l_180 = { __all_sync(-1, l_179)};
+const bool l_181 = l_mut_126 != uint32(0);
+if (l_181) {
+const uint32 l_182 = l_41 + l_mut_53;
+const uint32 l_183 = l_182 + l_174;
+shared_memory_22[l_183] = l_mut_73;
+shared_memory_23[l_183] = l_mut_135;
+l_mut_16 = l_mut_16 + uint32(1);
+const uint32 l_184 = uint32(l_mut_73);
+l_mut_17 = l_mut_17 + l_184;
+}
+l_mut_53 = l_mut_53 + l_175;
+__syncwarp();
+
+l_mut_126 = uint32(0);
+const bool l_185 = l_mut_53 >= l_mut_31;
+if (l_185) {
+l_mut_126 = l_mut_31;
+} else {
+if (l_180) {
+l_mut_126 = l_mut_53;
+}
+}
+const uint32 l_186 = l_41 + l_mut_53;
+const uint32 l_187 = l_186 - l_mut_126;
+const uint32 l_188 = l_187 + l_mut_18;
+const bool l_189 = l_mut_18 < l_mut_126;
+l_mut_154 = bool(true);
+const bool l_190 = l_188 != l_41;
+l_mut_154 = l_190;
+const bool l_191 = l_189 && l_mut_154;
+if (l_191) {
+l_mut_16 = l_mut_16 - uint32(1);
+const uint64 l_192 = shared_memory_22[l_188];
+const uint32 l_193 = uint32(l_192);
+l_mut_17 = l_mut_17 - l_193;
+const uint64 l_194 = shared_memory_22[l_188];
+const uint64 l_195 = shared_memory_23[l_188];
+l_mut_154 = bool(true);
+l_mut_146 = uint64(0);
+l_mut_135 = uint64(0);
+const bool l_196 = l_mut_154 && bool(true);
+if (l_196) {
+const uint64 l_198 = l_194 >> uint64(0);
+const uint32 l_199 = uint32(l_198);
+l_arr_197[uint32(0)] = l_199;
+const uint64 l_200 = l_194 >> uint64(32);
+const uint32 l_201 = uint32(l_200);
+l_arr_197[uint32(1)] = l_201;
+l_arr_202[uint32(0)] = uint32(0);
+l_arr_202[uint32(1)] = uint32(0);
+l_arr_202[uint32(2)] = uint32(0);
+l_arr_202[uint32(3)] = uint32(0);
+l_mut_73 = uint64(0);
+const uint32 l_203 = l_arr_197[uint32(0)];
+const uint64 l_204 = uint64(l_203);
+const uint32 l_205 = l_arr_197[uint32(0)];
+const uint64 l_206 = uint64(l_205);
+const uint64 l_207 = l_204 * l_206;
+const uint32 l_208 = l_arr_202[uint32(0)];
+const uint64 l_209 = uint64(l_208);
+const uint64 l_210 = l_207 + l_209;
+const uint64 l_211 = l_210 + l_mut_73;
+const uint32 l_212 = uint32(l_211);
+l_arr_202[uint32(0)] = l_212;
+const uint64 l_213 = l_211 >> uint64(32);
+l_mut_73 = l_213;
+const uint32 l_214 = l_arr_197[uint32(0)];
+const uint64 l_215 = uint64(l_214);
+const uint32 l_216 = l_arr_197[uint32(1)];
+const uint64 l_217 = uint64(l_216);
+const uint64 l_218 = l_215 * l_217;
+const uint32 l_219 = l_arr_202[uint32(1)];
+const uint64 l_220 = uint64(l_219);
+const uint64 l_221 = l_218 + l_220;
+const uint64 l_222 = l_221 + l_mut_73;
+const uint32 l_223 = uint32(l_222);
+l_arr_202[uint32(1)] = l_223;
+const uint64 l_224 = l_222 >> uint64(32);
+l_mut_73 = l_224;
+const uint32 l_225 = uint32(l_mut_73);
+l_arr_202[uint32(2)] = l_225;
+l_mut_73 = uint64(0);
+const uint32 l_226 = l_arr_197[uint32(1)];
+const uint64 l_227 = uint64(l_226);
+const uint32 l_228 = l_arr_197[uint32(0)];
+const uint64 l_229 = uint64(l_228);
+const uint64 l_230 = l_227 * l_229;
+const uint32 l_231 = l_arr_202[uint32(1)];
+const uint64 l_232 = uint64(l_231);
+const uint64 l_233 = l_230 + l_232;
+const uint64 l_234 = l_233 + l_mut_73;
+const uint32 l_235 = uint32(l_234);
+l_arr_202[uint32(1)] = l_235;
+const uint64 l_236 = l_234 >> uint64(32);
+l_mut_73 = l_236;
+const uint32 l_237 = l_arr_197[uint32(1)];
+const uint64 l_238 = uint64(l_237);
+const uint32 l_239 = l_arr_197[uint32(1)];
+const uint64 l_240 = uint64(l_239);
+const uint64 l_241 = l_238 * l_240;
+const uint32 l_242 = l_arr_202[uint32(2)];
+const uint64 l_243 = uint64(l_242);
+const uint64 l_244 = l_241 + l_243;
+const uint64 l_245 = l_244 + l_mut_73;
+const uint32 l_246 = uint32(l_245);
+l_arr_202[uint32(2)] = l_246;
+const uint64 l_247 = l_245 >> uint64(32);
+l_mut_73 = l_247;
+const uint32 l_248 = uint32(l_mut_73);
+l_arr_202[uint32(3)] = l_248;
+const uint32 l_249 = l_14 + uint32(0);
+const uint32 l_250 = l_arr_202[uint32(0)];
+shared_memory_13[l_249] = l_250;
+const uint32 l_251 = l_14 + uint32(1);
+const uint32 l_252 = l_arr_202[uint32(1)];
+shared_memory_13[l_251] = l_252;
+const uint32 l_253 = l_14 + uint32(2);
+const uint32 l_254 = l_arr_202[uint32(2)];
+shared_memory_13[l_253] = l_254;
+const uint32 l_255 = l_14 + uint32(3);
+const uint32 l_256 = l_arr_202[uint32(3)];
+shared_memory_13[l_255] = l_256;
+l_mut_257 = int32(3);
+while (true) {
+const bool l_258 = l_mut_257 >= int32(0);
+const bool l_259 = !l_258;
+if (l_259) {
+break;}
+const uint32 l_260 = uint32(l_mut_257);
+const uint32 l_261 = l_14 + l_260;
+const uint32 l_262 = shared_memory_13[l_261];
+const bool l_263 = l_262 != uint32(0);
+if (l_263) {
+break;}
+l_mut_257 = l_mut_257 - int32(1);
+}
+while (true) {
+const bool l_264 = l_mut_257 >= int32(0);
+const bool l_265 = l_264 && l_mut_154;
+const bool l_266 = !l_265;
+if (l_266) {
+break;}
+l_mut_79 = uint32(0);
+l_mut_267 = l_mut_257;
+while (true) {
+const bool l_268 = l_mut_267 >= int32(0);
+const bool l_269 = !l_268;
+if (l_269) {
+break;}
+const uint32 l_270 = uint32(l_mut_267);
+const uint32 l_271 = l_14 + l_270;
+const uint32 l_272 = shared_memory_13[l_271];
+const uint32 l_273 = l_mut_79 << uint32(16);
+const uint32 l_274 = l_272 >> uint32(16);
+const uint32 l_275 = l_273 | l_274;
+const uint32 l_276 = l_275 / uint32(2500);
+const uint32 l_277 = l_276 * uint32(2500);
+const uint32 l_278 = l_275 - l_277;
+const uint32 l_279 = l_278 << uint32(16);
+const uint32 l_280 = l_272 & uint32(65535);
+const uint32 l_281 = l_279 | l_280;
+const uint32 l_282 = l_281 / uint32(2500);
+const uint32 l_283 = l_282 * uint32(2500);
+const uint32 l_284 = l_281 - l_283;
+l_mut_79 = l_284;
+const uint32 l_285 = uint32(l_mut_267);
+const uint32 l_286 = l_14 + l_285;
+const uint32 l_287 = l_276 << uint32(16);
+const uint32 l_288 = l_287 | l_282;
+shared_memory_13[l_286] = l_288;
+l_mut_267 = l_mut_267 - int32(1);
+}
+while (true) {
+const bool l_289 = l_mut_257 >= int32(0);
+const bool l_290 = !l_289;
+if (l_290) {
+break;}
+const uint32 l_291 = uint32(l_mut_257);
+const uint32 l_292 = l_14 + l_291;
+const uint32 l_293 = shared_memory_13[l_292];
+const bool l_294 = l_293 != uint32(0);
+if (l_294) {
+break;}
+l_mut_257 = l_mut_257 - int32(1);
+}
+l_mut_295 = l_mut_79;
+l_mut_73 = uint64(0);
+const bool l_296 = l_mut_257 >= int32(0);
+if (l_296) {
+const uint32 l_297 = l_mut_295 / uint32(50);
+const uint32 l_298 = l_297 * uint32(50);
+const uint32 l_299 = l_mut_295 - l_298;
+l_mut_295 = l_297;
+const uint64 l_300 = uint64(l_299);
+const uint64 l_301 = uint64(1) << l_300;
+const uint64 l_302 = l_mut_146 & l_301;
+l_mut_73 = l_mut_73 | l_302;
+l_mut_146 = l_mut_146 | l_301;
+const uint32 l_303 = l_mut_295 / uint32(50);
+const uint32 l_304 = l_303 * uint32(50);
+const uint32 l_305 = l_mut_295 - l_304;
+l_mut_295 = l_303;
+const uint64 l_306 = uint64(l_305);
+const uint64 l_307 = uint64(1) << l_306;
+const uint64 l_308 = l_mut_146 & l_307;
+l_mut_73 = l_mut_73 | l_308;
+l_mut_146 = l_mut_146 | l_307;
+} else {
+while (true) {
+const bool l_309 = l_mut_295 != uint32(0);
+const bool l_310 = !l_309;
+if (l_310) {
+break;}
+const uint32 l_311 = l_mut_295 / uint32(50);
+const uint32 l_312 = l_311 * uint32(50);
+const uint32 l_313 = l_mut_295 - l_312;
+l_mut_295 = l_311;
+const uint64 l_314 = uint64(l_313);
+const uint64 l_315 = uint64(1) << l_314;
+const uint64 l_316 = l_mut_146 & l_315;
+l_mut_73 = l_mut_73 | l_316;
+l_mut_146 = l_mut_146 | l_315;
+}
+}
+const bool l_317 = l_mut_73 != uint64(0);
+if (l_317) {
+l_mut_154 = bool(false);
+}
+}
+if (l_mut_154) {
+const uint32 l_318 = l_14 + uint32(0);
+shared_memory_13[l_318] = uint32(0);
+const uint32 l_319 = l_14 + uint32(1);
+shared_memory_13[l_319] = uint32(0);
+const uint32 l_320 = l_14 + uint32(2);
+shared_memory_13[l_320] = uint32(0);
+const uint32 l_321 = l_14 + uint32(3);
+shared_memory_13[l_321] = uint32(0);
+const uint32 l_322 = l_14 + uint32(4);
+shared_memory_13[l_322] = uint32(0);
+const uint32 l_323 = l_14 + uint32(5);
+shared_memory_13[l_323] = uint32(0);
+l_mut_73 = uint64(0);
+const uint32 l_324 = l_arr_202[uint32(0)];
+const uint64 l_325 = uint64(l_324);
+const uint32 l_326 = l_arr_197[uint32(0)];
+const uint64 l_327 = uint64(l_326);
+const uint64 l_328 = l_325 * l_327;
+const uint32 l_329 = l_14 + uint32(0);
+const uint32 l_330 = shared_memory_13[l_329];
+const uint64 l_331 = uint64(l_330);
+const uint64 l_332 = l_328 + l_331;
+const uint64 l_333 = l_332 + l_mut_73;
+const uint32 l_334 = l_14 + uint32(0);
+const uint32 l_335 = uint32(l_333);
+shared_memory_13[l_334] = l_335;
+const uint64 l_336 = l_333 >> uint64(32);
+l_mut_73 = l_336;
+const uint32 l_337 = l_arr_202[uint32(0)];
+const uint64 l_338 = uint64(l_337);
+const uint32 l_339 = l_arr_197[uint32(1)];
+const uint64 l_340 = uint64(l_339);
+const uint64 l_341 = l_338 * l_340;
+const uint32 l_342 = l_14 + uint32(1);
+const uint32 l_343 = shared_memory_13[l_342];
+const uint64 l_344 = uint64(l_343);
+const uint64 l_345 = l_341 + l_344;
+const uint64 l_346 = l_345 + l_mut_73;
+const uint32 l_347 = l_14 + uint32(1);
+const uint32 l_348 = uint32(l_346);
+shared_memory_13[l_347] = l_348;
+const uint64 l_349 = l_346 >> uint64(32);
+l_mut_73 = l_349;
+const uint32 l_350 = l_14 + uint32(2);
+const uint32 l_351 = uint32(l_mut_73);
+shared_memory_13[l_350] = l_351;
+l_mut_73 = uint64(0);
+const uint32 l_352 = l_arr_202[uint32(1)];
+const uint64 l_353 = uint64(l_352);
+const uint32 l_354 = l_arr_197[uint32(0)];
+const uint64 l_355 = uint64(l_354);
+const uint64 l_356 = l_353 * l_355;
+const uint32 l_357 = l_14 + uint32(1);
+const uint32 l_358 = shared_memory_13[l_357];
+const uint64 l_359 = uint64(l_358);
+const uint64 l_360 = l_356 + l_359;
+const uint64 l_361 = l_360 + l_mut_73;
+const uint32 l_362 = l_14 + uint32(1);
+const uint32 l_363 = uint32(l_361);
+shared_memory_13[l_362] = l_363;
+const uint64 l_364 = l_361 >> uint64(32);
+l_mut_73 = l_364;
+const uint32 l_365 = l_arr_202[uint32(1)];
+const uint64 l_366 = uint64(l_365);
+const uint32 l_367 = l_arr_197[uint32(1)];
+const uint64 l_368 = uint64(l_367);
+const uint64 l_369 = l_366 * l_368;
+const uint32 l_370 = l_14 + uint32(2);
+const uint32 l_371 = shared_memory_13[l_370];
+const uint64 l_372 = uint64(l_371);
+const uint64 l_373 = l_369 + l_372;
+const uint64 l_374 = l_373 + l_mut_73;
+const uint32 l_375 = l_14 + uint32(2);
+const uint32 l_376 = uint32(l_374);
+shared_memory_13[l_375] = l_376;
+const uint64 l_377 = l_374 >> uint64(32);
+l_mut_73 = l_377;
+const uint32 l_378 = l_14 + uint32(3);
+const uint32 l_379 = uint32(l_mut_73);
+shared_memory_13[l_378] = l_379;
+l_mut_73 = uint64(0);
+const uint32 l_380 = l_arr_202[uint32(2)];
+const uint64 l_381 = uint64(l_380);
+const uint32 l_382 = l_arr_197[uint32(0)];
+const uint64 l_383 = uint64(l_382);
+const uint64 l_384 = l_381 * l_383;
+const uint32 l_385 = l_14 + uint32(2);
+const uint32 l_386 = shared_memory_13[l_385];
+const uint64 l_387 = uint64(l_386);
+const uint64 l_388 = l_384 + l_387;
+const uint64 l_389 = l_388 + l_mut_73;
+const uint32 l_390 = l_14 + uint32(2);
+const uint32 l_391 = uint32(l_389);
+shared_memory_13[l_390] = l_391;
+const uint64 l_392 = l_389 >> uint64(32);
+l_mut_73 = l_392;
+const uint32 l_393 = l_arr_202[uint32(2)];
+const uint64 l_394 = uint64(l_393);
+const uint32 l_395 = l_arr_197[uint32(1)];
+const uint64 l_396 = uint64(l_395);
+const uint64 l_397 = l_394 * l_396;
+const uint32 l_398 = l_14 + uint32(3);
+const uint32 l_399 = shared_memory_13[l_398];
+const uint64 l_400 = uint64(l_399);
+const uint64 l_401 = l_397 + l_400;
+const uint64 l_402 = l_401 + l_mut_73;
+const uint32 l_403 = l_14 + uint32(3);
+const uint32 l_404 = uint32(l_402);
+shared_memory_13[l_403] = l_404;
+const uint64 l_405 = l_402 >> uint64(32);
+l_mut_73 = l_405;
+const uint32 l_406 = l_14 + uint32(4);
+const uint32 l_407 = uint32(l_mut_73);
+shared_memory_13[l_406] = l_407;
+l_mut_73 = uint64(0);
+const uint32 l_408 = l_arr_202[uint32(3)];
+const uint64 l_409 = uint64(l_408);
+const uint32 l_410 = l_arr_197[uint32(0)];
+const uint64 l_411 = uint64(l_410);
+const uint64 l_412 = l_409 * l_411;
+const uint32 l_413 = l_14 + uint32(3);
+const uint32 l_414 = shared_memory_13[l_413];
+const uint64 l_415 = uint64(l_414);
+const uint64 l_416 = l_412 + l_415;
+const uint64 l_417 = l_416 + l_mut_73;
+const uint32 l_418 = l_14 + uint32(3);
+const uint32 l_419 = uint32(l_417);
+shared_memory_13[l_418] = l_419;
+const uint64 l_420 = l_417 >> uint64(32);
+l_mut_73 = l_420;
+const uint32 l_421 = l_arr_202[uint32(3)];
+const uint64 l_422 = uint64(l_421);
+const uint32 l_423 = l_arr_197[uint32(1)];
+const uint64 l_424 = uint64(l_423);
+const uint64 l_425 = l_422 * l_424;
+const uint32 l_426 = l_14 + uint32(4);
+const uint32 l_427 = shared_memory_13[l_426];
+const uint64 l_428 = uint64(l_427);
+const uint64 l_429 = l_425 + l_428;
+const uint64 l_430 = l_429 + l_mut_73;
+const uint32 l_431 = l_14 + uint32(4);
+const uint32 l_432 = uint32(l_430);
+shared_memory_13[l_431] = l_432;
+const uint64 l_433 = l_430 >> uint64(32);
+l_mut_73 = l_433;
+const uint32 l_434 = l_14 + uint32(5);
+const uint32 l_435 = uint32(l_mut_73);
+shared_memory_13[l_434] = l_435;
+l_mut_267 = int32(5);
+while (true) {
+const bool l_436 = l_mut_267 >= int32(0);
+const bool l_437 = !l_436;
+if (l_437) {
+break;}
+const uint32 l_438 = uint32(l_mut_267);
+const uint32 l_439 = l_14 + l_438;
+const uint32 l_440 = shared_memory_13[l_439];
+const bool l_441 = l_440 != uint32(0);
+if (l_441) {
+break;}
+l_mut_267 = l_mut_267 - int32(1);
+}
+while (true) {
+const bool l_442 = l_mut_267 >= int32(0);
+const bool l_443 = l_442 && l_mut_154;
+const bool l_444 = !l_443;
+if (l_444) {
+break;}
+l_mut_295 = uint32(0);
+l_mut_445 = l_mut_267;
+while (true) {
+const bool l_446 = l_mut_445 >= int32(0);
+const bool l_447 = !l_446;
+if (l_447) {
+break;}
+const uint32 l_448 = uint32(l_mut_445);
+const uint32 l_449 = l_14 + l_448;
+const uint32 l_450 = shared_memory_13[l_449];
+const uint32 l_451 = l_mut_295 << uint32(16);
+const uint32 l_452 = l_450 >> uint32(16);
+const uint32 l_453 = l_451 | l_452;
+const uint32 l_454 = l_453 / uint32(2500);
+const uint32 l_455 = l_454 * uint32(2500);
+const uint32 l_456 = l_453 - l_455;
+const uint32 l_457 = l_456 << uint32(16);
+const uint32 l_458 = l_450 & uint32(65535);
+const uint32 l_459 = l_457 | l_458;
+const uint32 l_460 = l_459 / uint32(2500);
+const uint32 l_461 = l_460 * uint32(2500);
+const uint32 l_462 = l_459 - l_461;
+l_mut_295 = l_462;
+const uint32 l_463 = uint32(l_mut_445);
+const uint32 l_464 = l_14 + l_463;
+const uint32 l_465 = l_454 << uint32(16);
+const uint32 l_466 = l_465 | l_460;
+shared_memory_13[l_464] = l_466;
+l_mut_445 = l_mut_445 - int32(1);
+}
+while (true) {
+const bool l_467 = l_mut_267 >= int32(0);
+const bool l_468 = !l_467;
+if (l_468) {
+break;}
+const uint32 l_469 = uint32(l_mut_267);
+const uint32 l_470 = l_14 + l_469;
+const uint32 l_471 = shared_memory_13[l_470];
+const bool l_472 = l_471 != uint32(0);
+if (l_472) {
+break;}
+l_mut_267 = l_mut_267 - int32(1);
+}
+l_mut_79 = l_mut_295;
+l_mut_73 = uint64(0);
+const bool l_473 = l_mut_267 >= int32(0);
+if (l_473) {
+const uint32 l_474 = l_mut_79 / uint32(50);
+const uint32 l_475 = l_474 * uint32(50);
+const uint32 l_476 = l_mut_79 - l_475;
+l_mut_79 = l_474;
+const uint64 l_477 = uint64(l_476);
+const uint64 l_478 = uint64(1) << l_477;
+const uint64 l_479 = l_mut_146 & l_478;
+l_mut_73 = l_mut_73 | l_479;
+l_mut_146 = l_mut_146 | l_478;
+const uint32 l_480 = l_mut_79 / uint32(50);
+const uint32 l_481 = l_480 * uint32(50);
+const uint32 l_482 = l_mut_79 - l_481;
+l_mut_79 = l_480;
+const uint64 l_483 = uint64(l_482);
+const uint64 l_484 = uint64(1) << l_483;
+const uint64 l_485 = l_mut_146 & l_484;
+l_mut_73 = l_mut_73 | l_485;
+l_mut_146 = l_mut_146 | l_484;
+} else {
+while (true) {
+const bool l_486 = l_mut_79 != uint32(0);
+const bool l_487 = !l_486;
+if (l_487) {
+break;}
+const uint32 l_488 = l_mut_79 / uint32(50);
+const uint32 l_489 = l_488 * uint32(50);
+const uint32 l_490 = l_mut_79 - l_489;
+l_mut_79 = l_488;
+const uint64 l_491 = uint64(l_490);
+const uint64 l_492 = uint64(1) << l_491;
+const uint64 l_493 = l_mut_146 & l_492;
+l_mut_73 = l_mut_73 | l_493;
+l_mut_146 = l_mut_146 | l_492;
+}
+}
+const bool l_494 = l_mut_73 != uint64(0);
+if (l_494) {
+l_mut_154 = bool(false);
+}
+}
+}
+}
+if (l_mut_154) {
+const uint32 l_495 = uint32(l_mut_146);
+const uint32 l_496 = uint32(__popc(l_495));
+const uint64 l_497 = l_mut_146 >> uint64(32);
+const uint32 l_498 = uint32(l_497);
+const uint32 l_499 = uint32(__popc(l_498));
+const uint32 l_500 = l_496 + l_499;
+l_mut_295 = l_500;
+const bool l_501 = l_mut_295 == uint32(50);
+const bool l_502 = bool(false) || l_501;
+if (l_502) {
+uint32* l_503 = &buffer_4[uint32(0)];
+const uint32 l_504 = atomicAdd(l_503, uint32(1));
+const bool l_505 = l_504 < info.scalars_uint32[6];
+if (l_505) {
+const uint32 l_506 = uint32(4) * l_504;
+const uint32 l_507 = uint32(l_194);
+buffer_3[l_506] = l_507;
+const uint32 l_508 = l_506 + uint32(1);
+const uint64 l_509 = l_194 >> uint64(32);
+const uint32 l_510 = uint32(l_509);
+buffer_3[l_508] = l_510;
+const uint32 l_511 = l_506 + uint32(2);
+const uint32 l_512 = uint32(l_195);
+buffer_3[l_511] = l_512;
+const uint32 l_513 = l_506 + uint32(3);
+const uint64 l_514 = l_195 >> uint64(32);
+const uint32 l_515 = uint32(l_514);
+buffer_3[l_513] = l_515;
+}
+}
+}
+}
+l_mut_53 = l_mut_53 - l_mut_126;
+__syncwarp();
+
+const bool l_516 = l_mut_53 == uint32(0);
+const bool l_517 = l_180 && l_516;
+if (l_517) {
+break;}
+}
+const bool l_518 = l_mut_16 != uint32(0);
+const bool l_519 = l_mut_17 != uint32(0);
+const bool l_520 = l_518 || l_519;
+if (l_520) {
+uint32* l_521 = &shared_memory_15[uint32(2)];
+const uint32 l_522 = atomicAdd(l_521, l_mut_16);
+uint32* l_523 = &shared_memory_15[uint32(3)];
+const uint32 l_524 = atomicAdd(l_523, l_mut_17);
+}
+__syncthreads();
+
+const bool l_525 = threadIdx.x == uint32(0);
+if (l_525) {
+uint32* l_526 = &shared_memory_15[uint32(2)];
+const uint32 l_527 = atomicAdd(l_526, uint32(0));
+uint32* l_528 = &shared_memory_15[uint32(3)];
+const uint32 l_529 = atomicAdd(l_528, uint32(0));
+const bool l_530 = l_527 != uint32(0);
+const bool l_531 = l_529 != uint32(0);
+const bool l_532 = l_530 || l_531;
+if (l_532) {
+uint32* l_533 = &buffer_4[uint32(1)];
+const uint32 l_534 = atomicAdd(l_533, l_527);
+uint32* l_535 = &buffer_4[uint32(2)];
+const uint32 l_536 = atomicAdd(l_535, l_529);
+}
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 256,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: NiceonlyKernelInfo {
+        base: 50,
+        limbs: 2,
+        chunk_digits: 2,
+        chunk_div: 2500,
+        wide_chunk: false,
+        stride_m: 6125000,
+        stride_r: 568272,
+        offset_chunk_bits: 8,
+        pre_limbs: 0,
+        pre_chunk_digits: 0,
+        pre_chunk_div: 0,
+        probe: false,
+        cross: true,
+        compact: true,
+        plane_scoped: true,
+        ballot: true,
+        test_bits: 2,
+        residues: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_offsets: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_lens: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_out: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        low_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        fs0: (),
+        fs1: (),
+        fs2: (),
+        fs3: (),
+        fs_mod_m: (),
+        num_ranges: (),
+        nice_cap: (),
+        lane_shift: (),
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct __align__(16) uint32_4 {
+    uint32 i_0;
+    uint32 i_1;
+    uint32 i_2;
+    uint32 i_3;
+};
+struct info_st {
+    uint32 scalars_uint32[8];uint32 static_meta[14];
+};
+
+
+extern "C" __global__ void __launch_bounds__(256)niceonly_kernel (
+    const uint32* __restrict__ buffer_0, const uint32* __restrict__ buffer_1, const uint32* __restrict__ buffer_2, uint32* buffer_3, uint32* buffer_4, const uint32* __restrict__ buffer_5, const uint32* __restrict__ buffer_6, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+uint32 idxGlobal = (
+                absoluteIdx.z * gridDim.x * blockDim.x * gridDim.y * blockDim.y)
+                + (absoluteIdx.y * gridDim.x * blockDim.x)
+                + absoluteIdx.x;
+uint32 warpSizeChecked = min(warpSize, blockDim.x * blockDim.y * blockDim.z);
+extern __shared__ __align__(8) uint8 dynamic_shared_mem[];
+// Shared array size: 4, 16 bytes
+uint32 *shared_memory_15 = reinterpret_cast<uint32*>(&dynamic_shared_mem[0]);
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_23 = reinterpret_cast<uint64*>(&dynamic_shared_mem[7184]);
+// Shared array size: 1792, 7168 bytes
+uint32 *shared_memory_13 = reinterpret_cast<uint32*>(&dynamic_shared_mem[16]);
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_22 = reinterpret_cast<uint64*>(&dynamic_shared_mem[11280]);
+uint32 l_arr_198[2];
+
+uint32 l_arr_203[4];
+
+bool l_mut_45;
+bool l_mut_46;
+bool l_mut_154;
+int32 l_mut_258;
+int32 l_mut_268;
+int32 l_mut_446;
+uint32 l_mut_16;
+uint32 l_mut_17;
+uint32 l_mut_18;
+uint32 l_mut_31;
+uint32 l_mut_36;
+uint32 l_mut_43;
+uint32 l_mut_52;
+uint32 l_mut_53;
+uint32 l_mut_79;
+uint32 l_mut_126;
+uint32 l_mut_296;
+uint64 l_mut_47;
+uint64 l_mut_48;
+uint64 l_mut_49;
+uint64 l_mut_50;
+uint64 l_mut_51;
+uint64 l_mut_73;
+uint64 l_mut_135;
+uint64 l_mut_146;
+const uint32 l_0 = uint32(1) << info.scalars_uint32[7];
+const uint32 l_1 = l_0 - uint32(1);
+const uint32 l_2 = absoluteIdx.x & l_1;
+const uint32 l_3 = gridDim.x * blockDim.x;
+const uint32 l_4 = l_3 >> info.scalars_uint32[7];
+const uint64 l_5 = uint64(info.scalars_uint32[1]);
+const uint64 l_6 = l_5 << uint64(32);
+const uint64 l_7 = uint64(info.scalars_uint32[0]);
+const uint64 l_8 = l_6 | l_7;
+const uint64 l_9 = uint64(info.scalars_uint32[3]);
+const uint64 l_10 = l_9 << uint64(32);
+const uint64 l_11 = uint64(info.scalars_uint32[2]);
+const uint64 l_12 = l_10 | l_11;
+const uint32 l_14 = threadIdx.x * uint32(7);
+l_mut_16 = uint32(0);
+l_mut_17 = uint32(0);
+l_mut_18 = threadIdx.x;
+while (true) {
+const bool l_19 = l_mut_18 < uint32(4);
+const bool l_20 = !l_19;
+if (l_20) {
+break;}
+uint32* l_21 = &shared_memory_15[l_mut_18];
+uint32 _tmp_0 = atomicExch(l_21, uint32(0));
+l_mut_18 = l_mut_18 + blockDim.x;
+}
+__syncthreads();
+
+const uint32 l_24 = uint32(1) << uint32(idxGlobal) % warpSize;
+const uint32 l_25 = l_24 - uint32(1);
+
+const uint32_4 l_26 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_27 = l_26.i_0;
+const uint32 l_28 = l_27 & l_25;
+const uint32 l_29 = uint32(__popc(l_28));
+l_mut_18 = l_29;
+const uint32 l_30 = uint32(__popc(l_27));
+l_mut_31 = l_30;
+const uint32 l_32 = l_27 - uint32(1);
+const uint32 l_33 = l_27 ^ l_32;
+const uint32 l_34 = uint32(__popc(l_33));
+const uint32 l_35 = l_34 - uint32(1);
+l_mut_36 = uint32(0);
+const bool l_37 = l_mut_18 == uint32(0);
+if (l_37) {
+const uint32 l_38 = uint32(2) * l_mut_31;
+uint32* l_39 = &shared_memory_15[uint32(0)];
+const uint32 l_40 = atomicAdd(l_39, l_38);
+l_mut_36 = l_40;
+}
+const uint32 l_41 = { __shfl_sync(-1, l_mut_36, l_35) };
+const uint32 l_42 = absoluteIdx.x >> info.scalars_uint32[7];
+l_mut_43 = l_42;
+const bool l_44 = l_mut_43 < info.scalars_uint32[5];
+l_mut_45 = l_44;
+l_mut_46 = l_mut_45;
+l_mut_47 = uint64(0);
+l_mut_48 = uint64(0);
+l_mut_49 = uint64(0);
+l_mut_50 = uint64(0);
+l_mut_51 = uint64(0);
+l_mut_52 = uint32(0);
+l_mut_53 = uint32(0);
+while (true) {
+if (l_mut_46) {
+l_mut_46 = bool(false);
+const uint32 l_54 = uint32(2) * l_mut_43;
+const uint32 l_55 = buffer_1[l_54];
+const uint32 l_56 = uint32(2) * l_mut_43;
+const uint32 l_57 = l_56 + uint32(1);
+const uint32 l_58 = buffer_1[l_57];
+const uint64 l_59 = uint64(l_58);
+const uint64 l_60 = l_59 << uint64(32);
+const uint64 l_61 = uint64(l_55);
+const uint64 l_62 = l_60 | l_61;
+l_mut_47 = uint64(0);
+const uint32 l_63 = uint32(2) * l_mut_43;
+const uint32 l_64 = l_63 + uint32(1);
+const uint32 l_65 = buffer_6[l_64];
+const uint64 l_66 = uint64(l_65);
+const uint64 l_67 = l_66 << uint64(32);
+const uint32 l_68 = uint32(2) * l_mut_43;
+const uint32 l_69 = buffer_6[l_68];
+const uint64 l_70 = uint64(l_69);
+const uint64 l_71 = l_67 | l_70;
+l_mut_47 = l_71;
+const uint64 l_72 = l_8 + l_62;
+l_mut_73 = l_12;
+const bool l_74 = l_72 < l_8;
+if (l_74) {
+l_mut_73 = l_mut_73 + uint64(1);
+}
+const uint32 l_75 = buffer_2[l_mut_43];
+const uint64 l_76 = uint64(l_75);
+const uint64 l_77 = l_72 + l_76;
+l_mut_48 = l_77;
+l_mut_49 = l_mut_73;
+const bool l_78 = l_mut_48 < l_72;
+if (l_78) {
+l_mut_49 = l_mut_49 + uint64(1);
+}
+l_mut_79 = uint32(0);
+const uint32 l_80 = l_mut_79 << uint32(8);
+const uint32 l_81 = l_58 >> uint32(24);
+const uint32 l_82 = l_81 & uint32(255);
+const uint32 l_83 = l_80 | l_82;
+const uint32 l_84 = l_83 % uint32(6125000);
+l_mut_79 = l_84;
+const uint32 l_85 = l_mut_79 << uint32(8);
+const uint32 l_86 = l_58 >> uint32(16);
+const uint32 l_87 = l_86 & uint32(255);
+const uint32 l_88 = l_85 | l_87;
+const uint32 l_89 = l_88 % uint32(6125000);
+l_mut_79 = l_89;
+const uint32 l_90 = l_mut_79 << uint32(8);
+const uint32 l_91 = l_58 >> uint32(8);
+const uint32 l_92 = l_91 & uint32(255);
+const uint32 l_93 = l_90 | l_92;
+const uint32 l_94 = l_93 % uint32(6125000);
+l_mut_79 = l_94;
+const uint32 l_95 = l_mut_79 << uint32(8);
+const uint32 l_96 = l_58 >> uint32(0);
+const uint32 l_97 = l_96 & uint32(255);
+const uint32 l_98 = l_95 | l_97;
+const uint32 l_99 = l_98 % uint32(6125000);
+l_mut_79 = l_99;
+const uint32 l_100 = l_mut_79 << uint32(8);
+const uint32 l_101 = l_55 >> uint32(24);
+const uint32 l_102 = l_101 & uint32(255);
+const uint32 l_103 = l_100 | l_102;
+const uint32 l_104 = l_103 % uint32(6125000);
+l_mut_79 = l_104;
+const uint32 l_105 = l_mut_79 << uint32(8);
+const uint32 l_106 = l_55 >> uint32(16);
+const uint32 l_107 = l_106 & uint32(255);
+const uint32 l_108 = l_105 | l_107;
+const uint32 l_109 = l_108 % uint32(6125000);
+l_mut_79 = l_109;
+const uint32 l_110 = l_mut_79 << uint32(8);
+const uint32 l_111 = l_55 >> uint32(8);
+const uint32 l_112 = l_111 & uint32(255);
+const uint32 l_113 = l_110 | l_112;
+const uint32 l_114 = l_113 % uint32(6125000);
+l_mut_79 = l_114;
+const uint32 l_115 = l_mut_79 << uint32(8);
+const uint32 l_116 = l_55 >> uint32(0);
+const uint32 l_117 = l_116 & uint32(255);
+const uint32 l_118 = l_115 | l_117;
+const uint32 l_119 = l_118 % uint32(6125000);
+l_mut_79 = l_119;
+const uint32 l_120 = info.scalars_uint32[4] + l_mut_79;
+const uint32 l_121 = l_120 % uint32(6125000);
+const uint64 l_122 = uint64(l_121);
+const uint64 l_123 = l_72 - l_122;
+l_mut_50 = l_123;
+l_mut_51 = l_mut_73;
+const uint64 l_124 = uint64(l_121);
+const bool l_125 = l_72 < l_124;
+if (l_125) {
+l_mut_51 = l_mut_51 - uint64(1);
+}
+l_mut_79 = uint32(0);
+l_mut_126 = uint32(568272);
+while (true) {
+const bool l_127 = l_mut_79 < l_mut_126;
+const bool l_128 = !l_127;
+if (l_128) {
+break;}
+const uint32 l_129 = l_mut_79 + l_mut_126;
+const uint32 l_130 = l_129 >> uint32(1);
+const uint32 l_131 = buffer_0[l_130];
+const bool l_132 = l_131 < l_121;
+if (l_132) {
+const uint32 l_133 = l_130 + uint32(1);
+l_mut_79 = l_133;
+} else {
+l_mut_126 = l_130;
+}
+}
+const uint32 l_134 = l_mut_79 + l_2;
+l_mut_52 = l_134;
+}
+l_mut_126 = uint32(0);
+l_mut_73 = uint64(0);
+l_mut_135 = uint64(0);
+if (l_mut_45) {
+const uint32 l_136 = l_mut_52 / uint32(568272);
+const uint32 l_137 = l_136 * uint32(568272);
+const uint32 l_138 = l_mut_52 - l_137;
+const uint64 l_139 = uint64(l_136);
+const uint64 l_140 = uint64(uint32(6125000));
+const uint64 l_141 = l_139 * l_140;
+const uint32 l_142 = buffer_0[l_138];
+const uint64 l_143 = uint64(l_142);
+const uint64 l_144 = l_141 + l_143;
+const uint64 l_145 = l_mut_50 + l_144;
+l_mut_146 = l_mut_51;
+const bool l_147 = l_145 < l_mut_50;
+if (l_147) {
+l_mut_146 = l_mut_146 + uint64(1);
+}
+const bool l_148 = l_mut_146 > l_mut_49;
+const bool l_149 = l_mut_146 == l_mut_49;
+const bool l_150 = l_145 >= l_mut_48;
+const bool l_151 = l_149 && l_150;
+const bool l_152 = l_148 || l_151;
+if (l_152) {
+l_mut_43 = l_mut_43 + l_4;
+const bool l_153 = l_mut_43 < info.scalars_uint32[5];
+if (l_153) {
+l_mut_46 = bool(true);
+} else {
+l_mut_45 = bool(false);
+}
+} else {
+l_mut_154 = bool(false);
+const uint32 l_155 = uint32(2) * l_138;
+const uint32 l_156 = l_155 + uint32(1);
+const uint32 l_157 = buffer_5[l_156];
+const uint64 l_158 = uint64(l_157);
+const uint64 l_159 = l_158 << uint64(32);
+const uint32 l_160 = uint32(2) * l_138;
+const uint32 l_161 = buffer_5[l_160];
+const uint64 l_162 = uint64(l_161);
+const uint64 l_163 = l_159 | l_162;
+const uint64 l_164 = l_163 & l_mut_47;
+const bool l_165 = l_164 != uint64(0);
+if (l_165) {
+l_mut_154 = bool(true);
+}
+const bool l_166 = !l_mut_154;
+if (l_166) {
+l_mut_126 = uint32(1);
+l_mut_73 = l_145;
+l_mut_135 = l_mut_146;
+}
+l_mut_52 = l_mut_52 + l_0;
+}
+}
+const uint32 l_167 = l_mut_126 | uint32(65536);
+const bool l_168 = l_mut_126 != uint32(0);
+
+const uint32_4 l_169 = { __ballot_sync(-1, l_168), 0, 0, 0 };
+const uint32 l_170 = l_169.i_0;
+
+const uint32_4 l_171 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_172 = l_171.i_0;
+const uint32 l_173 = l_170 & l_25;
+const uint32 l_174 = uint32(__popc(l_173));
+const uint32 l_175 = uint32(__popc(l_170));
+const uint32 l_176 = l_172 & l_25;
+const uint32 l_177 = uint32(__popc(l_176));
+l_mut_18 = l_177;
+const uint32 l_178 = uint32(__popc(l_172));
+l_mut_31 = l_178;
+const bool l_179 = !l_mut_45;
+const bool l_180 = { __all_sync(-1, l_179)};
+const bool l_181 = l_mut_126 != uint32(0);
+if (l_181) {
+const uint32 l_182 = l_41 + l_mut_53;
+const uint32 l_183 = l_182 + l_174;
+shared_memory_22[l_183] = l_mut_73;
+shared_memory_23[l_183] = l_mut_135;
+l_mut_16 = l_mut_16 + uint32(1);
+const uint32 l_184 = uint32(l_mut_73);
+l_mut_17 = l_mut_17 + l_184;
+}
+l_mut_53 = l_mut_53 + l_175;
+__syncwarp();
+
+l_mut_126 = uint32(0);
+const bool l_185 = l_mut_53 >= l_mut_31;
+if (l_185) {
+l_mut_126 = l_mut_31;
+} else {
+if (l_180) {
+l_mut_126 = l_mut_53;
+}
+}
+const uint32 l_186 = l_41 + l_mut_53;
+const uint32 l_187 = l_186 - l_mut_126;
+const uint32 l_188 = l_187 + l_mut_18;
+const uint32 l_189 = l_41 + uint32(1);
+const bool l_190 = l_188 == l_189;
+if (l_190) {
+l_mut_79 = l_41;
+} else {
+l_mut_79 = l_188;
+}
+const bool l_191 = l_mut_18 < l_mut_126;
+l_mut_154 = bool(true);
+const bool l_192 = l_191 && l_mut_154;
+if (l_192) {
+l_mut_16 = l_mut_16 - uint32(1);
+const uint64 l_193 = shared_memory_22[l_mut_79];
+const uint32 l_194 = uint32(l_193);
+l_mut_17 = l_mut_17 - l_194;
+const uint64 l_195 = shared_memory_22[l_mut_79];
+const uint64 l_196 = shared_memory_23[l_mut_79];
+l_mut_154 = bool(true);
+l_mut_146 = uint64(0);
+l_mut_135 = uint64(0);
+const bool l_197 = l_mut_154 && bool(true);
+if (l_197) {
+const uint64 l_199 = l_195 >> uint64(0);
+const uint32 l_200 = uint32(l_199);
+l_arr_198[uint32(0)] = l_200;
+const uint64 l_201 = l_195 >> uint64(32);
+const uint32 l_202 = uint32(l_201);
+l_arr_198[uint32(1)] = l_202;
+l_arr_203[uint32(0)] = uint32(0);
+l_arr_203[uint32(1)] = uint32(0);
+l_arr_203[uint32(2)] = uint32(0);
+l_arr_203[uint32(3)] = uint32(0);
+l_mut_73 = uint64(0);
+const uint32 l_204 = l_arr_198[uint32(0)];
+const uint64 l_205 = uint64(l_204);
+const uint32 l_206 = l_arr_198[uint32(0)];
+const uint64 l_207 = uint64(l_206);
+const uint64 l_208 = l_205 * l_207;
+const uint32 l_209 = l_arr_203[uint32(0)];
+const uint64 l_210 = uint64(l_209);
+const uint64 l_211 = l_208 + l_210;
+const uint64 l_212 = l_211 + l_mut_73;
+const uint32 l_213 = uint32(l_212);
+l_arr_203[uint32(0)] = l_213;
+const uint64 l_214 = l_212 >> uint64(32);
+l_mut_73 = l_214;
+const uint32 l_215 = l_arr_198[uint32(0)];
+const uint64 l_216 = uint64(l_215);
+const uint32 l_217 = l_arr_198[uint32(1)];
+const uint64 l_218 = uint64(l_217);
+const uint64 l_219 = l_216 * l_218;
+const uint32 l_220 = l_arr_203[uint32(1)];
+const uint64 l_221 = uint64(l_220);
+const uint64 l_222 = l_219 + l_221;
+const uint64 l_223 = l_222 + l_mut_73;
+const uint32 l_224 = uint32(l_223);
+l_arr_203[uint32(1)] = l_224;
+const uint64 l_225 = l_223 >> uint64(32);
+l_mut_73 = l_225;
+const uint32 l_226 = uint32(l_mut_73);
+l_arr_203[uint32(2)] = l_226;
+l_mut_73 = uint64(0);
+const uint32 l_227 = l_arr_198[uint32(1)];
+const uint64 l_228 = uint64(l_227);
+const uint32 l_229 = l_arr_198[uint32(0)];
+const uint64 l_230 = uint64(l_229);
+const uint64 l_231 = l_228 * l_230;
+const uint32 l_232 = l_arr_203[uint32(1)];
+const uint64 l_233 = uint64(l_232);
+const uint64 l_234 = l_231 + l_233;
+const uint64 l_235 = l_234 + l_mut_73;
+const uint32 l_236 = uint32(l_235);
+l_arr_203[uint32(1)] = l_236;
+const uint64 l_237 = l_235 >> uint64(32);
+l_mut_73 = l_237;
+const uint32 l_238 = l_arr_198[uint32(1)];
+const uint64 l_239 = uint64(l_238);
+const uint32 l_240 = l_arr_198[uint32(1)];
+const uint64 l_241 = uint64(l_240);
+const uint64 l_242 = l_239 * l_241;
+const uint32 l_243 = l_arr_203[uint32(2)];
+const uint64 l_244 = uint64(l_243);
+const uint64 l_245 = l_242 + l_244;
+const uint64 l_246 = l_245 + l_mut_73;
+const uint32 l_247 = uint32(l_246);
+l_arr_203[uint32(2)] = l_247;
+const uint64 l_248 = l_246 >> uint64(32);
+l_mut_73 = l_248;
+const uint32 l_249 = uint32(l_mut_73);
+l_arr_203[uint32(3)] = l_249;
+const uint32 l_250 = l_14 + uint32(0);
+const uint32 l_251 = l_arr_203[uint32(0)];
+shared_memory_13[l_250] = l_251;
+const uint32 l_252 = l_14 + uint32(1);
+const uint32 l_253 = l_arr_203[uint32(1)];
+shared_memory_13[l_252] = l_253;
+const uint32 l_254 = l_14 + uint32(2);
+const uint32 l_255 = l_arr_203[uint32(2)];
+shared_memory_13[l_254] = l_255;
+const uint32 l_256 = l_14 + uint32(3);
+const uint32 l_257 = l_arr_203[uint32(3)];
+shared_memory_13[l_256] = l_257;
+l_mut_258 = int32(3);
+while (true) {
+const bool l_259 = l_mut_258 >= int32(0);
+const bool l_260 = !l_259;
+if (l_260) {
+break;}
+const uint32 l_261 = uint32(l_mut_258);
+const uint32 l_262 = l_14 + l_261;
+const uint32 l_263 = shared_memory_13[l_262];
+const bool l_264 = l_263 != uint32(0);
+if (l_264) {
+break;}
+l_mut_258 = l_mut_258 - int32(1);
+}
+while (true) {
+const bool l_265 = l_mut_258 >= int32(0);
+const bool l_266 = l_265 && l_mut_154;
+const bool l_267 = !l_266;
+if (l_267) {
+break;}
+l_mut_79 = uint32(0);
+l_mut_268 = l_mut_258;
+while (true) {
+const bool l_269 = l_mut_268 >= int32(0);
+const bool l_270 = !l_269;
+if (l_270) {
+break;}
+const uint32 l_271 = uint32(l_mut_268);
+const uint32 l_272 = l_14 + l_271;
+const uint32 l_273 = shared_memory_13[l_272];
+const uint32 l_274 = l_mut_79 << uint32(16);
+const uint32 l_275 = l_273 >> uint32(16);
+const uint32 l_276 = l_274 | l_275;
+const uint32 l_277 = l_276 / uint32(2500);
+const uint32 l_278 = l_277 * uint32(2500);
+const uint32 l_279 = l_276 - l_278;
+const uint32 l_280 = l_279 << uint32(16);
+const uint32 l_281 = l_273 & uint32(65535);
+const uint32 l_282 = l_280 | l_281;
+const uint32 l_283 = l_282 / uint32(2500);
+const uint32 l_284 = l_283 * uint32(2500);
+const uint32 l_285 = l_282 - l_284;
+l_mut_79 = l_285;
+const uint32 l_286 = uint32(l_mut_268);
+const uint32 l_287 = l_14 + l_286;
+const uint32 l_288 = l_277 << uint32(16);
+const uint32 l_289 = l_288 | l_283;
+shared_memory_13[l_287] = l_289;
+l_mut_268 = l_mut_268 - int32(1);
+}
+while (true) {
+const bool l_290 = l_mut_258 >= int32(0);
+const bool l_291 = !l_290;
+if (l_291) {
+break;}
+const uint32 l_292 = uint32(l_mut_258);
+const uint32 l_293 = l_14 + l_292;
+const uint32 l_294 = shared_memory_13[l_293];
+const bool l_295 = l_294 != uint32(0);
+if (l_295) {
+break;}
+l_mut_258 = l_mut_258 - int32(1);
+}
+l_mut_296 = l_mut_79;
+l_mut_73 = uint64(0);
+const bool l_297 = l_mut_258 >= int32(0);
+if (l_297) {
+const uint32 l_298 = l_mut_296 / uint32(50);
+const uint32 l_299 = l_298 * uint32(50);
+const uint32 l_300 = l_mut_296 - l_299;
+l_mut_296 = l_298;
+const uint64 l_301 = uint64(l_300);
+const uint64 l_302 = uint64(1) << l_301;
+const uint64 l_303 = l_mut_146 & l_302;
+l_mut_73 = l_mut_73 | l_303;
+l_mut_146 = l_mut_146 | l_302;
+const uint32 l_304 = l_mut_296 / uint32(50);
+const uint32 l_305 = l_304 * uint32(50);
+const uint32 l_306 = l_mut_296 - l_305;
+l_mut_296 = l_304;
+const uint64 l_307 = uint64(l_306);
+const uint64 l_308 = uint64(1) << l_307;
+const uint64 l_309 = l_mut_146 & l_308;
+l_mut_73 = l_mut_73 | l_309;
+l_mut_146 = l_mut_146 | l_308;
+} else {
+while (true) {
+const bool l_310 = l_mut_296 != uint32(0);
+const bool l_311 = !l_310;
+if (l_311) {
+break;}
+const uint32 l_312 = l_mut_296 / uint32(50);
+const uint32 l_313 = l_312 * uint32(50);
+const uint32 l_314 = l_mut_296 - l_313;
+l_mut_296 = l_312;
+const uint64 l_315 = uint64(l_314);
+const uint64 l_316 = uint64(1) << l_315;
+const uint64 l_317 = l_mut_146 & l_316;
+l_mut_73 = l_mut_73 | l_317;
+l_mut_146 = l_mut_146 | l_316;
+}
+}
+const bool l_318 = l_mut_73 != uint64(0);
+if (l_318) {
+l_mut_154 = bool(false);
+}
+}
+if (l_mut_154) {
+const uint32 l_319 = l_14 + uint32(0);
+shared_memory_13[l_319] = uint32(0);
+const uint32 l_320 = l_14 + uint32(1);
+shared_memory_13[l_320] = uint32(0);
+const uint32 l_321 = l_14 + uint32(2);
+shared_memory_13[l_321] = uint32(0);
+const uint32 l_322 = l_14 + uint32(3);
+shared_memory_13[l_322] = uint32(0);
+const uint32 l_323 = l_14 + uint32(4);
+shared_memory_13[l_323] = uint32(0);
+const uint32 l_324 = l_14 + uint32(5);
+shared_memory_13[l_324] = uint32(0);
+l_mut_73 = uint64(0);
+const uint32 l_325 = l_arr_203[uint32(0)];
+const uint64 l_326 = uint64(l_325);
+const uint32 l_327 = l_arr_198[uint32(0)];
+const uint64 l_328 = uint64(l_327);
+const uint64 l_329 = l_326 * l_328;
+const uint32 l_330 = l_14 + uint32(0);
+const uint32 l_331 = shared_memory_13[l_330];
+const uint64 l_332 = uint64(l_331);
+const uint64 l_333 = l_329 + l_332;
+const uint64 l_334 = l_333 + l_mut_73;
+const uint32 l_335 = l_14 + uint32(0);
+const uint32 l_336 = uint32(l_334);
+shared_memory_13[l_335] = l_336;
+const uint64 l_337 = l_334 >> uint64(32);
+l_mut_73 = l_337;
+const uint32 l_338 = l_arr_203[uint32(0)];
+const uint64 l_339 = uint64(l_338);
+const uint32 l_340 = l_arr_198[uint32(1)];
+const uint64 l_341 = uint64(l_340);
+const uint64 l_342 = l_339 * l_341;
+const uint32 l_343 = l_14 + uint32(1);
+const uint32 l_344 = shared_memory_13[l_343];
+const uint64 l_345 = uint64(l_344);
+const uint64 l_346 = l_342 + l_345;
+const uint64 l_347 = l_346 + l_mut_73;
+const uint32 l_348 = l_14 + uint32(1);
+const uint32 l_349 = uint32(l_347);
+shared_memory_13[l_348] = l_349;
+const uint64 l_350 = l_347 >> uint64(32);
+l_mut_73 = l_350;
+const uint32 l_351 = l_14 + uint32(2);
+const uint32 l_352 = uint32(l_mut_73);
+shared_memory_13[l_351] = l_352;
+l_mut_73 = uint64(0);
+const uint32 l_353 = l_arr_203[uint32(1)];
+const uint64 l_354 = uint64(l_353);
+const uint32 l_355 = l_arr_198[uint32(0)];
+const uint64 l_356 = uint64(l_355);
+const uint64 l_357 = l_354 * l_356;
+const uint32 l_358 = l_14 + uint32(1);
+const uint32 l_359 = shared_memory_13[l_358];
+const uint64 l_360 = uint64(l_359);
+const uint64 l_361 = l_357 + l_360;
+const uint64 l_362 = l_361 + l_mut_73;
+const uint32 l_363 = l_14 + uint32(1);
+const uint32 l_364 = uint32(l_362);
+shared_memory_13[l_363] = l_364;
+const uint64 l_365 = l_362 >> uint64(32);
+l_mut_73 = l_365;
+const uint32 l_366 = l_arr_203[uint32(1)];
+const uint64 l_367 = uint64(l_366);
+const uint32 l_368 = l_arr_198[uint32(1)];
+const uint64 l_369 = uint64(l_368);
+const uint64 l_370 = l_367 * l_369;
+const uint32 l_371 = l_14 + uint32(2);
+const uint32 l_372 = shared_memory_13[l_371];
+const uint64 l_373 = uint64(l_372);
+const uint64 l_374 = l_370 + l_373;
+const uint64 l_375 = l_374 + l_mut_73;
+const uint32 l_376 = l_14 + uint32(2);
+const uint32 l_377 = uint32(l_375);
+shared_memory_13[l_376] = l_377;
+const uint64 l_378 = l_375 >> uint64(32);
+l_mut_73 = l_378;
+const uint32 l_379 = l_14 + uint32(3);
+const uint32 l_380 = uint32(l_mut_73);
+shared_memory_13[l_379] = l_380;
+l_mut_73 = uint64(0);
+const uint32 l_381 = l_arr_203[uint32(2)];
+const uint64 l_382 = uint64(l_381);
+const uint32 l_383 = l_arr_198[uint32(0)];
+const uint64 l_384 = uint64(l_383);
+const uint64 l_385 = l_382 * l_384;
+const uint32 l_386 = l_14 + uint32(2);
+const uint32 l_387 = shared_memory_13[l_386];
+const uint64 l_388 = uint64(l_387);
+const uint64 l_389 = l_385 + l_388;
+const uint64 l_390 = l_389 + l_mut_73;
+const uint32 l_391 = l_14 + uint32(2);
+const uint32 l_392 = uint32(l_390);
+shared_memory_13[l_391] = l_392;
+const uint64 l_393 = l_390 >> uint64(32);
+l_mut_73 = l_393;
+const uint32 l_394 = l_arr_203[uint32(2)];
+const uint64 l_395 = uint64(l_394);
+const uint32 l_396 = l_arr_198[uint32(1)];
+const uint64 l_397 = uint64(l_396);
+const uint64 l_398 = l_395 * l_397;
+const uint32 l_399 = l_14 + uint32(3);
+const uint32 l_400 = shared_memory_13[l_399];
+const uint64 l_401 = uint64(l_400);
+const uint64 l_402 = l_398 + l_401;
+const uint64 l_403 = l_402 + l_mut_73;
+const uint32 l_404 = l_14 + uint32(3);
+const uint32 l_405 = uint32(l_403);
+shared_memory_13[l_404] = l_405;
+const uint64 l_406 = l_403 >> uint64(32);
+l_mut_73 = l_406;
+const uint32 l_407 = l_14 + uint32(4);
+const uint32 l_408 = uint32(l_mut_73);
+shared_memory_13[l_407] = l_408;
+l_mut_73 = uint64(0);
+const uint32 l_409 = l_arr_203[uint32(3)];
+const uint64 l_410 = uint64(l_409);
+const uint32 l_411 = l_arr_198[uint32(0)];
+const uint64 l_412 = uint64(l_411);
+const uint64 l_413 = l_410 * l_412;
+const uint32 l_414 = l_14 + uint32(3);
+const uint32 l_415 = shared_memory_13[l_414];
+const uint64 l_416 = uint64(l_415);
+const uint64 l_417 = l_413 + l_416;
+const uint64 l_418 = l_417 + l_mut_73;
+const uint32 l_419 = l_14 + uint32(3);
+const uint32 l_420 = uint32(l_418);
+shared_memory_13[l_419] = l_420;
+const uint64 l_421 = l_418 >> uint64(32);
+l_mut_73 = l_421;
+const uint32 l_422 = l_arr_203[uint32(3)];
+const uint64 l_423 = uint64(l_422);
+const uint32 l_424 = l_arr_198[uint32(1)];
+const uint64 l_425 = uint64(l_424);
+const uint64 l_426 = l_423 * l_425;
+const uint32 l_427 = l_14 + uint32(4);
+const uint32 l_428 = shared_memory_13[l_427];
+const uint64 l_429 = uint64(l_428);
+const uint64 l_430 = l_426 + l_429;
+const uint64 l_431 = l_430 + l_mut_73;
+const uint32 l_432 = l_14 + uint32(4);
+const uint32 l_433 = uint32(l_431);
+shared_memory_13[l_432] = l_433;
+const uint64 l_434 = l_431 >> uint64(32);
+l_mut_73 = l_434;
+const uint32 l_435 = l_14 + uint32(5);
+const uint32 l_436 = uint32(l_mut_73);
+shared_memory_13[l_435] = l_436;
+l_mut_268 = int32(5);
+while (true) {
+const bool l_437 = l_mut_268 >= int32(0);
+const bool l_438 = !l_437;
+if (l_438) {
+break;}
+const uint32 l_439 = uint32(l_mut_268);
+const uint32 l_440 = l_14 + l_439;
+const uint32 l_441 = shared_memory_13[l_440];
+const bool l_442 = l_441 != uint32(0);
+if (l_442) {
+break;}
+l_mut_268 = l_mut_268 - int32(1);
+}
+while (true) {
+const bool l_443 = l_mut_268 >= int32(0);
+const bool l_444 = l_443 && l_mut_154;
+const bool l_445 = !l_444;
+if (l_445) {
+break;}
+l_mut_296 = uint32(0);
+l_mut_446 = l_mut_268;
+while (true) {
+const bool l_447 = l_mut_446 >= int32(0);
+const bool l_448 = !l_447;
+if (l_448) {
+break;}
+const uint32 l_449 = uint32(l_mut_446);
+const uint32 l_450 = l_14 + l_449;
+const uint32 l_451 = shared_memory_13[l_450];
+const uint32 l_452 = l_mut_296 << uint32(16);
+const uint32 l_453 = l_451 >> uint32(16);
+const uint32 l_454 = l_452 | l_453;
+const uint32 l_455 = l_454 / uint32(2500);
+const uint32 l_456 = l_455 * uint32(2500);
+const uint32 l_457 = l_454 - l_456;
+const uint32 l_458 = l_457 << uint32(16);
+const uint32 l_459 = l_451 & uint32(65535);
+const uint32 l_460 = l_458 | l_459;
+const uint32 l_461 = l_460 / uint32(2500);
+const uint32 l_462 = l_461 * uint32(2500);
+const uint32 l_463 = l_460 - l_462;
+l_mut_296 = l_463;
+const uint32 l_464 = uint32(l_mut_446);
+const uint32 l_465 = l_14 + l_464;
+const uint32 l_466 = l_455 << uint32(16);
+const uint32 l_467 = l_466 | l_461;
+shared_memory_13[l_465] = l_467;
+l_mut_446 = l_mut_446 - int32(1);
+}
+while (true) {
+const bool l_468 = l_mut_268 >= int32(0);
+const bool l_469 = !l_468;
+if (l_469) {
+break;}
+const uint32 l_470 = uint32(l_mut_268);
+const uint32 l_471 = l_14 + l_470;
+const uint32 l_472 = shared_memory_13[l_471];
+const bool l_473 = l_472 != uint32(0);
+if (l_473) {
+break;}
+l_mut_268 = l_mut_268 - int32(1);
+}
+l_mut_79 = l_mut_296;
+l_mut_73 = uint64(0);
+const bool l_474 = l_mut_268 >= int32(0);
+if (l_474) {
+const uint32 l_475 = l_mut_79 / uint32(50);
+const uint32 l_476 = l_475 * uint32(50);
+const uint32 l_477 = l_mut_79 - l_476;
+l_mut_79 = l_475;
+const uint64 l_478 = uint64(l_477);
+const uint64 l_479 = uint64(1) << l_478;
+const uint64 l_480 = l_mut_146 & l_479;
+l_mut_73 = l_mut_73 | l_480;
+l_mut_146 = l_mut_146 | l_479;
+const uint32 l_481 = l_mut_79 / uint32(50);
+const uint32 l_482 = l_481 * uint32(50);
+const uint32 l_483 = l_mut_79 - l_482;
+l_mut_79 = l_481;
+const uint64 l_484 = uint64(l_483);
+const uint64 l_485 = uint64(1) << l_484;
+const uint64 l_486 = l_mut_146 & l_485;
+l_mut_73 = l_mut_73 | l_486;
+l_mut_146 = l_mut_146 | l_485;
+} else {
+while (true) {
+const bool l_487 = l_mut_79 != uint32(0);
+const bool l_488 = !l_487;
+if (l_488) {
+break;}
+const uint32 l_489 = l_mut_79 / uint32(50);
+const uint32 l_490 = l_489 * uint32(50);
+const uint32 l_491 = l_mut_79 - l_490;
+l_mut_79 = l_489;
+const uint64 l_492 = uint64(l_491);
+const uint64 l_493 = uint64(1) << l_492;
+const uint64 l_494 = l_mut_146 & l_493;
+l_mut_73 = l_mut_73 | l_494;
+l_mut_146 = l_mut_146 | l_493;
+}
+}
+const bool l_495 = l_mut_73 != uint64(0);
+if (l_495) {
+l_mut_154 = bool(false);
+}
+}
+}
+}
+if (l_mut_154) {
+const uint32 l_496 = uint32(l_mut_146);
+const uint32 l_497 = uint32(__popc(l_496));
+const uint64 l_498 = l_mut_146 >> uint64(32);
+const uint32 l_499 = uint32(l_498);
+const uint32 l_500 = uint32(__popc(l_499));
+const uint32 l_501 = l_497 + l_500;
+l_mut_296 = l_501;
+const bool l_502 = l_mut_296 == uint32(50);
+const bool l_503 = bool(false) || l_502;
+if (l_503) {
+uint32* l_504 = &buffer_4[uint32(0)];
+const uint32 l_505 = atomicAdd(l_504, uint32(1));
+const bool l_506 = l_505 < info.scalars_uint32[6];
+if (l_506) {
+const uint32 l_507 = uint32(4) * l_505;
+const uint32 l_508 = uint32(l_195);
+buffer_3[l_507] = l_508;
+const uint32 l_509 = l_507 + uint32(1);
+const uint64 l_510 = l_195 >> uint64(32);
+const uint32 l_511 = uint32(l_510);
+buffer_3[l_509] = l_511;
+const uint32 l_512 = l_507 + uint32(2);
+const uint32 l_513 = uint32(l_196);
+buffer_3[l_512] = l_513;
+const uint32 l_514 = l_507 + uint32(3);
+const uint64 l_515 = l_196 >> uint64(32);
+const uint32 l_516 = uint32(l_515);
+buffer_3[l_514] = l_516;
+}
+}
+}
+}
+l_mut_53 = l_mut_53 - l_mut_126;
+__syncwarp();
+
+const bool l_517 = l_mut_53 == uint32(0);
+const bool l_518 = l_180 && l_517;
+if (l_518) {
+break;}
+}
+const bool l_519 = l_mut_16 != uint32(0);
+const bool l_520 = l_mut_17 != uint32(0);
+const bool l_521 = l_519 || l_520;
+if (l_521) {
+uint32* l_522 = &shared_memory_15[uint32(2)];
+const uint32 l_523 = atomicAdd(l_522, l_mut_16);
+uint32* l_524 = &shared_memory_15[uint32(3)];
+const uint32 l_525 = atomicAdd(l_524, l_mut_17);
+}
+__syncthreads();
+
+const bool l_526 = threadIdx.x == uint32(0);
+if (l_526) {
+uint32* l_527 = &shared_memory_15[uint32(2)];
+const uint32 l_528 = atomicAdd(l_527, uint32(0));
+uint32* l_529 = &shared_memory_15[uint32(3)];
+const uint32 l_530 = atomicAdd(l_529, uint32(0));
+const bool l_531 = l_528 != uint32(0);
+const bool l_532 = l_530 != uint32(0);
+const bool l_533 = l_531 || l_532;
+if (l_533) {
+uint32* l_534 = &buffer_4[uint32(1)];
+const uint32 l_535 = atomicAdd(l_534, l_528);
+uint32* l_536 = &buffer_4[uint32(2)];
+const uint32 l_537 = atomicAdd(l_536, l_530);
+}
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 256,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: NiceonlyKernelInfo {
+        base: 50,
+        limbs: 2,
+        chunk_digits: 2,
+        chunk_div: 2500,
+        wide_chunk: false,
+        stride_m: 6125000,
+        stride_r: 568272,
+        offset_chunk_bits: 8,
+        pre_limbs: 0,
+        pre_chunk_digits: 0,
+        pre_chunk_div: 0,
+        probe: false,
+        cross: true,
+        compact: true,
+        plane_scoped: true,
+        ballot: true,
+        test_bits: 0,
+        residues: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_offsets: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_lens: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_out: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        low_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        fs0: (),
+        fs1: (),
+        fs2: (),
+        fs3: (),
+        fs_mod_m: (),
+        num_ranges: (),
+        nice_cap: (),
+        lane_shift: (),
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct __align__(16) uint32_4 {
+    uint32 i_0;
+    uint32 i_1;
+    uint32 i_2;
+    uint32 i_3;
+};
+struct info_st {
+    uint32 scalars_uint32[8];uint32 static_meta[14];
+};
+
+
+extern "C" __global__ void __launch_bounds__(256)niceonly_kernel (
+    const uint32* __restrict__ buffer_0, const uint32* __restrict__ buffer_1, const uint32* __restrict__ buffer_2, uint32* buffer_3, uint32* buffer_4, const uint32* __restrict__ buffer_5, const uint32* __restrict__ buffer_6, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+uint32 idxGlobal = (
+                absoluteIdx.z * gridDim.x * blockDim.x * gridDim.y * blockDim.y)
+                + (absoluteIdx.y * gridDim.x * blockDim.x)
+                + absoluteIdx.x;
+uint32 warpSizeChecked = min(warpSize, blockDim.x * blockDim.y * blockDim.z);
+extern __shared__ __align__(8) uint8 dynamic_shared_mem[];
+// Shared array size: 4, 16 bytes
+uint32 *shared_memory_15 = reinterpret_cast<uint32*>(&dynamic_shared_mem[4096]);
+// Shared array size: 1792, 7168 bytes
+uint32 *shared_memory_13 = reinterpret_cast<uint32*>(&dynamic_shared_mem[4112]);
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_23 = reinterpret_cast<uint64*>(&dynamic_shared_mem[11280]);
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_22 = reinterpret_cast<uint64*>(&dynamic_shared_mem[0]);
+uint32 l_arr_196[2];
+
+uint32 l_arr_201[4];
+
+uint64 l_mut_47;
+uint64 l_mut_48;
+uint64 l_mut_49;
+uint64 l_mut_50;
+uint64 l_mut_51;
+uint64 l_mut_73;
+uint64 l_mut_135;
+uint64 l_mut_146;
+uint32 l_mut_16;
+uint32 l_mut_17;
+uint32 l_mut_18;
+uint32 l_mut_31;
+uint32 l_mut_36;
+uint32 l_mut_43;
+uint32 l_mut_52;
+uint32 l_mut_53;
+uint32 l_mut_79;
+uint32 l_mut_126;
+uint32 l_mut_294;
+bool l_mut_45;
+bool l_mut_46;
+bool l_mut_154;
+int32 l_mut_256;
+int32 l_mut_266;
+int32 l_mut_444;
+const uint32 l_0 = uint32(1) << info.scalars_uint32[7];
+const uint32 l_1 = l_0 - uint32(1);
+const uint32 l_2 = absoluteIdx.x & l_1;
+const uint32 l_3 = gridDim.x * blockDim.x;
+const uint32 l_4 = l_3 >> info.scalars_uint32[7];
+const uint64 l_5 = uint64(info.scalars_uint32[1]);
+const uint64 l_6 = l_5 << uint64(32);
+const uint64 l_7 = uint64(info.scalars_uint32[0]);
+const uint64 l_8 = l_6 | l_7;
+const uint64 l_9 = uint64(info.scalars_uint32[3]);
+const uint64 l_10 = l_9 << uint64(32);
+const uint64 l_11 = uint64(info.scalars_uint32[2]);
+const uint64 l_12 = l_10 | l_11;
+const uint32 l_14 = threadIdx.x * uint32(7);
+l_mut_16 = uint32(0);
+l_mut_17 = uint32(0);
+l_mut_18 = threadIdx.x;
+while (true) {
+const bool l_19 = l_mut_18 < uint32(4);
+const bool l_20 = !l_19;
+if (l_20) {
+break;}
+uint32* l_21 = &shared_memory_15[l_mut_18];
+uint32 _tmp_0 = atomicExch(l_21, uint32(0));
+l_mut_18 = l_mut_18 + blockDim.x;
+}
+__syncthreads();
+
+const uint32 l_24 = uint32(1) << uint32(idxGlobal) % warpSize;
+const uint32 l_25 = l_24 - uint32(1);
+
+const uint32_4 l_26 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_27 = l_26.i_0;
+const uint32 l_28 = l_27 & l_25;
+const uint32 l_29 = uint32(__popc(l_28));
+l_mut_18 = l_29;
+const uint32 l_30 = uint32(__popc(l_27));
+l_mut_31 = l_30;
+const uint32 l_32 = l_27 - uint32(1);
+const uint32 l_33 = l_27 ^ l_32;
+const uint32 l_34 = uint32(__popc(l_33));
+const uint32 l_35 = l_34 - uint32(1);
+l_mut_36 = uint32(0);
+const bool l_37 = l_mut_18 == uint32(0);
+if (l_37) {
+const uint32 l_38 = uint32(2) * l_mut_31;
+uint32* l_39 = &shared_memory_15[uint32(0)];
+const uint32 l_40 = atomicAdd(l_39, l_38);
+l_mut_36 = l_40;
+}
+const uint32 l_41 = { __shfl_sync(-1, l_mut_36, l_35) };
+const uint32 l_42 = absoluteIdx.x >> info.scalars_uint32[7];
+l_mut_43 = l_42;
+const bool l_44 = l_mut_43 < info.scalars_uint32[5];
+l_mut_45 = l_44;
+l_mut_46 = l_mut_45;
+l_mut_47 = uint64(0);
+l_mut_48 = uint64(0);
+l_mut_49 = uint64(0);
+l_mut_50 = uint64(0);
+l_mut_51 = uint64(0);
+l_mut_52 = uint32(0);
+l_mut_53 = uint32(0);
+while (true) {
+if (l_mut_46) {
+l_mut_46 = bool(false);
+const uint32 l_54 = uint32(2) * l_mut_43;
+const uint32 l_55 = buffer_1[l_54];
+const uint32 l_56 = uint32(2) * l_mut_43;
+const uint32 l_57 = l_56 + uint32(1);
+const uint32 l_58 = buffer_1[l_57];
+const uint64 l_59 = uint64(l_58);
+const uint64 l_60 = l_59 << uint64(32);
+const uint64 l_61 = uint64(l_55);
+const uint64 l_62 = l_60 | l_61;
+l_mut_47 = uint64(0);
+const uint32 l_63 = uint32(2) * l_mut_43;
+const uint32 l_64 = l_63 + uint32(1);
+const uint32 l_65 = buffer_6[l_64];
+const uint64 l_66 = uint64(l_65);
+const uint64 l_67 = l_66 << uint64(32);
+const uint32 l_68 = uint32(2) * l_mut_43;
+const uint32 l_69 = buffer_6[l_68];
+const uint64 l_70 = uint64(l_69);
+const uint64 l_71 = l_67 | l_70;
+l_mut_47 = l_71;
+const uint64 l_72 = l_8 + l_62;
+l_mut_73 = l_12;
+const bool l_74 = l_72 < l_8;
+if (l_74) {
+l_mut_73 = l_mut_73 + uint64(1);
+}
+const uint32 l_75 = buffer_2[l_mut_43];
+const uint64 l_76 = uint64(l_75);
+const uint64 l_77 = l_72 + l_76;
+l_mut_48 = l_77;
+l_mut_49 = l_mut_73;
+const bool l_78 = l_mut_48 < l_72;
+if (l_78) {
+l_mut_49 = l_mut_49 + uint64(1);
+}
+l_mut_79 = uint32(0);
+const uint32 l_80 = l_mut_79 << uint32(8);
+const uint32 l_81 = l_58 >> uint32(24);
+const uint32 l_82 = l_81 & uint32(255);
+const uint32 l_83 = l_80 | l_82;
+const uint32 l_84 = l_83 % uint32(6125000);
+l_mut_79 = l_84;
+const uint32 l_85 = l_mut_79 << uint32(8);
+const uint32 l_86 = l_58 >> uint32(16);
+const uint32 l_87 = l_86 & uint32(255);
+const uint32 l_88 = l_85 | l_87;
+const uint32 l_89 = l_88 % uint32(6125000);
+l_mut_79 = l_89;
+const uint32 l_90 = l_mut_79 << uint32(8);
+const uint32 l_91 = l_58 >> uint32(8);
+const uint32 l_92 = l_91 & uint32(255);
+const uint32 l_93 = l_90 | l_92;
+const uint32 l_94 = l_93 % uint32(6125000);
+l_mut_79 = l_94;
+const uint32 l_95 = l_mut_79 << uint32(8);
+const uint32 l_96 = l_58 >> uint32(0);
+const uint32 l_97 = l_96 & uint32(255);
+const uint32 l_98 = l_95 | l_97;
+const uint32 l_99 = l_98 % uint32(6125000);
+l_mut_79 = l_99;
+const uint32 l_100 = l_mut_79 << uint32(8);
+const uint32 l_101 = l_55 >> uint32(24);
+const uint32 l_102 = l_101 & uint32(255);
+const uint32 l_103 = l_100 | l_102;
+const uint32 l_104 = l_103 % uint32(6125000);
+l_mut_79 = l_104;
+const uint32 l_105 = l_mut_79 << uint32(8);
+const uint32 l_106 = l_55 >> uint32(16);
+const uint32 l_107 = l_106 & uint32(255);
+const uint32 l_108 = l_105 | l_107;
+const uint32 l_109 = l_108 % uint32(6125000);
+l_mut_79 = l_109;
+const uint32 l_110 = l_mut_79 << uint32(8);
+const uint32 l_111 = l_55 >> uint32(8);
+const uint32 l_112 = l_111 & uint32(255);
+const uint32 l_113 = l_110 | l_112;
+const uint32 l_114 = l_113 % uint32(6125000);
+l_mut_79 = l_114;
+const uint32 l_115 = l_mut_79 << uint32(8);
+const uint32 l_116 = l_55 >> uint32(0);
+const uint32 l_117 = l_116 & uint32(255);
+const uint32 l_118 = l_115 | l_117;
+const uint32 l_119 = l_118 % uint32(6125000);
+l_mut_79 = l_119;
+const uint32 l_120 = info.scalars_uint32[4] + l_mut_79;
+const uint32 l_121 = l_120 % uint32(6125000);
+const uint64 l_122 = uint64(l_121);
+const uint64 l_123 = l_72 - l_122;
+l_mut_50 = l_123;
+l_mut_51 = l_mut_73;
+const uint64 l_124 = uint64(l_121);
+const bool l_125 = l_72 < l_124;
+if (l_125) {
+l_mut_51 = l_mut_51 - uint64(1);
+}
+l_mut_79 = uint32(0);
+l_mut_126 = uint32(568272);
+while (true) {
+const bool l_127 = l_mut_79 < l_mut_126;
+const bool l_128 = !l_127;
+if (l_128) {
+break;}
+const uint32 l_129 = l_mut_79 + l_mut_126;
+const uint32 l_130 = l_129 >> uint32(1);
+const uint32 l_131 = buffer_0[l_130];
+const bool l_132 = l_131 < l_121;
+if (l_132) {
+const uint32 l_133 = l_130 + uint32(1);
+l_mut_79 = l_133;
+} else {
+l_mut_126 = l_130;
+}
+}
+const uint32 l_134 = l_mut_79 + l_2;
+l_mut_52 = l_134;
+}
+l_mut_126 = uint32(0);
+l_mut_73 = uint64(0);
+l_mut_135 = uint64(0);
+if (l_mut_45) {
+const uint32 l_136 = l_mut_52 / uint32(568272);
+const uint32 l_137 = l_136 * uint32(568272);
+const uint32 l_138 = l_mut_52 - l_137;
+const uint64 l_139 = uint64(l_136);
+const uint64 l_140 = uint64(uint32(6125000));
+const uint64 l_141 = l_139 * l_140;
+const uint32 l_142 = buffer_0[l_138];
+const uint64 l_143 = uint64(l_142);
+const uint64 l_144 = l_141 + l_143;
+const uint64 l_145 = l_mut_50 + l_144;
+l_mut_146 = l_mut_51;
+const bool l_147 = l_145 < l_mut_50;
+if (l_147) {
+l_mut_146 = l_mut_146 + uint64(1);
+}
+const bool l_148 = l_mut_146 > l_mut_49;
+const bool l_149 = l_mut_146 == l_mut_49;
+const bool l_150 = l_145 >= l_mut_48;
+const bool l_151 = l_149 && l_150;
+const bool l_152 = l_148 || l_151;
+if (l_152) {
+l_mut_43 = l_mut_43 + l_4;
+const bool l_153 = l_mut_43 < info.scalars_uint32[5];
+if (l_153) {
+l_mut_46 = bool(true);
+} else {
+l_mut_45 = bool(false);
+}
+} else {
+l_mut_154 = bool(false);
+const uint32 l_155 = uint32(2) * l_138;
+const uint32 l_156 = l_155 + uint32(1);
+const uint32 l_157 = buffer_5[l_156];
+const uint64 l_158 = uint64(l_157);
+const uint64 l_159 = l_158 << uint64(32);
+const uint32 l_160 = uint32(2) * l_138;
+const uint32 l_161 = buffer_5[l_160];
+const uint64 l_162 = uint64(l_161);
+const uint64 l_163 = l_159 | l_162;
+const uint64 l_164 = l_163 & l_mut_47;
+const bool l_165 = l_164 != uint64(0);
+if (l_165) {
+l_mut_154 = bool(true);
+}
+const bool l_166 = !l_mut_154;
+if (l_166) {
+l_mut_126 = uint32(1);
+l_mut_73 = l_145;
+l_mut_135 = l_mut_146;
+}
+l_mut_52 = l_mut_52 + l_0;
+}
+}
+const uint32 l_167 = l_mut_126 | uint32(65536);
+const bool l_168 = l_mut_126 != uint32(0);
+
+const uint32_4 l_169 = { __ballot_sync(-1, l_168), 0, 0, 0 };
+const uint32 l_170 = l_169.i_0;
+
+const uint32_4 l_171 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_172 = l_171.i_0;
+const uint32 l_173 = l_170 & l_25;
+const uint32 l_174 = uint32(__popc(l_173));
+const uint32 l_175 = uint32(__popc(l_170));
+const uint32 l_176 = l_172 & l_25;
+const uint32 l_177 = uint32(__popc(l_176));
+l_mut_18 = l_177;
+const uint32 l_178 = uint32(__popc(l_172));
+l_mut_31 = l_178;
+const bool l_179 = !l_mut_45;
+const bool l_180 = { __all_sync(-1, l_179)};
+const bool l_181 = l_mut_126 != uint32(0);
+if (l_181) {
+const uint32 l_182 = l_41 + l_mut_53;
+const uint32 l_183 = l_182 + l_174;
+shared_memory_22[l_183] = l_mut_73;
+shared_memory_23[l_183] = l_mut_135;
+l_mut_16 = l_mut_16 + uint32(1);
+const uint32 l_184 = uint32(l_mut_73);
+l_mut_17 = l_mut_17 + l_184;
+}
+l_mut_53 = l_mut_53 + l_175;
+__syncwarp();
+
+l_mut_126 = uint32(0);
+const bool l_185 = l_mut_53 >= l_mut_31;
+if (l_185) {
+l_mut_126 = l_mut_31;
+} else {
+if (l_180) {
+l_mut_126 = l_mut_53;
+}
+}
+const uint32 l_186 = l_41 + l_mut_53;
+const uint32 l_187 = l_186 - l_mut_126;
+const uint32 l_188 = l_187 + l_mut_18;
+const bool l_189 = l_mut_18 < l_mut_126;
+l_mut_154 = bool(true);
+const bool l_190 = l_189 && l_mut_154;
+if (l_190) {
+l_mut_16 = l_mut_16 - uint32(1);
+const uint64 l_191 = shared_memory_22[l_188];
+const uint32 l_192 = uint32(l_191);
+l_mut_17 = l_mut_17 - l_192;
+const uint64 l_193 = shared_memory_22[l_188];
+const uint64 l_194 = shared_memory_23[l_188];
+l_mut_154 = bool(true);
+l_mut_146 = uint64(0);
+l_mut_135 = uint64(0);
+const bool l_195 = l_mut_154 && bool(true);
+if (l_195) {
+const uint64 l_197 = l_193 >> uint64(0);
+const uint32 l_198 = uint32(l_197);
+l_arr_196[uint32(0)] = l_198;
+const uint64 l_199 = l_193 >> uint64(32);
+const uint32 l_200 = uint32(l_199);
+l_arr_196[uint32(1)] = l_200;
+l_arr_201[uint32(0)] = uint32(0);
+l_arr_201[uint32(1)] = uint32(0);
+l_arr_201[uint32(2)] = uint32(0);
+l_arr_201[uint32(3)] = uint32(0);
+l_mut_73 = uint64(0);
+const uint32 l_202 = l_arr_196[uint32(0)];
+const uint64 l_203 = uint64(l_202);
+const uint32 l_204 = l_arr_196[uint32(0)];
+const uint64 l_205 = uint64(l_204);
+const uint64 l_206 = l_203 * l_205;
+const uint32 l_207 = l_arr_201[uint32(0)];
+const uint64 l_208 = uint64(l_207);
+const uint64 l_209 = l_206 + l_208;
+const uint64 l_210 = l_209 + l_mut_73;
+const uint32 l_211 = uint32(l_210);
+l_arr_201[uint32(0)] = l_211;
+const uint64 l_212 = l_210 >> uint64(32);
+l_mut_73 = l_212;
+const uint32 l_213 = l_arr_196[uint32(0)];
+const uint64 l_214 = uint64(l_213);
+const uint32 l_215 = l_arr_196[uint32(1)];
+const uint64 l_216 = uint64(l_215);
+const uint64 l_217 = l_214 * l_216;
+const uint32 l_218 = l_arr_201[uint32(1)];
+const uint64 l_219 = uint64(l_218);
+const uint64 l_220 = l_217 + l_219;
+const uint64 l_221 = l_220 + l_mut_73;
+const uint32 l_222 = uint32(l_221);
+l_arr_201[uint32(1)] = l_222;
+const uint64 l_223 = l_221 >> uint64(32);
+l_mut_73 = l_223;
+const uint32 l_224 = uint32(l_mut_73);
+l_arr_201[uint32(2)] = l_224;
+l_mut_73 = uint64(0);
+const uint32 l_225 = l_arr_196[uint32(1)];
+const uint64 l_226 = uint64(l_225);
+const uint32 l_227 = l_arr_196[uint32(0)];
+const uint64 l_228 = uint64(l_227);
+const uint64 l_229 = l_226 * l_228;
+const uint32 l_230 = l_arr_201[uint32(1)];
+const uint64 l_231 = uint64(l_230);
+const uint64 l_232 = l_229 + l_231;
+const uint64 l_233 = l_232 + l_mut_73;
+const uint32 l_234 = uint32(l_233);
+l_arr_201[uint32(1)] = l_234;
+const uint64 l_235 = l_233 >> uint64(32);
+l_mut_73 = l_235;
+const uint32 l_236 = l_arr_196[uint32(1)];
+const uint64 l_237 = uint64(l_236);
+const uint32 l_238 = l_arr_196[uint32(1)];
+const uint64 l_239 = uint64(l_238);
+const uint64 l_240 = l_237 * l_239;
+const uint32 l_241 = l_arr_201[uint32(2)];
+const uint64 l_242 = uint64(l_241);
+const uint64 l_243 = l_240 + l_242;
+const uint64 l_244 = l_243 + l_mut_73;
+const uint32 l_245 = uint32(l_244);
+l_arr_201[uint32(2)] = l_245;
+const uint64 l_246 = l_244 >> uint64(32);
+l_mut_73 = l_246;
+const uint32 l_247 = uint32(l_mut_73);
+l_arr_201[uint32(3)] = l_247;
+const uint32 l_248 = l_14 + uint32(0);
+const uint32 l_249 = l_arr_201[uint32(0)];
+shared_memory_13[l_248] = l_249;
+const uint32 l_250 = l_14 + uint32(1);
+const uint32 l_251 = l_arr_201[uint32(1)];
+shared_memory_13[l_250] = l_251;
+const uint32 l_252 = l_14 + uint32(2);
+const uint32 l_253 = l_arr_201[uint32(2)];
+shared_memory_13[l_252] = l_253;
+const uint32 l_254 = l_14 + uint32(3);
+const uint32 l_255 = l_arr_201[uint32(3)];
+shared_memory_13[l_254] = l_255;
+l_mut_256 = int32(3);
+while (true) {
+const bool l_257 = l_mut_256 >= int32(0);
+const bool l_258 = !l_257;
+if (l_258) {
+break;}
+const uint32 l_259 = uint32(l_mut_256);
+const uint32 l_260 = l_14 + l_259;
+const uint32 l_261 = shared_memory_13[l_260];
+const bool l_262 = l_261 != uint32(0);
+if (l_262) {
+break;}
+l_mut_256 = l_mut_256 - int32(1);
+}
+while (true) {
+const bool l_263 = l_mut_256 >= int32(0);
+const bool l_264 = l_263 && l_mut_154;
+const bool l_265 = !l_264;
+if (l_265) {
+break;}
+l_mut_79 = uint32(0);
+l_mut_266 = l_mut_256;
+while (true) {
+const bool l_267 = l_mut_266 >= int32(0);
+const bool l_268 = !l_267;
+if (l_268) {
+break;}
+const uint32 l_269 = uint32(l_mut_266);
+const uint32 l_270 = l_14 + l_269;
+const uint32 l_271 = shared_memory_13[l_270];
+const uint32 l_272 = l_mut_79 << uint32(16);
+const uint32 l_273 = l_271 >> uint32(16);
+const uint32 l_274 = l_272 | l_273;
+const uint32 l_275 = l_274 / uint32(2500);
+const uint32 l_276 = l_275 * uint32(2500);
+const uint32 l_277 = l_274 - l_276;
+const uint32 l_278 = l_277 << uint32(16);
+const uint32 l_279 = l_271 & uint32(65535);
+const uint32 l_280 = l_278 | l_279;
+const uint32 l_281 = l_280 / uint32(2500);
+const uint32 l_282 = l_281 * uint32(2500);
+const uint32 l_283 = l_280 - l_282;
+l_mut_79 = l_283;
+const uint32 l_284 = uint32(l_mut_266);
+const uint32 l_285 = l_14 + l_284;
+const uint32 l_286 = l_275 << uint32(16);
+const uint32 l_287 = l_286 | l_281;
+shared_memory_13[l_285] = l_287;
+l_mut_266 = l_mut_266 - int32(1);
+}
+while (true) {
+const bool l_288 = l_mut_256 >= int32(0);
+const bool l_289 = !l_288;
+if (l_289) {
+break;}
+const uint32 l_290 = uint32(l_mut_256);
+const uint32 l_291 = l_14 + l_290;
+const uint32 l_292 = shared_memory_13[l_291];
+const bool l_293 = l_292 != uint32(0);
+if (l_293) {
+break;}
+l_mut_256 = l_mut_256 - int32(1);
+}
+l_mut_294 = l_mut_79;
+l_mut_73 = uint64(0);
+const bool l_295 = l_mut_256 >= int32(0);
+if (l_295) {
+const uint32 l_296 = l_mut_294 / uint32(50);
+const uint32 l_297 = l_296 * uint32(50);
+const uint32 l_298 = l_mut_294 - l_297;
+l_mut_294 = l_296;
+const uint64 l_299 = uint64(l_298);
+const uint64 l_300 = uint64(1) << l_299;
+const uint64 l_301 = l_mut_146 & l_300;
+l_mut_73 = l_mut_73 | l_301;
+l_mut_146 = l_mut_146 | l_300;
+const uint32 l_302 = l_mut_294 / uint32(50);
+const uint32 l_303 = l_302 * uint32(50);
+const uint32 l_304 = l_mut_294 - l_303;
+l_mut_294 = l_302;
+const uint64 l_305 = uint64(l_304);
+const uint64 l_306 = uint64(1) << l_305;
+const uint64 l_307 = l_mut_146 & l_306;
+l_mut_73 = l_mut_73 | l_307;
+l_mut_146 = l_mut_146 | l_306;
+} else {
+while (true) {
+const bool l_308 = l_mut_294 != uint32(0);
+const bool l_309 = !l_308;
+if (l_309) {
+break;}
+const uint32 l_310 = l_mut_294 / uint32(50);
+const uint32 l_311 = l_310 * uint32(50);
+const uint32 l_312 = l_mut_294 - l_311;
+l_mut_294 = l_310;
+const uint64 l_313 = uint64(l_312);
+const uint64 l_314 = uint64(1) << l_313;
+const uint64 l_315 = l_mut_146 & l_314;
+l_mut_73 = l_mut_73 | l_315;
+l_mut_146 = l_mut_146 | l_314;
+}
+}
+const bool l_316 = l_mut_73 != uint64(0);
+if (l_316) {
+l_mut_154 = bool(false);
+}
+}
+if (l_mut_154) {
+const uint32 l_317 = l_14 + uint32(0);
+shared_memory_13[l_317] = uint32(0);
+const uint32 l_318 = l_14 + uint32(1);
+shared_memory_13[l_318] = uint32(0);
+const uint32 l_319 = l_14 + uint32(2);
+shared_memory_13[l_319] = uint32(0);
+const uint32 l_320 = l_14 + uint32(3);
+shared_memory_13[l_320] = uint32(0);
+const uint32 l_321 = l_14 + uint32(4);
+shared_memory_13[l_321] = uint32(0);
+const uint32 l_322 = l_14 + uint32(5);
+shared_memory_13[l_322] = uint32(0);
+l_mut_73 = uint64(0);
+const uint32 l_323 = l_arr_201[uint32(0)];
+const uint64 l_324 = uint64(l_323);
+const uint32 l_325 = l_arr_196[uint32(0)];
+const uint64 l_326 = uint64(l_325);
+const uint64 l_327 = l_324 * l_326;
+const uint32 l_328 = l_14 + uint32(0);
+const uint32 l_329 = shared_memory_13[l_328];
+const uint64 l_330 = uint64(l_329);
+const uint64 l_331 = l_327 + l_330;
+const uint64 l_332 = l_331 + l_mut_73;
+const uint32 l_333 = l_14 + uint32(0);
+const uint32 l_334 = uint32(l_332);
+shared_memory_13[l_333] = l_334;
+const uint64 l_335 = l_332 >> uint64(32);
+l_mut_73 = l_335;
+const uint32 l_336 = l_arr_201[uint32(0)];
+const uint64 l_337 = uint64(l_336);
+const uint32 l_338 = l_arr_196[uint32(1)];
+const uint64 l_339 = uint64(l_338);
+const uint64 l_340 = l_337 * l_339;
+const uint32 l_341 = l_14 + uint32(1);
+const uint32 l_342 = shared_memory_13[l_341];
+const uint64 l_343 = uint64(l_342);
+const uint64 l_344 = l_340 + l_343;
+const uint64 l_345 = l_344 + l_mut_73;
+const uint32 l_346 = l_14 + uint32(1);
+const uint32 l_347 = uint32(l_345);
+shared_memory_13[l_346] = l_347;
+const uint64 l_348 = l_345 >> uint64(32);
+l_mut_73 = l_348;
+const uint32 l_349 = l_14 + uint32(2);
+const uint32 l_350 = uint32(l_mut_73);
+shared_memory_13[l_349] = l_350;
+l_mut_73 = uint64(0);
+const uint32 l_351 = l_arr_201[uint32(1)];
+const uint64 l_352 = uint64(l_351);
+const uint32 l_353 = l_arr_196[uint32(0)];
+const uint64 l_354 = uint64(l_353);
+const uint64 l_355 = l_352 * l_354;
+const uint32 l_356 = l_14 + uint32(1);
+const uint32 l_357 = shared_memory_13[l_356];
+const uint64 l_358 = uint64(l_357);
+const uint64 l_359 = l_355 + l_358;
+const uint64 l_360 = l_359 + l_mut_73;
+const uint32 l_361 = l_14 + uint32(1);
+const uint32 l_362 = uint32(l_360);
+shared_memory_13[l_361] = l_362;
+const uint64 l_363 = l_360 >> uint64(32);
+l_mut_73 = l_363;
+const uint32 l_364 = l_arr_201[uint32(1)];
+const uint64 l_365 = uint64(l_364);
+const uint32 l_366 = l_arr_196[uint32(1)];
+const uint64 l_367 = uint64(l_366);
+const uint64 l_368 = l_365 * l_367;
+const uint32 l_369 = l_14 + uint32(2);
+const uint32 l_370 = shared_memory_13[l_369];
+const uint64 l_371 = uint64(l_370);
+const uint64 l_372 = l_368 + l_371;
+const uint64 l_373 = l_372 + l_mut_73;
+const uint32 l_374 = l_14 + uint32(2);
+const uint32 l_375 = uint32(l_373);
+shared_memory_13[l_374] = l_375;
+const uint64 l_376 = l_373 >> uint64(32);
+l_mut_73 = l_376;
+const uint32 l_377 = l_14 + uint32(3);
+const uint32 l_378 = uint32(l_mut_73);
+shared_memory_13[l_377] = l_378;
+l_mut_73 = uint64(0);
+const uint32 l_379 = l_arr_201[uint32(2)];
+const uint64 l_380 = uint64(l_379);
+const uint32 l_381 = l_arr_196[uint32(0)];
+const uint64 l_382 = uint64(l_381);
+const uint64 l_383 = l_380 * l_382;
+const uint32 l_384 = l_14 + uint32(2);
+const uint32 l_385 = shared_memory_13[l_384];
+const uint64 l_386 = uint64(l_385);
+const uint64 l_387 = l_383 + l_386;
+const uint64 l_388 = l_387 + l_mut_73;
+const uint32 l_389 = l_14 + uint32(2);
+const uint32 l_390 = uint32(l_388);
+shared_memory_13[l_389] = l_390;
+const uint64 l_391 = l_388 >> uint64(32);
+l_mut_73 = l_391;
+const uint32 l_392 = l_arr_201[uint32(2)];
+const uint64 l_393 = uint64(l_392);
+const uint32 l_394 = l_arr_196[uint32(1)];
+const uint64 l_395 = uint64(l_394);
+const uint64 l_396 = l_393 * l_395;
+const uint32 l_397 = l_14 + uint32(3);
+const uint32 l_398 = shared_memory_13[l_397];
+const uint64 l_399 = uint64(l_398);
+const uint64 l_400 = l_396 + l_399;
+const uint64 l_401 = l_400 + l_mut_73;
+const uint32 l_402 = l_14 + uint32(3);
+const uint32 l_403 = uint32(l_401);
+shared_memory_13[l_402] = l_403;
+const uint64 l_404 = l_401 >> uint64(32);
+l_mut_73 = l_404;
+const uint32 l_405 = l_14 + uint32(4);
+const uint32 l_406 = uint32(l_mut_73);
+shared_memory_13[l_405] = l_406;
+l_mut_73 = uint64(0);
+const uint32 l_407 = l_arr_201[uint32(3)];
+const uint64 l_408 = uint64(l_407);
+const uint32 l_409 = l_arr_196[uint32(0)];
+const uint64 l_410 = uint64(l_409);
+const uint64 l_411 = l_408 * l_410;
+const uint32 l_412 = l_14 + uint32(3);
+const uint32 l_413 = shared_memory_13[l_412];
+const uint64 l_414 = uint64(l_413);
+const uint64 l_415 = l_411 + l_414;
+const uint64 l_416 = l_415 + l_mut_73;
+const uint32 l_417 = l_14 + uint32(3);
+const uint32 l_418 = uint32(l_416);
+shared_memory_13[l_417] = l_418;
+const uint64 l_419 = l_416 >> uint64(32);
+l_mut_73 = l_419;
+const uint32 l_420 = l_arr_201[uint32(3)];
+const uint64 l_421 = uint64(l_420);
+const uint32 l_422 = l_arr_196[uint32(1)];
+const uint64 l_423 = uint64(l_422);
+const uint64 l_424 = l_421 * l_423;
+const uint32 l_425 = l_14 + uint32(4);
+const uint32 l_426 = shared_memory_13[l_425];
+const uint64 l_427 = uint64(l_426);
+const uint64 l_428 = l_424 + l_427;
+const uint64 l_429 = l_428 + l_mut_73;
+const uint32 l_430 = l_14 + uint32(4);
+const uint32 l_431 = uint32(l_429);
+shared_memory_13[l_430] = l_431;
+const uint64 l_432 = l_429 >> uint64(32);
+l_mut_73 = l_432;
+const uint32 l_433 = l_14 + uint32(5);
+const uint32 l_434 = uint32(l_mut_73);
+shared_memory_13[l_433] = l_434;
+l_mut_266 = int32(5);
+while (true) {
+const bool l_435 = l_mut_266 >= int32(0);
+const bool l_436 = !l_435;
+if (l_436) {
+break;}
+const uint32 l_437 = uint32(l_mut_266);
+const uint32 l_438 = l_14 + l_437;
+const uint32 l_439 = shared_memory_13[l_438];
+const bool l_440 = l_439 != uint32(0);
+if (l_440) {
+break;}
+l_mut_266 = l_mut_266 - int32(1);
+}
+while (true) {
+const bool l_441 = l_mut_266 >= int32(0);
+const bool l_442 = l_441 && l_mut_154;
+const bool l_443 = !l_442;
+if (l_443) {
+break;}
+l_mut_294 = uint32(0);
+l_mut_444 = l_mut_266;
+while (true) {
+const bool l_445 = l_mut_444 >= int32(0);
+const bool l_446 = !l_445;
+if (l_446) {
+break;}
+const uint32 l_447 = uint32(l_mut_444);
+const uint32 l_448 = l_14 + l_447;
+const uint32 l_449 = shared_memory_13[l_448];
+const uint32 l_450 = l_mut_294 << uint32(16);
+const uint32 l_451 = l_449 >> uint32(16);
+const uint32 l_452 = l_450 | l_451;
+const uint32 l_453 = l_452 / uint32(2500);
+const uint32 l_454 = l_453 * uint32(2500);
+const uint32 l_455 = l_452 - l_454;
+const uint32 l_456 = l_455 << uint32(16);
+const uint32 l_457 = l_449 & uint32(65535);
+const uint32 l_458 = l_456 | l_457;
+const uint32 l_459 = l_458 / uint32(2500);
+const uint32 l_460 = l_459 * uint32(2500);
+const uint32 l_461 = l_458 - l_460;
+l_mut_294 = l_461;
+const uint32 l_462 = uint32(l_mut_444);
+const uint32 l_463 = l_14 + l_462;
+const uint32 l_464 = l_453 << uint32(16);
+const uint32 l_465 = l_464 | l_459;
+shared_memory_13[l_463] = l_465;
+l_mut_444 = l_mut_444 - int32(1);
+}
+while (true) {
+const bool l_466 = l_mut_266 >= int32(0);
+const bool l_467 = !l_466;
+if (l_467) {
+break;}
+const uint32 l_468 = uint32(l_mut_266);
+const uint32 l_469 = l_14 + l_468;
+const uint32 l_470 = shared_memory_13[l_469];
+const bool l_471 = l_470 != uint32(0);
+if (l_471) {
+break;}
+l_mut_266 = l_mut_266 - int32(1);
+}
+l_mut_79 = l_mut_294;
+l_mut_73 = uint64(0);
+const bool l_472 = l_mut_266 >= int32(0);
+if (l_472) {
+const uint32 l_473 = l_mut_79 / uint32(50);
+const uint32 l_474 = l_473 * uint32(50);
+const uint32 l_475 = l_mut_79 - l_474;
+l_mut_79 = l_473;
+const uint64 l_476 = uint64(l_475);
+const uint64 l_477 = uint64(1) << l_476;
+const uint64 l_478 = l_mut_146 & l_477;
+l_mut_73 = l_mut_73 | l_478;
+l_mut_146 = l_mut_146 | l_477;
+const uint32 l_479 = l_mut_79 / uint32(50);
+const uint32 l_480 = l_479 * uint32(50);
+const uint32 l_481 = l_mut_79 - l_480;
+l_mut_79 = l_479;
+const uint64 l_482 = uint64(l_481);
+const uint64 l_483 = uint64(1) << l_482;
+const uint64 l_484 = l_mut_146 & l_483;
+l_mut_73 = l_mut_73 | l_484;
+l_mut_146 = l_mut_146 | l_483;
+} else {
+while (true) {
+const bool l_485 = l_mut_79 != uint32(0);
+const bool l_486 = !l_485;
+if (l_486) {
+break;}
+const uint32 l_487 = l_mut_79 / uint32(50);
+const uint32 l_488 = l_487 * uint32(50);
+const uint32 l_489 = l_mut_79 - l_488;
+l_mut_79 = l_487;
+const uint64 l_490 = uint64(l_489);
+const uint64 l_491 = uint64(1) << l_490;
+const uint64 l_492 = l_mut_146 & l_491;
+l_mut_73 = l_mut_73 | l_492;
+l_mut_146 = l_mut_146 | l_491;
+}
+}
+const bool l_493 = l_mut_73 != uint64(0);
+if (l_493) {
+l_mut_154 = bool(false);
+}
+}
+}
+}
+if (l_mut_154) {
+const uint32 l_494 = uint32(l_mut_146);
+const uint32 l_495 = uint32(__popc(l_494));
+const uint64 l_496 = l_mut_146 >> uint64(32);
+const uint32 l_497 = uint32(l_496);
+const uint32 l_498 = uint32(__popc(l_497));
+const uint32 l_499 = l_495 + l_498;
+l_mut_294 = l_499;
+const bool l_500 = l_mut_294 == uint32(50);
+const bool l_501 = bool(false) || l_500;
+if (l_501) {
+uint32* l_502 = &buffer_4[uint32(0)];
+const uint32 l_503 = atomicAdd(l_502, uint32(1));
+const bool l_504 = l_503 < info.scalars_uint32[6];
+if (l_504) {
+const uint32 l_505 = uint32(4) * l_503;
+const uint32 l_506 = uint32(l_193);
+buffer_3[l_505] = l_506;
+const uint32 l_507 = l_505 + uint32(1);
+const uint64 l_508 = l_193 >> uint64(32);
+const uint32 l_509 = uint32(l_508);
+buffer_3[l_507] = l_509;
+const uint32 l_510 = l_505 + uint32(2);
+const uint32 l_511 = uint32(l_194);
+buffer_3[l_510] = l_511;
+const uint32 l_512 = l_505 + uint32(3);
+const uint64 l_513 = l_194 >> uint64(32);
+const uint32 l_514 = uint32(l_513);
+buffer_3[l_512] = l_514;
+}
+}
+}
+}
+l_mut_53 = l_mut_53 - l_mut_126;
+__syncwarp();
+
+const bool l_515 = l_mut_53 == uint32(0);
+const bool l_516 = l_180 && l_515;
+if (l_516) {
+break;}
+}
+const bool l_517 = l_mut_16 != uint32(0);
+const bool l_518 = l_mut_17 != uint32(0);
+const bool l_519 = l_517 || l_518;
+if (l_519) {
+uint32* l_520 = &shared_memory_15[uint32(2)];
+const uint32 l_521 = atomicAdd(l_520, l_mut_16);
+uint32* l_522 = &shared_memory_15[uint32(3)];
+const uint32 l_523 = atomicAdd(l_522, l_mut_17);
+}
+__syncthreads();
+
+const bool l_524 = threadIdx.x == uint32(0);
+if (l_524) {
+uint32* l_525 = &shared_memory_15[uint32(2)];
+const uint32 l_526 = atomicAdd(l_525, uint32(0));
+uint32* l_527 = &shared_memory_15[uint32(3)];
+const uint32 l_528 = atomicAdd(l_527, uint32(0));
+const bool l_529 = l_526 != uint32(0);
+const bool l_530 = l_528 != uint32(0);
+const bool l_531 = l_529 || l_530;
+if (l_531) {
+uint32* l_532 = &buffer_4[uint32(1)];
+const uint32 l_533 = atomicAdd(l_532, l_526);
+uint32* l_534 = &buffer_4[uint32(2)];
+const uint32 l_535 = atomicAdd(l_534, l_528);
+}
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 256,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: NiceonlyKernelInfo {
+        base: 50,
+        limbs: 2,
+        chunk_digits: 2,
+        chunk_div: 2500,
+        wide_chunk: false,
+        stride_m: 6125000,
+        stride_r: 568272,
+        offset_chunk_bits: 8,
+        pre_limbs: 0,
+        pre_chunk_digits: 0,
+        pre_chunk_div: 0,
+        probe: false,
+        cross: true,
+        compact: true,
+        plane_scoped: false,
+        ballot: true,
+        test_bits: 1,
+        residues: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_offsets: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_lens: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_out: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        low_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        fs0: (),
+        fs1: (),
+        fs2: (),
+        fs3: (),
+        fs_mod_m: (),
+        num_ranges: (),
+        nice_cap: (),
+        lane_shift: (),
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct __align__(16) uint32_4 {
+    uint32 i_0;
+    uint32 i_1;
+    uint32 i_2;
+    uint32 i_3;
+};
+struct info_st {
+    uint32 scalars_uint32[8];uint32 static_meta[14];
+};
+
+
+extern "C" __global__ void __launch_bounds__(256)niceonly_kernel (
+    const uint32* __restrict__ buffer_0, const uint32* __restrict__ buffer_1, const uint32* __restrict__ buffer_2, uint32* buffer_3, uint32* buffer_4, const uint32* __restrict__ buffer_5, const uint32* __restrict__ buffer_6, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+uint32 idxGlobal = (
+                absoluteIdx.z * gridDim.x * blockDim.x * gridDim.y * blockDim.y)
+                + (absoluteIdx.y * gridDim.x * blockDim.x)
+                + absoluteIdx.x;
+uint32 warpSizeChecked = min(warpSize, blockDim.x * blockDim.y * blockDim.z);
+extern __shared__ __align__(8) uint8 dynamic_shared_mem[];
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_22 = reinterpret_cast<uint64*>(&dynamic_shared_mem[4096]);
+// Shared array size: 4, 16 bytes
+uint32 *shared_memory_15 = reinterpret_cast<uint32*>(&dynamic_shared_mem[8192]);
+// Shared array size: 1792, 7168 bytes
+uint32 *shared_memory_13 = reinterpret_cast<uint32*>(&dynamic_shared_mem[8208]);
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_23 = reinterpret_cast<uint64*>(&dynamic_shared_mem[0]);
+uint32 l_arr_201[2];
+
+uint32 l_arr_206[4];
+
+int32 l_mut_261;
+int32 l_mut_272;
+int32 l_mut_450;
+bool l_mut_29;
+bool l_mut_30;
+bool l_mut_138;
+uint32 l_mut_16;
+uint32 l_mut_17;
+uint32 l_mut_18;
+uint32 l_mut_27;
+uint32 l_mut_36;
+uint32 l_mut_37;
+uint32 l_mut_63;
+uint32 l_mut_110;
+uint32 l_mut_172;
+uint32 l_mut_271;
+uint32 l_mut_300;
+uint64 l_mut_31;
+uint64 l_mut_32;
+uint64 l_mut_33;
+uint64 l_mut_34;
+uint64 l_mut_35;
+uint64 l_mut_57;
+uint64 l_mut_119;
+uint64 l_mut_130;
+const uint32 l_0 = uint32(1) << info.scalars_uint32[7];
+const uint32 l_1 = l_0 - uint32(1);
+const uint32 l_2 = absoluteIdx.x & l_1;
+const uint32 l_3 = gridDim.x * blockDim.x;
+const uint32 l_4 = l_3 >> info.scalars_uint32[7];
+const uint64 l_5 = uint64(info.scalars_uint32[1]);
+const uint64 l_6 = l_5 << uint64(32);
+const uint64 l_7 = uint64(info.scalars_uint32[0]);
+const uint64 l_8 = l_6 | l_7;
+const uint64 l_9 = uint64(info.scalars_uint32[3]);
+const uint64 l_10 = l_9 << uint64(32);
+const uint64 l_11 = uint64(info.scalars_uint32[2]);
+const uint64 l_12 = l_10 | l_11;
+const uint32 l_14 = threadIdx.x * uint32(7);
+l_mut_16 = uint32(0);
+l_mut_17 = uint32(0);
+l_mut_18 = threadIdx.x;
+while (true) {
+const bool l_19 = l_mut_18 < uint32(4);
+const bool l_20 = !l_19;
+if (l_20) {
+break;}
+uint32* l_21 = &shared_memory_15[l_mut_18];
+uint32 _tmp_0 = atomicExch(l_21, uint32(0));
+l_mut_18 = l_mut_18 + blockDim.x;
+}
+const uint32 l_24 = uint32(1) << uint32(idxGlobal) % warpSize;
+const uint32 l_25 = l_24 - uint32(1);
+l_mut_18 = uint32(0);
+const uint32 l_26 = absoluteIdx.x >> info.scalars_uint32[7];
+l_mut_27 = l_26;
+const bool l_28 = l_mut_27 < info.scalars_uint32[5];
+l_mut_29 = l_28;
+l_mut_30 = l_mut_29;
+l_mut_31 = uint64(0);
+l_mut_32 = uint64(0);
+l_mut_33 = uint64(0);
+l_mut_34 = uint64(0);
+l_mut_35 = uint64(0);
+l_mut_36 = uint32(0);
+l_mut_37 = uint32(0);
+while (true) {
+if (l_mut_30) {
+l_mut_30 = bool(false);
+const uint32 l_38 = uint32(2) * l_mut_27;
+const uint32 l_39 = buffer_1[l_38];
+const uint32 l_40 = uint32(2) * l_mut_27;
+const uint32 l_41 = l_40 + uint32(1);
+const uint32 l_42 = buffer_1[l_41];
+const uint64 l_43 = uint64(l_42);
+const uint64 l_44 = l_43 << uint64(32);
+const uint64 l_45 = uint64(l_39);
+const uint64 l_46 = l_44 | l_45;
+l_mut_31 = uint64(0);
+const uint32 l_47 = uint32(2) * l_mut_27;
+const uint32 l_48 = l_47 + uint32(1);
+const uint32 l_49 = buffer_6[l_48];
+const uint64 l_50 = uint64(l_49);
+const uint64 l_51 = l_50 << uint64(32);
+const uint32 l_52 = uint32(2) * l_mut_27;
+const uint32 l_53 = buffer_6[l_52];
+const uint64 l_54 = uint64(l_53);
+const uint64 l_55 = l_51 | l_54;
+l_mut_31 = l_55;
+const uint64 l_56 = l_8 + l_46;
+l_mut_57 = l_12;
+const bool l_58 = l_56 < l_8;
+if (l_58) {
+l_mut_57 = l_mut_57 + uint64(1);
+}
+const uint32 l_59 = buffer_2[l_mut_27];
+const uint64 l_60 = uint64(l_59);
+const uint64 l_61 = l_56 + l_60;
+l_mut_32 = l_61;
+l_mut_33 = l_mut_57;
+const bool l_62 = l_mut_32 < l_56;
+if (l_62) {
+l_mut_33 = l_mut_33 + uint64(1);
+}
+l_mut_63 = uint32(0);
+const uint32 l_64 = l_mut_63 << uint32(8);
+const uint32 l_65 = l_42 >> uint32(24);
+const uint32 l_66 = l_65 & uint32(255);
+const uint32 l_67 = l_64 | l_66;
+const uint32 l_68 = l_67 % uint32(6125000);
+l_mut_63 = l_68;
+const uint32 l_69 = l_mut_63 << uint32(8);
+const uint32 l_70 = l_42 >> uint32(16);
+const uint32 l_71 = l_70 & uint32(255);
+const uint32 l_72 = l_69 | l_71;
+const uint32 l_73 = l_72 % uint32(6125000);
+l_mut_63 = l_73;
+const uint32 l_74 = l_mut_63 << uint32(8);
+const uint32 l_75 = l_42 >> uint32(8);
+const uint32 l_76 = l_75 & uint32(255);
+const uint32 l_77 = l_74 | l_76;
+const uint32 l_78 = l_77 % uint32(6125000);
+l_mut_63 = l_78;
+const uint32 l_79 = l_mut_63 << uint32(8);
+const uint32 l_80 = l_42 >> uint32(0);
+const uint32 l_81 = l_80 & uint32(255);
+const uint32 l_82 = l_79 | l_81;
+const uint32 l_83 = l_82 % uint32(6125000);
+l_mut_63 = l_83;
+const uint32 l_84 = l_mut_63 << uint32(8);
+const uint32 l_85 = l_39 >> uint32(24);
+const uint32 l_86 = l_85 & uint32(255);
+const uint32 l_87 = l_84 | l_86;
+const uint32 l_88 = l_87 % uint32(6125000);
+l_mut_63 = l_88;
+const uint32 l_89 = l_mut_63 << uint32(8);
+const uint32 l_90 = l_39 >> uint32(16);
+const uint32 l_91 = l_90 & uint32(255);
+const uint32 l_92 = l_89 | l_91;
+const uint32 l_93 = l_92 % uint32(6125000);
+l_mut_63 = l_93;
+const uint32 l_94 = l_mut_63 << uint32(8);
+const uint32 l_95 = l_39 >> uint32(8);
+const uint32 l_96 = l_95 & uint32(255);
+const uint32 l_97 = l_94 | l_96;
+const uint32 l_98 = l_97 % uint32(6125000);
+l_mut_63 = l_98;
+const uint32 l_99 = l_mut_63 << uint32(8);
+const uint32 l_100 = l_39 >> uint32(0);
+const uint32 l_101 = l_100 & uint32(255);
+const uint32 l_102 = l_99 | l_101;
+const uint32 l_103 = l_102 % uint32(6125000);
+l_mut_63 = l_103;
+const uint32 l_104 = info.scalars_uint32[4] + l_mut_63;
+const uint32 l_105 = l_104 % uint32(6125000);
+const uint64 l_106 = uint64(l_105);
+const uint64 l_107 = l_56 - l_106;
+l_mut_34 = l_107;
+l_mut_35 = l_mut_57;
+const uint64 l_108 = uint64(l_105);
+const bool l_109 = l_56 < l_108;
+if (l_109) {
+l_mut_35 = l_mut_35 - uint64(1);
+}
+l_mut_63 = uint32(0);
+l_mut_110 = uint32(568272);
+while (true) {
+const bool l_111 = l_mut_63 < l_mut_110;
+const bool l_112 = !l_111;
+if (l_112) {
+break;}
+const uint32 l_113 = l_mut_63 + l_mut_110;
+const uint32 l_114 = l_113 >> uint32(1);
+const uint32 l_115 = buffer_0[l_114];
+const bool l_116 = l_115 < l_105;
+if (l_116) {
+const uint32 l_117 = l_114 + uint32(1);
+l_mut_63 = l_117;
+} else {
+l_mut_110 = l_114;
+}
+}
+const uint32 l_118 = l_mut_63 + l_2;
+l_mut_36 = l_118;
+}
+l_mut_110 = uint32(0);
+l_mut_57 = uint64(0);
+l_mut_119 = uint64(0);
+if (l_mut_29) {
+const uint32 l_120 = l_mut_36 / uint32(568272);
+const uint32 l_121 = l_120 * uint32(568272);
+const uint32 l_122 = l_mut_36 - l_121;
+const uint64 l_123 = uint64(l_120);
+const uint64 l_124 = uint64(uint32(6125000));
+const uint64 l_125 = l_123 * l_124;
+const uint32 l_126 = buffer_0[l_122];
+const uint64 l_127 = uint64(l_126);
+const uint64 l_128 = l_125 + l_127;
+const uint64 l_129 = l_mut_34 + l_128;
+l_mut_130 = l_mut_35;
+const bool l_131 = l_129 < l_mut_34;
+if (l_131) {
+l_mut_130 = l_mut_130 + uint64(1);
+}
+const bool l_132 = l_mut_130 > l_mut_33;
+const bool l_133 = l_mut_130 == l_mut_33;
+const bool l_134 = l_129 >= l_mut_32;
+const bool l_135 = l_133 && l_134;
+const bool l_136 = l_132 || l_135;
+if (l_136) {
+l_mut_27 = l_mut_27 + l_4;
+const bool l_137 = l_mut_27 < info.scalars_uint32[5];
+if (l_137) {
+l_mut_30 = bool(true);
+} else {
+l_mut_29 = bool(false);
+}
+} else {
+l_mut_138 = bool(false);
+const uint32 l_139 = uint32(2) * l_122;
+const uint32 l_140 = l_139 + uint32(1);
+const uint32 l_141 = buffer_5[l_140];
+const uint64 l_142 = uint64(l_141);
+const uint64 l_143 = l_142 << uint64(32);
+const uint32 l_144 = uint32(2) * l_122;
+const uint32 l_145 = buffer_5[l_144];
+const uint64 l_146 = uint64(l_145);
+const uint64 l_147 = l_143 | l_146;
+const uint64 l_148 = l_147 & l_mut_31;
+const bool l_149 = l_148 != uint64(0);
+if (l_149) {
+l_mut_138 = bool(true);
+}
+const bool l_150 = !l_mut_138;
+if (l_150) {
+l_mut_110 = uint32(1);
+l_mut_57 = l_129;
+l_mut_119 = l_mut_130;
+}
+l_mut_36 = l_mut_36 + l_0;
+}
+}
+const uint32 l_151 = l_mut_110 | uint32(1048576);
+l_mut_63 = l_151;
+if (l_mut_29) {
+l_mut_63 = l_mut_63 | uint32(1024);
+}
+const bool l_152 = l_mut_110 != uint32(0);
+
+const uint32_4 l_153 = { __ballot_sync(-1, l_152), 0, 0, 0 };
+const uint32 l_154 = l_153.i_0;
+
+const uint32_4 l_155 = { __ballot_sync(-1, l_mut_29), 0, 0, 0 };
+const uint32 l_156 = l_155.i_0;
+
+const uint32_4 l_157 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_158 = l_157.i_0;
+const uint32 l_159 = l_154 & l_25;
+const uint32 l_160 = uint32(__popc(l_159));
+const uint32 l_161 = l_158 & l_25;
+const uint32 l_162 = uint32(__popc(l_161));
+const uint32 l_163 = l_158 - uint32(1);
+const uint32 l_164 = l_158 ^ l_163;
+const uint32 l_165 = uint32(__popc(l_164));
+const uint32 l_166 = l_165 - uint32(1);
+const uint32 l_167 = uint32(__popc(l_154));
+const uint32 l_168 = uint32(__popc(l_156));
+const uint32 l_169 = l_168 << uint32(10);
+const uint32 l_170 = l_167 | l_169;
+const uint32 l_171 = l_mut_18 & uint32(1);
+__syncthreads();
+
+l_mut_172 = uint32(0);
+const bool l_173 = l_162 == uint32(0);
+if (l_173) {
+uint32* l_174 = &shared_memory_15[l_171];
+const uint32 l_175 = atomicAdd(l_174, l_170);
+l_mut_172 = l_175;
+}
+const uint32 l_176 = { __shfl_sync(-1, l_mut_172, l_166) };
+const bool l_177 = l_mut_110 != uint32(0);
+if (l_177) {
+const uint32 l_178 = l_176 & uint32(1023);
+const uint32 l_179 = l_mut_37 + l_178;
+const uint32 l_180 = l_179 + l_160;
+shared_memory_22[l_180] = l_mut_57;
+shared_memory_23[l_180] = l_mut_119;
+l_mut_16 = l_mut_16 + uint32(1);
+const uint32 l_181 = uint32(l_mut_57);
+l_mut_17 = l_mut_17 + l_181;
+}
+__syncthreads();
+
+uint32* l_182 = &shared_memory_15[l_171];
+const uint32 l_183 = atomicAdd(l_182, uint32(0));
+const uint32 l_184 = l_183 & uint32(1023);
+const uint32 l_185 = l_183 >> uint32(10);
+const bool l_186 = l_185 == uint32(0);
+l_mut_37 = l_mut_37 + l_184;
+const bool l_187 = threadIdx.x == uint32(0);
+if (l_187) {
+const uint32 l_188 = uint32(1) - l_171;
+uint32* l_189 = &shared_memory_15[l_188];
+uint32 _tmp_1 = atomicExch(l_189, uint32(0));
+}
+l_mut_18 = l_mut_18 + uint32(1);
+l_mut_110 = uint32(0);
+const bool l_190 = l_mut_37 >= blockDim.x;
+if (l_190) {
+l_mut_110 = blockDim.x;
+} else {
+if (l_186) {
+l_mut_110 = l_mut_37;
+}
+}
+const uint32 l_191 = l_mut_37 - l_mut_110;
+const uint32 l_192 = l_191 + threadIdx.x;
+const bool l_193 = threadIdx.x < l_mut_110;
+l_mut_138 = bool(true);
+const bool l_194 = l_192 != uint32(0);
+l_mut_138 = l_194;
+const bool l_195 = l_193 && l_mut_138;
+if (l_195) {
+l_mut_16 = l_mut_16 - uint32(1);
+const uint64 l_196 = shared_memory_22[l_192];
+const uint32 l_197 = uint32(l_196);
+l_mut_17 = l_mut_17 - l_197;
+const uint64 l_198 = shared_memory_22[l_192];
+const uint64 l_199 = shared_memory_23[l_192];
+l_mut_138 = bool(true);
+l_mut_130 = uint64(0);
+l_mut_119 = uint64(0);
+const bool l_200 = l_mut_138 && bool(true);
+if (l_200) {
+const uint64 l_202 = l_198 >> uint64(0);
+const uint32 l_203 = uint32(l_202);
+l_arr_201[uint32(0)] = l_203;
+const uint64 l_204 = l_198 >> uint64(32);
+const uint32 l_205 = uint32(l_204);
+l_arr_201[uint32(1)] = l_205;
+l_arr_206[uint32(0)] = uint32(0);
+l_arr_206[uint32(1)] = uint32(0);
+l_arr_206[uint32(2)] = uint32(0);
+l_arr_206[uint32(3)] = uint32(0);
+l_mut_57 = uint64(0);
+const uint32 l_207 = l_arr_201[uint32(0)];
+const uint64 l_208 = uint64(l_207);
+const uint32 l_209 = l_arr_201[uint32(0)];
+const uint64 l_210 = uint64(l_209);
+const uint64 l_211 = l_208 * l_210;
+const uint32 l_212 = l_arr_206[uint32(0)];
+const uint64 l_213 = uint64(l_212);
+const uint64 l_214 = l_211 + l_213;
+const uint64 l_215 = l_214 + l_mut_57;
+const uint32 l_216 = uint32(l_215);
+l_arr_206[uint32(0)] = l_216;
+const uint64 l_217 = l_215 >> uint64(32);
+l_mut_57 = l_217;
+const uint32 l_218 = l_arr_201[uint32(0)];
+const uint64 l_219 = uint64(l_218);
+const uint32 l_220 = l_arr_201[uint32(1)];
+const uint64 l_221 = uint64(l_220);
+const uint64 l_222 = l_219 * l_221;
+const uint32 l_223 = l_arr_206[uint32(1)];
+const uint64 l_224 = uint64(l_223);
+const uint64 l_225 = l_222 + l_224;
+const uint64 l_226 = l_225 + l_mut_57;
+const uint32 l_227 = uint32(l_226);
+l_arr_206[uint32(1)] = l_227;
+const uint64 l_228 = l_226 >> uint64(32);
+l_mut_57 = l_228;
+const uint32 l_229 = uint32(l_mut_57);
+l_arr_206[uint32(2)] = l_229;
+l_mut_57 = uint64(0);
+const uint32 l_230 = l_arr_201[uint32(1)];
+const uint64 l_231 = uint64(l_230);
+const uint32 l_232 = l_arr_201[uint32(0)];
+const uint64 l_233 = uint64(l_232);
+const uint64 l_234 = l_231 * l_233;
+const uint32 l_235 = l_arr_206[uint32(1)];
+const uint64 l_236 = uint64(l_235);
+const uint64 l_237 = l_234 + l_236;
+const uint64 l_238 = l_237 + l_mut_57;
+const uint32 l_239 = uint32(l_238);
+l_arr_206[uint32(1)] = l_239;
+const uint64 l_240 = l_238 >> uint64(32);
+l_mut_57 = l_240;
+const uint32 l_241 = l_arr_201[uint32(1)];
+const uint64 l_242 = uint64(l_241);
+const uint32 l_243 = l_arr_201[uint32(1)];
+const uint64 l_244 = uint64(l_243);
+const uint64 l_245 = l_242 * l_244;
+const uint32 l_246 = l_arr_206[uint32(2)];
+const uint64 l_247 = uint64(l_246);
+const uint64 l_248 = l_245 + l_247;
+const uint64 l_249 = l_248 + l_mut_57;
+const uint32 l_250 = uint32(l_249);
+l_arr_206[uint32(2)] = l_250;
+const uint64 l_251 = l_249 >> uint64(32);
+l_mut_57 = l_251;
+const uint32 l_252 = uint32(l_mut_57);
+l_arr_206[uint32(3)] = l_252;
+const uint32 l_253 = l_14 + uint32(0);
+const uint32 l_254 = l_arr_206[uint32(0)];
+shared_memory_13[l_253] = l_254;
+const uint32 l_255 = l_14 + uint32(1);
+const uint32 l_256 = l_arr_206[uint32(1)];
+shared_memory_13[l_255] = l_256;
+const uint32 l_257 = l_14 + uint32(2);
+const uint32 l_258 = l_arr_206[uint32(2)];
+shared_memory_13[l_257] = l_258;
+const uint32 l_259 = l_14 + uint32(3);
+const uint32 l_260 = l_arr_206[uint32(3)];
+shared_memory_13[l_259] = l_260;
+l_mut_261 = int32(3);
+while (true) {
+const bool l_262 = l_mut_261 >= int32(0);
+const bool l_263 = !l_262;
+if (l_263) {
+break;}
+const uint32 l_264 = uint32(l_mut_261);
+const uint32 l_265 = l_14 + l_264;
+const uint32 l_266 = shared_memory_13[l_265];
+const bool l_267 = l_266 != uint32(0);
+if (l_267) {
+break;}
+l_mut_261 = l_mut_261 - int32(1);
+}
+while (true) {
+const bool l_268 = l_mut_261 >= int32(0);
+const bool l_269 = l_268 && l_mut_138;
+const bool l_270 = !l_269;
+if (l_270) {
+break;}
+l_mut_271 = uint32(0);
+l_mut_272 = l_mut_261;
+while (true) {
+const bool l_273 = l_mut_272 >= int32(0);
+const bool l_274 = !l_273;
+if (l_274) {
+break;}
+const uint32 l_275 = uint32(l_mut_272);
+const uint32 l_276 = l_14 + l_275;
+const uint32 l_277 = shared_memory_13[l_276];
+const uint32 l_278 = l_mut_271 << uint32(16);
+const uint32 l_279 = l_277 >> uint32(16);
+const uint32 l_280 = l_278 | l_279;
+const uint32 l_281 = l_280 / uint32(2500);
+const uint32 l_282 = l_281 * uint32(2500);
+const uint32 l_283 = l_280 - l_282;
+const uint32 l_284 = l_283 << uint32(16);
+const uint32 l_285 = l_277 & uint32(65535);
+const uint32 l_286 = l_284 | l_285;
+const uint32 l_287 = l_286 / uint32(2500);
+const uint32 l_288 = l_287 * uint32(2500);
+const uint32 l_289 = l_286 - l_288;
+l_mut_271 = l_289;
+const uint32 l_290 = uint32(l_mut_272);
+const uint32 l_291 = l_14 + l_290;
+const uint32 l_292 = l_281 << uint32(16);
+const uint32 l_293 = l_292 | l_287;
+shared_memory_13[l_291] = l_293;
+l_mut_272 = l_mut_272 - int32(1);
+}
+while (true) {
+const bool l_294 = l_mut_261 >= int32(0);
+const bool l_295 = !l_294;
+if (l_295) {
+break;}
+const uint32 l_296 = uint32(l_mut_261);
+const uint32 l_297 = l_14 + l_296;
+const uint32 l_298 = shared_memory_13[l_297];
+const bool l_299 = l_298 != uint32(0);
+if (l_299) {
+break;}
+l_mut_261 = l_mut_261 - int32(1);
+}
+l_mut_300 = l_mut_271;
+l_mut_57 = uint64(0);
+const bool l_301 = l_mut_261 >= int32(0);
+if (l_301) {
+const uint32 l_302 = l_mut_300 / uint32(50);
+const uint32 l_303 = l_302 * uint32(50);
+const uint32 l_304 = l_mut_300 - l_303;
+l_mut_300 = l_302;
+const uint64 l_305 = uint64(l_304);
+const uint64 l_306 = uint64(1) << l_305;
+const uint64 l_307 = l_mut_130 & l_306;
+l_mut_57 = l_mut_57 | l_307;
+l_mut_130 = l_mut_130 | l_306;
+const uint32 l_308 = l_mut_300 / uint32(50);
+const uint32 l_309 = l_308 * uint32(50);
+const uint32 l_310 = l_mut_300 - l_309;
+l_mut_300 = l_308;
+const uint64 l_311 = uint64(l_310);
+const uint64 l_312 = uint64(1) << l_311;
+const uint64 l_313 = l_mut_130 & l_312;
+l_mut_57 = l_mut_57 | l_313;
+l_mut_130 = l_mut_130 | l_312;
+} else {
+while (true) {
+const bool l_314 = l_mut_300 != uint32(0);
+const bool l_315 = !l_314;
+if (l_315) {
+break;}
+const uint32 l_316 = l_mut_300 / uint32(50);
+const uint32 l_317 = l_316 * uint32(50);
+const uint32 l_318 = l_mut_300 - l_317;
+l_mut_300 = l_316;
+const uint64 l_319 = uint64(l_318);
+const uint64 l_320 = uint64(1) << l_319;
+const uint64 l_321 = l_mut_130 & l_320;
+l_mut_57 = l_mut_57 | l_321;
+l_mut_130 = l_mut_130 | l_320;
+}
+}
+const bool l_322 = l_mut_57 != uint64(0);
+if (l_322) {
+l_mut_138 = bool(false);
+}
+}
+if (l_mut_138) {
+const uint32 l_323 = l_14 + uint32(0);
+shared_memory_13[l_323] = uint32(0);
+const uint32 l_324 = l_14 + uint32(1);
+shared_memory_13[l_324] = uint32(0);
+const uint32 l_325 = l_14 + uint32(2);
+shared_memory_13[l_325] = uint32(0);
+const uint32 l_326 = l_14 + uint32(3);
+shared_memory_13[l_326] = uint32(0);
+const uint32 l_327 = l_14 + uint32(4);
+shared_memory_13[l_327] = uint32(0);
+const uint32 l_328 = l_14 + uint32(5);
+shared_memory_13[l_328] = uint32(0);
+l_mut_57 = uint64(0);
+const uint32 l_329 = l_arr_206[uint32(0)];
+const uint64 l_330 = uint64(l_329);
+const uint32 l_331 = l_arr_201[uint32(0)];
+const uint64 l_332 = uint64(l_331);
+const uint64 l_333 = l_330 * l_332;
+const uint32 l_334 = l_14 + uint32(0);
+const uint32 l_335 = shared_memory_13[l_334];
+const uint64 l_336 = uint64(l_335);
+const uint64 l_337 = l_333 + l_336;
+const uint64 l_338 = l_337 + l_mut_57;
+const uint32 l_339 = l_14 + uint32(0);
+const uint32 l_340 = uint32(l_338);
+shared_memory_13[l_339] = l_340;
+const uint64 l_341 = l_338 >> uint64(32);
+l_mut_57 = l_341;
+const uint32 l_342 = l_arr_206[uint32(0)];
+const uint64 l_343 = uint64(l_342);
+const uint32 l_344 = l_arr_201[uint32(1)];
+const uint64 l_345 = uint64(l_344);
+const uint64 l_346 = l_343 * l_345;
+const uint32 l_347 = l_14 + uint32(1);
+const uint32 l_348 = shared_memory_13[l_347];
+const uint64 l_349 = uint64(l_348);
+const uint64 l_350 = l_346 + l_349;
+const uint64 l_351 = l_350 + l_mut_57;
+const uint32 l_352 = l_14 + uint32(1);
+const uint32 l_353 = uint32(l_351);
+shared_memory_13[l_352] = l_353;
+const uint64 l_354 = l_351 >> uint64(32);
+l_mut_57 = l_354;
+const uint32 l_355 = l_14 + uint32(2);
+const uint32 l_356 = uint32(l_mut_57);
+shared_memory_13[l_355] = l_356;
+l_mut_57 = uint64(0);
+const uint32 l_357 = l_arr_206[uint32(1)];
+const uint64 l_358 = uint64(l_357);
+const uint32 l_359 = l_arr_201[uint32(0)];
+const uint64 l_360 = uint64(l_359);
+const uint64 l_361 = l_358 * l_360;
+const uint32 l_362 = l_14 + uint32(1);
+const uint32 l_363 = shared_memory_13[l_362];
+const uint64 l_364 = uint64(l_363);
+const uint64 l_365 = l_361 + l_364;
+const uint64 l_366 = l_365 + l_mut_57;
+const uint32 l_367 = l_14 + uint32(1);
+const uint32 l_368 = uint32(l_366);
+shared_memory_13[l_367] = l_368;
+const uint64 l_369 = l_366 >> uint64(32);
+l_mut_57 = l_369;
+const uint32 l_370 = l_arr_206[uint32(1)];
+const uint64 l_371 = uint64(l_370);
+const uint32 l_372 = l_arr_201[uint32(1)];
+const uint64 l_373 = uint64(l_372);
+const uint64 l_374 = l_371 * l_373;
+const uint32 l_375 = l_14 + uint32(2);
+const uint32 l_376 = shared_memory_13[l_375];
+const uint64 l_377 = uint64(l_376);
+const uint64 l_378 = l_374 + l_377;
+const uint64 l_379 = l_378 + l_mut_57;
+const uint32 l_380 = l_14 + uint32(2);
+const uint32 l_381 = uint32(l_379);
+shared_memory_13[l_380] = l_381;
+const uint64 l_382 = l_379 >> uint64(32);
+l_mut_57 = l_382;
+const uint32 l_383 = l_14 + uint32(3);
+const uint32 l_384 = uint32(l_mut_57);
+shared_memory_13[l_383] = l_384;
+l_mut_57 = uint64(0);
+const uint32 l_385 = l_arr_206[uint32(2)];
+const uint64 l_386 = uint64(l_385);
+const uint32 l_387 = l_arr_201[uint32(0)];
+const uint64 l_388 = uint64(l_387);
+const uint64 l_389 = l_386 * l_388;
+const uint32 l_390 = l_14 + uint32(2);
+const uint32 l_391 = shared_memory_13[l_390];
+const uint64 l_392 = uint64(l_391);
+const uint64 l_393 = l_389 + l_392;
+const uint64 l_394 = l_393 + l_mut_57;
+const uint32 l_395 = l_14 + uint32(2);
+const uint32 l_396 = uint32(l_394);
+shared_memory_13[l_395] = l_396;
+const uint64 l_397 = l_394 >> uint64(32);
+l_mut_57 = l_397;
+const uint32 l_398 = l_arr_206[uint32(2)];
+const uint64 l_399 = uint64(l_398);
+const uint32 l_400 = l_arr_201[uint32(1)];
+const uint64 l_401 = uint64(l_400);
+const uint64 l_402 = l_399 * l_401;
+const uint32 l_403 = l_14 + uint32(3);
+const uint32 l_404 = shared_memory_13[l_403];
+const uint64 l_405 = uint64(l_404);
+const uint64 l_406 = l_402 + l_405;
+const uint64 l_407 = l_406 + l_mut_57;
+const uint32 l_408 = l_14 + uint32(3);
+const uint32 l_409 = uint32(l_407);
+shared_memory_13[l_408] = l_409;
+const uint64 l_410 = l_407 >> uint64(32);
+l_mut_57 = l_410;
+const uint32 l_411 = l_14 + uint32(4);
+const uint32 l_412 = uint32(l_mut_57);
+shared_memory_13[l_411] = l_412;
+l_mut_57 = uint64(0);
+const uint32 l_413 = l_arr_206[uint32(3)];
+const uint64 l_414 = uint64(l_413);
+const uint32 l_415 = l_arr_201[uint32(0)];
+const uint64 l_416 = uint64(l_415);
+const uint64 l_417 = l_414 * l_416;
+const uint32 l_418 = l_14 + uint32(3);
+const uint32 l_419 = shared_memory_13[l_418];
+const uint64 l_420 = uint64(l_419);
+const uint64 l_421 = l_417 + l_420;
+const uint64 l_422 = l_421 + l_mut_57;
+const uint32 l_423 = l_14 + uint32(3);
+const uint32 l_424 = uint32(l_422);
+shared_memory_13[l_423] = l_424;
+const uint64 l_425 = l_422 >> uint64(32);
+l_mut_57 = l_425;
+const uint32 l_426 = l_arr_206[uint32(3)];
+const uint64 l_427 = uint64(l_426);
+const uint32 l_428 = l_arr_201[uint32(1)];
+const uint64 l_429 = uint64(l_428);
+const uint64 l_430 = l_427 * l_429;
+const uint32 l_431 = l_14 + uint32(4);
+const uint32 l_432 = shared_memory_13[l_431];
+const uint64 l_433 = uint64(l_432);
+const uint64 l_434 = l_430 + l_433;
+const uint64 l_435 = l_434 + l_mut_57;
+const uint32 l_436 = l_14 + uint32(4);
+const uint32 l_437 = uint32(l_435);
+shared_memory_13[l_436] = l_437;
+const uint64 l_438 = l_435 >> uint64(32);
+l_mut_57 = l_438;
+const uint32 l_439 = l_14 + uint32(5);
+const uint32 l_440 = uint32(l_mut_57);
+shared_memory_13[l_439] = l_440;
+l_mut_272 = int32(5);
+while (true) {
+const bool l_441 = l_mut_272 >= int32(0);
+const bool l_442 = !l_441;
+if (l_442) {
+break;}
+const uint32 l_443 = uint32(l_mut_272);
+const uint32 l_444 = l_14 + l_443;
+const uint32 l_445 = shared_memory_13[l_444];
+const bool l_446 = l_445 != uint32(0);
+if (l_446) {
+break;}
+l_mut_272 = l_mut_272 - int32(1);
+}
+while (true) {
+const bool l_447 = l_mut_272 >= int32(0);
+const bool l_448 = l_447 && l_mut_138;
+const bool l_449 = !l_448;
+if (l_449) {
+break;}
+l_mut_300 = uint32(0);
+l_mut_450 = l_mut_272;
+while (true) {
+const bool l_451 = l_mut_450 >= int32(0);
+const bool l_452 = !l_451;
+if (l_452) {
+break;}
+const uint32 l_453 = uint32(l_mut_450);
+const uint32 l_454 = l_14 + l_453;
+const uint32 l_455 = shared_memory_13[l_454];
+const uint32 l_456 = l_mut_300 << uint32(16);
+const uint32 l_457 = l_455 >> uint32(16);
+const uint32 l_458 = l_456 | l_457;
+const uint32 l_459 = l_458 / uint32(2500);
+const uint32 l_460 = l_459 * uint32(2500);
+const uint32 l_461 = l_458 - l_460;
+const uint32 l_462 = l_461 << uint32(16);
+const uint32 l_463 = l_455 & uint32(65535);
+const uint32 l_464 = l_462 | l_463;
+const uint32 l_465 = l_464 / uint32(2500);
+const uint32 l_466 = l_465 * uint32(2500);
+const uint32 l_467 = l_464 - l_466;
+l_mut_300 = l_467;
+const uint32 l_468 = uint32(l_mut_450);
+const uint32 l_469 = l_14 + l_468;
+const uint32 l_470 = l_459 << uint32(16);
+const uint32 l_471 = l_470 | l_465;
+shared_memory_13[l_469] = l_471;
+l_mut_450 = l_mut_450 - int32(1);
+}
+while (true) {
+const bool l_472 = l_mut_272 >= int32(0);
+const bool l_473 = !l_472;
+if (l_473) {
+break;}
+const uint32 l_474 = uint32(l_mut_272);
+const uint32 l_475 = l_14 + l_474;
+const uint32 l_476 = shared_memory_13[l_475];
+const bool l_477 = l_476 != uint32(0);
+if (l_477) {
+break;}
+l_mut_272 = l_mut_272 - int32(1);
+}
+l_mut_271 = l_mut_300;
+l_mut_57 = uint64(0);
+const bool l_478 = l_mut_272 >= int32(0);
+if (l_478) {
+const uint32 l_479 = l_mut_271 / uint32(50);
+const uint32 l_480 = l_479 * uint32(50);
+const uint32 l_481 = l_mut_271 - l_480;
+l_mut_271 = l_479;
+const uint64 l_482 = uint64(l_481);
+const uint64 l_483 = uint64(1) << l_482;
+const uint64 l_484 = l_mut_130 & l_483;
+l_mut_57 = l_mut_57 | l_484;
+l_mut_130 = l_mut_130 | l_483;
+const uint32 l_485 = l_mut_271 / uint32(50);
+const uint32 l_486 = l_485 * uint32(50);
+const uint32 l_487 = l_mut_271 - l_486;
+l_mut_271 = l_485;
+const uint64 l_488 = uint64(l_487);
+const uint64 l_489 = uint64(1) << l_488;
+const uint64 l_490 = l_mut_130 & l_489;
+l_mut_57 = l_mut_57 | l_490;
+l_mut_130 = l_mut_130 | l_489;
+} else {
+while (true) {
+const bool l_491 = l_mut_271 != uint32(0);
+const bool l_492 = !l_491;
+if (l_492) {
+break;}
+const uint32 l_493 = l_mut_271 / uint32(50);
+const uint32 l_494 = l_493 * uint32(50);
+const uint32 l_495 = l_mut_271 - l_494;
+l_mut_271 = l_493;
+const uint64 l_496 = uint64(l_495);
+const uint64 l_497 = uint64(1) << l_496;
+const uint64 l_498 = l_mut_130 & l_497;
+l_mut_57 = l_mut_57 | l_498;
+l_mut_130 = l_mut_130 | l_497;
+}
+}
+const bool l_499 = l_mut_57 != uint64(0);
+if (l_499) {
+l_mut_138 = bool(false);
+}
+}
+}
+}
+if (l_mut_138) {
+const uint32 l_500 = uint32(l_mut_130);
+const uint32 l_501 = uint32(__popc(l_500));
+const uint64 l_502 = l_mut_130 >> uint64(32);
+const uint32 l_503 = uint32(l_502);
+const uint32 l_504 = uint32(__popc(l_503));
+const uint32 l_505 = l_501 + l_504;
+l_mut_300 = l_505;
+const bool l_506 = l_mut_300 == uint32(50);
+const bool l_507 = bool(false) || l_506;
+if (l_507) {
+uint32* l_508 = &buffer_4[uint32(0)];
+const uint32 l_509 = atomicAdd(l_508, uint32(1));
+const bool l_510 = l_509 < info.scalars_uint32[6];
+if (l_510) {
+const uint32 l_511 = uint32(4) * l_509;
+const uint32 l_512 = uint32(l_198);
+buffer_3[l_511] = l_512;
+const uint32 l_513 = l_511 + uint32(1);
+const uint64 l_514 = l_198 >> uint64(32);
+const uint32 l_515 = uint32(l_514);
+buffer_3[l_513] = l_515;
+const uint32 l_516 = l_511 + uint32(2);
+const uint32 l_517 = uint32(l_199);
+buffer_3[l_516] = l_517;
+const uint32 l_518 = l_511 + uint32(3);
+const uint64 l_519 = l_199 >> uint64(32);
+const uint32 l_520 = uint32(l_519);
+buffer_3[l_518] = l_520;
+}
+}
+}
+}
+l_mut_37 = l_mut_37 - l_mut_110;
+const bool l_521 = l_mut_37 == uint32(0);
+const bool l_522 = l_186 && l_521;
+if (l_522) {
+break;}
+}
+const bool l_523 = l_mut_16 != uint32(0);
+const bool l_524 = l_mut_17 != uint32(0);
+const bool l_525 = l_523 || l_524;
+if (l_525) {
+uint32* l_526 = &shared_memory_15[uint32(2)];
+const uint32 l_527 = atomicAdd(l_526, l_mut_16);
+uint32* l_528 = &shared_memory_15[uint32(3)];
+const uint32 l_529 = atomicAdd(l_528, l_mut_17);
+}
+__syncthreads();
+
+const bool l_530 = threadIdx.x == uint32(0);
+if (l_530) {
+uint32* l_531 = &shared_memory_15[uint32(2)];
+const uint32 l_532 = atomicAdd(l_531, uint32(0));
+uint32* l_533 = &shared_memory_15[uint32(3)];
+const uint32 l_534 = atomicAdd(l_533, uint32(0));
+const bool l_535 = l_532 != uint32(0);
+const bool l_536 = l_534 != uint32(0);
+const bool l_537 = l_535 || l_536;
+if (l_537) {
+uint32* l_538 = &buffer_4[uint32(1)];
+const uint32 l_539 = atomicAdd(l_538, l_532);
+uint32* l_540 = &buffer_4[uint32(2)];
+const uint32 l_541 = atomicAdd(l_540, l_534);
+}
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 256,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: NiceonlyKernelInfo {
+        base: 50,
+        limbs: 2,
+        chunk_digits: 2,
+        chunk_div: 2500,
+        wide_chunk: false,
+        stride_m: 6125000,
+        stride_r: 568272,
+        offset_chunk_bits: 8,
+        pre_limbs: 0,
+        pre_chunk_digits: 0,
+        pre_chunk_div: 0,
+        probe: false,
+        cross: true,
+        compact: true,
+        plane_scoped: false,
+        ballot: true,
+        test_bits: 2,
+        residues: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_offsets: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_lens: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_out: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        low_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        fs0: (),
+        fs1: (),
+        fs2: (),
+        fs3: (),
+        fs_mod_m: (),
+        num_ranges: (),
+        nice_cap: (),
+        lane_shift: (),
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct __align__(16) uint32_4 {
+    uint32 i_0;
+    uint32 i_1;
+    uint32 i_2;
+    uint32 i_3;
+};
+struct info_st {
+    uint32 scalars_uint32[8];uint32 static_meta[14];
+};
+
+
+extern "C" __global__ void __launch_bounds__(256)niceonly_kernel (
+    const uint32* __restrict__ buffer_0, const uint32* __restrict__ buffer_1, const uint32* __restrict__ buffer_2, uint32* buffer_3, uint32* buffer_4, const uint32* __restrict__ buffer_5, const uint32* __restrict__ buffer_6, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+uint32 idxGlobal = (
+                absoluteIdx.z * gridDim.x * blockDim.x * gridDim.y * blockDim.y)
+                + (absoluteIdx.y * gridDim.x * blockDim.x)
+                + absoluteIdx.x;
+uint32 warpSizeChecked = min(warpSize, blockDim.x * blockDim.y * blockDim.z);
+extern __shared__ __align__(8) uint8 dynamic_shared_mem[];
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_23 = reinterpret_cast<uint64*>(&dynamic_shared_mem[0]);
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_22 = reinterpret_cast<uint64*>(&dynamic_shared_mem[11280]);
+// Shared array size: 4, 16 bytes
+uint32 *shared_memory_15 = reinterpret_cast<uint32*>(&dynamic_shared_mem[4096]);
+// Shared array size: 1792, 7168 bytes
+uint32 *shared_memory_13 = reinterpret_cast<uint32*>(&dynamic_shared_mem[4112]);
+uint32 l_arr_203[2];
+
+uint32 l_arr_208[4];
+
+bool l_mut_29;
+bool l_mut_30;
+bool l_mut_138;
+uint32 l_mut_16;
+uint32 l_mut_17;
+uint32 l_mut_18;
+uint32 l_mut_27;
+uint32 l_mut_36;
+uint32 l_mut_37;
+uint32 l_mut_63;
+uint32 l_mut_110;
+uint32 l_mut_172;
+uint32 l_mut_195;
+uint32 l_mut_301;
+uint64 l_mut_31;
+uint64 l_mut_32;
+uint64 l_mut_33;
+uint64 l_mut_34;
+uint64 l_mut_35;
+uint64 l_mut_57;
+uint64 l_mut_119;
+uint64 l_mut_130;
+int32 l_mut_263;
+int32 l_mut_273;
+int32 l_mut_451;
+const uint32 l_0 = uint32(1) << info.scalars_uint32[7];
+const uint32 l_1 = l_0 - uint32(1);
+const uint32 l_2 = absoluteIdx.x & l_1;
+const uint32 l_3 = gridDim.x * blockDim.x;
+const uint32 l_4 = l_3 >> info.scalars_uint32[7];
+const uint64 l_5 = uint64(info.scalars_uint32[1]);
+const uint64 l_6 = l_5 << uint64(32);
+const uint64 l_7 = uint64(info.scalars_uint32[0]);
+const uint64 l_8 = l_6 | l_7;
+const uint64 l_9 = uint64(info.scalars_uint32[3]);
+const uint64 l_10 = l_9 << uint64(32);
+const uint64 l_11 = uint64(info.scalars_uint32[2]);
+const uint64 l_12 = l_10 | l_11;
+const uint32 l_14 = threadIdx.x * uint32(7);
+l_mut_16 = uint32(0);
+l_mut_17 = uint32(0);
+l_mut_18 = threadIdx.x;
+while (true) {
+const bool l_19 = l_mut_18 < uint32(4);
+const bool l_20 = !l_19;
+if (l_20) {
+break;}
+uint32* l_21 = &shared_memory_15[l_mut_18];
+uint32 _tmp_0 = atomicExch(l_21, uint32(0));
+l_mut_18 = l_mut_18 + blockDim.x;
+}
+const uint32 l_24 = uint32(1) << uint32(idxGlobal) % warpSize;
+const uint32 l_25 = l_24 - uint32(1);
+l_mut_18 = uint32(0);
+const uint32 l_26 = absoluteIdx.x >> info.scalars_uint32[7];
+l_mut_27 = l_26;
+const bool l_28 = l_mut_27 < info.scalars_uint32[5];
+l_mut_29 = l_28;
+l_mut_30 = l_mut_29;
+l_mut_31 = uint64(0);
+l_mut_32 = uint64(0);
+l_mut_33 = uint64(0);
+l_mut_34 = uint64(0);
+l_mut_35 = uint64(0);
+l_mut_36 = uint32(0);
+l_mut_37 = uint32(0);
+while (true) {
+if (l_mut_30) {
+l_mut_30 = bool(false);
+const uint32 l_38 = uint32(2) * l_mut_27;
+const uint32 l_39 = buffer_1[l_38];
+const uint32 l_40 = uint32(2) * l_mut_27;
+const uint32 l_41 = l_40 + uint32(1);
+const uint32 l_42 = buffer_1[l_41];
+const uint64 l_43 = uint64(l_42);
+const uint64 l_44 = l_43 << uint64(32);
+const uint64 l_45 = uint64(l_39);
+const uint64 l_46 = l_44 | l_45;
+l_mut_31 = uint64(0);
+const uint32 l_47 = uint32(2) * l_mut_27;
+const uint32 l_48 = l_47 + uint32(1);
+const uint32 l_49 = buffer_6[l_48];
+const uint64 l_50 = uint64(l_49);
+const uint64 l_51 = l_50 << uint64(32);
+const uint32 l_52 = uint32(2) * l_mut_27;
+const uint32 l_53 = buffer_6[l_52];
+const uint64 l_54 = uint64(l_53);
+const uint64 l_55 = l_51 | l_54;
+l_mut_31 = l_55;
+const uint64 l_56 = l_8 + l_46;
+l_mut_57 = l_12;
+const bool l_58 = l_56 < l_8;
+if (l_58) {
+l_mut_57 = l_mut_57 + uint64(1);
+}
+const uint32 l_59 = buffer_2[l_mut_27];
+const uint64 l_60 = uint64(l_59);
+const uint64 l_61 = l_56 + l_60;
+l_mut_32 = l_61;
+l_mut_33 = l_mut_57;
+const bool l_62 = l_mut_32 < l_56;
+if (l_62) {
+l_mut_33 = l_mut_33 + uint64(1);
+}
+l_mut_63 = uint32(0);
+const uint32 l_64 = l_mut_63 << uint32(8);
+const uint32 l_65 = l_42 >> uint32(24);
+const uint32 l_66 = l_65 & uint32(255);
+const uint32 l_67 = l_64 | l_66;
+const uint32 l_68 = l_67 % uint32(6125000);
+l_mut_63 = l_68;
+const uint32 l_69 = l_mut_63 << uint32(8);
+const uint32 l_70 = l_42 >> uint32(16);
+const uint32 l_71 = l_70 & uint32(255);
+const uint32 l_72 = l_69 | l_71;
+const uint32 l_73 = l_72 % uint32(6125000);
+l_mut_63 = l_73;
+const uint32 l_74 = l_mut_63 << uint32(8);
+const uint32 l_75 = l_42 >> uint32(8);
+const uint32 l_76 = l_75 & uint32(255);
+const uint32 l_77 = l_74 | l_76;
+const uint32 l_78 = l_77 % uint32(6125000);
+l_mut_63 = l_78;
+const uint32 l_79 = l_mut_63 << uint32(8);
+const uint32 l_80 = l_42 >> uint32(0);
+const uint32 l_81 = l_80 & uint32(255);
+const uint32 l_82 = l_79 | l_81;
+const uint32 l_83 = l_82 % uint32(6125000);
+l_mut_63 = l_83;
+const uint32 l_84 = l_mut_63 << uint32(8);
+const uint32 l_85 = l_39 >> uint32(24);
+const uint32 l_86 = l_85 & uint32(255);
+const uint32 l_87 = l_84 | l_86;
+const uint32 l_88 = l_87 % uint32(6125000);
+l_mut_63 = l_88;
+const uint32 l_89 = l_mut_63 << uint32(8);
+const uint32 l_90 = l_39 >> uint32(16);
+const uint32 l_91 = l_90 & uint32(255);
+const uint32 l_92 = l_89 | l_91;
+const uint32 l_93 = l_92 % uint32(6125000);
+l_mut_63 = l_93;
+const uint32 l_94 = l_mut_63 << uint32(8);
+const uint32 l_95 = l_39 >> uint32(8);
+const uint32 l_96 = l_95 & uint32(255);
+const uint32 l_97 = l_94 | l_96;
+const uint32 l_98 = l_97 % uint32(6125000);
+l_mut_63 = l_98;
+const uint32 l_99 = l_mut_63 << uint32(8);
+const uint32 l_100 = l_39 >> uint32(0);
+const uint32 l_101 = l_100 & uint32(255);
+const uint32 l_102 = l_99 | l_101;
+const uint32 l_103 = l_102 % uint32(6125000);
+l_mut_63 = l_103;
+const uint32 l_104 = info.scalars_uint32[4] + l_mut_63;
+const uint32 l_105 = l_104 % uint32(6125000);
+const uint64 l_106 = uint64(l_105);
+const uint64 l_107 = l_56 - l_106;
+l_mut_34 = l_107;
+l_mut_35 = l_mut_57;
+const uint64 l_108 = uint64(l_105);
+const bool l_109 = l_56 < l_108;
+if (l_109) {
+l_mut_35 = l_mut_35 - uint64(1);
+}
+l_mut_63 = uint32(0);
+l_mut_110 = uint32(568272);
+while (true) {
+const bool l_111 = l_mut_63 < l_mut_110;
+const bool l_112 = !l_111;
+if (l_112) {
+break;}
+const uint32 l_113 = l_mut_63 + l_mut_110;
+const uint32 l_114 = l_113 >> uint32(1);
+const uint32 l_115 = buffer_0[l_114];
+const bool l_116 = l_115 < l_105;
+if (l_116) {
+const uint32 l_117 = l_114 + uint32(1);
+l_mut_63 = l_117;
+} else {
+l_mut_110 = l_114;
+}
+}
+const uint32 l_118 = l_mut_63 + l_2;
+l_mut_36 = l_118;
+}
+l_mut_110 = uint32(0);
+l_mut_57 = uint64(0);
+l_mut_119 = uint64(0);
+if (l_mut_29) {
+const uint32 l_120 = l_mut_36 / uint32(568272);
+const uint32 l_121 = l_120 * uint32(568272);
+const uint32 l_122 = l_mut_36 - l_121;
+const uint64 l_123 = uint64(l_120);
+const uint64 l_124 = uint64(uint32(6125000));
+const uint64 l_125 = l_123 * l_124;
+const uint32 l_126 = buffer_0[l_122];
+const uint64 l_127 = uint64(l_126);
+const uint64 l_128 = l_125 + l_127;
+const uint64 l_129 = l_mut_34 + l_128;
+l_mut_130 = l_mut_35;
+const bool l_131 = l_129 < l_mut_34;
+if (l_131) {
+l_mut_130 = l_mut_130 + uint64(1);
+}
+const bool l_132 = l_mut_130 > l_mut_33;
+const bool l_133 = l_mut_130 == l_mut_33;
+const bool l_134 = l_129 >= l_mut_32;
+const bool l_135 = l_133 && l_134;
+const bool l_136 = l_132 || l_135;
+if (l_136) {
+l_mut_27 = l_mut_27 + l_4;
+const bool l_137 = l_mut_27 < info.scalars_uint32[5];
+if (l_137) {
+l_mut_30 = bool(true);
+} else {
+l_mut_29 = bool(false);
+}
+} else {
+l_mut_138 = bool(false);
+const uint32 l_139 = uint32(2) * l_122;
+const uint32 l_140 = l_139 + uint32(1);
+const uint32 l_141 = buffer_5[l_140];
+const uint64 l_142 = uint64(l_141);
+const uint64 l_143 = l_142 << uint64(32);
+const uint32 l_144 = uint32(2) * l_122;
+const uint32 l_145 = buffer_5[l_144];
+const uint64 l_146 = uint64(l_145);
+const uint64 l_147 = l_143 | l_146;
+const uint64 l_148 = l_147 & l_mut_31;
+const bool l_149 = l_148 != uint64(0);
+if (l_149) {
+l_mut_138 = bool(true);
+}
+const bool l_150 = !l_mut_138;
+if (l_150) {
+l_mut_110 = uint32(1);
+l_mut_57 = l_129;
+l_mut_119 = l_mut_130;
+}
+l_mut_36 = l_mut_36 + l_0;
+}
+}
+const uint32 l_151 = l_mut_110 | uint32(1048576);
+l_mut_63 = l_151;
+if (l_mut_29) {
+l_mut_63 = l_mut_63 | uint32(1024);
+}
+const bool l_152 = l_mut_110 != uint32(0);
+
+const uint32_4 l_153 = { __ballot_sync(-1, l_152), 0, 0, 0 };
+const uint32 l_154 = l_153.i_0;
+
+const uint32_4 l_155 = { __ballot_sync(-1, l_mut_29), 0, 0, 0 };
+const uint32 l_156 = l_155.i_0;
+
+const uint32_4 l_157 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_158 = l_157.i_0;
+const uint32 l_159 = l_154 & l_25;
+const uint32 l_160 = uint32(__popc(l_159));
+const uint32 l_161 = l_158 & l_25;
+const uint32 l_162 = uint32(__popc(l_161));
+const uint32 l_163 = l_158 - uint32(1);
+const uint32 l_164 = l_158 ^ l_163;
+const uint32 l_165 = uint32(__popc(l_164));
+const uint32 l_166 = l_165 - uint32(1);
+const uint32 l_167 = uint32(__popc(l_154));
+const uint32 l_168 = uint32(__popc(l_156));
+const uint32 l_169 = l_168 << uint32(10);
+const uint32 l_170 = l_167 | l_169;
+const uint32 l_171 = l_mut_18 & uint32(1);
+__syncthreads();
+
+l_mut_172 = uint32(0);
+const bool l_173 = l_162 == uint32(0);
+if (l_173) {
+uint32* l_174 = &shared_memory_15[l_171];
+const uint32 l_175 = atomicAdd(l_174, l_170);
+l_mut_172 = l_175;
+}
+const uint32 l_176 = { __shfl_sync(-1, l_mut_172, l_166) };
+const bool l_177 = l_mut_110 != uint32(0);
+if (l_177) {
+const uint32 l_178 = l_176 & uint32(1023);
+const uint32 l_179 = l_mut_37 + l_178;
+const uint32 l_180 = l_179 + l_160;
+shared_memory_22[l_180] = l_mut_57;
+shared_memory_23[l_180] = l_mut_119;
+l_mut_16 = l_mut_16 + uint32(1);
+const uint32 l_181 = uint32(l_mut_57);
+l_mut_17 = l_mut_17 + l_181;
+}
+__syncthreads();
+
+uint32* l_182 = &shared_memory_15[l_171];
+const uint32 l_183 = atomicAdd(l_182, uint32(0));
+const uint32 l_184 = l_183 & uint32(1023);
+const uint32 l_185 = l_183 >> uint32(10);
+const bool l_186 = l_185 == uint32(0);
+l_mut_37 = l_mut_37 + l_184;
+const bool l_187 = threadIdx.x == uint32(0);
+if (l_187) {
+const uint32 l_188 = uint32(1) - l_171;
+uint32* l_189 = &shared_memory_15[l_188];
+uint32 _tmp_1 = atomicExch(l_189, uint32(0));
+}
+l_mut_18 = l_mut_18 + uint32(1);
+l_mut_110 = uint32(0);
+const bool l_190 = l_mut_37 >= blockDim.x;
+if (l_190) {
+l_mut_110 = blockDim.x;
+} else {
+if (l_186) {
+l_mut_110 = l_mut_37;
+}
+}
+const uint32 l_191 = l_mut_37 - l_mut_110;
+const uint32 l_192 = l_191 + threadIdx.x;
+const uint32 l_193 = uint32(0) + uint32(1);
+const bool l_194 = l_192 == l_193;
+if (l_194) {
+l_mut_195 = uint32(0);
+} else {
+l_mut_195 = l_192;
+}
+const bool l_196 = threadIdx.x < l_mut_110;
+l_mut_138 = bool(true);
+const bool l_197 = l_196 && l_mut_138;
+if (l_197) {
+l_mut_16 = l_mut_16 - uint32(1);
+const uint64 l_198 = shared_memory_22[l_mut_195];
+const uint32 l_199 = uint32(l_198);
+l_mut_17 = l_mut_17 - l_199;
+const uint64 l_200 = shared_memory_22[l_mut_195];
+const uint64 l_201 = shared_memory_23[l_mut_195];
+l_mut_138 = bool(true);
+l_mut_130 = uint64(0);
+l_mut_119 = uint64(0);
+const bool l_202 = l_mut_138 && bool(true);
+if (l_202) {
+const uint64 l_204 = l_200 >> uint64(0);
+const uint32 l_205 = uint32(l_204);
+l_arr_203[uint32(0)] = l_205;
+const uint64 l_206 = l_200 >> uint64(32);
+const uint32 l_207 = uint32(l_206);
+l_arr_203[uint32(1)] = l_207;
+l_arr_208[uint32(0)] = uint32(0);
+l_arr_208[uint32(1)] = uint32(0);
+l_arr_208[uint32(2)] = uint32(0);
+l_arr_208[uint32(3)] = uint32(0);
+l_mut_57 = uint64(0);
+const uint32 l_209 = l_arr_203[uint32(0)];
+const uint64 l_210 = uint64(l_209);
+const uint32 l_211 = l_arr_203[uint32(0)];
+const uint64 l_212 = uint64(l_211);
+const uint64 l_213 = l_210 * l_212;
+const uint32 l_214 = l_arr_208[uint32(0)];
+const uint64 l_215 = uint64(l_214);
+const uint64 l_216 = l_213 + l_215;
+const uint64 l_217 = l_216 + l_mut_57;
+const uint32 l_218 = uint32(l_217);
+l_arr_208[uint32(0)] = l_218;
+const uint64 l_219 = l_217 >> uint64(32);
+l_mut_57 = l_219;
+const uint32 l_220 = l_arr_203[uint32(0)];
+const uint64 l_221 = uint64(l_220);
+const uint32 l_222 = l_arr_203[uint32(1)];
+const uint64 l_223 = uint64(l_222);
+const uint64 l_224 = l_221 * l_223;
+const uint32 l_225 = l_arr_208[uint32(1)];
+const uint64 l_226 = uint64(l_225);
+const uint64 l_227 = l_224 + l_226;
+const uint64 l_228 = l_227 + l_mut_57;
+const uint32 l_229 = uint32(l_228);
+l_arr_208[uint32(1)] = l_229;
+const uint64 l_230 = l_228 >> uint64(32);
+l_mut_57 = l_230;
+const uint32 l_231 = uint32(l_mut_57);
+l_arr_208[uint32(2)] = l_231;
+l_mut_57 = uint64(0);
+const uint32 l_232 = l_arr_203[uint32(1)];
+const uint64 l_233 = uint64(l_232);
+const uint32 l_234 = l_arr_203[uint32(0)];
+const uint64 l_235 = uint64(l_234);
+const uint64 l_236 = l_233 * l_235;
+const uint32 l_237 = l_arr_208[uint32(1)];
+const uint64 l_238 = uint64(l_237);
+const uint64 l_239 = l_236 + l_238;
+const uint64 l_240 = l_239 + l_mut_57;
+const uint32 l_241 = uint32(l_240);
+l_arr_208[uint32(1)] = l_241;
+const uint64 l_242 = l_240 >> uint64(32);
+l_mut_57 = l_242;
+const uint32 l_243 = l_arr_203[uint32(1)];
+const uint64 l_244 = uint64(l_243);
+const uint32 l_245 = l_arr_203[uint32(1)];
+const uint64 l_246 = uint64(l_245);
+const uint64 l_247 = l_244 * l_246;
+const uint32 l_248 = l_arr_208[uint32(2)];
+const uint64 l_249 = uint64(l_248);
+const uint64 l_250 = l_247 + l_249;
+const uint64 l_251 = l_250 + l_mut_57;
+const uint32 l_252 = uint32(l_251);
+l_arr_208[uint32(2)] = l_252;
+const uint64 l_253 = l_251 >> uint64(32);
+l_mut_57 = l_253;
+const uint32 l_254 = uint32(l_mut_57);
+l_arr_208[uint32(3)] = l_254;
+const uint32 l_255 = l_14 + uint32(0);
+const uint32 l_256 = l_arr_208[uint32(0)];
+shared_memory_13[l_255] = l_256;
+const uint32 l_257 = l_14 + uint32(1);
+const uint32 l_258 = l_arr_208[uint32(1)];
+shared_memory_13[l_257] = l_258;
+const uint32 l_259 = l_14 + uint32(2);
+const uint32 l_260 = l_arr_208[uint32(2)];
+shared_memory_13[l_259] = l_260;
+const uint32 l_261 = l_14 + uint32(3);
+const uint32 l_262 = l_arr_208[uint32(3)];
+shared_memory_13[l_261] = l_262;
+l_mut_263 = int32(3);
+while (true) {
+const bool l_264 = l_mut_263 >= int32(0);
+const bool l_265 = !l_264;
+if (l_265) {
+break;}
+const uint32 l_266 = uint32(l_mut_263);
+const uint32 l_267 = l_14 + l_266;
+const uint32 l_268 = shared_memory_13[l_267];
+const bool l_269 = l_268 != uint32(0);
+if (l_269) {
+break;}
+l_mut_263 = l_mut_263 - int32(1);
+}
+while (true) {
+const bool l_270 = l_mut_263 >= int32(0);
+const bool l_271 = l_270 && l_mut_138;
+const bool l_272 = !l_271;
+if (l_272) {
+break;}
+l_mut_195 = uint32(0);
+l_mut_273 = l_mut_263;
+while (true) {
+const bool l_274 = l_mut_273 >= int32(0);
+const bool l_275 = !l_274;
+if (l_275) {
+break;}
+const uint32 l_276 = uint32(l_mut_273);
+const uint32 l_277 = l_14 + l_276;
+const uint32 l_278 = shared_memory_13[l_277];
+const uint32 l_279 = l_mut_195 << uint32(16);
+const uint32 l_280 = l_278 >> uint32(16);
+const uint32 l_281 = l_279 | l_280;
+const uint32 l_282 = l_281 / uint32(2500);
+const uint32 l_283 = l_282 * uint32(2500);
+const uint32 l_284 = l_281 - l_283;
+const uint32 l_285 = l_284 << uint32(16);
+const uint32 l_286 = l_278 & uint32(65535);
+const uint32 l_287 = l_285 | l_286;
+const uint32 l_288 = l_287 / uint32(2500);
+const uint32 l_289 = l_288 * uint32(2500);
+const uint32 l_290 = l_287 - l_289;
+l_mut_195 = l_290;
+const uint32 l_291 = uint32(l_mut_273);
+const uint32 l_292 = l_14 + l_291;
+const uint32 l_293 = l_282 << uint32(16);
+const uint32 l_294 = l_293 | l_288;
+shared_memory_13[l_292] = l_294;
+l_mut_273 = l_mut_273 - int32(1);
+}
+while (true) {
+const bool l_295 = l_mut_263 >= int32(0);
+const bool l_296 = !l_295;
+if (l_296) {
+break;}
+const uint32 l_297 = uint32(l_mut_263);
+const uint32 l_298 = l_14 + l_297;
+const uint32 l_299 = shared_memory_13[l_298];
+const bool l_300 = l_299 != uint32(0);
+if (l_300) {
+break;}
+l_mut_263 = l_mut_263 - int32(1);
+}
+l_mut_301 = l_mut_195;
+l_mut_57 = uint64(0);
+const bool l_302 = l_mut_263 >= int32(0);
+if (l_302) {
+const uint32 l_303 = l_mut_301 / uint32(50);
+const uint32 l_304 = l_303 * uint32(50);
+const uint32 l_305 = l_mut_301 - l_304;
+l_mut_301 = l_303;
+const uint64 l_306 = uint64(l_305);
+const uint64 l_307 = uint64(1) << l_306;
+const uint64 l_308 = l_mut_130 & l_307;
+l_mut_57 = l_mut_57 | l_308;
+l_mut_130 = l_mut_130 | l_307;
+const uint32 l_309 = l_mut_301 / uint32(50);
+const uint32 l_310 = l_309 * uint32(50);
+const uint32 l_311 = l_mut_301 - l_310;
+l_mut_301 = l_309;
+const uint64 l_312 = uint64(l_311);
+const uint64 l_313 = uint64(1) << l_312;
+const uint64 l_314 = l_mut_130 & l_313;
+l_mut_57 = l_mut_57 | l_314;
+l_mut_130 = l_mut_130 | l_313;
+} else {
+while (true) {
+const bool l_315 = l_mut_301 != uint32(0);
+const bool l_316 = !l_315;
+if (l_316) {
+break;}
+const uint32 l_317 = l_mut_301 / uint32(50);
+const uint32 l_318 = l_317 * uint32(50);
+const uint32 l_319 = l_mut_301 - l_318;
+l_mut_301 = l_317;
+const uint64 l_320 = uint64(l_319);
+const uint64 l_321 = uint64(1) << l_320;
+const uint64 l_322 = l_mut_130 & l_321;
+l_mut_57 = l_mut_57 | l_322;
+l_mut_130 = l_mut_130 | l_321;
+}
+}
+const bool l_323 = l_mut_57 != uint64(0);
+if (l_323) {
+l_mut_138 = bool(false);
+}
+}
+if (l_mut_138) {
+const uint32 l_324 = l_14 + uint32(0);
+shared_memory_13[l_324] = uint32(0);
+const uint32 l_325 = l_14 + uint32(1);
+shared_memory_13[l_325] = uint32(0);
+const uint32 l_326 = l_14 + uint32(2);
+shared_memory_13[l_326] = uint32(0);
+const uint32 l_327 = l_14 + uint32(3);
+shared_memory_13[l_327] = uint32(0);
+const uint32 l_328 = l_14 + uint32(4);
+shared_memory_13[l_328] = uint32(0);
+const uint32 l_329 = l_14 + uint32(5);
+shared_memory_13[l_329] = uint32(0);
+l_mut_57 = uint64(0);
+const uint32 l_330 = l_arr_208[uint32(0)];
+const uint64 l_331 = uint64(l_330);
+const uint32 l_332 = l_arr_203[uint32(0)];
+const uint64 l_333 = uint64(l_332);
+const uint64 l_334 = l_331 * l_333;
+const uint32 l_335 = l_14 + uint32(0);
+const uint32 l_336 = shared_memory_13[l_335];
+const uint64 l_337 = uint64(l_336);
+const uint64 l_338 = l_334 + l_337;
+const uint64 l_339 = l_338 + l_mut_57;
+const uint32 l_340 = l_14 + uint32(0);
+const uint32 l_341 = uint32(l_339);
+shared_memory_13[l_340] = l_341;
+const uint64 l_342 = l_339 >> uint64(32);
+l_mut_57 = l_342;
+const uint32 l_343 = l_arr_208[uint32(0)];
+const uint64 l_344 = uint64(l_343);
+const uint32 l_345 = l_arr_203[uint32(1)];
+const uint64 l_346 = uint64(l_345);
+const uint64 l_347 = l_344 * l_346;
+const uint32 l_348 = l_14 + uint32(1);
+const uint32 l_349 = shared_memory_13[l_348];
+const uint64 l_350 = uint64(l_349);
+const uint64 l_351 = l_347 + l_350;
+const uint64 l_352 = l_351 + l_mut_57;
+const uint32 l_353 = l_14 + uint32(1);
+const uint32 l_354 = uint32(l_352);
+shared_memory_13[l_353] = l_354;
+const uint64 l_355 = l_352 >> uint64(32);
+l_mut_57 = l_355;
+const uint32 l_356 = l_14 + uint32(2);
+const uint32 l_357 = uint32(l_mut_57);
+shared_memory_13[l_356] = l_357;
+l_mut_57 = uint64(0);
+const uint32 l_358 = l_arr_208[uint32(1)];
+const uint64 l_359 = uint64(l_358);
+const uint32 l_360 = l_arr_203[uint32(0)];
+const uint64 l_361 = uint64(l_360);
+const uint64 l_362 = l_359 * l_361;
+const uint32 l_363 = l_14 + uint32(1);
+const uint32 l_364 = shared_memory_13[l_363];
+const uint64 l_365 = uint64(l_364);
+const uint64 l_366 = l_362 + l_365;
+const uint64 l_367 = l_366 + l_mut_57;
+const uint32 l_368 = l_14 + uint32(1);
+const uint32 l_369 = uint32(l_367);
+shared_memory_13[l_368] = l_369;
+const uint64 l_370 = l_367 >> uint64(32);
+l_mut_57 = l_370;
+const uint32 l_371 = l_arr_208[uint32(1)];
+const uint64 l_372 = uint64(l_371);
+const uint32 l_373 = l_arr_203[uint32(1)];
+const uint64 l_374 = uint64(l_373);
+const uint64 l_375 = l_372 * l_374;
+const uint32 l_376 = l_14 + uint32(2);
+const uint32 l_377 = shared_memory_13[l_376];
+const uint64 l_378 = uint64(l_377);
+const uint64 l_379 = l_375 + l_378;
+const uint64 l_380 = l_379 + l_mut_57;
+const uint32 l_381 = l_14 + uint32(2);
+const uint32 l_382 = uint32(l_380);
+shared_memory_13[l_381] = l_382;
+const uint64 l_383 = l_380 >> uint64(32);
+l_mut_57 = l_383;
+const uint32 l_384 = l_14 + uint32(3);
+const uint32 l_385 = uint32(l_mut_57);
+shared_memory_13[l_384] = l_385;
+l_mut_57 = uint64(0);
+const uint32 l_386 = l_arr_208[uint32(2)];
+const uint64 l_387 = uint64(l_386);
+const uint32 l_388 = l_arr_203[uint32(0)];
+const uint64 l_389 = uint64(l_388);
+const uint64 l_390 = l_387 * l_389;
+const uint32 l_391 = l_14 + uint32(2);
+const uint32 l_392 = shared_memory_13[l_391];
+const uint64 l_393 = uint64(l_392);
+const uint64 l_394 = l_390 + l_393;
+const uint64 l_395 = l_394 + l_mut_57;
+const uint32 l_396 = l_14 + uint32(2);
+const uint32 l_397 = uint32(l_395);
+shared_memory_13[l_396] = l_397;
+const uint64 l_398 = l_395 >> uint64(32);
+l_mut_57 = l_398;
+const uint32 l_399 = l_arr_208[uint32(2)];
+const uint64 l_400 = uint64(l_399);
+const uint32 l_401 = l_arr_203[uint32(1)];
+const uint64 l_402 = uint64(l_401);
+const uint64 l_403 = l_400 * l_402;
+const uint32 l_404 = l_14 + uint32(3);
+const uint32 l_405 = shared_memory_13[l_404];
+const uint64 l_406 = uint64(l_405);
+const uint64 l_407 = l_403 + l_406;
+const uint64 l_408 = l_407 + l_mut_57;
+const uint32 l_409 = l_14 + uint32(3);
+const uint32 l_410 = uint32(l_408);
+shared_memory_13[l_409] = l_410;
+const uint64 l_411 = l_408 >> uint64(32);
+l_mut_57 = l_411;
+const uint32 l_412 = l_14 + uint32(4);
+const uint32 l_413 = uint32(l_mut_57);
+shared_memory_13[l_412] = l_413;
+l_mut_57 = uint64(0);
+const uint32 l_414 = l_arr_208[uint32(3)];
+const uint64 l_415 = uint64(l_414);
+const uint32 l_416 = l_arr_203[uint32(0)];
+const uint64 l_417 = uint64(l_416);
+const uint64 l_418 = l_415 * l_417;
+const uint32 l_419 = l_14 + uint32(3);
+const uint32 l_420 = shared_memory_13[l_419];
+const uint64 l_421 = uint64(l_420);
+const uint64 l_422 = l_418 + l_421;
+const uint64 l_423 = l_422 + l_mut_57;
+const uint32 l_424 = l_14 + uint32(3);
+const uint32 l_425 = uint32(l_423);
+shared_memory_13[l_424] = l_425;
+const uint64 l_426 = l_423 >> uint64(32);
+l_mut_57 = l_426;
+const uint32 l_427 = l_arr_208[uint32(3)];
+const uint64 l_428 = uint64(l_427);
+const uint32 l_429 = l_arr_203[uint32(1)];
+const uint64 l_430 = uint64(l_429);
+const uint64 l_431 = l_428 * l_430;
+const uint32 l_432 = l_14 + uint32(4);
+const uint32 l_433 = shared_memory_13[l_432];
+const uint64 l_434 = uint64(l_433);
+const uint64 l_435 = l_431 + l_434;
+const uint64 l_436 = l_435 + l_mut_57;
+const uint32 l_437 = l_14 + uint32(4);
+const uint32 l_438 = uint32(l_436);
+shared_memory_13[l_437] = l_438;
+const uint64 l_439 = l_436 >> uint64(32);
+l_mut_57 = l_439;
+const uint32 l_440 = l_14 + uint32(5);
+const uint32 l_441 = uint32(l_mut_57);
+shared_memory_13[l_440] = l_441;
+l_mut_273 = int32(5);
+while (true) {
+const bool l_442 = l_mut_273 >= int32(0);
+const bool l_443 = !l_442;
+if (l_443) {
+break;}
+const uint32 l_444 = uint32(l_mut_273);
+const uint32 l_445 = l_14 + l_444;
+const uint32 l_446 = shared_memory_13[l_445];
+const bool l_447 = l_446 != uint32(0);
+if (l_447) {
+break;}
+l_mut_273 = l_mut_273 - int32(1);
+}
+while (true) {
+const bool l_448 = l_mut_273 >= int32(0);
+const bool l_449 = l_448 && l_mut_138;
+const bool l_450 = !l_449;
+if (l_450) {
+break;}
+l_mut_301 = uint32(0);
+l_mut_451 = l_mut_273;
+while (true) {
+const bool l_452 = l_mut_451 >= int32(0);
+const bool l_453 = !l_452;
+if (l_453) {
+break;}
+const uint32 l_454 = uint32(l_mut_451);
+const uint32 l_455 = l_14 + l_454;
+const uint32 l_456 = shared_memory_13[l_455];
+const uint32 l_457 = l_mut_301 << uint32(16);
+const uint32 l_458 = l_456 >> uint32(16);
+const uint32 l_459 = l_457 | l_458;
+const uint32 l_460 = l_459 / uint32(2500);
+const uint32 l_461 = l_460 * uint32(2500);
+const uint32 l_462 = l_459 - l_461;
+const uint32 l_463 = l_462 << uint32(16);
+const uint32 l_464 = l_456 & uint32(65535);
+const uint32 l_465 = l_463 | l_464;
+const uint32 l_466 = l_465 / uint32(2500);
+const uint32 l_467 = l_466 * uint32(2500);
+const uint32 l_468 = l_465 - l_467;
+l_mut_301 = l_468;
+const uint32 l_469 = uint32(l_mut_451);
+const uint32 l_470 = l_14 + l_469;
+const uint32 l_471 = l_460 << uint32(16);
+const uint32 l_472 = l_471 | l_466;
+shared_memory_13[l_470] = l_472;
+l_mut_451 = l_mut_451 - int32(1);
+}
+while (true) {
+const bool l_473 = l_mut_273 >= int32(0);
+const bool l_474 = !l_473;
+if (l_474) {
+break;}
+const uint32 l_475 = uint32(l_mut_273);
+const uint32 l_476 = l_14 + l_475;
+const uint32 l_477 = shared_memory_13[l_476];
+const bool l_478 = l_477 != uint32(0);
+if (l_478) {
+break;}
+l_mut_273 = l_mut_273 - int32(1);
+}
+l_mut_195 = l_mut_301;
+l_mut_57 = uint64(0);
+const bool l_479 = l_mut_273 >= int32(0);
+if (l_479) {
+const uint32 l_480 = l_mut_195 / uint32(50);
+const uint32 l_481 = l_480 * uint32(50);
+const uint32 l_482 = l_mut_195 - l_481;
+l_mut_195 = l_480;
+const uint64 l_483 = uint64(l_482);
+const uint64 l_484 = uint64(1) << l_483;
+const uint64 l_485 = l_mut_130 & l_484;
+l_mut_57 = l_mut_57 | l_485;
+l_mut_130 = l_mut_130 | l_484;
+const uint32 l_486 = l_mut_195 / uint32(50);
+const uint32 l_487 = l_486 * uint32(50);
+const uint32 l_488 = l_mut_195 - l_487;
+l_mut_195 = l_486;
+const uint64 l_489 = uint64(l_488);
+const uint64 l_490 = uint64(1) << l_489;
+const uint64 l_491 = l_mut_130 & l_490;
+l_mut_57 = l_mut_57 | l_491;
+l_mut_130 = l_mut_130 | l_490;
+} else {
+while (true) {
+const bool l_492 = l_mut_195 != uint32(0);
+const bool l_493 = !l_492;
+if (l_493) {
+break;}
+const uint32 l_494 = l_mut_195 / uint32(50);
+const uint32 l_495 = l_494 * uint32(50);
+const uint32 l_496 = l_mut_195 - l_495;
+l_mut_195 = l_494;
+const uint64 l_497 = uint64(l_496);
+const uint64 l_498 = uint64(1) << l_497;
+const uint64 l_499 = l_mut_130 & l_498;
+l_mut_57 = l_mut_57 | l_499;
+l_mut_130 = l_mut_130 | l_498;
+}
+}
+const bool l_500 = l_mut_57 != uint64(0);
+if (l_500) {
+l_mut_138 = bool(false);
+}
+}
+}
+}
+if (l_mut_138) {
+const uint32 l_501 = uint32(l_mut_130);
+const uint32 l_502 = uint32(__popc(l_501));
+const uint64 l_503 = l_mut_130 >> uint64(32);
+const uint32 l_504 = uint32(l_503);
+const uint32 l_505 = uint32(__popc(l_504));
+const uint32 l_506 = l_502 + l_505;
+l_mut_301 = l_506;
+const bool l_507 = l_mut_301 == uint32(50);
+const bool l_508 = bool(false) || l_507;
+if (l_508) {
+uint32* l_509 = &buffer_4[uint32(0)];
+const uint32 l_510 = atomicAdd(l_509, uint32(1));
+const bool l_511 = l_510 < info.scalars_uint32[6];
+if (l_511) {
+const uint32 l_512 = uint32(4) * l_510;
+const uint32 l_513 = uint32(l_200);
+buffer_3[l_512] = l_513;
+const uint32 l_514 = l_512 + uint32(1);
+const uint64 l_515 = l_200 >> uint64(32);
+const uint32 l_516 = uint32(l_515);
+buffer_3[l_514] = l_516;
+const uint32 l_517 = l_512 + uint32(2);
+const uint32 l_518 = uint32(l_201);
+buffer_3[l_517] = l_518;
+const uint32 l_519 = l_512 + uint32(3);
+const uint64 l_520 = l_201 >> uint64(32);
+const uint32 l_521 = uint32(l_520);
+buffer_3[l_519] = l_521;
+}
+}
+}
+}
+l_mut_37 = l_mut_37 - l_mut_110;
+const bool l_522 = l_mut_37 == uint32(0);
+const bool l_523 = l_186 && l_522;
+if (l_523) {
+break;}
+}
+const bool l_524 = l_mut_16 != uint32(0);
+const bool l_525 = l_mut_17 != uint32(0);
+const bool l_526 = l_524 || l_525;
+if (l_526) {
+uint32* l_527 = &shared_memory_15[uint32(2)];
+const uint32 l_528 = atomicAdd(l_527, l_mut_16);
+uint32* l_529 = &shared_memory_15[uint32(3)];
+const uint32 l_530 = atomicAdd(l_529, l_mut_17);
+}
+__syncthreads();
+
+const bool l_531 = threadIdx.x == uint32(0);
+if (l_531) {
+uint32* l_532 = &shared_memory_15[uint32(2)];
+const uint32 l_533 = atomicAdd(l_532, uint32(0));
+uint32* l_534 = &shared_memory_15[uint32(3)];
+const uint32 l_535 = atomicAdd(l_534, uint32(0));
+const bool l_536 = l_533 != uint32(0);
+const bool l_537 = l_535 != uint32(0);
+const bool l_538 = l_536 || l_537;
+if (l_538) {
+uint32* l_539 = &buffer_4[uint32(1)];
+const uint32 l_540 = atomicAdd(l_539, l_533);
+uint32* l_541 = &buffer_4[uint32(2)];
+const uint32 l_542 = atomicAdd(l_541, l_535);
+}
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<
+    cubecl_cuda::runtime::CudaRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::niceonly_kernel::NiceonlyKernel<cubecl_cuda::runtime::CudaRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 256,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: NiceonlyKernelInfo {
+        base: 50,
+        limbs: 2,
+        chunk_digits: 2,
+        chunk_div: 2500,
+        wide_chunk: false,
+        stride_m: 6125000,
+        stride_r: 568272,
+        offset_chunk_bits: 8,
+        pre_limbs: 0,
+        pre_chunk_digits: 0,
+        pre_chunk_div: 0,
+        probe: false,
+        cross: true,
+        compact: true,
+        plane_scoped: false,
+        ballot: true,
+        test_bits: 0,
+        residues: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_offsets: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_lens: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_out: ArrayCompilationArg {
+            inplace: None,
+        },
+        nice_count: ArrayCompilationArg {
+            inplace: None,
+        },
+        low_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        range_masks: ArrayCompilationArg {
+            inplace: None,
+        },
+        fs0: (),
+        fs1: (),
+        fs2: (),
+        fs3: (),
+        fs_mod_m: (),
+        num_ranges: (),
+        nice_cap: (),
+        lane_shift: (),
+    },
+}
+source:
+```cpp
+#include <cuda_runtime.h>
+typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+typedef signed long long int int64;
+
+struct __align__(16) uint32_4 {
+    uint32 i_0;
+    uint32 i_1;
+    uint32 i_2;
+    uint32 i_3;
+};
+struct info_st {
+    uint32 scalars_uint32[8];uint32 static_meta[14];
+};
+
+
+extern "C" __global__ void __launch_bounds__(256)niceonly_kernel (
+    const uint32* __restrict__ buffer_0, const uint32* __restrict__ buffer_1, const uint32* __restrict__ buffer_2, uint32* buffer_3, uint32* buffer_4, const uint32* __restrict__ buffer_5, const uint32* __restrict__ buffer_6, const __grid_constant__ info_st info
+) {
+uint3 absoluteIdx = make_uint3(
+    blockIdx.x * blockDim.x + threadIdx.x,
+    blockIdx.y * blockDim.y + threadIdx.y,
+    blockIdx.z * blockDim.z + threadIdx.z
+);
+uint32 idxGlobal = (
+                absoluteIdx.z * gridDim.x * blockDim.x * gridDim.y * blockDim.y)
+                + (absoluteIdx.y * gridDim.x * blockDim.x)
+                + absoluteIdx.x;
+uint32 warpSizeChecked = min(warpSize, blockDim.x * blockDim.y * blockDim.z);
+extern __shared__ __align__(8) uint8 dynamic_shared_mem[];
+// Shared array size: 4, 16 bytes
+uint32 *shared_memory_15 = reinterpret_cast<uint32*>(&dynamic_shared_mem[8192]);
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_22 = reinterpret_cast<uint64*>(&dynamic_shared_mem[4096]);
+// Shared array size: 512, 4096 bytes
+uint64 *shared_memory_23 = reinterpret_cast<uint64*>(&dynamic_shared_mem[0]);
+// Shared array size: 1792, 7168 bytes
+uint32 *shared_memory_13 = reinterpret_cast<uint32*>(&dynamic_shared_mem[8208]);
+uint32 l_arr_200[2];
+
+uint32 l_arr_205[4];
+
+uint64 l_mut_31;
+uint64 l_mut_32;
+uint64 l_mut_33;
+uint64 l_mut_34;
+uint64 l_mut_35;
+uint64 l_mut_57;
+uint64 l_mut_119;
+uint64 l_mut_130;
+int32 l_mut_260;
+int32 l_mut_271;
+int32 l_mut_449;
+bool l_mut_29;
+bool l_mut_30;
+bool l_mut_138;
+uint32 l_mut_16;
+uint32 l_mut_17;
+uint32 l_mut_18;
+uint32 l_mut_27;
+uint32 l_mut_36;
+uint32 l_mut_37;
+uint32 l_mut_63;
+uint32 l_mut_110;
+uint32 l_mut_172;
+uint32 l_mut_270;
+uint32 l_mut_299;
+const uint32 l_0 = uint32(1) << info.scalars_uint32[7];
+const uint32 l_1 = l_0 - uint32(1);
+const uint32 l_2 = absoluteIdx.x & l_1;
+const uint32 l_3 = gridDim.x * blockDim.x;
+const uint32 l_4 = l_3 >> info.scalars_uint32[7];
+const uint64 l_5 = uint64(info.scalars_uint32[1]);
+const uint64 l_6 = l_5 << uint64(32);
+const uint64 l_7 = uint64(info.scalars_uint32[0]);
+const uint64 l_8 = l_6 | l_7;
+const uint64 l_9 = uint64(info.scalars_uint32[3]);
+const uint64 l_10 = l_9 << uint64(32);
+const uint64 l_11 = uint64(info.scalars_uint32[2]);
+const uint64 l_12 = l_10 | l_11;
+const uint32 l_14 = threadIdx.x * uint32(7);
+l_mut_16 = uint32(0);
+l_mut_17 = uint32(0);
+l_mut_18 = threadIdx.x;
+while (true) {
+const bool l_19 = l_mut_18 < uint32(4);
+const bool l_20 = !l_19;
+if (l_20) {
+break;}
+uint32* l_21 = &shared_memory_15[l_mut_18];
+uint32 _tmp_0 = atomicExch(l_21, uint32(0));
+l_mut_18 = l_mut_18 + blockDim.x;
+}
+const uint32 l_24 = uint32(1) << uint32(idxGlobal) % warpSize;
+const uint32 l_25 = l_24 - uint32(1);
+l_mut_18 = uint32(0);
+const uint32 l_26 = absoluteIdx.x >> info.scalars_uint32[7];
+l_mut_27 = l_26;
+const bool l_28 = l_mut_27 < info.scalars_uint32[5];
+l_mut_29 = l_28;
+l_mut_30 = l_mut_29;
+l_mut_31 = uint64(0);
+l_mut_32 = uint64(0);
+l_mut_33 = uint64(0);
+l_mut_34 = uint64(0);
+l_mut_35 = uint64(0);
+l_mut_36 = uint32(0);
+l_mut_37 = uint32(0);
+while (true) {
+if (l_mut_30) {
+l_mut_30 = bool(false);
+const uint32 l_38 = uint32(2) * l_mut_27;
+const uint32 l_39 = buffer_1[l_38];
+const uint32 l_40 = uint32(2) * l_mut_27;
+const uint32 l_41 = l_40 + uint32(1);
+const uint32 l_42 = buffer_1[l_41];
+const uint64 l_43 = uint64(l_42);
+const uint64 l_44 = l_43 << uint64(32);
+const uint64 l_45 = uint64(l_39);
+const uint64 l_46 = l_44 | l_45;
+l_mut_31 = uint64(0);
+const uint32 l_47 = uint32(2) * l_mut_27;
+const uint32 l_48 = l_47 + uint32(1);
+const uint32 l_49 = buffer_6[l_48];
+const uint64 l_50 = uint64(l_49);
+const uint64 l_51 = l_50 << uint64(32);
+const uint32 l_52 = uint32(2) * l_mut_27;
+const uint32 l_53 = buffer_6[l_52];
+const uint64 l_54 = uint64(l_53);
+const uint64 l_55 = l_51 | l_54;
+l_mut_31 = l_55;
+const uint64 l_56 = l_8 + l_46;
+l_mut_57 = l_12;
+const bool l_58 = l_56 < l_8;
+if (l_58) {
+l_mut_57 = l_mut_57 + uint64(1);
+}
+const uint32 l_59 = buffer_2[l_mut_27];
+const uint64 l_60 = uint64(l_59);
+const uint64 l_61 = l_56 + l_60;
+l_mut_32 = l_61;
+l_mut_33 = l_mut_57;
+const bool l_62 = l_mut_32 < l_56;
+if (l_62) {
+l_mut_33 = l_mut_33 + uint64(1);
+}
+l_mut_63 = uint32(0);
+const uint32 l_64 = l_mut_63 << uint32(8);
+const uint32 l_65 = l_42 >> uint32(24);
+const uint32 l_66 = l_65 & uint32(255);
+const uint32 l_67 = l_64 | l_66;
+const uint32 l_68 = l_67 % uint32(6125000);
+l_mut_63 = l_68;
+const uint32 l_69 = l_mut_63 << uint32(8);
+const uint32 l_70 = l_42 >> uint32(16);
+const uint32 l_71 = l_70 & uint32(255);
+const uint32 l_72 = l_69 | l_71;
+const uint32 l_73 = l_72 % uint32(6125000);
+l_mut_63 = l_73;
+const uint32 l_74 = l_mut_63 << uint32(8);
+const uint32 l_75 = l_42 >> uint32(8);
+const uint32 l_76 = l_75 & uint32(255);
+const uint32 l_77 = l_74 | l_76;
+const uint32 l_78 = l_77 % uint32(6125000);
+l_mut_63 = l_78;
+const uint32 l_79 = l_mut_63 << uint32(8);
+const uint32 l_80 = l_42 >> uint32(0);
+const uint32 l_81 = l_80 & uint32(255);
+const uint32 l_82 = l_79 | l_81;
+const uint32 l_83 = l_82 % uint32(6125000);
+l_mut_63 = l_83;
+const uint32 l_84 = l_mut_63 << uint32(8);
+const uint32 l_85 = l_39 >> uint32(24);
+const uint32 l_86 = l_85 & uint32(255);
+const uint32 l_87 = l_84 | l_86;
+const uint32 l_88 = l_87 % uint32(6125000);
+l_mut_63 = l_88;
+const uint32 l_89 = l_mut_63 << uint32(8);
+const uint32 l_90 = l_39 >> uint32(16);
+const uint32 l_91 = l_90 & uint32(255);
+const uint32 l_92 = l_89 | l_91;
+const uint32 l_93 = l_92 % uint32(6125000);
+l_mut_63 = l_93;
+const uint32 l_94 = l_mut_63 << uint32(8);
+const uint32 l_95 = l_39 >> uint32(8);
+const uint32 l_96 = l_95 & uint32(255);
+const uint32 l_97 = l_94 | l_96;
+const uint32 l_98 = l_97 % uint32(6125000);
+l_mut_63 = l_98;
+const uint32 l_99 = l_mut_63 << uint32(8);
+const uint32 l_100 = l_39 >> uint32(0);
+const uint32 l_101 = l_100 & uint32(255);
+const uint32 l_102 = l_99 | l_101;
+const uint32 l_103 = l_102 % uint32(6125000);
+l_mut_63 = l_103;
+const uint32 l_104 = info.scalars_uint32[4] + l_mut_63;
+const uint32 l_105 = l_104 % uint32(6125000);
+const uint64 l_106 = uint64(l_105);
+const uint64 l_107 = l_56 - l_106;
+l_mut_34 = l_107;
+l_mut_35 = l_mut_57;
+const uint64 l_108 = uint64(l_105);
+const bool l_109 = l_56 < l_108;
+if (l_109) {
+l_mut_35 = l_mut_35 - uint64(1);
+}
+l_mut_63 = uint32(0);
+l_mut_110 = uint32(568272);
+while (true) {
+const bool l_111 = l_mut_63 < l_mut_110;
+const bool l_112 = !l_111;
+if (l_112) {
+break;}
+const uint32 l_113 = l_mut_63 + l_mut_110;
+const uint32 l_114 = l_113 >> uint32(1);
+const uint32 l_115 = buffer_0[l_114];
+const bool l_116 = l_115 < l_105;
+if (l_116) {
+const uint32 l_117 = l_114 + uint32(1);
+l_mut_63 = l_117;
+} else {
+l_mut_110 = l_114;
+}
+}
+const uint32 l_118 = l_mut_63 + l_2;
+l_mut_36 = l_118;
+}
+l_mut_110 = uint32(0);
+l_mut_57 = uint64(0);
+l_mut_119 = uint64(0);
+if (l_mut_29) {
+const uint32 l_120 = l_mut_36 / uint32(568272);
+const uint32 l_121 = l_120 * uint32(568272);
+const uint32 l_122 = l_mut_36 - l_121;
+const uint64 l_123 = uint64(l_120);
+const uint64 l_124 = uint64(uint32(6125000));
+const uint64 l_125 = l_123 * l_124;
+const uint32 l_126 = buffer_0[l_122];
+const uint64 l_127 = uint64(l_126);
+const uint64 l_128 = l_125 + l_127;
+const uint64 l_129 = l_mut_34 + l_128;
+l_mut_130 = l_mut_35;
+const bool l_131 = l_129 < l_mut_34;
+if (l_131) {
+l_mut_130 = l_mut_130 + uint64(1);
+}
+const bool l_132 = l_mut_130 > l_mut_33;
+const bool l_133 = l_mut_130 == l_mut_33;
+const bool l_134 = l_129 >= l_mut_32;
+const bool l_135 = l_133 && l_134;
+const bool l_136 = l_132 || l_135;
+if (l_136) {
+l_mut_27 = l_mut_27 + l_4;
+const bool l_137 = l_mut_27 < info.scalars_uint32[5];
+if (l_137) {
+l_mut_30 = bool(true);
+} else {
+l_mut_29 = bool(false);
+}
+} else {
+l_mut_138 = bool(false);
+const uint32 l_139 = uint32(2) * l_122;
+const uint32 l_140 = l_139 + uint32(1);
+const uint32 l_141 = buffer_5[l_140];
+const uint64 l_142 = uint64(l_141);
+const uint64 l_143 = l_142 << uint64(32);
+const uint32 l_144 = uint32(2) * l_122;
+const uint32 l_145 = buffer_5[l_144];
+const uint64 l_146 = uint64(l_145);
+const uint64 l_147 = l_143 | l_146;
+const uint64 l_148 = l_147 & l_mut_31;
+const bool l_149 = l_148 != uint64(0);
+if (l_149) {
+l_mut_138 = bool(true);
+}
+const bool l_150 = !l_mut_138;
+if (l_150) {
+l_mut_110 = uint32(1);
+l_mut_57 = l_129;
+l_mut_119 = l_mut_130;
+}
+l_mut_36 = l_mut_36 + l_0;
+}
+}
+const uint32 l_151 = l_mut_110 | uint32(1048576);
+l_mut_63 = l_151;
+if (l_mut_29) {
+l_mut_63 = l_mut_63 | uint32(1024);
+}
+const bool l_152 = l_mut_110 != uint32(0);
+
+const uint32_4 l_153 = { __ballot_sync(-1, l_152), 0, 0, 0 };
+const uint32 l_154 = l_153.i_0;
+
+const uint32_4 l_155 = { __ballot_sync(-1, l_mut_29), 0, 0, 0 };
+const uint32 l_156 = l_155.i_0;
+
+const uint32_4 l_157 = { __ballot_sync(-1, bool(true)), 0, 0, 0 };
+const uint32 l_158 = l_157.i_0;
+const uint32 l_159 = l_154 & l_25;
+const uint32 l_160 = uint32(__popc(l_159));
+const uint32 l_161 = l_158 & l_25;
+const uint32 l_162 = uint32(__popc(l_161));
+const uint32 l_163 = l_158 - uint32(1);
+const uint32 l_164 = l_158 ^ l_163;
+const uint32 l_165 = uint32(__popc(l_164));
+const uint32 l_166 = l_165 - uint32(1);
+const uint32 l_167 = uint32(__popc(l_154));
+const uint32 l_168 = uint32(__popc(l_156));
+const uint32 l_169 = l_168 << uint32(10);
+const uint32 l_170 = l_167 | l_169;
+const uint32 l_171 = l_mut_18 & uint32(1);
+__syncthreads();
+
+l_mut_172 = uint32(0);
+const bool l_173 = l_162 == uint32(0);
+if (l_173) {
+uint32* l_174 = &shared_memory_15[l_171];
+const uint32 l_175 = atomicAdd(l_174, l_170);
+l_mut_172 = l_175;
+}
+const uint32 l_176 = { __shfl_sync(-1, l_mut_172, l_166) };
+const bool l_177 = l_mut_110 != uint32(0);
+if (l_177) {
+const uint32 l_178 = l_176 & uint32(1023);
+const uint32 l_179 = l_mut_37 + l_178;
+const uint32 l_180 = l_179 + l_160;
+shared_memory_22[l_180] = l_mut_57;
+shared_memory_23[l_180] = l_mut_119;
+l_mut_16 = l_mut_16 + uint32(1);
+const uint32 l_181 = uint32(l_mut_57);
+l_mut_17 = l_mut_17 + l_181;
+}
+__syncthreads();
+
+uint32* l_182 = &shared_memory_15[l_171];
+const uint32 l_183 = atomicAdd(l_182, uint32(0));
+const uint32 l_184 = l_183 & uint32(1023);
+const uint32 l_185 = l_183 >> uint32(10);
+const bool l_186 = l_185 == uint32(0);
+l_mut_37 = l_mut_37 + l_184;
+const bool l_187 = threadIdx.x == uint32(0);
+if (l_187) {
+const uint32 l_188 = uint32(1) - l_171;
+uint32* l_189 = &shared_memory_15[l_188];
+uint32 _tmp_1 = atomicExch(l_189, uint32(0));
+}
+l_mut_18 = l_mut_18 + uint32(1);
+l_mut_110 = uint32(0);
+const bool l_190 = l_mut_37 >= blockDim.x;
+if (l_190) {
+l_mut_110 = blockDim.x;
+} else {
+if (l_186) {
+l_mut_110 = l_mut_37;
+}
+}
+const uint32 l_191 = l_mut_37 - l_mut_110;
+const uint32 l_192 = l_191 + threadIdx.x;
+const bool l_193 = threadIdx.x < l_mut_110;
+l_mut_138 = bool(true);
+const bool l_194 = l_193 && l_mut_138;
+if (l_194) {
+l_mut_16 = l_mut_16 - uint32(1);
+const uint64 l_195 = shared_memory_22[l_192];
+const uint32 l_196 = uint32(l_195);
+l_mut_17 = l_mut_17 - l_196;
+const uint64 l_197 = shared_memory_22[l_192];
+const uint64 l_198 = shared_memory_23[l_192];
+l_mut_138 = bool(true);
+l_mut_130 = uint64(0);
+l_mut_119 = uint64(0);
+const bool l_199 = l_mut_138 && bool(true);
+if (l_199) {
+const uint64 l_201 = l_197 >> uint64(0);
+const uint32 l_202 = uint32(l_201);
+l_arr_200[uint32(0)] = l_202;
+const uint64 l_203 = l_197 >> uint64(32);
+const uint32 l_204 = uint32(l_203);
+l_arr_200[uint32(1)] = l_204;
+l_arr_205[uint32(0)] = uint32(0);
+l_arr_205[uint32(1)] = uint32(0);
+l_arr_205[uint32(2)] = uint32(0);
+l_arr_205[uint32(3)] = uint32(0);
+l_mut_57 = uint64(0);
+const uint32 l_206 = l_arr_200[uint32(0)];
+const uint64 l_207 = uint64(l_206);
+const uint32 l_208 = l_arr_200[uint32(0)];
+const uint64 l_209 = uint64(l_208);
+const uint64 l_210 = l_207 * l_209;
+const uint32 l_211 = l_arr_205[uint32(0)];
+const uint64 l_212 = uint64(l_211);
+const uint64 l_213 = l_210 + l_212;
+const uint64 l_214 = l_213 + l_mut_57;
+const uint32 l_215 = uint32(l_214);
+l_arr_205[uint32(0)] = l_215;
+const uint64 l_216 = l_214 >> uint64(32);
+l_mut_57 = l_216;
+const uint32 l_217 = l_arr_200[uint32(0)];
+const uint64 l_218 = uint64(l_217);
+const uint32 l_219 = l_arr_200[uint32(1)];
+const uint64 l_220 = uint64(l_219);
+const uint64 l_221 = l_218 * l_220;
+const uint32 l_222 = l_arr_205[uint32(1)];
+const uint64 l_223 = uint64(l_222);
+const uint64 l_224 = l_221 + l_223;
+const uint64 l_225 = l_224 + l_mut_57;
+const uint32 l_226 = uint32(l_225);
+l_arr_205[uint32(1)] = l_226;
+const uint64 l_227 = l_225 >> uint64(32);
+l_mut_57 = l_227;
+const uint32 l_228 = uint32(l_mut_57);
+l_arr_205[uint32(2)] = l_228;
+l_mut_57 = uint64(0);
+const uint32 l_229 = l_arr_200[uint32(1)];
+const uint64 l_230 = uint64(l_229);
+const uint32 l_231 = l_arr_200[uint32(0)];
+const uint64 l_232 = uint64(l_231);
+const uint64 l_233 = l_230 * l_232;
+const uint32 l_234 = l_arr_205[uint32(1)];
+const uint64 l_235 = uint64(l_234);
+const uint64 l_236 = l_233 + l_235;
+const uint64 l_237 = l_236 + l_mut_57;
+const uint32 l_238 = uint32(l_237);
+l_arr_205[uint32(1)] = l_238;
+const uint64 l_239 = l_237 >> uint64(32);
+l_mut_57 = l_239;
+const uint32 l_240 = l_arr_200[uint32(1)];
+const uint64 l_241 = uint64(l_240);
+const uint32 l_242 = l_arr_200[uint32(1)];
+const uint64 l_243 = uint64(l_242);
+const uint64 l_244 = l_241 * l_243;
+const uint32 l_245 = l_arr_205[uint32(2)];
+const uint64 l_246 = uint64(l_245);
+const uint64 l_247 = l_244 + l_246;
+const uint64 l_248 = l_247 + l_mut_57;
+const uint32 l_249 = uint32(l_248);
+l_arr_205[uint32(2)] = l_249;
+const uint64 l_250 = l_248 >> uint64(32);
+l_mut_57 = l_250;
+const uint32 l_251 = uint32(l_mut_57);
+l_arr_205[uint32(3)] = l_251;
+const uint32 l_252 = l_14 + uint32(0);
+const uint32 l_253 = l_arr_205[uint32(0)];
+shared_memory_13[l_252] = l_253;
+const uint32 l_254 = l_14 + uint32(1);
+const uint32 l_255 = l_arr_205[uint32(1)];
+shared_memory_13[l_254] = l_255;
+const uint32 l_256 = l_14 + uint32(2);
+const uint32 l_257 = l_arr_205[uint32(2)];
+shared_memory_13[l_256] = l_257;
+const uint32 l_258 = l_14 + uint32(3);
+const uint32 l_259 = l_arr_205[uint32(3)];
+shared_memory_13[l_258] = l_259;
+l_mut_260 = int32(3);
+while (true) {
+const bool l_261 = l_mut_260 >= int32(0);
+const bool l_262 = !l_261;
+if (l_262) {
+break;}
+const uint32 l_263 = uint32(l_mut_260);
+const uint32 l_264 = l_14 + l_263;
+const uint32 l_265 = shared_memory_13[l_264];
+const bool l_266 = l_265 != uint32(0);
+if (l_266) {
+break;}
+l_mut_260 = l_mut_260 - int32(1);
+}
+while (true) {
+const bool l_267 = l_mut_260 >= int32(0);
+const bool l_268 = l_267 && l_mut_138;
+const bool l_269 = !l_268;
+if (l_269) {
+break;}
+l_mut_270 = uint32(0);
+l_mut_271 = l_mut_260;
+while (true) {
+const bool l_272 = l_mut_271 >= int32(0);
+const bool l_273 = !l_272;
+if (l_273) {
+break;}
+const uint32 l_274 = uint32(l_mut_271);
+const uint32 l_275 = l_14 + l_274;
+const uint32 l_276 = shared_memory_13[l_275];
+const uint32 l_277 = l_mut_270 << uint32(16);
+const uint32 l_278 = l_276 >> uint32(16);
+const uint32 l_279 = l_277 | l_278;
+const uint32 l_280 = l_279 / uint32(2500);
+const uint32 l_281 = l_280 * uint32(2500);
+const uint32 l_282 = l_279 - l_281;
+const uint32 l_283 = l_282 << uint32(16);
+const uint32 l_284 = l_276 & uint32(65535);
+const uint32 l_285 = l_283 | l_284;
+const uint32 l_286 = l_285 / uint32(2500);
+const uint32 l_287 = l_286 * uint32(2500);
+const uint32 l_288 = l_285 - l_287;
+l_mut_270 = l_288;
+const uint32 l_289 = uint32(l_mut_271);
+const uint32 l_290 = l_14 + l_289;
+const uint32 l_291 = l_280 << uint32(16);
+const uint32 l_292 = l_291 | l_286;
+shared_memory_13[l_290] = l_292;
+l_mut_271 = l_mut_271 - int32(1);
+}
+while (true) {
+const bool l_293 = l_mut_260 >= int32(0);
+const bool l_294 = !l_293;
+if (l_294) {
+break;}
+const uint32 l_295 = uint32(l_mut_260);
+const uint32 l_296 = l_14 + l_295;
+const uint32 l_297 = shared_memory_13[l_296];
+const bool l_298 = l_297 != uint32(0);
+if (l_298) {
+break;}
+l_mut_260 = l_mut_260 - int32(1);
+}
+l_mut_299 = l_mut_270;
+l_mut_57 = uint64(0);
+const bool l_300 = l_mut_260 >= int32(0);
+if (l_300) {
+const uint32 l_301 = l_mut_299 / uint32(50);
+const uint32 l_302 = l_301 * uint32(50);
+const uint32 l_303 = l_mut_299 - l_302;
+l_mut_299 = l_301;
+const uint64 l_304 = uint64(l_303);
+const uint64 l_305 = uint64(1) << l_304;
+const uint64 l_306 = l_mut_130 & l_305;
+l_mut_57 = l_mut_57 | l_306;
+l_mut_130 = l_mut_130 | l_305;
+const uint32 l_307 = l_mut_299 / uint32(50);
+const uint32 l_308 = l_307 * uint32(50);
+const uint32 l_309 = l_mut_299 - l_308;
+l_mut_299 = l_307;
+const uint64 l_310 = uint64(l_309);
+const uint64 l_311 = uint64(1) << l_310;
+const uint64 l_312 = l_mut_130 & l_311;
+l_mut_57 = l_mut_57 | l_312;
+l_mut_130 = l_mut_130 | l_311;
+} else {
+while (true) {
+const bool l_313 = l_mut_299 != uint32(0);
+const bool l_314 = !l_313;
+if (l_314) {
+break;}
+const uint32 l_315 = l_mut_299 / uint32(50);
+const uint32 l_316 = l_315 * uint32(50);
+const uint32 l_317 = l_mut_299 - l_316;
+l_mut_299 = l_315;
+const uint64 l_318 = uint64(l_317);
+const uint64 l_319 = uint64(1) << l_318;
+const uint64 l_320 = l_mut_130 & l_319;
+l_mut_57 = l_mut_57 | l_320;
+l_mut_130 = l_mut_130 | l_319;
+}
+}
+const bool l_321 = l_mut_57 != uint64(0);
+if (l_321) {
+l_mut_138 = bool(false);
+}
+}
+if (l_mut_138) {
+const uint32 l_322 = l_14 + uint32(0);
+shared_memory_13[l_322] = uint32(0);
+const uint32 l_323 = l_14 + uint32(1);
+shared_memory_13[l_323] = uint32(0);
+const uint32 l_324 = l_14 + uint32(2);
+shared_memory_13[l_324] = uint32(0);
+const uint32 l_325 = l_14 + uint32(3);
+shared_memory_13[l_325] = uint32(0);
+const uint32 l_326 = l_14 + uint32(4);
+shared_memory_13[l_326] = uint32(0);
+const uint32 l_327 = l_14 + uint32(5);
+shared_memory_13[l_327] = uint32(0);
+l_mut_57 = uint64(0);
+const uint32 l_328 = l_arr_205[uint32(0)];
+const uint64 l_329 = uint64(l_328);
+const uint32 l_330 = l_arr_200[uint32(0)];
+const uint64 l_331 = uint64(l_330);
+const uint64 l_332 = l_329 * l_331;
+const uint32 l_333 = l_14 + uint32(0);
+const uint32 l_334 = shared_memory_13[l_333];
+const uint64 l_335 = uint64(l_334);
+const uint64 l_336 = l_332 + l_335;
+const uint64 l_337 = l_336 + l_mut_57;
+const uint32 l_338 = l_14 + uint32(0);
+const uint32 l_339 = uint32(l_337);
+shared_memory_13[l_338] = l_339;
+const uint64 l_340 = l_337 >> uint64(32);
+l_mut_57 = l_340;
+const uint32 l_341 = l_arr_205[uint32(0)];
+const uint64 l_342 = uint64(l_341);
+const uint32 l_343 = l_arr_200[uint32(1)];
+const uint64 l_344 = uint64(l_343);
+const uint64 l_345 = l_342 * l_344;
+const uint32 l_346 = l_14 + uint32(1);
+const uint32 l_347 = shared_memory_13[l_346];
+const uint64 l_348 = uint64(l_347);
+const uint64 l_349 = l_345 + l_348;
+const uint64 l_350 = l_349 + l_mut_57;
+const uint32 l_351 = l_14 + uint32(1);
+const uint32 l_352 = uint32(l_350);
+shared_memory_13[l_351] = l_352;
+const uint64 l_353 = l_350 >> uint64(32);
+l_mut_57 = l_353;
+const uint32 l_354 = l_14 + uint32(2);
+const uint32 l_355 = uint32(l_mut_57);
+shared_memory_13[l_354] = l_355;
+l_mut_57 = uint64(0);
+const uint32 l_356 = l_arr_205[uint32(1)];
+const uint64 l_357 = uint64(l_356);
+const uint32 l_358 = l_arr_200[uint32(0)];
+const uint64 l_359 = uint64(l_358);
+const uint64 l_360 = l_357 * l_359;
+const uint32 l_361 = l_14 + uint32(1);
+const uint32 l_362 = shared_memory_13[l_361];
+const uint64 l_363 = uint64(l_362);
+const uint64 l_364 = l_360 + l_363;
+const uint64 l_365 = l_364 + l_mut_57;
+const uint32 l_366 = l_14 + uint32(1);
+const uint32 l_367 = uint32(l_365);
+shared_memory_13[l_366] = l_367;
+const uint64 l_368 = l_365 >> uint64(32);
+l_mut_57 = l_368;
+const uint32 l_369 = l_arr_205[uint32(1)];
+const uint64 l_370 = uint64(l_369);
+const uint32 l_371 = l_arr_200[uint32(1)];
+const uint64 l_372 = uint64(l_371);
+const uint64 l_373 = l_370 * l_372;
+const uint32 l_374 = l_14 + uint32(2);
+const uint32 l_375 = shared_memory_13[l_374];
+const uint64 l_376 = uint64(l_375);
+const uint64 l_377 = l_373 + l_376;
+const uint64 l_378 = l_377 + l_mut_57;
+const uint32 l_379 = l_14 + uint32(2);
+const uint32 l_380 = uint32(l_378);
+shared_memory_13[l_379] = l_380;
+const uint64 l_381 = l_378 >> uint64(32);
+l_mut_57 = l_381;
+const uint32 l_382 = l_14 + uint32(3);
+const uint32 l_383 = uint32(l_mut_57);
+shared_memory_13[l_382] = l_383;
+l_mut_57 = uint64(0);
+const uint32 l_384 = l_arr_205[uint32(2)];
+const uint64 l_385 = uint64(l_384);
+const uint32 l_386 = l_arr_200[uint32(0)];
+const uint64 l_387 = uint64(l_386);
+const uint64 l_388 = l_385 * l_387;
+const uint32 l_389 = l_14 + uint32(2);
+const uint32 l_390 = shared_memory_13[l_389];
+const uint64 l_391 = uint64(l_390);
+const uint64 l_392 = l_388 + l_391;
+const uint64 l_393 = l_392 + l_mut_57;
+const uint32 l_394 = l_14 + uint32(2);
+const uint32 l_395 = uint32(l_393);
+shared_memory_13[l_394] = l_395;
+const uint64 l_396 = l_393 >> uint64(32);
+l_mut_57 = l_396;
+const uint32 l_397 = l_arr_205[uint32(2)];
+const uint64 l_398 = uint64(l_397);
+const uint32 l_399 = l_arr_200[uint32(1)];
+const uint64 l_400 = uint64(l_399);
+const uint64 l_401 = l_398 * l_400;
+const uint32 l_402 = l_14 + uint32(3);
+const uint32 l_403 = shared_memory_13[l_402];
+const uint64 l_404 = uint64(l_403);
+const uint64 l_405 = l_401 + l_404;
+const uint64 l_406 = l_405 + l_mut_57;
+const uint32 l_407 = l_14 + uint32(3);
+const uint32 l_408 = uint32(l_406);
+shared_memory_13[l_407] = l_408;
+const uint64 l_409 = l_406 >> uint64(32);
+l_mut_57 = l_409;
+const uint32 l_410 = l_14 + uint32(4);
+const uint32 l_411 = uint32(l_mut_57);
+shared_memory_13[l_410] = l_411;
+l_mut_57 = uint64(0);
+const uint32 l_412 = l_arr_205[uint32(3)];
+const uint64 l_413 = uint64(l_412);
+const uint32 l_414 = l_arr_200[uint32(0)];
+const uint64 l_415 = uint64(l_414);
+const uint64 l_416 = l_413 * l_415;
+const uint32 l_417 = l_14 + uint32(3);
+const uint32 l_418 = shared_memory_13[l_417];
+const uint64 l_419 = uint64(l_418);
+const uint64 l_420 = l_416 + l_419;
+const uint64 l_421 = l_420 + l_mut_57;
+const uint32 l_422 = l_14 + uint32(3);
+const uint32 l_423 = uint32(l_421);
+shared_memory_13[l_422] = l_423;
+const uint64 l_424 = l_421 >> uint64(32);
+l_mut_57 = l_424;
+const uint32 l_425 = l_arr_205[uint32(3)];
+const uint64 l_426 = uint64(l_425);
+const uint32 l_427 = l_arr_200[uint32(1)];
+const uint64 l_428 = uint64(l_427);
+const uint64 l_429 = l_426 * l_428;
+const uint32 l_430 = l_14 + uint32(4);
+const uint32 l_431 = shared_memory_13[l_430];
+const uint64 l_432 = uint64(l_431);
+const uint64 l_433 = l_429 + l_432;
+const uint64 l_434 = l_433 + l_mut_57;
+const uint32 l_435 = l_14 + uint32(4);
+const uint32 l_436 = uint32(l_434);
+shared_memory_13[l_435] = l_436;
+const uint64 l_437 = l_434 >> uint64(32);
+l_mut_57 = l_437;
+const uint32 l_438 = l_14 + uint32(5);
+const uint32 l_439 = uint32(l_mut_57);
+shared_memory_13[l_438] = l_439;
+l_mut_271 = int32(5);
+while (true) {
+const bool l_440 = l_mut_271 >= int32(0);
+const bool l_441 = !l_440;
+if (l_441) {
+break;}
+const uint32 l_442 = uint32(l_mut_271);
+const uint32 l_443 = l_14 + l_442;
+const uint32 l_444 = shared_memory_13[l_443];
+const bool l_445 = l_444 != uint32(0);
+if (l_445) {
+break;}
+l_mut_271 = l_mut_271 - int32(1);
+}
+while (true) {
+const bool l_446 = l_mut_271 >= int32(0);
+const bool l_447 = l_446 && l_mut_138;
+const bool l_448 = !l_447;
+if (l_448) {
+break;}
+l_mut_299 = uint32(0);
+l_mut_449 = l_mut_271;
+while (true) {
+const bool l_450 = l_mut_449 >= int32(0);
+const bool l_451 = !l_450;
+if (l_451) {
+break;}
+const uint32 l_452 = uint32(l_mut_449);
+const uint32 l_453 = l_14 + l_452;
+const uint32 l_454 = shared_memory_13[l_453];
+const uint32 l_455 = l_mut_299 << uint32(16);
+const uint32 l_456 = l_454 >> uint32(16);
+const uint32 l_457 = l_455 | l_456;
+const uint32 l_458 = l_457 / uint32(2500);
+const uint32 l_459 = l_458 * uint32(2500);
+const uint32 l_460 = l_457 - l_459;
+const uint32 l_461 = l_460 << uint32(16);
+const uint32 l_462 = l_454 & uint32(65535);
+const uint32 l_463 = l_461 | l_462;
+const uint32 l_464 = l_463 / uint32(2500);
+const uint32 l_465 = l_464 * uint32(2500);
+const uint32 l_466 = l_463 - l_465;
+l_mut_299 = l_466;
+const uint32 l_467 = uint32(l_mut_449);
+const uint32 l_468 = l_14 + l_467;
+const uint32 l_469 = l_458 << uint32(16);
+const uint32 l_470 = l_469 | l_464;
+shared_memory_13[l_468] = l_470;
+l_mut_449 = l_mut_449 - int32(1);
+}
+while (true) {
+const bool l_471 = l_mut_271 >= int32(0);
+const bool l_472 = !l_471;
+if (l_472) {
+break;}
+const uint32 l_473 = uint32(l_mut_271);
+const uint32 l_474 = l_14 + l_473;
+const uint32 l_475 = shared_memory_13[l_474];
+const bool l_476 = l_475 != uint32(0);
+if (l_476) {
+break;}
+l_mut_271 = l_mut_271 - int32(1);
+}
+l_mut_270 = l_mut_299;
+l_mut_57 = uint64(0);
+const bool l_477 = l_mut_271 >= int32(0);
+if (l_477) {
+const uint32 l_478 = l_mut_270 / uint32(50);
+const uint32 l_479 = l_478 * uint32(50);
+const uint32 l_480 = l_mut_270 - l_479;
+l_mut_270 = l_478;
+const uint64 l_481 = uint64(l_480);
+const uint64 l_482 = uint64(1) << l_481;
+const uint64 l_483 = l_mut_130 & l_482;
+l_mut_57 = l_mut_57 | l_483;
+l_mut_130 = l_mut_130 | l_482;
+const uint32 l_484 = l_mut_270 / uint32(50);
+const uint32 l_485 = l_484 * uint32(50);
+const uint32 l_486 = l_mut_270 - l_485;
+l_mut_270 = l_484;
+const uint64 l_487 = uint64(l_486);
+const uint64 l_488 = uint64(1) << l_487;
+const uint64 l_489 = l_mut_130 & l_488;
+l_mut_57 = l_mut_57 | l_489;
+l_mut_130 = l_mut_130 | l_488;
+} else {
+while (true) {
+const bool l_490 = l_mut_270 != uint32(0);
+const bool l_491 = !l_490;
+if (l_491) {
+break;}
+const uint32 l_492 = l_mut_270 / uint32(50);
+const uint32 l_493 = l_492 * uint32(50);
+const uint32 l_494 = l_mut_270 - l_493;
+l_mut_270 = l_492;
+const uint64 l_495 = uint64(l_494);
+const uint64 l_496 = uint64(1) << l_495;
+const uint64 l_497 = l_mut_130 & l_496;
+l_mut_57 = l_mut_57 | l_497;
+l_mut_130 = l_mut_130 | l_496;
+}
+}
+const bool l_498 = l_mut_57 != uint64(0);
+if (l_498) {
+l_mut_138 = bool(false);
+}
+}
+}
+}
+if (l_mut_138) {
+const uint32 l_499 = uint32(l_mut_130);
+const uint32 l_500 = uint32(__popc(l_499));
+const uint64 l_501 = l_mut_130 >> uint64(32);
+const uint32 l_502 = uint32(l_501);
+const uint32 l_503 = uint32(__popc(l_502));
+const uint32 l_504 = l_500 + l_503;
+l_mut_299 = l_504;
+const bool l_505 = l_mut_299 == uint32(50);
+const bool l_506 = bool(false) || l_505;
+if (l_506) {
+uint32* l_507 = &buffer_4[uint32(0)];
+const uint32 l_508 = atomicAdd(l_507, uint32(1));
+const bool l_509 = l_508 < info.scalars_uint32[6];
+if (l_509) {
+const uint32 l_510 = uint32(4) * l_508;
+const uint32 l_511 = uint32(l_197);
+buffer_3[l_510] = l_511;
+const uint32 l_512 = l_510 + uint32(1);
+const uint64 l_513 = l_197 >> uint64(32);
+const uint32 l_514 = uint32(l_513);
+buffer_3[l_512] = l_514;
+const uint32 l_515 = l_510 + uint32(2);
+const uint32 l_516 = uint32(l_198);
+buffer_3[l_515] = l_516;
+const uint32 l_517 = l_510 + uint32(3);
+const uint64 l_518 = l_198 >> uint64(32);
+const uint32 l_519 = uint32(l_518);
+buffer_3[l_517] = l_519;
+}
+}
+}
+}
+l_mut_37 = l_mut_37 - l_mut_110;
+const bool l_520 = l_mut_37 == uint32(0);
+const bool l_521 = l_186 && l_520;
+if (l_521) {
+break;}
+}
+const bool l_522 = l_mut_16 != uint32(0);
+const bool l_523 = l_mut_17 != uint32(0);
+const bool l_524 = l_522 || l_523;
+if (l_524) {
+uint32* l_525 = &shared_memory_15[uint32(2)];
+const uint32 l_526 = atomicAdd(l_525, l_mut_16);
+uint32* l_527 = &shared_memory_15[uint32(3)];
+const uint32 l_528 = atomicAdd(l_527, l_mut_17);
+}
+__syncthreads();
+
+const bool l_529 = threadIdx.x == uint32(0);
+if (l_529) {
+uint32* l_530 = &shared_memory_15[uint32(2)];
+const uint32 l_531 = atomicAdd(l_530, uint32(0));
+uint32* l_532 = &shared_memory_15[uint32(3)];
+const uint32 l_533 = atomicAdd(l_532, uint32(0));
+const bool l_534 = l_531 != uint32(0);
+const bool l_535 = l_533 != uint32(0);
+const bool l_536 = l_534 || l_535;
+if (l_536) {
+uint32* l_537 = &buffer_4[uint32(1)];
+const uint32 l_538 = atomicAdd(l_537, l_531);
+uint32* l_539 = &buffer_4[uint32(2)];
+const uint32 l_540 = atomicAdd(l_539, l_533);
+}
+}
+
+}
+```
+[END_KERNEL_COMPILATION]
+

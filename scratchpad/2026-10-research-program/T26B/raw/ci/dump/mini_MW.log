@@ -1,0 +1,152 @@
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::mini_store_kernel::MiniStoreKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::mini_store_kernel::MiniStoreKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: MiniStoreKernelInfo {
+        distinct: false,
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+struct info_st {
+   static_meta: array<u32, 2>,
+}
+
+@group(0)
+@binding(1)
+var<storage, read> info: info_st;
+
+var<workgroup> shared_memory_0: array<atomic<u32>, 4>;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn mini_store_kernel(
+    @builtin(local_invocation_id) local_invocation_id: vec3<u32>,
+) {
+let l_1 = local_invocation_id.x == u32(0);
+if l_1 {
+let l_2 = &shared_memory_0[u32(0)];
+atomicStore(l_2,u32(7));
+let l_3 = &shared_memory_0[u32(1)];
+atomicStore(l_3,u32(7));
+let l_4 = &shared_memory_0[u32(2)];
+atomicStore(l_4,u32(7));
+let l_5 = &shared_memory_0[u32(3)];
+atomicStore(l_5,u32(7));
+}
+workgroupBarrier();
+let l_6 = local_invocation_id.x == u32(0);
+if l_6 {
+let l_7 = &shared_memory_0[u32(0)];
+let l_8 = atomicLoad(l_7);
+buffer_0_global[u32(0)] = l_8;
+let l_9 = &shared_memory_0[u32(1)];
+let l_10 = atomicLoad(l_9);
+buffer_0_global[u32(1)] = l_10;
+let l_11 = &shared_memory_0[u32(2)];
+let l_12 = atomicLoad(l_11);
+buffer_0_global[u32(2)] = l_12;
+let l_13 = &shared_memory_0[u32(3)];
+let l_14 = atomicLoad(l_13);
+buffer_0_global[u32(3)] = l_14;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
+[START_KERNEL_COMPILATION]
+name: nice_common::cubecl_backend::mini_store_kernel::MiniStoreKernel<
+    cubecl_wgpu::runtime::WgpuRuntime,
+>
+id: KernelId {
+    type: nice_common::cubecl_backend::mini_store_kernel::MiniStoreKernel<cubecl_wgpu::runtime::WgpuRuntime>,
+    address_type: U32,
+    cube_dim: CubeDim {
+        x: 64,
+        y: 1,
+        z: 1,
+    },
+    mode: Unchecked,
+    info: MiniStoreKernelInfo {
+        distinct: true,
+        out: ArrayCompilationArg {
+            inplace: None,
+        },
+    },
+}
+source:
+```wgsl
+@group(0)
+@binding(0)
+var<storage, read_write> buffer_0_global: array<u32>;
+
+struct info_st {
+   static_meta: array<u32, 2>,
+}
+
+@group(0)
+@binding(1)
+var<storage, read> info: info_st;
+
+var<workgroup> shared_memory_0: array<atomic<u32>, 4>;
+
+const WORKGROUP_SIZE_X = 64u;
+const WORKGROUP_SIZE_Y = 1u;
+const WORKGROUP_SIZE_Z = 1u;
+
+@compute
+@workgroup_size(64, 1, 1)
+fn mini_store_kernel(
+    @builtin(local_invocation_id) local_invocation_id: vec3<u32>,
+) {
+let l_1 = local_invocation_id.x == u32(0);
+if l_1 {
+let l_2 = &shared_memory_0[u32(0)];
+atomicStore(l_2,u32(7));
+let l_3 = &shared_memory_0[u32(1)];
+atomicStore(l_3,u32(8));
+let l_4 = &shared_memory_0[u32(2)];
+atomicStore(l_4,u32(9));
+let l_5 = &shared_memory_0[u32(3)];
+atomicStore(l_5,u32(10));
+}
+workgroupBarrier();
+let l_6 = local_invocation_id.x == u32(0);
+if l_6 {
+let l_7 = &shared_memory_0[u32(0)];
+let l_8 = atomicLoad(l_7);
+buffer_0_global[u32(0)] = l_8;
+let l_9 = &shared_memory_0[u32(1)];
+let l_10 = atomicLoad(l_9);
+buffer_0_global[u32(1)] = l_10;
+let l_11 = &shared_memory_0[u32(2)];
+let l_12 = atomicLoad(l_11);
+buffer_0_global[u32(2)] = l_12;
+let l_13 = &shared_memory_0[u32(3)];
+let l_14 = atomicLoad(l_13);
+buffer_0_global[u32(3)] = l_14;
+}
+}
+```
+[END_KERNEL_COMPILATION]
+
