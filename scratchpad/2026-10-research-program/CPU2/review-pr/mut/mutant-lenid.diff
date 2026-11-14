@@ -1,0 +1,13 @@
+diff --git a/common/src/cpu_join.rs b/common/src/cpu_join.rs
+index e0fbf459..d07b8b50 100644
+--- a/common/src/cpu_join.rs
++++ b/common/src/cpu_join.rs
+@@ -172,7 +172,7 @@ impl Scratch {
+     /// one by at most [`RUN_GAP`].
+     fn enter(&mut self, id: u64, v: u32, len: usize) -> bool {
+         let (carry, runs) = match self.last {
+-            Some((last_id, last)) if last_id == id && last < v => (true, v - last <= RUN_GAP),
++            Some((_, last)) if self.next.len() == len && last < v => (true, v - last <= RUN_GAP),
+             _ => (false, false),
+         };
+         if !carry {

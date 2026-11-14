@@ -48,18 +48,27 @@ following shuffle or sum, and `UNIT_POS_PLANE` is the ballot bit (true for CUDA 
 
 | run | result |
 |---|---|
-| new partly-filled-plane test, RTX 3080 (one cube of 256/100/48/36, both queues, ballot and scan) | 64 runs exact (main: 24 of 32 lose survivors) |
+| new partly-filled-plane test, RTX 3080 (one cube of 256/100/48/36 units, both queues; ballot form, and the scan form forced by a test knob) | 64 runs exact (main: 24 of 32 lose survivors) |
+| the same with nine more one-cube sizes (255 down to 9 units), RTX 3080, ballot form | every run exact |
 | same, lavapipe WGSL and SPIR-V (cube-scoped queue, both forms) | 32 runs exact each (main: 8 of 16 lose) |
 | fault tests (skip one entry; check one twice) | the field fails with the account's message (CUDA, lavapipe) |
 | every `cubecl_backend` device test, CUDA and lavapipe (WGSL, SPIR-V) | pass |
 | 120 b54 fields of 1e13 and 6 NiceMark sweeps through the client's path | account zero, same hits as main |
 | host tests, fmt, clippy `-D warnings` (also `nice_client/gpu,cubecl-spirv`) | clean |
 
-Every other kernel's generated code is identical to main's (CUDA join kernels, all WGSL lint shaders).
+CUDA always takes the ballot form. The scan form can only be forced there by the test knob, and CubeCL's CUDA scans read
+every lane of a warp, so on partly filled warps it is undefined: it is exact at the test's sizes (last warps of 4 and 16
+lanes) and wrong in 24 of 60 plane-scoped runs at 255, 63, 31, 17 and 9 units. The account failed the field in every one
+of those runs. WGSL, SPIR-V and Metal define their scans over the running lanes.
+
+The other kernels' sources are untouched; their generated CUDA (join kernels) and WGSL (all lint shaders) compare
+identical to main's.
 
 ## Cost
 
-RTX 3080 at a 130 W power cap, interleaved with main, card cooled before each run, `NICE_JOIN_ROUTE=stride`:
+RTX 3080 at the host's 130 W power cap, interleaved with main, card cooled before each run. Every run forces the stride
+walk (`NICE_JOIN_ROUTE=stride`), which production uses only for the fields the overlap join does not take, so none of
+this is a client-wide speed-up:
 
 | | main | this PR | |
 |---|---|---|---|
@@ -70,7 +79,9 @@ RTX 3080 at a 130 W power cap, interleaved with main, card cooled before each ru
 | NiceMark nice-only, stride forced (median of 6) | 95.1 | 117.4 | ×1.23 |
 
 The gain is the ballot form: two ballots replace CubeCL's exclusive scan and sum (chains of warp shuffles) in every
-iteration. The scan form (64-lane devices) costs about 0.6 % on the plane-scoped queue, within main's run-to-run spread.
+iteration. Not measured at the card's default power limit: under the cap main ran at 1,120–1,160 MHz and this PR at
+1,380–1,415 MHz, so part of the gain here is clock. The scan form, forced on the RTX 3080, costs about 0.6 % on the
+plane-scoped queue, within main's run-to-run spread.
 NiceMark per scenario: b58 msd-weak ×1.46, b60 ×1.13, b62 ×1.39, b58 msd-strong ×1.02 (CPU rejection; rounds spread
 8 % on both sides, one of six at ×0.94).
 
@@ -83,7 +94,9 @@ queue and −1.8 % on the cube-scoped one, as measured on CUDA. The direction sh
 ## Not in this PR
 
 - The plane-scoped queue still cannot run on llvmpipe (it loses the same survivors on main and here with full
-  subgroups, and none with one subgroup per workgroup), so it stays off on software rasterizers.
+  subgroups, and none with one subgroup per workgroup), so it stays off on software rasterizers. The account does not
+  catch that loss there either: its report relies on the final workgroup barrier, which llvmpipe mishandles after
+  subgroup barriers.
 - CubeCL's CUDA lane id (`AbsolutePos % PLANE_DIM`) is wrong past the first cube when cubes are not whole warps.
 - A rank helper shared with `take_entries` (#251) and `top_slot` (#260) once those land.
 

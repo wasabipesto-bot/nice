@@ -5,6 +5,76 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T26B.1 The stride walk's survivor queues without full-plane or lane-0 assumptions; PR #263 (2026-11-14 15:45–19:31 UTC, engineer and independent reviewer; `T26B/RESULTS.md`, `T26B/PR-BODY.md`, `T26B/REVIEW.md`, `T26B/raw/` (box logs, repro patches, host model, `ident_summary.txt`), `T26B/review-model/qmodel.py`, `T26B/review-box/`; fork `pr/stride-queue-any-plane` bf6cc8e = 85fe64a (one commit on main 41b4b40, 650 lines in `cubecl_backend.rs`) + the changelog number and a test comment; box 60665092, RTX 3080 at the host's 130 W cap, 3.78 h, ~$0.43)
+
+- **Reproduced on main** (test-only cube size, one cube, b50 window with 30,449 survivors) [M]: RTX 3080, plane-scoped
+  queue loses 1,064 / 5,072 / 2,958 survivors at cubes of 100 / 48 / 36 units; cube-scoped 1,217 / 10,152 / 3,382;
+  lavapipe (both compilers) cube-scoped 1,217 / 0 / 3,382 (8-lane subgroups fill a 48-unit cube). No production launch
+  does this (256-unit cubes are whole planes on CUDA, Metal, RADV). "No lane 0" and non-linear layouts cannot be
+  shown on CUDA (CubeCL's lane id is `AbsolutePos % 32`): host model, main wrong in 36–100 % of launches per
+  population, the fix in 0 of 12,000 (author) and 0 of 500 per population with interleaved memory operations
+  (reviewer's own model; its two mutants fail almost every launch).
+- **Fix:** ranks, counts and takes from the running lanes (ballot ≤ 32 lanes, one exclusive scan and one sum of a
+  packed word wider); plane-scoped: each plane's lowest running lane reserves two slots per running lane once;
+  cube-scoped: one atomic per plane per iteration on two alternating shared words (the serial walk over plane totals
+  is gone); account = survivors queued − checked and the same for their low words, written only if non-zero, checked
+  by the host in `read_niceonly_hits`.
+- **Exactness** [M]: the new tests exact on CUDA (64 runs) and lavapipe (32 + 32); the reviewer's rebuilds are
+  byte-identical to the author's; main + the test fails as stated (24 of 32 CUDA, 8 of 16 lavapipe per compiler);
+  15 cube sizes on lavapipe 120 / 120 exact, three cubes per launch 120 / 120. **Review F1: the forced scan form on
+  partly filled CUDA warps is undefined (CubeCL's CUDA scans read every lane): wrong in 24 of 60 plane-scoped runs at
+  255 / 63 / 31 / 17 / 9 units, every one caught by the account; CUDA always takes the ballot form, exact at all 13
+  one-cube sizes.** Review F3: on llvmpipe the account does not catch the plane-scoped queue's loss (its report
+  relies on the cube barrier llvmpipe mishandles); production keeps that queue off on software rasterizers.
+- **Speed, CUDA, stride walk forced, 130 W cap** [M]: 40 b54 fields of 1e13: plane-scoped 83.86 → 73.58 s (×1.14,
+  median of 3; reviewer's own builds 81.4, 83.4 → 72.4, 72.4), cube-scoped 93.08 → 73.91 s (×1.26; reviewer 94.2 →
+  73.6); scan form forced +0.6 % / −1.8 %; NiceMark stride-forced ×1.23 (one b58 msd-strong round of six at ×0.94,
+  median ×1.02). **Under the cap main ran at 1,120–1,160 MHz and the fix at 1,380–1,415 MHz: part of the gain is
+  clock; not measured at a default power limit, on a 64-lane device or on Metal.** The stride walk is the join's
+  fallback in production, so this is not a search speed-up.
+- Stands alone on main; with #251 / #260 only the changelog line conflicts.
+
+## CPU2.2 The CPU skip walk as PR #262: review fixes, the real client at 42 and 8 threads, second review (2026-11-14 15:45–19:30 UTC, engineer and independent reviewer; `CPU2/PR-RESULTS.md`, `CPU2/PR-BODY.md`, `CPU2/PR-REVIEW.md`, `CPU2/raw-pr/` (`ab-summary.txt`, `nicemark-summary.txt`, box logs, scripts), `CPU2/review-pr/`; fork `pr/cpu-join-top-skip` 09f612b = 3ba5766 (one commit on main 41b4b40; same tree as `exp/cpu-top-skip-fixes` e2fe1f5) + the changelog number and two doc comments; box 60665025, 2× Xeon E5-2696 v4 container with a 42.24-CPU quota, 3.02 h, ~$0.35)
+
+- **Real `nice_client`, main against the branch, interleaved, medians of 3 rounds** [M] (a local stand-in for the
+  claim API; a measurement-only hook, identical in both, selects slices or partitions and prints the join's time):
+
+  | work | threads | main s | branch s | speed-up | rounds |
+  |---|---|---|---|---|---|
+  | b62 1e17, slice 0 of 7, 3,844 partitions | 42 | 204.4 | 185.0 | **×1.105** | 1.112, 1.101, 1.103 |
+  | b60 1e16, whole field | 42 | 207.2 | 191.7 | **×1.081** | 1.081, 1.079, 1.082 |
+  | b62 1e17, partitions 0–1023 | 8 | 241.3 | 213.5 | ×1.130 | 1.164, 1.124, 1.148 |
+  | b60 1e16, partitions 0–1023 | 8 | 262.1 | 237.5 | ×1.104 | 1.102, 1.114, 1.099 |
+  | b64 1e17, slice 0 of 6 (1 round) | 42 | 816.6 | 806.3 | ×1.013 | |
+
+  Counts identical in every run. The client keeps 75 % (b62) and 61 % (b60) of the one-thread harness's gain at 42
+  threads; why was not measured.
+- **Memory** [M]: peak RSS at 42 threads 360 → 706 MiB (b62), 382–389 → 745 (b60), 374 → 743 (b64): 8.5 MiB a thread;
+  at 8 threads +33 MiB. After the join 196 MiB (main 242; without the free 577).
+- **NiceMark CPU, 4 rounds, 42 threads** [M]: score ×1.003; scenarios ×0.993–×1.016 (bit-reversed partition order: no
+  skip, no loss).
+- **Second review** (`PR-REVIEW.md`): no code change needed. The broadcast free cannot run under the scratch's borrow
+  (a thread takes a broadcast only when idle or blocked in a rayon call; `nice_common` does not depend on rayon;
+  probe: 900 fields ending concurrently never panicked, one `rayon::join` under the borrow panicked at once); two
+  fields' CPU joins never overlap in the client and a clear can only land between partitions (safe: lost skips).
+  The morning's harness re-run on the final tree: run bound against big integers on 8.97 M certified evaluations, 0
+  above the exact run; main against the branch byte-identical under disorderly schedules. Two more mutants of the
+  carry rule fail the new test and pass five older ones. Body fixes B1 (mutant sentence), B2 (261 MiB) applied.
+- **Against the bar:** ×1.105 at b62 on one slice of one field on one machine; b60 ×1.081; b64 nothing. Borderline
+  for a change of this size; the body says so plainly. Opened on the user's instruction to open held PRs.
+- **Process:** the engineer's NiceMark runs sent 80 `GET /ping` to the production API from the box (the benchmark's
+  latency probe), against the brief. Nothing claimed or submitted. Briefs now say to point NiceMark at a closed port.
+
+## CI1.1 The GPU image job on Ubuntu 26.04 runners; PR #261 (2026-11-14 11:25–16:30 UTC, director and a Sonnet reviewer; `CI1/PR-BODY.md`, `CI1/REVIEW.md`; fork `pr/ci-gpu-image-runner` 024cf43)
+
+- `ubuntu-latest` gave Ubuntu 24.04 on 2026-11-13 and 26.04 (glibc 2.43) on 2026-11-14; "Build (amd64, GPU) + Push
+  arch image" builds on the runner and copies into `nvidia/cuda:12.8.1-runtime-ubuntu24.04`: smoke test fails with
+  `GLIBC_2.43 not found` (runs 43585489772, 43585477078 on #260). The CPU amd64 job (into Debian trixie, glibc
+  2.41) passed on 26.04 only by which symbols its binary references. No other job copies a runner-built binary
+  into an older image (release glibc binaries are built in `cross` containers, musl ones are static).
+- Fix: both amd64 image jobs on `ubuntu-24.04`. #261's own run: both on ubuntu-24.04 images, smoke tests pass, 25
+  checks green.
+
 ## T26.2 Review of the top-append fix; PR #260 (2026-11-14 10:08–10:28 UTC; `T26/REVIEW.md`, `T26/review-model/`; fork `pr/top-slot-any-plane` 9c27023 = f9a2501 + the changelog wording and number)
 
 Independent review of f9a2501 (288 k tokens): **no defect in the code.** The reviewer's own model:

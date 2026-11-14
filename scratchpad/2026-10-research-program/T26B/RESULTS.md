@@ -198,7 +198,7 @@ production).
 | lane id | `AbsolutePos % 32` | `AbsolutePos % 64` | `simd_lane_id` | `subgroup_invocation_id` | `SubgroupLocalInvocationId` |
 
 - CUDA (32 lanes) takes the ballot form; production cubes are 256 units = 8 full warps. On partly filled warps in one
-  cube both forms ran exact here (the scan form's butterflies read missing lanes, which CUDA leaves undefined; it is
+  cube both forms ran exact here **at the test's four sizes only (review, 2026-11-14, `REVIEW.md` F1: the forced scan form is wrong in 24 of 60 plane-scoped runs at 255 / 63 / 31 / 17 / 9 units, every one caught by the account; the ballot form is exact at all 13 one-cube sizes tried)** (the scan form's butterflies read missing lanes, which CUDA leaves undefined; it is
   never selected there).
 - 64-lane planes (RADV wave64, HIP wave64, Metal on AMD) take the scan form, defined over the active lanes on
   WGSL/SPIR-V/Metal for any population; HIP's butterflies need full waves, which 256-unit cubes give.

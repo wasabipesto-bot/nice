@@ -154,6 +154,33 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     until 20:45, the speed claim). ivory: cleared 12.5 GB of day-old debug artifacts from the
     main checkout's cargo cache (18 GB free).
 
+- **19:31 UTC: PRs #262 and #263 opened; nothing is held any more.**
+  - **#262 CPU skip walk** (`pr/cpu-join-top-skip` 09f612b). Second review (`CPU2/PR-REVIEW.md`,
+    218 k tokens): open after two body edits, no code change. The broadcast free cannot run under
+    the scratch's borrow (`nice_common` never enters rayon) and a clear can only land between
+    partitions; the morning's harness re-run on the final tree (0 of 8.97 M run bounds above the
+    exact run; main against the branch byte-identical under disorderly schedules); every number
+    of the body matches the logs but one memory cell (fixed). Follow-up commit: the changelog
+    number and a comment that nothing under the scratch's borrow may call into rayon.
+    Against the bar: borderline (×1.105 at b62 on one slice; ×1.081 at b60; nothing at b64).
+  - **#263 stride queues** (`pr/stride-queue-any-plane` bf6cc8e). Review (`T26B/REVIEW.md`, 267 k
+    tokens, own model, own builds byte-identical to the author's, device runs on the box): the
+    code is right; four text fixes applied (the forced scan form on partly filled CUDA warps is
+    undefined and fails at other sizes, caught by the account; the cost qualifiers: forced on a
+    3080, 130 W cap with a clock difference, the stride walk is the join's fallback; llvmpipe
+    also defeats the account). The reviewer's own interleaved timing reproduces ×1.14 / ×1.28.
+    Box 60665092 destroyed after 3.78 h.
+  - Vast today: $0.49 + $0.35 + $0.43 + $0.01 ≈ $1.28; month ≈ $16.8 of $30 (invoiced so far
+    $16.26). Agents today: nine (four this morning, five this afternoon: one Sonnet, four Opus),
+    about 2.8 M subagent tokens.
+  - Both new PRs' CI will show the GPU image job red until #261 is merged (the runner, not the
+    code). Reminder at 20:20 UTC to read their CI.
+- **Tomorrow:** merge-ups as PRs land (#251/#260 `ran` words; #255/#259 `walk_pf_lean`; changelog
+  lines everywhere); T2.6c (the join's survivor count without lane 0: telemetry only) as a small
+  fix if nothing better; the third account word for #260/#263 only if the user wants it; base
+  62's first telemetry once the search resumes; a fresh look at high-level strategy (the queue of
+  kernel optimisations for demoux is empty apart from the two under-bar branches).
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit

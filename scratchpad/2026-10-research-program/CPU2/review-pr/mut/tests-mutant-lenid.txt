@@ -1,0 +1,31 @@
+   Compiling nice_common v3.4.8-dev (/home/claude/projects/nice/.worktrees/review-cpu2-pr-mut/common)
+    Finished `release` profile [optimized] target(s) in 57.30s
+     Running unittests src/lib.rs (/home/claude/projects/nice/.worktrees/rebase-1112/target/release/build/nice_common/30a508274a37079a/out/nice_common-30a508274a37079a)
+
+running 7 tests
+test cpu_join::tests::a_field_in_slices_finds_what_it_finds_whole ... ok
+test cpu_join::tests::cpu_join_agrees_with_the_stride_path_on_whole_windows ... ok
+test cpu_join::tests::cpu_join_matches_the_reference_on_a_whole_field ... ignored, opt-in, minutes of CPU
+test cpu_join::tests::the_carried_state_survives_any_order_of_joins_and_partitions ... FAILED
+test cpu_join::tests::the_skip_walk_finds_every_top_on_production_fields ... ok
+test cpu_join::tests::the_skip_walk_finds_every_top_on_small_bases ... ok
+test cpu_join::tests::the_skip_walk_finds_every_top_on_the_timed_shapes ... ok
+
+failures:
+
+---- cpu_join::tests::the_carried_state_survives_any_order_of_joins_and_partitions stdout ----
+
+thread 'cpu_join::tests::the_carried_state_survives_any_order_of_joins_and_partitions' (3344235) panicked at common/src/cpu_join.rs:1893:17:
+assertion `left == right` failed: b23 join 3 thread 0 partition 37: tops
+  left: [Top { p: 36009, mask: 2229510, seed: 2229510, rlo: 0, rhi: 23, dh: 552094095, pc: 17, gate: true, ends: [6, 11] }, Top { p: 41299, mask: 71686, seed: 67590, rlo: 0, rhi: 23, dh: 633284403, pc: 5, gate: true, ends: [8, 11] }, Top { p: 42357, mask: 659478, seed: 659478, rlo: 0, rhi: 23, dh: 649522465, pc: 7, gate: true, ends: [6, 11] }, Top { p: 42886, mask: 1446402, seed: 1446402, rlo: 0, rhi: 23, dh: 657641496, pc: 8, gate: true, ends: [6, 11] }, Top { p: 43415, mask: 4788226, seed: 4788226, rlo: 0, rhi: 23, dh: 665760527, pc: 9, gate: true, ends: [6, 12] }, Top { p: 46589, mask: 50220, seed: 50220, rlo: 0, rhi: 23, dh: 714474711, pc: 15, gate: true, ends: [6, 11] }, Top { p: 47118, mask: 6311942, seed: 6311942, rlo: 0, rhi: 23, dh: 722593742, pc: 16, gate: true, ends: [6, 11] }, Top { p: 47647, mask: 114822, seed: 114822, rlo: 0, rhi: 23, dh: 730712773, pc: 17, gate: true, ends: [6, 11] }, Top { p: 48705, mask: 327693, seed: 327693, rlo: 0, rhi: 23, dh: 746950835, pc: 19, gate: true, ends: [7, 11] }, Top { p: 52408, mask: 2364424, seed: 2364424, rlo: 0, rhi: 23, dh: 803784050, pc: 4, gate: true, ends: [7, 11] }, Top { p: 52937, mask: 2368264, seed: 2367752, rlo: 0, rhi: 23, dh: 811903081, pc: 5, gate: true, ends: [7, 11] }, Top { p: 53995, mask: 5014024, seed: 5014024, rlo: 0, rhi: 23, dh: 828141143, pc: 7, gate: true, ends: [6, 11] }, Top { p: 55582, mask: 1573016, seed: 1048728, rlo: 0, rhi: 23, dh: 852498235, pc: 10, gate: true, ends: [8, 11] }, Top { p: 56640, mask: 3178768, seed: 3178768, rlo: 0, rhi: 23, dh: 868736297, pc: 12, gate: true, ends: [7, 11] }]
+ right: [Top { p: 36009, mask: 2229510, seed: 2229510, rlo: 0, rhi: 23, dh: 552094095, pc: 17, gate: true, ends: [6, 11] }, Top { p: 37596, mask: 6722, seed: 6722, rlo: 0, rhi: 23, dh: 576451188, pc: 20, gate: true, ends: [7, 11] }, Top { p: 38125, mask: 918146, seed: 918146, rlo: 0, rhi: 23, dh: 584570218, pc: 21, gate: true, ends: [6, 11] }, Top { p: 39712, mask: 166915, seed: 166915, rlo: 0, rhi: 23, dh: 608927311, pc: 2, gate: true, ends: [6, 11] }, Top { p: 41299, mask: 71686, seed: 67590, rlo: 0, rhi: 23, dh: 633284403, pc: 5, gate: true, ends: [8, 11] }, Top { p: 41828, mask: 935938, seed: 935938, rlo: 0, rhi: 23, dh: 641403434, pc: 6, gate: true, ends: [6, 11] }, Top { p: 42357, mask: 659478, seed: 659478, rlo: 0, rhi: 23, dh: 649522465, pc: 7, gate: true, ends: [6, 11] }, Top { p: 42886, mask: 1446402, seed: 1446402, rlo: 0, rhi: 23, dh: 657641496, pc: 8, gate: true, ends: [6, 11] }, Top { p: 43415, mask: 4788226, seed: 4788226, rlo: 0, rhi: 23, dh: 665760527, pc: 9, gate: true, ends: [6, 12] }, Top { p: 46589, mask: 50220, seed: 50220, rlo: 0, rhi: 23, dh: 714474711, pc: 15, gate: true, ends: [6, 11] }, Top { p: 47118, mask: 6311942, seed: 6311942, rlo: 0, rhi: 23, dh: 722593742, pc: 16, gate: true, ends: [6, 11] }, Top { p: 47647, mask: 114822, seed: 114822, rlo: 0, rhi: 23, dh: 730712773, pc: 17, gate: true, ends: [6, 11] }, Top { p: 48705, mask: 327693, seed: 327693, rlo: 0, rhi: 23, dh: 746950835, pc: 19, gate: true, ends: [7, 11] }, Top { p: 49234, mask: 1130756, seed: 1130756, rlo: 0, rhi: 23, dh: 755069865, pc: 20, gate: true, ends: [6, 12] }, Top { p: 51350, mask: 426072, seed: 426072, rlo: 0, rhi: 23, dh: 787545989, pc: 2, gate: true, ends: [6, 11] }, Top { p: 52408, mask: 2364424, seed: 2364424, rlo: 0, rhi: 23, dh: 803784050, pc: 4, gate: true, ends: [7, 11] }, Top { p: 52937, mask: 2368264, seed: 2367752, rlo: 0, rhi: 23, dh: 811903081, pc: 5, gate: true, ends: [7, 11] }, Top { p: 53995, mask: 5014024, seed: 5014024, rlo: 0, rhi: 23, dh: 828141143, pc: 7, gate: true, ends: [6, 11] }, Top { p: 55582, mask: 1573016, seed: 1048728, rlo: 0, rhi: 23, dh: 852498235, pc: 10, gate: true, ends: [8, 11] }, Top { p: 56640, mask: 3178768, seed: 3178768, rlo: 0, rhi: 23, dh: 868736297, pc: 12, gate: true, ends: [7, 11] }, Top { p: 57169, mask: 4458514, seed: 4458514, rlo: 0, rhi: 23, dh: 876855327, pc: 13, gate: true, ends: [6, 12] }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    cpu_join::tests::the_carried_state_survives_any_order_of_joins_and_partitions
+
+test result: FAILED. 5 passed; 1 failed; 1 ignored; 0 measured; 203 filtered out; finished in 182.04s
+
+error: test failed, to rerun pass `-p nice_common --lib`
+exit 101

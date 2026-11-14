@@ -21,7 +21,7 @@ Proof in `cpu_top_fd`'s module docs. If certified positions `(j, i)` and `(j', i
 
 - `a_failing_run_fails_at_every_block`: bases 7–64, random fields: every block inside a computed run re-certified by `Base::cert_parts` fails (one full run: 142 M blocks).
 - `the_skip_walk_finds_every_top_on_small_bases` (268 field shapes) and `…_on_production_fields` (b57–b64): tops identical to certifying every block.
-- New, `the_carried_state_survives_any_order_of_joins_and_partitions`: joins interleaved on shared thread scratches, out of order, with retries, steps back and gaps; tops and `run_partition` against no carried state. It fails on three mutants of the carry rule (never reset, carry backwards, ignore the join id) that the ascending tests miss.
+- New, `the_carried_state_survives_any_order_of_joins_and_partitions`: joins interleaved on shared thread scratches, out of order, with retries, steps back and gaps; tops and `run_partition` against no carried state. It fails on five mutants of the carry rule (never reset; carry to any earlier partition, or to the one just before; ignore the join id, or match joins by their prefix count) that `the_skip_walk_finds_every_top_on_small_bases` passes.
 - Outside this PR: the run bound against big-integer arithmetic on 9 M adversarial cases (never above the exact run); main against this branch under disorderly schedules on 567 joins at b10–b34 and 50 production-shape fields at b44–b64: identical tops, survivors, checked counts and hits.
 - Every timed run below: identical survivors, checked counts and hits.
 
@@ -39,7 +39,7 @@ The real `nice_client` (release, CPU only), main against this branch, on a rente
 
 Spreads 0.0–0.7 % (42 threads), 0.5–4.0 % (8). Field starts: 4473066762334864396992 (b62), 1157209632114824200908 (b60), 71779931862957161709568 (b64).
 
-A one-thread harness (EPYC-Rome VM, 32 contiguous partitions of these slices) measured ×1.140 (b62), ×1.132 (b60), ×1.009 (b64); why the client keeps less at 42 threads I did not investigate.
+A one-thread harness (EPYC-Rome VM, 32 contiguous partitions of these slices) measured ×1.140 (b62), ×1.132 (b60), ×1.009 (b64); why the client keeps less of it at 42 threads was not investigated.
 
 **b64 gains nothing**: its top phase is 19 %, and what the skip leaves of it is stepping and seeding.
 
@@ -52,7 +52,7 @@ Each worker thread holds 2 bytes per top-layer prefix while a join runs: 10.8 MB
 | b62 1e17 slice 0 | 42 | 360 MiB | 706 MiB |
 | b60 1e16 | 42 | 382–389 MiB | 745 MiB |
 | b64 1e17 slice 0 | 42 | 374 MiB | 743 MiB |
-| b62 / b60, 1024 partitions | 8 | 229 / 243 MiB | 262 / 275 MiB |
+| b62 / b60, 1024 partitions | 8 | 229 / 243 MiB | 261 / 275 MiB |
 
 About +350 MiB at 42 threads, freed when the join ends: resident just after, 196 MiB against main's 242 MiB (b62), and 577 MiB without the free.
 

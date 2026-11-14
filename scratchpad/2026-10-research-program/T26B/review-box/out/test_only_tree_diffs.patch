@@ -1,0 +1,380 @@
+--- fix/common/src/cubecl_backend.rs	2026-11-14 16:40:02.000000000 +0000
++++ fixx/common/src/cubecl_backend.rs	2026-11-14 18:59:46.814656783 +0000
+@@ -4221,7 +4221,7 @@
+                 for &ballot in forms {
+                     for &dim in dims {
+                         for shift in [0u32, 2] {
+-                            let nr = dim >> shift;
++                            let nr = (dim >> shift).max(1);
+                             let step = len / nr;
+                             let offsets: Vec<u64> = (0..nr).map(|i| u64::from(i * step)).collect();
+                             let lens: Vec<u32> = (0..nr)
+@@ -4301,7 +4301,7 @@
+         } else {
+             &[false]
+         };
+-        let bad = queue_partial_planes(client, planes, &[true, false], &[256, 100, 48, 36]);
++        let bad = queue_partial_planes(client, planes, &[true, false], &[256, 255, 200, 129, 100, 65, 63, 48, 36, 33, 31, 17, 9, 2, 1]);
+         assert!(bad.is_empty(), "{} wrong runs: {bad:#?}", bad.len());
+     }
+ 
+@@ -4320,7 +4320,7 @@
+         } else {
+             &[true]
+         };
+-        let bad = queue_partial_planes(client, &[true, false], forms, &[256, 100, 48, 36]);
++        let bad = queue_partial_planes(client, &[true, false], forms, &[256, 255, 200, 129, 100, 65, 63, 48, 36, 33, 31, 17, 9, 2, 1]);
+         assert!(bad.is_empty(), "{} wrong runs: {bad:#?}", bad.len());
+     }
+ 
+--- fix/common/src/cubecl_backend.rs	2026-11-14 16:40:02.000000000 +0000
++++ fixy/common/src/cubecl_backend.rs	2026-11-14 18:59:46.818656743 +0000
+@@ -4221,7 +4221,8 @@
+                 for &ballot in forms {
+                     for &dim in dims {
+                         for shift in [0u32, 2] {
+-                            let nr = dim >> shift;
++                            let k: u32 = std::env::var("NICE_REVIEW_CUBES").ok().and_then(|v| v.parse().ok()).unwrap_or(1);
++                            let nr = ((dim * k) >> shift).max(1);
+                             let step = len / nr;
+                             let offsets: Vec<u64> = (0..nr).map(|i| u64::from(i * step)).collect();
+                             let lens: Vec<u32> = (0..nr)
+@@ -4301,7 +4302,7 @@
+         } else {
+             &[false]
+         };
+-        let bad = queue_partial_planes(client, planes, &[true, false], &[256, 100, 48, 36]);
++        let bad = queue_partial_planes(client, planes, &[true, false], &[256, 255, 200, 129, 100, 65, 63, 48, 36, 33, 31, 17, 9, 2, 1]);
+         assert!(bad.is_empty(), "{} wrong runs: {bad:#?}", bad.len());
+     }
+ 
+@@ -4320,7 +4321,7 @@
+         } else {
+             &[true]
+         };
+-        let bad = queue_partial_planes(client, &[true, false], forms, &[256, 100, 48, 36]);
++        let bad = queue_partial_planes(client, &[true, false], forms, &[256, 255, 200, 129, 100, 65, 63, 48, 36, 33, 31, 17, 9, 2, 1]);
+         assert!(bad.is_empty(), "{} wrong runs: {bad:#?}", bad.len());
+     }
+ 
+--- fix/common/src/cubecl_backend.rs	2026-11-14 16:40:02.000000000 +0000
++++ fth/common/src/cubecl_backend.rs	2026-11-14 18:53:29.266507103 +0000
+@@ -4398,4 +4398,57 @@
+         assert!(over.contains("checked -1 fewer"), "{over}");
+         assert!(queue_complete(50, &[0]).is_err());
+     }
++
++    /// Timing harness (not in the PR): `NICE_TEST_FIELDS` fields of `NICE_TEST_STRIDE_FIELD=base:start:size` through
++    /// the CUDA runtime's nice-only pipeline (set `NICE_JOIN_ROUTE=stride`), after one untimed warm-up field before
++    /// `start`.
++    #[test]
++    #[cfg(feature = "cubecl-cuda")]
++    #[ignore = "requires an NVIDIA device; prints throughput"]
++    #[allow(clippy::cast_precision_loss)]
++    fn cubecl_cuda_stride_throughput_fixed_fields() {
++        use crate::gpu_niceonly::{FIELDS_IN_FLIGHT, msd_floor_in_use};
++        use crate::gpu_route::{NiceonlyStarted, begin_niceonly};
++        let Ok(n) = std::env::var("NICE_TEST_FIELDS") else {
++            eprintln!("skipping: set NICE_TEST_FIELDS");
++            return;
++        };
++        let spec = std::env::var("NICE_TEST_STRIDE_FIELD").expect("NICE_TEST_STRIDE_FIELD=base:start:size");
++        let v: Vec<u128> = spec.split(':').map(|x| x.parse().unwrap()).collect();
++        let (base, start, size) = (v[0] as u32, v[1], v[2]);
++        let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
++        let n: usize = n.parse().expect("NICE_TEST_FIELDS must be a count");
++        let fields: Vec<FieldSize> = (0..n as u128)
++            .map(|i| FieldSize::new(start + i * size, start + (i + 1) * size))
++            .collect();
++        let warm = FieldSize::new(start - size / 10, start);
++        if let NiceonlyStarted::Queued(ticket) = begin_niceonly(&ctx, &warm, base).unwrap() {
++            ctx.finish(ticket).unwrap();
++        }
++        let lookahead = FIELDS_IN_FLIGHT.saturating_sub(1);
++        let t = std::time::Instant::now();
++        let mut queued = std::collections::VecDeque::new();
++        let mut found = Vec::new();
++        for f in &fields {
++            match begin_niceonly(&ctx, f, base).unwrap() {
++                NiceonlyStarted::Queued(ticket) => queued.push_back(ticket),
++                _ => panic!("field did not take the stride pipeline"),
++            }
++            while queued.len() > lookahead {
++                let ticket = queued.pop_front().unwrap();
++                found.extend(ctx.finish(ticket).unwrap().0.nice_numbers.iter().map(|x| x.number));
++            }
++        }
++        for ticket in queued {
++            found.extend(ctx.finish(ticket).unwrap().0.nice_numbers.iter().map(|x| x.number));
++        }
++        let secs = t.elapsed().as_secs_f64();
++        eprintln!(
++            "STRIDE THROUGHPUT base={base} fields={n} size={size} secs={secs:.3} rate={:.4e} n/s floor_now={} found={} {:?}",
++            (n as f64) * (size as f64) / secs,
++            msd_floor_in_use(),
++            found.len(),
++            found
++        );
++    }
+ }
+--- main/common/src/cubecl_backend.rs	2026-11-13 15:38:58.000000000 +0000
++++ rmain/common/src/cubecl_backend.rs	2026-11-14 18:56:27.788685551 +0000
+@@ -2802,6 +2802,9 @@
+     /// Force the plane-scoped queue on or off (device tests).
+     #[cfg(test)]
+     plane_override: Option<bool>,
++    /// Units per cube (device tests, repro only).
++    #[cfg(test)]
++    cube_dim_override: Option<u32>,
+ }
+ 
+ impl<R: cubecl::prelude::Runtime> CubeclNiceonlyRun<R> {
+@@ -2862,6 +2865,8 @@
+             compact_override: None,
+             #[cfg(test)]
+             plane_override: None,
++            #[cfg(test)]
++            cube_dim_override: None,
+         })
+     }
+ 
+@@ -3052,8 +3057,12 @@
+         let num_ranges = u32::try_from(offsets.len()).unwrap_or(u32::MAX);
+         let threads = u64::from(num_ranges) << lane_shift;
+         #[allow(clippy::cast_possible_truncation)]
++        #[cfg(test)]
++        let cube_dim = self.cube_dim_override.unwrap_or(WORKGROUP_SIZE).min(WORKGROUP_SIZE);
++        #[cfg(not(test))]
++        let cube_dim = WORKGROUP_SIZE;
+         let cubes = threads
+-            .div_ceil(u64::from(WORKGROUP_SIZE))
++            .div_ceil(u64::from(cube_dim))
+             .clamp(1, u64::from(MAX_CUBES)) as u32;
+ 
+         let (pre_limbs, pre_chunk_digits, pre_chunk_div) = self
+@@ -3066,7 +3075,7 @@
+             niceonly_kernel::launch_unchecked::<R>(
+                 &self.client,
+                 CubeCount::Static(cubes, 1, 1),
+-                CubeDim::new_1d(WORKGROUP_SIZE),
++                CubeDim::new_1d(cube_dim),
+                 ArrayArg::from_raw_parts(self.plan.residues.clone(), self.plan.stride_r as usize),
+                 ArrayArg::from_raw_parts(offsets_handle, offsets.len() * 2),
+                 ArrayArg::from_raw_parts(lens_handle, lens.len()),
+@@ -3815,4 +3824,156 @@
+             );
+         }
+     }
++
++    /// The window, certificate and host-mirror survivors of the queue tests:
++    /// b50 (no prefilter, so every queued survivor is reported in probe
++    /// mode) and b40 (prefilter), with certificates that fire.
++    fn queue_cases() -> Vec<(u32, u64, u128, u32, Vec<u128>)> {
++        let mut cases = Vec::new();
++        for (base, mask) in [
++            (50u32, (1u64 << 3) | (1u64 << 45)),
++            (40, (1u64 << 5) | (1u64 << 39)),
++        ] {
++            let pre = vulkan_prefilter_params(base);
++            let table = StrideTable::new(base, GPU_LSD_K);
++            let start = crate::base_range::get_base_range_u128(base)
++                .unwrap()
++                .unwrap()
++                .range_start;
++            let len: u32 = 400_000;
++            let end = start + u128::from(len);
++            let (mut n, mut idx) = table.first_valid_at_or_after(start);
++            let mut want = Vec::new();
++            while n < end {
++                if table.low_digit_masks[idx] & mask == 0
++                    && pre.is_none_or(|p| prefilter_mirror(n, base, &p))
++                {
++                    want.push(n);
++                }
++                n += u128::from(table.gap_table[idx]);
++                idx = (idx + 1) % table.gap_table.len();
++            }
++            assert!(want.len() < NICEONLY_OUT_CAPACITY / 2);
++            cases.push((base, mask, start, len, want));
++        }
++        cases
++    }
++
++    /// The queued stride walk's survivor set (probe mode) against the host
++    /// mirror on cubes of `dims` units, so that a cube's last plane is
++    /// partly filled wherever `dim` is not a multiple of the plane width,
++    /// for each queue (`plane`: per plane, else per cube) and rank form
++    /// (`forms`: ballot, scan). The window is cut into one range per
++    /// `1 << shift` units, so that every unit has candidates and the launch
++    /// is one cube (`CubeCL`'s CUDA lane id is right only in a grid's first
++    /// cube when cubes are not whole warps). Returns the runs that lost,
++    /// duplicated or failed, after printing every run.
++    fn queue_partial_planes<R: cubecl::prelude::Runtime>(
++        client: &cubecl::prelude::ComputeClient<R>,
++        planes: &[bool],
++        forms: &[bool],
++        dims: &[u32],
++    ) -> Vec<String> {
++        let mut bad = Vec::new();
++        let mut runs = 0usize;
++        for (base, mask, start, len, want) in queue_cases() {
++            for &plane in planes {
++                for &ballot in forms {
++                    for &dim in dims {
++                        for shift in [0u32, 2] {
++                            let nr = dim >> shift;
++                            let step = len / nr;
++                            let offsets: Vec<u64> = (0..nr).map(|i| u64::from(i * step)).collect();
++                            let lens: Vec<u32> = (0..nr)
++                                .map(|i| if i + 1 == nr { len - i * step } else { step })
++                                .collect();
++                            let masks = vec![mask; nr as usize];
++                            let mut run = CubeclNiceonlyRun::new(client, base, start, false)
++                                .expect("probe run");
++                            run.probe = true;
++                            run.compact_override = Some(true);
++                            run.plane_override = Some(plane);
++                            let _ = ballot;
++                            run.cube_dim_override = Some(dim);
++                            run.lane_shift_override = Some(shift);
++                            run.launch(0, &offsets, &lens, &masks).expect("dispatch");
++                            let tag = format!(
++                                "b{base} plane={plane} ballot={ballot} cube={dim} lanes/range={}",
++                                1u32 << shift
++                            );
++                            runs += 1;
++                            match run.finish() {
++                                Err(e) => {
++                                    println!("{tag}: FAILED: {e:#}");
++                                    bad.push(format!("{tag}: {e:#}"));
++                                }
++                                Ok(hits) => {
++                                    let mut got: Vec<u128> =
++                                        hits.iter().map(|n| n.number).collect();
++                                    got.sort_unstable();
++                                    let mut uniq = got.clone();
++                                    uniq.dedup();
++                                    let missing = want
++                                        .iter()
++                                        .filter(|n| uniq.binary_search(n).is_err())
++                                        .count();
++                                    let dup = got.len() - uniq.len();
++                                    let extra = uniq
++                                        .iter()
++                                        .filter(|n| want.binary_search(n).is_err())
++                                        .count();
++                                    println!(
++                                        "{tag}: {} of {} survivors, {missing} missing, {dup} \
++                                         duplicated, {extra} extra",
++                                        got.len(),
++                                        want.len()
++                                    );
++                                    if got != want {
++                                        bad.push(format!(
++                                            "{tag}: {missing} missing, {dup} duplicated, {extra} extra"
++                                        ));
++                                    }
++                                }
++                            }
++                        }
++                    }
++                }
++            }
++        }
++        println!("{runs} runs, {} wrong", bad.len());
++        bad
++    }
++
++    /// Both queues on planes that are partly filled: every survivor is
++    /// checked once, by ballot and by scan, and the host's account agrees.
++    /// lavapipe runs 8-lane subgroups, so cubes of 100 and 36 units end in a
++    /// 4-lane one.
++    #[test]
++    #[ignore = "requires a wgpu device"]
++    fn repro_queues_check_every_survivor_on_partly_filled_planes() {
++        let ctx = CubeclContext::new_default().expect("CubeCL init");
++        #[allow(irrefutable_let_patterns)]
++        let CubeclContext::Wgpu { client, .. } = &ctx else {
++            unreachable!("new_default returns the wgpu variant");
++        };
++        let planes: &[bool] = &[false];
++        let bad = queue_partial_planes(client, planes, &[true], &[256, 100, 48, 36]);
++        assert!(bad.is_empty(), "{} wrong runs: {bad:#?}", bad.len());
++    }
++
++    /// The same on CUDA, one cube: cubes of 100, 48 and 36 units end in a
++    /// warp of 4, 16 and 4 lanes.
++    #[test]
++    #[cfg(feature = "cubecl-cuda")]
++    #[ignore = "requires an NVIDIA device"]
++    fn repro_cuda_queues_check_every_survivor_on_partly_filled_warps() {
++        let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
++        let CubeclContext::Cuda { client, .. } = &ctx else {
++            unreachable!("new_cuda returns the CUDA variant");
++        };
++        let forms: &[bool] = &[true];
++        let bad = queue_partial_planes(client, &[true, false], forms, &[256, 100, 48, 36]);
++        assert!(bad.is_empty(), "{} wrong runs: {bad:#?}", bad.len());
++    }
++
+ }
+--- main/common/src/cubecl_backend.rs	2026-11-13 15:38:58.000000000 +0000
++++ mt/common/src/cubecl_backend.rs	2026-11-14 18:53:29.246507307 +0000
+@@ -3815,4 +3815,57 @@
+             );
+         }
+     }
++
++    /// Timing harness (not in the PR): `NICE_TEST_FIELDS` fields of `NICE_TEST_STRIDE_FIELD=base:start:size` through
++    /// the CUDA runtime's nice-only pipeline (set `NICE_JOIN_ROUTE=stride`), after one untimed warm-up field before
++    /// `start`.
++    #[test]
++    #[cfg(feature = "cubecl-cuda")]
++    #[ignore = "requires an NVIDIA device; prints throughput"]
++    #[allow(clippy::cast_precision_loss)]
++    fn cubecl_cuda_stride_throughput_fixed_fields() {
++        use crate::gpu_niceonly::{FIELDS_IN_FLIGHT, msd_floor_in_use};
++        use crate::gpu_route::{NiceonlyStarted, begin_niceonly};
++        let Ok(n) = std::env::var("NICE_TEST_FIELDS") else {
++            eprintln!("skipping: set NICE_TEST_FIELDS");
++            return;
++        };
++        let spec = std::env::var("NICE_TEST_STRIDE_FIELD").expect("NICE_TEST_STRIDE_FIELD=base:start:size");
++        let v: Vec<u128> = spec.split(':').map(|x| x.parse().unwrap()).collect();
++        let (base, start, size) = (v[0] as u32, v[1], v[2]);
++        let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
++        let n: usize = n.parse().expect("NICE_TEST_FIELDS must be a count");
++        let fields: Vec<FieldSize> = (0..n as u128)
++            .map(|i| FieldSize::new(start + i * size, start + (i + 1) * size))
++            .collect();
++        let warm = FieldSize::new(start - size / 10, start);
++        if let NiceonlyStarted::Queued(ticket) = begin_niceonly(&ctx, &warm, base).unwrap() {
++            ctx.finish(ticket).unwrap();
++        }
++        let lookahead = FIELDS_IN_FLIGHT.saturating_sub(1);
++        let t = std::time::Instant::now();
++        let mut queued = std::collections::VecDeque::new();
++        let mut found = Vec::new();
++        for f in &fields {
++            match begin_niceonly(&ctx, f, base).unwrap() {
++                NiceonlyStarted::Queued(ticket) => queued.push_back(ticket),
++                _ => panic!("field did not take the stride pipeline"),
++            }
++            while queued.len() > lookahead {
++                let ticket = queued.pop_front().unwrap();
++                found.extend(ctx.finish(ticket).unwrap().0.nice_numbers.iter().map(|x| x.number));
++            }
++        }
++        for ticket in queued {
++            found.extend(ctx.finish(ticket).unwrap().0.nice_numbers.iter().map(|x| x.number));
++        }
++        let secs = t.elapsed().as_secs_f64();
++        eprintln!(
++            "STRIDE THROUGHPUT base={base} fields={n} size={size} secs={secs:.3} rate={:.4e} n/s floor_now={} found={} {:?}",
++            (n as f64) * (size as f64) / secs,
++            msd_floor_in_use(),
++            found.len(),
++            found
++        );
++    }
+ }
