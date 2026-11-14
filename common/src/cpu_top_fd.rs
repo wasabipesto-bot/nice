@@ -34,9 +34,10 @@
 //! of the blocks after it fail the same way ([`TopFdSetup::cert`]'s
 //! `Err`). Say the digit at position `i` of `a^j` repeats one at `i'` of
 //! `a^j'`, both certified. Position `i` is certified exactly when `i >=
-//! from_j = max(c0, h)`, `h` the lowest position from which `a^j` and `e^j`
-//! agree, so `X = ⌊a^j/b^i⌋ = ⌊e^j/b^i⌋`. For every later block `[a', e']`
-//! with `e'^j < (X + 1)·b^i` the same holds: `X <= ⌊a'^j/b^i⌋ <=
+//! from_j = max(c0, h)`, `h` the lowest position from which `a^j` and
+//! `e^j` agree (`TopFdSetup::first_certified`, from which both the
+//! certificate and the run take it), so `X = ⌊a^j/b^i⌋ = ⌊e^j/b^i⌋`. For
+//! every later block `[a', e']` with `e'^j < (X + 1)·b^i` the same holds: `X <= ⌊a'^j/b^i⌋ <=
 //! ⌊e'^j/b^i⌋ <= X` (n ↦ n^j increases), so the digits from `i` up are
 //! `a^j`'s, `e'^j − a'^j < b^i` puts `c0` at or below `i`, and `h <= i`.
 //! Both digits are certified again and still equal, and the certificate
@@ -595,6 +596,37 @@ impl TopFdSetup {
         !rem.add(d).lt(&self.pw[c0 as usize])
     }
 
+    /// The lowest position of `a^j` the certificate reads, `from_j`, for
+    /// the power with digit array `x` (`a^j = X·b^z`), endpoint difference
+    /// `d` and `sp` digits, and the mask of the digit above the run of
+    /// `b − 1` that the high endpoint carries through (0 without a carry).
+    /// As in `Base::cert`: `c0 = max(cap, ndig(d))`, and with a carry out
+    /// of `c0` the position above the run and that digit; `sp` (nothing
+    /// read) if `c0 >= sp`. Both [`Self::cert`] and [`Self::run`] take the
+    /// positions they read from here: a failing run is only sound for
+    /// positions the certificate reads (module docs).
+    // A digit, below b <= 64.
+    #[allow(clippy::cast_possible_truncation)]
+    #[inline(always)]
+    fn first_certified(&self, x: &Digits, d: &W4, sp: u32, z: u32, bz: u128) -> (u32, u64) {
+        let c0 = self.cap.max(self.ndig(d));
+        if c0 >= sp {
+            return (sp, 0);
+        }
+        if !self.carry(x, d, c0, z, bz) {
+            return (c0, 0);
+        }
+        // The run of b − 1 ends below sp.
+        let top = (self.b - 1) as u8;
+        let at = |pos: u32| if pos < z { 0 } else { digit(x, pos - z) };
+        let mut pos = c0;
+        while at(pos) == top {
+            pos += 1;
+        }
+        let g = at(pos);
+        (pos + 1, digit_range_mask(g, g + 1))
+    }
+
     /// The certificate of the block of `st`'s prefix (unclipped): the same
     /// as `Base::cert_parts(a, a + w − 1, cap)`, read from the stepped
     /// digits. The digit of `a^j` at position `pos` is digit `pos − j·f0`
@@ -604,9 +636,6 @@ impl TopFdSetup {
     /// the run is not worked out, and `n` is 1.
     #[inline]
     pub(crate) fn cert(&self, st: &TopFd, runs: bool) -> Result<Cert, u32> {
-        // A digit, below b <= 64.
-        #[allow(clippy::cast_possible_truncation)]
-        let top = (self.b - 1) as u8;
         let mut mask = 0u64;
         let mut doms = [0u64; 2];
         let mut from = [self.s2, self.s3];
@@ -615,22 +644,10 @@ impl TopFdSetup {
             (&st.cu, &st.d3, self.s3, 3 * self.f0, self.bz[1]),
         ];
         for (jj, (x, d, sp, z, bz)) in powers.into_iter().enumerate() {
-            let c0 = self.cap.max(self.ndig(d));
-            if c0 >= sp {
-                continue;
-            }
-            let at = |pos: u32| if pos < z { 0 } else { digit(x, pos - z) };
-            let mut pos = c0;
-            if self.carry(x, d, c0, z, bz) {
-                // As in `Base::cert`: the run of b − 1 ends below sp.
-                while at(pos) == top {
-                    pos += 1;
-                }
-                let g = at(pos);
-                doms[jj] = digit_range_mask(g, g + 1);
-                pos += 1;
-            }
+            let (mut pos, dom) = self.first_certified(x, d, sp, z, bz);
+            doms[jj] = dom;
             from[jj] = pos;
+            let at = |pos: u32| if pos < z { 0 } else { digit(x, pos - z) };
             while pos < sp {
                 let bit = 1u64 << at(pos);
                 if mask & bit != 0 {
@@ -659,27 +676,16 @@ impl TopFdSetup {
     #[cold]
     #[inline(never)]
     fn run(&self, st: &TopFd, mut from: [u32; 2], failed: usize) -> u32 {
-        let top = (self.b - 1) as u8;
         let powers = [
             (&st.sq, &st.d2, self.s2, 2 * self.f0, self.bz[0]),
             (&st.cu, &st.d3, self.s3, 3 * self.f0, self.bz[1]),
         ];
-        // The cube's lowest certified position, as in `cert`, if its scan
-        // had not begun.
+        // The cube's lowest certified position, if its scan had not begun:
+        // the same helper as `cert`'s, so a pair is only ever taken from
+        // positions the certificate reads.
         if failed == 0 {
             let (x, d, sp, z, bz) = powers[1];
-            let c0 = self.cap.max(self.ndig(d));
-            from[1] = sp;
-            if c0 < sp {
-                let mut pos = c0;
-                if self.carry(x, d, c0, z, bz) {
-                    while pos >= z && digit(x, pos - z) == top {
-                        pos += 1;
-                    }
-                    pos += 1;
-                }
-                from[1] = pos;
-            }
+            from[1] = self.first_certified(x, d, sp, z, bz).0;
         }
         let at = |j: usize, i: u32| {
             let (x, _, _, z, _) = powers[j];
