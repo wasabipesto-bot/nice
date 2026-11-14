@@ -33,6 +33,16 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     last two CPU PRs at once.
   - No new GPU speed PR today: four are already waiting.
 
+- **08:57 UTC: the CPU study handed back (EXPERIMENTS CPU2.1; 412 k tokens, no box).** The top
+  phase is far larger on the CPU than I assumed: 45 % of a b62 partition, 39 % at b60, 19 % at
+  b64. The skip walk is exact by the agent's proof and tests and gives ×1.14 at b62, ×1.13 at
+  b60 and ×1.009 at b64 on one thread. My kill line said "under ×1.05 at b62 and b64": b62
+  clears it, b64 does not; I read it as not killed, but it is worth nothing at the long pole.
+  Held as a ready branch (no PR slot; CPU clients do none of the search today); the user is
+  asked whether a CPU gain at b62 is wanted. **Because a wrong skip would lose candidates, an
+  independent reviewer is on the branch now (`CPU2/REVIEW-BRIEF.md`), so it is review-clean if
+  it is ever opened.** The summaries check out against the raw files.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit

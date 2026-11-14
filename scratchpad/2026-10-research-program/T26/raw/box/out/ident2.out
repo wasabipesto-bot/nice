@@ -1,0 +1,86 @@
+M2 md5 aacdc4a6: cuda 6 kernels, 1 ok; wgsl 1589972 bytes, 1 ok
+bucket_kernel IDENTICAL (modulo numbering/order) 682 682
+check_kernel IDENTICAL (modulo numbering/order) 908 908
+join_kernel DIFFER 1510 1510
+    --- 
+    +++ 
+    @@ -106,36 +106,36 @@
+     extern __shared__ __align__(4) uint8 dynamic_shared_mem[];
+    -// Shared array size: 8, 32 bytes
+    -uint32 *shared_memory_8 = reinterpret_cast<uint32*>(&dynamic_shared_mem[12380]);
+    -// Shared array size: 1024, 4096 bytes
+    -uint32 *shared_memory_10 = reinterpret_cast<uint32*>(&dynamic_shared_mem[8284]);
+    +// Shared array size: 9, 36 bytes
+    +uint32 *shared_memory_14 = reinterpret_cast<uint32*>(&dynamic_shared_mem[11320]);
+     // Shared array size: 256, 1024 bytes
+    -uint32 *shared_memory_7 = reinterpret_cast<uint32*>(&dynamic_shared_mem[3080]);
+    +uint32 *shared_memory_4 = reinterpret_cast<uint32*>(&dynamic_shared_mem[17532]);
+    +// Shared array size: 1, 4 bytes
+    +uint32 *shared_memory_13 = reinterpret_cast<uint32*>(&dynamic_shared_mem[4]);
+     // Shared array size: 256, 1024 bytes
+    -uint32 *shared_memory_5 = reinterpret_cast<uint32*>(&dynamic_shared_mem[6204]);
+    -// Shared array size: 512, 2048 bytes
+    -uint32 *shared_memory_9 = reinterpret_cast<uint32*>(&dynamic_shared_mem[4]);
+    +uint32 *shared_memory_7 = reinterpret_cast<uint32*>(&dynamic_shared_mem[6168]);
+     // Shared array size: 256, 1024 bytes
+    -uint32 *shared_memory_0 = reinterpret_cast<uint32*>(&dynamic_shared_mem[17532]);
+    -// Shared array size: 256, 1024 bytes
+    -uint32 *shared_memory_4 = reinterpret_cast<uint32*>(&dynamic_shared_mem[5180]);
+    -// Shared array size: 4, 16 bytes
+    -uint32 *shared_memory_16 = reinterpret_cast<uint32*>(&dynamic_shared_mem[5164]);
+    -// Shared array size: 256, 1024 bytes
+    -uint32 *shared_memory_6 = reinterpret_cast<uint32*>(&dynamic_shared_mem[4104]);
+    -// Shared array size: 256, 1024 bytes
+    -uint32 *shared_memory_1 = reinterpret_cast<uint32*>(&dynamic_shared_mem[16508]);
+smoke_kernel IDENTICAL (modulo numbering/order) 52 52
+top_fd_kernel DIFFER 8759 8839
+    --- 
+    +++ 
+    @@ -26,2 +26,3 @@
+             ballot: true,
+    +        test: 0,
+             tlay: ArrayCompilationArg {
+    @@ -92,2 +93,5 @@
+     uint32 warpSizeChecked = min(warpSize, blockDim.x * blockDim.y * blockDim.z);
+    +extern __shared__ __align__(4) uint8 dynamic_shared_mem[];
+    +// Shared array size: 2, 8 bytes
+    +uint32 *shared_memory_0 = reinterpret_cast<uint32*>(&dynamic_shared_mem[0]);
+     
+    @@ -130,66 +134,63 @@
+     
+    -const bool v0 = absoluteIdx.x < info.scalars_uint32[0];
+    -v1 = uint64(0);
+    -v2 = uint32(0);
+    -v3 = uint32(0);
+    -v4 = uint32(0);
+    +
+    +const bool v0 = threadIdx.x < uint32(2);
+     if (v0) {
+    -const uint32 v5 = uint32(5) * absoluteIdx.x;
+    -const uint32 v6 = v5 + uint32(1);
+    -const uint32 v7 = buffer_0[v6];
+    -const uint64 v8 = uint64(v7);
+    -const uint64 v9 = v8 << uint64(32);
+    -const uint32 v10 = uint32(5) * absoluteIdx.x;
+    -const uint32 v11 = buffer_0[v10];
+    -const uint64 v12 = uint64(v11);
+top_kernel IDENTICAL (modulo numbering/order) 8585 8585
+wgsl shaders 14 14 DIFFER (9 only in M, 9 only in F)
+  differs: M check_kernel 723 bytes 
+  differs: F check_kernel 723 bytes 
+  differs: F detailed_fd_kernel 894 bytes 
+  differs: M detailed_fd_kernel 894 bytes 
+  differs: M detailed_fd_kernel 900 bytes 
+  differs: F detailed_fd_kernel 900 bytes 
+  differs: M detailed_fd_kernel 900 bytes 
+  differs: F detailed_fd_kernel 900 bytes 
+  differs: F detailed_kernel 618 bytes 
+  differs: M detailed_kernel 618 bytes 
+  differs: F detailed_kernel_u32 671 bytes 
+  differs: M detailed_kernel_u32 671 bytes 
+  differs: M join_kernel 942 bytes 
+  differs: F join_kernel 942 bytes 
+  differs: M niceonly_kernel 1389 bytes 
+  differs: F niceonly_kernel 1389 bytes 
+  differs: M top_fd_kernel 2574 bytes top_fd
+  differs: F top_fd_kernel 1992 bytes top_fd

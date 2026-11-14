@@ -1,0 +1,43 @@
+diff --git a/common/src/cpu_join.rs b/common/src/cpu_join.rs
+index 149f27ec..0efa6eed 100644
+--- a/common/src/cpu_join.rs
++++ b/common/src/cpu_join.rs
+@@ -2126,3 +2126,6 @@ mod tests {
+         );
+     }
+ }
++
++#[doc(hidden)]
++pub mod prof;
+diff --git a/common/src/cpu_top_fd.rs b/common/src/cpu_top_fd.rs
+index c36ba331..4d108eb4 100644
+--- a/common/src/cpu_top_fd.rs
++++ b/common/src/cpu_top_fd.rs
+@@ -481,6 +481,27 @@ impl TopFdSetup {
+         self.seed(st, p);
+     }
+ 
++    /// CPU2 scratch: `seed` from outside.
++    pub(crate) fn seed_pub(&self, st: &mut TopFd, p: u128) {
++        self.seed(st, p);
++    }
++
++    /// CPU2 scratch: `advance`, returning (seeds, steps).
++    pub(crate) fn advance_counted(&self, st: &mut TopFd, p: u128) -> (u64, u64) {
++        let mut n = 0;
++        if p > st.p && p - st.p <= self.reach {
++            while st.p < p {
++                self.step(st);
++                n += 1;
++            }
++            if st.p == p {
++                return (0, n);
++            }
++        }
++        self.seed(st, p);
++        (1, n)
++    }
++
+     /// `ndig(d)`: smallest `i` with `b^i > d`. `d` lies in `[2^(l − 1),
+     /// 2^l)` for its bit length `l`, and `2 < b`, so it has `ndig(2^(l − 1))`
+     /// digits or one more.

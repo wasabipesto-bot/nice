@@ -1,0 +1,112 @@
+START cuda_suite_F 07:04:50 md5=2c8cb647
+
+running 4 tests
+test cubecl_join::tests::cubecl_cuda_join_matches_the_cpu_reference ... NVIDIA GeForce RTX 3080: b20 [58945, 160000) (3,2,0) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b20 [58945, 160000) (2,3,1) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b20 [60001, 150003) (2,3,1) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b25 [3339797, 4339797) (4,3,1) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b25 [5000123, 5700456) (3,4,2) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b30 [300000000, 301000000) (5,4,2) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b34 [12000000017, 12001000017) (5,5,2) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b40 [3000000000000, 3000002000000) (6,5,2) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b40 [3000000000000, 3000002000000) (7,4,2) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b50 [62082117268529817, 62082117268829817) (7,4,1) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b54 [2321864499473908801, 2321864499474208801) (8,4,1) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b57 [30000000000000000000, 30000000000000300000) (10,4,1) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b57 [20635899893042801193, 20635899893043101193) (9,5,1) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b57 [78920310198429586458, 78920310198429886458) (9,5,2) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b58 [114041927169846138720, 114041927169846438720) (10,4,2) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b60 [1573714731429953349518, 1573714731429953649518) (10,4,2) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b64 [52125117810081128433988, 52125117810081128733988) (11,4,2) agrees (FD tops: true)
+NVIDIA GeForce RTX 3080: b57 frontier field JoinParams { t: 9, k: 6, p: 2 }, partitions 0, 1000, 3248 agree
+NVIDIA GeForce RTX 3080: b20 [58945, 160000) JoinParams { t: 3, k: 2, p: 0 } tight layouts agree (1 partitions re-run, 110 splits)
+NVIDIA GeForce RTX 3080: b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (10 partitions re-run, 29 splits)
+NVIDIA GeForce RTX 3080: b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } tight layouts agree (8 partitions re-run, 20 splits)
+NVIDIA GeForce RTX 3080: b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } tight layouts agree (12 partitions re-run, 58 splits)
+NVIDIA GeForce RTX 3080: 5 windows agree whole and in slices
+NVIDIA GeForce RTX 3080: b20 [58945, 160000) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 617 MiB layout (1 refusals, ceiling 308 MiB)
+NVIDIA GeForce RTX 3080: b20 [60001, 150003) JoinParams { t: 2, k: 3, p: 1 } agrees after the device refused a 617 MiB layout (1 refusals, ceiling 308 MiB)
+NVIDIA GeForce RTX 3080: b25 [3339797, 4339797) JoinParams { t: 4, k: 3, p: 1 } agrees after the device refused a 618 MiB layout (1 refusals, ceiling 309 MiB)
+NVIDIA GeForce RTX 3080: b50 [62082117268529817, 62082117268829817) JoinParams { t: 7, k: 4, p: 1 } agrees after the device refused a 852 MiB layout (1 refusals, ceiling 426 MiB)
+NVIDIA GeForce RTX 3080: b54 [2321864499473908801, 2321864499474208801) JoinParams { t: 8, k: 4, p: 1 } agrees after the device refused a 976 MiB layout (1 refusals, ceiling 488 MiB)
+NVIDIA GeForce RTX 3080: b57 frontier partitions [0, 1000, 3248] agree in a tight layout (3 re-run, 6 splits) and after a refused one
+NVIDIA GeForce RTX 3080: b20 [58945, 160000) JoinParams { t: 3, k: 2, p: 0 }, test bits 2: the field fails: overlap join b20: the top stage kept 112 more tops than it counted for the join; a device whose planes lose tops cannot run the join
+NVIDIA GeForce RTX 3080: b20 [58945, 160000) JoinParams { t: 3, k: 2, p: 0 }, test bits 4: the field fails: overlap join b20: the record indices the top stage wrote differ from those it counted by -94 (mod 2^32): it wrote some records twice and others not at all; a device that does cannot run the join
+ok
+test cubecl_join::tests::cubecl_cuda_top_certificates_match_the_lockstep_scan_and_the_cpu ... NVIDIA GeForce RTX 3080: 102365 intervals, 33582 kept; 203413 of the powers scanned above c0, 69824 of them with the carry
+ok
+test cubecl_join::tests::cubecl_cuda_top_fd_appends_every_top_on_partly_filled_warps ... NVIDIA GeForce RTX 3080: top_fd's append = top_kernel's on partly filled planes: 230 runs on 23 fields (4764544 tops), append forms (ballot) [true]
+ok
+test cubecl_join::tests::cubecl_cuda_top_fd_matches_the_top_kernel ... NVIDIA GeForce RTX 3080: b20 [58945, 160000) (3,2,0): 2 batches (slots 4, 3576 prefixes) agree
+NVIDIA GeForce RTX 3080: b20 [58945, 160000) (2,3,1): 10 batches (slots 4, 13 prefixes) agree
+NVIDIA GeForce RTX 3080: b20 [60001, 150003) (2,3,1): 10 batches (slots 4, 12 prefixes) agree
+NVIDIA GeForce RTX 3080: b25 [3339797, 4339797) (4,3,1): 12 batches (slots 4, 1059 prefixes) agree
+NVIDIA GeForce RTX 3080: b25 [5000123, 5700456) (3,4,2): 10 batches (slots 4, 3 prefixes) agree
+NVIDIA GeForce RTX 3080: b30 [300000000, 301000000) (5,4,2): 10 batches (slots 4, 0 prefixes) agree
+NVIDIA GeForce RTX 3080: b34 [12000000017, 12001000017) (5,5,2): 10 batches (slots 4, 0 prefixes) agree
+NVIDIA GeForce RTX 3080: b40 [3000000000000, 3000002000000) (6,5,2): 10 batches (slots 4, 1 prefixes) agree
+NVIDIA GeForce RTX 3080: b40 [3000000000000, 3000002000000) (7,4,2): 10 batches (slots 4, 4 prefixes) agree
+NVIDIA GeForce RTX 3080: b50 [62082117268529817, 62082117268829817) (7,4,1): 15 batches (slots 4, 1 prefixes) agree
+NVIDIA GeForce RTX 3080: b54 [2321864499473908801, 2321864499474208801) (8,4,1): 16 batches (slots 4, 1 prefixes) agree
+NVIDIA GeForce RTX 3080: b57 [30000000000000000000, 30000000000000300000) (10,4,1): 20 batches (slots 4, 0 prefixes) agree
+NVIDIA GeForce RTX 3080: b57 [20635899893042801193, 20635899893043101193) (9,5,1): 17 batches (slots 4, 0 prefixes) agree
+NVIDIA GeForce RTX 3080: b57 [78920310198429586458, 78920310198429886458) (9,5,2): 7 batches (slots 4, 1 prefixes) agree
+NVIDIA GeForce RTX 3080: b58 [114041927169846138720, 114041927169846438720) (10,4,2): 10 batches (slots 4, 1 prefixes) agree
+NVIDIA GeForce RTX 3080: b60 [1573714731429953349518, 1573714731429953649518) (10,4,2): 10 batches (slots 4, 0 prefixes) agree
+NVIDIA GeForce RTX 3080: b64 [52125117810081128433988, 52125117810081128733988) (11,4,2): 10 batches (slots 4, 1 prefixes) agree
+
+thread 'DSD-0-0' (47665) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-cuda-0.10.0/src/compute/server.rs:124:46:
+called `Result::unwrap()` on an `Err` value: can't allocate buffer of size: 2589212672
+No backtrace available
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+NVIDIA GeForce RTX 3080: b57 1e14 at 28151599893042801193, first slice: 10 batches (slots 16, 80906 prefixes) agree
+NVIDIA GeForce RTX 3080: b60 1e14 at 1366406074057412100454, first slice: 10 batches (slots 16, 61160 prefixes) agree
+
+thread 'DSD-0-0' (47665) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-cuda-0.10.0/src/compute/server.rs:124:46:
+called `Result::unwrap()` on an `Err` value: can't allocate buffer of size: 2589212672
+No backtrace available
+NVIDIA GeForce RTX 3080: b62 1e14 at 7997740455941656911841, first slice: 10 batches (slots 16, 53067 prefixes) agree
+
+thread 'DSD-0-0' (47665) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-cuda-0.10.0/src/compute/server.rs:124:46:
+called `Result::unwrap()` on an `Err` value: can't allocate buffer of size: 2589212672
+No backtrace available
+NVIDIA GeForce RTX 3080: b64 1e14 at 41242006262957161709568, first slice: 10 batches (slots 16, 42039 prefixes) agree
+
+thread 'DSD-0-0' (47665) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-cuda-0.10.0/src/compute/server.rs:124:46:
+called `Result::unwrap()` on an `Err` value: can't allocate buffer of size: 2589212672
+No backtrace available
+
+thread 'DSD-0-0' (47665) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-runtime-0.10.0/src/memory_management/memory_manage.rs:418:9:
+assertion `left == right` failed
+  left: ManagedMemoryDescriptor { id: ManagedMemoryId { value: 61457 }, location: MemoryLocation { pool: 0, page: 0, slice: 0, init: 1 } }
+ right: ManagedMemoryDescriptor { id: ManagedMemoryId { value: 64404 }, location: MemoryLocation { pool: 0, page: 0, slice: 0, init: 0 } }
+
+thread 'DSD-0-0' (47665) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-runtime-0.10.0/src/memory_management/memory_manage.rs:418:9:
+assertion `left == right` failed
+  left: ManagedMemoryDescriptor { id: ManagedMemoryId { value: 61457 }, location: MemoryLocation { pool: 0, page: 0, slice: 0, init: 1 } }
+ right: ManagedMemoryDescriptor { id: ManagedMemoryId { value: 64404 }, location: MemoryLocation { pool: 0, page: 0, slice: 0, init: 0 } }
+
+thread 'DSD-0-0' (47665) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-runtime-0.10.0/src/memory_management/memory_manage.rs:418:9:
+assertion `left == right` failed
+  left: ManagedMemoryDescriptor { id: ManagedMemoryId { value: 61457 }, location: MemoryLocation { pool: 0, page: 0, slice: 0, init: 1 } }
+ right: ManagedMemoryDescriptor { id: ManagedMemoryId { value: 64404 }, location: MemoryLocation { pool: 0, page: 0, slice: 0, init: 0 } }
+
+thread 'DSD-0-0' (47665) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-runtime-0.10.0/src/memory_management/memory_manage.rs:418:9:
+assertion `left == right` failed
+  left: ManagedMemoryDescriptor { id: ManagedMemoryId { value: 61457 }, location: MemoryLocation { pool: 0, page: 0, slice: 0, init: 1 } }
+ right: ManagedMemoryDescriptor { id: ManagedMemoryId { value: 64404 }, location: MemoryLocation { pool: 0, page: 0, slice: 0, init: 0 } }
+
+thread 'cubecl_join::tests::cubecl_cuda_top_fd_matches_the_top_kernel' (48297) panicked at common/src/cubecl_join.rs:6647:13:
+assertion `left == right` failed: top cubes run
+  left: 0
+ right: 152919
+FAILED
+
+failures:
+
+failures:
+    cubecl_join::tests::cubecl_cuda_top_fd_matches_the_top_kernel
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 299 filtered out; finished in 271.72s
+
+END cuda_suite_F 07:09:23 rc=0

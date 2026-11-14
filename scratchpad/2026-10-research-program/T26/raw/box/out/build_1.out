@@ -1,0 +1,43 @@
+built M (main 41b4b405 Bum +) features gpu in 1 s md5 aacdc4a6
+BUILD FAILED F
+   Compiling clap v4.6.7
+   Compiling ciborium v0.2.2
+   Compiling cubecl-cuda v0.10.0
+   Compiling cubecl-ir v0.10.0
+   Compiling gpu-allocator v0.28.0
+   Compiling cubecl-core v0.10.0
+   Compiling wgpu-naga-bridge v29.0.4
+   Compiling cubecl-opt v0.10.0
+   Compiling cubecl-std v0.10.0
+   Compiling cubecl-cpp v0.10.0
+   Compiling wgpu-core-deps-windows-linux-android v29.0.4
+   Compiling malachite-q v0.14.0
+   Compiling malachite-float v0.14.0
+   Compiling malachite v0.14.0
+error[E0308]: `if` and `else` have incompatible types
+    --> common/src/cubecl_join.rs:1817:13
+     |
+1777 |     #[cube]
+     |     ------- expected because of this
+...
+1817 |             0u32
+     |             ^^^^ expected `NativeExpand<u32>`, found `u32`
+     |
+     = note: expected struct `NativeExpand<u32>`
+                  found type `u32`
+
+warning: variable does not need to be mutable
+    --> common/src/cubecl_join.rs:2744:13
+     |
+2744 |         let mut s_acct = SharedMemory::<Atomic<u32>>::new(2usize);
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0308`.
+warning: `nice_common` (lib) generated 1 warning
+error: could not compile `nice_common` (lib) due to 1 previous error; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+built MS (main 41b4b405 Bum +) features gpu,cubecl-spirv in 0 s md5 a15a47b8

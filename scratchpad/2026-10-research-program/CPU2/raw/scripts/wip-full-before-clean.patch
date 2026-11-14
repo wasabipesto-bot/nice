@@ -1,0 +1,1076 @@
+diff --git a/common/examples/cpu2_ab.rs b/common/examples/cpu2_ab.rs
+new file mode 100644
+index 00000000..6324a83a
+--- /dev/null
++++ b/common/examples/cpu2_ab.rs
+@@ -0,0 +1,46 @@
++//! CPU2 scratch (not for the PR): contiguous partitions of one slice on one
++//! thread, as the client's pool runs them. usage:
++//! cpu2_ab <base> <start|fFRAC> <size> <slice> <v0> <count> [counts]
++use nice_common::FieldSize;
++use nice_common::base_range::get_base_range_u128;
++use nice_common::cpu_join::{CpuJoin, PartitionResult, Scratch, slices_for};
++use std::time::Instant;
++
++fn main() {
++    let a: Vec<String> = std::env::args().collect();
++    let base: u32 = a[1].parse().unwrap();
++    let size: u128 = a[3].parse::<f64>().unwrap() as u128;
++    let start: u128 = if let Some(f) = a[2].strip_prefix('f') {
++        let band = get_base_range_u128(base).unwrap().unwrap();
++        let f: f64 = f.parse().unwrap();
++        let off = (band.size() as f64 * f) as u128;
++        let s = band.start() + off / size * size;
++        s.min(band.end() - size)
++    } else {
++        a[2].parse().unwrap()
++    };
++    let si: usize = a[4].parse().unwrap();
++    let v0: u32 = a[5].parse().unwrap();
++    let count: u32 = a[6].parse().unwrap();
++    let range = FieldSize::new(start, start + size);
++    let (jp, slices) = slices_for(base, &range).expect("a join field");
++    let t = Instant::now();
++    let join = CpuJoin::new(base, &slices[si], jp).expect("setup");
++    let setup = t.elapsed().as_secs_f64();
++    let v1 = (v0 + count).min(join.partitions());
++    let mut sc = Scratch::default();
++    let mut out = PartitionResult::default();
++    let wall = Instant::now();
++    for v in v0..v1 {
++        out.add(join.run_partition(v, &mut sc));
++    }
++    let secs = wall.elapsed().as_secs_f64();
++    out.hits.sort_unstable();
++    println!(
++        "AB b{base} start {start} size {size:e} slice {si}/{} v {v0}..{v1} setup {setup:.3} secs {secs:.4} survivors {} checked {} hits {:?}",
++        slices.len(),
++        out.survivors,
++        out.checked,
++        out.hits
++    );
++}
+diff --git a/common/examples/cpu2_prof.rs b/common/examples/cpu2_prof.rs
+new file mode 100644
+index 00000000..f6cf16ec
+--- /dev/null
++++ b/common/examples/cpu2_prof.rs
+@@ -0,0 +1,69 @@
++//! CPU2 scratch (not for the PR): the CPU join's top phase at production
++//! shapes. usage: cpu2_prof <base> <start|fFRAC> <size> <partitions> [slices: all|i]
++use nice_common::FieldSize;
++use nice_common::base_range::get_base_range_u128;
++use nice_common::bench_defs::sample_order;
++use nice_common::cpu_join::{CpuJoin, Scratch, slices_for};
++use std::time::Instant;
++
++fn main() {
++    let a: Vec<String> = std::env::args().collect();
++    let base: u32 = a[1].parse().unwrap();
++    let size: u128 = a[3].parse::<f64>().unwrap() as u128;
++    let start: u128 = if let Some(f) = a[2].strip_prefix('f') {
++        let band = get_base_range_u128(base).unwrap().unwrap();
++        let f: f64 = f.parse().unwrap();
++        let off = (band.size() as f64 * f) as u128;
++        let s = band.start() + off / size * size;
++        s.min(band.end() - size)
++    } else {
++        a[2].parse().unwrap()
++    };
++    let want: usize = a[4].parse().unwrap();
++    let range = FieldSize::new(start, start + size);
++    let (jp, slices) = slices_for(base, &range).expect("a join field");
++    let which: Vec<usize> = match a.get(5).map(String::as_str) {
++        None | Some("all") => (0..slices.len()).collect(),
++        Some("spread") => {
++            let mut v = vec![0, slices.len() / 2, slices.len() - 1];
++            v.dedup();
++            v
++        }
++        Some(i) => vec![i.parse().unwrap()],
++    };
++    println!(
++        "FIELD b{base} start {start} size {size:e} {jp:?} slices {}",
++        slices.len()
++    );
++    for si in which {
++        let t = Instant::now();
++        let join = CpuJoin::new(base, &slices[si], jp).expect("setup");
++        let setup = t.elapsed().as_secs_f64();
++        let parts = join.partitions();
++        let order = sample_order(parts);
++        let n = want.min(order.len());
++        println!("SLICE {si} setup {setup:.3}s partitions {parts} sampled {n}");
++        let mut sc = Scratch::default();
++        for &v in &order[..n] {
++            let t = Instant::now();
++            let out = join.run_partition(v, &mut sc);
++            let total = t.elapsed().as_nanos();
++            let m: Vec<_> = (0..4).map(|m| join.prof_tops(v, m, &mut sc)).collect();
++            println!(
++                "PART b{base} s{si} v{v} total_ns {total} survivors {} checked {} | full_ns {} tops {} | adv_ns {} prefixes {} unclipped {} seeds {} steps {} | cert_ns {} tops {} | seedall_ns {}",
++                out.survivors,
++                out.checked,
++                m[0].ns,
++                m[0].tops,
++                m[1].ns,
++                m[1].prefixes,
++                m[1].unclipped,
++                m[1].seeds,
++                m[1].steps,
++                m[2].ns,
++                m[2].tops,
++                m[3].ns
++            );
++        }
++    }
++}
+diff --git a/common/examples/cpu2_skipcount.rs b/common/examples/cpu2_skipcount.rs
+new file mode 100644
+index 00000000..bda5e827
+--- /dev/null
++++ b/common/examples/cpu2_skipcount.rs
+@@ -0,0 +1,50 @@
++//! CPU2 scratch: the skip walk's counts over contiguous partitions.
++//! usage: cpu2_skipcount <base> <start|fFRAC> <size> <slice> <v0> <count>
++use nice_common::FieldSize;
++use nice_common::base_range::get_base_range_u128;
++use nice_common::cpu_join::{CpuJoin, Scratch, slices_for};
++
++fn main() {
++    let a: Vec<String> = std::env::args().collect();
++    let base: u32 = a[1].parse().unwrap();
++    let size: u128 = a[3].parse::<f64>().unwrap() as u128;
++    let start: u128 = if let Some(f) = a[2].strip_prefix('f') {
++        let band = get_base_range_u128(base).unwrap().unwrap();
++        let f: f64 = f.parse().unwrap();
++        let off = (band.size() as f64 * f) as u128;
++        let s = band.start() + off / size * size;
++        s.min(band.end() - size)
++    } else {
++        a[2].parse().unwrap()
++    };
++    let si: usize = a[4].parse().unwrap();
++    let v0: u32 = a[5].parse().unwrap();
++    let count: u32 = a[6].parse().unwrap();
++    let range = FieldSize::new(start, start + size);
++    let (jp, slices) = slices_for(base, &range).expect("a join field");
++    let join = CpuJoin::new(base, &slices[si], jp).expect("setup");
++    let v1 = (v0 + count).min(join.partitions());
++    let mut sc = Scratch::default();
++    let (mut un, mut te, mut se, mut stp, mut to, mut ns) = (0u64, 0u64, 0u64, 0u64, 0u64, 0u64);
++    for v in v0..v1 {
++        let p = join.prof_skip(v, &mut sc);
++        println!(
++            "V {v} unclipped {} tests {} seeds {} steps {} tops {} ns {}",
++            p.unclipped, p.tests, p.seeds, p.steps, p.tops, p.ns
++        );
++        un += p.unclipped;
++        te += p.tests;
++        se += p.seeds;
++        stp += p.steps;
++        to += p.tops;
++        ns += p.ns;
++    }
++    println!(
++        "SUM b{base} start {start} slice {si} v {v0}..{v1}: unclipped {un} tests {te} ({:.4}) seeds {se} ({:.4}/test) steps {stp} ({:.3}/test) tops {to} ({:.4}) ns/unclipped {:.1}",
++        te as f64 / un as f64,
++        se as f64 / te as f64,
++        stp as f64 / te as f64,
++        to as f64 / un as f64,
++        ns as f64 / un as f64
++    );
++}
+diff --git a/common/src/cpu_join.rs b/common/src/cpu_join.rs
+index 149f27ec..c9d6e1bb 100644
+--- a/common/src/cpu_join.rs
++++ b/common/src/cpu_join.rs
+@@ -10,7 +10,14 @@
+ //!    join. A thread holds one key's tops (about `1/b` of the partition's).
+ //!    A key's prefixes come in ascending order, a multiple of a power of the
+ //!    base apart, so their certificates step from one to the next by
+-//!    digit-array additions (`cpu_top_fd`) instead of dividing.
++//!    digit-array additions (`cpu_top_fd`) instead of dividing. A prefix's
++//!    blocks in consecutive partitions are consecutive blocks, and a
++//!    certificate that fails on a repeated digit fails on the next ones
++//!    too until one of the two digits can change: the failure says in which
++//!    partition that is at the earliest (`cpu_top_fd`'s module docs), and
++//!    a thread that runs the partitions in ascending order (the client's
++//!    pool runs contiguous ranges) does not certify the prefix again before
++//!    it. The tops are the same, so is everything after them.
+ //! 2. **Bottoms**: every residue of the field's bottom list extended by the
+ //!    partition's fixed digits, with exact arithmetic once per residue.
+ //!    What the last bottom digit `d` (the key digit) adds is affine in `d`:
+@@ -133,6 +140,14 @@ pub struct Scratch {
+     /// A scan's first pass: the passing bottoms of a piece of a class, by
+     /// index (`PIECE` slots).
+     idx: Vec<u16>,
++    /// For each top-layer prefix of the join `last` names, the first
++    /// partition whose block can pass (saturated at `u16::MAX`; a lower
++    /// bound): every partition from the last one it was certified at up to
++    /// that fails.
++    next: Vec<u16>,
++    /// The join (`CpuJoin::id`) and partition this thread ran last; `next`
++    /// is only read for a later partition of the same join.
++    last: Option<(u64, u32)>,
+ }
+ 
+ /// A top prefix of the partition: `n = P·b^f0 + r` for the bottom residues
+@@ -441,6 +456,9 @@ pub struct CpuJoin {
+     /// `fs.tlay` is ordered by key digit (stably): `key_off[d]..key_off[d +
+     /// 1]` are the prefixes whose key is `d`.
+     key_off: Vec<u32>,
++    /// This join among the process's: what a [`Scratch`]'s failing runs
++    /// belong to.
++    id: u64,
+ }
+ 
+ impl CpuJoin {
+@@ -481,7 +499,16 @@ impl CpuJoin {
+         }
+         // A key's prefixes are `b^(p + key level) = b^o` apart in P, and
+         // `o = k − f0`: the step is `pk`.
+-        let fd = TopFdSetup::try_new(&fs.base, fs.f0, k - fs.f0, k, fs.phi, u32::try_from(bmid)?);
++        let fd = TopFdSetup::try_new(
++            &fs.base,
++            fs.f0,
++            k - fs.f0,
++            k,
++            fs.phi,
++            u32::try_from(bmid)?,
++            u32::try_from(fs.nparts).unwrap_or(u32::MAX),
++        );
++        static JOINS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+         let check = Check::new(
+             base, fs.base.l, fs.base.s2, fs.base.s3, fs.f0, fs.k2, fs.phi,
+         )?;
+@@ -511,6 +538,7 @@ impl CpuJoin {
+             avx512: std::arch::is_x86_feature_detected!("avx512f")
+                 && std::arch::is_x86_feature_detected!("avx2"),
+             piece: PIECE,
++            id: JOINS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+             fs,
+         })
+     }
+@@ -586,6 +614,13 @@ impl CpuJoin {
+         let m1 = self.fs.m1;
+         let roots = &self.fs.base.roots;
+         sc.idx.resize(PIECE, 0);
++        // The failing runs carry over from an earlier partition of this
++        // join; otherwise every prefix is certified.
++        if !sc.last.is_some_and(|(id, last)| id == self.id && last < v) {
++            sc.next.clear();
++            sc.next.resize(self.fs.tlay.len(), 0);
++        }
++        sc.last = Some((self.id, v));
+         // The bottoms are extended at the first key with a top, so a
+         // partition without tops does no bottom work at all.
+         let mut extended = false;
+@@ -597,7 +632,7 @@ impl CpuJoin {
+             if lo == hi {
+                 continue;
+             }
+-            self.tops(v, &self.fs.tlay[lo..hi], &mut sc.tops);
++            self.tops(v, &self.fs.tlay[lo..hi], &mut sc.next[lo..hi], &mut sc.tops);
+             if sc.tops.is_empty() {
+                 continue;
+             }
+@@ -634,17 +669,22 @@ impl CpuJoin {
+     /// The partition's tops from the top-layer prefixes `layer` (all of one
+     /// key, ascending), as the reference join makes them. An unclipped
+     /// block's certificate steps from the last one's (`TopFdSetup`); a
+-    /// clipped one, at either end of the field, is divided out.
++    /// clipped one, at either end of the field, is divided out. `next` is
++    /// [`Scratch::next`] for `layer`, valid for every partition up to `v`:
++    /// an unclipped block whose partition is below its prefix's entry
++    /// fails, and is not certified; one that is certified and fails sets
++    /// the entry.
+     // Below 2^32: w = b^f0 is (`JoinParams::supported`), and so are b^mid,
+     // b - 1 and the key space. w, p, a, e as in `overlap_join`.
+     #[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
+-    fn tops(&self, v: u32, layer: &[(u128, u64)], tops: &mut Vec<Top>) {
++    fn tops(&self, v: u32, layer: &[(u128, u64)], next: &mut [u16], tops: &mut Vec<Top>) {
+         tops.clear();
+         let fs = &self.fs;
+         let (w, v) = (fs.w, u128::from(v));
+         let mut st = TopFd::default();
+         let full_seed = fs.full_floor >= fs.k2;
+-        for &(p0, _) in layer {
++        let vs = u32::from(u16::try_from(v).unwrap_or(u16::MAX));
++        for (&(p0, _), next) in layer.iter().zip(next) {
+             let p = p0 * fs.nparts + v;
+             if p < fs.plo || p > fs.phi {
+                 continue;
+@@ -656,9 +696,15 @@ impl CpuJoin {
+                 && a == lo
+                 && e == lo + w - 1
+             {
++                if vs < u32::from(*next) {
++                    continue;
++                }
+                 fd.advance(&mut st, p);
+-                if let Some(c) = fd.cert(&st) {
+-                    tops.push(self.top(p, c, full_seed, (0, w as u32), self.fx.dh(st.dm), st.pc));
++                match fd.cert(&st) {
++                    Ok(c) => {
++                        tops.push(self.top(p, c, full_seed, (0, w as u32), self.fx.dh(st.dm), st.pc));
++                    }
++                    Err(n) => *next = u16::try_from(v + u128::from(n)).unwrap_or(u16::MAX),
+                 }
+                 continue;
+             }
+@@ -1177,7 +1223,7 @@ mod tests {
+         let (mut out, mut tops) = (Vec::new(), Vec::new());
+         for key in 0..join.keyspace as usize {
+             let (lo, hi) = (join.key_off[key] as usize, join.key_off[key + 1] as usize);
+-            join.tops(v, &join.fs.tlay[lo..hi], &mut tops);
++            join.tops(v, &join.fs.tlay[lo..hi], &mut vec![0; hi - lo], &mut tops);
+             out.extend_from_slice(&tops);
+         }
+         out
+@@ -1468,6 +1514,205 @@ mod tests {
+         }
+     }
+ 
++    /// Partition `v`'s tops, every key in order, as [`CpuJoin::run`] makes
++    /// them with `next` carried over from earlier partitions; also how many
++    /// unclipped blocks of the partition it did not certify.
++    fn skipped_tops(join: &CpuJoin, v: u32, next: &mut [u16]) -> (Vec<Top>, u64) {
++        let fs = &join.fs;
++        let skipped = fs
++            .tlay
++            .iter()
++            .zip(next.iter())
++            .filter(|&(&(p0, _), &nx)| {
++                let p = p0 * fs.nparts + u128::from(v);
++                let lo = p * fs.w;
++                join.fd.is_some()
++                    && p >= fs.plo
++                    && p <= fs.phi
++                    && lo >= fs.s
++                    && lo + fs.w <= fs.e
++                    && v < u32::from(nx)
++            })
++            .count() as u64;
++        let (mut out, mut tops) = (Vec::new(), Vec::new());
++        for key in 0..join.keyspace as usize {
++            let (lo, hi) = (join.key_off[key] as usize, join.key_off[key + 1] as usize);
++            join.tops(v, &join.fs.tlay[lo..hi], &mut next[lo..hi], &mut tops);
++            out.extend_from_slice(&tops);
++        }
++        (out, skipped)
++    }
++
++    /// The partitions `vs` (ascending) with the failing runs carried over
++    /// from one to the next: every partition's tops are the ones it has
++    /// with nothing carried over, in the same order. Returns the tops and
++    /// the blocks not certified.
++    fn check_skip_walk(join: &CpuJoin, vs: &[u32], what: &str) -> (u64, u64) {
++        let mut next = vec![0u16; join.fs.tlay.len()];
++        let (mut tops, mut skipped) = (0u64, 0u64);
++        for &v in vs {
++            let (got, sk) = skipped_tops(join, v, &mut next);
++            assert_eq!(got, all_tops(join, v), "{what} partition {v}");
++            tops += got.len() as u64;
++            skipped += sk;
++        }
++        (tops, skipped)
++    }
++
++    /// The skip walk on small bases, exhaustively: for bases 10-36 every
++    /// field of a few hundred thousand numbers or more cut from the band
++    /// (the whole band if it is small), every join shape with partitions
++    /// that the field takes, every partition in ascending order: the same
++    /// tops as certifying every block. Also the whole join on each, run
++    /// partition by partition with one scratch (the client's order) and
++    /// with a fresh scratch each time: the same results.
++    #[test]
++    fn the_skip_walk_finds_every_top_on_small_bases() {
++        use crate::base_range::get_base_range_u128;
++        let (mut shapes, mut tops, mut skipped, mut runs) = (0u32, 0u64, 0u64, 0u32);
++        for b in 10..=36u32 {
++            let Some(band) = get_base_range_u128(b).expect("base range") else {
++                continue;
++            };
++            let size = band.size().min(400_000 + u128::from(b) * 20_000);
++            let fields: Vec<u128> = if size == band.size() {
++                vec![band.start()]
++            } else {
++                vec![
++                    band.start(),
++                    band.start() + (band.size() - size) / 2,
++                    band.end() - size,
++                ]
++            };
++            for s in fields {
++                let range = FieldSize::new(s, s + size);
++                let Some(base) = crate::overlap_join::Base::try_new(b, s, s + size - 1) else {
++                    continue;
++                };
++                let l = base.l;
++                for t in 1..l {
++                    for k in 1..l {
++                        for p in 1..=2 {
++                            let jp = JoinParams { t, k, p };
++                            if !jp.supported(b, l) {
++                                continue;
++                            }
++                            let Ok(join) = CpuJoin::new(b, &range, jp) else {
++                                continue;
++                            };
++                            if join.fd.is_none() || join.fs.tlay.is_empty() {
++                                continue;
++                            }
++                            let work = join.fs.tlay.len() as u64 * u64::from(join.partitions());
++                            if work > 3_000_000 {
++                                continue;
++                            }
++                            let what = format!("b{b} [{s}, +{size}) {jp:?}");
++                            let vs: Vec<u32> = (0..join.partitions()).collect();
++                            let (t1, s1) = check_skip_walk(&join, &vs, &what);
++                            shapes += 1;
++                            tops += t1;
++                            skipped += s1;
++                            if runs < 60 && s1 > 0 {
++                                let mut sc = Scratch::default();
++                                let mut carried = PartitionResult::default();
++                                let mut fresh = PartitionResult::default();
++                                for &v in &vs {
++                                    carried.add(join.run_partition(v, &mut sc));
++                                    fresh.add(join.run_partition(v, &mut Scratch::default()));
++                                }
++                                assert_eq!(carried, fresh, "{what}");
++                                runs += 1;
++                            }
++                        }
++                    }
++                }
++            }
++        }
++        eprintln!(
++            "{shapes} field shapes, every partition: {tops} tops, {skipped} blocks not certified; {runs} whole joins compared"
++        );
++        assert!(shapes > 100 && skipped > 100_000 && runs >= 30);
++    }
++
++    /// The skip walk on real fields at bases 57-64 (1e14 fields from a
++    /// third into each band and the production list's): the first 600
++    /// partitions in ascending order, the same tops as certifying every
++    /// block; and the same with gaps (a thread of the client's pool).
++    #[test]
++    fn the_skip_walk_finds_every_top_on_production_fields() {
++        use crate::base_range::get_base_range_u128;
++        let mut fields: Vec<(u32, u128, u128)> = PLAN_FIELDS
++            .iter()
++            .copied()
++            .filter(|&(b, _, _)| b >= 57)
++            .collect();
++        for b in 57..=64u32 {
++            let Some(band) = get_base_range_u128(b).expect("base range") else {
++                continue;
++            };
++            let size = 100_000_000_000_000u128;
++            fields.push((b, band.start() + band.size() / 3 / size * size, size));
++        }
++        let mut walked = 0;
++        for (b, s, size) in fields {
++            let range = FieldSize::new(s, s + size);
++            let jp = join_params_for(b, &range).expect("a join field");
++            let join = CpuJoin::new(b, &range, jp).expect("field setup");
++            if join.fs.tlay.is_empty() {
++                eprintln!("b{b} [{s}, +{size}): no tops");
++                continue;
++            }
++            assert!(join.fd.is_some(), "b{b}: no stepped certificates");
++            let what = format!("b{b} [{s}, +{size}) {jp:?}");
++            let all: Vec<u32> = (0..join.partitions().min(600)).collect();
++            let t = Instant::now();
++            let (tops, skipped) = check_skip_walk(&join, &all, &what);
++            let gaps: Vec<u32> = all.iter().copied().filter(|v| v % 7 != 3 && v % 11 != 5).collect();
++            check_skip_walk(&join, &gaps, &what);
++            eprintln!(
++                "{what}: {} prefixes, {tops} tops, {skipped} blocks not certified ({:.3} of the layer), {:.1}s",
++                join.fs.tlay.len(),
++                skipped as f64 / (join.fs.tlay.len() as f64 * all.len() as f64),
++                t.elapsed().as_secs_f64()
++            );
++            walked += 1;
++        }
++        assert!(walked >= 6, "{walked} fields walked");
++    }
++
++    /// Opt-in (`NICE_TEST_CPU_SKIP_PROD=n`): the skip walk on `n`
++    /// consecutive partitions from each of three places of the timed
++    /// production shapes (b60 1e16, b62 1e17's first slice, b64 1e17's first
++    /// slice): the same tops as certifying every block.
++    #[test]
++    fn the_skip_walk_finds_every_top_on_the_timed_shapes() {
++        let Ok(n) = std::env::var("NICE_TEST_CPU_SKIP_PROD") else {
++            eprintln!("skipping: set NICE_TEST_CPU_SKIP_PROD to a partition count");
++            return;
++        };
++        let n: u32 = n.parse().expect("NICE_TEST_CPU_SKIP_PROD: a count");
++        for (b, s, size) in [
++            (60, 1_157_209_632_114_824_200_908u128, 10_000_000_000_000_000u128),
++            (62, 4_473_066_762_334_864_396_992, 100_000_000_000_000_000),
++            (64, 71_779_931_862_957_161_709_568, 100_000_000_000_000_000),
++        ] {
++            let (jp, slices) = slices_for(b, &FieldSize::new(s, s + size)).expect("a join field");
++            let join = CpuJoin::new(b, &slices[0], jp).expect("setup");
++            let parts = join.partitions();
++            for v0 in [0, parts / 2, parts - n] {
++                let vs: Vec<u32> = (v0..v0 + n).collect();
++                let t = Instant::now();
++                let (tops, skipped) = check_skip_walk(&join, &vs, &format!("b{b} {s}"));
++                eprintln!(
++                    "b{b} [{s}, +{size}) slice 0, partitions {v0}..{}: {tops} tops, {skipped} blocks not certified, {:.1}s",
++                    v0 + n,
++                    t.elapsed().as_secs_f64()
++                );
++            }
++        }
++    }
++
+     /// Every AND scan this CPU has (AVX-512F, AVX2, the portable loop)
+     /// finds the same pairs: the same hits, join survivors and prefilter
+     /// survivors on every partition of the test windows. Each also runs
+@@ -2126,3 +2371,6 @@ mod tests {
+         );
+     }
+ }
++
++#[doc(hidden)]
++pub mod prof;
+diff --git a/common/src/cpu_join/prof.rs b/common/src/cpu_join/prof.rs
+new file mode 100644
+index 00000000..de0662a3
+--- /dev/null
++++ b/common/src/cpu_join/prof.rs
+@@ -0,0 +1,122 @@
++//! CPU2 scratch profiling (not for the PR): the top phase of one partition
++//! in isolation, in several ablation modes.
++use super::*;
++use std::time::Instant;
++
++#[derive(Default, Debug, Clone)]
++pub struct TopProf {
++    pub prefixes: u64,
++    pub unclipped: u64,
++    pub seeds: u64,
++    pub steps: u64,
++    pub tops: u64,
++    pub tests: u64,
++    pub ns: u64,
++}
++
++impl CpuJoin {
++    /// Mode 0: `tops()` as the join runs it; 1: advance only; 2: advance +
++    /// cert, no push; 3: seed every unclipped prefix.
++    #[allow(clippy::cast_possible_truncation)]
++    pub fn prof_tops(&self, v: u32, mode: u32, sc: &mut Scratch) -> TopProf {
++        let mut pr = TopProf::default();
++        let fs = &self.fs;
++        let t = Instant::now();
++        let mut sink = 0u64;
++        for key in 0..self.keyspace as usize {
++            let (lo, hi) = (self.key_off[key] as usize, self.key_off[key + 1] as usize);
++            if lo == hi {
++                continue;
++            }
++            let layer = &fs.tlay[lo..hi];
++            if mode == 0 {
++                self.tops(v, layer, &mut vec![0; hi - lo], &mut sc.tops);
++                pr.tops += sc.tops.len() as u64;
++                continue;
++            }
++            let fd = self.fd.as_ref().expect("fd");
++            let mut st = TopFd::default();
++            for &(p0, _) in layer {
++                let p = p0 * fs.nparts + u128::from(v);
++                if p < fs.plo || p > fs.phi {
++                    continue;
++                }
++                pr.prefixes += 1;
++                let lo = p * fs.w;
++                if !(lo >= fs.s && lo + fs.w - 1 <= fs.e - 1) {
++                    continue;
++                }
++                pr.unclipped += 1;
++                if mode == 3 {
++                    fd.seed_pub(&mut st, p);
++                    sink ^= st.pc as u64;
++                    continue;
++                }
++                let (s, n) = fd.advance_counted(&mut st, p);
++                pr.seeds += s;
++                pr.steps += n;
++                if mode == 2 {
++                    if let Ok(c) = fd.cert(&st) {
++                        pr.tops += 1;
++                        sink ^= c.mask;
++                    }
++                } else {
++                    sink ^= u64::from(st.pc);
++                }
++            }
++        }
++        pr.ns = t.elapsed().as_nanos() as u64;
++        std::hint::black_box(sink);
++        pr
++    }
++}
++
++impl CpuJoin {
++    /// The skip walk's counts for partition `v` (call in ascending order
++    /// with one scratch): prefixes, tests (certs), seeds, steps, tops.
++    #[allow(clippy::cast_possible_truncation)]
++    pub fn prof_skip(&self, v: u32, sc: &mut Scratch) -> TopProf {
++        let mut pr = TopProf::default();
++        let fs = &self.fs;
++        if !sc.last.is_some_and(|(id, last)| id == self.id && last < v) {
++            sc.next.clear();
++            sc.next.resize(fs.tlay.len(), 0);
++        }
++        sc.last = Some((self.id, v));
++        let fd = self.fd.as_ref().expect("fd");
++        let t = Instant::now();
++        for key in 0..self.keyspace as usize {
++            let (lo, hi) = (self.key_off[key] as usize, self.key_off[key + 1] as usize);
++            let mut st = TopFd::default();
++            for i in lo..hi {
++                let p = fs.tlay[i].0 * fs.nparts + u128::from(v);
++                if p < fs.plo || p > fs.phi {
++                    continue;
++                }
++                pr.prefixes += 1;
++                let l = p * fs.w;
++                if !(l >= fs.s && l + fs.w - 1 <= fs.e - 1) {
++                    continue;
++                }
++                pr.unclipped += 1;
++                if v < u32::from(sc.next[i]) {
++                    continue;
++                }
++                let (s, n) = fd.advance_counted(&mut st, p);
++                pr.seeds += s;
++                pr.steps += n;
++                pr.tests += 1;
++                match fd.cert(&st) {
++                    Ok(_) => pr.tops += 1,
++                    Err(n) => sc.next[i] = u16::try_from(v + n).unwrap_or(u16::MAX),
++                }
++                pr.unclipped += 0;
++                pr.prefixes += 0;
++                // tests counted as seeds+... below
++                pr.ns += 0;
++            }
++        }
++        pr.ns = t.elapsed().as_nanos() as u64;
++        pr
++    }
++}
+diff --git a/common/src/cpu_top_fd.rs b/common/src/cpu_top_fd.rs
+index c36ba331..fa4d76a3 100644
+--- a/common/src/cpu_top_fd.rs
++++ b/common/src/cpu_top_fd.rs
+@@ -27,6 +27,26 @@
+ //! steps above the last one (a key's first, or after a gap) seeds the
+ //! state: `P`, `P²` and `P³` are converted to digits with reciprocal
+ //! multiplies, and the differences are built from those by digit additions.
++//!
++//! # Runs of failing blocks
++//!
++//! A block whose certificate fails on a repeated digit also says how many
++//! of the blocks after it fail the same way ([`TopFdSetup::cert`]'s
++//! `Err`). Say the digit at position `i` of `a^j` repeats one at `i'` of
++//! `a^j'`, both certified. Position `i` is certified exactly when `i >=
++//! from_j = max(c0, h)`, `h` the lowest position from which `a^j` and `e^j`
++//! agree, so `X = ⌊a^j/b^i⌋ = ⌊e^j/b^i⌋`. For every later block `[a', e']`
++//! with `e'^j < (X + 1)·b^i` the same holds: `X <= ⌊a'^j/b^i⌋ <=
++//! ⌊e'^j/b^i⌋ <= X` (n ↦ n^j increases), so the digits from `i` up are
++//! `a^j`'s, `e'^j − a'^j < b^i` puts `c0` at or below `i`, and `h <= i`.
++//! Both digits are certified again and still equal, and the certificate
++//! fails. With `e = a + δ` and `G = (X + 1)·b^i − e^j > 0`, the block `D`
++//! steps on has `e'^j − e^j = (e + Dw)^j − e^j <= j(e + Dw)^(j − 1)·Dw`, so
++//! every block before `D_j = G / (j(e + Sw)^(j − 1)·w)` steps (for `D_j <=
++//! S`, any bound on the steps asked about) fails. `G/b^i = 1 − (a^j mod
++//! b^i)/b^i − (e^j − a^j)/b^i`, the first from the top digits of `a^j`
++//! below `i` (rounded up), the second from `d_j`, all in f64 with margins
++//! far above its rounding: the run is a lower bound, never more.
+ 
+ // The digit-array helpers are forced inline: they sit in the per-prefix loop.
+ #![allow(clippy::inline_always)]
+@@ -35,8 +55,10 @@ use crate::cpu_join::SmallDiv;
+ use crate::overlap_join::{Base, Cert, Div64, W4, close_certificate, digit_range_mask};
+ 
+ /// The most steps the state walks to the next prefix; one farther away
+-/// seeds it instead.
+-const MAX_STEPS: u32 = 4;
++/// seeds it instead. A seed costs about twelve steps; the join's failing
++/// runs (`cpu_join`) leave gaps of several steps between the prefixes it
++/// certifies.
++const MAX_STEPS: u32 = 12;
+ 
+ /// Digits of every digit array: `P³` for every field the join takes, with
+ /// the word a carry out of the longest addend runs into.
+@@ -189,6 +211,10 @@ fn w4_f64(x: &W4) -> f64 {
+ /// error (below 1e-11, see [`TopFdSetup::carry`]).
+ const SCREEN_MARGIN: f64 = 1.0 / 1_048_576.0;
+ 
++/// The margins of a failing run's length ([`TopFdSetup::run_of`]): its
++/// f64 values carry relative errors of a few `2^-52`.
++const RUN_MARGIN: f64 = 1.0 / 1_099_511_627_776.0;
++
+ /// The field's constants for stepping its top prefixes.
+ pub(crate) struct TopFdSetup {
+     b: u32,
+@@ -235,6 +261,14 @@ pub(crate) struct TopFdSetup {
+     /// b^mid` step with `P`.
+     m1: u32,
+     bmid: u32,
++    /// Every position `(power index, i)` the certificates can read, the
++    /// slowest-changing first ([`TopFdSetup::run`]).
++    order: Vec<(u8, u8)>,
++    /// `b^i` as f64; the steps a failing run is asked about (`S`) and `w`
++    /// as f64.
++    bpow: Vec<f64>,
++    span: f64,
++    wf: f64,
+ }
+ 
+ /// The state at one prefix `P`: its digit arrays, the binary differences,
+@@ -276,7 +310,7 @@ impl Default for TopFd {
+ impl TopFdSetup {
+     /// The constants for blocks of `w = b^f0`, prefixes stepped by `h = b^o`
+     /// up to `phi`, and certificates from position `cap`; `bmid` as in
+-    /// [`TopFd`]. `None` if a digit array would not hold its
++    /// [`TopFd`]; failing runs ([`Self::cert`]) of at most `span` blocks. `None` if a digit array would not hold its
+     /// values over the field, or the base has no room for the step's
+     /// digits (`b <= 6`); the join then certifies every block by
+     /// `Base::cert`.
+@@ -289,6 +323,7 @@ impl TopFdSetup {
+         cap: u32,
+         phi: u128,
+         bmid: u32,
++        span: u32,
+     ) -> Option<Self> {
+         let b = base.b;
+         if !(7..=64).contains(&b) || f0 == 0 || o == 0 {
+@@ -340,6 +375,19 @@ impl TopFdSetup {
+         let inv = (0..pw.len())
+             .map(|c| if c < 2 { 0.0 } else { 1.0 / w4_f64(&pw[c - 2]) })
+             .collect();
++        // Position i of a^j changes about every b^i / (j·a^(j − 1)·w) blocks.
++        #[allow(clippy::cast_precision_loss)]
++        let (lb, la) = (f64::from(b).ln(), ((phi * w) as f64).ln());
++        let mut order: Vec<(u8, u8)> = [base.s2, base.s3]
++            .iter()
++            .enumerate()
++            .flat_map(|(j, &sp)| (cap..sp).map(move |i| (j as u8, i as u8)))
++            .collect();
++        let slow = |&(j, i): &(u8, u8)| {
++            f64::from(i) * lb - f64::from(j + 2).ln() - f64::from(j + 1) * la
++        };
++        order.sort_by(|x, y| slow(y).total_cmp(&slow(x)));
++        let bpow = pw.iter().map(w4_f64).collect();
+         let b64 = u64::from(b);
+         Some(Self {
+             b,
+@@ -374,6 +422,10 @@ impl TopFdSetup {
+             sb: SmallDiv::new(b64),
+             m1: b - 1,
+             bmid,
++            order,
++            bpow,
++            span: f64::from(span),
++            wf: f64::from(u32::try_from(w).ok()?),
+         })
+     }
+ 
+@@ -481,6 +533,27 @@ impl TopFdSetup {
+         self.seed(st, p);
+     }
+ 
++    /// CPU2 scratch: `seed` from outside.
++    pub(crate) fn seed_pub(&self, st: &mut TopFd, p: u128) {
++        self.seed(st, p);
++    }
++
++    /// CPU2 scratch: `advance`, returning (seeds, steps).
++    pub(crate) fn advance_counted(&self, st: &mut TopFd, p: u128) -> (u64, u64) {
++        let mut n = 0;
++        if p > st.p && p - st.p <= self.reach {
++            while st.p < p {
++                self.step(st);
++                n += 1;
++            }
++            if st.p == p {
++                return (0, n);
++            }
++        }
++        self.seed(st, p);
++        (1, n)
++    }
++
+     /// `ndig(d)`: smallest `i` with `b^i > d`. `d` lies in `[2^(l − 1),
+     /// 2^l)` for its bit length `l`, and `2 < b`, so it has `ndig(2^(l − 1))`
+     /// digits or one more.
+@@ -543,9 +616,11 @@ impl TopFdSetup {
+     /// The certificate of the block of `st`'s prefix (unclipped): the same
+     /// as `Base::cert_parts(a, a + w − 1, cap)`, read from the stepped
+     /// digits. The digit of `a^j` at position `pos` is digit `pos − j·f0`
+-    /// of `P^j` (zero below).
++    /// of `P^j` (zero below). If it fails, `Err(n)`: this block and the
++    /// `n − 1` after it (`P + h`, `P + 2h`, … for `h = 1`, i.e. `P`'s blocks
++    /// in the next `n − 1` partitions) fail, `1 <= n <= span` (module docs).
+     #[inline]
+-    pub(crate) fn cert(&self, st: &TopFd) -> Option<Cert> {
++    pub(crate) fn cert(&self, st: &TopFd) -> Result<Cert, u32> {
+         // A digit, below b <= 64.
+         #[allow(clippy::cast_possible_truncation)]
+         let top = (self.b - 1) as u8;
+@@ -576,17 +651,113 @@ impl TopFdSetup {
+             while pos < sp {
+                 let bit = 1u64 << at(pos);
+                 if mask & bit != 0 {
+-                    return None;
++                    return Err(self.run(st));
+                 }
+                 mask |= bit;
+                 pos += 1;
+             }
+         }
+-        close_certificate(mask, doms).map(|closed| Cert {
+-            mask: closed,
+-            common: mask,
+-            from,
+-        })
++        close_certificate(mask, doms)
++            .map(|closed| Cert {
++                mask: closed,
++                common: mask,
++                from,
++            })
++            .ok_or(1)
++    }
++
++    /// The failing run that starts at `st`'s block, whose certified digits
++    /// repeat (module docs): its length, at least 1. Of the repeated pairs
++    /// it takes the first one met in [`Self::order`], whose faster digit is
++    /// the slowest of any pair's (up to the order's estimate).
++    // A digit is below b <= 64, an index into `order` below 2·48.
++    #[allow(clippy::cast_possible_truncation)]
++    #[cold]
++    #[inline(never)]
++    fn run(&self, st: &TopFd) -> u32 {
++        let top = (self.b - 1) as u8;
++        let powers = [
++            (&st.sq, &st.d2, self.s2, 2 * self.f0, self.bz[0]),
++            (&st.cu, &st.d3, self.s3, 3 * self.f0, self.bz[1]),
++        ];
++        // As in `cert`: the lowest certified position of each power.
++        let mut from = [self.s2, self.s3];
++        for (first, &(x, d, sp, z, bz)) in from.iter_mut().zip(&powers) {
++            let c0 = self.cap.max(self.ndig(d));
++            if c0 >= sp {
++                continue;
++            }
++            let mut pos = c0;
++            if self.carry(x, d, c0, z, bz) {
++                while pos >= z && digit(x, pos - z) == top {
++                    pos += 1;
++                }
++                pos += 1;
++            }
++            *first = pos;
++        }
++        let at = |j: usize, i: u32| {
++            let (x, _, _, z, _) = powers[j];
++            if i < z { 0 } else { digit(x, i - z) }
++        };
++        let (mut seen, mut slot) = (0u64, [0u8; 64]);
++        for (n, &(j, i)) in self.order.iter().enumerate() {
++            let (j, i) = (usize::from(j), u32::from(i));
++            if i < from[j] {
++                continue;
++            }
++            let g = at(j, i);
++            if seen & (1 << g) != 0 {
++                let (j0, i0) = self.order[usize::from(slot[usize::from(g)])];
++                return self
++                    .run_of(st, usize::from(j0), u32::from(i0))
++                    .min(self.run_of(st, j, i));
++            }
++            seen |= 1 << g;
++            slot[usize::from(g)] = n as u8;
++        }
++        1
++    }
++
++    /// Blocks from `st`'s on (at least 1, at most `span`) before the one
++    /// whose last `n` has `n^j >= (⌊a^j/b^i⌋ + 1)·b^i` (`j = 2 + pj`), as
++    /// a lower bound (module docs).
++    // Digits and steps are small; the f64 of P is rounded, then bounded.
++    #[allow(
++        clippy::cast_possible_truncation,
++        clippy::cast_precision_loss,
++        clippy::cast_sign_loss
++    )]
++    fn run_of(&self, st: &TopFd, pj: usize, i: u32) -> u32 {
++        let (x, d, z) = if pj == 0 {
++            (&st.sq, &st.d2, 2 * self.f0)
++        } else {
++            (&st.cu, &st.d3, 3 * self.f0)
++        };
++        // (a^j mod b^i) / b^i < (r + 1)/b^m for r its top m digits.
++        let mut low = 0.0;
++        if i > z {
++            let k = i - z;
++            let m = k.min(4);
++            let mut r = 0.0;
++            for t in 1..=m {
++                r = r * f64::from(self.b) + f64::from(digit(x, k - t));
++            }
++            low = (r + 1.0) / self.bpow[m as usize];
++        }
++        let g = 1.0 - low - w4_f64(d) / self.bpow[i as usize] - RUN_MARGIN;
++        if g <= 0.0 {
++            return 1;
++        }
++        // e + S·w < (P + 1 + S)·w.
++        let e = (st.p as f64 + 1.0 + self.span) * self.wf * (1.0 + RUN_MARGIN);
++        let slope = if pj == 0 { 2.0 * e } else { 3.0 * e * e } * self.wf;
++        let n = g * self.bpow[i as usize] / slope * (1.0 - RUN_MARGIN);
++        if n >= self.span {
++            self.span as u32
++        } else {
++            (n.ceil() as u32).max(1)
++        }
+     }
+ }
+ 
+@@ -654,7 +825,8 @@ mod tests {
+                             continue;
+                         }
+                         let (plo, phi) = (s / w, (e - 1) / w);
+-                        let Some(fd) = TopFdSetup::try_new(&base, f0, o, cap, phi, b * b) else {
++                        let Some(fd) = TopFdSetup::try_new(&base, f0, o, cap, phi, b * b, b * b)
++                        else {
+                             continue;
+                         };
+                         setups += 1;
+@@ -679,7 +851,7 @@ mod tests {
+                                     seeds += u64::from(!(p > before && p - before <= fd.reach));
+                                     let want = base.cert_parts(a, z, cap);
+                                     assert_eq!(
+-                                        fd.cert(&st),
++                                        fd.cert(&st).ok(),
+                                         want,
+                                         "b{b} [{s}, {e}) f0 {f0} o {o} P {p}"
+                                     );
+@@ -714,6 +886,105 @@ mod tests {
+         assert!(setups > 1500 && certs > 1_000_000 && clipped > 1000 && kept > 100_000);
+     }
+ 
++    /// The failing runs (`cert`'s `Err(n)`): bases 7-64, random fields in
++    /// each band, blocks of `b^f0` for several `f0` and `o`; at random
++    /// blocks and, on small fields, at every block: the `n − 1` blocks after
++    /// a failing one (`P + 1, …`) inside the field all fail by
++    /// `Base::cert_parts`, clipped or not, and `1 <= n <= span`. Also how
++    /// often the block at `P + n` passes, i.e. how tight the runs are.
++    #[test]
++    #[allow(clippy::many_single_char_names)] // b, s, e, l, w, o, p as above
++    fn a_failing_run_fails_at_every_block() {
++        let mut rng = Lcg(0x0DDB_A11C_0FFE_E123);
++        let (mut runs, mut covered, mut longest, mut ends_pass, mut ones) =
++            (0u64, 0u64, 0u32, 0u64, 0u64);
++        for b in 7..=64u32 {
++            let Some(band) = get_base_range_u128(b).expect("base range") else {
++                continue;
++            };
++            let mut fields = 0;
++            for attempt in 0..60 {
++                if fields == 6 {
++                    break;
++                }
++                // Small fields (every block) and large ones (random blocks).
++                let small = attempt % 2 == 0;
++                let size = if small {
++                    1 + rng.below(band.size().min(2_000_000))
++                } else {
++                    1 + rng.below(band.size())
++                };
++                let s = band.start() + rng.below(band.size() - size + 1);
++                let e = s + size;
++                let Some(base) = Base::try_new(b, s, e - 1) else {
++                    continue;
++                };
++                fields += 1;
++                for f0 in 1..base.l {
++                    let w = base.powu(f0);
++                    if w >= 1 << 32 {
++                        break;
++                    }
++                    for o in 1..=2u32 {
++                        let cap = f0 + o;
++                        if cap >= base.l {
++                            continue;
++                        }
++                        let (plo, phi) = (s / w, (e - 1) / w);
++                        let span = [1, b, b * b][rng.next() as usize % 3];
++                        let Some(fd) = TopFdSetup::try_new(&base, f0, o, cap, phi, b * b, span)
++                        else {
++                            continue;
++                        };
++                        let every = phi - plo < 3000;
++                        let picks: Vec<u128> = if every {
++                            (plo..=phi).collect()
++                        } else {
++                            (0..300).map(|_| plo + rng.below(phi - plo + 1)).collect()
++                        };
++                        for p in picks {
++                            let lo = p * w;
++                            if lo < s || lo + w > e {
++                                continue;
++                            }
++                            let mut st = TopFd::default();
++                            fd.advance(&mut st, p);
++                            let Err(n) = fd.cert(&st) else {
++                                continue;
++                            };
++                            assert!(n >= 1 && n <= span, "b{b} P {p}: run {n} of {span}");
++                            runs += 1;
++                            ones += u64::from(n == 1);
++                            longest = longest.max(n);
++                            for m in 1..u128::from(n) {
++                                let q = p + m;
++                                if q > phi {
++                                    break;
++                                }
++                                let (a, z) = ((q * w).max(s), (q * w + w - 1).min(e - 1));
++                                assert_eq!(
++                                    base.cert_parts(a, z, cap),
++                                    None,
++                                    "b{b} [{s}, {e}) f0 {f0} o {o}: run {n} from P {p}, block {q} passes"
++                                );
++                                covered += 1;
++                            }
++                            let q = p + u128::from(n);
++                            if q <= phi {
++                                let (a, z) = ((q * w).max(s), (q * w + w - 1).min(e - 1));
++                                ends_pass += u64::from(base.cert_parts(a, z, cap).is_some());
++                            }
++                        }
++                    }
++                }
++            }
++        }
++        eprintln!(
++            "{runs} failing blocks: {covered} blocks after them proved failing, longest run {longest}, {ones} runs of 1, {ends_pass} runs followed by a passing block"
++        );
++        assert!(runs > 200_000 && covered > 10_000_000);
++    }
++
+     /// A carry through words of b − 1: into word 0, through the words above
+     /// it (a carry in over eight digit sums of b − 1), and past the carry
+     /// word. The certificates' runs rarely reach either.

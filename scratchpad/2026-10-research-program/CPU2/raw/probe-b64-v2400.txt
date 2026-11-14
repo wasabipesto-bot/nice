@@ -1,0 +1,17 @@
+old 0.94 secs 29.7074
+new2 0.97 secs 29.8452
+old 0.98 secs 29.4550
+new2 1.05 secs 29.7038
+# above: cpu2_ab (raw/bin/old, raw/bin/new2), b64 71779931862957161709568 1e17 slice 0, partitions 2400..2406, alternating, 07:5x UTC
+# per-partition times (cpu2_abv, built from 41b4b405 and from b86e4389), same partitions, seconds:
+old ABV b64 v 2400..2406 total 29.640 per: 4.922 4.897 4.914 4.977 4.944 4.986
+new ABV b64 v 2400..2406 total 29.903 per: 5.457 5.064 4.822 4.842 4.814 4.904
+old ABV b64 v 2400..2406 total 30.986 per: 5.179 5.248 5.249 5.128 5.078 5.103
+new ABV b64 v 2400..2406 total 29.853 per: 5.474 4.868 5.018 4.764 4.800 4.929
+# the real tops() with runs carried, alone, then the whole partition (scratch prof build of b86e4389 + hooks):
+V 2400 tops_ns 1207296432 tops 1574654 partition_ns 5312142051 survivors 179762275
+V 2401 tops_ns 595170966 tops 1574568 partition_ns 4685741720 survivors 180276823
+V 2402 tops_ns 640424781 tops 1571633 partition_ns 4759142865 survivors 180460454
+V 2403 tops_ns 607064521 tops 1569994 partition_ns 4771846778 survivors 179356530
+V 2404 tops_ns 629353510 tops 1570600 partition_ns 4650626913 survivors 178641165
+V 2405 tops_ns 616027709 tops 1571362 partition_ns 4808778933 survivors 180049612

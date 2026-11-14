@@ -1,0 +1,28 @@
+# cpu2_skipcount (scratch build with CPU2_MAX_STEPS env, best-pair runs, first version), nice -n 19, 1 thread, 07:2x UTC
+# columns: tests = certificates done / unclipped prefix-partitions; ns/unclipped = top phase alone
+# b62 4473066762334864396992 1e17 slice 0, partitions 0..12
+M=4  tests 22623279 (0.3973) seeds 7357273 (0.3252/test) steps 29812643 (1.318/test) tops 18153615 (0.3188) ns/unclipped 129.1
+M=8  tests 22623279 (0.3973) seeds 3628262 (0.1604/test) steps 52784475 (2.333/test) tops 18153615 (0.3188) ns/unclipped 113.3
+M=12 tests 22623279 (0.3973) seeds 2322206 (0.1026/test) steps 66229011 (2.927/test) tops 18153615 (0.3188) ns/unclipped 108.2
+M=16 tests 22623279 (0.3973) seeds 1638532 (0.0724/test) steps 76007250 (3.360/test) tops 18153615 (0.3188) ns/unclipped 110.3
+M=24 tests 22623279 (0.3973) seeds 1030855 (0.0456/test) steps 88136442 (3.896/test) tops 18153615 (0.3188) ns/unclipped 112.3
+M=32 tests 22623279 (0.3973) seeds 539847 (0.0239/test) steps 101851931 (4.502/test) tops 18153615 (0.3188) ns/unclipped 113.8
+# b64 f0.9 (71779931862957161709568) 1e17 slice 0, partitions 0..8
+M=4  tests 19496030 (0.4877) seeds 5917702 (0.3035/test) steps 25185496 (1.292/test) tops 12594133 (0.3150) ns/unclipped 169.5
+M=8  tests 19496030 (0.4877) seeds 2771934 (0.1422/test) steps 44599176 (2.288/test) tops 12594133 (0.3150) ns/unclipped 145.0
+M=12 tests 19496030 (0.4877) seeds 1503624 (0.0771/test) steps 57531627 (2.951/test) tops 12594133 (0.3150) ns/unclipped 141.7
+M=16 tests 19496030 (0.4877) seeds 812631 (0.0417/test) steps 67423790 (3.458/test) tops 12594133 (0.3150) ns/unclipped 146.7
+# b60 f0.5 (1366399612114824200908) 1e16, partitions 0..8
+M=4  tests 18931777 (0.4470) seeds 4541002 (0.2399/test) steps 27119121 (1.432/test) tops 15298668 (0.3612) ns/unclipped 122.7
+M=8  tests 18931777 (0.4470) seeds 1600913 (0.0846/test) steps 45135663 (2.384/test) tops 15298668 (0.3612) ns/unclipped 103.0
+M=12 tests 18931777 (0.4470) seeds 731147 (0.0386/test) steps 53947529 (2.850/test) tops 15298668 (0.3612) ns/unclipped 99.0
+M=16 tests 18931777 (0.4470) seeds 498390 (0.0263/test) steps 57237624 (3.023/test) tops 15298668 (0.3612) ns/unclipped 102.9
+# b62 s0 partitions 0..24, MAX_STEPS 4 (steady state from partition 1: ~1.628e6 tests of 4,745,415 = 0.343; tops 1.513e6 = 0.319)
+SUM v 0..24: unclipped 113889960 tests 42164446 (0.3702) seeds 15142452 (0.3591/test) steps 55250972 (1.310/test) tops 36309614 (0.3188) ns/unclipped 125.0
+# MAX_STEPS 12 without the skip (cpu2_prof mode adv, b62 s0 v0/2048/1024, two repeats each):
+# M=4 adv 365/374/358, 367/368/370 ms; seeds 225038 steps 6541362
+# M=12 adv 340/348/338, 339/348/336 ms; seeds 126336 steps 7321066
+# b64 f0.9 s0 v1000..1008, MAX_STEPS 12, best-pair (final order) vs first-pair-in-scan-order runs:
+# best : v1000 (fresh) tests 4997077 ns 1306151913; v1001..1007 tests 2.0715-2.0746e6, seeds ~202.5k, steps ~6.89e6, ns 605-635 ms; total tests 0.4881
+# first: v1000 (fresh) ns 1074535534; v1001..1007 tests 2.32e6 -> 2.09e6, ns 611-656 ms; total tests 0.5021
+# after passing `from` into run() and the reciprocal table: v1000 (fresh) 1158-1219 ms, v1001.. 606-637 ms (same counts)

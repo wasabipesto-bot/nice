@@ -1,0 +1,35 @@
+diff --git a/common/src/cpu_top_fd.rs b/common/src/cpu_top_fd.rs
+index 6cb45b0f..9ad191cd 100644
+--- a/common/src/cpu_top_fd.rs
++++ b/common/src/cpu_top_fd.rs
+@@ -401,7 +401,7 @@ impl TopFdSetup {
+             cap,
+             w,
+             h,
+-            reach: h * u128::from(MAX_STEPS),
++            reach: h * u128::from(std::env::var("CPU2_MAX_STEPS").ok().and_then(|x| x.parse::<u32>().ok()).unwrap_or(MAX_STEPS)),
+             addend_words,
+             dds: digit_at(2, 2 * o),
+             dds_at,
+@@ -439,6 +439,21 @@ impl TopFdSetup {
+     #[allow(clippy::cast_possible_truncation)]
+     fn to_digits(&self, mut x: W4) -> Digits {
+         let mut out = [0u64; NW];
++        if self.b.is_power_of_two() {
++            // CPU2 experiment: digits are bit groups.
++            let k = self.b.trailing_zeros() as usize;
++            let n = bit_len(&x).div_ceil(k);
++            let m = u64::from(self.b - 1);
++            for i in 0..n {
++                let (w, o) = ((i * k) / 64, (i * k) % 64);
++                let mut v = x.0[w] >> o;
++                if o + k > 64 {
++                    v |= x.0[w + 1] << (64 - o);
++                }
++                out[i / 8] |= (v & m) << (8 * (i % 8));
++            }
++            return out;
++        }
+         let mut i = 0;
+         while x != W4::default() {
+             let chunk = self.d8.divrem_w4(&mut x);

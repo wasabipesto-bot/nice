@@ -1,0 +1,34 @@
+Overlap join: append the FD kernel's tops without assuming lane 0
+
+top_slot appended a plane's kept tops through lane 0: it tested lane 0's
+group, let only lane 0 take the group's atomic and broadcast lane 0's
+result. Vulkan does not promise full subgroups (wgpu does not ask for
+them), and on a plane that runs without lane 0 no lane took the atomic:
+the kept tops were written at offsets other planes also use and never
+counted, so the join silently lost them.
+
+- The leader is now the lowest kept lane of the lanes that run the call.
+  Its group is tested, it alone takes the atomic when every kept lane is of
+  that group, and the result reaches the others from it: by a shuffle from
+  the ballot's lowest set bit (planes of at most 32 lanes), else as a sum
+  over the active lanes in which only the leader's term is nonzero. A
+  plane whose kept tops straddle groups still takes one atomic per kept
+  lane. Same number of plane operations as before.
+- The FD kernel keeps an account of its appends in two new words of `ran`:
+  tops kept minus records reserved in grp_cnt, and the indices of the
+  records written minus those reserved (mod 2^32), summed per cube in
+  shared memory. The host requires both to be zero after every batch, in
+  run_pass and in run_partition (top_complete, ensure_appended); otherwise
+  the field fails instead of coming out with fewer candidates.
+- Tests: the FD kernel against top_kernel on cubes of 100 and 48 units
+  (partly filled planes) and 256, in both append forms, and on wgpu also
+  with every plane's lane 0 appending alone (TOP_LANE0_OUT), on the test
+  windows and the production fields' first slices (on CUDA one cube, as
+  CubeCL lowers the lane id as AbsolutePos % 32); two test-only bits that
+  make the append wrong (TOP_SHORT_TAKE, TOP_DUP_RANK) must fail a field
+  and a partition's re-run with the matching error; a host unit test of
+  top_complete. The test bits are comptime; production compiles without
+  them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+

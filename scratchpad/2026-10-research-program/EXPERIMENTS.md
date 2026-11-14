@@ -5,6 +5,33 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## CPU2.1 A skip walk for the CPU join's top certificates (2026-11-14 05:46–08:57 UTC, agent, ivory, one thread; `CPU2/RESULTS.md`, `CPU2/raw/` (`profile_*.txt`, `ab*-runs.txt`, `ab*-summary.txt`, test logs, `rayon-runs.txt`, `bitreversed-order.txt`); fork branches `exp/cpu-top-skip` (two commits) and `exp/cpu-top-skip-squashed` e0bf513 (one commit on main 41b4b40; 600 changed lines in `cpu_join.rs`, `cpu_top_fd.rs`, `client/src/main.rs`))
+
+**Profile of the CPU join today** (main, three fields per base, three slices each, three
+partitions per slice): the top phase is 45 % of a b62 1e17 partition (40–51 %), 39 % at b60 1e16
+(31–54 %), 19 % at b64 1e17 (17–22 %); at b62: certificates 21 %, stepping 16 %, seeding 9 %.
+
+**The rule:** when a certificate fails on a repeated digit at two certified positions, every
+later block in which neither position's digit can have changed fails too; the number of
+partitions that covers is bounded from below in f64 with margins, and each worker thread keeps
+a "next partition to certify" per prefix, used only when its next partition closely follows the
+previous one in the same join. Tests: 1.4e8 blocks inside computed runs re-certified (all fail);
+passing tops identical to the unskipped walk on 268 small-base field shapes exhaustively and on
+real fields at b57–b64; counts identical in every timed run.
+
+| shape (one thread, `nice -n 19`, 6 interleaved rounds) | old (median) | new | gain |
+|---|---|---|---|
+| b60 1e16, 32 partitions | 49.36 s | 43.62 s | ×1.132 (1.118–1.139) |
+| b62 1e17 slice 0, 32 partitions | 46.08 s | 40.41 s | ×1.140 (1.130–1.145) |
+| b64 1e17 slice 0, 12 partitions | 59.77 s | 59.22 s | ×1.009 (1.002–1.015) |
+
+At b64 the skip leaves 0.415 of the certificates but stepping and seeding dominate what is left.
+The client needed one scratch per worker thread (rayon's `map_init` gives runs of 1–5 partitions
+at 8 threads); NiceMark's bit-reversed partition order shows no gain and no loss (×1.02). Not
+timed: more than two threads. **Verdict: clears the bar at b60 and b62, nothing at b64. A ready
+branch, held: no PR slot, and CPU clients do none of the search today. Independent review
+started (`CPU2/REVIEW-BRIEF.md`) because a wrong skip would lose candidates.**
+
 ## N21.3 The population-count prefilter test as PR #259: review and device verification (2026-11-13 16:22–17:41 UTC; `N21/PR/` (`PR-BODY.md`, `NOTES.md`, `REVIEW.md` with `review-pfcheck.rs`, `VERIFY.md`, `raw-verify/`); fork `pr/join-prefilter-popcount-spirv` 3b77370 = 760512c (the change, on main 41b4b40) + c53d99f (the compare form's statements in main's order) + the changelog number; box 60522271, RTX 3080 at 280 W, 0.81 h, ~$0.08)
 
 Scope decision (director): the count form is compiled only on `wgpu<spirv>` (Vulkan through
