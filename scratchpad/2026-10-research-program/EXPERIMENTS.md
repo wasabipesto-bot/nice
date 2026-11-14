@@ -5,6 +5,28 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T26.2 Review of the top-append fix; PR #260 (2026-11-14 10:08–10:28 UTC; `T26/REVIEW.md`, `T26/review-model/`; fork `pr/top-slot-any-plane` 9c27023 = f9a2501 + the changelog wording and number)
+
+Independent review of f9a2501 (288 k tokens): **no defect in the code.** The reviewer's own model:
+every population of an 8-lane plane exhaustively (3.95 M calls) and 80,000 random launches at
+widths 8–64, including planes without lane 0, with holes, split across calls, and indices that
+wrap the u32 sums: 0 wrong appends, 0 false alarms. On full planes main and the fix give the
+same set of tops per group (3.36 M cases); only the order inside a group changes and nothing
+reads it. Plane operations per backend re-read in CubeCL 0.10, naga 29 and cubecl-opt (the open
+question about SPIR-V's uniformity marking is settled for this code). The account is computed
+from the indices really written and the atomic's real return, on every production path; a
+mismatch is a hard error. Cost re-derived from the raw logs (+0.23 % / +0.33 %); the
+other-kernels-identical claim re-checked with the reviewer's own comparator.
+
+Findings: the account is a count plus an index sum, so sum-preserving wrong appends pass (model:
+0.6 % of the wrong launches of a 64-lane plane misreported as 32; a third word, the sum of
+squares, would cut 342 undetected cases to 4): recommended, not required, listed under "Not in
+this PR"; three body sentences and the changelog line overclaimed (fixed); **merge hazard with
+#251:** both extend the `ran` array; if this lands first and the merge only bumps `RAN_WORDS`,
+the two accounts share words and every batch fails loudly. Whichever lands second must name
+every `ran` word in one place with a compile-time disjointness assert (`exp/integration-1114`
+8bcee21 has the correct resolution for "#251 first"). PR #260 opened 10:28 UTC.
+
 ## T26.1 The FD top kernel's append without a lane-0 assumption; the four open PRs merged together (2026-11-14 05:46–10:07 UTC, agent; `T26/RESULTS.md`, `T26/PR-BODY.md`, `T26/raw/` (`repro/`, `model/`, `box/logs`, `box/out`, `box/ident`, `0001-top-slot-any-plane.patch`); fork `pr/top-slot-any-plane` f9a2501 (one commit on main 41b4b40) and `exp/integration-1114` (99b283a = main + #251 + #255 + #256 + #259; 8bcee21 = that + the fix); box 60601437, RTX 3080 at 260 W, 4.38 h, ~$0.49)
 
 **Reproduction:** only `top_fd_kernel` uses `top_slot`. With a test-only switch that takes each

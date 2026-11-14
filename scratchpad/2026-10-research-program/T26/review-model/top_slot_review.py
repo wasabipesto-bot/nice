@@ -31,6 +31,7 @@ import random
 import sys
 
 M32 = (1 << 32) - 1
+LAST_SQ_ZERO = True
 
 
 def popc(x):
@@ -74,6 +75,18 @@ def fix_call(P, lanes, cnt, goff, form, acct, writes, fault=None, garb=None, wid
                     kb |= 1 << l
             n = {l: popc(kb) for l in P}
             rank = {l: popc(kb & ((1 << (l % 32)) - 1)) for l in P}
+        elif fault == "rotlane":
+            # UNIT_POS_PLANE is not the ballot bit: CubeCL's CUDA/HIP lane id
+            # AbsolutePos % 32 on a grid whose cubes are not multiples of 32
+            # (lane id = (hardware lane + rot) % 32); ballot bits and the
+            # shuffle use the hardware lane
+            rot = garb.rot
+            kb = 0
+            for l in P:
+                if kept[l]:
+                    kb |= 1 << l
+            n = {l: popc(kb) for l in P}
+            rank = {l: popc(kb & ((1 << ((l + rot) % width)) - 1)) for l in P}
         elif fault == "ballot_ghost":
             # inactive lanes' bits set (stale kept): not allowed by any backend,
             # modelled to see whether the account catches it
@@ -136,6 +149,9 @@ def fix_call(P, lanes, cnt, goff, form, acct, writes, fault=None, garb=None, wid
             r0 = goff[g[l]] + a
             acct[0] = (acct[0] - take) & M32
             acct[1] = (acct[1] - (take * r0 + take * (take - 1) // 2)) & M32
+            # suggested third word: sum of squares, closed form as the kernel would compute it
+            acct[2] = (acct[2] - (take * r0 * r0 + r0 * take * (take - 1)
+                                  + (take - 1) * take * (2 * take - 1) // 6)) & M32
         events1.append(ev)
     return dict(P=P, kept=kept, g=g, n=n, rank=rank, lead=lead, g0=g0, one=one, a0=a0,
                 src=(src if form == "ballot" else None), form=form, events1=events1,
@@ -176,14 +192,17 @@ def fix_finish(c, cnt, goff, acct, writes, noreconv=False):
                 acct[0] = (acct[0] - 1) & M32
                 acct[1] = (acct[1] - (goff[g[l]] + at2)) & M32
                 rec = goff[g[l]] + at2
+                acct[2] = (acct[2] - rec * rec) & M32
                 acct[0] = (acct[0] + 1) & M32
                 acct[1] = (acct[1] + rec) & M32
+                acct[2] = (acct[2] + rec * rec) & M32
                 writes.append((rec, l, g[l]))
             events2.append(ev)
         elif kept[l]:
             rec = (goff[g[l]] + at) & M32
             acct[0] = (acct[0] + 1) & M32
             acct[1] = (acct[1] + rec) & M32
+            acct[2] = (acct[2] + rec * rec) & M32
             writes.append((rec, l, g[l]))
     return events2
 
@@ -336,7 +355,7 @@ def verify_tagged(planes, nb, sizes, goff, form, rng, garb, width, tops, impl="f
                   noreconv=False):
     """Run with writes tagged by (plane, lane)."""
     cnt = {gg: 0 for gg in range(nb)}
-    acct = [0, 0]
+    acct = [0, 0, 0]
     calls = []
     allw = []
     for pi, (insts, lanes) in enumerate(planes):
@@ -367,7 +386,9 @@ def verify_tagged(planes, nb, sizes, goff, form, rng, garb, width, tops, impl="f
         for rec, l, gg in w:
             allw.append((rec, (pi, l), gg))
     ok = verify(tops, allw, cnt, goff, sizes)
-    return ok, acct == [0, 0], cnt, allw
+    global LAST_SQ_ZERO
+    LAST_SQ_ZERO = acct[2] == 0
+    return ok, acct[:2] == [0, 0], cnt, allw
 
 
 def verify_tagged_ok(*a, **k):
@@ -404,19 +425,23 @@ def random_suite(seed, trials, out, fault=None, noreconv=False, impl="fix", form
             tops += [(p, l, lanes[l][1]) for l in P if lanes[l][0]]
             planes.append((insts, lanes))
         garb = Garbage(rng, rng.choice(["zero", "own", "rand"]))
+        garb.rot = rng.randrange(1, width)
         ok, acc0 = verify_tagged_ok(planes, nb, sizes, goff, form, rng, garb, width, tops,
                                     impl=impl, fault=fault, noreconv=noreconv)
-        s = stats.setdefault((width, form, pkind), [0, 0, 0, 0])
+        s = stats.setdefault((width, form, pkind), [0, 0, 0, 0, 0, 0])
         s[0] += 1
         s[1] += (not ok)
         s[2] += (not ok and acc0)       # wrong, passed the host check
         s[3] += (ok and not acc0)       # right, false alarm
-    tot = [0, 0, 0, 0]
+        s[4] = (s[4] or 0) + (not ok and acc0 and LAST_SQ_ZERO)   # also passes with squares
+        s[5] = (s[5] or 0) + (ok and not (acc0 and LAST_SQ_ZERO))  # false alarm with squares
+    tot = [0, 0, 0, 0, 0, 0]
     for k in sorted(stats):
-        for i in range(4):
+        for i in range(6):
             tot[i] += stats[k][i]
     out.write(f"  seed {seed} impl={impl} fault={fault} noreconv={noreconv}: launches {tot[0]}, "
-              f"wrong {tot[1]}, wrong-but-account-zero {tot[2]}, false alarms {tot[3]}\n")
+              f"wrong {tot[1]}, wrong-but-account-zero {tot[2]}, false alarms {tot[3]}; "
+              f"with a squares word: undetected {tot[4]}, false alarms {tot[5]}\n")
     return tot
 
 
@@ -512,6 +537,8 @@ def main():
         random_suite(seed, 20000, out, fault="scan_garbage", forms=["scan"],
                      pkinds=["prefix", "nolane0", "holes"])
         random_suite(seed, 20000, out, fault="bad_shuffle", forms=["ballot"], widths=[8, 16, 32])
+        random_suite(seed, 20000, out, fault="rotlane", forms=["ballot"], widths=[32],
+                     pkinds=["full", "prefix"])
         random_suite(seed, 20000, out, fault="ballot_ghost", forms=["ballot"], widths=[8, 16, 32],
                      pkinds=["prefix", "nolane0", "holes"])
 

@@ -61,6 +61,18 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   about 10 MB a thread and is never freed (≈ 1.4 GB on a 128-thread node, up to 4 GiB at the
   slice cap). The branch stays held.
 
+- **10:28 UTC: PR #260 opened** (EXPERIMENTS T26.2): the top-append fix, reviewed (no code defect;
+  wording fixed; a third account word noted as a follow-up). **Five program PRs open: the cap.**
+  The review also sharpened the merge procedure for #251 and #260 (both extend the same counter
+  array; a careless merge fails every batch loudly). CI check at 11:25 UTC.
+- **Day so far:** agents: top-append fix 517 k, its reviewer 288 k, CPU study 412 k, its reviewer
+  260 k: about 1.5 M subagent tokens, all Opus. Vast $0.49 (one box); month ≈ $15.5 of $30.
+- **Tomorrow:** nothing new can be opened until the user merges (cap). Merge-ups when they do.
+  GPU-free work that does not need a slot: the stride queues' lane assumptions (T2.6b) as a
+  ready branch; the third account word for #260 and #251's check as follow-ups; a profile of
+  what is left on demoux after the five PRs needs a window and waits for merges. If the search
+  is still idle, say so again.
+
 ## 2026-11-13 (cycle 4 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $13.26 of $30 (fleet $23.50); credit

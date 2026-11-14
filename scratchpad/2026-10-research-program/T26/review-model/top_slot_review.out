@@ -1,0 +1,14 @@
+== exhaustive ==
+  exhaustive 8-lane single call, fix, both forms: 3949120 calls, wrong 0, nonzero account 0
+  full 8-lane planes, 3 groups any order, every kept subset, both forms: 3359232 calls; fix wrong 0, main wrong 0, per-group top sets differ 0, record assignment differs 1965776
+== random, seed 11 ==
+  seed 11 impl=fix fault=None noreconv=False: launches 20000, wrong 0, wrong-but-account-zero 0, false alarms 0
+  -- main on the same populations (sanity: it should fail without lane 0)
+  seed 11 impl=main fault=None noreconv=False: launches 20000, wrong 7048, wrong-but-account-zero 7048, false alarms 0
+  seed 11 impl=main fault=None noreconv=False: launches 20000, wrong 0, wrong-but-account-zero 0, false alarms 0
+  -- faults (fix): does the account catch them?
+  seed 11 impl=fix fault=None noreconv=True: launches 20000, wrong 9238, wrong-but-account-zero 0, false alarms 0
+  seed 11 impl=fix fault=misreport64 noreconv=False: launches 20000, wrong 13193, wrong-but-account-zero 76, false alarms 0
+  seed 11 impl=fix fault=scan_garbage noreconv=False: launches 20000, wrong 4396, wrong-but-account-zero 0, false alarms 0
+  seed 11 impl=fix fault=bad_shuffle noreconv=False: launches 20000, wrong 7299, wrong-but-account-zero 15, false alarms 0
+  seed 11 impl=fix fault=ballot_ghost noreconv=False: launches 20000, wrong 13135, wrong-but-account-zero 0, false alarms 0

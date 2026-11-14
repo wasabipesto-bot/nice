@@ -7,13 +7,13 @@ The GPU overlap join's FD top kernel appends its kept tops through `top_slot`, o
 
 ## Why
 
-Vulkan does not promise full subgroups, and wgpu does not ask for them. On a plane without lane 0, no lane took the atomic: the kept tops were written at offsets other planes also use, never counted, and never read by the join, a silent loss of candidates. No production device is known to launch such planes (256-thread groups are full on CUDA, Metal and RADV): a robustness fix. #251 removed the same assumption from the check kernel.
+Vulkan does not promise full subgroups, and wgpu does not ask for them. On a plane without lane 0, no lane took the atomic: the kept tops were written at offsets other planes also use, never counted, and never read by the join, a silent loss of candidates. No production device is known to launch such planes (256-thread groups are full on CUDA, Metal and RADV): a robustness fix. #251 (open) removes the same assumption from its new check kernel.
 
 ## Soundness
 
 Let P be the lanes that execute one call together. A ballot clears inactive lanes' bits on every backend, WGSL, SPIR-V and Metal define sums and scans over the active invocations, and the shuffles read the leader, which is in P. So P's kept lanes get ranks exactly 0..n-1 and there is one leader. If they share `g0`, one `fetch_add(n)` reserves `[a0, a0+n)` of that group and each writes `a0 + rank`; otherwise each reserves its own record. Every kept top thus gets a distinct record of its own group inside the counted range, for any population: full, partly filled, without lane 0, with holes, or split across calls.
 
-Still assumed, as before and as in #251: the lanes that run the ballot (or scan) run the shuffle (or sum) after the leader's `if` together; `UNIT_POS_PLANE` is the lane's ballot bit (`CubeCL` lowers it on CUDA/HIP as `AbsolutePos % PLANE_DIM`, right for 256-unit cubes); CUDA/HIP's butterfly sums need full planes (CUDA never takes the scan form; HIP wave64 runs 256-unit cubes as full waves). If a device broke one of these, or misreported a 64-lane plane as 32, the account fails the field instead of losing tops.
+Still assumed, as before and as in #251: the lanes that run the ballot (or scan) run the shuffle (or sum) after the leader's `if` together; `UNIT_POS_PLANE` is the lane's ballot bit (`CubeCL` lowers it on CUDA/HIP as `AbsolutePos % PLANE_DIM`, right for 256-unit cubes); CUDA/HIP's butterfly sums need full planes (CUDA never takes the scan form; HIP wave64 runs 256-unit cubes as full waves). If a device broke one of these, or misreported a 64-lane plane as 32, the account fails the field in almost every case: it is a count and an index sum over the batch, so a wrong append that preserves both would pass (0.6 % of the wrong launches of a misreported plane width in a host model).
 
 ## Exactness
 
@@ -32,7 +32,7 @@ The generated CUDA and WGSL of every kernel other than `top_fd_kernel` are ident
 
 ## Cost
 
-RTX 3080 at its 260 W cap, `cubecl_cuda_join_throughput_fixed_fields`, one field each, main and this branch interleaved, card back at idle temperature before every run, identical survivors / checked / found in every run. Processes where the driver JIT gave the (unchanged) join kernel its 40-register spill variant (1-2 % slower, either side) are left out, as before.
+RTX 3080 at its 260 W cap, `cubecl_cuda_join_throughput_fixed_fields`, one field each, main and this branch interleaved, card back at idle temperature before every run, identical survivors / checked / found in every run. Processes where the driver JIT gave the (unchanged) join kernel its 40-register spill variant (1-2 % slower, either side) are left out, as before. CUDA takes the ballot form; the scan form that 64-lane planes take was not timed (its number of plane operations is unchanged too).
 
 | field | main s/field (median, rounds) | this PR | change |
 |---|---|---|---|
@@ -43,6 +43,7 @@ RTX 3080 at its 260 W cap, `cubecl_cuda_join_throughput_fixed_fields`, one field
 
 ## Not in this PR
 
+- A third account word, the sum of squares of the record indices, which would close most of the count-and-sum-preserving cases.
 - The join kernel's survivor count (telemetry only), the niceonly stride kernels' plane queues, and `top_kernel` (one atomic per top, no plane operations) are unchanged.
 - No device has been seen running planes without lane 0; the reproduction makes lane 0 sit out in a test-only mode.
 

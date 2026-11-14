@@ -1,0 +1,47 @@
+== M vs M2
+bucket_kernel: body SAME; comptime info SAME; shared arrays 1/1 same names+sizes; unused shared []/[]; overlaps A [] B []
+check_kernel: body SAME; comptime info SAME; shared arrays 1/1 same names+sizes; unused shared []/[]; overlaps A [] B []
+join_kernel: body SAME; comptime info SAME; shared arrays 17/17 same names+sizes; unused shared []/[]; overlaps A [] B []
+smoke_kernel: body SAME; comptime info SAME; shared arrays 0/0 same names+sizes; unused shared []/[]; overlaps A [] B []
+top_fd_kernel: body SAME; comptime info SAME; shared arrays 0/0 same names+sizes; unused shared []/[]; overlaps A [] B []
+top_kernel: body SAME; comptime info SAME; shared arrays 0/0 same names+sizes; unused shared []/[]; overlaps A [] B []
+== M vs F
+bucket_kernel: body SAME; comptime info SAME; shared arrays 1/1 same names+sizes; unused shared []/[]; overlaps A [] B []
+check_kernel: body SAME; comptime info SAME; shared arrays 1/1 same names+sizes; unused shared []/[]; overlaps A [] B []
+join_kernel: body SAME; comptime info SAME; shared arrays 17/17 same names+sizes; unused shared []/[]; overlaps A [] B []
+smoke_kernel: body SAME; comptime info SAME; shared arrays 0/0 same names+sizes; unused shared []/[]; overlaps A [] B []
+top_fd_kernel: body DIFFERS; comptime info DIFFERS; shared arrays 0/1 DIFFER; unused shared []/[]; overlaps A [] B []
+   body diff lines: 17090
+      --- 
+      +++ 
+      @@ -35,0 +36 @@
+      +extern __shared__ __align__(4) uint8 dynamic_shared_mem[];
+      @@ -74,5 +75,2 @@
+      -const bool v0 = absoluteIdx.x < info.scalars_uint32[0];
+      -v1 = uint64(0);
+      -v2 = uint32(0);
+      -v3 = uint32(0);
+      -v4 = uint32(0);
+      +
+      +const bool v0 = threadIdx.x < uint32(2);
+top_kernel: body SAME; comptime info SAME; shared arrays 0/0 same names+sizes; unused shared []/[]; overlaps A [] B []
+== M2 vs F
+bucket_kernel: body SAME; comptime info SAME; shared arrays 1/1 same names+sizes; unused shared []/[]; overlaps A [] B []
+check_kernel: body SAME; comptime info SAME; shared arrays 1/1 same names+sizes; unused shared []/[]; overlaps A [] B []
+join_kernel: body SAME; comptime info SAME; shared arrays 17/17 same names+sizes; unused shared []/[]; overlaps A [] B []
+smoke_kernel: body SAME; comptime info SAME; shared arrays 0/0 same names+sizes; unused shared []/[]; overlaps A [] B []
+top_fd_kernel: body DIFFERS; comptime info DIFFERS; shared arrays 0/1 DIFFER; unused shared []/[]; overlaps A [] B []
+   body diff lines: 17090
+      --- 
+      +++ 
+      @@ -35,0 +36 @@
+      +extern __shared__ __align__(4) uint8 dynamic_shared_mem[];
+      @@ -74,5 +75,2 @@
+      -const bool v0 = absoluteIdx.x < info.scalars_uint32[0];
+      -v1 = uint64(0);
+      -v2 = uint32(0);
+      -v3 = uint32(0);
+      -v4 = uint32(0);
+      +
+      +const bool v0 = threadIdx.x < uint32(2);
+top_kernel: body SAME; comptime info SAME; shared arrays 0/0 same names+sizes; unused shared []/[]; overlaps A [] B []
