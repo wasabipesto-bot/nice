@@ -71,6 +71,10 @@ pub fn slices_for(base: u32, range: &FieldSize) -> Option<(JoinParams, Vec<Field
     Some((jp, join_slices(range, block, CPU_SLICE_PREFIXES)))
 }
 
+/// The largest step from a thread's last partition of a join to its next
+/// at which the next works out its failing runs ([`CpuJoin::run`]).
+const RUN_GAP: u32 = 8;
+
 /// The joins this process has set up: each takes the next value as its
 /// id (`CpuJoin::id`).
 static JOINS: AtomicU64 = AtomicU64::new(0);
@@ -619,8 +623,15 @@ impl CpuJoin {
         let roots = &self.fs.base.roots;
         sc.idx.resize(PIECE, 0);
         // The failing runs carry over from an earlier partition of this
-        // join; otherwise every prefix is certified.
-        if !sc.last.is_some_and(|(id, last)| id == self.id && last < v) {
+        // join; otherwise every prefix is certified. They are worked out
+        // only while the thread runs the join's partitions densely (a run
+        // costs more than a certificate, and pays only in a later partition
+        // of this thread that it covers).
+        let (carry, runs) = match sc.last {
+            Some((id, last)) if id == self.id && last < v => (true, v - last <= RUN_GAP),
+            _ => (false, false),
+        };
+        if !carry {
             sc.next.clear();
             sc.next.resize(self.fs.tlay.len(), 0);
         }
@@ -636,7 +647,8 @@ impl CpuJoin {
             if lo == hi {
                 continue;
             }
-            self.tops(v, &self.fs.tlay[lo..hi], &mut sc.next[lo..hi], &mut sc.tops);
+            let next = &mut sc.next[lo..hi];
+            self.tops(v, &self.fs.tlay[lo..hi], next, runs, &mut sc.tops);
             if sc.tops.is_empty() {
                 continue;
             }
@@ -676,12 +688,19 @@ impl CpuJoin {
     /// clipped one, at either end of the field, is divided out. `next` is
     /// [`Scratch::next`] for `layer`, valid for every partition up to `v`:
     /// an unclipped block whose partition is below its prefix's entry
-    /// fails, and is not certified; one that is certified and fails sets
-    /// the entry.
+    /// fails, and is not certified; with `runs`, one that is certified and
+    /// fails sets the entry.
     // Below 2^32: w = b^f0 is (`JoinParams::supported`), and so are b^mid,
     // b - 1 and the key space. w, p, a, e as in `overlap_join`.
     #[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
-    fn tops(&self, v: u32, layer: &[(u128, u64)], next: &mut [u16], tops: &mut Vec<Top>) {
+    fn tops(
+        &self,
+        v: u32,
+        layer: &[(u128, u64)],
+        next: &mut [u16],
+        runs: bool,
+        tops: &mut Vec<Top>,
+    ) {
         tops.clear();
         let fs = &self.fs;
         let (w, v) = (fs.w, u128::from(v));
@@ -704,7 +723,7 @@ impl CpuJoin {
                     continue;
                 }
                 fd.advance(&mut st, p);
-                match fd.cert(&st) {
+                match fd.cert(&st, runs) {
                     Ok(c) => {
                         tops.push(self.top(
                             p,
@@ -1234,7 +1253,13 @@ mod tests {
         let (mut out, mut tops) = (Vec::new(), Vec::new());
         for key in 0..join.keyspace as usize {
             let (lo, hi) = (join.key_off[key] as usize, join.key_off[key + 1] as usize);
-            join.tops(v, &join.fs.tlay[lo..hi], &mut vec![0; hi - lo], &mut tops);
+            join.tops(
+                v,
+                &join.fs.tlay[lo..hi],
+                &mut vec![0; hi - lo],
+                false,
+                &mut tops,
+            );
             out.extend_from_slice(&tops);
         }
         out
@@ -1526,9 +1551,10 @@ mod tests {
     }
 
     /// Partition `v`'s tops, every key in order, as [`CpuJoin::run`] makes
-    /// them with `next` carried over from earlier partitions; also how many
-    /// unclipped blocks of the partition it did not certify.
-    fn skipped_tops(join: &CpuJoin, v: u32, next: &mut [u16]) -> (Vec<Top>, u64) {
+    /// them with `next` carried over from earlier partitions (and with
+    /// `runs`, setting it); also how many unclipped blocks of the partition
+    /// it did not certify.
+    fn skipped_tops(join: &CpuJoin, v: u32, next: &mut [u16], runs: bool) -> (Vec<Top>, u64) {
         let fs = &join.fs;
         let skipped = fs
             .tlay
@@ -1548,7 +1574,7 @@ mod tests {
         let (mut out, mut tops) = (Vec::new(), Vec::new());
         for key in 0..join.keyspace as usize {
             let (lo, hi) = (join.key_off[key] as usize, join.key_off[key + 1] as usize);
-            join.tops(v, &join.fs.tlay[lo..hi], &mut next[lo..hi], &mut tops);
+            join.tops(v, &join.fs.tlay[lo..hi], &mut next[lo..hi], runs, &mut tops);
             out.extend_from_slice(&tops);
         }
         (out, skipped)
@@ -1562,7 +1588,8 @@ mod tests {
         let mut next = vec![0u16; join.fs.tlay.len()];
         let (mut tops, mut skipped) = (0u64, 0u64);
         for &v in vs {
-            let (got, sk) = skipped_tops(join, v, &mut next);
+            // Runs worked out at most partitions, not at some.
+            let (got, sk) = skipped_tops(join, v, &mut next, v % 5 != 2);
             assert_eq!(got, all_tops(join, v), "{what} partition {v}");
             tops += got.len() as u64;
             skipped += sk;

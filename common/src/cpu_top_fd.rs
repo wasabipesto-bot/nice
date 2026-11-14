@@ -598,11 +598,12 @@ impl TopFdSetup {
     /// The certificate of the block of `st`'s prefix (unclipped): the same
     /// as `Base::cert_parts(a, a + w − 1, cap)`, read from the stepped
     /// digits. The digit of `a^j` at position `pos` is digit `pos − j·f0`
-    /// of `P^j` (zero below). If it fails, `Err(n)`: this block and the
-    /// `n − 1` after it (`P + h`, `P + 2h`, … for `h = 1`, i.e. `P`'s blocks
-    /// in the next `n − 1` partitions) fail, `1 <= n <= span` (module docs).
+    /// of `P^j` (zero below). If it fails, `Err(n)`: this block and those
+    /// of `P + 1, …, P + n − 1` (the prefix's in the next `n − 1`
+    /// partitions) fail, `1 <= n <= span` (module docs). Without `runs`
+    /// the run is not worked out, and `n` is 1.
     #[inline]
-    pub(crate) fn cert(&self, st: &TopFd) -> Result<Cert, u32> {
+    pub(crate) fn cert(&self, st: &TopFd, runs: bool) -> Result<Cert, u32> {
         // A digit, below b <= 64.
         #[allow(clippy::cast_possible_truncation)]
         let top = (self.b - 1) as u8;
@@ -633,7 +634,7 @@ impl TopFdSetup {
             while pos < sp {
                 let bit = 1u64 << at(pos);
                 if mask & bit != 0 {
-                    return Err(self.run(st, from, jj));
+                    return Err(if runs { self.run(st, from, jj) } else { 1 });
                 }
                 mask |= bit;
                 pos += 1;
@@ -839,7 +840,7 @@ mod tests {
                                     seeds += u64::from(!(p > before && p - before <= fd.reach));
                                     let want = base.cert_parts(a, z, cap);
                                     assert_eq!(
-                                        fd.cert(&st).ok(),
+                                        fd.cert(&st, rng.next().is_multiple_of(2)).ok(),
                                         want,
                                         "b{b} [{s}, {e}) f0 {f0} o {o} P {p}"
                                     );
@@ -941,7 +942,7 @@ mod tests {
                             }
                             let mut st = TopFd::default();
                             fd.advance(&mut st, p);
-                            let Err(n) = fd.cert(&st) else {
+                            let Err(n) = fd.cert(&st, true) else {
                                 continue;
                             };
                             assert!(n >= 1 && n <= span, "b{b} P {p}: run {n} of {span}");
