@@ -201,6 +201,22 @@ pub(crate) fn n22_bits() -> u32 {
 }
 /// [`n22_bits`]: the scan forms of the appends ([`ballot_append`] off).
 pub(crate) const N22_SCAN: u32 = 1;
+/// [`n22_bits`]: the walk over a chunk's pass bits as a per-lane loop (`while
+/// x != 0`), without the plane vote and the inner `if` (no CUDA thread
+/// scheduling to correct for on AMD: a divergent loop is one exec-masked loop).
+pub(crate) const N22_WALK_LANE: u32 = 2;
+/// [`n22_bits`]: the walk's pop as `find_first_set(x) - 1` (x != 0 there).
+pub(crate) const N22_FFS: u32 = 4;
+/// [`n22_bits`]: at b = 2^s the prefilter's low digits as one bit-field
+/// extract, `(F >> (32 - 2s)) & (b - 1)`, not `(F << s) >> (32 - s)`.
+pub(crate) const N22_BFE: u32 = 8;
+/// [`n22_bits`]: the check kernel's limb products as 24-bit multiplies: every
+/// base-b² limb is below b² <= 4096, so masking it with 0xFFF is an identity
+/// that lets Mesa's compiler prove both factors below 2^24 (a full-rate
+/// `v_mul_u32_u24` / `v_mad_u32_u24` instead of the quarter-rate
+/// `v_mul_lo_u32`); a limb's two digits by `(y·⌈2^20/b⌉) >> 20` (exact for y <
+/// b², b <= 64, checked exhaustively) instead of the 32-bit magic's `mul_hi`.
+pub(crate) const N22_CHECK24: u32 = 16;
 
 /// Whether [`top_fd_kernel`]'s append ranks a plane's kept tops with one
 /// ballot (`top_slot`): only on devices whose planes have at most 32 lanes.
@@ -574,8 +590,12 @@ mod kernels {
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
         #[comptime] pf_count: bool,
+        #[comptime] n22: u32,
     ) {
         let m1 = comptime!(base - 1);
+        let lane_walk = comptime!(n22 & N22_WALK_LANE != 0);
+        let ffs_pop = comptime!(n22 & N22_FFS != 0);
+        let pf_bfe = comptime!(n22 & N22_BFE != 0);
         let nkeys = comptime!(if key_level { base } else { 1 });
         let wave = comptime!(ept * JOIN_WG);
         let mid = comptime!(k2 - k);
@@ -1011,9 +1031,14 @@ mod kernels {
                         for j in 0..ept {
                             let mut x = pm[j as usize] & vv[j as usize];
                             let r0 = rr[j as usize];
-                            while plane_any(x != 0u32) {
-                                if x != 0u32 {
-                                    let jt2 = jc + x.trailing_zeros();
+                            if comptime!(lane_walk) {
+                                while x != 0u32 {
+                                    let tz = if comptime!(ffs_pop) {
+                                        x.find_first_set() - 1u32
+                                    } else {
+                                        x.trailing_zeros()
+                                    };
+                                    let jt2 = jc + tz;
                                     x &= x - 1u32;
                                     let pass = if comptime!(lean) {
                                         walk_pf_lean(
@@ -1028,6 +1053,7 @@ mod kernels {
                                             t_ghi[jt2 as usize],
                                             base,
                                             pf_count,
+                                            pf_bfe,
                                         )
                                     } else {
                                         walk_pf(
@@ -1057,8 +1083,62 @@ mod kernels {
                                         }
                                     }
                                 }
-                                if walk_sync {
-                                    sync_plane();
+                            } else {
+                                while plane_any(x != 0u32) {
+                                    if x != 0u32 {
+                                        let tz = if comptime!(ffs_pop) {
+                                            x.find_first_set() - 1u32
+                                        } else {
+                                            x.trailing_zeros()
+                                        };
+                                        let jt2 = jc + tz;
+                                        x &= x - 1u32;
+                                        let pass = if comptime!(lean) {
+                                            walk_pf_lean(
+                                                ac[j as usize],
+                                                ac3[j as usize],
+                                                pc[j as usize],
+                                                pc3[j as usize],
+                                                t_dm[jt2 as usize],
+                                                mlo[j as usize],
+                                                mhi[j as usize],
+                                                t_glo[jt2 as usize],
+                                                t_ghi[jt2 as usize],
+                                                base,
+                                                pf_count,
+                                                pf_bfe,
+                                            )
+                                        } else {
+                                            walk_pf(
+                                                ac[j as usize],
+                                                pc[j as usize],
+                                                t_dm[jt2 as usize],
+                                                mlo[j as usize],
+                                                mhi[j as usize],
+                                                t_lo[jt2 as usize],
+                                                t_hi[jt2 as usize],
+                                                base,
+                                                k,
+                                                k2,
+                                            )
+                                        };
+                                        if pass {
+                                            let at = s_cnt[0].fetch_add(1u32);
+                                            if at < SURV_SH_CAP {
+                                                s_t[at as usize] = t_id[jt2 as usize];
+                                                s_r[at as usize] = r0;
+                                            } else {
+                                                let g = surv_count[0].fetch_add(1u32);
+                                                if g < surv_cap {
+                                                    surv[(2u32 * g) as usize] = t_id[jt2 as usize];
+                                                    surv[(2u32 * g + 1u32) as usize] = r0;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if walk_sync {
+                                        sync_plane();
+                                    }
                                 }
                             }
                         }
@@ -3233,6 +3313,7 @@ mod kernels {
         thi: u32,
         #[comptime] base: u32,
         #[comptime] count: bool,
+        #[comptime] bfe: bool,
     ) -> bool {
         let f2 = ah2 + p2 * dh;
         let f3 = ah3 + p3 * dh;
@@ -3247,7 +3328,12 @@ mod kernels {
         } else {
             u32::mul_hi(f2, base)
         };
-        let g2 = if comptime!(pow2) {
+        // (`bfe`: the same bits 32 - 2s .. 32 - s of F as one field extract.)
+        let low = comptime!(base - 1);
+        let dn = comptime!(32 - 2 * base.trailing_zeros());
+        let g2 = if comptime!(pow2 && bfe) {
+            (f2 >> dn) & low
+        } else if comptime!(pow2) {
             (f2 << s) >> up
         } else {
             u32::mul_hi(f2 * base, base)
@@ -3257,7 +3343,9 @@ mod kernels {
         } else {
             u32::mul_hi(f3, base)
         };
-        let g3 = if comptime!(pow2) {
+        let g3 = if comptime!(pow2 && bfe) {
+            (f3 >> dn) & low
+        } else if comptime!(pow2) {
             (f3 << s) >> up
         } else {
             u32::mul_hi(f3 * base, base)
@@ -3351,6 +3439,17 @@ mod kernels {
     #[cube]
     fn put2(mask: u64, y: u32, #[comptime] base: u32) -> u64 {
         let hi = d_div(y, base);
+        let lo = y - hi * base;
+        mask | (1u64 << u64::cast_from(lo)) | (1u64 << u64::cast_from(hi))
+    }
+
+    /// [`put2`] for a limb `y < b² <= 4096` ([`N22_CHECK24`]): `y & 0xFFF` is
+    /// `y`, and `⌊y/b⌋ = (y·⌈2^20/b⌉) >> 20` with a product below 2^32 from
+    /// factors below 2^24.
+    #[cube]
+    fn put2_24(mask: u64, y0: u32, #[comptime] base: u32) -> u64 {
+        let y = y0 & 0xFFFu32;
+        let hi = (y * comptime!((1u32 << 20).div_ceil(base))) >> 20u32;
         let lo = y - hi * base;
         mask | (1u64 << u64::cast_from(lo)) | (1u64 << u64::cast_from(hi))
     }
@@ -3523,6 +3622,7 @@ mod kernels {
         #[comptime] sh: CheckShape,
         #[comptime] mode: u32,
         #[comptime] ballot: bool,
+        #[comptime] m24: bool,
     ) {
         let skip_first = comptime!(mode & CHECK_SKIP_FIRST != 0);
         let dup_first = comptime!(mode & CHECK_DUP_FIRST != 0);
@@ -3597,6 +3697,13 @@ mod kernels {
                         part_limbs(h, pend, &mut nn, k2c, hdig, l, base);
                     }
                 }
+                if comptime!(m24) {
+                    // Every limb is below b² <= 4096: the mask is an identity.
+                    #[unroll]
+                    for i in 0..nl {
+                        nn[i as usize] = nn[i as usize] & 0xFFFu32;
+                    }
+                }
                 // n²: column k is twice the products i < j (i + j = k),
                 // the square of limb k/2 and the carry.
                 let mut sq = Array::<u32>::new(ql as usize);
@@ -3616,18 +3723,33 @@ mod kernels {
                         x2 += nn[comptime!(k / 2) as usize] * nn[comptime!(k / 2) as usize];
                     }
                     if comptime!(k + 1 == ql) {
-                        sq[k as usize] = x2;
+                        if comptime!(m24) {
+                            sq[k as usize] = x2 & 0xFFFu32;
+                        } else {
+                            sq[k as usize] = x2;
+                        }
                         if comptime!(s2 % 2 == 0) {
-                            mask = put2(mask, x2, base);
+                            mask = if comptime!(m24) {
+ put2_24(mask, x2, base)
+ } else {
+ put2(mask, x2, base)
+ };
                         } else {
                             mask |= 1u64 << u64::cast_from(x2);
                         }
                     } else {
                         let q = d_div(x2, bb);
-                        let y = x2 - q * bb;
+                        let mut y = x2 - q * bb;
+                        if comptime!(m24) {
+                            y &= 0xFFFu32;
+                        }
                         sq[k as usize] = y;
                         carry = q;
-                        mask = put2(mask, y, base);
+                        mask = if comptime!(m24) {
+ put2_24(mask, y, base)
+ } else {
+ put2(mask, y, base)
+ };
                     }
                 }
                 // n³ = n²·n, its low gl limbs first.
@@ -3643,7 +3765,11 @@ mod kernels {
                     }
                     let q = d_div(x3, bb);
                     carry = q;
-                    mask = put2(mask, x3 - q * bb, base);
+                    mask = if comptime!(m24) {
+ put2_24(mask, x3 - q * bb, base)
+ } else {
+ put2(mask, x3 - q * bb, base)
+ };
                 }
                 let seen =
                     u32::cast_from(mask).count_ones() + u32::cast_from(mask >> 32u64).count_ones();
@@ -3660,14 +3786,22 @@ mod kernels {
                         }
                         if comptime!(k + 1 == cl) {
                             if comptime!(s3 % 2 == 0) {
-                                mask = put2(mask, x3, base);
+                                mask = if comptime!(m24) {
+ put2_24(mask, x3, base)
+ } else {
+ put2(mask, x3, base)
+ };
                             } else {
                                 mask |= 1u64 << u64::cast_from(x3);
                             }
                         } else {
                             let q = d_div(x3, bb);
                             carry = q;
-                            mask = put2(mask, x3 - q * bb, base);
+                            mask = if comptime!(m24) {
+ put2_24(mask, x3 - q * bb, base)
+ } else {
+ put2(mask, x3 - q * bb, base)
+ };
                         }
                     }
                 }
@@ -4355,6 +4489,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k2,
                 self.walk_sync,
                 self.pf_count,
+                self.n22 & (N22_WALK_LANE | N22_FFS | N22_BFE),
             );
         }
         let mode = if probe { CHECK_PROBE } else { CHECK_HITS };
@@ -4431,6 +4566,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.check,
                 mode,
                 self.ballot,
+                self.n22 & N22_CHECK24 != 0,
             );
         }
     }
