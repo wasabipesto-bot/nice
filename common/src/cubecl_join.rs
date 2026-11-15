@@ -7827,6 +7827,7 @@ mod tests {
     /// `(F >> (32 - 2s)) & (b - 1) = (F << s) >> (32 - s)` on the edges and
     /// 10^6 random fractions.
     #[test]
+    #[allow(clippy::cast_possible_truncation)]
     fn n22_small_division_and_bit_field_are_exact() {
         for base in 10u32..=64 {
             let m = (1u32 << 20).div_ceil(base);
