@@ -5,6 +5,30 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## Q1.1 The nice-only claim queue handed fields out twice at base 62; PR #264 (2026-11-15 09:31–10:15 UTC, engineer and independent reviewer; `Q1/RESULTS.md`, `Q1/PR-BODY.md`, `Q1/REVIEW.md`, `Q1/raw/` (`analyse.py`, `routes.py`, claims data, `test_runs_after_review.txt`), `Q1/b62_niceonly_submissions_to_0929utc.json`; fork `pr/api-niceonly-queue-stale-claims` 516444e = 6a62913 + acc615d (the review's removal of the detailed age limit) + the changelog number; scratch Postgres on ivory, no box)
+
+- **Production, base 62, 00:58–09:29 UTC** [M, public API]: 655 real nice-only submissions on 530 fields; 125 fields
+  searched twice (19 % of submissions, 18 % of join time); pairs 95 demoux twice / 24 one client then another / 6
+  fleet twice; nice-only hand-outs 83–93 an hour; refills at 02:18, 03:59, 06:15, 08:33 UTC each re-claimed the 50
+  fields still queued (route A) plus 6–9 handed out and unsubmitted (route B). Of 213 fields with two nice-only
+  claims: 186 route A, 27 route B, none other. Detailed queues: ≈ 9,100 claims an hour, queue ages 1–20 minutes: safe
+  today.
+- **Mechanism** [R]: `REFILL_AMOUNT` 200 at `REFILL_THRESHOLD` 50, FIFO without an age check; a hand-out writes a
+  `claims` row but the field's claim runs from the bulk claim; `CLAIM_DURATION_HOURS` 1.
+- **Fix:** a refill replaces an already queued field in place (`merge`, all queues); each nice-only claim is renewed
+  at hand-out (`renew_niceonly_claim`: `UPDATE fields SET last_claim_time = NOW() WHERE id = $1 AND
+  last_claim_time = $2 AND check_level = 0 RETURNING *`), a field with no matching row is skipped. The detailed
+  age limit of the first version was removed on review (not needed; a clock-skew risk).
+- **Tests** [M]: reproduction by back-dated claims on a scratch Postgres: main-like code hands 100 fields out twice;
+  merge only 50; renewal only 0; both 0. Reviewer's stress test (two queues as two API processes, 8 claimers, a
+  direct claimer, claims aged 61 minutes every 15 ms): 3,600 hand-outs, 3,600 distinct fields on the branch;
+  4,008 duplicates on the main-like mutant. Timestamp equality exact against Postgres 17 (also under odd time
+  zones). Cost: one single-row update per nice-only claim, 0.013 ms with the repository's indexes, 0.046 ms
+  with the claim indexes dropped as in production. `cargo test -p nice_api` with and without the database,
+  `claim_queries`, `just lint`: pass.
+- Not verified: production's index set and clock; behaviour under the real API's load (the deploy notes say what
+  to watch).
+
 ## T28.1 Early audit of base 62: every instant verdict, 156 re-run comparisons, main against v3.4.7; the duplicate searches (2026-11-15 05:57–09:30 UTC, agent; `T28/RESULTS.md`, `T28/raw/` (`instant_check.py`, `instant_summary.txt`, `compare.py`, `compare.txt`, `compare_detail.jsonl`, `proof_hosts_block.txt`, queues, `box/`); duplicates: director, `Q1/b62_niceonly_submissions_to_0929utc.json`; box 60746721, RTX 3080 capped at 150 W (≈ 1.14 GHz), 3.61 h, ~$0.42)
 
 - **Instant fields** [M]: all 8,665 base-62 fields submitted with zero survivors and zero checked (census to 09:01

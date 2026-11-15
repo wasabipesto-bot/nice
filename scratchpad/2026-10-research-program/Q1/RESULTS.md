@@ -124,3 +124,32 @@ On unfixed main the test fails with **100 fields handed out twice**: 50 by route
 - **Refused action:** running cargo with `CARGO_TARGET_DIR=~/projects/nice/.worktrees/rebase-1112/target`, as the brief suggested, was refused by the permission classifier. It was not retried. The builds used the worktree's own `target/` instead (inside the allowed worktree). Free disk is 9.5 GB, and the worktree's `target/` can be deleted once review is done.
 - **Scratch Postgres:** the `q1-queue-pg` container (tmpfs, port 55441) was removed at the end.
 - **Live at the time of the fetch:** 144 fields of the 08:33:33 batch were still at `check_level = 0`. Their claims expired at 09:33, so the next refill re-claims them while they are still queued. The duplication continues until the fix is deployed.
+
+## After review (10:15 UTC)
+
+I applied the changes from `REVIEW.md` F1–F5 as one new commit, **`acc615d4`**, on top of `6a629136`. It went up as a plain push and is a fast-forward (`git merge-base --is-ancestor 6a629136 acc615d4` succeeds). The branch is now 54d0aac4 → 6a629136 → acc615d4.
+
+**What changed:**
+
+- **F1:** the detailed queues' age limit is removed. That covers `DETAILED_MAX_QUEUED_AGE`, `max_age`, `too_old` and `prune`, and the two tests `detailed_queues_drop_old_claims` and `an_aged_queue_drops_old_fields_and_refills`. `Preclaimed::new` takes two arguments again, `claim` is back to `len()` and `pop_front()`, and the comment about the nice-only queue having "no age limit" went with the removed block. The diff against main now contains only:
+  - `merge` (all queues);
+  - the renewal at hand-out;
+  - the tests;
+  - the `claimed` helper.
+  Section 3's last table row and its "Sudden fall, detailed" paragraph above are superseded by this.
+- **F4:** the changelog line is now the one sentence given in the review.
+- **F2, F3 and F5** are in `PR-BODY.md` (595 words plus tables), along with the removal of the detailed and clock items and a "Not in this PR" line for a separate detailed age limit (those queues turn over in 1–20 min today).
+
+**Tests** (scratch Postgres on 127.0.0.1:55441; output in `raw/test_runs_after_review.txt`):
+
+| run | result |
+|---|---|
+| `cargo test --locked --release -p nice_api`, no database | 4 passed, Postgres scenarios skipped |
+| the same with `NICE_TEST_DATABASE_URL` | 4 passed: the reproduction, the renewal test and the seven existing scenarios |
+| reproduction against main's behaviour (temporary mutant: no merge, no renewal; restored) | fails, 100 fields handed out twice (ids 701–800) |
+| `cargo test --locked -p nice_common --features database --test claim_queries` | passed |
+| `just lint` | exit 0; only the existing `web-sys` manifest warning |
+
+The run "renewal only → no duplicates" comes from the reviewer's mutant. I did not repeat it. The container `q1-queue-pg` and the worktree's `target/` have been removed (14 GB free).
+
+**Not as asked:** the first commit's message, `6a629136`, still describes the detailed age limit. It was not rewritten, per the no-rewrite rule. A squash merge would replace it, or the PR description can be relied on instead.

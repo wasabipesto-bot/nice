@@ -113,6 +113,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   The agent's shared-target cargo run was refused by the harness; it built in its own target
   (4.6 GB, removed by me after the push; 14 GB free).
 
+- **10:15 UTC: PR #264 opened (the claim-queue fix).** Review (`Q1/REVIEW.md`, 167 k tokens): the
+  nice-only part correct (own stress test: 3,600 hand-outs, 3,600 distinct fields; 4,008
+  duplicates on main-like code; timestamp equality exact on Postgres 17; no lock across the
+  database call; a `None` only falls through to the direct claim); **required: take the
+  detailed queues' age limit out** (not needed, never acts today, a clock-skew risk; one change
+  per PR), plus four wording fixes. The engineer applied them as one new commit (acc615d) and
+  re-ran the tests; I checked the diff against main (only the in-place refill, the renewal and
+  tests remain), read the body, opened the PR and pushed the changelog number (516444e).
+  Agents today: six (five Opus, one Sonnet), two of them resumed; about 1.4 M subagent tokens.
+  Vast today $0.74.
+
 ## 2026-11-14 (cycle 5 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $14.98 of $30 (fleet $24.91); credit
