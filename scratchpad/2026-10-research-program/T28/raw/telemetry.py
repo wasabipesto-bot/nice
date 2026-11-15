@@ -2,8 +2,8 @@
 """T2.8 task 4: telemetry facts from the census (fields_b62.json, subs_0615.json, predict_instant.json)."""
 import json, collections, statistics as st
 from datetime import datetime, timezone
-F = {f['id']: f for f in json.load(open('fields_b62.json'))}
-S = [s for s in json.load(open('subs_0615.json')) if s['field_id'] in F]
+F = {f['id']: f for f in json.load(open('fields_b62_0900.json'))}
+S = [s for s in json.load(open('subs_merged.json')) if s['field_id'] in F]
 P = {int(k): v for k, v in json.load(open('predict_instant.json')).items()}
 ts = lambda x: datetime.fromisoformat(x).astimezone(timezone.utc)
 def q(v, p): v = sorted(v); return v[min(len(v) - 1, int(p * len(v)))]

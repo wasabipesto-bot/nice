@@ -82,6 +82,21 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   1.100 moved test binaries, which breaks the old window driver's build step (fixed in
   `go22.sh`).
 
+- **09:35 UTC: T2.8 final (`T28/RESULTS.md`, 234 k tokens; box 60746721 destroyed after 3.61 h).**
+  All 8,665 instant verdicts proved empty; 156 comparisons, 0 mismatches (91 exact, 65 v3.4.7
+  within the bound); **main is ×3.13 v3.4.7 at b62 1e17** (3080 at 150 W, 5 fields × 2 rounds).
+  I read `compare.txt` and the ratio lines.
+- **The audit's telemetry showed something bigger: 19 % of real base-62 submissions are second
+  searches of the same field.** My own count from the API: 656 real submissions, 530 fields, 126
+  searched twice (96 by demoux both times), a median 38 minutes apart, in bursts. The cause is
+  the server's nice-only pre-claim queue (200 at a time, FIFO, no age check, one-hour claims),
+  which I had predicted in BACKLOG item 1 on 10-09 and which base 62's slow fields now trigger.
+  **Worth about ×1.2 of the whole search, as much as the three best open kernel PRs together.**
+  Estimate for base 62: 2027-01-06 as things are, 2026-12-26 without the duplicates.
+  Started **Q1** (`Q1/BRIEF.md`, Opus, scratch Postgres on ivory, no box): confirm, reproduce in a
+  test, fix minimally, PR branch; an independent review follows; hard stop 12:45 UTC. The server
+  and its deployment are the user's: a PR is all I do.
+
 ## 2026-11-14 (cycle 5 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $14.98 of $30 (fleet $24.91); credit

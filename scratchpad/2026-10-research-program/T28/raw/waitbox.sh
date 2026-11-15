@@ -5,6 +5,6 @@ while true; do
   ./pull.sh >/dev/null 2>&1
   grep -q "$P" box/runs.log 2>/dev/null && { echo "found $P"; break; }
   [ "$(date -u +%H%M)" -ge "$D" ] && { echo "deadline $D"; break; }
-  sleep 300
+  sleep 120
 done
 tail -n 3 box/runs.log; date -u

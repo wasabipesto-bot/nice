@@ -2,7 +2,7 @@
 """T2.8 task 1 summary: instant fields by argument (instant_check.jsonl) and real fields' stronger-argument verdicts."""
 import json, collections
 B = 62
-F = {f['id']: f for f in json.load(open('fields_b62.json'))}
+F = {f['id']: f for f in json.load(open('fields_b62_0900.json'))}
 R = [json.loads(l) for l in open('instant_check.jsonl')]
 def lead(x, j):
     X = x ** j; n = 0; y = X

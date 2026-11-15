@@ -5,6 +5,34 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T28.1 Early audit of base 62: every instant verdict, 156 re-run comparisons, main against v3.4.7; the duplicate searches (2026-11-15 05:57–09:30 UTC, agent; `T28/RESULTS.md`, `T28/raw/` (`instant_check.py`, `instant_summary.txt`, `compare.py`, `compare.txt`, `compare_detail.jsonl`, `proof_hosts_block.txt`, queues, `box/`); duplicates: director, `Q1/b62_niceonly_submissions_to_0929utc.json`; box 60746721, RTX 3080 capped at 150 W (≈ 1.14 GHz), 3.61 h, ~$0.42)
+
+- **Instant fields** [M]: all 8,665 base-62 fields submitted with zero survivors and zero checked (census to 09:01
+  UTC) are empty by an independent big-integer check: 8,385 by leading digits 1 and 1 (x = n / 62^12 < 2^(1/3)), 263
+  by another collision among the top digits the range fixes, 14 by Hall's condition at the first position where
+  the range's ends differ, 3 after subdividing. The client's certificate (read from the code): per slice, a
+  breadth-first pass over the top 8 of n's 13 digits (t = 10, k = 6, p = 2), `Base::cert` with cap 6. Of the 329
+  fields the clients ran, none falls to a stronger field-level argument; deeper subdivision proves one empty
+  (207072495; 193 survivors, 32 checked).
+- **Re-runs** [M] (main 54d0aac against the stub; production hosts blocked and proven): 112 fields, **156
+  comparisons, 0 mismatches**: 91 exact equalities of survivors, checked and the number list (85 demoux a7a59c1
+  submissions, 6 repeats of main); 65 v3.4.7 comparisons inside the 11-12 overrun-model bound (53 fleet
+  submissions, all RTX 4060; 12 v3.4.7 runs on the box; max |d| / tolerance 0.49, max overrun 3.2e-6 of a field's
+  survivors). No nice number.
+- **Main against v3.4.7 at b62 1e17** [M]: 5 real fields × 2 interleaved rounds on the 3080 at 150 W: v3.4.7 takes
+  **×3.13** main's join seconds (geomean; 2.99–3.21), ×3.08 wall; main 75–100 s, v3.4.7 239–301 s. Derived for the
+  fleet's RTX 4060s (assuming the ratio carries over): 337 s → ≈ 108 s a field.
+- **Duplicate searches** [M, my own count from the API, 656 real submissions to 09:29 UTC]: 530 distinct fields;
+  **126 fields searched twice = 19.2 % of real submissions, 17.9 % of join seconds**; pairs: 96 demoux–demoux, 24
+  demoux–fleet, 6 fleet–fleet; gap between the two submissions median 2,282 s (p10 2,007, p90 2,536); per hour 0,
+  2, 0, 25, 24, 8, 42, 0, 25; the repeats agree with the first. Mechanism read in `api/src/field_queue.rs`:
+  `REFILL_AMOUNT` 200 at `REFILL_THRESHOLD` 50, FIFO, no age check, against `CLAIM_DURATION_HOURS` = 1; predicted in
+  BACKLOG item 1 on 2026-10-09.
+- **Estimate** [D]: 76,762 of the 86,245 fields past the processed frontier (207073292) need a real run; at 61.7
+  new real fields an hour ≈ 1,245 h → **2027-01-06**; without the duplicates ≈ 2026-12-26; with the fleet on main
+  as well ≈ 2026-12-23. Base 62 began at 00:57:50 UTC; 35 % of fields submitted past the boundary were instant.
+  Base 60 complete (162,076 fields at check_level ≥ 1).
+
 ## N22.1 The next gain for the RX 9070 XT, found offline: the walk as a per-lane loop (2026-11-15 05:57–08:36 UTC, agent; `N22/RESULTS.md`, `N22/WINDOW-PLAN.md`, `N22/raw/` (`aco_tables.txt`, `aco_repeat.txt`, `ab_table.txt`, `shares.txt`, `topfd_blocks_b6{2,4}.txt`, `scripts/`, `box/`); fork `exp/n22-rdna4` c750605 (switches `NICE_EXP_N22` on `exp/integration-1114` 8bcee21) and `exp/n22-walk-lane-spirv` 86b7ab0 (W alone, gated to `wgpu<spirv>`, one commit); box 60746198, RTX 3080 at ≈ 285 W, 2.84 h, ~$0.32)
 
 - **Shares on the card after the five open PRs** [D from N17.1 / N13 phase timers and each PR's on-card gain]:
