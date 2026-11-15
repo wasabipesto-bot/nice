@@ -217,6 +217,13 @@ pub(crate) const N22_BFE: u32 = 8;
 /// `v_mul_lo_u32`); a limb's two digits by `(y·⌈2^20/b⌉) >> 20` (exact for y <
 /// b², b <= 64, checked exhaustively) instead of the 32-bit magic's `mul_hi`.
 pub(crate) const N22_CHECK24: u32 = 16;
+/// [`n22_bits`]: the transposed AND's digit loop as a fixed run of as many
+/// pops as an entry has digits (2·(f0 + pp), and the key digit's two),
+/// without the loop's test and branch; a pop past the entry's last digit
+/// repeats its last digit (an OR already done), and the loop after it takes
+/// any digits left (none for the entries of these shapes), so the ORs are
+/// the same for every entry.
+pub(crate) const N22_AND_FIX: u32 = 32;
 
 /// Whether [`top_fd_kernel`]'s append ranks a plane's kept tops with one
 /// ballot (`top_slot`): only on devices whose planes have at most 32 lanes.
@@ -592,6 +599,7 @@ mod kernels {
         #[comptime] walk_sync: bool,
         #[comptime] pf_count: bool,
         #[comptime] n22: u32,
+        #[comptime] and_fix: u32,
     ) {
         let m1 = comptime!(base - 1);
         let lane_walk = comptime!(n22 & N22_WALK_LANE != 0);
@@ -943,6 +951,29 @@ mod kernels {
                                     // empty slot (vv = 0) has none.
                                     let mut x = mlo[j as usize] & vv[j as usize];
                                     let mut y = mhi[j as usize] & vv[j as usize];
+                                    if comptime!(and_fix > 0) {
+                                        let mut dl = 0u32;
+                                        #[unroll]
+                                        for _t in 0..and_fix {
+                                            let lo = x != 0u32;
+                                            let v = select(lo, x, y);
+                                            let d = select(
+                                                v != 0u32,
+                                                (v.find_first_set() - 1u32) + select(lo, 0u32, 32u32),
+                                                dl,
+                                            );
+                                            dl = d;
+                                            let v1 = v & (v - 1u32);
+                                            x = select(lo, v1, x);
+                                            y = select(lo, y, v1);
+                                            let a = ab + d;
+                                            #[unroll]
+                                            for c in 0..ag {
+                                                acc[comptime!(c * ept + j) as usize] |=
+                                                    t_tr[(a + comptime!(c * 64)) as usize];
+                                            }
+                                        }
+                                    }
                                     while (x | y) != 0u32 {
                                         let lo = x != 0u32;
                                         let v = select(lo, x, y);
@@ -4491,6 +4522,11 @@ impl<R: Runtime> JoinDevice<R> {
                 self.walk_sync,
                 self.pf_count,
                 self.n22 & (N22_WALK_LANE | N22_FFS | N22_BFE),
+                if self.n22 & N22_AND_FIX != 0 {
+                    2 * (self.f0 + self.pp) + if self.key_level { 2 } else { 0 }
+                } else {
+                    0
+                },
             );
         }
         let mode = if probe { CHECK_PROBE } else { CHECK_HITS };
