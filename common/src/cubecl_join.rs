@@ -270,10 +270,9 @@ pub use kernels::{bucket_kernel, check_kernel, join_kernel, top_fd_kernel, top_k
 mod kernels {
     use super::{
         AND_GROUP, CHECK_COUNT, CHECK_DUP_FIRST, CHECK_GATED, CHECK_MIN_TAKE, CHECK_PROBE,
-        CHECK_SKIP_FIRST, DEAD_MASK, JOIN_WG, MAX_ROOTS, N22_BFE, N22_FFS, N22_WALK_LANE, STAGES_U32,
-        SURV_FLUSH, SURV_SH_CAP,
-        TOP_ACCOUNT, TOP_CAP, TOP_DUP_RANK, TOP_LANE0_OUT, TOP_REC_WORDS, TOP_SHORT_TAKE,
-        TRANSPOSE_MIN,
+        CHECK_SKIP_FIRST, DEAD_MASK, JOIN_WG, MAX_ROOTS, N22_BFE, N22_FFS, N22_WALK_LANE,
+        STAGES_U32, SURV_FLUSH, SURV_SH_CAP, TOP_ACCOUNT, TOP_CAP, TOP_DUP_RANK, TOP_LANE0_OUT,
+        TOP_REC_WORDS, TOP_SHORT_TAKE, TRANSPOSE_MIN,
     };
     use crate::cubecl_backend::NICEONLY_STRIDE;
     use crate::cubecl_detailed_fd::fd_add_top;
@@ -959,7 +958,8 @@ mod kernels {
                                             let v = select(lo, x, y);
                                             let d = select(
                                                 v != 0u32,
-                                                (v.find_first_set() - 1u32) + select(lo, 0u32, 32u32),
+                                                (v.find_first_set() - 1u32)
+                                                    + select(lo, 0u32, 32u32),
                                                 dl,
                                             );
                                             dl = d;
@@ -3762,10 +3762,10 @@ mod kernels {
                         }
                         if comptime!(s2 % 2 == 0) {
                             mask = if comptime!(m24) {
- put2_24(mask, x2, base)
- } else {
- put2(mask, x2, base)
- };
+                                put2_24(mask, x2, base)
+                            } else {
+                                put2(mask, x2, base)
+                            };
                         } else {
                             mask |= 1u64 << u64::cast_from(x2);
                         }
@@ -3778,10 +3778,10 @@ mod kernels {
                         sq[k as usize] = y;
                         carry = q;
                         mask = if comptime!(m24) {
- put2_24(mask, y, base)
- } else {
- put2(mask, y, base)
- };
+                            put2_24(mask, y, base)
+                        } else {
+                            put2(mask, y, base)
+                        };
                     }
                 }
                 // n³ = n²·n, its low gl limbs first.
@@ -3798,10 +3798,10 @@ mod kernels {
                     let q = d_div(x3, bb);
                     carry = q;
                     mask = if comptime!(m24) {
- put2_24(mask, x3 - q * bb, base)
- } else {
- put2(mask, x3 - q * bb, base)
- };
+                        put2_24(mask, x3 - q * bb, base)
+                    } else {
+                        put2(mask, x3 - q * bb, base)
+                    };
                 }
                 let seen =
                     u32::cast_from(mask).count_ones() + u32::cast_from(mask >> 32u64).count_ones();
@@ -3819,10 +3819,10 @@ mod kernels {
                         if comptime!(k + 1 == cl) {
                             if comptime!(s3 % 2 == 0) {
                                 mask = if comptime!(m24) {
- put2_24(mask, x3, base)
- } else {
- put2(mask, x3, base)
- };
+                                    put2_24(mask, x3, base)
+                                } else {
+                                    put2(mask, x3, base)
+                                };
                             } else {
                                 mask |= 1u64 << u64::cast_from(x3);
                             }
@@ -3830,10 +3830,10 @@ mod kernels {
                             let q = d_div(x3, bb);
                             carry = q;
                             mask = if comptime!(m24) {
- put2_24(mask, x3 - q * bb, base)
- } else {
- put2(mask, x3 - q * bb, base)
- };
+                                put2_24(mask, x3 - q * bb, base)
+                            } else {
+                                put2(mask, x3 - q * bb, base)
+                            };
                         }
                     }
                 }
