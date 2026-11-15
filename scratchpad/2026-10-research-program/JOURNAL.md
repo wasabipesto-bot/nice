@@ -97,6 +97,22 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   test, fix minimally, PR branch; an independent review follows; hard stop 12:45 UTC. The server
   and its deployment are the user's: a PR is all I do.
 
+- **09:55 UTC: Q1 engineer done in 20 minutes (`Q1/RESULTS.md`, 196 k tokens); reviewer started.**
+  Fork `pr/api-niceonly-queue-stale-claims` 6a62913 (one commit on main; 389 lines, most of them
+  tests). Mechanism confirmed from the claims table: hand-outs ran at 83–93 an hour, a refill
+  about every 1.8 h, each re-claiming exactly the 50 fields still queued plus 6–9 handed out and
+  not yet submitted; of 213 fields with two nice-only claims 186 were re-claimed while queued and
+  27 after hand-out. The detailed queues are safe at today's rates (≈ 9,100 claims an hour, queue
+  ages 1–20 minutes). Fix: a refill replaces a queued field in place; each nice-only claim is
+  renewed at hand-out by a conditional primary-key update and skipped if no row matches; the
+  detailed queues drop fields older than 30 minutes in memory. Reproduction on a scratch
+  Postgres: main hands 100 fields out twice, the branch none. I read the diff: three things for
+  the reviewer in particular (the timestamp equality against a real Postgres; whether the
+  detailed age limit is a second change; the nice-only loop's `None`). The changelog line is too
+  long: I shorten it when I fill the number. Reviewer: `Q1/REVIEW-BRIEF.md`, hard stop 11:45.
+  The agent's shared-target cargo run was refused by the harness; it built in its own target
+  (4.6 GB, removed by me after the push; 14 GB free).
+
 ## 2026-11-14 (cycle 5 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $14.98 of $30 (fleet $24.91); credit
