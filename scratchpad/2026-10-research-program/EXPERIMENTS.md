@@ -5,6 +5,21 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## B62.1 Base 62's first hours, from telemetry (2026-11-15, director, public API by bounded id ranges; `../2026-11-fresh-eyes/recent_niceonly_1115.json` = nice-only submissions with id in (294552514, 294806748])
+
+- 12,705 nice-only submissions since the 11-14 snapshot: demoux 10,390 (a7a59c1), fleet 2,315 (v3.4.7 8bd154b).
+  Base 60's last fields (ids ≤ 207064109): demoux 2,601, fleet 1,042. Base 62 (ids ≥ 207064110; 1e17 fields;
+  `range_start` of the first = 62^12 = 3226266762397899821056; last id 207159539): demoux 7,789, fleet 1,273.
+- **Instant fields** (join `run_secs` ≤ 1 or absent): demoux 7,479, fleet 1,223. Explanation [D]: x = n / 62^12,
+  leading digits ⌊x²⌋ and ⌊x³⌋ are both 1 for x < 2^(1/3) → 62^12 · 2^(1/3) = 4.06484e21 = field index 8,385; first
+  real fields: fleet id 207072495 (index 8,385), demoux 207072501 [M]. Both 2 for x in [√2, 3^(1/3)): indices
+  ≈ 13,364–14,268 [D]. Past the boundary, of 570 fields claimed so far 360 were real (310 + 50) [M]: 37 % instant.
+- **Real fields** [M]: demoux n = 310, join `run_secs` median 56.2 (p10 47.2, p90 63.8, max 73.3), setup ≈ 6 s,
+  slots 6, slices 14, 3,844 partitions, survivors median 7.57e11, checked 4.49e10; 61–69 real fields an hour.
+  Fleet (RTX 4060, v3.4.7) n = 50: median 338.0 s (p10 285, p90 379); 10–11 an hour.
+- **Estimate** [D]: frontier id 207073065 at 2026-11-15 03:59 UTC, 86,474 fields left; at 75 real fields an hour:
+  30 days if 37 % stay instant, 41 days at 15 %.
+
 ## T26B.2 #263's CI failure: cubecl-opt drops same-value atomic stores in a block (2026-11-14 20:26–23:35 UTC, engineer resumed and the reviewer resumed; `T26B/CI-FAIL.md`, `T26B/REVIEW2.md`, `T26B/CUBECL-ISSUE-DRAFT.md`, `T26B/ci-fail/` (CI's log), `T26B/raw/ci/` (`dump/` modules, `box/` logs, `add_mini.py`, `stores.py`), `T26B/review2-box/` (per-tree comparison tables, modules, probe kernel); fork `pr/stride-queue-any-plane` ffcfcfc = 85fe64a + changelog number + merge of main 54d0aac + comment fix + 165192b (the fix) + a comment; boxes 60693354 and 60694347 (host m16641 refuses ssh keys; 0.19 h + 0.34 h), 60696216 (RTX 3080 host, 48 threads, Ubuntu 26.04 chroot with Mesa 26.0.8, 2.36 h, ~$0.29))
 
 - **Symptom** [M]: CI's lavapipe job, SPIR-V step (llvmpipe LLVM 21.1.8, Mesa 26.0.8, ubuntu-26.04 runner), test

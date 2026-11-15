@@ -4,6 +4,47 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-15 (cycle 6 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $16.60 invoiced of $30 (fleet $26.42);
+  credit $18.28; 16 days left (≈ $0.84 a day). No day missed. No user message since "remove the
+  cap". Main unchanged (54d0aac). **Seven PRs open, all green and mergeable, no comments:** #251,
+  #255, #256, #259, #260, #262, #263.
+- **The search resumed, base 60 is finished and base 62 started** (public API, bounded id
+  ranges; `../2026-11-fresh-eyes/recent_niceonly_1115.json`, 12,705 nice-only submissions since
+  yesterday's snapshot). demoux (still a7a59c1, so no realized gain to measure) worked off base
+  60's last fields from ≈ 22:00 UTC on 11-14 and entered base 62 at ≈ 00:00 UTC.
+  - Base 62: field ids 207064110–207159539 (95,430 fields of 1e17), `range_start` = 62^12.
+  - **The first 8,385 fields are empty at once**, and the reason is simple (my derivation; the
+    audit below checks it exactly): with x = n / 62^12 the square's leading digit is ⌊x²⌋ and
+    the cube's ⌊x³⌋; both are 1 until x = 2^(1/3) (4.0648e21 = field index 8,385; the fleet's
+    first real field is index 8,385, demoux's 8,391). Both are 2 again for x in [√2, 3^(1/3)):
+    about 900 more fields near index 13,364. Past the boundary 37 % of fields so far are still
+    instant (their fixed leading digits collide).
+  - **First real telemetry:** demoux 310 real fields, join median 56.2 s (p10 47, p90 64), 61–69
+    real fields an hour; the fleet (v3.4.7, RTX 4060) 50 real fields, **median 338 s**, 10–11 an
+    hour. demoux is ≈ 86 % of the real output.
+  - Frontier 207073065 at 03:59 UTC; 86,474 fields left. At 75 real fields an hour: 30 days if
+    37 % stay instant, 41 days at a 15 % instant share. With #251, #256 and #259 on demoux
+    (×1.12 × 1.056 × 1.037 = ×1.23 there, derived) about a week less.
+- **Plan (the queue to the user is the bottleneck: seven PRs and six decisions wait), kill
+  criteria first:**
+  - **T2.8, an early audit of base 62** (`T28/BRIEF.md`; Opus + box 60746721, RTX 3080, $0.108/h,
+    TTL 10:20 UTC): every instant verdict by exact arithmetic; ≥ 30 of demoux's and ≥ 15 of the
+    fleet's real fields re-run on main against the stub; v3.4.7 against main at b62 on the box
+    (what a release is worth to the fleet). An audit: no kill criterion; a mismatch is reported
+    at once.
+  - **N22, the next gain for the 9070 XT without the card** (`N22/BRIEF.md`; Opus + box 60746198,
+    RTX 3080, $0.107/h, TTL 11:40 UTC): shares after the five PRs, ACO instruction counts on
+    `exp/integration-1114`, exact candidates behind switches, CUDA no-regression, a 30-minute
+    window plan. **Kill: nothing predicted ≥ ×1.04 on the card at b62 or b64 → stop after the
+    instruction tables.**
+  - **L7 literature sweep #5** (Sonnet, no box; overdue since 11-12): 11-05 → 11-15, plus CubeCL
+    and Mesa release notes.
+  - Not started: T2.7's CI comparison (needs the user's yes), T2.6c (telemetry counter; low
+    value), a fresh on-card profile (needs merges and a window).
+  - Both boxes: ssh checked by me before hand-over (yesterday's lesson).
+
 ## 2026-11-14 (cycle 5 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $14.98 of $30 (fleet $24.91); credit
