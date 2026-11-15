@@ -7821,6 +7821,35 @@ mod tests {
     /// for every F. Checked at b = 2-256 on the edges (0, the extremes, and
     /// the first 4,096 multiples of 2^(32 - s) and of 2^(32 - 2s), each
     /// ±1) and on 10^6 random fractions.
+    /// `N22_CHECK24`'s small division and `N22_BFE`'s bit field: `⌊y/b⌋ =
+    /// (y·⌈2^20/b⌉) >> 20` with the product below 2^32 for every limb y < b²
+    /// at every base 10-64 (exhaustive), and at b = 2^s (s = 1..8)
+    /// `(F >> (32 - 2s)) & (b - 1) = (F << s) >> (32 - s)` on the edges and
+    /// 10^6 random fractions.
+    #[test]
+    fn n22_small_division_and_bit_field_are_exact() {
+        for base in 10u32..=64 {
+            let m = (1u32 << 20).div_ceil(base);
+            assert!(m < 1 << 24);
+            for y in 0..base * base {
+                assert!(u64::from(y) * u64::from(m) < 1 << 32);
+                assert_eq!((y * m) >> 20, y / base, "b{base} y={y}");
+            }
+        }
+        let mut x = 0x2545_F491_4F6C_DD1Du64;
+        for s in 1u32..=8 {
+            let mut fs = vec![0u32, 1, u32::MAX, 1 << 31, (1 << 31) - 1];
+            fs.extend((0..1_000_000).map(|_| (xorshift(&mut x) >> 32) as u32));
+            for f in fs {
+                assert_eq!(
+                    (f >> (32 - 2 * s)) & ((1 << s) - 1),
+                    (f << s) >> (32 - s),
+                    "s={s} F={f:#x}"
+                );
+            }
+        }
+    }
+
     #[test]
     #[allow(clippy::cast_possible_truncation)]
     fn fx_digits_are_bit_fields_at_powers_of_two() {
