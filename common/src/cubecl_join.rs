@@ -186,6 +186,22 @@ const MAX_ROOTS: u32 = 8;
 /// Units [`top_fd_kernel`] should have: a smaller top layer splits a batch's slots into groups.
 const TOP_FD_MIN_UNITS: u32 = 1 << 17;
 
+/// Experiment switches of fork branch `exp/n22-rdna4` (`NICE_EXP_N22`, a bit
+/// mask read once; 0 = the code of `exp/integration-1114`). [`N22_SCAN`]: the
+/// scan forms of the plane appends whatever the plane width (what a 64-lane
+/// device runs), so a 32-lane or narrower device compiles the RDNA kernels.
+pub(crate) fn n22_bits() -> u32 {
+    static BITS: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *BITS.get_or_init(|| {
+        std::env::var("NICE_EXP_N22")
+            .ok()
+            .and_then(|v| v.trim().parse().ok())
+            .unwrap_or(0)
+    })
+}
+/// [`n22_bits`]: the scan forms of the appends ([`ballot_append`] off).
+pub(crate) const N22_SCAN: u32 = 1;
+
 /// Whether [`top_fd_kernel`]'s append ranks a plane's kept tops with one
 /// ballot (`top_slot`): only on devices whose planes have at most 32 lanes.
 /// `CubeCL`'s C++ backends (CUDA, HIP, Metal) return a ballot's first 32
@@ -3809,6 +3825,8 @@ pub(crate) struct JoinDevice<R: Runtime> {
     top_wg: u32,
     /// [`ballot_append`] for the device's largest plane.
     ballot: bool,
+    /// Experiment switches (`NICE_EXP_N22`, see [`n22_bits`]).
+    n22: u32,
     w_f0: u32,
     nbp: u32,
     /// The field's certificate (`FieldSetup::fc`), low and high words.
@@ -4013,7 +4031,9 @@ impl<R: Runtime> JoinDevice<R> {
             tq: fs.base.l - fs.f0,
             top_fd_min: TOP_FD_MIN_UNITS,
             top_wg: JOIN_WG,
-            ballot: ballot_append(client.properties().hardware.plane_size_max),
+            ballot: ballot_append(client.properties().hardware.plane_size_max)
+                && n22_bits() & N22_SCAN == 0,
+            n22: n22_bits(),
             clip_vs: {
                 let mut c = Vec::new();
                 if fs.plo * fs.w < fs.s {
