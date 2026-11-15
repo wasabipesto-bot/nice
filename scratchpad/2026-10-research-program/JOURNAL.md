@@ -124,6 +124,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   Agents today: six (five Opus, one Sonnet), two of them resumed; about 1.4 M subagent tokens.
   Vast today $0.74.
 
+- **11:02 UTC: #264 green (25 pass, 3 skipped), as are the other seven open PRs; nothing merged,
+  no comments.** CI has no Postgres service, so the API's database tests (the reproduction, the
+  renewal and in-place refill tests) skip there: they ran only on the scratch Postgres on ivory,
+  by the engineer and independently by the reviewer. Said so to the user.
+
 ## 2026-11-14 (cycle 5 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $14.98 of $30 (fleet $24.91); credit
