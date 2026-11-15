@@ -558,6 +558,7 @@ mod kernels {
         #[comptime] k2: u32,
         #[comptime] walk_sync: bool,
         #[comptime] pf_count: bool,
+        #[comptime] walk_lane: bool,
     ) {
         let m1 = comptime!(base - 1);
         let nkeys = comptime!(if key_level { base } else { 1 });
@@ -995,8 +996,10 @@ mod kernels {
                         for j in 0..ept {
                             let mut x = pm[j as usize] & vv[j as usize];
                             let r0 = rr[j as usize];
-                            while plane_any(x != 0u32) {
-                                if x != 0u32 {
+                            if comptime!(walk_lane) {
+                                // Per lane, no vote: on AMD a divergent loop is one
+                                // exec-masked loop, and the pop needs no zero case.
+                                while x != 0u32 {
                                     let jt2 = jc + x.trailing_zeros();
                                     x &= x - 1u32;
                                     let pass = if comptime!(lean) {
@@ -1041,8 +1044,56 @@ mod kernels {
                                         }
                                     }
                                 }
-                                if walk_sync {
-                                    sync_plane();
+                            } else {
+                                while plane_any(x != 0u32) {
+                                    if x != 0u32 {
+                                        let jt2 = jc + x.trailing_zeros();
+                                        x &= x - 1u32;
+                                        let pass = if comptime!(lean) {
+                                            walk_pf_lean(
+                                                ac[j as usize],
+                                                ac3[j as usize],
+                                                pc[j as usize],
+                                                pc3[j as usize],
+                                                t_dm[jt2 as usize],
+                                                mlo[j as usize],
+                                                mhi[j as usize],
+                                                t_glo[jt2 as usize],
+                                                t_ghi[jt2 as usize],
+                                                base,
+                                                pf_count,
+                                            )
+                                        } else {
+                                            walk_pf(
+                                                ac[j as usize],
+                                                pc[j as usize],
+                                                t_dm[jt2 as usize],
+                                                mlo[j as usize],
+                                                mhi[j as usize],
+                                                t_lo[jt2 as usize],
+                                                t_hi[jt2 as usize],
+                                                base,
+                                                k,
+                                                k2,
+                                            )
+                                        };
+                                        if pass {
+                                            let at = s_cnt[0].fetch_add(1u32);
+                                            if at < SURV_SH_CAP {
+                                                s_t[at as usize] = t_id[jt2 as usize];
+                                                s_r[at as usize] = r0;
+                                            } else {
+                                                let g = surv_count[0].fetch_add(1u32);
+                                                if g < surv_cap {
+                                                    surv[(2u32 * g) as usize] = t_id[jt2 as usize];
+                                                    surv[(2u32 * g + 1u32) as usize] = r0;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if walk_sync {
+                                        sync_plane();
+                                    }
                                 }
                             }
                         }
@@ -3792,6 +3843,9 @@ pub(crate) struct JoinDevice<R: Runtime> {
     /// Test the prefilter's four digits by one population count
     /// ([`walk_pf_lean`]): on Vulkan through `CubeCL`'s SPIR-V compiler only.
     pf_count: bool,
+    /// Walk each lane's pass bits in a per-lane loop, without the plane vote
+    /// (see the walk): on Vulkan through `CubeCL`'s SPIR-V compiler only.
+    walk_lane: bool,
     limbs: u32,
     /// The check kernel's shape (`crate::join_check`).
     check: CheckShape,
@@ -4007,6 +4061,11 @@ impl<R: Runtime> JoinDevice<R> {
             // SPIR-V compiler); every other runtime keeps the compares, and its
             // kernel is unchanged.
             pf_count: R::name(client).contains("spirv"),
+            // The vote exists for CUDA's independent thread scheduling, which
+            // the RX 9070 XT does not have; there the per-lane loop is 4 fewer
+            // instructions per walk round (Mesa's ACO). On CUDA it is 1.5x
+            // slower, so only the runtime it was measured on takes it.
+            walk_lane: R::name(client).contains("spirv"),
             limbs,
             check,
             top_fd: top_fd_runs(fs),
@@ -4335,6 +4394,7 @@ impl<R: Runtime> JoinDevice<R> {
                 self.k2,
                 self.walk_sync,
                 self.pf_count,
+                self.walk_lane,
             );
         }
         let mode = if probe { CHECK_PROBE } else { CHECK_HITS };
