@@ -45,6 +45,29 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     value), a fresh on-card profile (needs merges and a window).
   - Both boxes: ssh checked by me before hand-over (yesterday's lesson).
 
+- **L7 sweep #5 in (`L7/2026-11-15.md`): no relevant new paper** (fifth null week; arXiv listings
+  for math.NT, math.CO, cs.DC, cs.MS, cs.PF, first 50 titles a day; cs.DS and cs.AR not scanned
+  separately). CubeCL: 0.11.3 is the latest release, 0.12.0 only as pre.1 / pre.2; nothing in
+  the release titles mentions the atomic-store merge (titles only); two pre.2 items to read
+  before any upgrade: #1970 ("an eager store serves a value the storage refused to write") and
+  #2105 (a remainder / `mul_hi` constant-fold fix). The 10-28 "do not upgrade yet" stands. Mesa
+  26.2.7 (11-11): no RDNA4 or compute change in RADV, a few ACO post-RA and barrier fixes.
+  WebGPU `subgroup-size-control` shipped in Chrome 151–152.
+
+- **06:46 UTC: T2.8 interim** (`T28/RESULTS.md`; the box runs an unattended queue until ≈ 10:20;
+  reminder at 09:35 to pull and finish). **All 8,644 instant base-62 fields proved empty by an
+  independent big-integer check** (8,385 by the leading digits both being 1; 246 by another
+  collision among the digits the range fixes; 11 by Hall's condition at the first unfixed
+  position; 2 after subdividing; none left over). The client's certificate, read from the
+  code: per slice, the top 8 of n's 13 digits, `Base::cert` with cap 6. Of the 329 fields the
+  clients ran, deeper subdivision proves one empty (207072495: 193 survivors). Re-runs so far:
+  14 comparisons, 0 mismatches (2 demoux exact; 12 on v3.4.7 within the 11-12 audit's bound).
+  **Main is ≈ 3.1× v3.4.7 at b62 on an RTX 3080 capped at 150 W** (round 1: 82.1 vs 258.4,
+  79.7 vs 251.3, 99.7 vs 298.5 s). Base 62 began at 00:58 UTC; 76,883 of the 86,379 fields past
+  the frontier need a real run by the agent's predictor (11 % instant, not my 15–37 %): about
+  985 h at 78 real fields an hour → **≈ 2026-12-26**. Base 60 complete (162,076 fields at
+  check_level ≥ 1).
+
 ## 2026-11-14 (cycle 5 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $14.98 of $30 (fleet $24.91); credit
