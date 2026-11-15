@@ -68,6 +68,20 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   985 h at 78 real fields an hour → **≈ 2026-12-26**. Base 60 complete (162,076 fields at
   check_level ≥ 1).
 
+- **08:40 UTC: N22 in (`N22/RESULTS.md`, 520 k tokens; box 60746198 destroyed after 2.84 h).** Not
+  killed: **W, the walk as a per-lane loop on the SPIR-V runtime, is 44 → 40 instructions per
+  round by ACO (Mesa 26.0.8, gfx1201; I read the table) and predicts ×1.04–1.05 at b64, ×1.02 at
+  b62 on the card; with B (b64's low digits as a bit field, in #255's lines) ×1.06–1.075 at b64.**
+  On CUDA W is ×0.62–0.68, so it is `wgpu<spirv>` only, like #259. K (24-bit limb products in
+  the check) and A (fixed-trip AND loop) predict ≤ ×1.03 each and lose on CUDA. **Nothing
+  reaches ×1.04 at b62**: after the five PRs the FD top kernel is 26 % there and its cost is
+  spread over a dozen pieces. A 30-minute window plan with a dry-run driver is ready. Base 64 is
+  weeks away, so the window is not urgent; I ask for it together with a combined run of the five
+  open PRs (the measured version of the derived ×1.23 at b62). Useful by-products: Mesa 26
+  removed `RADV_FORCE_FAMILY` (the offline compile now uses RADV's amdgpu no-op shim); cargo
+  1.100 moved test binaries, which breaks the old window driver's build step (fixed in
+  `go22.sh`).
+
 ## 2026-11-14 (cycle 5 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $14.98 of $30 (fleet $24.91); credit

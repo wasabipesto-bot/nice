@@ -21,6 +21,12 @@ flag; per field and mode: base ÷ mode per round and the median).
 `target/release/deps/`; `go13.sh`'s `grep -o "$W/target-…/deps/nice_common-…"` finds nothing. `go22.sh` takes the
 path cargo prints (`Executable unittests src/lib.rs (…)`).
 
+**Dry run** [M]: `go22.sh` ran end to end on the box under CUDA from a fresh workspace (`/root/win`, worktree of
+`c750605e`, `DEV=cuda SZ62=1e15 SZ64=1e15`): built X in 216 s at `JOBS=12` on the 3900X (md5 055ddfe3, the same as
+the box's own X4 build), ran all 20 runs with identical counts per field, and `analyze_window.py` printed the per-run
+clock / power / OFF-POINT table and the per-mode medians (`raw/box/dryrun_window/`, `raw/box/out/dry_*.out`; the
+1e15 fields are too short to stay on point and mean nothing as timings).
+
 ## Steps (director, on demoux, production client stopped by the user)
 
 1. `W=/tmp/claude-exp-$(date +%Y%m%d)-amd; mkdir -p $W/scripts $W/wt; cp N22/raw/scripts/window/* $W/scripts/`;

@@ -6,7 +6,28 @@ compiler (ACO, Mesa 26.0.8) emits for GFX1201, not timings**; nothing here ran o
 
 ## 0. Verdict against the kill criterion
 
-__VERDICT__
+**Kill criterion not met: one candidate clears ×1.04 at base 64 (none at base 62).** It is **W, the walk over a
+chunk's pass bits as a per-lane loop** (no plane vote) on the SPIR-V runtime: ACO emits **4 fewer ALU instructions
+per walk round (44 → 40) at b62 and b64**, which at the card's measured price per walk-round instruction (N21.2:
+0.95–1.09 s of a b64 1e17 field per instruction) is **×1.040–1.048 at b64 (central ×1.045)** and ×1.021–1.026 at
+b62 [E]. With **B** (b64's low digits as one bit field, a two-line change to #255's own lines that N21 already
+recommended folding into #255) the round is 38 at b64: **×1.060–1.075** [E]. W also makes N21's cheap pop (P,
+`exp/n21-ffs-pop`) unnecessary: in the per-lane loop ACO drops `trailing_zeros`' zero case by itself, so W + P = W.
+Two more exact rewrites are under the bar alone: **K** (the check kernel's 12-bit limb products as 24-bit
+multiplies: −38 % / −33 % of its VALU issue, ×1.00–1.03 at b62, ×1.00–1.04 at b64 depending on whether the check is
+issue-bound on the card) and **A** (fixed-trip AND digit loop, −24 % of the digit loop's instructions, ×1.02–1.03).
+**At b62 nothing reaches ×1.04**: the largest part there is the FD top kernel (26 % of a field after the five PRs),
+whose stepped slot is ≈ 880 ALU instructions in a dozen pieces, none above half of it, so no single exact rewrite of
+it removes the ≈ 15 % of the kernel that ×1.04 would need; the next b62 lever would have to change what a slot
+computes (the cert's per-word digit-run scan, or fewer seeds per batch), not how ACO compiles it.
+
+All three are exact (arguments in §3; dense compares against the CPU join on CUDA at b62 and b64, lavapipe of Mesa
+26.0.8 with both compilers, identical counts in every timed run) and all three **lose on NVIDIA** (W ×0.62–0.68, A
+×0.84–0.90, K ×0.98–1.00, §4), so each would be compiled for `wgpu<spirv>` only, as #259 is. A PR-shaped W is on fork
+**`exp/n22-walk-lane-spirv`** (one commit `86b7ab0c` on `exp/integration-1114`, gated to `wgpu<spirv>`, `just lint`
+clean). The 30-minute card plan is `WINDOW-PLAN.md` (b64: three rotated rounds of 0 / W / W + B / K; b62: one round
+of 0 / W / K / A).
+
 
 ## 1. Where a field's time goes on the card after the five PRs (task 1) [D]
 
@@ -90,7 +111,7 @@ a 32-bit fraction).
 **Join kernel, the transposed AND's digit loop** (one pop of the entry's 64-bit mask, four chunks): **23 ALU**
 (16 VALU, 5 SALU, 2 `ds_read2_b32`): `v_or` + `v_cmpx` + `s_andn2`/`s_cbranch_scc0` (loop test), `v_cmp` + 2
 `v_cndmask` (which word), `v_ffbl`, `v_add3` + `v_lshl_add` (address), `v_add` + `v_and` (pop), 2 `v_cndmask`
-(update), 4 `v_or`, latch. An entry has 2·(f0 + pp) + 2 = 12 digits at both bases, all lanes the same count, so a
+(update), 4 `v_or`, latch. An entry has 2·(f0 + pp) + 2 = 12 digits at both bases (A's unrolled run is 12 pops, 24 `ds_read2`), all lanes the same count, so a
 wave runs exactly 12 pops per entry slot and chunk group. Each pop waits on its two loads before the ORs.
 
 **Check kernel, one list entry** (the loop body, both gate paths): b62 **765 ALU, 240 quarter-rate multiplies**
@@ -181,12 +202,71 @@ there reaches the 15 % of the kernel that ×1.04 at b62 would need.
 
 ## 4. CUDA, RTX 3080 [M]
 
-__CUDA__
+**Method** (N21's, `raw/scripts/run.sh`, `ab.sh`, `gate_ab.sh`, `abtab.py` → `raw/ab_table.txt`): one binary (X3,
+`678a0f10`, md5 95364fac; `--features gpu,cubecl-spirv`), the throughput harness
+`cubecl_cuda_join_throughput_fixed_fields` (one untimed 1e14 warm-up field, then the timed field), N16's starts
+(b62 1e17 at 0.45, b64 1e17 at 0.55), modes interleaved with the order rotated by one each round, three rounds,
+**every run started at ≤ 50 °C**, nothing else on the box (the gate waited for every test and build to end), the
+card at its 310 W limit (median 272–290 W, 1,770–1,815 MHz over ≥ 90 %-busy samples per run), each process's join
+kernel replayed through the driver JIT for its register variant. **Counts identical in every run of a field**
+(b62 1,097,114,812,011 join survivors / 66,862,268,894 checked; b64 3,092,989,872,066 / 191,683,594,021). 07:08–08:09
+UTC.
+
+| mode (`NICE_EXP_N22`) | b62 1e17 s (r1, r2, r3) | base ÷ mode | median | b64 1e17 s (r1, r2, r3) | base ÷ mode | median |
+|---|---|---|---|---|---|---|
+| 0 integration | 60.48, 60.73, 60.62 (48 regs) | — | — | 120.50, 119.75, 122.66 (47–48) | — | — |
+| 2 W | 89.66, 89.79, 89.48 (48 + 16 B local) | 0.675, 0.676, 0.677 | **×0.676** | 202.03, 194.81, 193.93 | 0.596, 0.615, 0.632 | **×0.615** |
+| 10 W + B (b62: W's code, an A/A with 2) | 89.40, 88.73, 92.13 | 0.677, 0.684, 0.658 | ×0.677 | 195.30, 194.16, 195.45 | 0.617, 0.617, 0.628 | ×0.617 |
+| 16 K | 60.31, 60.46, 60.33 | 1.003, 1.004, 1.005 | **×1.004** | 123.18, 122.37, 122.65 | 0.978, 0.979, 1.000 | **×0.979** |
+| 32 A | 67.81, 67.53, 67.58 (79–80 regs) | 0.892, 0.899, 0.897 | **×0.897** | 145.34, 143.03, 142.82 (79–80) | 0.829, 0.837, 0.859 | **×0.837** |
+
+- **W loses a third on NVIDIA**: without the vote, CUDA's independent thread scheduling lets a warp's lanes drift
+  apart in the walk (the reason the vote and `walk_sync` exist, see the kernel's comment), and its PTX draws a
+  16-byte local-memory variant in most processes. **W is a wgpu<spirv>-only change** (branch
+  `exp/n22-walk-lane-spirv` gates it so: CUDA's kernel is the vote form, unchanged).
+- **A loses 10–16 % on NVIDIA**: the unrolled pops raise the join kernel from 48 to 79–80 registers (fewer warps per
+  SM); on ACO the kernel stays at 96 VGPRs and 16 waves (§2). AMD-only too.
+- **K is neutral at b62 and −2 % at b64** on NVIDIA (IMAD is full rate there; the masks are extra instructions):
+  AMD-only if kept.
+- None of this predicts the card (N21: ×0.98–0.99 on NVIDIA for P + M, ×1.05–1.10 on the card).
+
 
 ## 5. Exactness [M]
 
-__EXACT__
+All on box 60746198 (RTX 3080 10 GB, driver 610.57.04; Ryzen 9 3900X), toolchain 1.100.0 (the repo pin), logs
+`raw/box/logs/t/`.
+
+| check | binary (commit), `NICE_EXP_N22` | result |
+|---|---|---|
+| dense compare against the CPU join on CUDA, b62 1e17 (0.45, 32 partitions) | X2 (`d14e5b4c`): 0, 2, 16, 26 (= W + B + K); X3 (`678a0f10`): 32, 58 (= W + B + K + A) | **all ok**, 679,431,359 join survivors / 41,427,678 checked in every run (= N21's and PRP's counts for this field) |
+| the same at b64 1e17 (0.55, 32 partitions) | the same modes | **all ok**, 2,803,067,823 / 173,796,394 in every run |
+| lavapipe of **Mesa 26.0.8** (Ubuntu 26.04 chroot, as CI runs it), every wgpu test of `cubecl_join`, CubeCL's SPIR-V compiler | X2 with 27 (every switch of X2 + scan forms); X3 with 59 (every switch) | **11 / 11 pass** each |
+| the same with naga (WGSL; `--features gpu`) | X2n with 27; X3n with 59 | **11 / 11 pass** each |
+| CUDA device suite of `cubecl_join` (`--ignored cubecl_cuda`) | X2 with 26; X3 with 58 | 9 / 10: `cubecl_cuda_top_fd_matches_the_top_kernel` fails to allocate 617 MiB (`can't allocate buffer`) when run after the others in one process on this 10 GB card; **run alone it passes with 0 and with 26** (X2). The switches do not touch the top kernels. **The unmodified integration binary (X0, 8bcee21) fails the same test the same way in the same suite** (`cuda_X0.log`): a property of this card's 10 GB and the suite's order, not of the switches. |
+| host tests | — | `n22_small_division_and_bit_field_are_exact` (K's division for every y < b² at b = 10–64; B's identity) passes, and **all 256 host tests of `nice_common`** (X4, `c750605e`) |
+| `just lint` (fmt, clippy on all targets with and without `gpu,cubecl-spirv`) on ivory | `c750605e` | **pass** (`raw/lint.log`) |
+| counts in every timed run | X3, every mode | **identical** per field (§4) |
+| the PR-shaped W, fork `exp/n22-walk-lane-spirv` `86b7ab0c` (WL) | its own code (gated to `wgpu<spirv>`) | ACO round **40 ALU at b62 and b64** (31 / 7 / 2; `raw/box/spv/wl62`, `wl64`); dense compares on CUDA equal at b62 and b64 (the CUDA kernel is the vote form); lavapipe 26.0.8 11 / 11 with CubeCL's SPIR-V compiler (the per-lane loop runs there) and 11 / 11 with naga; `just lint` pass (`raw/lint_walk_lane.log`) |
+
+Not run: a 64-lane device (only the card has one), Metal, HIP. The atomic-store rule of T26B is respected by
+construction: no variant adds an atomic store (W moves the existing `fetch_add` / `ds_append` into a per-lane loop;
+K, A and B are pure arithmetic).
+
 
 ## 6. Files
 
-__FILES__
+- `RESULTS.md` (this), `WINDOW-PLAN.md` (the 30-minute card plan).
+- `raw/shares.txt` (§1, `raw/scripts/shares.py`), `raw/aco_tables.txt`, `raw/aco_repeat.txt` (§2–3, `tables.py`),
+  `raw/topfd_blocks_b62.txt`, `raw/topfd_blocks_b64.txt` (the FD top kernel's slot loop block by block),
+  `raw/ab_table.txt` (§4, `abtab.py`), `raw/lint.log`.
+- `raw/scripts/`: `setup.sh`, `build_mesa.sh` (RADV 26.0.8, ACO only; then `meson configure build -Dtools=drm-shim`),
+  `chroot_setup.sh` (Ubuntu 26.04 with Mesa 26.0.8's lavapipe), `build.sh` (cargo 1.100's binary path), `spvdump.sh`
+  (SPIR-V on lavapipe → ACO via the drm shim), `dumps1.sh`–`dumps3.sh`, `loops.py` (every loop of an ACO listing by
+  instruction class; `--blocks N [--summary]`), `walkcount.py`, `tables.py`, `shares.py`, `tests.sh`, `tests_b.sh`,
+  `dense.sh`, `run.sh`, `ab.sh`, `gate_ab.sh`, `abtab.py`, `ptxjit.py` + `cbor_min.py`, `taskC/` (pipec, reflect);
+  `window/` (`env.sh`, `wrun.sh`, `go22.sh`, `analyze_window.py`).
+- `raw/box/`: `spv/<label>/` (ACO listings, `loops.txt`, run logs; labels `v|a|e<base>_<NICE_EXP_N22>[b|c]`),
+  `logs/` (timed runs `ab_*` with `.smi` and `_jit.txt`; tests in `logs/t/`), `out/` (builds with md5s, dump and
+  test streams).
+- Fork branch `exp/n22-rdna4` (switch commits on `exp/integration-1114` 8bcee21).
+

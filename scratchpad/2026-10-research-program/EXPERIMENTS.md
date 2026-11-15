@@ -5,6 +5,34 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## N22.1 The next gain for the RX 9070 XT, found offline: the walk as a per-lane loop (2026-11-15 05:57–08:36 UTC, agent; `N22/RESULTS.md`, `N22/WINDOW-PLAN.md`, `N22/raw/` (`aco_tables.txt`, `aco_repeat.txt`, `ab_table.txt`, `shares.txt`, `topfd_blocks_b6{2,4}.txt`, `scripts/`, `box/`); fork `exp/n22-rdna4` c750605 (switches `NICE_EXP_N22` on `exp/integration-1114` 8bcee21) and `exp/n22-walk-lane-spirv` 86b7ab0 (W alone, gated to `wgpu<spirv>`, one commit); box 60746198, RTX 3080 at ≈ 285 W, 2.84 h, ~$0.32)
+
+- **Shares on the card after the five open PRs** [D from N17.1 / N13 phase timers and each PR's on-card gain]:
+  b62 1e17 ≈ 58 s: FD top 26 %, prefilter 24 %, AND 12 %, join base 8 %, walk 7 %, check 7 %, bucket 5.5 %,
+  other 5 %, upload + host 5 %. b64 1e17 ≈ 93–96 s: prefilter 26 %, AND 14.5 %, FD top 13 %, check 11 %, walk
+  11 %, join base 7 %, the rest 17 %.
+- **ACO (Mesa 26.0.8, gfx1201 through RADV's amdgpu no-op shim; `RADV_FORCE_FAMILY` is gone in Mesa 26)** [M]:
+  walk round 44 ALU instructions (33 VALU / 9 SALU / 2 LDS) on the integration build; join kernel 96 VGPRs, LDS
+  15,360 B, 16 waves per SIMD; check kernel 48 VGPRs, 32 waves.
+- **W, the walk over a chunk's pass bits as a per-lane loop instead of the plane vote:** 44 → 40 per round at b62
+  and b64 [M, three dumps; I read `aco_tables.txt`]. Predicted on the card with N21.2's price (0.95–1.09 s per
+  instruction per b64 1e17 field): **×1.040–1.048 at b64, ×1.021–1.026 at b62** [D]. W + B (b64's low digits as one
+  bit field, two lines in #255's code): 38 at b64, ×1.060–1.075 [D]. W makes `exp/n21-ffs-pop` unnecessary.
+  **CUDA: ×0.676 at b62, ×0.615 at b64** (3 rounds, counts identical) [M]: SPIR-V only.
+- **K, the check kernel's limb products as 24-bit multiplies:** quarter-rate multiplies 240 → 64 (b62), 114 → 0
+  (b64); predicted ×1.00–1.03 / ×1.00–1.04 depending on whether the check is issue-bound on the card (unknown);
+  CUDA ×1.004 / ×0.979. **A, a fixed-trip AND digit loop:** −24 % of that loop's instructions, predicted
+  ×1.02–1.03; CUDA ×0.897 / ×0.837 (48 → 80 registers there; 96 VGPRs unchanged on AMD).
+- **Nothing reaches ×1.04 at b62:** the FD top kernel (26 %) is ≈ 880 instructions per stepped slot in a dozen
+  pieces, none above half; the two cheapest fixes price at ≈ ×1.01 each. The next b62 lever must change what a
+  slot computes.
+- Exactness [M]: every switch equals the CPU join on CUDA at b62 and b64; lavapipe 26.0.8 (26.04 chroot) 11 / 11
+  with both compilers; 256 host tests incl. an exhaustive check of K's division at bases 10–64; no atomic store
+  added. `go22.sh` (window driver) dry-run end to end on the box; cargo 1.100 changed where test binaries land,
+  which breaks `go13.sh`'s build step.
+- **Verdict:** kill criterion not met (W ≥ ×1.04 predicted at b64). Nothing is measured on the card: a 30-minute
+  window decides (b64 1e17: three rotated rounds of base / W / W+B / K; b62 1e17: one round of base / W / K / A).
+
 ## B62.1 Base 62's first hours, from telemetry (2026-11-15, director, public API by bounded id ranges; `../2026-11-fresh-eyes/recent_niceonly_1115.json` = nice-only submissions with id in (294552514, 294806748])
 
 - 12,705 nice-only submissions since the 11-14 snapshot: demoux 10,390 (a7a59c1), fleet 2,315 (v3.4.7 8bd154b).
