@@ -57,6 +57,39 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   second needs the integration branch's resolution); the realized gain on demoux when it runs
   main; nothing else is queued that does not need the user (window, release, CI-check yes).
 
+- **16:20 UTC, the user (after my answer that today held no new research):** (1) a PR they mark as
+  a draft is not ready to merge and kept for reference; #255's gain on one base and one card is
+  suspect (it is a draft now). (2) They merged #259 and #260 (main = 7e0113f). (3) They want to
+  cut a release today and ask what of mine could go in within an hour. (4) No significant time
+  on rote calculations like odds per dollar: a subagent or a script. (5) "Optimizations like the
+  ones you have been implementing are useful. But my main goal with a long-running persistent
+  research agent is to delve deep into novel high-impact ideas." and "you need to be more
+  ambitious".
+  Applied: memory (two feedback notes), README ("What the program is for"), the routine's prompt.
+  The two tracks I announced at 10:40 are withdrawn (neither had started). Release check: main's
+  changelog has a line for every feature PR since v3.4.7 (#234, #261 and five dependency bumps
+  have none, by their nature); CI on 7e0113f: parity (lavapipe, Metal), images, browser green,
+  the Rust build workflow still running; nothing of mine is ready that should hold a release.
+
+- **16:30 UTC: the deep lines started** (the user's course change). I re-read the join's module
+  docs and my 11-09 no-shortcut argument first, and worked the accounting again myself: the
+  linear windows (digits of H² + 2Hm above position 2u, of H³ + 3H²m above L + 2u) are exactly
+  what deeper tops certify; every enumeration (tree, inversion by roots, gap with a per-pair
+  tree) lands on the same count N · roots/(b−1) · e^(−0.094 b); the only arrangement-independent
+  invariant I can find is still the digit sum. I could not see a way through, which is the
+  reason to give independent investigators different angles instead of my framing alone:
+  - **BX "below exhaustive"** (`BX/COMMON.md`): A1 polynomial progressions and congruences, A2 the
+    exact cover, A3 measurement (hidden predictors of niceness, uniformity of the middle given
+    the ends) and adversary. Opus, CPU on ivory, living `NOTES.md` each so they can be resumed.
+    Hard stop 20:30 UTC.
+  - **G2 "second-generation join"** (`G2/BRIEF.md`): clean-slate design for ≥ ×10 per base;
+    N1's ×3 is the baseline to beat; kill below ×5 at b64 with the ceiling argument written.
+    Hard stop 20:45 UTC.
+  - My honest prior: BX is most likely a negative; G2's ceiling may be nearer ×3–4 than ×10
+    (the top stage alone is a quarter of a base-62 field). Both are worth knowing precisely.
+  - Release: main 7e0113f's Rust build workflow was still pending at 16:25; no tag yet.
+  - ivory disk back to 11 GB free (debug artifacts of this morning's lint and test runs).
+
 ## 2026-11-15 (cycle 6 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $16.60 invoiced of $30 (fleet $26.42);

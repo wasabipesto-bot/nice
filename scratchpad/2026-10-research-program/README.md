@@ -31,6 +31,18 @@ director session can be replaced from it at any time.
 4. Record: journal, ledger, experiments; `./sync.sh "<summary>"`.
 5. Report, then end the turn. Long waits: a one-shot reminder into this session.
 
+## What the program is for (the user, 2026-11-16)
+
+"My main goal with a long-running persistent research agent is to delve deep into novel
+high-impact ideas." Optimisations are useful but secondary. Rote calculations (cost and odds
+tables, bookkeeping) go to a cheap subagent or a script and get one line in the report. Spend
+the director's own attention and the strongest agents on a few deep lines that could change the
+search by an order of magnitude or change what is reachable; prototypes and honest negative
+results count. Structural changes still need a proposal and the user's yes.
+
+A PR the user marks as a draft is parked by them: not ready to merge, kept for reference. Do
+not list it for merging. Gains shown on one base and one card are suspect to them (#255).
+
 ## PRs
 
 Open immediately once the 5 % protocol and exactness pass and the independent review is in.
