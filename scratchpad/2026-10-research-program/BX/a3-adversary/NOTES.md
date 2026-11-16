@@ -195,6 +195,11 @@ multiplication, so any b <= 64 with n < 2^128; validated bit-identical on b28)
   also makes the fixed-core omnibus empty at b62 (N = 0).
 - Mean niceness vs b iid digits: 28.71/28.63 (b45), 31.72/31.79 (b50), 35.08/34.95 (b55),
   39.50/39.38 (b62).
+- b62 again on 2,000 random windows × 3e5 n (`data/big62s/`, 172 s): omnibus test core 28,
+  N 6,105, chi2 8.6/13, mean distinct 44.221 vs 44.241 (sd 0.026). Positions n² 15-18 and n³
+  28-31 still non-uniform: in a 3e5-wide window the upper middle digits move slowly (a digit at
+  position p of n³ changes every ~b^p/(3n²) steps), so narrow windows cannot sample them; a
+  proper test there needs one n per window (another day, item 3).
 **The conditional uniformity of the middle holds at the production base.**
 
 ## Verdict on job 1 (measured)
@@ -339,7 +344,7 @@ Fitted slopes of ln(cost / A) against b, b20-b33 (unit weights): **flat PSJ -0.1
    1.11 (b32) — rising slowly, consistent with N5's ×6 at b62 / ×10 at b64. So: in today's
    frontier the gap is a constant ×6-10, asymptotically it is the one exponent in VC.
 
-## Part 3: attacks on A1 and A2 (read 17:25 UTC; re-read before the stop)
+## Part 3: attacks on A1 and A2 (read 17:25 UTC, re-read 18:15 and 18:35; A1 unchanged since 17:15)
 
 ### A1 (progressions)
 - **D1 / E5 (prescribe-and-solve counting identity)** = my §2.2, found independently; theirs is
@@ -403,4 +408,5 @@ Fitted slopes of ln(cost / A) against b, b20-b33 (unit weights): **flat PSJ -0.1
   is unaffected (it is a ratio).
 - I8 (dual tree costs 6-10× FLAT; digit keys ×1.3-1.5 of a ×8-27 in-unit gap) is the empirical
   counterpart of my statement that the gap is real and lives in per-element deep digits; agree.
+- A2 I10 (CaDiCaL ≈ optimal tree ×1-2, added 18:29): consistent with I5/I6; no objection.
 - Nothing in A2 that I could break.

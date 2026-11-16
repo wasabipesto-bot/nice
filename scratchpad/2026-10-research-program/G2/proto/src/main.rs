@@ -268,6 +268,44 @@ fn main() {
             println!("PTOP b{} f0 {} k {} samples {} P_T {:.4} P_T(parent) {:.4} child|parent {:.4} mean cert digits {:.2}",
                 b, f0, k, ns, ok as f64 / ns as f64, par_ok as f64 / ns as f64, both as f64 / par_ok.max(1) as f64, bits as f64 / ok.max(1) as f64);
         }
+        // dumpsu b f0 k pip outdir : one super-unit (digits [f0,k-1) = pip), all b units of digit k-1
+        "dumpsu" => {
+            use std::io::Write;
+            let b: u64 = a[2].parse().unwrap();
+            let f0: u32 = a[3].parse().unwrap();
+            let k: u32 = a[4].parse().unwrap();
+            let pip: u128 = a[5].parse().unwrap();
+            let out = &a[6];
+            std::fs::create_dir_all(out).unwrap();
+            let base = Base::new(b);
+            let sn = Shape { fr: f0, kr: k };
+            let step = base.pw[(k - 1 - f0) as usize];
+            let mut tf = std::fs::File::create(format!("{out}/tops.bin")).unwrap();
+            let mut sf = std::fs::File::create(format!("{out}/surv.bin")).unwrap();
+            let mut meta = std::fs::File::create(format!("{out}/meta.txt")).unwrap();
+            writeln!(meta, "b {} f0 {} k {} pip {} start {} end {}", b, f0, k, pip, base.start, base.end).unwrap();
+            let (mut tt, mut ss, mut pp, mut bb) = (0u64, 0u64, 0u64, 0u64);
+            for d in 0..b as u128 {
+                let uval = pip + d * step;
+                let mut st = JoinStats::default();
+                let ln = unit_lists(&base, &sn, f0, k, uval, &mut st);
+                let out_n = join_scalar(&base, &sn, f0, &ln, &mut st);
+                // tops record: d u32, h u64, mask u64, lo u128, hi u128  (little endian)
+                for (_, t) in &ln.tops {
+                    tf.write_all(&(d as u32).to_le_bytes()).unwrap();
+                    tf.write_all(&(t.h as u64).to_le_bytes()).unwrap();
+                    tf.write_all(&t.mask.to_le_bytes()).unwrap();
+                    tf.write_all(&t.lo.to_le_bytes()).unwrap();
+                    tf.write_all(&t.hi.to_le_bytes()).unwrap();
+                }
+                let mut v = out_n.clone(); v.sort();
+                for n in v { sf.write_all(&n.to_le_bytes()).unwrap(); }
+                writeln!(meta, "unit {} uval {} tops {} tops_tested {} bottoms {} pairs {} surv {}", d, uval, ln.tops.len(), st.top_tested, ln.bots.len(), st.pairs, out_n.len()).unwrap();
+                tt += ln.tops.len() as u64; ss += out_n.len() as u64; pp += st.pairs; bb += ln.bots.len() as u64;
+                eprintln!("unit {d}: tops {} bots {} pairs {} surv {}", ln.tops.len(), ln.bots.len(), st.pairs, out_n.len());
+            }
+            writeln!(meta, "total tops {} bottoms {} pairs {} surv {}", tt, bb, pp, ss).unwrap();
+        }
         _ => panic!("unknown command"),
     }
 }

@@ -142,6 +142,36 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   - I told the user ×10 at 17:55 as "modelled, not measured, under review"; corrected to them
     at 18:35.
 
+- **18:35 UTC: BX A3 in (`BX/a3-adversary/NOTES.md`): no hidden structure, and a lower-bound model
+  with its optimum computed.** Exhaustive over every candidate of bases 10–33 (≈ 7e9 n) plus
+  windows at 40–62: no residue of n (1,643 moduli), no statistic of n's digits, no position
+  feature and no boosted model over all of them predicts niceness (held-out R² equal to the
+  shuffled control); the middle given the ends is uniform to 1e-4 per digit, pairwise
+  independent (square–cube pairs included), passes an all-orders test, and the near-nice tail
+  matches the product formula (0.977 ± 0.016). **"View certificates" model:** an algorithm
+  learns about n only through views (fixed digits, or n mod m), a view reveals the outputs
+  constant across it, n is discarded only on a repeated digit. Its exact optimum for b20–33 (a
+  fractional cover over all prefix × suffix views): the flat join sits ×1.5 → ×5.9 above the
+  floor, growing ≈ ×1.085 per base; **an ideal join that pays only for pairs that pass
+  disjointness lands on the floor**, so the only slack left inside the model is the pairing
+  step (orthogonal vectors). At production weights the gap is ×1.03 → ×1.11 by b32 (consistent
+  with N5's ×6–10 at b62/64, and with G2's ×5). Outside the model: lattice and
+  prescribe-and-solve lose by a counting identity; CRT / p-adic splitting fails by measurement;
+  pandigital numbers carry no constraint beyond mod b − 1 and the suffix.
+
+- **19:20 UTC: the G2 benchmark did not run.** The resumed designer's ssh to the box was refused
+  by the harness's permission check ("unauthorized access"; its first brief had said "no rented
+  machines", and my follow-up message is not the user's authority). It did not work around it,
+  and neither do I: box 60959320 destroyed (≈ 0.8 h, ≈ $0.12), the user told. Everything is
+  staged on ivory (`G2/bench/`, status in `G2/BENCH.md`): one real b64 super-unit (π′ = 712012851,
+  all 64 units, 238,813 tops, the prototype's survivor sets: 11,768,560 n), `g2bench.cu` (CUDA
+  with a CPU reference path; the CPU path reproduces every unit's survivor set and gives the
+  counts the GPU run must match: children 7.54e-6, flat incidences 5.61e-5, kept 2.76e-5 (kept
+  fraction 0.492), survivors 2.63e-6 per admissible n), box scripts for the same-session main
+  baseline through the stub. Not yet compiled with nvcc. **Plan, said to the user: tomorrow's
+  cycle starts it with a fresh engineer whose brief includes the box from its first message
+  (as every earlier box task did), unless they object or prefer I run it from this session.**
+
 ## 2026-11-15 (cycle 6 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $16.60 invoiced of $30 (fleet $26.42);

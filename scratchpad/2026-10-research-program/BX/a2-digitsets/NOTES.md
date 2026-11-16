@@ -141,16 +141,20 @@ tree certified nodes (zeta-transform pair count; leaf level corrected to admissi
 | 18 | 1,112 | 7,921 | 661 | 532 | 15,758 / 3,171 / 0.76 | 7,757 / 1,337 / 0.20 |
 | 20 | 10,638 | 77,919 | 6,251 | 6,224 | 146,277 / 35,520 / 11.7 | 37,735 / 9,839 / 1.6 |
 | 22 | 80,406 | 233,983 | 31,279 | 27,652 | 651,803 / 157,266 / 80 | 99,549 / 49,310 / 6.5 |
-| 24 | 98,707 | 603,236 | 36,958 | 31,783 | 794,567 / 133,847 / 87 | 387,919 / 177,766 / 24 |
+| 24 | 98,707 | 603,236 | 36,958 | 31,783 | 267,511 / 44,112 / 27 (real split only; 794,567 / 133,847 / 87 with the phantom split, see I10) | 163,418 / 65,891 / 9.6 (real split; 387,919 / 177,766 / 24 with it) |
 | 25 | 1,606,456 | 3,585,161 | 468,548 | 476,484 | >1.86e6 / >5.0e5 / >280 (timeout) | 655,709 / 341,549 / 73 |
 
 (outputs: `code/solver_scaling.out`, `solver_scaling_2425.out`, `solver_fixed_alt.out`,
 `tree_counts_small.out`, `tree_counts_2425.out`, `alt_tree.out`.)
 
 Measured findings:
-- Free CP-SAT branches / PSJ cost = 26, 24, 23, 21, 21.5 for b 17–24: **a constant ratio, i.e. the
-  same growth exponent as the two-sided join**, not a smaller one. Conflicts / PSJ = 4.5, 4.8, 5.7,
-  5.0, 3.6. (The 2026-08 note compared wall time with the scanner and saw a 4–6 order gap; the node
+- Free CP-SAT branches / PSJ cost = 26, 24, 23, 21 for b 17–22 and 7.2 at b24 (real split; I10
+  caveat), and at b25 the per-leading-digit runs (`code/cpsat_b25_perlead.out`; leading digits 8–11
+  done: 162k, 1.67M, 976k, 1.24M branches) run at ≈ ×9–16 the OPT tree per leading digit
+  (estimated as 0.69 × the no-residue per-digit OPT, the base-wide with/without-residue ratio;
+  b24 whole base: ×1.1): **no consistent trend — b24 is an easy base for
+  CP-SAT, b25 a hard one**; over b17–25 the ratio to the join does not fall systematically.
+  Conflicts / PSJ = 4.5, 4.8, 5.7, 5.0, 1.0 (b24 real split). (The 2026-08 note compared wall time with the scanner and saw a 4–6 order gap; the node
   counts show why: the solver does the PSJ's work ×20 in nodes and ×1e5 in time per node.)
 - Forced to branch like the two-sided tree (a_{L−1}, a_0, a_{L−2}, a_1, …), CP-SAT is 3.6–12× faster
   than free search (b20–24) and its conflicts are 0.7–5.6× the certified ALT nodes (no trend with b);
@@ -270,6 +274,11 @@ support its "< ×1.2 on a base at today's shape" projection.
 
 ### Growth fits (least squares of ln(count) on b, b 17, 18, 20, 22, 24; checks included in PSJ)
 
+(Corrected after I10: with b24's real split only, CP-SAT free has rel-slope −0.13 against PSJ
+over b17–24, driven entirely by b24; b25 (×10–16 OPT per leading digit) reverses it. CaDiCaL
+conflicts / OPT(no residue): rel-slope −0.19 over b17–25 but −0.07 over b20–25, i.e. the fall is
+the small-base overhead. The table below is the pre-correction fit, kept for the record.)
+
 | count | ln-slope per base | slope of count/PSJ | slope of count/A |
 |---|---|---|---|
 | A (admissible n) | 0.822 | +0.166 | 0 |
@@ -343,8 +352,10 @@ OPT per leading digit in `code/opt_tree_nores_b25_perlead.out`, sum 2.91e6 = OPT
 | 24 | 325,405 | 542,948 | 55 | 339,972 | 0.96 |
 | 25 | 4,973,454 | (17 runs) | 856 | 2,905,170 | 1.71 |
 
-The ratio fell from ≈ 5 to ≈ 1 between b17 and b22 (fixed overhead amortising) and then sits at
-1.0–1.7: **a bit-level CDCL solver, free to branch on bits, carries and outputs and to learn
+The ratio fell from ≈ 5 to ≈ 1.5 between b17 and b22 (fixed overhead amortising) and then sits at
+1.0–1.7 (least-squares rel-slope −0.07 per base over b20–25, i.e. flat within the b24/b25 scatter;
+part of any residual gain is expected from branching on bits, which sees partial digits — N5
+§A.3–A.4 puts that at ≤ ×1.01 per level at b62): **a bit-level CDCL solver, free to branch on bits, carries and outputs and to learn
 clauses, refutes the instance in about as many conflicts as the optimal digit tree has nodes**, at
 ≈ 6k–10k conflicts/s (×1e5 per node against the tree). No evidence of shorter (resolution) proofs
 than the certificate tree. b25's 17 sub-runs total 856 s for a base the tree clears in
