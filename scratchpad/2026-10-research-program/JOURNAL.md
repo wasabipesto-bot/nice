@@ -118,6 +118,30 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   today's kernels and GPU memory limits, the server change, and the smallest GPU experiment
   with stop numbers. Tomorrow, if it stands: that experiment on a rented card.
 
+- **18:30 UTC: the adversarial review of G2 is in (`G2/REVIEW.md`, 284 k tokens): the design
+  holds, the ×10 does not; corrected central ≈ ×5 per base at b64 (×4.7–5.5 by baseline; band
+  ×2.6–9.6) and ×4.5–5.7 at b62.**
+  - Holds: soundness and coverage (the reviewer's own predicate, written from the definition,
+    matches the prototype's survivor sets on whole bases 10, 18, 25, on one real b62 and one
+    real b64 unit enumerated from scratch, and on the unit with the base's last clipped top);
+    the counts (4 new units per base within 8 %).
+  - Does not: the 64-pair word costed at 12.7–14.9 ps against 17.8 ps measured for the nearest
+    analog (N1.G1; ≈ 25 ps calibrated); a b64 arithmetic slip (table amortized over 464 probes,
+    not the ≈ 226 kept: the author's own model then gives ×7.2); the b62 bottom side priced at
+    a few instructions; tops and bottoms need opposite super-unit orders (unpriced).
+  - The server change is workable but bigger than stated (every backend needs an
+    implementation before a base can switch; no field is complete until the base is).
+  - Base 62 ends before any of it could ship: **b64 is the only base it is for (≈ 1.5 years at
+    today's speed, so ×5 there is worth more than a year of GPU time).**
+  - The benchmark that decides it, with stop numbers: one real b64 super-unit end to end on an
+    RTX 3080 at 300 W against the same-session main: stop above 1.06 fs per admissible n
+    (< ×5); on to the 9070 XT at ≤ 0.88 (≥ ×6); the ×10 only at ≤ 0.53.
+  - **Started tonight:** the G2 designer resumed with `G2/BENCH-BRIEF.md` on box 60959320 (RTX
+    3080 at 300 W, m144567, $0.135/h, TTL ≈ 03:25 UTC; a first box at a 170 W cap was released
+    after a minute). Hard stop 02:45 UTC. A throwaway prototype: inside the rails.
+  - I told the user ×10 at 17:55 as "modelled, not measured, under review"; corrected to them
+    at 18:35.
+
 ## 2026-11-15 (cycle 6 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $16.60 invoiced of $30 (fleet $26.42);

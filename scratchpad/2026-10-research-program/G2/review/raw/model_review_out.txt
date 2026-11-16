@@ -1,0 +1,46 @@
+b62: author's central 1.308 fs
+  low      1.522 fs: 64-pair words 0.456, skip tests 0.030, children 0.255, chunking 0.325, parent sort 0.053, tops (+order) 0.289, survivors+check 0.068, other 0.046
+  central  2.719 fs: 64-pair words 0.740, skip tests 0.061, children 0.510, chunking 0.568, parent sort 0.160, tops (+order) 0.351, survivors+check 0.111, other 0.218
+  high     4.883 fs: 64-pair words 1.240, skip tests 0.122, children 1.020, chunking 0.974, parent sort 0.399, tops (+order) 0.351, survivors+check 0.191, other 0.586
+  vs baseline author 13.2 fs: x4.9 central (x2.7 .. x8.7)
+  vs baseline direct 12.1 fs: x4.5 central (x2.5 .. x7.9)
+  vs baseline lo 11.0 fs: x4.0 central (x2.3 .. x7.2)
+  vs baseline hi 15.9 fs: x5.8 central (x3.3 .. x10.4)
+b64: author's central 0.542 fs
+  low      0.550 fs: 64-pair words 0.363, skip tests 0.028, children 0.025, chunking 0.030, parent sort 0.005, tops (+order) 0.029, survivors+check 0.053, other 0.016
+  central  0.965 fs: 64-pair words 0.586, skip tests 0.055, children 0.050, chunking 0.053, parent sort 0.015, tops (+order) 0.041, survivors+check 0.087, other 0.077
+  high     1.721 fs: 64-pair words 0.976, skip tests 0.110, children 0.100, chunking 0.090, parent sort 0.038, tops (+order) 0.049, survivors+check 0.150, other 0.206
+  vs baseline author 4.5 fs: x4.7 central (x2.6 .. x8.2)
+  vs baseline direct 5.3 fs: x5.5 central (x3.1 .. x9.6)
+  vs baseline lo 4.5 fs: x4.7 central (x2.6 .. x8.2)
+  vs baseline hi 5.5 fs: x5.6 central (x3.2 .. x9.9)
+b62 (4,9): central 2.321 fs (64-pair words 1.307, skip tests 0.171, children 0.015, chunking 0.019, parent sort 0.005, tops (+order) 0.080, survivors+check 0.539, other 0.186)
+  vs author 13.2: x5.7 (x3.2 .. x9.7)
+  vs direct 12.1: x5.2 (x2.9 .. x8.9)
+b64 (4,9): central 2.071 fs (64-pair words 1.315, skip tests 0.155, children 0.001, chunking 0.002, parent sort 0.000, tops (+order) 0.010, survivors+check 0.422, other 0.166)
+  vs author 4.5: x2.2 (x1.2 .. x3.8)
+  vs direct 5.3: x2.6 (x1.4 .. x4.4)
+
+b62 x5 vs 12.1 fs needs an all-in word <= 13.2 ps (reviewer central 20.9, author 14.8)
+b62 x8 vs 12.1 fs needs an all-in word <= -10.5 ps (reviewer central 20.9, author 14.8)
+b62 x10 vs 12.1 fs needs an all-in word <= -18.3 ps (reviewer central 20.9, author 14.8)
+b62 x5 needs all-in per stored bottom (its ~2.1 child tests + chunking) <= 9.9 ps (reviewer central 13.3)
+b62 x8 needs all-in per stored bottom (its ~2.1 child tests + chunking) <= -0.4 ps (reviewer central 13.3)
+   b62 word 10 ps, rest central: 2.30 fs -> x5.3 (x5.7 vs author's baseline)
+   b62 word 15 ps, rest central: 2.49 fs -> x4.9 (x5.3 vs author's baseline)
+   b62 word 20 ps, rest central: 2.68 fs -> x4.5 (x4.9 vs author's baseline)
+   b62 word 25 ps, rest central: 2.87 fs -> x4.2 (x4.6 vs author's baseline)
+b64 x5 vs 5.3 fs needs an all-in word <= 25.0 ps (reviewer central 21.8, author 12.7)
+b64 x8 vs 5.3 fs needs an all-in word <= 11.4 ps (reviewer central 21.8, author 12.7)
+b64 x10 vs 5.3 fs needs an all-in word <= 6.9 ps (reviewer central 21.8, author 12.7)
+b64 x5 needs all-in per stored bottom (its ~2.2 child tests + chunking) <= 25.2 ps (reviewer central 13.6)
+b64 x8 needs all-in per stored bottom (its ~2.2 child tests + chunking) <= -23.3 ps (reviewer central 13.6)
+   b64 word 10 ps, rest central: 0.62 fs -> x8.5 (x7.2 vs author's baseline)
+   b64 word 15 ps, rest central: 0.77 fs -> x6.9 (x5.9 vs author's baseline)
+   b64 word 20 ps, rest central: 0.91 fs -> x5.8 (x4.9 vs author's baseline)
+   b64 word 25 ps, rest central: 1.06 fs -> x5.0 (x4.2 vs author's baseline)
+
+b62 mid-base switch, remaining fraction 1.0: reviewer central 2.72 fs per remaining adm -> x4.5; author's central 1.31 fs -> x10.1
+b62 mid-base switch, remaining fraction 0.7: reviewer central 3.30 fs per remaining adm -> x3.7; author's central 1.53 fs -> x8.6
+b62 mid-base switch, remaining fraction 0.5: reviewer central 4.06 fs per remaining adm -> x3.0; author's central 1.82 fs -> x7.2
+b62 mid-base switch, remaining fraction 0.3: reviewer central 5.86 fs per remaining adm -> x2.1; author's central 2.51 fs -> x5.3

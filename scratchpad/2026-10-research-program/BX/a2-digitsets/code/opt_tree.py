@@ -102,6 +102,13 @@ def run(b):
         memo.clear()
         out[strat] = cost(0, 0, 0, 0, strat)
     out["states_opt"] = len(memo)
+    # per-leading-digit OPT subtree cost (root forced to refine the top), +1 for the node
+    per = {}
+    for dd in range(b):
+        if tmask(1, dd) == -1:
+            continue
+        per[dd] = 1 + (cost(1, dd, 0, 0, "opt") if alive(1, dd, 0, 0) else 0)
+    out["per_lead_opt"] = per
     return out
 
 

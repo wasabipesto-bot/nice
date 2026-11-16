@@ -38,6 +38,10 @@ fn base_range(b: u32) -> Option<(u128, u128)> {
     }
 }
 
+fn range_of(b: u32) -> (u128, u128) {
+    if let Ok(v) = std::env::var("A3_RANGE") { let mut p = v.split(':'); return (p.next().unwrap().parse().unwrap(), p.next().unwrap().parse().unwrap()); }
+    base_range(b).unwrap()
+}
 fn digits(mut x: u128, b: u128) -> Vec<u32> {
     let mut v = Vec::new();
     while x > 0 {
@@ -62,7 +66,29 @@ fn common_top(a: &[u32], c: &[u32]) -> usize {
     k
 }
 
-const MAXD: usize = 32;
+
+// digits of x^p in base b without overflow (schoolbook on base-b digit vectors)
+fn pdig(x: u128, p: u32, b: u128) -> Vec<u32> {
+    let xd = digits(x, b);
+    let mut acc: Vec<u32> = vec![1];
+    for _ in 0..p {
+        let mut out = vec![0u64; acc.len() + xd.len() + 1];
+        for (i, &a) in acc.iter().enumerate() {
+            for (j, &c) in xd.iter().enumerate() {
+                out[i + j] += a as u64 * c as u64;
+            }
+            // normalise occasionally to avoid overflow
+            let mut carry = 0u64;
+            for v in out.iter_mut() { let t = *v + carry; *v = t % b as u64; carry = t / b as u64; }
+        }
+        while out.len() > 1 && *out.last().unwrap() == 0 { out.pop(); }
+        acc = out.iter().map(|&v| v as u32).collect();
+    }
+    while acc.len() > 1 && *acc.last().unwrap() == 0 { acc.pop(); }
+    acc
+}
+
+const MAXD: usize = 48;
 
 fn splitmix(x: u64) -> u64 {
     let mut z = x.wrapping_add(0x9E3779B97F4A7C15);
@@ -96,13 +122,13 @@ struct Stats {
 
 fn run<const B: u32>(windows: &[(u128, u128)], out: &str, slack: u32) {
     let b = B as u128;
-    let (rs, re) = base_range(B).unwrap();
+    let (rs, re) = range_of(B);
     let ln = digits(rs, b).len();
-    let l2 = digits(rs * rs, b).len();
-    let l3 = digits(rs * rs * rs, b).len();
+    let l2 = pdig(rs, 2, b).len();
+    let l3 = pdig(rs, 3, b).len();
     let le = re - 1;
-    assert_eq!(digits(le * le, b).len(), l2);
-    assert_eq!(digits(le * le * le, b).len(), l3);
+    assert_eq!(pdig(le, 2, b).len(), l2);
+    assert_eq!(pdig(le, 3, b).len(), l3);
     assert_eq!(l2 + l3, B as usize);
     let t = (ln + 1) / 2;
     let k = ln - t;
@@ -152,10 +178,10 @@ fn run<const B: u32>(windows: &[(u128, u128)], out: &str, slack: u32) {
         for (i, v) in digits(ws, b).iter().enumerate() {
             d1[i] = *v;
         }
-        for (i, v) in digits(ws * ws, b).iter().enumerate() {
+        for (i, v) in pdig(ws, 2, b).iter().enumerate() {
             d2[i] = *v;
         }
-        for (i, v) in digits(ws * ws * ws, b).iter().enumerate() {
+        for (i, v) in pdig(ws, 3, b).iter().enumerate() {
             d3[i] = *v;
         }
         let mut c2 = 0usize;
@@ -172,8 +198,8 @@ fn run<const B: u32>(windows: &[(u128, u128)], out: &str, slack: u32) {
                 let p = n / bk;
                 let lo = (p * bk).max(rs);
                 let hi = (p * bk + bk - 1).min(re - 1);
-                c2 = common_top(&digits(lo * lo, b), &digits(hi * hi, b));
-                c3 = common_top(&digits(lo * lo * lo, b), &digits(hi * hi * hi, b));
+                c2 = common_top(&pdig(lo, 2, b), &pdig(hi, 2, b));
+                c3 = common_top(&pdig(lo, 3, b), &pdig(hi, 3, b));
                 // cap so certificates never meet the low-k windows
                 c2 = c2.min(l2 - k);
                 c3 = c3.min(l3 - k);
@@ -391,7 +417,7 @@ fn main() {
     let base: u32 = a[1].parse().unwrap();
     let out = &a[2];
     let slack: u32 = a[3].parse().unwrap();
-    let (rs, re) = base_range(base).expect("no range");
+    let (rs, re) = range_of(base);
     let mut w: Vec<(u128, u128)> = vec![];
     for x in &a[4..] {
         let mut p = x.split(':');
@@ -402,5 +428,5 @@ fn main() {
     if w.is_empty() {
         w.push((rs, re - rs));
     }
-    dispatch!(base, &w, out, slack; 10,12,13,14,15,17,18,19,20,22,23,24,25,27,28,29,30,32,33,34,35,37,38,39,40);
+    dispatch!(base, &w, out, slack; 10,12,13,14,15,17,18,19,20,22,23,24,25,27,28,29,30,32,33,34,35,37,38,39,40,42,44,45,47,50,52,55,57,60,62);
 }

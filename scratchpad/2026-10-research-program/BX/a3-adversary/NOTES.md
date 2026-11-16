@@ -13,6 +13,36 @@ Definitions used everywhere below:
   those e digits distinct. Middle = the other b - e positions.
 - uniform-middle model: middle digits iid uniform on 0..b-1, independent of E.
 
+## Summary (18:20 UTC; details below)
+- **Job 1, measured: nothing.** Exhaustive b10-b33 (~7e9 n) + windows at b40, b45, b50, b55, b62. No residue (1,643
+  moduli), digit/position feature, rational proximity or gradient-boosted combination of cheap
+  features predicts near-niceness or the middle beyond the prefix/suffix views. Given the views,
+  the middle is iid uniform: per digit to 1e-4 (b32, 2e8 n), pairwise (403 pairs, MI null), in an
+  omnibus higher-order test (chi2 ≈ dof, b25-b40), and the near-nice tail to 2 %
+  (0.977 ± 0.016). Every deviation sits at a view edge (known crumbs) or is a base-dependent
+  constant on the ends (E-clean / uniform = 0.65-1.12). Middle collisions decorrelate between
+  n and n+1.
+- **Job 2: the model (VC), and its optimum computed exactly** (§2.6): the free-list floor
+  (fractional cover over all prefix × suffix views) vs the exact flat join at b20-b33: ×1.5 →
+  ×5.9, growing ≈ ×1.085 per base (unit weights); the ideal output-sensitive join lands on the
+  floor. The only exponent left in VC is the disjointness (OV) pairing; with production weights
+  the gap is ×1.03 → ×1.11 (b32), consistent with N5's ×6-10 at b62/64.
+- Outside VC: generators (lattice/Coppersmith/any solver) dead by counting (A1 D1 + §2.2);
+  CRT/p-adic digits dead (measured); pandigital congruences are only mod b-1 and the suffix
+  (all pandigitals of b9/b10, m <= 1000); joint square/cube algebra leaves no trace in the
+  interior.
+- Peers: no errors in A1/A2 conclusions; one artefact (A2's e^(-0.17b) slope; exact b20-b33 gives
+  -0.108) and one caution (A1's planned Weyl-sum lemma would be ×100 looser than the data at b62).
+
+## With another day
+1. Measure the OV gap where it matters: exact flat vs ideal-OV vs floor in sampled transversal
+   units at b40-b62 with production weights, fit its exponent, and try structured OV
+   (random-subset bucketing tuned to the real per-digit densities) on real masks.
+2. The VC optimum *with* list creation costs as an LP (prefix/suffix creation constraints), to
+   show the join is within a constant of every VC algorithm except through OV.
+3. Omnibus test at b62 with windows spanning many prefix blocks (strided sampling of n rather
+   than contiguous windows), to cover the top-of-middle region at the frontier too.
+
 ## Log (in order)
 
 ### 1. Exhaustive enumeration, bases 10-30 (+32, 33 running)
@@ -137,7 +167,11 @@ bases; the low-overlap tail (ov = 4, i.e. niceness b-4) is 10-15 % short at b30/
 the square and cube share *slightly more* digits than independence predicts, i.e. slightly worse
 for niceness. Not isolated (the histogram has no positional split), but the interior pair and
 omnibus tests (§3, §10) show no excess, so it must sit in the end digits (S0/C0 = r², r³ mod b,
-small leading digits of both) — the same constants as §7/§11. Guess, labelled as such.
+small leading digits of both) — the same constants as §7/§11.
+Checked (`code/an_overlap_pos.py`, n from the near-nice file with both sides internally distinct,
+b30 4,951 n / b32 6,403 n): the shared digits sit at the last digit of n² and n³ (obs/exp 1.22
+and 1.39 at b30, 1.10/1.12 at b32) and at the leading digits (1.07/1.16 at b32); every interior
+position 0.91-1.02. **The excess is an end effect; attribution confirmed.**
 
 ### 14. "Anything cheap", by machine (`code/an_ml.py`, sklearn HistGradientBoosting, 1 thread)
 Features: every digit of n (categorical), n mod each prime <= 47, n mod b±1, position x.
@@ -148,6 +182,20 @@ the outer digit set, as a residual after the null expectation core·|outer set|/
 — entirely the size of the outer set, which the ends determine: a reminder that every "lift"
 must be measured against the views' own prediction.) **No interaction of cheap features
 predicts the middle.**
+
+### 15. Large bases, windows (`code/run_big.sh`; enumerator now computes n², n³ by digit-vector
+multiplication, so any b <= 64 with n < 2^128; validated bit-identical on b28)
+4 windows × 1.5e8 n at b45, b50, b55, b62 (`data/big/`).
+- Omnibus test (§10): b45 core 19, N 89,829, chi2 6.0/12, mean distinct 32.604 vs 32.603;
+  b50 core 22, N 32,815, 8.2/12; b55 core 25, N 64,224, 17.5/14, 39.197 vs 39.198.
+- **b62 (the frontier base, L = 13)**: 3.2e6 E-clean n. Interior positions n² 6-15 and n³ 6-27:
+  P(digit in E) = e/b within 2.7 sd, digit-value chi2/61 = 0.56-1.40 (32 positions). The top
+  positions (n² >= 16, n³ >= 28) are near-constant only because a 1.5e8 window sits inside one
+  prefix block (width b^6 = 5.7e10) — a sampling artefact of narrow windows, not structure; it
+  also makes the fixed-core omnibus empty at b62 (N = 0).
+- Mean niceness vs b iid digits: 28.71/28.63 (b45), 31.72/31.79 (b50), 35.08/34.95 (b55),
+  39.50/39.38 (b62).
+**The conditional uniformity of the middle holds at the production base.**
 
 ## Verdict on job 1 (measured)
 Nothing. Hunted: 1,573 coprime residues m <= 300 + 70 structured moduli (b^k±1 family,
@@ -168,7 +216,9 @@ Creating or testing a view costs >= 1. A view returns its certificate C(S) — t
 digit) pairs of n², n³ constant on S — and nothing else; a candidate may be discarded only
 inside a view whose certificate repeats a digit (or whose residue class fails mod b-1).
 Soundness: every nice n reaches a fully fixed view.
-Within VC the cost is a covering number, and N5's PSJ numbers are its value, because:
+Within VC the cost is a covering number (computed exactly at b17-b33 in §2.6: the flat join is
+×1.5-5.9 above the free-list optimum at unit weights, the gap growing ≈ ×1.085 per base and
+lying entirely in the pairing step), and prefix × suffix views are the only ones that matter, because:
 - (measured, A1 E1 + my §2) fixing digits anywhere but the ends, or n mod m for m coprime to
   b (m <= 300 here, <= 1500 in A1), certifies nothing about the middle (<= 2 % of a digit's
   entropy) — so the useful views are prefix × suffix pairs (+ the mod b-1 key);
@@ -267,6 +317,8 @@ Three exact counts over every admissible n of b17-b33 (data `data/floor_*.txt`, 
 | 32 | 150,656,514 | 22,164,444 | 3,901,989 | 4,600,121 | 1,644,655 | 4.82 |
 | 33 | 511,951,689 | 62,020,883 | 10,081,802 | 10,486,511 | 6,202,945 | 5.91 |
 
+Floor extended on windows (4 × 2.5e8 n each, `data/floor_win.txt`): floor / A = 0.0163 (b34),
+0.0041 (b37), 0.0100 (b38), 0.0029 (b40); fit b20-b40: ln(floor/A) slope -0.230 per base.
 Fitted slopes of ln(cost / A) against b, b20-b33 (unit weights): **flat PSJ -0.108 per base**
 (the baseline's e^(-0.094 b), confirmed exactly), **ideal-OV -0.219, free-list floor -0.190,
 μ = 1 count -0.219.** Measured conclusions:
@@ -281,8 +333,11 @@ Fitted slopes of ln(cost / A) against b, b20-b33 (unit weights): **flat PSJ -0.1
 3. This sharpens N5 C3 / A2 I1 (which priced the OV gap at today's shape as a constant ×6-10 or
    ×1.35): as a function of b the gap is exponential. Whether it is reachable is the
    Orthogonal-Vectors question with d = b and set density ~0.3-0.5; known OV algorithms win
-   only at d ≲ c·log n (galactic constants) or for very skewed densities. Unit weights here;
-   with N5's weights (list entry 50 AND-units, survivor 45) see below.
+   only at d ≲ c·log n (galactic constants) or for very skewed densities.
+4. **With N5's weights** (list entry 50 AND-units, pair 1, survivor 45; `psj3`, `data/psj3.txt`)
+   lists dominate at small b and flat / ideal-OV is only 1.03 (b20-b24), 1.06-1.09 (b25-b30),
+   1.11 (b32) — rising slowly, consistent with N5's ×6 at b62 / ×10 at b64. So: in today's
+   frontier the gap is a constant ×6-10, asymptotically it is the one exponent in VC.
 
 ## Part 3: attacks on A1 and A2 (read 17:25 UTC; re-read before the stop)
 
@@ -334,4 +389,18 @@ Fitted slopes of ln(cost / A) against b, b20-b33 (unit weights): **flat PSJ -0.1
   should say "at today's shape".
 - I2: S1 (subset-sum mod b-1) 0/4400 — consistent with my §12 (the composition of the end set
   does not steer the middle at all), which is the statistical version of their algebraic result.
+- **Re-read 18:15 (A2 now has I8, I9, growth fits, a model).** Their "another day" #2 asks for
+  a Rust PSJ counter to b28-b34 and whether the weighted ideal-OV gap starts to grow: done here
+  (§2.6, `psj2`/`psj3`, reproduces their b20-b25 PSJ exactly): weighted flat / ideal-OV =
+  1.03 (b20-24) → 1.06-1.09 (b25-30) → 1.11 (b32); unit-weight 1.5 → 6.2 (b33). It grows, as
+  they guessed, and the free-list VC floor lands on ideal-OV — so their model statement ("work is
+  the flat join's up to constants except the ideal-OV term") is confirmed with the refinement
+  that nothing else in VC, not even free lists, has an exponent.
+- **Objection to their growth table:** "all three save ≈ e^(-0.17b) against A" is fitted on
+  b17-b24 (5 bases, A = 483 … 98,707, ranges so small that b17/b18 dominate the slope). On the
+  exact counts b20-b33 (9 bases) flat PSJ / A falls as e^(-0.108 b) — the baseline's -0.094 is
+  right, -0.17 is a small-base artefact. Their solver/tree "same exponent as the join" conclusion
+  is unaffected (it is a ratio).
+- I8 (dual tree costs 6-10× FLAT; digit keys ×1.3-1.5 of a ×8-27 in-unit gap) is the empirical
+  counterpart of my statement that the gap is real and lives in per-element deep digits; agree.
 - Nothing in A2 that I could break.

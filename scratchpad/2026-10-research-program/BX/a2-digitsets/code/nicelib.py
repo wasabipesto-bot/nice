@@ -103,3 +103,18 @@ def mask_of(cert):
             return None
         m |= bit
     return m
+
+
+def real_splits(b):
+    """(L, ndig(n^2), ndig(n^3)) combinations that actually occur in the nice range."""
+    from math import isqrt
+    lo, hi = nice_range(b)
+    pts = {lo, hi - 1}
+    for j in range(1, 4 * b):
+        x = b ** j
+        r2 = isqrt(x)
+        r3 = round(x ** (1 / 3))
+        for r in (r2 - 1, r2, r2 + 1, r3 - 1, r3, r3 + 1):
+            if lo <= r < hi:
+                pts.add(r)
+    return sorted({(ndig(n, b), ndig(n * n, b), ndig(n ** 3, b)) for n in pts if lo <= n < hi})

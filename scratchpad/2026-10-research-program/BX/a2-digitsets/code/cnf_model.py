@@ -5,6 +5,8 @@ one CNF per digit split. Enumerates all solutions with blocking clauses.
 Usage: cnf_model.py b1,b2,... [time_limit_s]"""
 import sys, time, json, threading
 from pysat.solvers import Cadical195
+import os as _os
+from nicelib import real_splits as _rs
 from cpsat_model_2608 import digit_splits
 
 
@@ -119,6 +121,11 @@ def build(b, d, dsq, dcu):
     for v in a + q + cu:
         c.lt_const(v, b)
     c.cl.append(a[d - 1])            # leading digit nonzero
+    import os
+    if os.environ.get("LEAD"):
+        v = int(os.environ["LEAD"])
+        for kbit, lit in enumerate(a[d - 1]):
+            c.cl.append([lit] if (v >> kbit) & 1 else [-lit])
     c.cl.append(q[dsq - 1])
     c.cl.append(cu[dcu - 1])
     # square columns
@@ -176,7 +183,7 @@ def main():
     limit = float(sys.argv[2]) if len(sys.argv) > 2 else 250
     for b in bases:
         tot = dict(b=b, time=0.0, conflicts=0, decisions=0, sols=[], vars=0, clauses=0, status=[])
-        for (d, dsq, dcu) in digit_splits(b):
+        for (d, dsq, dcu) in [x for x in digit_splits(b) if not _os.environ.get('REALSPLITS') or x in _rs(b)]:
             c, a = build(b, d, dsq, dcu)
             tot["vars"] += c.n
             tot["clauses"] += len(c.cl)
@@ -184,6 +191,9 @@ def main():
             t0 = time.time()
             timer = threading.Timer(limit, lambda: S.interrupt())
             timer.start()
+            import os
+            if os.environ.get("CONFBUDGET"):
+                S.conf_budget(int(os.environ["CONFBUDGET"]))
             st = "UNSAT"
             while True:
                 res = S.solve_limited(expect_interrupt=True)

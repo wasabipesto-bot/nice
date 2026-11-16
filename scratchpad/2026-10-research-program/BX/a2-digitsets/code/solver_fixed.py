@@ -3,6 +3,8 @@ order: 'alt' = a_{L-1}, a_0, a_{L-2}, a_1, ... (two-sided tree); 'top' = MSD fir
 Compares branches/conflicts with the tree counts (tree_counts.py, alt_tree.py)."""
 import sys, time, json
 from ortools.sat.python import cp_model
+import os as _os
+from nicelib import real_splits as _rs
 from cpsat_model_2608 import build_model, digit_splits, Collector
 
 bases = [int(x) for x in sys.argv[1].split(",")]
@@ -10,7 +12,7 @@ order = sys.argv[2]
 limit = float(sys.argv[3]) if len(sys.argv) > 3 else 280
 for b in bases:
     tot = dict(b=b, order=order, time=0.0, conflicts=0, branches=0, sols=[], status=[])
-    for (d, dsq, dcu) in digit_splits(b):
+    for (d, dsq, dcu) in [x for x in digit_splits(b) if not _os.environ.get('REALSPLITS') or x in _rs(b)]:
         model, a = build_model(b, d, dsq, dcu, redundant=False, residues=True)
         if order == "alt":
             seq = []

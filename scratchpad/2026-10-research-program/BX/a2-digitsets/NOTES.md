@@ -323,3 +323,40 @@ anything at the pair level.
    the derived e^{0.05b} and whether the weighted ideal-OV gap starts to grow (b17–25: ×1.01–1.06).
 3. Otherwise stop this angle: nothing in it reaches ×10, and the one in-model exponent (ideal OV)
    is a known-hard problem whose known algorithms lose at the frontier.
+
+## I10. Pure CNF + CDCL (CaDiCaL 1.9.5 via python-sat) — measured: ≈ the optimal tree, ×1–2
+
+`code/cnf_model.py`: the same schoolbook digit/carry model bit-blasted (binary digits, Tseitin
+multipliers and ripple adders, column equations s_j = q_j + b·r_{j+1}, final carry tied to the
+top output digits, pairwise all-different by XOR clauses; **no residue constraint**), all
+solutions enumerated by blocking clauses. Finds exactly 69 at b10. 10k–48k variables.
+Comparator: OPT tree without the residue filter (`NORES=1 code/opt_tree.py`,
+`code/opt_tree_nores.out`). b25 split by leading digit into 17 runs (`code/cnf_b25_perlead.out`;
+OPT per leading digit in `code/opt_tree_nores_b25_perlead.out`, sum 2.91e6 = OPT).
+
+| b | CaDiCaL conflicts | decisions | s | OPT tree (no residue) | conflicts / OPT |
+|---|---|---|---|---|---|
+| 17 | 26,265 | 59,985 | 1.8 | 5,856 | 4.5 |
+| 18 | 33,263 | 81,835 | 2.4 | 5,510 | 6.0 |
+| 20 | 129,125 | 249,950 | 14 | 66,163 | 1.95 |
+| 22 | 328,867 | 583,743 | 48 | 213,877 | 1.54 |
+| 24 | 325,405 | 542,948 | 55 | 339,972 | 0.96 |
+| 25 | 4,973,454 | (17 runs) | 856 | 2,905,170 | 1.71 |
+
+The ratio fell from ≈ 5 to ≈ 1 between b17 and b22 (fixed overhead amortising) and then sits at
+1.0–1.7: **a bit-level CDCL solver, free to branch on bits, carries and outputs and to learn
+clauses, refutes the instance in about as many conflicts as the optimal digit tree has nodes**, at
+≈ 6k–10k conflicts/s (×1e5 per node against the tree). No evidence of shorter (resolution) proofs
+than the certificate tree. b25's 17 sub-runs total 856 s for a base the tree clears in
+milliseconds.
+
+**Caveat found on the way (affects the 2026-08 CP-SAT model and my I5 numbers):**
+`digit_splits` in `cpsat_model_2608.py` admits digit-count splits that cannot occur — (2d, 3d−2)
+and (2d−1, 3d), e.g. (3, 5, 9) at b14 and (5, 9, 15) at b24 (`nicelib.real_splits` lists the
+real ones) — and for (2d−1, 3d) it does not tie the final cube carry to the top cube digits, so
+that split is under-constrained: my first CNF port found a bogus "solution" 359 at b14 from it
+(n = 359 is outside the b14 range); in CP-SAT the residue constraint happened to mask it.
+Results stay correct (the 2026-08 brute-force cross-check passed) but solver effort on the
+phantom split inflates counts: CP-SAT free at b24 drops from 794,567 to 267,511 branches and
+133,847 to 44,112 conflicts with real splits only (`code/real_splits_rerun.out`); b13, b14, b18
+change little. The I5 table and fits are corrected below.

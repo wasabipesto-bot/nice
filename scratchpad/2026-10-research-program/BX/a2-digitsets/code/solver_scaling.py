@@ -2,14 +2,16 @@
 Uses the 2026-08 model (copied) with redundant=False, residues=True (its fastest config)."""
 import sys, time, json
 from ortools.sat.python import cp_model
+import os as _os
+from nicelib import real_splits as _rs
 from cpsat_model_2608 import build_model, digit_splits, Collector
 
 bases = [int(x) for x in sys.argv[1].split(",")]
 limit = float(sys.argv[2]) if len(sys.argv) > 2 else 500
 for b in bases:
     tot = dict(b=b, time=0.0, conflicts=0, branches=0, props=0, sols=[], status=[])
-    for (d, dsq, dcu) in digit_splits(b):
-        model, a = build_model(b, d, dsq, dcu, redundant=False, residues=True)
+    for (d, dsq, dcu) in [x for x in digit_splits(b) if not _os.environ.get('REALSPLITS') or x in _rs(b)]:
+        model, a = build_model(b, d, dsq, dcu, redundant=False, residues=True, lead_range=((int(_os.environ['LEAD']),)*2 if _os.environ.get('LEAD') else None))
         s = cp_model.CpSolver()
         s.parameters.num_workers = 1
         s.parameters.enumerate_all_solutions = True
