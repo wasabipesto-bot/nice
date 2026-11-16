@@ -90,6 +90,34 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   - Release: main 7e0113f's Rust build workflow was still pending at 16:25; no tag yet.
   - ivory disk back to 11 GB free (debug artifacts of this morning's lint and test runs).
 
+- **17:15 UTC: BX A1 in (`BX/a1-progressions/NOTES.md`, 325 k tokens): a negative with
+  measurements.** Every middle output digit behaves as a random function of each single digit of
+  n (b62: 36–48 values on changing one digit; random gives 39); no view of up to L − 2 digits of
+  n and no n mod q (q ≤ 1,500) predicts a middle digit by more than 0.04 (noise 0.02). A
+  counting identity: any prescribe-outputs-and-solve method pays one call per allowed choice
+  and each fixed digit cuts one digit of candidates, so it loses to the tree at every node
+  (b40 prototype: 41.7 k operations per top against 29.6 k). **One new exception to "two
+  output digits per fixed digit": ramified slices p^j | n when b = p·q** (n/p^j mod q^c
+  certifies 2c outputs; ×12 fewer tree nodes per candidate in the 49 | n slice at b28), useless
+  for finding (each digit of slicing gives up a factor b of the expected count for about e^1.2).
+- **17:55 UTC: G2 in (`G2/RESULTS.md`, 396 k tokens): not killed.** A design with transversal
+  super-units (digits 4–8 of n), shape (f0 4, k 10), bottoms generated from shared depth-9
+  parents with the deepest digit in registers, top-driven pairing over sorted 64-chunks with a
+  common-mask skip (42–51 % of chunks skipped) and four-Russians words. **Model: ×10.1 per base
+  at b62 (×4.7–17.6), ×8.3 at b64 (×5.1–13.2)**; counts measured by an exact CPU prototype on
+  real b62 / b64 units (14 whole small bases equal brute force; no survivor of today's shape
+  lost); GPU unit costs derived, not measured. A whole base would be ≈ 110 card-hours at b62
+  (today ≈ 1,150) and ≈ 720 at b64 (today 6,000–7,200). Needs a transversal server work unit;
+  with today's fields about ×1.05 transfers. Its own ceiling argument: pairs per admissible n
+  are forced (P_T · P_B); at b64 it tests as many pairs as today and wins on cost per pair.
+  Three unmeasured numbers decide it (a 64-pair word on the card, the per-bottom generation and
+  chunking cost, today's b64 base mean).
+  **Before I repeat ×10 to anyone as a finding: an adversarial reviewer is on it**
+  (`G2/REVIEW-BRIEF.md`, Opus, CPU, hard stop 20:40): soundness by its own independent check,
+  the counts and their representativeness, the baseline's fairness, each unit cost against
+  today's kernels and GPU memory limits, the server change, and the smallest GPU experiment
+  with stop numbers. Tomorrow, if it stands: that experiment on a rented card.
+
 ## 2026-11-15 (cycle 6 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $16.60 invoiced of $30 (fleet $26.42);
