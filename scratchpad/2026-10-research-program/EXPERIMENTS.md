@@ -5,6 +5,76 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## G2.1 A second-generation join from a clean slate: design, adversarial review, benchmark staged (2026-11-16 16:28–18:45 UTC, designer, independent reviewer; `G2/RESULTS.md`, `G2/NOTES.md`, `G2/model.py`, `G2/model2.py`, `G2/proto/` (exact CPU prototype), `G2/raw/`; `G2/REVIEW.md`, `G2/review/` (independent predicate, `model_review.py`, `order.py`); `G2/BENCH.md`, `G2/bench/` (inputs for one b64 super-unit, `g2bench.cu`, box scripts); no GPU run yet)
+
+- **Design:** work unit = transversal super-unit π′ = digits 4–8 of n (every leading and low value); shape (f0 4,
+  k 10); the depth-9 bottom parents built once per super-unit and shared by the b units of digit 9, the deepest
+  digit generated in registers from two affine digits (never stored); top-driven pairing over 64-chunks of
+  bottoms sorted by a key that puts the tops' frequent digits first, one AND with a chunk's common mask skipping
+  42–51 % of chunks, bit-sliced or four-Russians 64-wide tests, one nonzero test per word.
+- **Counts** [M, exact CPU prototype on real b62 / b64 units; reviewer re-measured 4 more units per base within
+  8 %]: per admissible n at b62 / b64: pairs 3.9e-3 / 3.5e-3, flat chunk incidences 6.1e-5 / 5.5e-5, kept 3.5e-5 /
+  2.7e-5, survivors 3.3e-6 / 2.6e-6 (÷75 / ÷58 against today), tops tested 2.06e-6 / 4.69e-7 if every f0 = 4 top is
+  tested. At b64 the pair count equals today's pruned count: the gain there is cost per pair.
+- **Soundness** [M]: 14 whole bases b10–b28 against brute force (author); the reviewer's own predicate, written
+  from the definition, matches the prototype's survivor *sets* on whole bases 10, 18, 25, on one real b62 unit
+  (18,944 survivors) and one real b64 unit (183,776) enumerated from scratch, and on the unit with the base's
+  last clipped top.
+- **Model** [D]: author ×10.1 at b62 (×4.7–17.6), ×8.3 at b64 (×5.1–13.2). **Reviewer's correction: ≈ ×5 at b64
+  (×4.7 against a 4.5 fs baseline, ×5.5 against 5.3 fs; band ×2.6–9.6); b62 (4,10) ×4.5–4.9, (4,9) ×5.2–5.7.**
+  Reasons: the 64-pair word costed at 12.7–14.9 ps against 17.8 ps measured for the nearest analog (N1.G1;
+  ≈ 25 ps calibrated); the b64 four-Russians table amortized over 464 probes instead of ≈ 226 kept (author's
+  own model then ×7.2); the b62 bottom side at ≈ 8 instructions per child and a sort ~70× cheaper than any GPU
+  sort; tops and bottoms need opposite super-unit orders (+0.21–0.36 fs at b62, +0.03 at b64). Sensitivity at
+  b64: word 10 ps → ×8.5; 15 → ×6.9; 20 → ×5.8; 25 → ×5.0.
+- **Baseline** [M/D]: today's main ≈ 12.1–13.2 fs per admissible n at b62, 4.5–5.3 fs at b64 (base means, RTX 3080).
+  A whole base ≈ 1,150 card-hours at b62 and 6,000–7,200 at b64 today.
+- **Server:** needs units keyed by the shared middle digits ("all n whose digits 4–8 lie in [p0, p1)"):
+  homogeneous, resumable, auditable by survivor counts, algorithm-agnostic; but no field is complete until the
+  base is, every backend needs an implementation before a base can switch, and a mid-base switch is exact only
+  with a frozen snapshot of completed fields. With today's 1e17 fields ≈ ×1.05 transfers.
+- **Benchmark** (the reviewer's specification): one real b64 super-unit end to end on an RTX 3080 at 300 W against
+  the same-session main: stop above 1.06 fs per admissible n (< ×5) or a kept word > 25 ps or a stored bottom
+  > 25 ps; on to the RX 9070 XT at ≤ 0.88 fs (≥ ×6); ×10 only at ≤ 0.53 fs. **Staged, not run:** the resumed
+  designer's ssh to the box was refused by the harness; inputs (π′ = 712012851, 64 units, 238,813 tops, survivor
+  sets of 11,768,560 n), `g2bench.cu` with a CPU reference that reproduces every unit's survivor set (children
+  7.54e-6, flat 5.61e-5, kept 2.76e-5 (0.492), survivors 2.63e-6 per admissible n) and the box scripts are on ivory.
+
+## BX.1 Below exhaustive: three independent attacks and the director's own accounting (2026-11-16 16:28–18:45 UTC; `BX/COMMON.md`; `BX/a1-progressions/NOTES.md` (+ `code/`, `out_*`), `BX/a2-digitsets/NOTES.md` (+ `code/`), `BX/a3-adversary/NOTES.md` (+ `code/`, `data/`))
+
+- **Question:** can any method do work that grows more slowly than the number of candidates, or find a condition
+  on partial information that involves the middle output digits?
+- **A1, polynomial progressions and lattices: no** [M at b20–62]. Every middle output digit behaves as a random
+  function of each single digit of n (b62: 36–48 values on changing one digit; random 39); no view of up to
+  L − 2 digits of n and no n mod q (q ≤ 1,500) predicts a middle digit by more than 0.04 (noise 0.02); output
+  digits do not predict it either. A counting identity: any prescribe-outputs-and-solve method (any lattice, both
+  progressions together, solving free) pays one call per allowed choice while each fixed digit cuts one digit of
+  candidates: it loses to the tree at every node (b40 prototype 41.7 k operations per top against 29.6 k).
+  **New exception to "two outputs per fixed digit": ramified slices p^j | n for b = p·q** (n/p^j mod q^c certifies
+  2c outputs; ×12 fewer tree nodes per candidate in the 49 | n slice at b28); useless for finding (each digit of
+  slicing gives up a factor b of the expected count for ≈ e^1.2).
+- **A2, the exact cover: no** [M at b17–40 and at the real b62 shape]. Complement conditions computable per side
+  reject 0 of 4,400 AND survivors (0 of 150 at b62); digit-class identities reduce to the mod b − 1 root;
+  mod b + 1 splits and value bounds reject < 8 % and need n. The best possible adaptive digit tree (exact DP) is
+  ×4–6 worse than the flat join; CP-SAT and CaDiCaL sit at ×1–16 of that tree with no trend and ~1e5 slower per
+  node, and reveal no pruning rule. Inclusion–exclusion: truncation at level m errs by exactly Σ C(f_n − 1, m)
+  over non-nice n; the full sum is 2^b terms. Representations: O(L²), no merge level. Side finding: the 2026-08
+  CP-SAT model admits digit-count splits that cannot occur (results unaffected).
+- **A3, measurement and adversary: no hidden structure; a lower-bound model with its optimum** [M]. Every
+  candidate of bases 10–33 (≈ 7e9 n) and windows at b40–62: no residue (1,643 moduli), digit statistic, position
+  feature or boosted model predicts niceness or the middle (held-out R² = shuffled control); the middle given
+  the ends is uniform to 1e-4 per digit, pairwise independent (square–cube pairs included), passes an all-orders
+  test, and the near-nice tail matches the product formula (0.977 ± 0.016). "View certificates" model (views =
+  fixed digits of n or n mod m; a view reveals outputs constant across it; discard only on a repeat): exact
+  optimum for b20–33 by a fractional cover over all prefix × suffix views: the flat join is ×1.5 → ×5.9 above
+  the floor at unit weights (≈ ×1.085 per base), ×1.03 → ×1.11 at production weights by b32; **an ideal join that
+  pays only for pairs passing disjointness lands on the floor.**
+- **The one slack left: the pairing step, which is orthogonal vectors on digit masks.** Ideal inside a transversal
+  unit: ×8–27 on the pair term (A2 I8); dual trees cost 6–10× a flat AND, block prunes ×1.0–1.2, digit keys
+  ×1.3–1.5; G2's sorted-chunk skip keeps 0.45–0.58 of chunk incidences.
+- **Verdict:** no method below exhaustive, with measurements behind each angle. What remains is constant-factor
+  structure: G2 (≈ ×5 at b64 if the GPU costs hold) and whatever of the pairing gap a GPU can take.
+
 ## MU260.1 #260 merged up over #251's `ran` words; v3.4.7 against main at default power (2026-11-16 05:50–08:05 UTC, engineer, then director after a harness outage stopped the agent; `MU260/RESULTS.md`, `MU260/RELEASE-NUMBERS.md`, `MU260/work/` (merge-file inputs, `merge_vs_int.diff`, `p255.diff`, `p259.diff`, `interdiff.txt`), `MU260/box/logs`, `MU260/t2/`; fork `pr/top-slot-any-plane` 31ba079 = merge of ec6a43a and main 0711b16; box 60886021, RTX 3080 at 300 W, 2.27 h, ~$0.30)
 
 - **Resolution:** `cubecl_join.rs` = main's file plus the change that took `exp/integration-1114` from 99b283a to

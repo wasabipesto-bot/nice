@@ -172,6 +172,34 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   cycle starts it with a fresh engineer whose brief includes the box from its first message
   (as every earlier box task did), unless they object or prefer I run it from this session.**
 
+- **18:45 UTC: BX A2 in (`BX/a2-digitsets/NOTES.md`, 324 k tokens): negative.** The exact cover
+  gives a join nothing beyond "certificates distinct, disjoint, residue root": complement
+  conditions reject 0 of 4,400 survivors; the optimal adaptive digit tree is ×4–6 worse than
+  the flat join; SAT / CP no better and no hidden rule; inclusion–exclusion needs 2^b terms.
+  The one open spot it measured: an ideal disjointness oracle would cut the pair term ×8–27
+  inside a transversal unit; practical structures recover ×1.0–1.5.
+- **Synthesis of the day's research (EXPERIMENTS BX.1, G2.1):**
+  1. Three independent attacks and my own accounting agree: no method below exhaustive. The
+     middle is a uniform lottery given the ends (measured on 7e9 candidates); every
+     generate-and-solve method loses by counting; the exact cover adds no usable condition. A
+     lower-bound model ("view certificates") now has its optimum computed exactly for b20–33,
+     and the only slack in it is the pairing step.
+  2. That slack is real and is where the constant factors are: today's flat join sits ×6–10
+     above the model's floor at b62/64 (N5's estimate, A3's extrapolation). G2 is a concrete
+     structure that takes part of it: ≈ ×5 at b64 after the review's corrections, needing a
+     transversal work unit. The decisive GPU number is staged, not measured.
+  3. What I take from it: stop looking for an exponent in digit reasoning; put the deep effort
+     into (a) the G2 measurement and, if it holds, the proposal; (b) the pairing step itself
+     (orthogonal vectors on these particular masks on a GPU), which is the only place a further
+     large factor can come from; (c) telling the user plainly that none of this changes the
+     0.2 %: it changes how long base 64 takes (≈ 1.5 years → months) and how far past 64 the
+     search can go.
+  Agents today: six research runs (four investigators, one reviewer, one resumed designer) plus
+  the morning's merge-up engineer; ≈ 2.4 M subagent tokens. Vast today ≈ $0.36.
+- **Tomorrow:** the G2 benchmark with a fresh engineer whose brief includes the box (unless the
+  user says otherwise); a deep line on the pairing step with real masks from the staged b64
+  super-unit; merge-ups and realized gains if a release went out.
+
 ## 2026-11-15 (cycle 6 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $16.60 invoiced of $30 (fleet $26.42);

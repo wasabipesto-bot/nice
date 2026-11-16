@@ -7,7 +7,7 @@ Shared helper: `code/nicelib.py` (range, residue roots, top/bottom certificates)
 Baseline counter: `code/tree_counts.py` (exact MSD-tree, LSD-tree, flat prefix–suffix-join
 (PSJ) cost minimised over (t, k), and B2L = admissible n whose ≈2L end digits are distinct).
 
-## Index of ideas (status, 2026-11-16 ~17:45 UTC)
+## Index of ideas (status, 2026-11-16 18:45 UTC; session ended here)
 
 | # | idea | outcome | kind |
 |---|---|---|---|
@@ -15,11 +15,12 @@ Baseline counter: `code/tree_counts.py` (exact MSD-tree, LSD-tree, flat prefix�
 | I2 | complement C: per-side split-sum conditions (mod b−1, mod b+1), value bounds, digit-class identities | S1 rejects 0/4400 survivors; S2 ≤ 1.5 % → 0; S3 needs n; class identities collapse to the mod b−1 root identically | measured + derived |
 | I3 | inclusion–exclusion / Walsh counting | truncation error = Σ_{non-nice} C(f_n−1, m) exactly (useless until m ≈ max f_n); full sum = 2^b Gelfond-type sums, ≥ today's cost at b62 even if each were free | derived + measured |
 | I4 | representation technique / dissection | O(L²) representations, no merge level: Σ_s 1/R_s ≥ 1 ⇒ work ≥ best single shape | derived |
-| I5 | CP-SAT scaling, free and fixed order | branches = ×21–26 PSJ at constant ratio (same exponent); forced two-sided order ≈ the certificate tree; no hidden pruning rule | measured |
+| I5 | CP-SAT scaling, free and fixed order | branches ×21–26 PSJ at b17–22, ×7 at b24, ×9–16 OPT per leading digit at b25: no systematic gain; forced two-sided order ≈ the certificate tree; no hidden pruning rule | measured |
 | I6 | optimal adaptive digit tree (exact DP) | adaptivity ×1.0–1.6, no trend; best tree ≥ ×4–6 the flat join ⇒ every digit-branching solver is ≥ ×4 the join | measured |
 | I7 | output-side (exact-cover) branching | ×200–400 worse than the tree at b14 | measured |
 | I8 | dual tree / block prune / digit-key index inside N1 units | IDEAL/FLAT 0.04–0.12 but dual tree costs 6–10× FLAT; best block ×1.0–1.2; digit key ×1.3–1.5 on the pair term | measured |
 | I9 | structured (AP-digit) OV at the sibling level | b·r ≈ 10²–10³ pairs per group pair; one AND each beats any structure | derived |
+| I10 | pure CNF + CaDiCaL | conflicts = ×1.0–1.7 the optimal digit tree at b20–25 (×5 at b17–18), flat within scatter; also found phantom digit splits in the 2026-08 CP-SAT model | measured |
 
 **Bottom line so far:** the exact-cover structure adds no information a join can use beyond
 "certificates distinct, disjoint, residue root". Every combinatorial lever measured lands in
@@ -300,8 +301,10 @@ a set of candidates when this information rules out every completion of the exac
 Measured in this file: (a) completions consistent at the multiset level exist for 100 % of AND
 survivors (mod b−1 split: b20–b62 incl. the frontier shape; with the mod b+1 splits too: b24–25;
 I2), so (ii) adds nothing beyond the root
-key; (b) digit-branching searches, including CDCL solvers that pick their own variables, need at
-least the optimal certificate tree, which is ≥ ×4–6 the flat join with the same exponent (I5, I6);
+key; (b) digit-branching searches need at least the optimal certificate tree, which is ≥ ×4–6 the
+flat join with the same exponent (I6), and CDCL solvers that pick their own variables (CP-SAT,
+bit-level CaDiCaL) land at ×1–16 of that tree in conflicts/branches with no systematic trend
+over b17–25 (I5, I10);
 (c) organising the pair tests by shared digits (dual tree, blocks, digit keys) recovers ≤ ×1.5 of
 the pair term although an oracle would give ×8–27 inside a unit (I8); (d) counting formulas are
 either useless when truncated (identity) or need 2^b digital-function sums of squares and cubes
@@ -326,8 +329,8 @@ anything at the pair level.
 
 ## What I would do with another day
 
-1. A real CNF/CDCL run (kissat/cadical; column-wise encoding, one-hot all-different) at b14–20
-   to close the "modern SAT solver" question beyond CP-SAT (expected: the I5/I6 picture).
+1. (Done as I10.) If anyone revisits solvers: extend CaDiCaL to b28–30 by splitting on the two
+   leading digits, to pin the CDCL/OPT ratio's slope (b20–25 says −0.07 ± noise per base).
 2. A Rust OPT-tree / PSJ counter to b28–34 (states 1e7–1e8) to test whether OPT/PSJ grows like
    the derived e^{0.05b} and whether the weighted ideal-OV gap starts to grow (b17–25: ×1.01–1.06).
 3. Otherwise stop this angle: nothing in it reaches ×10, and the one in-model exponent (ideal OV)
