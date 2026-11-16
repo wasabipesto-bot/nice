@@ -1,0 +1,63 @@
+4,6c4,6
+< -/// finished cubes.
+< +/// finished cubes in `ran`, whose next two words are the top stage's account
+< +/// of its appends (see [`TOP_ACCOUNT`]).
+---
+> -/// (mod 2^32).
+> +/// (mod 2^32), then the top stage's account of its appends (see
+> +/// [`TOP_ACCOUNT`]).
+12,15c12,15
+< +const TOP_ACCOUNT: u32 = 4;
+< +/// The words of `ran`.
+< +const RAN_WORDS: usize = STAGES + 2;
+< +const _: () = assert!(TOP_ACCOUNT as usize == STAGES);
+---
+> +const TOP_ACCOUNT: u32 = STAGES_U32 + 3;
+> -const RAN_WORDS: usize = STAGES + 3;
+> +const RAN_WORDS: usize = STAGES + 5;
+> +const _: () = assert!(TOP_ACCOUNT as usize + 2 == RAN_WORDS);
+27,30c27,29
+< -        AND_GROUP, DEAD_MASK, JOIN_WG, MAX_ROOTS, SURV_FLUSH, SURV_SH_CAP, TOP_CAP, TOP_REC_WORDS,
+< -        TRANSPOSE_MIN,
+< +        AND_GROUP, DEAD_MASK, JOIN_WG, MAX_ROOTS, SURV_FLUSH, SURV_SH_CAP, TOP_ACCOUNT, TOP_CAP,
+< +        TOP_DUP_RANK, TOP_LANE0_OUT, TOP_REC_WORDS, TOP_SHORT_TAKE, TRANSPOSE_MIN,
+---
+> -        TOP_CAP, TOP_REC_WORDS, TRANSPOSE_MIN,
+> +        TOP_ACCOUNT, TOP_CAP, TOP_DUP_RANK, TOP_LANE0_OUT, TOP_REC_WORDS, TOP_SHORT_TAKE,
+> +        TRANSPOSE_MIN,
+140c139
+< +        }
+---
+> -        slot * ntlay + goff + at
+151c150
+< -        slot * ntlay + goff + at
+---
+> +        }
+211a211,214
+> -                    ran[comptime!(STAGES_U32 + 3) as usize].fetch_min(lanes.count_ones());
+> +                    ran[comptime!(TOP_ACCOUNT + 2) as usize].fetch_min(lanes.count_ones());
+> -                    ran[comptime!(STAGES_U32 + 3) as usize].fetch_min(lanes);
+> +                    ran[comptime!(TOP_ACCOUNT + 2) as usize].fetch_min(lanes);
+233,238c236,240
+< -        let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; expect.len()]));
+< -        let nran = expect.len();
+< +        // Two more words: the top stage's account of its appends.
+< +        let ran = c.create(cubecl::bytes::Bytes::from_elems(vec![0u32; RAN_WORDS]));
+< +        let nran = RAN_WORDS;
+< +        let ran = &ran[..ran.len().min(STAGES)];
+---
+> -        // Three more words: the check kernel's work counter, the entries it
+> -        // checked and the sum of their indices.
+> +        // Five more words: the check kernel's work counter, the entries it
+> +        // checked and the sum of their indices, and the top stage's account
+> +        // of its appends.
+284,286d285
+< -    dev.ensure_ran(&dev.read_u32(&rec.ran)?, &rec.expect)?;
+< +    let ran = dev.read_u32(&rec.ran)?;
+< +    dev.ensure_ran(&ran, &rec.expect)?;
+294,295d292
+< +    }
+< +
+354a352,353
+> +    }
+> +

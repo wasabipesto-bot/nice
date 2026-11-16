@@ -31,6 +31,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   (×1.18 at b62 there by the window's numbers), a release for the fleet (×3.1), the window for
   N22's candidate. T2.7's CI comparison waits for a yes.
 
+- **07:05 UTC: #255 and #259 merged up and pushed** (merge commits 9d185d4 and d3fe29e; only the
+  changelog conflicted; `just lint` clean and the host tests pass on each merged branch: 246 and
+  245 passed, 0 failed; the debug-mode host suite takes 30–36 minutes on ivory, which is why my
+  first combined background run hit its 50-minute limit after finishing #255's). #255 is
+  mergeable again with CI at 23 pass and 2 pending; #259's CI has just started.
+
 ## 2026-11-15 (cycle 6 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $16.60 invoiced of $30 (fleet $26.42);
