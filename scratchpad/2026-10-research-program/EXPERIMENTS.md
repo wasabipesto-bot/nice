@@ -5,6 +5,35 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## MU260.1 #260 merged up over #251's `ran` words; v3.4.7 against main at default power (2026-11-16 05:50–08:05 UTC, engineer, then director after a harness outage stopped the agent; `MU260/RESULTS.md`, `MU260/RELEASE-NUMBERS.md`, `MU260/work/` (merge-file inputs, `merge_vs_int.diff`, `p255.diff`, `p259.diff`, `interdiff.txt`), `MU260/box/logs`, `MU260/t2/`; fork `pr/top-slot-any-plane` 31ba079 = merge of ec6a43a and main 0711b16; box 60886021, RTX 3080 at 300 W, 2.27 h, ~$0.30)
+
+- **Resolution:** `cubecl_join.rs` = main's file plus the change that took `exp/integration-1114` from 99b283a to
+  8bcee21 (`git merge-file`, 0 conflicts). `STAGES` 4; #251's check words at `STAGES + 1`, `+ 2`; `TOP_ACCOUNT` =
+  `STAGES + 3` (two words); `RAN_WORDS` = `STAGES + 5`; #251's test-only smallest-take word moved from
+  `STAGES + 3` (a silent overlap: it merged without a conflict) to `TOP_ACCOUNT + 2` = `RAN_WORDS`; assert
+  `TOP_ACCOUNT + 2 == RAN_WORDS` (I read these lines in the pushed file).
+- **Mechanical checks** [M]: merge against 8bcee21: 14 hunks, all in what #255 / #259 change; applying #255's then
+  #259's own diff to the merged file gives 8bcee21's file byte for byte. Main against the merge: `cubecl_join.rs`
+  and one changelog line only.
+- **Verification** [M]: `just lint` clean; host tests 207 (ivory, debug) and 260 (box, CI's command); CUDA: #251's
+  and #260's partly-filled-warp tests, the CPU-reference suite with both PRs' fault tests on the one `ran` array
+  (each fault reports its own words), the certificates test, the heavy FD comparison, dense compares at b60 1e16,
+  b62 1e17 (170,247,827 / 10,384,896), b64 1e17 (697,596,881 / 43,247,716); lavapipe from Mesa 26.0.8 (26.04
+  chroot) as CI: WGSL 40 passed, SPIR-V 31 passed, incl. the lane-0-out tests (552 runs, 6,492,699 tops); SPIR-V
+  against WGSL atomic operations: 902 kernel variants, none missing.
+- **Two totals differ from 11-14 for the same commands** (b60 dense 336,157,460 / 22,524,024 against 334,071,589 /
+  22,383,910; heavy FD total 422,559,183 against 423,104,943): the 11-14 build 8bcee21 run on today's box gives
+  today's numbers [M, `GI_*.log`], so it is the box, not the code; the likely input is the card's reported memory,
+  which sets the first slice's extent [inferred, not shown]. Whole-field totals do not depend on slicing.
+- **v3.4.7 (8bd154b) against main 0711b16, b62 1e17, RTX 3080 at 300 W (289–297 W, 1.83–1.86 GHz), 3 real fields × 2
+  interleaved rounds** [M]: join 161.6 s against 49.8 s: **×3.25** (3.20–3.31); wall 163.3 against 51.6: ×3.17.
+  Main's counts equal 54d0aac's exactly (6 of 6); v3.4.7 within the audit's bound (6 of 6). NiceMark nice-only GPU,
+  2 rounds, API at a closed port: score 4,622 → 10,559 (×2.28); b58 msd-weak ×2.53, b58 msd-strong ×1.48, b60
+  ×2.76, b62 ×2.65.
+- A release from 0711b16 since v3.4.7: the GPU join ≈ ×3.2 per field; #263 and #251's host checks (a misbehaving
+  device fails its field instead of submitting); no new client flags, no changed defaults; Rust 1.100.0; the GPU
+  image built on ubuntu-24.04 runners (#261); #238 / #264 are server-side.
+
 ## Q1.2 Realized effect of #264 (2026-11-16, director, public API by bounded id ranges; `../2026-11-fresh-eyes/recent_niceonly_1116.json` = nice-only submissions with id in (294552514, 295551140])
 
 - #264 merged 2026-11-15 15:06 UTC; deployed at once by the evidence below.

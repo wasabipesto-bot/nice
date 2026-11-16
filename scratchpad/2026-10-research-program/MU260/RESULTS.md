@@ -110,10 +110,10 @@ commit, before the push), clean; one target dir `/root/mu/target-m`; rustc 1.100
 
 **Counts that differ from T26 (2026-11-14), and why it is not the merge.** b60 dense (334,071,589 / 22,383,910 on
 11-14) and the heavy FD comparison's top total (423,104,943 on 11-14) differ on this tree. Upstream main `0711b163`
-built on the same box gives exactly this tree's numbers (`GM_*`), so the change came with main since `41b4b405`
-(#262 rewrote `cpu_top_fd.rs`/`cpu_join.rs` and #263 the stride walk; I did not trace which test input moved). In
-every run the device equals the CPU reference. b62 and b64 dense counts are unchanged from 11-14. Not investigated
-further (outside this task); flagged for the director.
+built on the same box gives exactly this tree's numbers (`GM_*`). In every run the device equals the CPU reference.
+b62 and b64 dense counts are unchanged from 11-14. **Corrected by §6:** my first reading ("the change came with main")
+was wrong. The 11-14 integration binary itself (same md5) gives today's numbers on this box: the input differs, not
+the code.
 
 Not run: Metal, HIP, any 64-lane device; whole-workspace `cargo test` (the merge changes `nice_common` only).
 
@@ -121,3 +121,31 @@ Not run: Metal, HIP, any 64-lane device; whole-workspace `cargo test` (the merge
 
 `git push fork t26/top-slot:pr/top-slot-any-plane` at 06:49 UTC: `ec6a43a1..31ba079b` (fast-forward, accepted).
 `fork/pr/top-slot-any-plane` = `31ba079ba2dae573e372aa01ecd50eb20eb391e5`. No PR action taken.
+
+GitHub (read only, 07:22 UTC): PR #260 head = `31ba079b`, **MERGEABLE**; its CI on the merge: every finished job green
+(Format and clippy, Test workspace, Test GPU host code, cubecl on lavapipe, cubecl (Metal) on macOS, wasm e2e, image
+and release-target builds); Linux-armv7 and Linux-arm-musl builds still running at that time (state UNSTABLE only for
+those).
+
+## 5. Files
+
+`scripts/` (box scripts: `setup.sh`, `build.sh`, `builds.sh`, `ex.sh`, `t.sh`, `lvp.sh`, `atomcmp.py` from T26B);
+`work/` (`lint_ivory.log`, `host_tests_ivory.log`, `cand_vs_int.diff` = `merge_vs_int.diff`, `p255.diff`,
+`p259.diff`, `interdiff.txt`, `merge_vs_main.u0`, `fix_vs_oldmain.u0`, `conflicts.rs`, the five source files of the
+merge-file step, `mu260.bundle`); `box/logs/` (every run), `box/out/` (`builds.txt`, `cmp_merge.txt`, `setup.out`
+with the chroot's Mesa version, build logs). CubeCL compilation dumps (`spv.log` 158 MB, `wgsl.log` 109 MB) stayed on
+the box, which destroys itself at about 10:45 UTC.
+
+## 6. The counts that differ from 11-14 (written by the director; the engineer was stopped by a harness outage at about 07:35 UTC before writing this section)
+
+- Same test, same field string, same partition count on both days (T26/RESULTS.md §5: b60 1e16 at
+  `1447429612114824200908`, 8 partitions of slice 0; both logs print "2 slice(s), 9 per launch").
+- **The 11-14 integration build (`8bcee21f`), built and run on this box today, gives today's numbers** [M]:
+  `box/logs/GI_dense_b60.log`: survivors 336157460, checked 22524024; `box/logs/GI_top_fd_matches.log`: 422,559,183
+  tops. So the code merged since 11-14 did not change them; the box did.
+- Which input differs was not shown. The engineer's unfinished probe (`box/probe/probe_plan.rs`) was testing the
+  likely cause: the test plans the field with `JoinLimits::for_buffer(device memory / 4).with_vram_budget()`, so
+  the first slice's extent, and with it "8 partitions of slice 0", depends on the memory the card reports; the
+  heavy FD comparison includes the same 1e16 field. Vast's "RTX 3080" covers 10 GB and 12 GB cards. [inferred]
+- Whole-field totals do not depend on slicing: the production comparisons (T2.3, T28.1, and task 2 above:
+  main `0711b163` equals yesterday's main on six base-62 fields exactly) are unaffected.

@@ -37,6 +37,26 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   first combined background run hit its 50-minute limit after finishing #255's). #255 is
   mergeable again with CI at 23 pass and 2 pending; #259's CI has just started.
 
+- **08:05 UTC: #260 merged up (31ba079), verified; release numbers in; a harness outage in
+  between.** (`MU260/RESULTS.md`, `MU260/RELEASE-NUMBERS.md`; 246 k tokens; box 60886021
+  destroyed after 2.27 h.) The engineer built the resolution mechanically from the tested
+  integration branch and proved it by diffs; I read the `ran` words in the pushed file and the
+  hunk list myself. Device suites pass on CUDA and on lavapipe from Mesa 26.0.8; 902 kernel
+  variants have every atomic operation in SPIR-V. **v3.4.7 takes ×3.25 main's join time at b62
+  on an RTX 3080 at 300 W (161.6 s against 49.8 s); NiceMark ×2.28.**
+  Two totals of the exactness tests differ from 11-14 with the same commands: I had the engineer
+  trace it; the 11-14 build gives today's numbers on today's box (`GI_*.log`, copied to ivory),
+  so it is the box and not the code; the input (most likely the card's reported memory, which
+  sets the first slice) was not shown, because **the harness's permission check failed for
+  about 25 minutes from ≈ 07:35 UTC: it stopped the agent and blocked my own shell commands**;
+  I finished from the logs when it returned (my attempt to finish the engineer's probe on the
+  box did not build; dropped). The box idled about 30 minutes for that (≈ $0.07).
+  CI at 08:05: #255 green; #259 and #260 with one or two jobs still running, none failed.
+  All three mergeable.
+- **Tomorrow:** merge-ups if #255 / #259 / #260 land (#255 and #259 touch `walk_pf_lean`: the
+  second needs the integration branch's resolution); the realized gain on demoux when it runs
+  main; nothing else is queued that does not need the user (window, release, CI-check yes).
+
 ## 2026-11-15 (cycle 6 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $16.60 invoiced of $30 (fleet $26.42);
