@@ -4,6 +4,33 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-16 (cycle 7 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $17.36 invoiced of $30 (fleet $28.28);
+  credit $15.67; 15 days left (≈ $0.84 a day). No day missed. No user message, but **the user
+  merged five PRs on 11-15 between 15:06 and 15:24 UTC: #264, #251, #256, #262, #263** (main =
+  0711b16, CI green). Open: #255, #259, #260, all three in conflict with main after the merges.
+  ivory at 93 %: day-old build artifacts removed (11 GB free).
+- **#264 was deployed at once and works** (public API, `../2026-11-fresh-eyes/recent_niceonly_1116.json`):
+  before (01:00–15:06 UTC, 14.1 h) 253 of 1,091 real base-62 submissions were second searches
+  (23.2 %; 23.1 % of join seconds); after (14.6 h) **0 of 1,012**. demoux's new fields per hour
+  51.3 → 65.2 (**×1.27**); all clients 59.4 → 69.2 (the fleet was away for eight of those hours).
+- **demoux is still on a7a59c1** (57–60 s a real field): nothing of #251 / #256 is realized yet.
+  The fleet is still on v3.4.7 (320–425 s; RTX 4060, 3060, 3070, V100 now).
+- **Merge-ups (my job the day PRs land):**
+  - #255 and #259 conflicted only in CHANGELOG: merged main into each (merge commits, every line
+    kept, the PR's own line first), `just lint` and the host tests running before the push.
+  - #260 conflicts in ten regions of `cubecl_join.rs` (the `ran` words it shares with the merged
+    #251): given to an Opus engineer with box 60886021 (RTX 3080 at 300 W, $0.121/h, TTL 10:45
+    UTC), `MU260/BRIEF.md`: resolve to the tested resolution of `exp/integration-1114` per
+    T26/REVIEW F4, prove it by diffs, verify on CUDA and on lavapipe from Mesa 26.0.8, check the
+    SPIR-V module for missing atomics, push the merge commit. Second, time-boxed: v3.4.7 against
+    main 0711b16 at b62 at this card's default power, and NiceMark (API pointed at a closed
+    port): numbers for the release decision.
+- **Plan otherwise:** nothing new started. The levers left are the user's: deploy main on demoux
+  (×1.18 at b62 there by the window's numbers), a release for the fleet (×3.1), the window for
+  N22's candidate. T2.7's CI comparison waits for a yes.
+
 ## 2026-11-15 (cycle 6 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $16.60 invoiced of $30 (fleet $26.42);

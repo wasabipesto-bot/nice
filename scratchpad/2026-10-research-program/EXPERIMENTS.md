@@ -5,6 +5,18 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## Q1.2 Realized effect of #264 (2026-11-16, director, public API by bounded id ranges; `../2026-11-fresh-eyes/recent_niceonly_1116.json` = nice-only submissions with id in (294552514, 295551140])
+
+- #264 merged 2026-11-15 15:06 UTC; deployed at once by the evidence below.
+- Real base-62 submissions (join `run_secs` > 1) [M]: **before** (01:00–15:06 UTC, 14.1 h): 1,091, of which 253 are
+  a second search of a field (23.2 %; 23.1 % of join seconds): demoux 724 new + 218 repeats, fleet 114 + 35.
+  **After** (15:06 → 05:43 UTC, 14.6 h): 1,012, **0 repeats**: demoux 954 new, fleet 58 new.
+- New fields per hour: demoux 51.3 → 65.2 (**×1.27**); all clients 59.4 → 69.2 (×1.16; the fleet submitted
+  nothing from ≈ 15:00 to 23:00 UTC). demoux's real submissions per hour unchanged (66.8 → 65.2): the same work,
+  none of it wasted.
+- demoux build a7a59c1 throughout (median join 57–60 s); fleet v3.4.7 on RTX 4060 / 3060 / 3070 / V100 (medians
+  320–425 s).
+
 ## Q1.1 The nice-only claim queue handed fields out twice at base 62; PR #264 (2026-11-15 09:31–10:15 UTC, engineer and independent reviewer; `Q1/RESULTS.md`, `Q1/PR-BODY.md`, `Q1/REVIEW.md`, `Q1/raw/` (`analyse.py`, `routes.py`, claims data, `test_runs_after_review.txt`), `Q1/b62_niceonly_submissions_to_0929utc.json`; fork `pr/api-niceonly-queue-stale-claims` 516444e = 6a62913 + acc615d (the review's removal of the detailed age limit) + the changelog number; scratch Postgres on ivory, no box)
 
 - **Production, base 62, 00:58–09:29 UTC** [M, public API]: 655 real nice-only submissions on 530 fields; 125 fields
