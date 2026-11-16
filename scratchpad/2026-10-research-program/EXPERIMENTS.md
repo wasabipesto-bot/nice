@@ -5,6 +5,18 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T2.9 Realized gain of main 0711b16 on demoux at base 62, from telemetry (2026-11-16 20:55 UTC, director, public API by bounded id ranges; `../2026-11-fresh-eyes/recent_niceonly_1116b.json`)
+
+- demoux switched from a7a59c1 to **0711b16** (main with #251, #256, #262, #263; before #259 and #260) at
+  2026-11-16 12:52 UTC. Real base-62 fields (join `run_secs` > 1), hours kept only if their median is within
+  1.25× the build's (all 25 + 9 hours qualified: no shared-card hours).
+- a7a59c1, last 24 h before the switch: n = 1,557, join median 58.1 s (mean 55.2), 72.8 ps per survivor.
+  0711b16: n = 634, median 48.0 s (mean 45.6), 61.8 ps per survivor.
+- **Realized: ×1.21 in join seconds (median and mean), ×1.18 per survivor (the fields since the switch have ≈ 3 %
+  fewer survivors); real fields per full hour 65 → 78 (×1.20).** The windows had predicted ×1.18–1.19 (#251
+  ×1.12–1.13 × #256 ×1.056).
+- Fleet: still v3.4.7 (8bd154b), median ≈ 305 s. No release tag yet (latest v3.4.7). Main 7e0113f CI all green.
+
 ## G2.1 A second-generation join from a clean slate: design, adversarial review, benchmark staged (2026-11-16 16:28–18:45 UTC, designer, independent reviewer; `G2/RESULTS.md`, `G2/NOTES.md`, `G2/model.py`, `G2/model2.py`, `G2/proto/` (exact CPU prototype), `G2/raw/`; `G2/REVIEW.md`, `G2/review/` (independent predicate, `model_review.py`, `order.py`); `G2/BENCH.md`, `G2/bench/` (inputs for one b64 super-unit, `g2bench.cu`, box scripts); no GPU run yet)
 
 - **Design:** work unit = transversal super-unit π′ = digits 4–8 of n (every leading and low value); shape (f0 4,

@@ -200,6 +200,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   user says otherwise); a deep line on the pairing step with real masks from the staged b64
   super-unit; merge-ups and realized gains if a release went out.
 
+- **20:57 UTC: demoux deployed main 0711b16 at 12:52 UTC; realized ×1.21** (EXPERIMENTS T2.9):
+  join median 58.1 → 48.0 s, ×1.18 per survivor, real fields per hour 65 → 78; the windows had
+  predicted ×1.18–1.19. With #264 that is 51 → 78 new fields an hour on demoux since yesterday
+  morning (×1.5). Fleet still v3.4.7; no release tag yet; main 7e0113f CI all green. No user
+  reply yet on decisions 8 and 9.
+
 ## 2026-11-15 (cycle 6 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $16.60 invoiced of $30 (fleet $26.42);
