@@ -127,6 +127,7 @@ mod kernels {
     pub fn g2_kernel(
         par: &Array<u32>, // parent records, 4 words each (mask lo, mask hi, cacc, r4), loaded as one 16-byte run
         pseg: &Array<u32>,
+        tmask: &Array<u64>, // the tops' masks (only for --tdig 0: digits made in every cube, as before the fixes)
         tdig: &Array<u32>, // each top's digits, 20 6-bit fields in 4 words (`tdig_kernel`), computed once per super-unit
         tseg: &Array<u32>,
         roots: &Array<u32>,
@@ -145,18 +146,21 @@ mod kernels {
         #[comptime] ranks: u32,
         #[comptime] cut: u32,
         #[comptime] cmask: u32,
+        #[comptime] tdg: u32,
     ) {
         let npl = comptime!(NT / w);
         let segs = comptime!(64 / w); // ballot segments per chunk (W <= 64)
         let mut pend_p = SharedMemory::<u32>::new(comptime!((fill + NT) as usize));
         let mut sl = SharedMemory::<u32>::new(comptime!((64 * 16 * 2) as usize)); // [(v*16+q)*2 + half]
-        let slt = SharedMemory::<Atomic<u32>>::new(comptime!((if w < 32 { 64 * 16 * 2 } else { 1 }) as usize));
+        // every shared array a multiple of 128 bytes, so that every array starts 128-byte aligned whatever order
+        // CubeCL places them in (its placement changed per build, and the full kernel's time with it)
+        let slt = SharedMemory::<Atomic<u32>>::new(comptime!((if w < 32 { 64 * 16 * 2 } else { 32 }) as usize));
         let comm = SharedMemory::<Atomic<u32>>::new(32usize); // [2q + half]
         let mut prob_d = SharedMemory::<u32>::new(comptime!((PMAX * 4) as usize));
         let mut plist = SharedMemory::<u32>::new(comptime!(PMAX as usize));
-        let mut wcnt = SharedMemory::<u32>::new(comptime!((2 * NT / w) as usize));
-        let s_nl = SharedMemory::<Atomic<u32>>::new(1usize);
-        let mut s_np = SharedMemory::<u32>::new(1usize);
+        let mut wcnt = SharedMemory::<u32>::new(comptime!((if 2 * NT / w < 32 { 32 } else { 2 * NT / w }) as usize));
+        let s_nl = SharedMemory::<Atomic<u32>>::new(32usize);
+        let mut s_np = SharedMemory::<u32>::new(32usize);
 
         let t = UNIT_POS_X;
         let lane = UNIT_POS_PLANE;
@@ -206,9 +210,29 @@ mod kernels {
             let mut j = t;
             while j < b1 - b0 {
                 if base + j < PMAX {
-                    #[unroll]
-                    for k in 0..4u32 {
-                        prob_d[((base + j) * 4u32 + k) as usize] = tdig[((b0 + j) * 4u32 + k) as usize];
+                    if comptime!(tdg == 1) {
+                        #[unroll]
+                        for k in 0..4u32 {
+                            prob_d[((base + j) * 4u32 + k) as usize] = tdig[((b0 + j) * 4u32 + k) as usize];
+                        }
+                    } else {
+                        let mut x = tmask[(b0 + j) as usize];
+                        let first = x.trailing_zeros();
+                        let mut dw = Array::<u32>::new(4usize);
+                        #[unroll]
+                        for k in 0..4u32 {
+                            dw[k as usize] = 0u32;
+                        }
+                        #[unroll]
+                        for k in 0..20u32 {
+                            let v = select(x != 0u64, x.trailing_zeros(), first);
+                            x &= x - select(x != 0u64, 1u64, 0u64);
+                            dw[comptime!(k / 5) as usize] |= v << comptime!(6 * (k % 5));
+                        }
+                        #[unroll]
+                        for k in 0..4u32 {
+                            prob_d[((base + j) * 4u32 + k) as usize] = dw[k as usize];
+                        }
                     }
                 }
                 j += NT;
@@ -1315,6 +1339,9 @@ fn run_gpu<R: Runtime>(
     let rec = mk(rec_host.clone());
     let pseg = mk(inp.pseg.clone());
     let tdig = mk(tdig_host.clone());
+    let tmask_k = client.create(cubecl::bytes::Bytes::from_elems(inp.ts.iter().map(|t| t.mask).collect::<Vec<u64>>()));
+    // --tdig 0: the probe setup makes the digits in every cube (as before the fixes), for bisecting
+    let tdg: u32 = opt("--tdig").map_or(Ok(0), |s| s.parse())?; // 0 by default: 1 slowed the full kernel by 2.8 ms on CUDA (cause unknown)
     let tseg = mk(inp.tseg.clone());
     let roots = mk(ROOTS.to_vec());
     chk("records/digits/tseg/roots");
@@ -1355,10 +1382,17 @@ fn run_gpu<R: Runtime>(
         let g_pseg = client.empty(64 * 4);
         let mut tv = Vec::new();
         let mut histh = mk(vec![0u32; 16128]);
-        for _ in 0..reps.max(1) {
+        let pburst = args.iter().any(|a| a == "--burst");
+        let mut pt0: Option<Instant> = None;
+        for prep_rep in 0..reps.max(1) {
             histh = mk(vec![0u32; 16128]);
-            cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
+            if !pburst || prep_rep == 0 {
+                cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
+            }
             let tl = Instant::now();
+            if pt0.is_none() {
+                pt0 = Some(tl);
+            }
             let cubes = nroots.div_ceil(NT);
             unsafe {
                 prep::tdig_kernel::launch_unchecked::<R>(
@@ -1387,6 +1421,13 @@ fn run_gpu<R: Runtime>(
                     ArrayArg::from_raw_parts(off.clone(), 16128), ArrayArg::from_raw_parts(histh.clone(), 16128),
                     ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4), ArrayArg::from_raw_parts(g_rec.clone(), npar * 4),
                 );
+            }
+            if pburst {
+                if prep_rep + 1 == reps.max(1) {
+                    cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
+                    tv.push(pt0.unwrap().elapsed().as_secs_f64() / reps.max(1) as f64);
+                }
+                continue;
             }
             cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
             tv.push(tl.elapsed().as_secs_f64());
@@ -1424,6 +1465,11 @@ fn run_gpu<R: Runtime>(
         let mut pairs = Vec::new();
         let mut nrec = 0u64;
         let mut nslabs = 0u64;
+        // --burst (with --no-sets): all reps' launches queued back to back and synced once, the time divided by the
+        // reps: no per-sync latency of the runtime in the number (wall-clock syncs quantize CubeCL's timings)
+        let burst = args.iter().any(|a| a == "--burst") && no_sets;
+        let mut burst_t0: Option<Instant> = None;
+        let mut burst_pending = Vec::new();
         for rep in 0..reps.max(1) {
             let last_rep = rep + 1 == reps.max(1);
             let mut tsum = 0f64;
@@ -1442,6 +1488,7 @@ fn run_gpu<R: Runtime>(
                                 CubeDim::new_1d(NT),
                                 ArrayArg::from_raw_parts(rec.clone(), inp.par.len() * 4),
                                 ArrayArg::from_raw_parts(pseg.clone(), 64),
+                                ArrayArg::from_raw_parts(tmask_k.clone(), inp.ts.len()),
                                 ArrayArg::from_raw_parts(tdig.clone(), inp.ts.len() * 4),
                                 ArrayArg::from_raw_parts(tseg.clone(), inp.tseg.len()),
                                 ArrayArg::from_raw_parts(roots.clone(), NROOT),
@@ -1460,6 +1507,7 @@ fn run_gpu<R: Runtime>(
                                 ranks,
                                 cut,
                                 cmask,
+                                tdg,
                             )
                         };
                     }
@@ -1470,6 +1518,27 @@ fn run_gpu<R: Runtime>(
                         (_, false) => go!(2u32, false),
                         (_, true) => go!(2u32, true),
                     }
+                }
+                if burst {
+                    if burst_t0.is_none() {
+                        burst_t0 = Some(tl);
+                    }
+                    if last_rep {
+                        burst_pending.push(cnt);
+                    }
+                    if !(last_rep && bi + 1 == batches.len()) {
+                        continue;
+                    }
+                    cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
+                    let per = burst_t0.take().unwrap().elapsed().as_secs_f64() / reps.max(1) as f64;
+                    for h in burst_pending.drain(..) {
+                        let hc = u32::from_bytes(&client.read_one(h).map_err(|e| anyhow!("{e:?}"))?).to_vec();
+                        for (i, &x) in hc.iter().enumerate() {
+                            hc_tot[i] += x as u64;
+                        }
+                    }
+                    tv.push(per);
+                    continue;
                 }
                 if no_sets {
                     // timing runs: the launches of one rep are queued back to back and synced once (no tail per
@@ -1538,7 +1607,9 @@ fn run_gpu<R: Runtime>(
                     }
                 }
             }
-            tv.push(tsum);
+            if !burst {
+                tv.push(tsum);
+            }
         }
         tv.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let med = tv[tv.len() / 2];

@@ -202,3 +202,77 @@ The algorithm and the order are unchanged throughout: same chunks, same kept inc
   - The 1.573 fs above is the low mode, seen in all three A1 rounds. The window driver's dry run on this box gave
     A at 1.66–2.02 fs, with launches of 1008 synced one by one.
   - The cause is not found. Candidates: CubeCL's memory pool placement, or a clock state at process start.
+
+## CubeCL port after fixes (2026-11-17 13:09–13:56 UTC, Vast 61073296, RTX 3080 at a 300 W cap, one session)
+
+**The fixed port (`997339bc`) is exact at 32 lanes with the new common masks**:
+- both super-units;
+- survivor sets, counts, the GPU preparation's records, order, class segments and top digits;
+- 0 kernel errors;
+- `--cmask 0` also exact.
+
+**It is slower, not faster: 2.13–2.44 fs end to end.** For comparison, the pre-fix port was 1.573 fs on the
+previous box, and hand CUDA v10 is 1.115 fs here.
+
+| component (ms, per-launch medians of 200) | v10 | fixed port F | F, `--cmask 0` | F without records | pre-fix A1 (same box) | 02075501 (host-only change on A1) |
+|---|---|---|---|---|---|---|
+| preparation | 0.42 | **0.705 / 0.707** (from 1.03) | 0.70 | — | — | — |
+| bottom side (probes off) | 0.624 / 0.630 | **1.75–1.80** (from 1.97–2.16) | 1.76–2.14 | 1.79–1.80 | 1.97–2.16 | 1.77–1.95 |
+| full kernel | 4.54 | **8.80–10.20** | 9.0 | 5.39 / 5.40 | 5.80 / 7.19 / 5.80 | 7.19–7.21 |
+| end to end, fs per admissible n | 1.115 / 1.114 | **2.440 / 2.127** | 2.17 / 2.17 | — | — | — |
+
+- **Repeated processes of F** (modes 0 and 2, six processes): the full kernel took 8.99, 10.19, 10.00, 10.19, 8.99
+  and 8.99 ms. Median 9.5, **minimum 8.99**.
+- **Output-buffer size makes no difference:** with batches of 1008, 2016 and 4032 the full kernel was 9.0 ms each
+  time.
+- **A second protocol, `--burst`**, queues 400 launches and syncs once, so its numbers include host-side buffer
+  creation between launches. It ranked the same way: F 2.76 / 2.92, F `--cmask 0` 2.82 / 2.77, pre-fix 2.11 /
+  2.10, and v10 (events) 1.12 / 1.11 fs.
+- **What it means:**
+  - **The fixes did what they were for.** The preparation fell by 0.33 ms and the bottom side by about 0.25 ms.
+  - **The record path in phase 3 got about 3 ms slower** (full minus no-records: 3.6 ms, against 0.4 ms for A1).
+    The same 3b code is in both.
+  - The same jump in quantized steps of about 1.4 ms (5.8 → 7.2 → 8.8 → 10.2) already appeared between two pre-fix
+    builds that differ only in comptime-dead code and host code: A1 against 02075501.
+  - CubeCL's generated CUDA places the shared arrays at different offsets in every build: `prob_d` lost its 16-byte
+    alignment, and `pend_p` moved to 0 (`raw/cuda_box2/cuda_src/*_k2.cu`).
+  - **My reading, not proven:** the record path is sensitive to CubeCL's shared-memory layout or its scheduling on
+    this kernel, not to the fixes' arithmetic.
+- **Main:** not re-run on this box (time went to the bisection). The same-session main values from today are 6.35
+  and 6.396 fs, on other 3080s.
+  - Against those, the fixed port is ×2.6–2.9 (best run: 6.396 / (2.127 + 0.115) = ×2.85).
+  - The pre-fix port was ×3.8; v10 is ×5.1.
+- Raw: `G2/port/raw/cuda_box2/`.
+- **Follow-up at 14:00: every shared array padded to a multiple of 128 bytes** (`b2624def`), so that every array
+  is 128-byte aligned in any placement.
+  - Exact on lavapipe (4 jobs) and on this 3080 (whole super-unit, GPU prep).
+  - **The timing became stable: 2.1249 / 2.1262 / 2.1263 / 2.1261 fs** in four processes (full 8.795–8.797 ms).
+  - The bimodality across builds and processes is gone, so the placement lottery was the variance.
+  - The slowdown remains, so it is real code, not layout. The record path (full against no-records) still costs
+    about 3.4 ms more than in the pre-fix build.
+  - The generated CUDA of the record path has the same structure in both builds; the cause is not found.
+- **Bisection so far:**
+  - The no-records kernel is unchanged at 5.4 ms.
+  - `--cmask 0` is just as slow, so the common masks are not the cause.
+  - That leaves the parent-record and top-digit changes, or their side effects, in the phase 3 record path.
+- **Found at 14:10: the precomputed top digits are the culprit.**
+  - The digits come from `tdig_kernel` and are copied into each cube's probe table, instead of being made in the
+    cube.
+  - On the same binary, `--tdig 1` against `--tdig 0` gave a full kernel of 8.796 / 8.798 ms against 5.998 / 5.998.
+  - The table contents are identical (exact either way). The cause is a CUDA codegen effect not yet understood.
+  - **`--tdig 0` is now the default** (head `9ff100e6`).
+- **Final four rounds, same session** (per-launch medians, GPU prep included):
+
+  | round | 1 | 2 | 3 | 4 |
+  |---|---|---|---|---|
+  | **fixed port (`--tdig 0`), fs** | **1.4995** | **1.4991** | **1.5006** | **1.4989** |
+  | v10, fs | 1.1139 | 1.1214 | 1.1173 | 1.1146 |
+
+  - Fixed port: **median 1.4993, minimum 1.4989 fs**.
+  - Components: prep 0.70 ms, probes off 1.75 ms, full 5.998 ms.
+  - **CubeCL/v10 = ×1.34** (×1.37 before the fixes, 1.573 fs).
+  - The gain is the preparation alone. The bottom-side gain is offset inside the full kernel: full stays at the
+    pre-fix low mode, 6.0 ms.
+  - Exact at W = 32 with `--tdig 0` on both super-units.
+- **Against today's same-session main values** (6.35 and 6.396 fs, not re-run on this box): **×3.93–3.96**,
+  counting tops and survivor checks.

@@ -115,6 +115,41 @@ Brief: `G2/PORT-BRIEF.md`. Benchmark ported: `G2/BENCH.md` (kernel v10, ×5.13 o
       ×4.5 before the fixes. Both rest on the CUDA savings being real. The cut timings make them likely, but they
       are not measured.
 
+- **2026-11-17 13:56 UTC, the fixes on a 3080 (Vast 61073296) — a regression:**
+  - **Exact at W = 32 with `--cmask 1`.** That is the combination lavapipe could not run.
+  - **The fixed port is 2.13–2.44 fs end to end** (v10 1.115). The prep improved 1.03 → 0.70 ms and the bottom side
+    2.0 → 1.75 ms, but the full kernel with survivor records went 5.8 → 8.8–10.2 ms. Without records it is
+    unchanged at 5.4 ms.
+  - The full kernel takes quantized steps of about 1.4 ms between builds, already seen between two pre-fix builds.
+    CubeCL's shared-array placement differs per build. Suspected, not proven.
+  - **Padding every shared array to a multiple of 128 bytes** (head **`b2624def`**, bundle current) made the timing
+    stable at 2.126 fs (four processes, ±0.1 %). The variance was placement; the slowdown is code.
+    - `--cmask 0` is not the cause.
+    - Next bisect, one fix at a time on a card: (a) 4-word records only; (b) top digits only.
+    - Each is a small revert on top of `b2624def`; the cubecl-cuda build takes about 1 min there.
+  - **The RX 9070 XT prediction is withdrawn to "unknown; ×4.5 before the fixes" until this is understood.** The
+    AMD compiler does its own LDS layout, so the effect may not carry over, but nothing shows that it does not.
+  - **Next:**
+    1. Find the record-path sensitivity on CUDA. Try:
+       - pinning the shared layout, by declaring arrays in a fixed order or merging them into one array with
+         manual offsets;
+       - records staged in shared memory then flushed per round;
+       - an `nsys`/`ncu` run where counters are allowed.
+    2. Then re-time.
+    3. Only then the window.
+- **Window plan:** do not spend the AMD hour until the fixed port is at least back to the pre-fix 1.57 fs on CUDA.
+  If the window happens anyway, run variants A (the fixed build) and the pre-fix build `3cb3abda` side by side.
+
+- **2026-11-17 14:20 UTC, culprit found:**
+  - `--tdig 1` (top digits copied from a per-super-unit table) slows CUDA's full kernel by 2.8 ms, with identical
+    contents. `--tdig 0` is now the default (head **`9ff100e6`**, bundle current).
+  - **Fixed port: 1.499 fs** (four rounds, minimum 1.4989) against v10 1.114–1.121: **×1.34**. Against morning
+    main: ×3.93–3.96. Exact at W = 32.
+  - The remaining gap to v10 is the bottom side (1.75 against 0.63 ms) and the prep (0.70 against 0.42 ms).
+    - The bottom-side gain did not show in the full kernel, which stayed at 6.0 ms.
+  - **RX 9070 XT prediction:** by the CUDA-component method, prep 0.70 instead of 1.03 ms and the rest as
+    measured: central about ×4.7 (×3.4–5.9). The stop line ×4.0 is still inside the band.
+
 ## Worktree, branch, build
 
 - **Worktree and branch:**

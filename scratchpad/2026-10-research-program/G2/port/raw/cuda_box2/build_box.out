@@ -1,0 +1,49 @@
++ source /root/.cargo/env
+++ case ":${PATH}:" in
+++ export PATH=/root/.cargo/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/root/.cargo/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++ cd /root/nice
++ git fetch -q upstream main
++ git checkout -q --detach FETCH_HEAD
++ git log --oneline -1
+7e0113fc Overlap join: append the FD kernel's tops without assuming lane 0 (#260)
++ git fetch -q /root/g2/g2-cubecl-local.bundle g2-cubecl-local:g2-cubecl-local
++ git worktree add -f /root/g2/wt g2-cubecl-local
+Preparing worktree (checking out 'g2-cubecl-local')
+HEAD is now at 997339bc g2 port: common-mask branch purely comptime (WGSL kept dead atomicAnd)
++ cd /root/g2/wt
++ git log --oneline -3
+997339bc g2 port: common-mask branch purely comptime (WGSL kept dead atomicAnd)
+b3cbb430 g2 port: --cmask switch; valid rows from u32 shifts
+75348455 g2 port fixes: common masks from the transpose, 4-word parent records, rank-sort prep, top digits once per super-unit
++ mkdir -p /root/g2/bin
++ export CARGO_TARGET_DIR=/root/t/g2 NICE_BUILD_SHA=test
++ CARGO_TARGET_DIR=/root/t/g2
++ NICE_BUILD_SHA=test
++ cd /root/g2
++ nvcc -O3 -arch=sm_86 -std=c++17 -lineinfo -Xptxas -v -DKVER=10 -DMINB=3 -o bin/v10 g2bench_final.cu
++ echo 'v10 rc=0'
+v10 rc=0
++ cargo build --release -j 22 -p nice_common --example g2_cubecl --features cubecl-cuda
++ echo 'g2 rc=0'
+g2 rc=0
++ cp /root/t/g2/release/examples/g2_cubecl /root/g2/bin/g2_cuda
++ cargo build --release -j 22 -p nice_client --features gpu,cubecl-cuda
++ echo 'client rc=0'
+client rc=0
++ cp /root/t/g2/release/nice_client /root/g2/box/nice-main
++ cargo test --release -j 22 -p nice_common --features gpu,cubecl-cuda --no-run
+Terminated
++ echo 'test rc=143'
+test rc=143
+++ grep -o 'Executable unittests src/lib.rs ([^)]*)' /root/g2/build_test.log
+++ sed 's/.*(//; s/)//'
++ b=
++ cp '' /root/g2/bin/main_cuda_test
+cp: cannot stat '': No such file or directory
++ md5sum /root/g2/bin/g2_cuda /root/g2/bin/v10 /root/g2/box/nice-main
+ba5dad700aab8e3c6725935fd8f94ec6  /root/g2/bin/g2_cuda
+3556dc938b5b1297459cbb4a99e510a2  /root/g2/bin/v10
+9a769a358d0c7b3f9eb212c524f0a298  /root/g2/box/nice-main
++ echo BUILD_DONE
+BUILD_DONE

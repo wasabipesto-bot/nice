@@ -21,9 +21,9 @@ grep -q 'ALL CHECKS PASSED' $OUT/x_B_su1.log && XB=1 || XB=0
 echo "EXACT A=$XA B=$XB"
 [ $XA = 1 ] || [ $XB = 1 ] || { echo "no exact variant on the card: stop (report the logs)"; exit 1; }
 # timing variants: A = shuffle transpose, 2 entries per step (the predicted default); B = ballot transpose; C = 1 entry
-VA="--xpose 1 --ept 2"; VB="--xpose 0 --ept 2"; VC="--xpose 1 --ept 1"
+VA="--xpose 1 --ept 2"; VB="--xpose 0 --ept 2"; VC="--xpose 1 --ept 1"; VD="--xpose 1 --ept 2 --tdig 1"
 g2t() { # round variant
-  eval V=\$V$2; [ "$2" = A ] && [ $XA = 0 ] && return; [ "$2" = C ] && [ $XA = 0 ] && return; [ "$2" = B ] && [ $XB = 0 ] && return
+  eval V=\$V$2; [ "$2" = D ] && [ $XA = 0 ] && return; [ "$2" = A ] && [ $XA = 0 ] && return; [ "$2" = C ] && [ $XA = 0 ] && return; [ "$2" = B ] && [ $XB = 0 ] && return
   ok; sh $S/run_g2.sh t_$2_r$1 $SU1 --gpu-prep --no-sets --reps $REPS $V
   ok; sh $S/run_g2.sh o_$2_r$1 $SU1 --no-sets --noout --modes 0,1,2 --reps $REPS $V
 }
@@ -36,6 +36,8 @@ mainf 6 10
 g2t 3 C; g2t 3 A; g2t 3 B
 # round 4 of A (the CubeCL kernel's timing was bimodal across processes on a 3080: four rounds, median and minimum)
 g2t 4 A
+# D: the precomputed top digits (3 ms slower on CUDA's full kernel; is it the same on the card?)
+g2t 1 D
 echo "SPARE_START $(date -u +%T)"
 # spare: re-run once any main field the analysis marks OFF-POINT (the director's call), else round 5 of A
 ok; g2t 5 A

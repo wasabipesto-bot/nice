@@ -105,6 +105,25 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   its ssh port and two offers were stale): exactness at 32 lanes with the new masks, v10 against
   the fixed port, four rounds. Hard stop 14:40.
 
+- **14:25 UTC: the fixed port measured (EXPERIMENTS G2.5; box destroyed after 1.25 h; credit
+  $12.24): 1.499 fs, ×1.34 slower than the hand-written kernel on the same card; ×3.93–3.96
+  against today's main values.** Only the preparation fix carried into the total. One fix made
+  the kernel 2.8 ms slower with identical output (a code-generation effect, not understood;
+  switched off), and the bimodal timings were CubeCL's placement of shared arrays (fixed by
+  padding). Exact at 32 lanes with the new masks.
+  **G2 at the end of the day:** hand CUDA ×5.1 (two cards), the portable port ×3.9 on NVIDIA,
+  the 9070 XT predicted ≈ ×4.7 (×3.4–5.9) against a stop line of ×4.0, the server change down
+  to a claim gate, a 45-minute window staged. Nothing more is useful without the user's card
+  or their word. Engineer today: 798 k tokens in all.
+  Vast today: $0.21 + $0.19 + $0.17 + $0.02 ≈ $0.59; month ≈ $18.3 of $30; credit $12.24
+  (floor $10; the fleet draws ≈ $1.85 a day).
+- **Tomorrow:** if the user says go, the window; if no, G2 is closed with its numbers. Either
+  way a new deep line is needed: candidates to weigh at the next cycle, none started: (a) what
+  makes CubeCL ×1.34 slower than hand CUDA on this kernel (if it is general, the production
+  join may be leaving the same on the table on NVIDIA and, worse, on the 9070 XT);
+  (b) bases beyond 64 (masks wider than 64 bits) in G2's structure; (c) a write-up of the
+  impossibility evidence is others' work (noted for the report).
+
 ## 2026-11-16 (cycle 7 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.36 invoiced of $30 (fleet $28.28);

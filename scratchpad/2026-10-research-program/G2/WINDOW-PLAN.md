@@ -157,3 +157,24 @@ ratio = main base mean / (G2 end-to-end + tops and survivor checks)
   bimodality, and gives the ratio for both.
 - **Prediction for the card:** central ×5.4 (×4.0–6.9). Stop line ×4.0. A useful extra comparison on the card is
   B = `--cmask 0` (variant C's slot), if a card run should show the in-transpose common masks' worth there.
+
+## Hold (2026-11-17 14:00 UTC; lifted at 14:20, see below)
+
+- **Do not run the window yet.**
+  - On a rented RTX 3080 the fixed port (`997339bc`) measured 2.13–2.44 fs.
+  - The pre-fix port measured 1.57 fs.
+  - The record path in the full kernel jumps in about 1.4 ms steps between CubeCL builds (`BENCH.md` §"CubeCL port
+    after fixes").
+- **Until that is understood, the RX 9070 XT prediction is not ×5.4. The last defensible value is ×4.5 (×3.3–5.7)
+  for the pre-fix port.**
+- **If the window must happen anyway:** build both `3cb3abda` (pre-fix) and the current head `b2624def` (stable but slow on CUDA). Run each as a variant
+  (four rounds, median and minimum), and decide on the better one.
+
+## Hold lifted, with one change (2026-11-17 14:20 UTC)
+
+- **Head `9ff100e6`.** `--tdig 0` is the default: the precomputed top-digit table was the 3 ms regression on CUDA.
+- The fixed port measures 1.499 fs on a 3080 (×1.34 hand CUDA). Prediction for the card: central about ×4.7
+  (×3.4–5.9).
+- In the window, add variant **D = `--tdig 1`**, one round. If the card shows the same penalty, the cause is in
+  CubeCL's IR, not in NVRTC.
+- Everything else in the plan stands: four rounds of A, median and minimum, one launch, sampler check.

@@ -5,6 +5,26 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## G2.5 The CubeCL port after its fixes: 1.499 fs, ×1.34 slower than hand CUDA; ×3.9 against main (2026-11-17 13:09–14:20 UTC, engineer; `G2/BENCH.md` "CubeCL port after fixes", `G2/PORT-NOTES.md`, `G2/WINDOW-PLAN.md`, `G2/port/raw/cuda_box2/` (incl. generated CUDA sources); box 61073296, RTX 3080 at a 300 W cap, 1.25 h, ~$0.17; port head 9ff100e, bundle current)
+
+- **Exact at 32 lanes on real hardware with the new common masks** [M]: both super-units, survivor sets, counts, the
+  GPU preparation's records, order, class segments and top digits; 0 kernel errors.
+- **Final four rounds, same session, fs per admissible n** [M]: fixed port 1.4995 / 1.4991 / 1.5006 / 1.4989 (median
+  1.4993); hand CUDA v10 1.1139 / 1.1214 / 1.1173 / 1.1146. **CubeCL / v10 = ×1.34** (×1.37 before the fixes).
+  Components of the port: preparation 0.70 ms (from 1.03), bottom side 1.75 ms (from ≈ 2.0), full kernel 5.998 ms
+  (unchanged: the bottom-side gain does not carry into the full kernel).
+- **Against main** (not re-run on this box; today's two same-session values on other 3080s, 6.35 and 6.396 fs),
+  with tops and survivor checks added: **×3.93–3.96** [D from M].
+- **Two CubeCL / CUDA code-generation effects found** [M]: (1) the fix that precomputes the top digits once per
+  super-unit made the full kernel 2.8 ms slower with identical output (8.796 against 5.998 ms on the same
+  binary by a switch; cause not understood; off by default); (2) run-to-run bimodality (steps of ≈ 1.4 ms)
+  came from where CubeCL places shared arrays in each build; padding every shared array to 128 bytes removes
+  it.
+- **Prediction for the RX 9070 XT** [D, ACO-based]: ≈ ×4.7 (×3.4–5.9); the proposal's stop line ×4.0 is inside the
+  band. The window driver gained a one-round variant with the precomputed digits.
+- **State of G2:** hand-written CUDA ×5.1 (two cards); the portable port ×3.9 on NVIDIA; the production card
+  unmeasured; everything for a 45-minute window is staged (`G2/WINDOW-PLAN.md`, ≈ 22 minutes of runs).
+
 ## G2.4 The CubeCL port on a real card: exact at 32 lanes; ×1.37 slower than hand CUDA; main replicated (2026-11-17 10:30–12:00 UTC, engineer; `G2/BENCH.md` "CubeCL port on CUDA", `G2/PORT-NOTES.md`, `G2/port/raw/cuda_box/`; box 61056498, RTX 3080 at a 280 W cap, 1.54 h, ~$0.19; port at local branch `g2-cubecl-local` 8579db4 → bundle head 0207550)
 
 - **Exactness at 32-lane planes on real hardware** [M]: both super-units, every unit's survivor set, the counts,
