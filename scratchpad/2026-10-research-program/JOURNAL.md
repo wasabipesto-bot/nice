@@ -52,6 +52,28 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   (`G2/PROPOSAL-BRIEF.md`, Opus, reading only, hard stop 10:45). No further GPU spend on G2
   without their word. Vast credit $13.07.
 
+- **07:45 UTC: the proposal is in (`G2/PROPOSAL.md`, 203 k tokens), and it shrinks the server
+  change.** Base 64's range is exactly [2^75, 2^76) (a power-of-two base), so moving n's bits 24–53
+  up to bits 45–74 renumbers the base one-to-one and every aligned range is a set of whole
+  super-units: **base 64 fits today's `fields` table as 262,144 fields of 2^57 (≈ 23 s each on a
+  3080); the server needs only a claim gate so old clients never receive a base-64 field, plus a
+  submit guard (≈ 150–250 lines, no new tables), or nothing at all with a private coordinator
+  for the owner's machines.** Detailed mode untouched. Whole base: 1,652 card-hours on a 3080
+  in G2 against 8,462 for main. Cost: 15–22 agent-days, mostly one CubeCL kernel for Vulkan and
+  CUDA; 2–3 days of the maintainer's review. Its stop line for the AMD card: ×4.0 same-session.
+  Strongest argument against: a permanent second search implementation and field ranges that
+  are no longer ranges of n, for about a year on one base, on a card not yet measured.
+- **Decision (mine, inside the rails): keep the critical path moving at prototype level without
+  the user's card or rented hardware.** I had told the user at 07:35 that G2 was parked; on
+  reflection, idling until they answer costs days against a late-December deadline, while a
+  CubeCL port of the benchmark kernel is throwaway work that spends neither their time nor
+  Vast credit. Lavapipe from CI's Mesa 26.0.8 now runs on ivory in a container
+  (`localhost/lvp26`, 421 MB: device tests on CI's Mesa no longer need a box). The benchmark
+  engineer is resumed with `G2/PORT-BRIEF.md`: port v10 to `#[cube]`, exactness on lavapipe
+  with both compilers, ACO pricing for gfx1201, a 45-minute window plan with a dry-run. Said
+  so to the user. I still do not ask for the card on my own initiative.
+  ivory: t26 build directory and the superseded 1.99.1 toolchain removed.
+
 ## 2026-11-16 (cycle 7 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.36 invoiced of $30 (fleet $28.28);

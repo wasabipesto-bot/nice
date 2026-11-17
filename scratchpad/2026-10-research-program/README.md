@@ -54,6 +54,13 @@ force-pushes, lease or not (2026-11-12). Bodies:
 what, why, soundness, measurements, exactness, short "Not in this PR"; no mention of the
 program, the scratchpad or fork-only write-ups; no reference re-pinning (ops does it).
 
+## Device tests on CI's Mesa without a box (2026-11-17)
+
+`podman run --rm --cgroups=disabled -v <dir>:<dir> -e VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json localhost/lvp26:latest <test binary> …`
+runs a host-built test binary on lavapipe from Mesa 26.0.8 (Ubuntu 26.04), the driver CI uses.
+Slow (CPU), but it is the check that would have caught #263's first-run failure. Rebuild the
+image with `apt-get install mesa-vulkan-drivers vulkan-tools` in `ubuntu:26.04` if it is gone.
+
 ## Rails (PROPOSAL §6)
 
 Never without asking: live fleet (config, crontab, `~/fleet-run`), server, schema,
