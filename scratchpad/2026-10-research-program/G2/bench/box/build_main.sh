@@ -5,7 +5,7 @@ set -e
 source ~/.cargo/env
 cd /root
 [ -d nice ] || git clone -q https://github.com/wasabipesto/nice.git
-cd nice && git fetch -q origin && git checkout -q --detach origin/main
+cd nice && (git remote get-url upstream >/dev/null 2>&1 || git remote add upstream https://github.com/wasabipesto/nice.git) && git fetch -q upstream main && git checkout -q --detach FETCH_HEAD
 git rev-parse HEAD > /root/g2/main_sha.txt
 export CARGO_TARGET_DIR=/root/t/main
 cargo build --release -p nice_client --features gpu,cubecl-cuda > /root/g2/build_main.log 2>&1

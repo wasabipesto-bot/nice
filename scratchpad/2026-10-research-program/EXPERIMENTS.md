@@ -5,6 +5,18 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## T2.10 Realized gain of main 7e0113f (#259, #260) on demoux at base 62 (2026-11-17 05:45 UTC, director, public API by bounded id ranges; `../2026-11-fresh-eyes/recent_niceonly_1117.json`)
+
+- demoux switched from 0711b16 to **7e0113f** (adds #259 the population-count prefilter test and #260 the top
+  append fix) at 2026-11-16 23:05 UTC. Real base-62 fields, hours kept only if their median is within 1.25× the
+  build's (all 12 + 7 hours qualified).
+- 0711b16: n = 794, join median 48.4 s, 61.6 ps per survivor. 7e0113f: n = 532, median 47.4 s, 59.9 ps per survivor.
+- **Realized: ×1.029 per survivor (×1.019 in median join seconds on slightly denser fields); 77.5 → 79 real fields
+  per full hour.** Predicted: #259 ×1.037 at b62 (window, 3 rounds) less #260's +0.2–0.3 %.
+- Since 11-15 morning on demoux: 51 → 79 new fields an hour (×1.55: the claim-queue fix ×1.27, #251 + #256 ×1.21,
+  #259 ×1.03). Fleet still v3.4.7 (RTX 4060 median ≈ 299 s); no release tag. Frontier 207076982 of 207159539
+  (82,557 fields left).
+
 ## T2.9 Realized gain of main 0711b16 on demoux at base 62, from telemetry (2026-11-16 20:55 UTC, director, public API by bounded id ranges; `../2026-11-fresh-eyes/recent_niceonly_1116b.json`)
 
 - demoux switched from a7a59c1 to **0711b16** (main with #251, #256, #262, #263; before #259 and #260) at

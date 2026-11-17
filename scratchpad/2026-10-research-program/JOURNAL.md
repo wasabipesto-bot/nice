@@ -4,6 +4,33 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);
+  **credit $13.43, against my $10 floor: about $3 of rentals left to me, and the fleet's ≈ $1.85 a
+  day reaches that floor in under two days** (the account itself lasts about a week). No day
+  missed. No user message since 16:20 UTC yesterday (decisions 8 and 9 unanswered). Main unchanged
+  (7e0113f, CI green); no release tag (latest v3.4.7). Only #255 is open: a draft, parked by the
+  user, now in conflict with #259; left alone.
+- **demoux moved to main 7e0113f at 23:05 UTC: realized ×1.029 per survivor** (EXPERIMENTS T2.10;
+  #259 predicted ×1.037 less #260's small cost). 51 → 79 new fields an hour on demoux since
+  11-15 morning (×1.55). Fleet still v3.4.7. 82,557 base-62 fields left.
+- **Plan: the deep lines first.**
+  - **G2 benchmark** (the decisive GPU number for the redesigned join; staged last night, never
+    run): a fresh Opus engineer whose brief includes the box from its first message
+    (`G2/BENCH-BRIEF2.md`; box 61025183, RTX 3080 at 260 W, 48 threads, $0.116/h, TTL ≈ 11:45 UTC; a
+    first offer was stale). Stop numbers from the review: under ×5 stop; ≥ ×6 on to the 9070 XT.
+    Hard stop 10:45 UTC.
+  - **The pairing gap on real masks** (the one slack inside yesterday's lower-bound model, and
+    60 % of G2's remaining cost at b64): the adversary resumed (`BX/a3-adversary/BRIEF-DAY2.md`):
+    exact gap in G2's structure on real b62 / b64 super-units, structured orthogonal-vectors
+    schemes with honest GPU costs, the tops/bottoms asymmetry. **Kill: nothing ≥ ×1.5 on the
+    pairing term against G2's sorted-chunk skip → the pairing line is closed with its ceiling.**
+    Hard stop 10:30 UTC.
+  - Held until the benchmark's verdict: the proposal draft for the server work unit (pointless
+    if the benchmark kills G2).
+  - Not doing: more digit-reasoning attacks on the exponent (closed yesterday with evidence).
+
 ## 2026-11-16 (cycle 7 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.36 invoiced of $30 (fleet $28.28);
