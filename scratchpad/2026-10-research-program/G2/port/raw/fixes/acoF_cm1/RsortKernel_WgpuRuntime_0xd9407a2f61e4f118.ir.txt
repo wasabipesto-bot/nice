@@ -1,0 +1,255 @@
+Shared memories: [
+    shared_array(id: 0, offset: 0, length: 2048, align: 4, ty: u32)
+]
+
+uniform bb0 {
+    Live variables: []
+
+    Live shared memories: []
+
+    binding(1) = input(0)[CubePosX] : (u32, u32, u32, u32) -> (u32); @ uniform
+    binding(2) = input(1)[CubePosX] : (u32, u32, u32, u32) -> (u32); @ uniform
+    binding(3) = binding(2) <= u32(2048) : (u32, u32) -> (bool); @ uniform
+    binding(3) ? bb2 : bb25; merge: bb25
+}
+
+uniform bb2 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb4;
+}
+
+bb4 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    local(4).v5 = phi [bb9: local(4).v6][bb2: UnitPosX];
+
+
+    loop(continue: bb9, merge: bb7)
+    branch bb5;
+}
+
+bb5 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(5) = local(4).v5 < binding(2) : (u32, u32) -> (bool);
+    binding(6) = !binding(5) : (bool) -> (bool);
+    binding(6) ? bb7 : bb8; merge: None
+}
+
+bb7 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb25;
+}
+
+bb8 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(7) = binding(1) + local(4).v5 : (u32, u32) -> (u32);
+    binding(8) = binding(7) << u32(2) : (u32, u32) -> (u32);
+    binding(9) = binding(8) + u32(3) : (u32, u32) -> (u32);
+    copy_mem(shared_array(0)[local(4).v5], input(2)[binding(9)]); @ uniform
+    local(4).v6 = local(4).v5 + u32(64) : (u32, u32) -> (u32);
+    branch bb9;
+}
+
+bb9 {
+    Uses: [ContinueTarget]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb4;
+}
+
+uniform bb10 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    local(4).v2 = phi [bb24: local(4).v3][bb25: UnitPosX];
+
+
+    loop(continue: bb24, merge: bb13)
+    branch bb11;
+}
+
+bb11 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(11) = local(4).v2 < binding(2) : (u32, u32) -> (bool);
+    binding(12) = !binding(11) : (bool) -> (bool);
+    binding(12) ? bb13 : bb14; merge: None
+}
+
+bb13 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    return;
+}
+
+bb14 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(13) = binding(1) + local(4).v2 : (u32, u32) -> (u32);
+    binding(14) = binding(13) << u32(2) : (u32, u32) -> (u32);
+    binding(15) = binding(14) + u32(3) : (u32, u32) -> (u32);
+    binding(16) = input(2)[binding(15)] : (u32, u32, u32, u32) -> (u32);
+    binding(3) ? bb15 : bb16; merge: bb17
+}
+
+bb15 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb18;
+}
+
+bb16 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb21;
+}
+
+bb17 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    local(17).v3 = phi [bb23: local(17).v2][bb20: local(17).v5];
+
+
+    binding(29) = binding(1) + local(17).v3 : (u32, u32) -> (u32);
+    binding(30) = binding(29) << u32(2) : (u32, u32) -> (u32);
+    copy_mem(output(3)[binding(30)], input(2)[binding(14)]); @ uniform
+    binding(34) = binding(30) + u32(1) : (u32, u32) -> (u32);
+    binding(35) = binding(14) + u32(1) : (u32, u32) -> (u32);
+    copy_mem(output(3)[binding(34)], input(2)[binding(35)]); @ uniform
+    binding(37) = binding(30) + u32(2) : (u32, u32) -> (u32);
+    binding(38) = binding(14) + u32(2) : (u32, u32) -> (u32);
+    copy_mem(output(3)[binding(37)], input(2)[binding(38)]); @ uniform
+    binding(40) = binding(30) + u32(3) : (u32, u32) -> (u32);
+    output(3)[binding(40)] = binding(16)  : (u32, u32) -> (u32); @ uniform
+    local(4).v3 = local(4).v2 + u32(64) : (u32, u32) -> (u32);
+    branch bb24;
+}
+
+bb18 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    local(17).v5 = phi [bb19: local(17).v6][bb15: u32(0)];
+
+    local(18).v3 = phi [bb19: local(18).v4][bb15: u32(0)];
+
+
+    binding(41) = local(18).v3 < binding(2) : (u32, u32) -> (bool);
+    loop(cond: binding(41), body: bb19 continue: bb19, break: bb20)
+}
+
+bb19 {
+    Uses: [ContinueTarget]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(19) = shared_array(0)[local(18).v3] : (u32, u32, u32, u32) -> (u32);
+    binding(20) = binding(19) < binding(16) : (u32, u32) -> (bool);
+    binding(21) = binding(20) ? u32(1) : u32(0) : (bool, u32, u32) -> (u32);
+    local(17).v6 = local(17).v5 + binding(21) : (u32, u32) -> (u32);
+    local(18).v4 = local(18).v3 + i32(1) : (u32, i32) -> (u32);
+    branch bb18;
+}
+
+bb20 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb17;
+}
+
+bb21 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    local(17).v2 = phi [bb22: local(17).v4][bb16: u32(0)];
+
+    local(22).v3 = phi [bb22: local(22).v4][bb16: u32(0)];
+
+
+    binding(42) = local(22).v3 < binding(2) : (u32, u32) -> (bool);
+    loop(cond: binding(42), body: bb22 continue: bb22, break: bb23)
+}
+
+bb22 {
+    Uses: [ContinueTarget]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(23) = binding(1) + local(22).v3 : (u32, u32) -> (u32);
+    binding(24) = binding(23) << u32(2) : (u32, u32) -> (u32);
+    binding(25) = binding(24) + u32(3) : (u32, u32) -> (u32);
+    binding(26) = input(2)[binding(25)] : (u32, u32, u32, u32) -> (u32);
+    binding(27) = binding(26) < binding(16) : (u32, u32) -> (bool);
+    binding(28) = binding(27) ? u32(1) : u32(0) : (bool, u32, u32) -> (u32);
+    local(17).v4 = local(17).v2 + binding(28) : (u32, u32) -> (u32);
+    local(22).v4 = local(22).v3 + i32(1) : (u32, i32) -> (u32);
+    branch bb21;
+}
+
+bb23 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb17;
+}
+
+bb24 {
+    Uses: [ContinueTarget]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb10;
+}
+
+uniform bb25 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: []
+
+    sync_cube();
+    branch bb10;
+}
+

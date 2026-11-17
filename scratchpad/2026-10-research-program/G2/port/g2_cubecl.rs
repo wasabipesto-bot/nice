@@ -125,10 +125,9 @@ mod kernels {
     /// One cube per job (class c, unit d). MODE 0: bottom side only; 1: skip off; 2: full.
     #[cube(launch_unchecked)]
     pub fn g2_kernel(
-        par_m: &Array<u64>,
-        par_c: &Array<u32>,
+        par: &Array<u32>, // parent records, 4 words each (mask lo, mask hi, cacc, r4), loaded as one 16-byte run
         pseg: &Array<u32>,
-        tmask: &Array<u64>,
+        tdig: &Array<u32>, // each top's digits, 20 6-bit fields in 4 words (`tdig_kernel`), computed once per super-unit
         tseg: &Array<u32>,
         roots: &Array<u32>,
         jobs: &Array<u32>,
@@ -145,6 +144,7 @@ mod kernels {
         #[comptime] ept: u32,
         #[comptime] ranks: u32,
         #[comptime] cut: u32,
+        #[comptime] cmask: u32,
     ) {
         let npl = comptime!(NT / w);
         let segs = comptime!(64 / w); // ballot segments per chunk (W <= 64)
@@ -191,7 +191,7 @@ mod kernels {
             }
         }
         if t < 32u32 {
-            comm[t as usize].store(0u32);
+            comm[t as usize].store(comptime!(if xpose == 0 || cmask == 0 { 0u32 } else { u32::MAX }));
         }
         sync_cube();
         // probes: the 8 compatible top classes of unit d, each probe's digits as 20 6-bit fields (5 per word),
@@ -206,22 +206,9 @@ mod kernels {
             let mut j = t;
             while j < b1 - b0 {
                 if base + j < PMAX {
-                    let mut x = tmask[(b0 + j) as usize];
-                    let first = x.trailing_zeros();
-                    let mut dw = Array::<u32>::new(4usize);
                     #[unroll]
                     for k in 0..4u32 {
-                        dw[k as usize] = 0u32;
-                    }
-                    #[unroll]
-                    for k in 0..20u32 {
-                        let v = select(x != 0u64, x.trailing_zeros(), first);
-                        x &= x - select(x != 0u64, 1u64, 0u64);
-                        dw[comptime!(k / 5) as usize] |= v << comptime!(6 * (k % 5));
-                    }
-                    #[unroll]
-                    for k in 0..4u32 {
-                        prob_d[((base + j) * 4u32 + k) as usize] = dw[k as usize];
+                        prob_d[((base + j) * 4u32 + k) as usize] = tdig[((b0 + j) * 4u32 + k) as usize];
                     }
                 }
                 j += NT;
@@ -246,7 +233,7 @@ mod kernels {
         let pe = pseg[(c + 1u32) as usize];
         let mut cur = pb;
         let mut npend = 0u32;
-        let mut par = 0u32;
+        let mut parity = 0u32;
         // no `loop`/`break`: cubecl-spirv 0.10 emitted a conditional branch without OpSelectionMerge for them
         let mut going = true;
         while going {
@@ -255,19 +242,20 @@ mod kernels {
                 let idx = cur + t;
                 let mut m = 0u64;
                 if idx < pe {
-                    m = child_mask(par_m[idx as usize], par_c[idx as usize], d);
+                    let pb = 4u32 * idx;
+                    m = child_mask(u64::cast_from(par[pb as usize]) | (u64::cast_from(par[(pb + 1u32) as usize]) << 32u64), par[(pb + 2u32) as usize], d);
                 }
                 let f = select(m != 0u64, 1u32, 0u32);
                 let r = plane_rank(m != 0u64, f, w, ranks);
                 let tot = plane_count(m != 0u64, f, w, ranks);
                 if lane == 0u32 {
-                    wcnt[(par * npl + pl) as usize] = tot;
+                    wcnt[(parity * npl + pl) as usize] = tot;
                 }
                 sync_cube();
                 let mut off = 0u32;
                 let mut all = 0u32;
                 for i in 0..npl {
-                    let x = wcnt[(par * npl + i) as usize];
+                    let x = wcnt[(parity * npl + i) as usize];
                     off += select(i < pl, x, 0u32);
                     all += x;
                 }
@@ -275,7 +263,7 @@ mod kernels {
                     pend_p[(npend + off + r) as usize] = idx;
                 }
                 npend += all;
-                par ^= 1u32;
+                parity ^= 1u32;
                 cur += NT;
             }
             sync_cube();
@@ -303,7 +291,8 @@ mod kernels {
                     let mut m = 0u64;
                     if q < nch && mi < ntake {
                         let pi = pend_p[mi as usize];
-                        m = child_mask(par_m[pi as usize], par_c[pi as usize], d);
+                        let pb = 4u32 * pi;
+                        m = child_mask(u64::cast_from(par[pb as usize]) | (u64::cast_from(par[(pb + 1u32) as usize]) << 32u64), par[(pb + 2u32) as usize], d);
                     }
                     if comptime!(xpose == 0) {
                         for v in 0..64u32 {
@@ -340,6 +329,35 @@ mod kernels {
                                 x = (x & comptime!(!stage_mask(w >> (st + 1)))) | ((y << comptime!(j as u64)) & mj);
                             }
                         }
+                        if comptime!(cmask == 1) {
+                        if q < nch {
+                            // common masks from the registers (no pass over the slices): digit v is common to the
+                            // chunk iff, in every plane of it, the column holds all of that plane's valid rows
+                            let nv = min(w, ntake - min(ntake, q * 64u32 + sg * w));
+                            // valid rows as a u64, built from u32 shifts (a variable 64-bit shift crashed lavapipe's
+                            // 512-bit JIT)
+                            let vlo = select(nv >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(nv, 31u32)) - 1u32);
+                            let vhi = select(nv >= 64u32, 0xFFFF_FFFFu32, select(nv > 32u32, (1u32 << ((nv - min(nv, 32u32)) & 31u32)) - 1u32, 0u32));
+                            let vp = u64::cast_from(vlo) | (u64::cast_from(vhi) << 32u64);
+                            #[unroll]
+                            for sb in 0..segs {
+                                let piece = (x >> comptime!((sb * w) as u64)) & comptime!(if w == 64 { u64::MAX } else { (1u64 << w) - 1 });
+                                let bal = plane_ballot(piece == vp);
+                                if lane == 0u32 {
+                                    if comptime!(w == 64) {
+                                        comm[(2u32 * q) as usize].fetch_and(bal[0usize]);
+                                        comm[(2u32 * q + 1u32) as usize].fetch_and(bal[1usize]);
+                                    } else if comptime!(w == 32) {
+                                        comm[(2u32 * q + comptime!(sb)) as usize].fetch_and(bal[0usize]);
+                                    } else {
+                                        let wm = comptime!((1u32 << w) - 1);
+                                        let sh = comptime!((sb * w) % 32);
+                                        comm[(2u32 * q + comptime!((sb * w) / 32)) as usize].fetch_and(!(wm << sh) | ((bal[0usize] & wm) << sh));
+                                    }
+                                }
+                            }
+                        }
+                        }
                         if q < nch {
                             #[unroll]
                             for sb in 0..segs {
@@ -369,8 +387,8 @@ mod kernels {
                     }
                     sync_cube();
                 }
-                if comptime!(cut & 2 == 0) {
-                // common masks: digit v is common to chunk q iff its slice equals the chunk's valid mask
+                if comptime!(cut & 2 == 0 && (xpose == 0 || cmask == 0)) {
+                // common masks (ballot transpose only): digit v is common to chunk q iff its slice equals the chunk's valid mask
                 {
                     let mut j = t;
                     while j < 1024u32 {
@@ -546,7 +564,7 @@ mod kernels {
                     s_nl[0usize].store(0u32);
                 }
                 if t >= 32u32 && t < 64u32 {
-                    comm[(t - 32u32) as usize].store(0u32);
+                    comm[(t - 32u32) as usize].store(comptime!(if xpose == 0 || cmask == 0 { 0u32 } else { u32::MAX }));
                 }
                 npend = left;
                 sync_cube();
@@ -681,9 +699,7 @@ mod prep {
         r4s: &Array<u32>,
         rank: &Array<u32>,
         cur: &mut Array<Atomic<u32>>,
-        par_m: &mut Array<u64>,
-        par_c: &mut Array<u32>,
-        par_r: &mut Array<u32>,
+        tmp: &mut Array<u32>,
         nroots: u32,
         pip_lo: u32,
         pip_hi: u32,
@@ -695,43 +711,77 @@ mod prep {
             let (m, c, key) = parent(r4, pip, rank);
             if m != 0u64 {
                 let slot = cur[key as usize].fetch_add(1u32);
-                par_m[slot as usize] = m;
-                par_c[slot as usize] = c;
-                par_r[slot as usize] = r4;
+                tmp[(4u32 * slot) as usize] = u32::cast_from(m & 0xFFFF_FFFFu64);
+                tmp[(4u32 * slot + 1u32) as usize] = u32::cast_from(m >> 32u64);
+                tmp[(4u32 * slot + 2u32) as usize] = c;
+                tmp[(4u32 * slot + 3u32) as usize] = r4;
             }
         }
     }
 
-    /// One unit per bucket: insertion sort of its segment by r4 (the CPU's stable order).
+    /// One cube of 64 per bucket: each record's rank is the number of the bucket's records with a smaller r4 (r4s
+    /// are distinct), so the records land in the CPU's stable order. Buckets up to RS_CAP are ranked from shared
+    /// memory, larger ones from global memory.
     #[cube(launch_unchecked)]
-    pub fn bsort_kernel(off: &Array<u32>, hist: &Array<u32>, par_m: &mut Array<u64>, par_c: &mut Array<u32>, par_r: &mut Array<u32>) {
-        let k = ABSOLUTE_POS_X;
-        if k < 16128u32 {
-            let b0 = off[k as usize];
-            let n = hist[k as usize];
-            let mut i = 1u32;
+    pub fn rsort_kernel(off: &Array<u32>, hist: &Array<u32>, tmp: &Array<u32>, rec: &mut Array<u32>) {
+        let mut sr = SharedMemory::<u32>::new(2048usize);
+        let k = CUBE_POS_X;
+        let t = UNIT_POS_X;
+        let b0 = off[k as usize];
+        let n = hist[k as usize];
+        let small = n <= 2048u32;
+        if small {
+            let mut i = t;
             while i < n {
-                let rr = par_r[(b0 + i) as usize];
-                let mm = par_m[(b0 + i) as usize];
-                let cc = par_c[(b0 + i) as usize];
-                let mut j = i;
-                let mut moving = true;
-                while moving {
-                    if j == 0u32 {
-                        moving = false;
-                    } else if par_r[(b0 + j - 1u32) as usize] <= rr {
-                        moving = false;
-                    } else {
-                        par_r[(b0 + j) as usize] = par_r[(b0 + j - 1u32) as usize];
-                        par_m[(b0 + j) as usize] = par_m[(b0 + j - 1u32) as usize];
-                        par_c[(b0 + j) as usize] = par_c[(b0 + j - 1u32) as usize];
-                        j -= 1u32;
-                    }
+                sr[i as usize] = tmp[(4u32 * (b0 + i) + 3u32) as usize];
+                i += 64u32;
+            }
+        }
+        sync_cube();
+        let mut i = t;
+        while i < n {
+            let mine = tmp[(4u32 * (b0 + i) + 3u32) as usize];
+            let mut rk = 0u32;
+            if small {
+                for j in 0..n {
+                    rk += select(sr[j as usize] < mine, 1u32, 0u32);
                 }
-                par_r[(b0 + j) as usize] = rr;
-                par_m[(b0 + j) as usize] = mm;
-                par_c[(b0 + j) as usize] = cc;
-                i += 1u32;
+            } else {
+                for j in 0..n {
+                    rk += select(tmp[(4u32 * (b0 + j) + 3u32) as usize] < mine, 1u32, 0u32);
+                }
+            }
+            let dst = 4u32 * (b0 + rk);
+            let src = 4u32 * (b0 + i);
+            rec[dst as usize] = tmp[src as usize];
+            rec[(dst + 1u32) as usize] = tmp[(src + 1u32) as usize];
+            rec[(dst + 2u32) as usize] = tmp[(src + 2u32) as usize];
+            rec[(dst + 3u32) as usize] = mine;
+            i += 64u32;
+        }
+    }
+
+    /// Each top's digits once per super-unit: 20 6-bit fields in 4 words, padded with the first digit.
+    #[cube(launch_unchecked)]
+    pub fn tdig_kernel(tmask: &Array<u64>, tdig: &mut Array<u32>, ntops: u32) {
+        let i = ABSOLUTE_POS_X;
+        if i < ntops {
+            let mut x = tmask[i as usize];
+            let first = x.trailing_zeros();
+            let mut dw = Array::<u32>::new(4usize);
+            #[unroll]
+            for k in 0..4u32 {
+                dw[k as usize] = 0u32;
+            }
+            #[unroll]
+            for k in 0..20u32 {
+                let v = select(x != 0u64, x.trailing_zeros(), first);
+                x &= x - select(x != 0u64, 1u64, 0u64);
+                dw[comptime!(k / 5) as usize] |= v << comptime!(6 * (k % 5));
+            }
+            #[unroll]
+            for k in 0..4u32 {
+                tdig[(i * 4u32 + k) as usize] = dw[k as usize];
             }
         }
     }
@@ -793,6 +843,26 @@ fn child_mask(pm: u64, cacc: u32, d: u32) -> u64 {
     let add = (1u64 << e2) | (1u64 << e3);
     if e2 == e3 || (pm & add) != 0 { 0 } else { pm | add }
 }
+/// Each top's digit words as `tdig_kernel` makes them (20 6-bit fields, 5 per word, padded with the first digit),
+/// in the sorted top order.
+fn top_digits(inp: &Input) -> Vec<u32> {
+    let mut out = Vec::with_capacity(inp.ts.len() * 4);
+    for t in &inp.ts {
+        let mut x = t.mask;
+        let first = x.trailing_zeros();
+        let mut dw = [0u32; 4];
+        for k in 0..20 {
+            let v = if x != 0 { x.trailing_zeros() } else { first };
+            if x != 0 {
+                x &= x - 1;
+            }
+            dw[k / 5] |= v << (6 * (k % 5));
+        }
+        out.extend(dw);
+    }
+    out
+}
+
 fn key8(mask: u64, rank: &[u32; 8]) -> u32 {
     let mut k = 0;
     for (i, &v) in rank.iter().enumerate() {
@@ -1219,6 +1289,9 @@ fn run_gpu<R: Runtime>(
     println!("plane ranks: {}", if ranks == 1 { "ballot + popcount" } else { "plane scans" });
     // --cut BITS (timing only; results invalid): 1 skips the transpose, 2 the common masks, 4 the probe setup
     let cut: u32 = opt("--cut").map_or(Ok(0), |s| s.parse())?;
+    // common masks: 1 = from the shuffle transpose's registers (default with --xpose 1), 0 = a pass over the slices
+    let cmask: u32 = opt("--cmask").map_or(Ok(1), |s| s.parse())?;
+    println!("common masks: {}", if cmask == 1 && xpose == 1 { "from the transpose" } else { "pass over the slices" });
     if cut != 0 {
         println!("CUT {cut}: phases skipped for timing; counts and sets are not valid");
     }
@@ -1232,15 +1305,19 @@ fn run_gpu<R: Runtime>(
     chk("init");
     let mk = |v: Vec<u32>| client.create(cubecl::bytes::Bytes::from_elems(v));
     let mut all_prep_bad = false;
-    let par_m = client.create(cubecl::bytes::Bytes::from_elems(inp.par.iter().map(|p| p.mask).collect::<Vec<u64>>()));
-    chk("par_m");
-    let par_c = mk(inp.par.iter().map(|p| p.cacc).collect());
-    chk("par_c");
+    // parent records (mask lo, mask hi, cacc, r4) and each top's digit words, as the GPU preparation makes them
+    let rec_host: Vec<u32> = inp
+        .par
+        .iter()
+        .flat_map(|p| [p.mask as u32, (p.mask >> 32) as u32, p.cacc, (p.r - (inp.pip << 24)) as u32])
+        .collect();
+    let tdig_host = top_digits(inp);
+    let rec = mk(rec_host.clone());
     let pseg = mk(inp.pseg.clone());
-    let tmask = client.create(cubecl::bytes::Bytes::from_elems(inp.ts.iter().map(|t| t.mask).collect::<Vec<u64>>()));
+    let tdig = mk(tdig_host.clone());
     let tseg = mk(inp.tseg.clone());
     let roots = mk(ROOTS.to_vec());
-    chk("tseg/roots/tmask");
+    chk("records/digits/tseg/roots");
     // jobs in launches of `--batch` (default: all at once; lavapipe needs smaller output buffers)
     let batch: usize = opt("--batch").map_or(Ok(jobs.len()), |s| s.parse())?;
     let batches: Vec<&[(u32, u32)]> = jobs.chunks(batch.max(1)).collect();
@@ -1258,19 +1335,21 @@ fn run_gpu<R: Runtime>(
     let out = client.empty(nslab_cap as usize * SLAB as usize * 16);
     let slabcnt = client.empty(nslab_cap as usize * 4);
     chk("out/slabcnt");
-    // ---- GPU preparation (timed, then checked against the host's sorted parents; the kernel runs on its arrays)
-    let par_m = par_m;
-    let par_c = par_c;
+    // ---- GPU preparation (timed, then checked against the host's: the records' order and words, the class
+    // segments, the top digits; the kernel then runs on the GPU's arrays). Five launches: top digits, histogram,
+    // scan, scatter, rank sort per bucket.
     let mut prep_secs = 0f64;
-    let (par_m, par_c, pseg) = if args.iter().any(|a| a == "--gpu-prep") {
+    let (rec, pseg, tdig) = if args.iter().any(|a| a == "--gpu-prep") {
         let r4s: Vec<u32> = (0..(1u32 << 24)).filter(|&r| root_mask(r as u64) != 0).collect();
         let nroots = r4s.len() as u32;
+        let ntops = inp.ts.len();
         let r4h = mk(r4s);
         let rankh = mk(inp.rank.to_vec());
+        let tmask = client.create(cubecl::bytes::Bytes::from_elems(inp.ts.iter().map(|t| t.mask).collect::<Vec<u64>>()));
         let npar = inp.par.len();
-        let g_m = client.empty(npar * 8);
-        let g_c = client.empty(npar * 4);
-        let g_r = client.empty(npar * 4);
+        let g_tmp = client.empty(npar * 16);
+        let g_rec = client.empty(npar * 16);
+        let g_tdig = client.empty(ntops * 16);
         let off = client.empty(16128 * 4);
         let curh = client.empty(16128 * 4);
         let g_pseg = client.empty(64 * 4);
@@ -1282,6 +1361,11 @@ fn run_gpu<R: Runtime>(
             let tl = Instant::now();
             let cubes = nroots.div_ceil(NT);
             unsafe {
+                prep::tdig_kernel::launch_unchecked::<R>(
+                    &client, CubeCount::Static((ntops as u32).div_ceil(NT), 1, 1), CubeDim::new_1d(NT),
+                    ArrayArg::from_raw_parts(tmask.clone(), ntops), ArrayArg::from_raw_parts(g_tdig.clone(), ntops * 4),
+                    ntops as u32,
+                );
                 prep::hist_kernel::launch_unchecked::<R>(
                     &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
                     ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
@@ -1295,15 +1379,13 @@ fn run_gpu<R: Runtime>(
                 prep::scatter_kernel::launch_unchecked::<R>(
                     &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
                     ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
-                    ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_m.clone(), npar),
-                    ArrayArg::from_raw_parts(g_c.clone(), npar), ArrayArg::from_raw_parts(g_r.clone(), npar),
+                    ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4),
                     nroots, inp.pip as u32, (inp.pip >> 32) as u32,
                 );
-                prep::bsort_kernel::launch_unchecked::<R>(
-                    &client, CubeCount::Static(16128u32.div_ceil(64), 1, 1), CubeDim::new_1d(64),
+                prep::rsort_kernel::launch_unchecked::<R>(
+                    &client, CubeCount::Static(16128, 1, 1), CubeDim::new_1d(64),
                     ArrayArg::from_raw_parts(off.clone(), 16128), ArrayArg::from_raw_parts(histh.clone(), 16128),
-                    ArrayArg::from_raw_parts(g_m.clone(), npar), ArrayArg::from_raw_parts(g_c.clone(), npar),
-                    ArrayArg::from_raw_parts(g_r.clone(), npar),
+                    ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4), ArrayArg::from_raw_parts(g_rec.clone(), npar * 4),
                 );
             }
             cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
@@ -1311,29 +1393,27 @@ fn run_gpu<R: Runtime>(
         }
         tv.sort_by(|a, b| a.partial_cmp(b).unwrap());
         prep_secs = tv[tv.len() / 2];
-        let gm = u64::from_bytes(&client.read_one(g_m.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
-        let gc = u32::from_bytes(&client.read_one(g_c.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
+        let gr = u32::from_bytes(&client.read_one(g_rec.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
+        let gd = u32::from_bytes(&client.read_one(g_tdig.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
         let gp = u32::from_bytes(&client.read_one(g_pseg.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
         let gh = u32::from_bytes(&client.read_one(histh.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
         let total: u64 = gh.iter().map(|&x| x as u64).sum();
-        let ok = total == npar as u64
-            && gp == inp.pseg
-            && (0..npar).all(|i| gm[i] == inp.par[i].mask && gc[i] == inp.par[i].cacc);
+        let ok = total == npar as u64 && gp == inp.pseg && gr == rec_host && gd == tdig_host;
         println!(
-            "PREP (GPU, 4 launches) median {:.3} ms ({} reps) for {npar} parents from {nroots} roots: {:.1} ps per parent; order and class segments {}",
+            "PREP (GPU, 5 launches) median {:.3} ms ({} reps) for {npar} parents from {nroots} roots: {:.1} ps per parent; largest bucket {}; order, records, class segments and top digits {}",
             prep_secs * 1e3,
             tv.len(),
             prep_secs * 1e12 / npar as f64,
+            gh.iter().max().unwrap_or(&0),
             if ok { "EQUAL to the CPU's" } else { "DIFFER from the CPU's" }
         );
         if !ok {
             all_prep_bad = true;
         }
-        (g_m, g_c, g_pseg)
+        (g_rec, g_pseg, g_tdig)
     } else {
-        (par_m, par_c, pseg)
+        (rec, pseg, tdig)
     };
-    println!("{} launches of up to {} jobs; output {} slabs of {SLAB} records ({:.1} MB)", batches.len(), batch, nslab_cap, nslab_cap as f64 * SLAB as f64 * 16.0 / 1e6);
     let names = ["probes off", "skip off", "full"];
     let mut times = [0f64; 3];
     let mut all_ok = !all_prep_bad;
@@ -1360,10 +1440,9 @@ fn run_gpu<R: Runtime>(
                                 &client,
                                 CubeCount::Static(bj.len() as u32, 1, 1),
                                 CubeDim::new_1d(NT),
-                                ArrayArg::from_raw_parts(par_m.clone(), inp.par.len()),
-                                ArrayArg::from_raw_parts(par_c.clone(), inp.par.len()),
+                                ArrayArg::from_raw_parts(rec.clone(), inp.par.len() * 4),
                                 ArrayArg::from_raw_parts(pseg.clone(), 64),
-                                ArrayArg::from_raw_parts(tmask.clone(), inp.ts.len()),
+                                ArrayArg::from_raw_parts(tdig.clone(), inp.ts.len() * 4),
                                 ArrayArg::from_raw_parts(tseg.clone(), inp.tseg.len()),
                                 ArrayArg::from_raw_parts(roots.clone(), NROOT),
                                 ArrayArg::from_raw_parts(jobs_h[bi].clone(), 2 * bj.len()),
@@ -1380,6 +1459,7 @@ fn run_gpu<R: Runtime>(
                                 ept,
                                 ranks,
                                 cut,
+                                cmask,
                             )
                         };
                     }

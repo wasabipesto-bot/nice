@@ -96,6 +96,15 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   Honest summary for the user: ×5.1 for a hand-written NVIDIA kernel, ×3.8 for the portable one
   today, ×4.4 predicted on their card (×3.3–5.6), stop line ×4.0.
 
+- **13:10 UTC: the three port fixes are in and exact on lavapipe at width 8** (head 997339b; common
+  masks from the transpose's registers, one 12-byte parent record per load, a per-bucket rank
+  sort for the preparation). Width 16 with the new common masks crashes lavapipe's JIT under
+  both compilers (unproven combination). Predicted from the 3080 phase cuts: 1.57 → ≈ 1.33 fs;
+  prediction for the 9070 XT ≈ ×5.4 (×4.0–6.9), unmeasured. **Timing run started** on box
+  61073296 (RTX 3080 at 300 W, m144567, $0.121/h, TTL 15:05 UTC; one box before it never opened
+  its ssh port and two offers were stale): exactness at 32 lanes with the new masks, v10 against
+  the fixed port, four rounds. Hard stop 14:40.
+
 ## 2026-11-16 (cycle 7 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.36 invoiced of $30 (fleet $28.28);

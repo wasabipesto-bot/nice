@@ -142,3 +142,18 @@ ratio = main base mean / (G2 end-to-end + tops and survivor checks)
    - The bottom-side and preparation fixes listed in `BENCH.md` would be worth about +0.4 fs of headroom.
    - **I would land them before the window** (ivory, lavapipe-provable, about half a day) rather than spend the
      hour on a kernel known to carry 0.43 fs of avoidable cost.
+
+## Changes after the fixes (2026-11-17 13:00 UTC)
+
+- **Bundle head `997339bc`.** Defaults: `--xpose 1 --ept 2 --ranks 1 --cmask 1`, with the GPU preparation's rank
+  sort and top digits.
+- **`go_g2.sh` now:**
+  - stops after the first exactness run if the sampler wrote no `busy=` samples on the card (the hand check, made
+    explicit);
+  - runs **four rounds of A** (round 4 after round 3) and keeps a spare round 5;
+  - defaults to `G2BATCH=4032`, one launch per super-unit. Set `G2BATCH=2016` if the card refuses a 254 MB storage
+    binding.
+- **`analyze_g2.py`** prints each variant's median **and minimum**, flags a spread over 10 % as possible
+  bimodality, and gives the ratio for both.
+- **Prediction for the card:** central ×5.4 (×4.0–6.9). Stop line ×4.0. A useful extra comparison on the card is
+  B = `--cmask 0` (variant C's slot), if a card run should show the in-transpose common masks' worth there.

@@ -47,7 +47,10 @@ for p in sorted(glob.glob(f'{D}/[to]_*_r*.log')):
 best = {}
 for var in sorted({k[1] for k in G}):
     v = [G[k]['e2e'] for k in G if k[0] == 't' and k[1] == var and G[k]['e2e']]
-    if v: best[var] = st.median(v); print(f"  variant {var}: end-to-end median {best[var]:.4f} fs over {len(v)} rounds (spread {min(v):.4f}-{max(v):.4f})")
+    if v:
+        best[var] = st.median(v)
+        print(f"  variant {var}: end-to-end median {best[var]:.4f} fs, MINIMUM {min(v):.4f} fs over {len(v)} rounds (max {max(v):.4f}){' BIMODAL? spread > 10 %' if max(v) > 1.1 * min(v) else ''}")
+        best[var + ' (min)'] = min(v)
 print("== main (base 64, one field per process)")
 secs, rows = 0.0, 0
 for i in range(1, 11):

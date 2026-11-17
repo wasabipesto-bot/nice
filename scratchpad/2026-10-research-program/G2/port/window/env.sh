@@ -9,7 +9,7 @@ mkdir -p "$OUT"
 export NICE_BUILD_SHA=test RUST_LOG=${RUST_LOG:-warn}
 SU1=$DATA/su64_712012851; SU2=$DATA/su64_391856203
 # G2 runs: the whole super-unit in launches of 1008 jobs (output buffers stay under 64 MB); REPS launches per mode
-: "${G2JOBS:=all}" "${G2BATCH:=1008}" "${REPS:=400}"
+: "${G2JOBS:=all}" "${G2BATCH:=4032}" "${REPS:=400}"   # one launch per super-unit; 2016 if the card refuses a 254 MB binding
 # main: B64.1's ten base-64 1e17 fields at 0.05..0.95 (aligned; 0.25, 0.45 and 0.75 are empty), one process each
 # (the harness's untimed warm-up field first), the same starts as G2/bench/box/queue_b64.json
 : "${SZ64:=1e17}"

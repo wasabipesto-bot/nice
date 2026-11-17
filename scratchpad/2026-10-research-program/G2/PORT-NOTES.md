@@ -61,6 +61,60 @@ Brief: `G2/PORT-BRIEF.md`. Benchmark ported: `G2/BENCH.md` (kernel v10, ×5.13 o
 - **Window plan changes from the CUDA dry run:** see `WINDOW-PLAN.md` (the driver ran end to end against the CUDA
   binaries with `HARNESS=…cubecl_cuda… G2EXTRA=--cuda`).
 
+- **2026-11-17 ~13:00 UTC, the three fixes landed** (branch head **`997339bc`**; bundle `G2/port/g2-cubecl-local.bundle`
+  re-created; `G2/port/g2_cubecl.rs` is a copy):
+  1. **Common masks from the transpose's registers** (`--cmask 1`, default).
+     - After the shuffle stages, each lane compares its column against the plane's valid rows.
+     - One ballot per block, and lane 0 `fetch_and`s it into the chunk's two words. At W = 64 that is 2 atomics
+       per chunk, against the old pass's 1,024 (q, v) tests and up to 1,024 `fetch_or` per round.
+     - `comm` starts at all ones. The slice pass remains for `--cmask 0` and `--xpose 0`.
+  2. **Parent records as one run of 4 words** (mask lo, mask hi, cacc, r4).
+     - ACO now emits one `buffer_load_dwordx3` per parent in phases 1 and 2, where there were two loads.
+     - `Array<Vector<u32, 4>>` was abandoned: the compile errors were a local `par` shadowing the array (renamed
+       `parity`), not vectors.
+  3. **Preparation:** histogram, scan, atomic scatter into a temporary, then a **per-bucket rank sort** (one cube
+     of 64 per bucket; rank = number of smaller r4 in the bucket, from 8 KB of shared memory for buckets ≤ 2,048,
+     else global) instead of one thread's insertion sort per bucket. The largest bucket is 573 / 554.
+     **Plus each top's digit words once per super-unit** (`tdig_kernel`, 239k tops) instead of in every cube: the
+     probe setup loop goes from 441 to 13 ALU per pass.
+  - **Exactness [M], lavapipe 26.0.8, both compilers, both super-units, whole** (`G2/port/raw/fixes/G_*`):
+    - W = 8 with GPU prep: PASS. Survivor sets, counts, and the records' order and words, class segments and top
+      digits all equal the CPU's.
+    - W = 8 with `--cmask 0` and with `--xpose 0`: PASS.
+    - W = 16 with `--cmask 0`: PASS.
+    - **W = 16 with `--cmask 1` crashes lavapipe's 512-bit JIT** ("stack smashing detected", both compilers,
+      before the first mode).
+      - Bisect: it needs both the ballot of `piece == vp` and its shifted value feeding the `fetch_and`; a
+        constant in either place passes.
+      - The W = 8 build of the same code is exact, and the W = 64 path has no shift.
+      - I read this as a lavapipe defect, like the 512-bit `--gpu-prep` crash. **But W = 16 + cmask 1 is not
+        proven.**
+  - **Atomics:** 25 variants (W 8 / 32 / 64, cmask 0 / 1, xpose 0 / 1, modes, records on and off, the five prep
+    kernels). SPIR-V = WGSL, **0 mismatches**.
+    - The first comparison showed 6 "mismatches": WGSL kept dead `atomicAnd`s from a runtime-`&&`-comptime
+      condition. They are now purely comptime.
+  - **ACO (GFX1201, W = 64, full mode):**
+    - 2,310 instructions (2,779 before), 192 VGPRs, LDS 25,600 B, 8 waves. LDS is still the limit.
+    - In mode 0 the VGPRs fall from 108 to 36.
+    - Per-iteration: probe setup 13 ALU (441); phase 1 102 (88); the slice common pass gone; 3a 295; 3b 319 (306).
+      The 3b loop is unchanged in substance; ±13 is scheduling.
+    - Prep kernels: rsort 86 instructions, LDS 8 KB per 64-thread group (8 waves); tdig 626 instructions per 32
+      tops.
+  - **Predicted effect** (no card measured the fixes):
+    - The RDNA4 issue-bound model hardly moves: 0.685 → 0.697 fs. The removed work was small *in issue*: setup
+      0.07 ms, common pass 0.07 ms.
+    - But on the 3080 those phases cost far more than their issue count. Measured by phase cuts: the common pass
+      0.40 ms, probe setup 0.18 ms, prep 1.03 against cub's 0.44 ms. They are latency and atomics, which the bound
+      model does not see.
+    - **The CUDA-based prediction** (the CubeCL port's measured 3080 components, minus the cut costs, prep assumed
+      back to about 0.5 ms):
+      - bottom side 1.98 → about 1.4 ms;
+      - end-to-end 1.573 → **about 1.33 fs on the 3080** (v10 1.147);
+      - ×4.4 against main there (×3.8 before).
+    - **RX 9070 XT** (the same components × card/3080 factors, as before): central **×5.4** (×4.0–6.9), against
+      ×4.5 before the fixes. Both rest on the CUDA savings being real. The cut timings make them likely, but they
+      are not measured.
+
 ## Worktree, branch, build
 
 - **Worktree and branch:**

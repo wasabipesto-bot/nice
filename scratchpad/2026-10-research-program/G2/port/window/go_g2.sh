@@ -11,6 +11,9 @@ ok() { [ -e "$W/stop" ] && { echo "stopped by $W/stop"; exit 0; }; [ "$(date +%s
 # 1. exactness on the card: every unit's survivor set, the counts, the GPU preparation's order (A must pass; B is the
 #    fallback transpose if A's does not)
 ok; sh $S/run_g2.sh x_A_su1 $SU1 --gpu-prep --xpose 1 --ept 2 --reps 1
+# the sampler, checked once by hand: on the card it must have busy/sclk/pw samples
+NS=$(grep -c 'busy=' $OUT/x_A_su1.gpu 2>/dev/null); echo "SAMPLER: $NS samples with busy= in x_A_su1.gpu; last: $(tail -1 $OUT/x_A_su1.gpu)"
+[ "$DEV" = card ] && [ "${NS:-0}" -eq 0 ] && { echo "SAMPLER EMPTY on the card: stop, fix smp.sh (sysfs paths), re-run"; exit 1; }
 ok; sh $S/run_g2.sh x_A_su2 $SU2 --gpu-prep --xpose 1 --ept 2 --reps 1
 ok; sh $S/run_g2.sh x_B_su1 $SU1 --gpu-prep --xpose 0 --ept 2 --reps 1
 grep -q 'ALL CHECKS PASSED' $OUT/x_A_su1.log && grep -q 'ALL CHECKS PASSED' $OUT/x_A_su2.log && XA=1 || XA=0
@@ -31,7 +34,9 @@ mainf 1 5
 g2t 2 B; g2t 2 C; g2t 2 A
 mainf 6 10
 g2t 3 C; g2t 3 A; g2t 3 B
+# round 4 of A (the CubeCL kernel's timing was bimodal across processes on a 3080: four rounds, median and minimum)
+g2t 4 A
 echo "SPARE_START $(date -u +%T)"
-# spare: re-run once any main field the analysis marks OFF-POINT (the director's call), else one more round of A
-ok; g2t 4 A
+# spare: re-run once any main field the analysis marks OFF-POINT (the director's call), else round 5 of A
+ok; g2t 5 A
 echo "GO_DONE $(date -u +%T)"
