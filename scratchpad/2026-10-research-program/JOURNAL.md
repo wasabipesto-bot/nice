@@ -85,6 +85,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   the project would ship), and a dry-run of the window driver. Hard stop 12:45 UTC. Credit
   $12.98.
 
+- **12:00 UTC: the port on a real card (EXPERIMENTS G2.4; box destroyed after 1.54 h; credit
+  $12.74).** Exact at 32 lanes on an RTX 3080. The hand-written kernel's ratio replicated on this
+  second card (×5.07 against a same-session main of 6.396 fs). **The CubeCL port as it stands is
+  ×1.37 slower than the hand-written kernel: ×3.79 against main.** The word is at parity; the
+  gap is the bottom side and the preparation, with three named fixes worth ≈ 0.4 fs. The engineer
+  is landing them on ivory (exactness on lavapipe, effects predicted from ACO and the generated
+  CUDA); a short card run to time them is my call afterwards (credit is $2.74 above my floor and
+  the fleet draws ≈ $1.85 a day).
+  Honest summary for the user: ×5.1 for a hand-written NVIDIA kernel, ×3.8 for the portable one
+  today, ×4.4 predicted on their card (×3.3–5.6), stop line ×4.0.
+
 ## 2026-11-16 (cycle 7 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.36 invoiced of $30 (fleet $28.28);

@@ -112,3 +112,33 @@ ratio = main base mean / (G2 end-to-end + tops and survivor checks)
 - **Not exercised:**
   - the AMD sysfs sampler and the OFF-POINT test (lavapipe has no GPU);
   - the W = 64 kernel paths.
+
+## Changes after the CUDA run (2026-11-17 12:00 UTC, `BENCH.md` §"CubeCL port on CUDA")
+
+1. **Rebuild from the current bundle** (head `02075501`). It adds:
+   - `--cuda`;
+   - ballot ranks (`--ranks 1`, default), without which CubeCL's plane scans cost 0.76 fs on CUDA;
+   - queued launches in timing runs.
+   The driver's variants take the defaults.
+2. **The driver ran end to end on a rented RTX 3080 against the CUDA binaries.**
+   - Settings: `HARNESS=cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields`, `G2EXTRA=--cuda`,
+     `NMAIN=1`, `REPS=400`.
+   - Exactness A / A su2 / B passed. Every timing run passed, with equal counts. Main fields 1 and 6 ran in 93.5 s
+     and 124.3 s, matching the client's 96.7 s and 123.1 s.
+   - The analysis printed every table.
+   - The sampler has nothing to read on NVIDIA. That is expected: it reads AMD sysfs only, so the AMD path of
+     `smp.sh` is still unexercised. **The director should check by hand that `$OUT/*.gpu` fills during the first
+     exactness run on the card.**
+3. **The CubeCL kernel's per-process timing is bimodal on the 3080** (about +25 % in the slow mode).
+   - Run **four rounds of A** (move the spare's A into the rounds).
+   - Report the median *and* the minimum per variant.
+   - If A's rounds split into two clusters, report both and decide on the low cluster only if it is ≥ ×4.0 with
+     margin. Otherwise call it inconclusive.
+4. **Set `G2BATCH=4032`** if the card allows a 254 MB storage binding (W = 64 needs about 62k slabs of 4 KB).
+   Otherwise use `2016`.
+5. **The context the director should carry in:** the same CubeCL kernel is **×3.79 against main on the RTX 3080**
+   (hand CUDA v10 ×5.07). The ×4.5 AMD prediction rests on main being relatively slower on that card and phase 3
+   being faster there.
+   - The bottom-side and preparation fixes listed in `BENCH.md` would be worth about +0.4 fs of headroom.
+   - **I would land them before the window** (ivory, lavapipe-provable, about half a day) rather than spend the
+     hour on a kernel known to carry 0.43 fs of avoidable cost.

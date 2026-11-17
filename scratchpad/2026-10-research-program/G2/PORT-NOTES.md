@@ -30,6 +30,37 @@ Brief: `G2/PORT-BRIEF.md`. Benchmark ported: `G2/BENCH.md` (kernel v10, ×5.13 o
 - **What I would not do:** spend window time on the ballot transpose. ACO prices it 4× the shuffle one; it is in
   the window only as the fallback if the shuffle's W = 64 path is wrong.
 
+- **2026-11-17 ~11:55 UTC, CubeCL port on a rented RTX 3080 (Vast 61056498, CUDA runtime):**
+  - **Exact at W = 32 on real hardware:** both super-units, all variants (shuffle / ballot transpose, ept 1 / 2,
+    scan / ballot ranks).
+  - **Same-box, same-session timing** (`BENCH.md` §"CubeCL port on CUDA"):
+    - CubeCL **1.573 fs** against hand CUDA v10 **1.147 fs**: ×1.37 slower.
+    - The kept word is at parity (32.5–34.4 against 32.9 ps).
+    - The gap is the bottom side (1.9 against 0.63 ms) and the GPU prep (1.03 against 0.44 ms).
+    - Main on that box: 6.396 fs. The port as it stands is ×3.79 against it; v10 is ×5.07.
+  - **New on the branch:**
+    - `--cuda` (the GPU part is now generic over the runtime);
+    - `--ranks 1` (ballot + popcount, default; CubeCL's plane scans cost 0.76 fs on CUDA);
+    - `--cut` (phase-skip timing).
+  - **lavapipe at 512-bit crashes** ("stack smashing", in lavapipe's process) with `--gpu-prep`, with either
+    compiler. The main kernel alone at W = 16 still passes. That is a lavapipe defect in the wide mode, not
+    reproduced at 256-bit.
+  - **The AMD prediction is unchanged in centre:** ×4.5 (×3.3–5.7).
+    - It is now re-derived from CubeCL's own CUDA components times card/3080 factors: phase 3 ×0.44–0.85 from the
+      ACO model; the rest ×0.6–1.0, centred on main's ×1/1.24.
+  - **The bottom side and prep fixes above are now the highest-value work before the window.** Each 0.1 fs is
+    about ×0.35 of ratio near ×4.5.
+- **Bimodal CubeCL timing across processes on the 3080:** full kernel about 6.0 or about 7.4–7.6 ms. Branch head
+  is now `02075501` (queued launches in timing runs); the bundle is current.
+- **Next session, in order:**
+  1. Common masks inside the transpose (registers, no shared atomics).
+  2. Parent records as one 16-byte load.
+  3. A radix-sort prep.
+  4. Find the bimodality.
+  5. Re-time on CUDA if a box is available, then the AMD window.
+- **Window plan changes from the CUDA dry run:** see `WINDOW-PLAN.md` (the driver ran end to end against the CUDA
+  binaries with `HARNESS=…cubecl_cuda… G2EXTRA=--cuda`).
+
 ## Worktree, branch, build
 
 - **Worktree and branch:**

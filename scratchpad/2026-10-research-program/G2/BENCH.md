@@ -150,3 +150,55 @@ The algorithm and the order are unchanged throughout: same chunks, same kept inc
   - SASS of the final kernel: `sass_v10_m2.txt`.
 - **Final source:** `bench/g2bench.cu` (KVER 10 default; it holds every kernel version) = `bench/variants/g2bench_final.cu`.
 - **Second super-unit's inputs:** `bench/su64_391856203/`.
+
+## CubeCL port on CUDA (2026-11-17 10:30–12:00 UTC, Vast 61056498, RTX 3080 at a 280 W cap, same box and session for all rows)
+
+**Verdict:**
+- The CubeCL port (`G2/PORT-NOTES.md`, branch `g2-cubecl-local` at `8579db48`, `--features cubecl-cuda`) is
+  **exact at 32-lane planes on real hardware**: both super-units, every unit's survivor set, the counts, the GPU
+  preparation's parent order, and 0 kernel errors. It also passed with the ballot transpose and with one entry per
+  step.
+- It costs **×1.37 the hand-written CUDA v10: 1.573 fs against 1.147 fs** per admissible n, end to end.
+- **The whole gap is outside the 64-pair word.** Phase 3 runs at parity: kept word all-in 32.5–34.4 ps against
+  v10's 32.9.
+- Against the same-session main (6.396 fs), the port as it stands is **×3.79** (×5.07 for v10), with tops and
+  survivor checks (+0.115 fs) added to both.
+
+| (ms, median of 200 launches; 3 rounds) | v10 (hand CUDA) | CubeCL A1 (shuffle transpose, ballot ranks) | CubeCL A0 (plane-scan ranks, the port as of 10:25) |
+|---|---|---|---|
+| preparation | 0.425 / 0.447 / 0.444 (cub select-if + radix sort) | 1.027 / 1.039 / 1.034 (hist + scan + scatter + bucket sort) | 1.03 |
+| bottom side (probes off) | 0.628 / 0.635 / 0.638 | 1.971 / 1.991 / 1.764 | 2.19–2.39 |
+| phase 3 (full − probes off) | 4.05 / 4.06 / 4.05 | 4.03 / 4.00 / 4.23 | 6.2–7.0 |
+| full kernel | 4.680 / 4.694 / 4.689 | 5.998 / 5.990 / 5.997 | 8.18–9.41 |
+| **end to end, fs per admissible n** | **1.143 / 1.151 / 1.149** | **1.572 / 1.573 / 1.574** | 2.06–2.34 |
+| busy power / SM clock | 168 / 147 / 130 W, 1.73–1.76 GHz | 201 / 180 / 189 W, 1.78–1.85 GHz | ~210 W, 1.81–1.88 GHz |
+
+- **Main, same session:**
+  - ten base-64 1e17 fields at 0.05–0.95 (B64.1) through the stub, production hosts blocked and proven
+    (`raw/cuda_box/proof_*.txt`);
+  - **6.396 fs** per admissible n (812.2 s of client processing, 3 empty fields), at 276 W and 1.79 GHz.
+- **Where CubeCL loses** (phase-cut timing of the bottom side, `--cut`):
+  - shuffle transpose 0.80 ms;
+  - common masks by shared `fetch_or` 0.40 ms (v10 had them free inside the transpose);
+  - probe setup 0.18 ms;
+  - the rest (phase 1, barriers) 0.75 ms, against v10's whole bottom side of 0.63 ms;
+  - the preparation +0.59 ms.
+- **The first fix**, made on this box: the plane scans in the ordered compaction and the record append became a
+  ballot and population counts. That took A0 → A1, 2.33 → 1.57 fs. CubeCL lowers `plane_exclusive_sum` /
+  `plane_sum` to shuffle loops on CUDA.
+- **The noted next fixes** (unmeasured):
+  - common masks from the transpose's registers, not shared atomics;
+  - one 16-byte parent record per load;
+  - a radix-sort preparation as v10's.
+  If they reach v10's bottom side and prep, the port returns to about ×5.
+- **Not counted in main's number:** a 1-job CubeCL compile-log run (about 1 s of GPU) happened at 11:13, during
+  main's first field.
+- Raw: `G2/port/raw/cuda_box/`.
+- **Run-to-run timing of the CubeCL kernel is bimodal on this box.**
+  - Within a process, the 200-launch medians are stable.
+  - Across processes, the full kernel sits at either ~6.0 ms or ~7.4–7.6 ms, and skip-off at 6.2–8.1 ms. The batch
+    size changes nothing: the queued-launch build `02075501` gave 1.57–1.93 fs with batches of 1008 and of 4032.
+  - v10 was stable to ±0.4 % in every run.
+  - The 1.573 fs above is the low mode, seen in all three A1 rounds. The window driver's dry run on this box gave
+    A at 1.66–2.02 fs, with launches of 1008 synced one by one.
+  - The cause is not found. Candidates: CubeCL's memory pool placement, or a clock state at process start.

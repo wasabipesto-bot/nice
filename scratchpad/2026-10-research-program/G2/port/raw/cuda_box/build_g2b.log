@@ -1,0 +1,23 @@
+   Compiling nice_common v3.4.8-dev (/root/g2/wt/common)
+warning: value assigned to `r` is never read
+  --> common/examples/g2_cubecl.rs:82:21
+   |
+82 |         let mut r = 0u32;
+   |                     ^^^^ this value is reassigned later and never used
+...
+89 |             r = (b[0usize] & lo).count_ones();
+   |             --------------------------------- `r` is overwritten here before the previous value is read
+   |
+   = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `n` is never read
+   --> common/examples/g2_cubecl.rs:100:21
+    |
+ 98 |     #[cube]
+    |     ------- `n` is overwritten here before the previous value is read
+ 99 |     fn plane_count(flag: bool, f: u32, #[comptime] w: u32, #[comptime] ranks: u32) -> u32 {
+100 |         let mut n = 0u32;
+    |                     ^^^^ this value is reassigned later and never used
+
+warning: `nice_common` (example "g2_cubecl") generated 2 warnings
+    Finished `release` profile [optimized] target(s) in 2m 03s

@@ -75,6 +75,41 @@ mod kernels {
         m
     }
 
+    /// Exclusive rank of this lane's flag in its plane: a ballot and population counts (ranks 1), or the plane scan
+    /// (ranks 0; CubeCL lowers it to shuffle loops on CUDA). The ballot's second word only when W = 64.
+    #[cube]
+    fn plane_rank(flag: bool, f: u32, #[comptime] w: u32, #[comptime] ranks: u32) -> u32 {
+        let mut r = 0u32;
+        if comptime!(ranks == 0) {
+            r = plane_exclusive_sum(f);
+        } else {
+            let b = plane_ballot(flag);
+            let l = UNIT_POS_PLANE;
+            let lo = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
+            r = (b[0usize] & lo).count_ones();
+            if comptime!(w > 32) {
+                let hi = select(l >= 32u32, (1u32 << (l & 31u32)) - 1u32, 0u32);
+                r += (b[1usize] & hi).count_ones();
+            }
+        }
+        r
+    }
+
+    #[cube]
+    fn plane_count(flag: bool, f: u32, #[comptime] w: u32, #[comptime] ranks: u32) -> u32 {
+        let mut n = 0u32;
+        if comptime!(ranks == 0) {
+            n = plane_sum(f);
+        } else {
+            let b = plane_ballot(flag);
+            n = b[0usize].count_ones();
+            if comptime!(w > 32) {
+                n += b[1usize].count_ones();
+            }
+        }
+        n
+    }
+
     #[cube]
     fn child_mask(pm: u64, cacc: u32, d: u32) -> u64 {
         let e2 = ((cacc & 63u32) + ((cacc >> 16u32) & 63u32) * d) & 63u32;
@@ -108,6 +143,8 @@ mod kernels {
         #[comptime] fill: u32,
         #[comptime] xpose: u32,
         #[comptime] ept: u32,
+        #[comptime] ranks: u32,
+        #[comptime] cut: u32,
     ) {
         let npl = comptime!(NT / w);
         let segs = comptime!(64 / w); // ballot segments per chunk (W <= 64)
@@ -159,6 +196,7 @@ mod kernels {
         sync_cube();
         // probes: the 8 compatible top classes of unit d, each probe's digits as 20 6-bit fields (5 per word),
         // padded with its first digit (OR is idempotent)
+        if comptime!(cut & 4 == 0) {
         let mut base = 0u32;
         for i in 0..8u32 {
             let ct = (roots[i as usize] + M - cc) % M;
@@ -190,6 +228,7 @@ mod kernels {
             }
             base += b1 - b0;
         }
+        }
         sync_cube();
         let nprobe = min(s_np[0usize], PMAX);
 
@@ -219,8 +258,8 @@ mod kernels {
                     m = child_mask(par_m[idx as usize], par_c[idx as usize], d);
                 }
                 let f = select(m != 0u64, 1u32, 0u32);
-                let r = plane_exclusive_sum(f);
-                let tot = plane_sum(f);
+                let r = plane_rank(m != 0u64, f, w, ranks);
+                let tot = plane_count(m != 0u64, f, w, ranks);
                 if lane == 0u32 {
                     wcnt[(par * npl + pl) as usize] = tot;
                 }
@@ -254,6 +293,7 @@ mod kernels {
                     }
                     sync_cube();
                 }
+                if comptime!(cut & 1 == 0) {
                 // phase 2: transpose by ballots. Plane task i covers chunk q, segment s (members s*W .. s*W+W-1).
                 for i in 0..4u32 {
                     let task = pl + npl * i;
@@ -319,6 +359,7 @@ mod kernels {
                         }
                     }
                 }
+                }
                 sync_cube();
                 if comptime!(w < 32) {
                     let mut z = t;
@@ -328,6 +369,7 @@ mod kernels {
                     }
                     sync_cube();
                 }
+                if comptime!(cut & 2 == 0) {
                 // common masks: digit v is common to chunk q iff its slice equals the chunk's valid mask
                 {
                     let mut j = t;
@@ -345,6 +387,7 @@ mod kernels {
                         }
                         j += NT;
                     }
+                }
                 }
                 sync_cube();
                 if comptime!(mode != 0) {
@@ -437,10 +480,10 @@ mod kernels {
                         } else {
                             let fa = select(nza, 1u32, 0u32);
                             let fb = select(nzb, 1u32, 0u32);
-                            let na = plane_sum(fa);
-                            let nn = na + plane_sum(fb);
-                            let ra = plane_exclusive_sum(fa);
-                            let rb = plane_exclusive_sum(fb);
+                            let na = plane_count(nza, fa, w, ranks);
+                            let nn = na + plane_count(nzb, fb, w, ranks);
+                            let ra = plane_rank(nza, fa, w, ranks);
+                            let rb = plane_rank(nzb, fb, w, ranks);
                             if nn > 0u32 {
                                 if slab_used + nn > SLAB {
                                     if lane == 0u32 && have_slab {
@@ -1109,11 +1152,43 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // ---------------- GPU
-    let ctx = CubeclContext::new_default()?;
+    // ---------------- GPU (wgpu by default; --cuda: CubeCL's CUDA runtime, with the cubecl-cuda feature)
+    let ctx = if args.iter().any(|a| a == "--cuda") {
+        #[cfg(feature = "cubecl-cuda")]
+        {
+            CubeclContext::new_cuda(0)?
+        }
+        #[cfg(not(feature = "cubecl-cuda"))]
+        {
+            bail!("--cuda needs the cubecl-cuda feature")
+        }
+    } else {
+        CubeclContext::new_default()?
+    };
     let name = ctx.device_name();
-    #[allow(irrefutable_let_patterns)]
-    let CubeclContext::Wgpu { client, .. } = ctx else { unreachable!() };
+    match ctx {
+        CubeclContext::Wgpu { client, .. } => run_gpu(client, name, &inp, &jobs, &args, reps, &modes, noout, no_sets, cref, &want),
+        #[cfg(feature = "cubecl-cuda")]
+        CubeclContext::Cuda { client, .. } => run_gpu(client, name, &inp, &jobs, &args, reps, &modes, noout, no_sets, cref, &want),
+        #[allow(unreachable_patterns)]
+        _ => bail!("unsupported runtime"),
+    }
+}
+
+fn run_gpu<R: Runtime>(
+    client: ComputeClient<R>,
+    name: String,
+    inp: &Input,
+    jobs: &[(u32, u32)],
+    args: &[String],
+    reps: usize,
+    modes: &[u32],
+    noout: bool,
+    no_sets: bool,
+    cref: Counts,
+    want: &[Vec<u128>],
+) -> Result<()> {
+    let opt = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
     let w_hw = client.properties().hardware.plane_size_max;
     // --force-w: compile the kernel for another plane width (to dump its SPIR-V for an offline compiler);
     // results are then invalid and only the module is wanted
@@ -1125,7 +1200,7 @@ fn main() -> Result<()> {
         println!("COMPILE-ONLY: kernel compiled for W = {w} on a device with W = {w_hw}; results are not checked");
     }
     let wmin = client.properties().hardware.plane_size_min;
-    println!("device: {name}; plane size min {wmin} max {w}; compiler: {}", if cfg!(feature = "cubecl-spirv") { "SPIR-V (cubecl-spirv)" } else { "WGSL (naga)" });
+    println!("device: {name}; plane size min {wmin} max {w}; compiler: {}", if R::name(&client).contains("cuda") { "CUDA (cubecl-cpp)" } else if cfg!(feature = "cubecl-spirv") { "SPIR-V (cubecl-spirv)" } else { "WGSL (naga)" });
     if ![8u32, 16, 32, 64].contains(&w) {
         bail!("plane width {w} not supported");
     }
@@ -1139,6 +1214,14 @@ fn main() -> Result<()> {
     // list entries per unit per 3b step (2 = v9/v10's form; 1 = fewer VGPRs)
     let ept: u32 = opt("--ept").map_or(Ok(2), |s| s.parse())?;
     println!("entries per unit per step: {ept}");
+    // plane ranks for the ordered compaction and the record append: 1 = ballot + popcount (default), 0 = plane scans
+    let ranks: u32 = opt("--ranks").map_or(Ok(1), |s| s.parse())?;
+    println!("plane ranks: {}", if ranks == 1 { "ballot + popcount" } else { "plane scans" });
+    // --cut BITS (timing only; results invalid): 1 skips the transpose, 2 the common masks, 4 the probe setup
+    let cut: u32 = opt("--cut").map_or(Ok(0), |s| s.parse())?;
+    if cut != 0 {
+        println!("CUT {cut}: phases skipped for timing; counts and sets are not valid");
+    }
     let dbg = std::env::var("G2_DEBUG_SYNC").is_ok();
     let chk = |what: &str| {
         if dbg {
@@ -1166,7 +1249,7 @@ fn main() -> Result<()> {
         let mut cb = Counts::default();
         let mut scratch = Vec::new();
         for &(c, d) in bj.iter() {
-            cpu_job(&inp, c, d, &mut cb, &mut scratch);
+            cpu_job(inp, c, d, &mut cb, &mut scratch);
         }
         nslab_cap = nslab_cap.max(((cb.surv as usize / SLAB as usize) + bj.len() * (NT / w) as usize + 64) as u32);
     }
@@ -1199,24 +1282,24 @@ fn main() -> Result<()> {
             let tl = Instant::now();
             let cubes = nroots.div_ceil(NT);
             unsafe {
-                prep::hist_kernel::launch_unchecked::<cubecl::wgpu::WgpuRuntime>(
+                prep::hist_kernel::launch_unchecked::<R>(
                     &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
                     ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
                     ArrayArg::from_raw_parts(histh.clone(), 16128), nroots, inp.pip as u32, (inp.pip >> 32) as u32,
                 );
-                prep::scan_kernel::launch_unchecked::<cubecl::wgpu::WgpuRuntime>(
+                prep::scan_kernel::launch_unchecked::<R>(
                     &client, CubeCount::Static(1, 1, 1), CubeDim::new_1d(256),
                     ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(off.clone(), 16128),
                     ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_pseg.clone(), 64),
                 );
-                prep::scatter_kernel::launch_unchecked::<cubecl::wgpu::WgpuRuntime>(
+                prep::scatter_kernel::launch_unchecked::<R>(
                     &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
                     ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
                     ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_m.clone(), npar),
                     ArrayArg::from_raw_parts(g_c.clone(), npar), ArrayArg::from_raw_parts(g_r.clone(), npar),
                     nroots, inp.pip as u32, (inp.pip >> 32) as u32,
                 );
-                prep::bsort_kernel::launch_unchecked::<cubecl::wgpu::WgpuRuntime>(
+                prep::bsort_kernel::launch_unchecked::<R>(
                     &client, CubeCount::Static(16128u32.div_ceil(64), 1, 1), CubeDim::new_1d(64),
                     ArrayArg::from_raw_parts(off.clone(), 16128), ArrayArg::from_raw_parts(histh.clone(), 16128),
                     ArrayArg::from_raw_parts(g_m.clone(), npar), ArrayArg::from_raw_parts(g_c.clone(), npar),
@@ -1254,7 +1337,7 @@ fn main() -> Result<()> {
     let names = ["probes off", "skip off", "full"];
     let mut times = [0f64; 3];
     let mut all_ok = !all_prep_bad;
-    for &mode in &modes {
+    for &mode in modes {
         let mut tv = Vec::new();
         let mut s = Counts::default();
         let mut hc_tot = vec![0u64; NCNT];
@@ -1264,6 +1347,8 @@ fn main() -> Result<()> {
         for rep in 0..reps.max(1) {
             let last_rep = rep + 1 == reps.max(1);
             let mut tsum = 0f64;
+            let mut rep_t0: Option<Instant> = None;
+            let mut pending = Vec::new();
             for (bi, bj) in batches.iter().enumerate() {
                 let cnt = mk(vec![0u32; NCNT]);
                 let slabn = mk(vec![0u32; 1]);
@@ -1271,7 +1356,7 @@ fn main() -> Result<()> {
                 unsafe {
                     macro_rules! go {
                         ($m:expr, $no:expr) => {
-                            kernels::g2_kernel::launch_unchecked::<cubecl::wgpu::WgpuRuntime>(
+                            kernels::g2_kernel::launch_unchecked::<R>(
                                 &client,
                                 CubeCount::Static(bj.len() as u32, 1, 1),
                                 CubeDim::new_1d(NT),
@@ -1293,6 +1378,8 @@ fn main() -> Result<()> {
                                 fill,
                                 xpose,
                                 ept,
+                                ranks,
+                                cut,
                             )
                         };
                     }
@@ -1303,6 +1390,29 @@ fn main() -> Result<()> {
                         (_, false) => go!(2u32, false),
                         (_, true) => go!(2u32, true),
                     }
+                }
+                if no_sets {
+                    // timing runs: the launches of one rep are queued back to back and synced once (no tail per
+                    // launch); their counters are read after the rep
+                    if rep_t0.is_none() {
+                        rep_t0 = Some(tl);
+                    }
+                    pending.push(cnt);
+                    if bi + 1 < batches.len() {
+                        continue;
+                    }
+                    cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
+                    tsum += rep_t0.take().unwrap().elapsed().as_secs_f64();
+                    if last_rep {
+                        for h in pending.drain(..) {
+                            let hc = u32::from_bytes(&client.read_one(h).map_err(|e| anyhow!("{e:?}"))?).to_vec();
+                            for (i, &x) in hc.iter().enumerate() {
+                                hc_tot[i] += x as u64;
+                            }
+                        }
+                    }
+                    pending.clear();
+                    continue;
                 }
                 cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
                 tsum += tl.elapsed().as_secs_f64();
@@ -1331,7 +1441,7 @@ fn main() -> Result<()> {
                             let (du, ps, pf) = (ob[o] >> 16, ob[o] & 0xFFFF, ob[o + 1]);
                             let wd = ob[o + 2] as u64 | ((ob[o + 3] as u64) << 32);
                             let cl = inp.par[pf as usize].cls;
-                            let pr = probes(&inp, cl, du);
+                            let pr = probes(inp, cl, du);
                             let ti = pr[ps as usize];
                             let mut k = 0;
                             let mut j = pf as usize;
@@ -1386,8 +1496,8 @@ fn main() -> Result<()> {
         all_ok &= cok;
         if mode >= 1 && !noout && !no_sets {
             println!("records {nrec} in {nslabs} slabs ({:.2} survivors per record)", pairs.len() as f64 / nrec.max(1) as f64);
-            let (g, cl) = sets(&inp, &pairs);
-            all_ok &= compare(names[mode as usize], &g, &want, cl);
+            let (g, cl) = sets(inp, &pairs);
+            all_ok &= compare(names[mode as usize], &g, want, cl);
         }
     }
     if modes.contains(&0) && modes.contains(&2) {

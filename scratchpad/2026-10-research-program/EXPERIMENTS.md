@@ -5,6 +5,25 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## G2.4 The CubeCL port on a real card: exact at 32 lanes; ×1.37 slower than hand CUDA; main replicated (2026-11-17 10:30–12:00 UTC, engineer; `G2/BENCH.md` "CubeCL port on CUDA", `G2/PORT-NOTES.md`, `G2/port/raw/cuda_box/`; box 61056498, RTX 3080 at a 280 W cap, 1.54 h, ~$0.19; port at local branch `g2-cubecl-local` 8579db4 → bundle head 0207550)
+
+- **Exactness at 32-lane planes on real hardware** [M]: both super-units, every unit's survivor set, the counts,
+  the GPU preparation's parent order, 0 kernel errors; also with the ballot transpose and one entry per step.
+- **Same box, same session, three rounds, fs per admissible n** [M]: hand CUDA v10 1.143 / 1.151 / 1.149 (this
+  morning on another 3080: 1.123); CubeCL port 1.572 / 1.573 / 1.574 (**×1.37** v10; the port as first built, with
+  plane scans: 2.06–2.34); main 7e0113f 6.396 (ten b64 fields, 3 empties, stub, hosts blocked).
+- **Ratios against main, with tops and survivor checks (+0.115 fs) added: v10 ×5.07 (a replication of the
+  morning's ×5.13 on a second card); the CubeCL port as it stands ×3.79.**
+- The 64-pair word is at parity (32.5–34.4 ps against 32.9). The gap is the bottom side (1.76–1.99 ms against 0.63:
+  shuffle transpose 0.80, common masks by shared `fetch_or` 0.40, probe setup 0.18, phase 1 and barriers 0.75) and
+  the preparation (1.03 ms against 0.44). CubeCL lowers `plane_exclusive_sum` / `plane_sum` to shuffle loops on
+  CUDA: replacing them by a ballot and population counts took the port from 2.33 to 1.57 fs. Named next fixes
+  (unmeasured): common masks from the transpose's registers; one 16-byte parent record per load; a radix-sort
+  preparation: worth ≈ 0.4 fs if they reach v10's numbers (→ ≈ ×5).
+- CubeCL kernel timings are bimodal across processes on this box (≈ +25 % in the slow mode; stable within a
+  process): the window plan now asks for four rounds, median and minimum.
+- Window driver dry-run end to end against the CUDA binary.
+
 ## G2.3 The benchmark kernel ported to CubeCL: exact on lavapipe, priced for RDNA4, window plan (2026-11-17 07:43–10:25 UTC, engineer, ivory only; `G2/PORT-NOTES.md`, `G2/WINDOW-PLAN.md`, `G2/port/` (bundle `g2-cubecl-local.bundle`, head 3a3a467 on main 7e0113f, never pushed; `raw/` incl. the dry run), worktree `.worktrees/g2-cubecl` (`common/examples/g2_cubecl.rs`, ≈ 1,500 lines); also `G2/PROPOSAL.md`, `G2/proposal/NOTES.md`)
 
 - **Port** [M on lavapipe 26.0.8 in the container `localhost/lvp26`, WGSL and direct SPIR-V compilers]: both staged
