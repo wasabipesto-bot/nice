@@ -38,6 +38,20 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   that takes 5–8 digits specific to the top. What remains for G2 is the cost of the 64-pair word
   on a card: the benchmark.
 
+- **07:30 UTC: the G2 benchmark is in (EXPERIMENTS G2.2; `G2/BENCH.md`; 301 k tokens; box destroyed
+  after 1.73 h): measured ×5.13 against same-session main at b64 on an RTX 3080** (G2 1.24 fs per
+  admissible n, main 6.35; ×4.75 with an 8 % overhead allowance). Exact on both super-units in
+  every variant. The kept word costs 32 ps (the reviewer's high end was 29); the kernel is
+  LDS-bound and draws 150–200 W against main's 258 W. The designer's 0.54 fs was off by ×2.3,
+  the reviewer's central by ×1.3.
+  **By the stop numbers fixed before the run (word ≤ 25 ps; ≥ ×6 for the 9070 XT) this is a stop
+  for my own initiative.** But the user's bar for a work-unit change on 11-09 was ×3, base 64 is
+  the long pole (≈ 8,500 card-hours on a 3080 at today's main; ≈ 1,700 in G2), and the pairing
+  study says ×5 is what this structure is worth, not a first draft's number. So: parked, not
+  closed; the decision goes to the user with a document that sizes the smallest server change
+  (`G2/PROPOSAL-BRIEF.md`, Opus, reading only, hard stop 10:45). No further GPU spend on G2
+  without their word. Vast credit $13.07.
+
 ## 2026-11-16 (cycle 7 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.36 invoiced of $30 (fleet $28.28);

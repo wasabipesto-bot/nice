@@ -5,6 +5,33 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## G2.2 The redesigned join on a GPU: one real b64 super-unit against same-session main (2026-11-17 05:50–07:28 UTC, engineer; `G2/BENCH.md`, `G2/bench/box_out/` (per-variant dev logs, protocol runs, client logs of main, proofs of the host block), `G2/bench/variants/` (kernels v1–v11), `G2/bench/g2bench.cu` = v10; box 61025183, RTX 3080 10 GB at a 260 W cap, 1.73 h, ~$0.21)
+
+- **G2, super-unit π′ = 712012851 (all 64 units; 4.4679e12 admissible n), kernel v10, 3 rounds** [M]: preparation 431–433
+  ps per parent (0.101 fs per admissible n); bottom side alone 18.5–19.8 ps per stored child; 17.6–17.8 ps per flat
+  chunk incidence; **31.7–32.0 ps per kept 64-pair word all-in** (27.5 without the survivor append); **end to end
+  1.1226–1.1240 fs per admissible n**; a second super-unit (391856203) 1.1224 fs. Plus tops 0.049 fs (B64.1's FD
+  test on every top) and survivors 0.066 fs (20 ps per AND survivor + main's check) [D from measured unit costs]:
+  **1.24 fs**. Power while busy 148–203 W at ≈ 1.8 GHz (main: 258 W). Kernel: 72 registers, 32.2 KB LDS per
+  256-thread group, 3 blocks per SM.
+- **Main 7e0113f, same box and session, cubecl-cuda, real client against the stub (production hosts blocked and
+  proven), ten b64 1e17 fields at 0.05–0.95 with the 3 empties counted, 3 rounds** [M]: 6.254, 6.386, 6.402 fs per
+  admissible n (mean 6.35).
+- **Ratio: ×5.13 (×5.05–5.17); ×4.75 with the review's 8 % allowance for host and launch overhead.**
+- **Exactness** [M]: every kernel variant reproduces all 64 units' survivor sets of both super-units (11,768,560
+  and 11,769,950 n) and the CPU reference's counts exactly.
+- **Against the stop numbers fixed before the run:** word 32.0 ps > 25 ps (fails); stored bottom 18.5–19.8 ps ≤ 25
+  (passes); ratio between ×5 and ×6 with no named culprit that has a measured fix → **stop: the run on the RX
+  9070 XT is not earned on my own initiative.**
+- **Where the cost is:** the inner loop is bound by LDS issue (17 independent 8-byte slice loads per kept word; ≈ 2×
+  the LDS floor); the common-mask skip's 49 % mostly does not pay on SIMT lanes (60.5 % of lane slots do work;
+  full mode only 10 % faster than skip off); the staged draft cost 4.93 fs and ten variants took it to 1.12.
+- **Model check:** measured 1.24 fs against the designer's 0.54 and the reviewer's 0.965 central (high 1.72):
+  the word is above the reviewer's high end (21.8 central, 29.3 high; measured 32.0), the bottom side and prep
+  are 2× the reviewer's central.
+- Unmeasured: the RX 9070 XT (LDS-bound kernel; 32 KB LDS against production's 18.9 KiB sweet spot; RDNA4's LDS
+  throughput could favour or hurt it), Metal, a CubeCL port.
+
 ## BX.2 The pairing gap on real masks: closed (2026-11-17 05:50–08:20 UTC, the adversary resumed; `BX/a3-adversary/NOTES.md` "Day 2", `BX/a3-adversary/day2/`; real super-units b64 712012851 and 400000017, b62 696365039 and 123456791, shape (4, 10))
 
 - **The gap, per admissible n at b64** [M; b62 has the same ratios]: pairs 3.58e-3; passing pairs 2.64e-6; G2 flat

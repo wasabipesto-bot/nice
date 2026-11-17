@@ -1208,10 +1208,742 @@ __global__ void __launch_bounds__(NT, MINB) k_main7(const u64 *sm, const u32 *sc
     if (my_surv) atomicAdd(&cnt[d * 5 + 4], my_surv);
     if (my_lslots) atomicAdd(&cnt[64 * 5], my_lslots);
 }
-#ifndef KVER
-#define KVER 7
+// ---- v8: v7 with less LDS for 3 blocks per SM: no pend_m (child masks recomputed in phase 2 from the parent
+// records), no prob_i (a record names the probe by (unit, probe slot); the host re-derives the top), PMAX 576.
+#ifndef PMAX8
+#define PMAX8 576   // max probes per (class, unit) here: 561
 #endif
-#if KVER == 7
+template <int MODE>
+__global__ void __launch_bounds__(NT, MINB) k_main8(const u64 *sm, const u32 *scacc, const int *pseg,
+                                              const u64 *tmask, const int *tseg,
+                                              u64 *cnt, u32 *outbuf, u64 *outn, u64 outcap) {
+    __shared__ u32 pend_p[PEND3];
+    __shared__ u64 slices3[65 * 16];  // row 64 = zero slice (padding digit)
+    __shared__ u32 prob_d[PMAX8 * 5];  // probe digits, 4 per word, padded with 64
+    __shared__ u64 commonm[16], validm[16];
+    __shared__ u64 prob_m[PMAX8];
+    __shared__ int wcnt2[2][NT / 32];
+    __shared__ int s_pend, s_nprobe, s_tot, s_nlist;
+    __shared__ u32 plist[PMAX8];
+    const int c = blockIdx.x / 64;
+    const u32 d = blockIdx.x % 64;
+    const int t = threadIdx.x, lane = t & 31, w = t >> 5;
+    const int cc = (c + (int)d) % M;
+    if (t == 0) {
+        int n = 0;
+        for (int i = 0; i < NROOT; i++) {
+            int ct = (c_roots[i] - cc + M) % M;
+            n += tseg[(d * M + ct) * 2 + 1] - tseg[(d * M + ct) * 2];
+        }
+        s_nprobe = n; s_pend = 0; s_nlist = 0;
+    }
+    if (t < 16) slices3[64 * 16 + t] = 0;
+    __syncthreads();
+    {
+        int base = 0;
+        for (int i = 0; i < NROOT; i++) {
+            int ct = (c_roots[i] - cc + M) % M;
+            int b0 = tseg[(d * M + ct) * 2], b1 = tseg[(d * M + ct) * 2 + 1];
+            for (int j = t; j < b1 - b0; j += NT) if (base + j < PMAX8) {
+                u64 x = tmask[b0 + j]; prob_m[base + j] = x;
+                u32 dw[5] = {0x40404040u, 0x40404040u, 0x40404040u, 0x40404040u, 0x40404040u};
+                for (int k = 0; x && k < 20; k++) { u32 v = __ffsll((long long)x) - 1; dw[k >> 2] = (dw[k >> 2] & ~(0xffu << (8 * (k & 3)))) | (v << (8 * (k & 3))); x &= x - 1; }
+                for (int k = 0; k < 5; k++) prob_d[(base + j) * 5 + k] = dw[k];
+            }
+            base += b1 - b0;
+        }
+    }
+    __syncthreads();
+    const int nprobe = min(s_nprobe, PMAX8);
+    u64 my_children = 0, my_chunks = 0, my_flat = 0, my_kept = 0, my_surv = 0, my_lslots = 0;
+    long long slab_id = -1; int slab_used = SLAB;  // full: the first record allocates
+    const int pb = pseg[c], pe = pseg[c + 1];
+    int cur = pb, npend_r = 0, par = 0;
+    while (true) {
+        // phase 1 (v6): one barrier per NT parents; warp counts double-buffered, pend count kept block-uniform in a register
+        while (npend_r < FILL3 && cur < pe) {
+            int idx = cur + t;
+            u64 m = 0;
+            if (idx < pe) m = child_mask(sm[idx], scacc[idx], d);
+            unsigned bal = __ballot_sync(0xffffffffu, m != 0);
+            if (lane == 0) wcnt2[par][w] = __popc(bal);
+            __syncthreads();
+            int off = 0, tot = 0;
+#pragma unroll
+            for (int i = 0; i < NT / 32; i++) { int x = wcnt2[par][i]; off += (i < w) ? x : 0; tot += x; }
+            if (m) { int pos = npend_r + off + __popc(bal & ((1u << lane) - 1)); pend_p[pos] = idx; }
+            npend_r += tot; par ^= 1;
+            cur += NT;
+        }
+        __syncthreads();
+        const bool done = cur >= pe;
+        const int npend = npend_r;
+        const int nch = done ? min(16, (npend + 63) / 64) : 16;
+        if (nch == 0) break;
+        const int ntake = min(npend, nch * 64);
+        // phase 2 (v6): 64x64 bit transpose per chunk by a local 32-block swap and 5 shfl_xor stages on four 32x32 blocks
+        for (int q = w; q < nch; q += NT / 32) {
+            int i0 = q * 64 + lane, i1 = q * 64 + 32 + lane;
+            bool v0 = i0 < ntake, v1 = i1 < ntake;
+            u64 m0 = 0, m1 = 0;  // v8: child masks recomputed from the (cached) parent records
+            if (v0) { u32 j = pend_p[i0]; m0 = child_mask(sm[j], scacc[j], d); }
+            if (v1) { u32 j = pend_p[i1]; m1 = child_mask(sm[j], scacc[j], d); }
+            u32 A = (u32)m0, Bk = (u32)(m0 >> 32), C = (u32)m1, D = (u32)(m1 >> 32);
+#pragma unroll
+            for (int j = 16; j; j >>= 1) {
+                const u32 hi = (j == 16) ? 0xFFFF0000u : (j == 8) ? 0xFF00FF00u : (j == 4) ? 0xF0F0F0F0u : (j == 2) ? 0xCCCCCCCCu : 0xAAAAAAAAu;
+                const u32 yA = __shfl_xor_sync(0xffffffffu, A, j), yB = __shfl_xor_sync(0xffffffffu, Bk, j);
+                const u32 yC = __shfl_xor_sync(0xffffffffu, C, j), yD = __shfl_xor_sync(0xffffffffu, D, j);
+                if (lane & j) { A = (A & hi) | ((yA >> j) & ~hi); Bk = (Bk & hi) | ((yB >> j) & ~hi); C = (C & hi) | ((yC >> j) & ~hi); D = (D & hi) | ((yD >> j) & ~hi); }
+                else { A = (A & ~hi) | ((yA << j) & hi); Bk = (Bk & ~hi) | ((yB << j) & hi); C = (C & ~hi) | ((yC << j) & hi); D = (D & ~hi) | ((yD << j) & hi); }
+            }
+            slices3[lane * 16 + q] = (u64)A | ((u64)C << 32);
+            slices3[(lane + 32) * 16 + q] = (u64)Bk | ((u64)D << 32);
+            u64 cm = (v0 ? m0 : ~0ULL) & (v1 ? m1 : ~0ULL);
+            for (int o = 16; o; o >>= 1) cm &= __shfl_xor_sync(0xffffffffu, cm, o);
+            unsigned bv0 = __ballot_sync(0xffffffffu, v0), bv1 = __ballot_sync(0xffffffffu, v1);
+            if (lane == 0) { commonm[q] = cm; validm[q] = (u64)bv0 | ((u64)bv1 << 32); }
+        }
+        __syncthreads();
+        // phase 3a: per probe, the 16-bit mask of chunks that survive the common-mask skip; probes with any kept chunk
+        // go to a list (unordered: the output is a set). 3b: half-warps take list entries, lane = chunk.
+        if (MODE != 0) {
+            for (int pp = t; pp < nprobe; pp += NT) {
+                const u64 tm = prob_m[pp];
+                u32 km = 0;
+                for (int qq = 0; qq < nch; qq++) if (!(MODE == 2 && (commonm[qq] & tm))) km |= 1u << qq;
+                if (km) { int sl = atomicAdd(&s_nlist, 1); plist[sl] = (u32)pp | (km << 16); }
+            }
+            __syncthreads();
+            const int nlist = s_nlist;
+            const int q = lane & 15;
+            u64 vmq = q < nch ? validm[q] : 0;
+            for (int e0 = 0; e0 < nlist; e0 += NT / 16) {   // block-uniform
+                const int e = e0 + w * 2 + (lane >> 4);
+                u64 wd = 0; u32 pk = 0;
+                if (e < nlist) {
+                    const u32 ent = plist[e];
+                    pk = ent & 0xffffu;
+                    if ((ent >> (16 + q)) & 1u) {
+                        my_kept++;
+                        const u32 *dp = prob_d + pk * 5;
+                        u64 acc = 0;
+#pragma unroll
+                        for (int k5 = 0; k5 < 5; k5++) {
+                            const u32 dw = dp[k5];
+#pragma unroll
+                            for (int k = 0; k < 4; k++) if (k5 * 4 + k < MAXPOP) acc |= slices3[((dw >> (8 * k)) & 0xffu) * 16 + q];
+                        }
+                        wd = ~acc & vmq;
+                    }
+                }
+                if (t == 0) my_lslots += (u64)min(NT / 16, nlist - e0) * nch;
+#if NOOUT
+                my_surv += __popcll(wd);
+#else
+                const unsigned nzb = __ballot_sync(0xffffffffu, wd != 0);
+                if (nzb) {   // warp-private slabs of SLAB records: a global atomic only when a slab is full
+                    const int nn = __popc(nzb);
+                    if (slab_used + nn > SLAB) {
+                        if (slab_id >= 0 && lane == 0) g_slabcnt[slab_id] = slab_used;
+                        long long sid = 0;
+                        if (lane == 0) sid = (long long)atomicAdd(outn, 1ULL);
+                        slab_id = __shfl_sync(0xffffffffu, sid, 0); slab_used = 0;
+                    }
+                    if (wd) {
+                        const u64 slot = (u64)slab_id * SLAB + slab_used + __popc(nzb & ((1u << lane) - 1));
+                        if (slot < outcap) {
+                            uint4 r; r.x = pk | (d << 16); r.y = pend_p[q * 64]; r.z = (u32)wd; r.w = (u32)(wd >> 32);
+                            reinterpret_cast<uint4 *>(outbuf)[slot] = r;
+                        }
+                        my_surv += __popcll(wd);
+                    }
+                    slab_used += nn;
+                }
+#endif
+            }
+            if (t == 0) my_flat += (u64)nprobe * nch;
+        }
+        if (t == 0) { my_chunks += nch; my_children += (u64)ntake; }
+        __syncthreads();
+        // phase 4: carry the rest (< NT + 64 - 1 ... at most PEND3 - FILL3) to the front; ranges are disjoint
+        const int left = npend - ntake;
+        if (t < left) { u32 pp = pend_p[ntake + t]; pend_p[t] = pp; }
+        __syncthreads();
+        npend_r = left;
+        if (t == 0) s_nlist = 0;
+        __syncthreads();
+        if (done && left == 0) break;
+    }
+    if (slab_id >= 0 && lane == 0) g_slabcnt[slab_id] = slab_used;
+    if (my_children) atomicAdd(&cnt[d * 5 + 0], my_children);
+    if (my_chunks) atomicAdd(&cnt[d * 5 + 1], my_chunks);
+    if (my_flat) atomicAdd(&cnt[d * 5 + 2], my_flat);
+    if (my_kept) atomicAdd(&cnt[d * 5 + 3], my_kept);
+    if (my_surv) atomicAdd(&cnt[d * 5 + 4], my_surv);
+    if (my_lslots) atomicAdd(&cnt[64 * 5], my_lslots);
+}
+// ---- v9: v8 with two list entries per lane per step (twice the independent loads in flight, half the per-step
+// output and loop overhead) and a 32-bit slab id
+template <int MODE>
+__global__ void __launch_bounds__(NT, MINB) k_main9(const u64 *sm, const u32 *scacc, const int *pseg,
+                                              const u64 *tmask, const int *tseg,
+                                              u64 *cnt, u32 *outbuf, u64 *outn, u64 outcap) {
+    __shared__ u32 pend_p[PEND3];
+    __shared__ u64 slices3[65 * 16];  // row 64 = zero slice (padding digit)
+    __shared__ u32 prob_d[PMAX8 * 5];  // probe digits, 4 per word, padded with 64
+    __shared__ u64 commonm[16], validm[16];
+    __shared__ u64 prob_m[PMAX8];
+    __shared__ int wcnt2[2][NT / 32];
+    __shared__ int s_pend, s_nprobe, s_tot, s_nlist;
+    __shared__ u32 plist[PMAX8];
+    const int c = blockIdx.x / 64;
+    const u32 d = blockIdx.x % 64;
+    const int t = threadIdx.x, lane = t & 31, w = t >> 5;
+    const int cc = (c + (int)d) % M;
+    if (t == 0) {
+        int n = 0;
+        for (int i = 0; i < NROOT; i++) {
+            int ct = (c_roots[i] - cc + M) % M;
+            n += tseg[(d * M + ct) * 2 + 1] - tseg[(d * M + ct) * 2];
+        }
+        s_nprobe = n; s_pend = 0; s_nlist = 0;
+    }
+    if (t < 16) slices3[64 * 16 + t] = 0;
+    __syncthreads();
+    {
+        int base = 0;
+        for (int i = 0; i < NROOT; i++) {
+            int ct = (c_roots[i] - cc + M) % M;
+            int b0 = tseg[(d * M + ct) * 2], b1 = tseg[(d * M + ct) * 2 + 1];
+            for (int j = t; j < b1 - b0; j += NT) if (base + j < PMAX8) {
+                u64 x = tmask[b0 + j]; prob_m[base + j] = x;
+                u32 dw[5] = {0x40404040u, 0x40404040u, 0x40404040u, 0x40404040u, 0x40404040u};
+                for (int k = 0; x && k < 20; k++) { u32 v = __ffsll((long long)x) - 1; dw[k >> 2] = (dw[k >> 2] & ~(0xffu << (8 * (k & 3)))) | (v << (8 * (k & 3))); x &= x - 1; }
+                for (int k = 0; k < 5; k++) prob_d[(base + j) * 5 + k] = dw[k];
+            }
+            base += b1 - b0;
+        }
+    }
+    __syncthreads();
+    const int nprobe = min(s_nprobe, PMAX8);
+    u64 my_children = 0, my_chunks = 0, my_flat = 0, my_kept = 0, my_surv = 0, my_lslots = 0;
+    int slab_id = -1; int slab_used = SLAB;  // full: the first record allocates
+    const int pb = pseg[c], pe = pseg[c + 1];
+    int cur = pb, npend_r = 0, par = 0;
+    while (true) {
+        // phase 1 (v6): one barrier per NT parents; warp counts double-buffered, pend count kept block-uniform in a register
+        while (npend_r < FILL3 && cur < pe) {
+            int idx = cur + t;
+            u64 m = 0;
+            if (idx < pe) m = child_mask(sm[idx], scacc[idx], d);
+            unsigned bal = __ballot_sync(0xffffffffu, m != 0);
+            if (lane == 0) wcnt2[par][w] = __popc(bal);
+            __syncthreads();
+            int off = 0, tot = 0;
+#pragma unroll
+            for (int i = 0; i < NT / 32; i++) { int x = wcnt2[par][i]; off += (i < w) ? x : 0; tot += x; }
+            if (m) { int pos = npend_r + off + __popc(bal & ((1u << lane) - 1)); pend_p[pos] = idx; }
+            npend_r += tot; par ^= 1;
+            cur += NT;
+        }
+        __syncthreads();
+        const bool done = cur >= pe;
+        const int npend = npend_r;
+        const int nch = done ? min(16, (npend + 63) / 64) : 16;
+        if (nch == 0) break;
+        const int ntake = min(npend, nch * 64);
+        // phase 2 (v6): 64x64 bit transpose per chunk by a local 32-block swap and 5 shfl_xor stages on four 32x32 blocks
+        for (int q = w; q < nch; q += NT / 32) {
+            int i0 = q * 64 + lane, i1 = q * 64 + 32 + lane;
+            bool v0 = i0 < ntake, v1 = i1 < ntake;
+            u64 m0 = 0, m1 = 0;  // v8: child masks recomputed from the (cached) parent records
+            if (v0) { u32 j = pend_p[i0]; m0 = child_mask(sm[j], scacc[j], d); }
+            if (v1) { u32 j = pend_p[i1]; m1 = child_mask(sm[j], scacc[j], d); }
+            u32 A = (u32)m0, Bk = (u32)(m0 >> 32), C = (u32)m1, D = (u32)(m1 >> 32);
+#pragma unroll
+            for (int j = 16; j; j >>= 1) {
+                const u32 hi = (j == 16) ? 0xFFFF0000u : (j == 8) ? 0xFF00FF00u : (j == 4) ? 0xF0F0F0F0u : (j == 2) ? 0xCCCCCCCCu : 0xAAAAAAAAu;
+                const u32 yA = __shfl_xor_sync(0xffffffffu, A, j), yB = __shfl_xor_sync(0xffffffffu, Bk, j);
+                const u32 yC = __shfl_xor_sync(0xffffffffu, C, j), yD = __shfl_xor_sync(0xffffffffu, D, j);
+                if (lane & j) { A = (A & hi) | ((yA >> j) & ~hi); Bk = (Bk & hi) | ((yB >> j) & ~hi); C = (C & hi) | ((yC >> j) & ~hi); D = (D & hi) | ((yD >> j) & ~hi); }
+                else { A = (A & ~hi) | ((yA << j) & hi); Bk = (Bk & ~hi) | ((yB << j) & hi); C = (C & ~hi) | ((yC << j) & hi); D = (D & ~hi) | ((yD << j) & hi); }
+            }
+            slices3[lane * 16 + q] = (u64)A | ((u64)C << 32);
+            slices3[(lane + 32) * 16 + q] = (u64)Bk | ((u64)D << 32);
+            u64 cm = (v0 ? m0 : ~0ULL) & (v1 ? m1 : ~0ULL);
+            for (int o = 16; o; o >>= 1) cm &= __shfl_xor_sync(0xffffffffu, cm, o);
+            unsigned bv0 = __ballot_sync(0xffffffffu, v0), bv1 = __ballot_sync(0xffffffffu, v1);
+            if (lane == 0) { commonm[q] = cm; validm[q] = (u64)bv0 | ((u64)bv1 << 32); }
+        }
+        __syncthreads();
+        // phase 3a: per probe, the 16-bit mask of chunks that survive the common-mask skip; probes with any kept chunk
+        // go to a list (unordered: the output is a set). 3b: half-warps take list entries, lane = chunk.
+        if (MODE != 0) {
+            for (int pp = t; pp < nprobe; pp += NT) {
+                const u64 tm = prob_m[pp];
+                u32 km = 0;
+                for (int qq = 0; qq < nch; qq++) if (!(MODE == 2 && (commonm[qq] & tm))) km |= 1u << qq;
+                if (km) { int sl = atomicAdd(&s_nlist, 1); plist[sl] = (u32)pp | (km << 16); }
+            }
+            __syncthreads();
+            const int nlist = s_nlist;
+            const int q = lane & 15;
+            u64 vmq = q < nch ? validm[q] : 0;
+            auto word = [&](int e, u32 &pk) -> u64 {
+                pk = 0;
+                if (e >= nlist) return 0;
+                const u32 ent = plist[e];
+                pk = ent & 0xffffu;
+                if (!((ent >> (16 + q)) & 1u)) return 0;
+                my_kept++;
+                const u32 *dp = prob_d + pk * 5;
+                u64 acc = 0;
+#pragma unroll
+                for (int k5 = 0; k5 < 5; k5++) {
+                    const u32 dw = dp[k5];
+#pragma unroll
+                    for (int k = 0; k < 4; k++) if (k5 * 4 + k < MAXPOP) acc |= slices3[((dw >> (8 * k)) & 0xffu) * 16 + q];
+                }
+                return ~acc & vmq;
+            };
+            const int pend0 = pend_p[q * 64];
+            for (int e0 = 0; e0 < nlist; e0 += NT / 8) {   // block-uniform; two list entries per lane per step
+                const int ea = e0 + w * 2 + (lane >> 4), eb = ea + NT / 16;
+                u32 pa, pb2;
+                const u64 wa = word(ea, pa), wb = word(eb, pb2);
+                if (t == 0) my_lslots += (u64)min(NT / 8, nlist - e0) * nch;
+#if NOOUT
+                my_surv += __popcll(wa) + __popcll(wb);
+#else
+                const unsigned za = __ballot_sync(0xffffffffu, wa != 0), zb = __ballot_sync(0xffffffffu, wb != 0);
+                if (za | zb) {
+                    const int na = __popc(za), nn = na + __popc(zb);
+                    if (slab_used + nn > SLAB) {
+                        if (slab_id >= 0 && lane == 0) g_slabcnt[slab_id] = slab_used;
+                        int sid = 0;
+                        if (lane == 0) sid = (int)atomicAdd(outn, 1ULL);
+                        slab_id = __shfl_sync(0xffffffffu, sid, 0); slab_used = 0;
+                    }
+                    const unsigned lt = (1u << lane) - 1;
+                    const u64 sbase = (u64)slab_id * SLAB + slab_used;
+                    if (wa) {
+                        const u64 slot = sbase + __popc(za & lt);
+                        if (slot < outcap) reinterpret_cast<uint4 *>(outbuf)[slot] = make_uint4(pa | (d << 16), pend0, (u32)wa, (u32)(wa >> 32));
+                        my_surv += __popcll(wa);
+                    }
+                    if (wb) {
+                        const u64 slot = sbase + na + __popc(zb & lt);
+                        if (slot < outcap) reinterpret_cast<uint4 *>(outbuf)[slot] = make_uint4(pb2 | (d << 16), pend0, (u32)wb, (u32)(wb >> 32));
+                        my_surv += __popcll(wb);
+                    }
+                    slab_used += nn;
+                }
+#endif
+            }
+            if (t == 0) my_flat += (u64)nprobe * nch;
+        }
+        if (t == 0) { my_chunks += nch; my_children += (u64)ntake; }
+        __syncthreads();
+        // phase 4: carry the rest (< NT + 64 - 1 ... at most PEND3 - FILL3) to the front; ranges are disjoint
+        const int left = npend - ntake;
+        if (t < left) { u32 pp = pend_p[ntake + t]; pend_p[t] = pp; }
+        __syncthreads();
+        npend_r = left;
+        if (t == 0) s_nlist = 0;
+        __syncthreads();
+        if (done && left == 0) break;
+    }
+    if (slab_id >= 0 && lane == 0) g_slabcnt[slab_id] = slab_used;
+    if (my_children) atomicAdd(&cnt[d * 5 + 0], my_children);
+    if (my_chunks) atomicAdd(&cnt[d * 5 + 1], my_chunks);
+    if (my_flat) atomicAdd(&cnt[d * 5 + 2], my_flat);
+    if (my_kept) atomicAdd(&cnt[d * 5 + 3], my_kept);
+    if (my_surv) atomicAdd(&cnt[d * 5 + 4], my_surv);
+    if (my_lslots) atomicAdd(&cnt[64 * 5], my_lslots);
+}
+// ---- v10: v9 reading the sorted 16-byte parent records directly (no split pass, one load per parent) and each
+// probe's digits with one 16-byte load plus one word
+template <int MODE>
+__global__ void __launch_bounds__(NT, MINB) k_main10(const u64 *sm, const u32 *scacc, const int *pseg,
+                                              const u64 *tmask, const int *tseg,
+                                              u64 *cnt, u32 *outbuf, u64 *outn, u64 outcap) {
+    __shared__ u32 pend_p[PEND3];
+    __shared__ u64 slices3[65 * 16];  // row 64 = zero slice (padding digit)
+    __shared__ uint4 prob_d4[PMAX8];
+    __shared__ u32 prob_dx[PMAX8];  // probe digits, 4 per word, padded with 64
+    __shared__ u64 commonm[16], validm[16];
+    __shared__ u64 prob_m[PMAX8];
+    __shared__ int wcnt2[2][NT / 32];
+    __shared__ int s_pend, s_nprobe, s_tot, s_nlist;
+    __shared__ u32 plist[PMAX8];
+    const int c = blockIdx.x / 64;
+    const u32 d = blockIdx.x % 64;
+    const int t = threadIdx.x, lane = t & 31, w = t >> 5;
+    const uint4 *PV = reinterpret_cast<const uint4 *>(sm);  // v10: sorted parent records straight from the sort
+    const int cc = (c + (int)d) % M;
+    if (t == 0) {
+        int n = 0;
+        for (int i = 0; i < NROOT; i++) {
+            int ct = (c_roots[i] - cc + M) % M;
+            n += tseg[(d * M + ct) * 2 + 1] - tseg[(d * M + ct) * 2];
+        }
+        s_nprobe = n; s_pend = 0; s_nlist = 0;
+    }
+    if (t < 16) slices3[64 * 16 + t] = 0;
+    __syncthreads();
+    {
+        int base = 0;
+        for (int i = 0; i < NROOT; i++) {
+            int ct = (c_roots[i] - cc + M) % M;
+            int b0 = tseg[(d * M + ct) * 2], b1 = tseg[(d * M + ct) * 2 + 1];
+            for (int j = t; j < b1 - b0; j += NT) if (base + j < PMAX8) {
+                u64 x = tmask[b0 + j]; prob_m[base + j] = x;
+                u32 dw[5] = {0x40404040u, 0x40404040u, 0x40404040u, 0x40404040u, 0x40404040u};
+                for (int k = 0; x && k < 20; k++) { u32 v = __ffsll((long long)x) - 1; dw[k >> 2] = (dw[k >> 2] & ~(0xffu << (8 * (k & 3)))) | (v << (8 * (k & 3))); x &= x - 1; }
+                prob_d4[base + j] = make_uint4(dw[0], dw[1], dw[2], dw[3]); prob_dx[base + j] = dw[4];
+            }
+            base += b1 - b0;
+        }
+    }
+    __syncthreads();
+    const int nprobe = min(s_nprobe, PMAX8);
+    u64 my_children = 0, my_chunks = 0, my_flat = 0, my_kept = 0, my_surv = 0, my_lslots = 0;
+    int slab_id = -1; int slab_used = SLAB;  // full: the first record allocates
+    const int pb = pseg[c], pe = pseg[c + 1];
+    int cur = pb, npend_r = 0, par = 0;
+    while (true) {
+        // phase 1 (v6): one barrier per NT parents; warp counts double-buffered, pend count kept block-uniform in a register
+        while (npend_r < FILL3 && cur < pe) {
+            int idx = cur + t;
+            u64 m = 0;
+            if (idx < pe) { const uint4 v = PV[idx]; m = child_mask((u64)v.x | ((u64)v.y << 32), v.z, d); }
+            unsigned bal = __ballot_sync(0xffffffffu, m != 0);
+            if (lane == 0) wcnt2[par][w] = __popc(bal);
+            __syncthreads();
+            int off = 0, tot = 0;
+#pragma unroll
+            for (int i = 0; i < NT / 32; i++) { int x = wcnt2[par][i]; off += (i < w) ? x : 0; tot += x; }
+            if (m) { int pos = npend_r + off + __popc(bal & ((1u << lane) - 1)); pend_p[pos] = idx; }
+            npend_r += tot; par ^= 1;
+            cur += NT;
+        }
+        __syncthreads();
+        const bool done = cur >= pe;
+        const int npend = npend_r;
+        const int nch = done ? min(16, (npend + 63) / 64) : 16;
+        if (nch == 0) break;
+        const int ntake = min(npend, nch * 64);
+        // phase 2 (v6): 64x64 bit transpose per chunk by a local 32-block swap and 5 shfl_xor stages on four 32x32 blocks
+        for (int q = w; q < nch; q += NT / 32) {
+            int i0 = q * 64 + lane, i1 = q * 64 + 32 + lane;
+            bool v0 = i0 < ntake, v1 = i1 < ntake;
+            u64 m0 = 0, m1 = 0;  // v8: child masks recomputed from the (cached) parent records
+            if (v0) { const uint4 v = PV[pend_p[i0]]; m0 = child_mask((u64)v.x | ((u64)v.y << 32), v.z, d); }
+            if (v1) { const uint4 v = PV[pend_p[i1]]; m1 = child_mask((u64)v.x | ((u64)v.y << 32), v.z, d); }
+            u32 A = (u32)m0, Bk = (u32)(m0 >> 32), C = (u32)m1, D = (u32)(m1 >> 32);
+#pragma unroll
+            for (int j = 16; j; j >>= 1) {
+                const u32 hi = (j == 16) ? 0xFFFF0000u : (j == 8) ? 0xFF00FF00u : (j == 4) ? 0xF0F0F0F0u : (j == 2) ? 0xCCCCCCCCu : 0xAAAAAAAAu;
+                const u32 yA = __shfl_xor_sync(0xffffffffu, A, j), yB = __shfl_xor_sync(0xffffffffu, Bk, j);
+                const u32 yC = __shfl_xor_sync(0xffffffffu, C, j), yD = __shfl_xor_sync(0xffffffffu, D, j);
+                if (lane & j) { A = (A & hi) | ((yA >> j) & ~hi); Bk = (Bk & hi) | ((yB >> j) & ~hi); C = (C & hi) | ((yC >> j) & ~hi); D = (D & hi) | ((yD >> j) & ~hi); }
+                else { A = (A & ~hi) | ((yA << j) & hi); Bk = (Bk & ~hi) | ((yB << j) & hi); C = (C & ~hi) | ((yC << j) & hi); D = (D & ~hi) | ((yD << j) & hi); }
+            }
+            slices3[lane * 16 + q] = (u64)A | ((u64)C << 32);
+            slices3[(lane + 32) * 16 + q] = (u64)Bk | ((u64)D << 32);
+            u64 cm = (v0 ? m0 : ~0ULL) & (v1 ? m1 : ~0ULL);
+            for (int o = 16; o; o >>= 1) cm &= __shfl_xor_sync(0xffffffffu, cm, o);
+            unsigned bv0 = __ballot_sync(0xffffffffu, v0), bv1 = __ballot_sync(0xffffffffu, v1);
+            if (lane == 0) { commonm[q] = cm; validm[q] = (u64)bv0 | ((u64)bv1 << 32); }
+        }
+        __syncthreads();
+        // phase 3a: per probe, the 16-bit mask of chunks that survive the common-mask skip; probes with any kept chunk
+        // go to a list (unordered: the output is a set). 3b: half-warps take list entries, lane = chunk.
+        if (MODE != 0) {
+            for (int pp = t; pp < nprobe; pp += NT) {
+                const u64 tm = prob_m[pp];
+                u32 km = 0;
+                for (int qq = 0; qq < nch; qq++) if (!(MODE == 2 && (commonm[qq] & tm))) km |= 1u << qq;
+                if (km) { int sl = atomicAdd(&s_nlist, 1); plist[sl] = (u32)pp | (km << 16); }
+            }
+            __syncthreads();
+            const int nlist = s_nlist;
+            const int q = lane & 15;
+            u64 vmq = q < nch ? validm[q] : 0;
+            auto word = [&](int e, u32 &pk) -> u64 {
+                pk = 0;
+                if (e >= nlist) return 0;
+                const u32 ent = plist[e];
+                pk = ent & 0xffffu;
+                if (!((ent >> (16 + q)) & 1u)) return 0;
+                my_kept++;
+                const uint4 d4 = prob_d4[pk];
+                const u32 dws[5] = {d4.x, d4.y, d4.z, d4.w, (MAXPOP > 16) ? prob_dx[pk] : 0u};
+                u64 acc = 0;
+#pragma unroll
+                for (int k5 = 0; k5 < 5; k5++) {
+                    const u32 dw = dws[k5];
+#pragma unroll
+                    for (int k = 0; k < 4; k++) if (k5 * 4 + k < MAXPOP) acc |= slices3[((dw >> (8 * k)) & 0xffu) * 16 + q];
+                }
+                return ~acc & vmq;
+            };
+            const int pend0 = pend_p[q * 64];
+            for (int e0 = 0; e0 < nlist; e0 += NT / 8) {   // block-uniform; two list entries per lane per step
+                const int ea = e0 + w * 2 + (lane >> 4), eb = ea + NT / 16;
+                u32 pa, pb2;
+                const u64 wa = word(ea, pa), wb = word(eb, pb2);
+                if (t == 0) my_lslots += (u64)min(NT / 8, nlist - e0) * nch;
+#if NOOUT
+                my_surv += __popcll(wa) + __popcll(wb);
+#else
+                const unsigned za = __ballot_sync(0xffffffffu, wa != 0), zb = __ballot_sync(0xffffffffu, wb != 0);
+                if (za | zb) {
+                    const int na = __popc(za), nn = na + __popc(zb);
+                    if (slab_used + nn > SLAB) {
+                        if (slab_id >= 0 && lane == 0) g_slabcnt[slab_id] = slab_used;
+                        int sid = 0;
+                        if (lane == 0) sid = (int)atomicAdd(outn, 1ULL);
+                        slab_id = __shfl_sync(0xffffffffu, sid, 0); slab_used = 0;
+                    }
+                    const unsigned lt = (1u << lane) - 1;
+                    const u64 sbase = (u64)slab_id * SLAB + slab_used;
+                    if (wa) {
+                        const u64 slot = sbase + __popc(za & lt);
+                        if (slot < outcap) reinterpret_cast<uint4 *>(outbuf)[slot] = make_uint4(pa | (d << 16), pend0, (u32)wa, (u32)(wa >> 32));
+                        my_surv += __popcll(wa);
+                    }
+                    if (wb) {
+                        const u64 slot = sbase + na + __popc(zb & lt);
+                        if (slot < outcap) reinterpret_cast<uint4 *>(outbuf)[slot] = make_uint4(pb2 | (d << 16), pend0, (u32)wb, (u32)(wb >> 32));
+                        my_surv += __popcll(wb);
+                    }
+                    slab_used += nn;
+                }
+#endif
+            }
+            if (t == 0) my_flat += (u64)nprobe * nch;
+        }
+        if (t == 0) { my_chunks += nch; my_children += (u64)ntake; }
+        __syncthreads();
+        // phase 4: carry the rest (< NT + 64 - 1 ... at most PEND3 - FILL3) to the front; ranges are disjoint
+        const int left = npend - ntake;
+        if (t < left) { u32 pp = pend_p[ntake + t]; pend_p[t] = pp; }
+        __syncthreads();
+        npend_r = left;
+        if (t == 0) s_nlist = 0;
+        __syncthreads();
+        if (done && left == 0) break;
+    }
+    if (slab_id >= 0 && lane == 0) g_slabcnt[slab_id] = slab_used;
+    if (my_children) atomicAdd(&cnt[d * 5 + 0], my_children);
+    if (my_chunks) atomicAdd(&cnt[d * 5 + 1], my_chunks);
+    if (my_flat) atomicAdd(&cnt[d * 5 + 2], my_flat);
+    if (my_kept) atomicAdd(&cnt[d * 5 + 3], my_kept);
+    if (my_surv) atomicAdd(&cnt[d * 5 + 4], my_surv);
+    if (my_lslots) atomicAdd(&cnt[64 * 5], my_lslots);
+}
+// ---- v11: v10 with the probe list split by half-round (8 chunks per entry, quarter-warps) and no prob_m
+template <int MODE>
+__global__ void __launch_bounds__(NT, MINB) k_main11(const u64 *sm, const u32 *scacc, const int *pseg,
+                                              const u64 *tmask, const int *tseg,
+                                              u64 *cnt, u32 *outbuf, u64 *outn, u64 outcap) {
+    __shared__ u32 pend_p[PEND3];
+    __shared__ u64 slices3[65 * 16];  // row 64 = zero slice (padding digit)
+    __shared__ uint4 prob_d4[PMAX8];
+    __shared__ u32 prob_dx[PMAX8];  // probe digits, 4 per word, padded with 64
+    __shared__ u64 commonm[16], validm[16];
+    __shared__ int wcnt2[2][NT / 32];
+    __shared__ int s_pend, s_nprobe, s_tot, s_nl[2];
+    __shared__ u32 plist[2][PMAX8];
+    const int c = blockIdx.x / 64;
+    const u32 d = blockIdx.x % 64;
+    const int t = threadIdx.x, lane = t & 31, w = t >> 5;
+    const uint4 *PV = reinterpret_cast<const uint4 *>(sm);  // v10: sorted parent records straight from the sort
+    const int cc = (c + (int)d) % M;
+    if (t == 0) {
+        int n = 0;
+        for (int i = 0; i < NROOT; i++) {
+            int ct = (c_roots[i] - cc + M) % M;
+            n += tseg[(d * M + ct) * 2 + 1] - tseg[(d * M + ct) * 2];
+        }
+        s_nprobe = n; s_pend = 0; s_nl[0] = 0; s_nl[1] = 0;
+    }
+    if (t < 16) slices3[64 * 16 + t] = 0;
+    __syncthreads();
+    {
+        int base = 0;
+        for (int i = 0; i < NROOT; i++) {
+            int ct = (c_roots[i] - cc + M) % M;
+            int b0 = tseg[(d * M + ct) * 2], b1 = tseg[(d * M + ct) * 2 + 1];
+            for (int j = t; j < b1 - b0; j += NT) if (base + j < PMAX8) {
+                u64 x = tmask[b0 + j];
+                u32 dw[5] = {0x40404040u, 0x40404040u, 0x40404040u, 0x40404040u, 0x40404040u};
+#pragma unroll
+                for (int k = 0; k < 20; k++) if (x) { u32 v = __ffsll((long long)x) - 1; dw[k >> 2] = (dw[k >> 2] & ~(0xffu << (8 * (k & 3)))) | (v << (8 * (k & 3))); x &= x - 1; }
+                prob_d4[base + j] = make_uint4(dw[0], dw[1], dw[2], dw[3]); prob_dx[base + j] = dw[4];
+            }
+            base += b1 - b0;
+        }
+    }
+    __syncthreads();
+    const int nprobe = min(s_nprobe, PMAX8);
+    u64 my_children = 0, my_chunks = 0, my_flat = 0, my_kept = 0, my_surv = 0, my_lslots = 0;
+    int slab_id = -1; int slab_used = SLAB;  // full: the first record allocates
+    const int pb = pseg[c], pe = pseg[c + 1];
+    int cur = pb, npend_r = 0, par = 0;
+    while (true) {
+        // phase 1 (v6): one barrier per NT parents; warp counts double-buffered, pend count kept block-uniform in a register
+        while (npend_r < FILL3 && cur < pe) {
+            int idx = cur + t;
+            u64 m = 0;
+            if (idx < pe) { const uint4 v = PV[idx]; m = child_mask((u64)v.x | ((u64)v.y << 32), v.z, d); }
+            unsigned bal = __ballot_sync(0xffffffffu, m != 0);
+            if (lane == 0) wcnt2[par][w] = __popc(bal);
+            __syncthreads();
+            int off = 0, tot = 0;
+#pragma unroll
+            for (int i = 0; i < NT / 32; i++) { int x = wcnt2[par][i]; off += (i < w) ? x : 0; tot += x; }
+            if (m) { int pos = npend_r + off + __popc(bal & ((1u << lane) - 1)); pend_p[pos] = idx; }
+            npend_r += tot; par ^= 1;
+            cur += NT;
+        }
+        __syncthreads();
+        const bool done = cur >= pe;
+        const int npend = npend_r;
+        const int nch = done ? min(16, (npend + 63) / 64) : 16;
+        if (nch == 0) break;
+        const int ntake = min(npend, nch * 64);
+        // phase 2 (v6): 64x64 bit transpose per chunk by a local 32-block swap and 5 shfl_xor stages on four 32x32 blocks
+        for (int q = w; q < nch; q += NT / 32) {
+            int i0 = q * 64 + lane, i1 = q * 64 + 32 + lane;
+            bool v0 = i0 < ntake, v1 = i1 < ntake;
+            u64 m0 = 0, m1 = 0;  // v8: child masks recomputed from the (cached) parent records
+            if (v0) { const uint4 v = PV[pend_p[i0]]; m0 = child_mask((u64)v.x | ((u64)v.y << 32), v.z, d); }
+            if (v1) { const uint4 v = PV[pend_p[i1]]; m1 = child_mask((u64)v.x | ((u64)v.y << 32), v.z, d); }
+            u32 A = (u32)m0, Bk = (u32)(m0 >> 32), C = (u32)m1, D = (u32)(m1 >> 32);
+#pragma unroll
+            for (int j = 16; j; j >>= 1) {
+                const u32 hi = (j == 16) ? 0xFFFF0000u : (j == 8) ? 0xFF00FF00u : (j == 4) ? 0xF0F0F0F0u : (j == 2) ? 0xCCCCCCCCu : 0xAAAAAAAAu;
+                const u32 yA = __shfl_xor_sync(0xffffffffu, A, j), yB = __shfl_xor_sync(0xffffffffu, Bk, j);
+                const u32 yC = __shfl_xor_sync(0xffffffffu, C, j), yD = __shfl_xor_sync(0xffffffffu, D, j);
+                if (lane & j) { A = (A & hi) | ((yA >> j) & ~hi); Bk = (Bk & hi) | ((yB >> j) & ~hi); C = (C & hi) | ((yC >> j) & ~hi); D = (D & hi) | ((yD >> j) & ~hi); }
+                else { A = (A & ~hi) | ((yA << j) & hi); Bk = (Bk & ~hi) | ((yB << j) & hi); C = (C & ~hi) | ((yC << j) & hi); D = (D & ~hi) | ((yD << j) & hi); }
+            }
+            slices3[lane * 16 + q] = (u64)A | ((u64)C << 32);
+            slices3[(lane + 32) * 16 + q] = (u64)Bk | ((u64)D << 32);
+            u64 cm = (v0 ? m0 : ~0ULL) & (v1 ? m1 : ~0ULL);
+            for (int o = 16; o; o >>= 1) cm &= __shfl_xor_sync(0xffffffffu, cm, o);
+            unsigned bv0 = __ballot_sync(0xffffffffu, v0), bv1 = __ballot_sync(0xffffffffu, v1);
+            if (lane == 0) { commonm[q] = cm; validm[q] = (u64)bv0 | ((u64)bv1 << 32); }
+        }
+        __syncthreads();
+        // phase 3a (v11): per probe and half-round (8 chunks), the 8-bit mask of chunks that survive the skip; nonzero
+        // halves go to list 0 (chunks 0-7) or list 1 (chunks 8-15). 3b: quarter-warps 0,2 take list 0 and 1,3 take list 1,
+        // lane = chunk, so each warp-wide slice load is still two conflict-free wavefronts.
+        if (MODE != 0) {
+            for (int pp = t; pp < nprobe; pp += NT) {
+                const uint4 d4 = prob_d4[pp];
+                const u32 dws[5] = {d4.x, d4.y, d4.z, d4.w, (MAXPOP > 16) ? prob_dx[pp] : 0u};
+                u64 tm = 0;
+#pragma unroll
+                for (int k = 0; k < MAXPOP; k++) { u32 v = (dws[k >> 2] >> (8 * (k & 3))) & 0xffu; tm |= (v < 64) ? (1ULL << v) : 0ULL; }
+                u32 km = 0;
+                for (int qq = 0; qq < nch; qq++) if (!(MODE == 2 && (commonm[qq] & tm))) km |= 1u << qq;
+                if (km & 0xffu) { int sl = atomicAdd(&s_nl[0], 1); plist[0][sl] = (u32)pp | ((km & 0xffu) << 16); }
+                if (km >> 8) { int sl = atomicAdd(&s_nl[1], 1); plist[1][sl] = (u32)pp | ((km >> 8) << 16); }
+            }
+            __syncthreads();
+            const int qi = lane >> 3, hh = qi & 1, q8 = lane & 7, q = q8 + 8 * hh;
+            const int nlist = s_nl[hh], nmax = max(s_nl[0], s_nl[1]);
+            const u32 *pl = plist[hh];
+            u64 vmq = q < nch ? validm[q] : 0;
+            auto word = [&](int e, u32 &pk) -> u64 {
+                pk = 0;
+                if (e >= nlist) return 0;
+                const u32 ent = pl[e];
+                pk = ent & 0xffffu;
+                if (!((ent >> (16 + q8)) & 1u)) return 0;
+                my_kept++;
+                const uint4 d4 = prob_d4[pk];
+                const u32 dws[5] = {d4.x, d4.y, d4.z, d4.w, (MAXPOP > 16) ? prob_dx[pk] : 0u};
+                u64 acc = 0;
+#pragma unroll
+                for (int k5 = 0; k5 < 5; k5++) {
+                    const u32 dw = dws[k5];
+#pragma unroll
+                    for (int k = 0; k < 4; k++) if (k5 * 4 + k < MAXPOP) acc |= slices3[((dw >> (8 * k)) & 0xffu) * 16 + q];
+                }
+                return ~acc & vmq;
+            };
+            const int pend0 = pend_p[q * 64];
+            for (int e0 = 0; e0 < nmax; e0 += NT / 8) {   // block-uniform; two entries per lane per step
+                const int ea = e0 + w * 2 + (qi >> 1), eb = ea + NT / 16;
+                u32 pa, pb2;
+                const u64 wa = word(ea, pa), wb = word(eb, pb2);
+                if (t == 0) my_lslots += (u64)(min(NT / 8, max(0, s_nl[0] - e0)) + min(NT / 8, max(0, s_nl[1] - e0))) * 8;
+#if NOOUT
+                my_surv += __popcll(wa) + __popcll(wb);
+#else
+                const unsigned za = __ballot_sync(0xffffffffu, wa != 0), zb = __ballot_sync(0xffffffffu, wb != 0);
+                if (za | zb) {
+                    const int na = __popc(za), nn = na + __popc(zb);
+                    if (slab_used + nn > SLAB) {
+                        if (slab_id >= 0 && lane == 0) g_slabcnt[slab_id] = slab_used;
+                        int sid = 0;
+                        if (lane == 0) sid = (int)atomicAdd(outn, 1ULL);
+                        slab_id = __shfl_sync(0xffffffffu, sid, 0); slab_used = 0;
+                    }
+                    const unsigned lt = (1u << lane) - 1;
+                    const u64 sbase = (u64)slab_id * SLAB + slab_used;
+                    if (wa) {
+                        const u64 slot = sbase + __popc(za & lt);
+                        if (slot < outcap) reinterpret_cast<uint4 *>(outbuf)[slot] = make_uint4(pa | (d << 16), pend0, (u32)wa, (u32)(wa >> 32));
+                        my_surv += __popcll(wa);
+                    }
+                    if (wb) {
+                        const u64 slot = sbase + na + __popc(zb & lt);
+                        if (slot < outcap) reinterpret_cast<uint4 *>(outbuf)[slot] = make_uint4(pb2 | (d << 16), pend0, (u32)wb, (u32)(wb >> 32));
+                        my_surv += __popcll(wb);
+                    }
+                    slab_used += nn;
+                }
+#endif
+            }
+            if (t == 0) my_flat += (u64)nprobe * nch;
+        }
+        if (t == 0) { my_chunks += nch; my_children += (u64)ntake; }
+        __syncthreads();
+        // phase 4: carry the rest (< NT + 64 - 1 ... at most PEND3 - FILL3) to the front; ranges are disjoint
+        const int left = npend - ntake;
+        if (t < left) { u32 pp = pend_p[ntake + t]; pend_p[t] = pp; }
+        __syncthreads();
+        npend_r = left;
+        if (t == 0) { s_nl[0] = 0; s_nl[1] = 0; }
+        __syncthreads();
+        if (done && left == 0) break;
+    }
+    if (slab_id >= 0 && lane == 0) g_slabcnt[slab_id] = slab_used;
+    if (my_children) atomicAdd(&cnt[d * 5 + 0], my_children);
+    if (my_chunks) atomicAdd(&cnt[d * 5 + 1], my_chunks);
+    if (my_flat) atomicAdd(&cnt[d * 5 + 2], my_flat);
+    if (my_kept) atomicAdd(&cnt[d * 5 + 3], my_kept);
+    if (my_surv) atomicAdd(&cnt[d * 5 + 4], my_surv);
+    if (my_lslots) atomicAdd(&cnt[64 * 5], my_lslots);
+}
+#ifndef KVER
+#define KVER 10   // final variant (v11 measured slower)
+#endif
+#if KVER == 11
+#define KMAIN k_main11
+#elif KVER == 10
+#define KMAIN k_main10
+#elif KVER == 9
+#define KMAIN k_main9
+#elif KVER == 8
+#define KMAIN k_main8
+#elif KVER == 7
 #define KMAIN k_main7
 #elif KVER == 6
 #define KMAIN k_main6
@@ -1373,6 +2105,7 @@ int main(int argc, char **argv) {
     cub::DeviceSelect::If(nullptr, tb5, d_r4, d_r4c, d_nsel, nr, SelPar3{pip});
     cub::DeviceRadixSort::SortPairs(nullptr, tb6, d_keyc, d_skey, d_val, d_sval, nr / 8, 0, 14);
     if (std::max(tb5, tb6) > tmpb) { CK(cudaFree(d_tmp)); tmpb = std::max(tb5, tb6); CK(cudaMalloc(&d_tmp, tmpb)); }
+    bool need_split = true;
     auto prep3 = [&](bool ev) {
         if (ev) CK(cudaEventRecord(pev[0]));
         size_t a = tmpb; cub::DeviceSelect::If(d_tmp, a, d_r4, d_r4c, d_nsel, nr, SelPar3{pip});
@@ -1383,7 +2116,7 @@ int main(int argc, char **argv) {
         if (ev) CK(cudaEventRecord(pev[3]));
         a = tmpb; cub::DeviceRadixSort::SortPairs(d_tmp, a, d_keyc, d_skey, d_val, d_sval, npar, 0, 14);
         if (ev) CK(cudaEventRecord(pev[4]));
-        k_split3<<<(npar + 255) / 256, 256>>>(d_sval, npar, pip, d_sr, d_sm, d_sc);
+        if (KVER < 10 || need_split) k_split3<<<(npar + 255) / 256, 256>>>(d_sval, npar, pip, d_sr, d_sm, d_sc);  // v10+: verification only
         if (ev) CK(cudaEventRecord(pev[5]));
         k_segments<<<(npar + 255) / 256, 256>>>(d_skey, npar, d_pseg);
         if (ev) CK(cudaEventRecord(pev[6]));
@@ -1401,6 +2134,7 @@ int main(int argc, char **argv) {
         bool ok = npar == (int)P.size() && gseg == pseg;
         for (int i = 0; ok && i < npar; i++) ok = gr[i] == P[i].r;
         printf("GPU parents %d, order and class segments %s the CPU's\n", npar, ok ? "EQUAL to" : "DIFFER from");
+        need_split = false;
         if (!ok) return 3;
     }
     float ms; std::vector<float> tprep;
@@ -1443,9 +2177,9 @@ int main(int argc, char **argv) {
         for (int r = 0; r < reps + 1; r++) {
             CK(cudaMemset(d_cnt, 0, (64 * 5 + 8) * 8)); CK(cudaMemset(d_outn, 0, 8));
             CK(cudaEventRecord(e0));
-            if (mode == 0) KMAIN<0><<<M * 64, NT>>>(d_sm, d_sc, d_pseg, d_tm, d_tseg, d_cnt, d_out, d_outn, outcap);
-            if (mode == 1) KMAIN<1><<<M * 64, NT>>>(d_sm, d_sc, d_pseg, d_tm, d_tseg, d_cnt, d_out, d_outn, outcap);
-            if (mode == 2) KMAIN<2><<<M * 64, NT>>>(d_sm, d_sc, d_pseg, d_tm, d_tseg, d_cnt, d_out, d_outn, outcap);
+            if (mode == 0) KMAIN<0><<<M * 64, NT>>>(KVER >= 10 ? reinterpret_cast<const u64 *>(d_sval) : d_sm, d_sc, d_pseg, d_tm, d_tseg, d_cnt, d_out, d_outn, outcap);
+            if (mode == 1) KMAIN<1><<<M * 64, NT>>>(KVER >= 10 ? reinterpret_cast<const u64 *>(d_sval) : d_sm, d_sc, d_pseg, d_tm, d_tseg, d_cnt, d_out, d_outn, outcap);
+            if (mode == 2) KMAIN<2><<<M * 64, NT>>>(KVER >= 10 ? reinterpret_cast<const u64 *>(d_sval) : d_sm, d_sc, d_pseg, d_tm, d_tseg, d_cnt, d_out, d_outn, outcap);
             CK(cudaEventRecord(e1)); CK(cudaEventSynchronize(e1)); CK(cudaGetLastError());
             CK(cudaEventElapsedTime(&ms, e0, e1));
             if (r) tv.push_back(ms);
@@ -1478,6 +2212,16 @@ int main(int argc, char **argv) {
             std::vector<std::pair<u32, u32>> pairs;
             for (u64 i = 0; i < nout; i++) {  // expand a word record: the chunk's members are the next 64 certified children
                 u32 ti = ob[4 * i], pf = ob[4 * i + 1]; u64 wd = (u64)ob[4 * i + 2] | ((u64)ob[4 * i + 3] << 32);
+#if KVER >= 8
+                {   // (unit, probe slot) -> top index: the kernel's probe order (8 root classes, each top segment in order)
+                    u32 du = ti >> 16, ps = ti & 0xffff; int cl0 = P[pf].cls, cc0 = (cl0 + (int)du) % M, base = 0; ti = ~0u;
+                    for (int r = 0; r < NROOT && ti == ~0u; r++) {
+                        int ct = (ROOTS[r] - cc0 + M) % M, b0 = tseg[(du * M + ct) * 2], b1 = tseg[(du * M + ct) * 2 + 1];
+                        if ((int)ps < base + (b1 - b0)) ti = b0 + (ps - base);
+                        base += b1 - b0;
+                    }
+                }
+#endif
                 u32 dd = ts[ti].d; int cl = P[pf].cls; int k = 0;
                 for (int j = (int)pf; j < pseg[cl + 1] && k < 64; j++) if (child_mask(P[j].mask, P[j].cacc, dd)) { if ((wd >> k) & 1) pairs.push_back({ti, (u32)j}); k++; }
             }

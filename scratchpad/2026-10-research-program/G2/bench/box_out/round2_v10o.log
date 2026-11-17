@@ -1,0 +1,28 @@
+loaded 238813 tops, pip 712012851, expected survivors 11768560 (unit 0: 179675)
+roots 9298544 (0.68s)
+max top popcount 17
+parents 1042046; key digits: 1 2 3 16 36 0 4 17
+admissible n in the super-unit ~ 4.4679e+12
+GPU NVIDIA GeForce RTX 3080, 68 SMs
+GPU parents 1042046, order and class segments EQUAL to the CPU's
+PREP2 step select-if over roots   median 0.207 ms
+PREP2 step build parents          median 0.036 ms
+PREP2 step count to host          median 0.010 ms
+PREP2 step radix sort 14 bit      median 0.190 ms
+PREP2 step split (sequential)     median 0.001 ms
+PREP2 step segments               median 0.009 ms
+prep version: prep3 (r4-only select-if + build + sort pairs with the record + split)
+PREP: median 0.448 ms (min 0.441) for 1042046 parents from 9298544 roots: 429.5 ps per parent, 48.13 ps per root
+variant: KVER 10 LOCKSTEP 0 TILE 1024 AGG 1 NT 256 MINB 3 NOOUT 1
+KMAIN<2>: 71 registers, 32200 B static shared, 3 blocks/SM (24 warps of 48)
+MODE probes off median 0.665 ms (min 0.622, max 0.668, 200 reps) children 33705647 chunks 528635 flat 0 kept 0 surv 0
+MODE skip off   median 4.541 ms (min 4.352, max 4.567, 200 reps) children 33705647 chunks 528635 flat 250486772 kept 250486772 surv 11768560
+slabs 0 of 256 (fill -nan)
+records 0 (-nan survivors per nonzero word), lane slots 250486772 (kept/slots 1.000)
+NOOUT: sets not checked
+MODE full       median 4.036 ms (min 4.027, max 4.224, 200 reps) children 33705647 chunks 528635 flat 250486772 kept 123163397 surv 11768560
+slabs 0 of 256 (fill -nan)
+records 0 (-nan survivors per nonzero word), lane slots 203564717 (kept/slots 0.605)
+NOOUT: sets not checked
+RESULT ps per child 19.74 (probes-off time / children); ps per flat incidence 15.47 (skip-off minus probes-off); ps per kept word all-in 27.36 (full minus probes-off, / kept)
+RESULT end-to-end (prep + full) 4.483 ms for 4.4679e+12 admissible n = 1.0034 fs per admissible n (tops and survivor checks not included)
