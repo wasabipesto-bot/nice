@@ -14,4 +14,7 @@ SU1=$DATA/su64_712012851; SU2=$DATA/su64_391856203
 # (the harness's untimed warm-up field first), the same starts as G2/bench/box/queue_b64.json
 : "${SZ64:=1e17}"
 F64S="39667831862957161709568 43445731862957161709568 47223631862957161709568 51001531862957161709568 54779431862957161709568 58557331862957161709568 62335231862957161709568 66113031862957161709568 69890931862957161709568 73668831862957161709568"
-HARNESS=cubecl_join::tests::join_throughput_fixed_fields
+# HARNESS: the wgpu harness on the AMD card; cubecl_join::tests::cubecl_cuda_join_throughput_fixed_fields for a CUDA dry run
+: "${HARNESS:=cubecl_join::tests::join_throughput_fixed_fields}"
+# G2EXTRA: extra arguments for every G2 run (--cuda for the CUDA dry run)
+: "${G2EXTRA:=}"
