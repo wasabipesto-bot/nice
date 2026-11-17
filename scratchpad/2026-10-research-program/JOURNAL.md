@@ -74,6 +74,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   so to the user. I still do not ask for the card on my own initiative.
   ivory: t26 build directory and the superseded 1.99.1 toolchain removed.
 
+- **10:30 UTC: the port is done in under three hours (EXPERIMENTS G2.3; 619 k tokens in all for
+  this engineer today).** Exact on lavapipe 26.0.8 with both compilers on both whole super-units;
+  ACO pricing predicts **×4.4 on the RX 9070 XT (×3.3–5.6)**, so the proposal's ×4.0 stop line is
+  inside the band and only the card decides; the window plan needs ≈ 22 minutes and its driver
+  dry-ran on lavapipe. One CubeCL defect found on the way (invalid SPIR-V for `loop` / `break`).
+  Unproven: the 32- and 64-lane paths. **So one more step before any window: the port on a rented
+  RTX 3080** (box 61056498, 280 W, $0.109/h, TTL 13:30 UTC): exactness at 32 lanes on real
+  hardware, the cost of CubeCL against the hand-written kernel (restating ×5.1 for something
+  the project would ship), and a dry-run of the window driver. Hard stop 12:45 UTC. Credit
+  $12.98.
+
 ## 2026-11-16 (cycle 7 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.36 invoiced of $30 (fleet $28.28);

@@ -5,6 +5,27 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## G2.3 The benchmark kernel ported to CubeCL: exact on lavapipe, priced for RDNA4, window plan (2026-11-17 07:43–10:25 UTC, engineer, ivory only; `G2/PORT-NOTES.md`, `G2/WINDOW-PLAN.md`, `G2/port/` (bundle `g2-cubecl-local.bundle`, head 3a3a467 on main 7e0113f, never pushed; `raw/` incl. the dry run), worktree `.worktrees/g2-cubecl` (`common/examples/g2_cubecl.rs`, ≈ 1,500 lines); also `G2/PROPOSAL.md`, `G2/proposal/NOTES.md`)
+
+- **Port** [M on lavapipe 26.0.8 in the container `localhost/lvp26`, WGSL and direct SPIR-V compilers]: both staged
+  super-units whole: every unit's survivor set equals the prototype's, counts equal the CPU reference, the GPU
+  preparation's parent order equals the CPU's; plane widths 8 and 16, both transposes (shuffle and ballot);
+  SPIR-V and WGSL modules have identical atomic operations in all 20 kernel variants. Not proven: the 32- and
+  64-lane paths (lavapipe gives full planes only up to 16).
+- **CubeCL defect found:** cubecl-spirv emits invalid SPIR-V for `loop` / `break` (wgpu reports only "Buffer
+  invalid"); worked around.
+- **RDNA4 pricing** [M: ACO on RADV with the amdgpu no-op shim, gfx1201; D: the prediction]: 25.6 KB of LDS per
+  work group → 8 waves per SIMD (production's join: 16); the 64-pair word step 208 VALU per 128 lane slots; the
+  shuffle transpose 5× cheaper than ballots; main on the card ≈ 5.1 fs per admissible n at b64 (from N22's 0.55
+  field ratio and today's 3080 timing). **Predicted ratio on the RX 9070 XT: ×4.4 central (×3.3–5.6).**
+- **Window plan:** ≈ 22 of 45 minutes: exactness at 64 lanes, three rotated rounds of three G2 variants, main's ten
+  b64 fields; stop below ×4.0 same-session (the proposal's line). Driver dry-run end to end on lavapipe.
+- **Proposal** (`G2/PROPOSAL.md`): base 64's range is [2^75, 2^76); moving n's bits 24–53 to bits 45–74 renumbers it
+  one-to-one so that aligned ranges are whole super-units: 262,144 fields of 2^57 in today's `fields` table
+  (≈ 23 s each on a 3080); server change = a claim gate and a submit guard (150–250 lines), or none with a private
+  coordinator; backends needed: CubeCL on Vulkan and CUDA, plus the CPU version as audit reference; 15–22
+  agent-days, 2–3 days of maintainer review; whole base 1,652 card-hours on a 3080 against 8,462.
+
 ## G2.2 The redesigned join on a GPU: one real b64 super-unit against same-session main (2026-11-17 05:50–07:28 UTC, engineer; `G2/BENCH.md`, `G2/bench/box_out/` (per-variant dev logs, protocol runs, client logs of main, proofs of the host block), `G2/bench/variants/` (kernels v1–v11), `G2/bench/g2bench.cu` = v10; box 61025183, RTX 3080 10 GB at a 260 W cap, 1.73 h, ~$0.21)
 
 - **G2, super-unit π′ = 712012851 (all 64 units; 4.4679e12 admissible n), kernel v10, 3 rounds** [M]: preparation 431–433
