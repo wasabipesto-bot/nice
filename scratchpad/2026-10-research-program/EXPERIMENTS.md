@@ -5,6 +5,28 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## BX.2 The pairing gap on real masks: closed (2026-11-17 05:50–08:20 UTC, the adversary resumed; `BX/a3-adversary/NOTES.md` "Day 2", `BX/a3-adversary/day2/`; real super-units b64 712012851 and 400000017, b62 696365039 and 123456791, shape (4, 10))
+
+- **The gap, per admissible n at b64** [M; b62 has the same ratios]: pairs 3.58e-3; passing pairs 2.64e-6; G2 flat
+  64-pair words 5.61e-5; G2 kept words 2.76e-5 (kept fraction 0.492, reproducing the staged unit and the
+  prototype's survivors exactly); words holding at least one passing pair 2.45e-6 (×11 below kept); optimally
+  packed words 4.2e-7 (×65 below kept).
+- **Why none of it is reachable:** 91 % of kept words hold no passing pair, and certifying such a word needs digits
+  of the top that cover all 64 bottoms: 5–8 of the top's own digits in 86 % of cases (median 6), specific to the
+  top. Covers that can be precomputed per chunk: the common mask skips 51 %, 2-covers add 7–9 %, 3-covers < 1.5 %.
+- **Schemes** (costs: the G2 review's bands, word = 7 + 0.9 ps per digit ORed central, skip test 1 ps, child reorder
+  5–60 ps): best practical = per-(class, unit) presence buckets on the 4–5 most frequent digits: ×1.14 at b64
+  (×1.04–1.18), a loss at b62 (children outnumber kept words ×2.3); parent sort key only: ×1.03–1.06;
+  clustering, full sorts, greedy chunk formation: within ×1.13 of G2's word count; two-sided blocking ×1.03;
+  hierarchical masks cut only skip tests (9 % of the cost); early exit from a word saves nothing (11 of ≈ 16
+  lookups still needed); a trie over tops needs ×1.43 fewer lookups per lane but more per 32-lane warp (CPU build
+  0.5× G2's loop). **Ceiling with every auxiliary cost at zero: ×1.36 at b64.**
+- Asymmetry: tops skewed only on digits 1–3 (45–54 % of tops at b64), bottoms only on residue digits; pairwise
+  co-occurrence null; G2's 8-bit key already uses them. Not measurable here: binary matrix multiply on tensor
+  cores (capped near ×1.25 by the per-pair zero test even if the multiply were free).
+- **Verdict: kill criterion met (nothing ≥ ×1.5). The pairing line is closed; what is left is the cost of the
+  64-pair word itself, i.e. the GPU benchmark.**
+
 ## T2.10 Realized gain of main 7e0113f (#259, #260) on demoux at base 62 (2026-11-17 05:45 UTC, director, public API by bounded id ranges; `../2026-11-fresh-eyes/recent_niceonly_1117.json`)
 
 - demoux switched from 0711b16 to **7e0113f** (adds #259 the population-count prefilter test and #260 the top

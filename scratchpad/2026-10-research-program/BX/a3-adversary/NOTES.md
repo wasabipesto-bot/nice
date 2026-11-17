@@ -410,3 +410,114 @@ Fitted slopes of ln(cost / A) against b, b20-b33 (unit weights): **flat PSJ -0.1
   counterpart of my statement that the gap is real and lives in per-element deep digits; agree.
 - A2 I10 (CaDiCaL ≈ optimal tree ×1-2, added 18:29): consistent with I5/I6; no objection.
 - Nothing in A2 that I could break.
+
+---
+
+# Day 2 (2026-11-17, 05:50– UTC): the pairing gap on real G2 masks
+
+Code: `day2/proto/` (copy of G2's prototype + a `dump2` mode: the tops of all b units of a
+super-unit, no join, and the super-unit's depth-9 parents with their affine child coefficients),
+`day2/pair/` (Rust harness: G2's blocks = (parent class, unit digit), children in G2 order, probes
+= the unit's tops in the class-compatible top classes; every scheme evaluated exactly, every
+passing pair counted, word by word). Outputs `day2/raw/`. Super-units: b64 π′ = 712012851 (the
+staged one) and 400000017; b62 π′ = 696365039 and 123456791 (all digits 4–8, shape (4, 10)).
+
+## D2.1 Reproduction
+My harness reproduces the staged b64 super-unit exactly: children 7.544e-6, flat 5.606e-5,
+kept 2.757e-5 (0.492), passing pairs 2.634e-6 per adm = the prototype's survivor count
+(`BENCH.md` / `cpu_ref.txt`). At b62 kept 0.586 (G2/REVIEW: 0.58), kept 3.52e-5 (G2: 3.53e-5).
+The second unit of each base is within 0.5 %.
+
+## D2.2 The gap, exactly (per admissible n; `raw/cost_table.md`)
+| | b64 (2 units) | b62 (2 units) |
+|---|---|---|
+| pairs | 3.58e-3 | 3.83e-3 |
+| passing pairs (disjoint, key-matched) | 2.64e-6 (7.4e-4 of pairs) | 3.35e-6 (8.7e-4) |
+| G2 flat 64-words | 5.61e-5 | 6.01e-5 |
+| G2 kept 64-words | 2.76e-5 (0.492) | 3.52e-5 (0.586) |
+| words holding ≥ 1 passing pair (ideal, G2's chunks) | 2.45e-6 | 3.11e-6 |
+| optimally packed words Σ_t ⌈pass_t/64⌉ | 4.22e-7 | 5.18e-7 |
+| kept / touched, kept / packed | ×11.3, ×65 | ×11.3, ×68 |
+A touched word holds 1.08 passing pairs on average: passing pairs are scattered, one per word.
+At the reviewer's central unit costs the pairing term is 0.655 fs (b64) / 0.794 fs (b62); an
+oracle that touched only passing words would pay 0.053 / 0.065 fs.
+
+## D2.3 Asymmetry of the two sides (`pair DIR stats`)
+- Tops: 16.4 digits (b64) / 15.5 (b62). Strongly skewed only on the smallest digits — the
+  leading output digits: at b64 digit 1 in 54 % of tops, 2 in 48 %, 3 in 45 %, every other digit
+  0.23–0.26. At b62 the skew is spread over 2–10 (0.29–0.34) against ~0.23.
+- Bottoms (parents, 18 digits): b64 residue structure gives 0.36–0.37 for {0, 4, 16, 36} and
+  0.31–0.33 for the 8-step families, 0.26 elsewhere; b62 0.27–0.33.
+- Pairwise co-occurrence is nearly the fixed-weight null: median lift 0.95–0.96 on both sides
+  (sampling without replacement), rms ln-lift 0.045–0.056; extremes 0.71 (tops 1 & 2 at b64: one
+  leading digit or the other) and 1.50 (parents 0 & 16).
+- Best exploitable structure: the three small digits of the b64 tops and the 4–6 residue digits of
+  the bottoms — exactly the digits G2's 8-bit key already uses (1 2 3 16 36 0 4 17). There is no
+  second-order structure (co-occurrence) to exploit.
+
+## D2.4 Schemes, measured (kept words exact; costs from REVIEW F1/F3 bands)
+Cost model (ps): kept word = B0 + ℓ·L (L = digits ORed), skip test s, bucket enumeration v,
+unit-specific reordering of children p (partition) or σ (full sort); low/central/high =
+B0 3/7/15.1, ℓ 0.64/0.9/1.29, s 0.5/1/2, v 0.5/1/2, p 2/5/20, σ 20/60/150.
+| scheme | b64 kept words | L | b64 ratio vs G2 (low/central/high) | b62 ratio |
+|---|---|---|---|---|
+| G2 (pooled 8-bit key, parents sorted once) | 2.76e-5 | 16.4 | 1 | 1 |
+| random order (no key), reference | 5.61e-5 | 16.4 | 0.51 | 0.60 |
+| parent-level 2^d presence buckets, pooled digits, shared by all units (d 3–4) | 2.68e-5 | 16.4 | 1.05/1.06/1.06 | 1.02–1.03 |
+| per-(class, unit) full 64-bit probe×child-weighted sort | 2.54e-5 | 16.4 | 0.77/0.62/0.51 (sort) | 0.24/0.14/0.10 |
+| per-(class, unit) 2^d presence buckets (d 4–5) + common skip, bucket digits not looked up | 2.46e-5 | 14.7–14.9 | **1.18/1.14/1.04** | 0.91/0.79/0.51 |
+| greedy clustering (window 1024, probe-weighted common) | 2.44e-5 | 16.4 | (≤ the bucket line, no sort priced) | — |
+| + all 2-covers and 3-covers as extra certificates (upper bound) | −8.5 % of kept | | ≤ ×1.09 more, at ~5 extra tests per kept word (net ≈ 0) | |
+| two-sided blocking (8-top groups × chunk commons) | words unchanged | | removes 34 % of skip tests (b64), 7.5 % (b62): ×1.03 / ×1.01 | |
+| hierarchical commons (chunk of chunks) | words unchanged | | ≤ skip-test share 8.6 % (G2 measured visits ≥ flat) | |
+| 32-wide / 16-wide chunks | kept frac 0.449 / 0.422 (b64), 0.529 / 0.489 (b62) | | ×1.10 / ×1.17 fewer pairs in kept words; double/quadruple skip tests and per-word base: ≤ ×1 at central | |
+| early exit inside the word (digits in decreasing coverage) | — | mean 11.3 of 16.4 needed; warp-max 16.3 | none | |
+| probe trie × chunk (shared prefix ORs, prune when all members are hit) | leaves = passing words only | lane: 5.66 per flat incidence (vs G2 8.1); 32-lane union: 13.3 | per lane ×1.43 fewer lookups; on a warp the union is ≈ the unpruned trie (×1.6 *more* lookups than G2); CPU (my build) 0.5× of G2's loop | |
+**Zero-cost ceiling of everything measured** (best chunking + all covers free + bucket-digit
+lookups saved): b64 0.48 fs vs 0.655 → **×1.36 at central costs, before paying for the
+unit-specific reorder and the cover tests**; with those priced, ×1.14–1.18 (b64) and < 1 (b62,
+where children outnumber kept words ×2.3, so any per-child work costs more than it saves).
+
+## D2.5 Why the ceiling is where it is
+- A kept word that holds no passing pair (91 % of G2's kept words) is a chunk whose 64 members
+  are all hit by t, but by no single digit common to all of them. Any precomputed per-chunk
+  certificate cheaper than the word is a *cover* (a digit set meeting every member) that t
+  contains. Measured on real chunks: 1-covers (the common mask, 3–4 digits) certify 51 % of
+  flat incidences; 2-covers number 1.2 per chunk (2.9 inside presence buckets) and certify a
+  further 7–9 % of kept words; 3-covers among the 12 most frequent digits 0.5–1.4 %. Measured
+  greedy cover of a kept non-passing word by t's own digits: size 2 in 7–8 %, 3–4 in 5–6 %, 5–8
+  in 86 % (median 6; b64 and b62 alike). A certificate of 5–8 t-specific digits out of ~16 is the
+  word itself; nothing precomputable per chunk reaches it.
+- Chunk formation can only raise the common mask by one digit or so: 64 members of 18-digit sets
+  drawn from 64 share ≥ 4 digits only in groups that are a 1/(density^4) ≈ 1/100 slice of a
+  class group, and the probes' frequent digits (which decide the skip) are 3 at b64.
+- What the word costs is set by the digits ORed (16 of the probe's 16.4); none can be dropped
+  without knowing the members lack them (bucket digits: −1.5), and the last member to be hit
+  needs a rare digit (early exit buys nothing).
+- Literature (checked against d = 64, set size 16–20, lists of 10²–10⁴ per block): subset-query /
+  partial-match structures (Charikar–Indyk–Panigrahy; tries) answer "is some member ⊆ complement
+  of t" in time n^(1−ε) only with space exponential in d·density — the trie variant measured above
+  is the practical member and is exactly what SIMT divergence destroys; polynomial-method OV
+  (Abboud–Williams–Yu, Chan–Williams) beats n² by n^(1/O(log c)) with c = d/log n ≈ 5–6, i.e. a
+  few percent, with constants far above a 5–25 ps word; random-subset / LSH bucketing is the
+  presence bucketing above with worse (random) digits. Nothing survives a 5–25 ps word.
+- One idea I cannot measure here (CPU-only rule): **binary tensor-core MMA** (mma …b1.and.popc)
+  computes |t ∧ m| for all pairs of a 16×8 tile. It pays per *flat* pair (no skip) and its
+  epilogue needs ≥ 1 lane-instruction per pair (zero test on an int32 count): ≈ 0.125 ps per pair
+  on the 3080 class = 8 ps per 64 pairs, against G2's ≈ 10 ps per 64 flat pairs (0.49 × ~21 ps).
+  Even with a free MMA that is ≤ ×1.25, and GA102's support for b1 MMA is unverified. Not a
+  ×1.5 lever; recorded so nobody re-derives it.
+
+## D2.6 Verdict against the kill criterion
+**Killed.** No scheme reduces the pairing term by ×1.5 against G2's sorted-chunk skip at any
+GPU-plausible cost point. Best measured: per-(class, unit) presence buckets on 4–5 digits,
+×1.14 (central) / ×1.18 (low) / ×1.04 (high) at b64, a loss at b62; the shared (parent-level)
+version that costs nothing extra gives ×1.03–1.06. Absolute ceiling of the measured family
+with every auxiliary cost set to zero: ×1.36 (b64, central). The ideal output-sensitive word
+count is ×11 (touched) to ×65 (packed) below G2's, but reaching it requires knowing which pairs
+pass; every certificate cheaper than a word is a cover, and covers beyond the common mask
+certify < 10 % of kept words. The pairing line is closed at about ×1.15 practical, ×1.36
+theoretical within chunked word tests.
+If anyone wants the ×1.06 for free: sort parents by (class, pattern on the pooled top-3/4
+digits, key8) instead of (class, key8) and enumerate buckets by pattern; it changes only the
+prep kernel's key.

@@ -1,0 +1,26 @@
+loaded 238813 tops, pip 712012851, expected survivors 11768560 (unit 0: 179675)
+roots 9298544 (0.65s)
+max top popcount 17
+parents 1042046; key digits: 1 2 3 16 36 0 4 17
+admissible n in the super-unit ~ 4.4679e+12
+GPU NVIDIA GeForce RTX 3080, 68 SMs
+GPU parents 1042046, order and class segments EQUAL to the CPU's
+PREP2 step select-if over roots   median 0.432 ms
+PREP2 step build parents          median 0.108 ms
+PREP2 step count to host          median 0.013 ms
+PREP2 step radix sort 14 bit      median 0.106 ms
+PREP2 step gather                 median 0.346 ms
+PREP2 step segments               median 0.010 ms
+prep version: prep2 (select-if + build)
+PREP: median 1.001 ms (min 0.991) for 1042046 parents from 9298544 roots: 960.9 ps per parent, 107.68 ps per root
+variant: KVER 6 LOCKSTEP 0 TILE 1024 AGG 1 NT 256 MINB 1 NOOUT 0
+KMAIN<2>: 71 registers, 47048 B static shared, 2 blocks/SM (16 warps of 48)
+MODE probes off median 0.677 ms (min 0.676, max 0.677, 3 reps) children 33705647 chunks 528635 flat 0 kept 0 surv 0
+MODE skip off   median 6.932 ms (min 6.927, max 6.936, 3 reps) children 33705647 chunks 528635 flat 250486772 kept 250486772 surv 11768560
+records 10929765 (1.08 survivors per nonzero word), lane slots 250486772 (kept/slots 1.000)
+VERIFY skip off: 11768560 survivors (0 outside a clipped top), every unit's set EQUAL to the prototype's
+MODE full       median 6.469 ms (min 6.464, max 6.474, 3 reps) children 33705647 chunks 528635 flat 250486772 kept 123163397 surv 11768560
+records 10929765 (1.08 survivors per nonzero word), lane slots 203564717 (kept/slots 0.605)
+VERIFY full: 11768560 survivors (0 outside a clipped top), every unit's set EQUAL to the prototype's
+RESULT ps per child 20.08 (probes-off time / children); ps per flat incidence 24.97 (skip-off minus probes-off); ps per kept word all-in 47.03 (full minus probes-off, / kept)
+RESULT end-to-end (prep + full) 7.470 ms for 4.4679e+12 admissible n = 1.6719 fs per admissible n (tops and survivor checks not included)

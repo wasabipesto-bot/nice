@@ -31,6 +31,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     if the benchmark kills G2).
   - Not doing: more digit-reasoning attacks on the exponent (closed yesterday with evidence).
 
+- **08:20 UTC: the pairing line is closed (EXPERIMENTS BX.2).** On real b62 / b64 super-units the
+  best practical scheme beats G2's sorted-chunk skip by ×1.14 at b64 and loses at b62; the ceiling
+  with every auxiliary cost at zero is ×1.36. The gap is real (words holding a passing pair are
+  ×11 fewer than kept words) but unreachable: 91 % of kept words hold no passing pair and proving
+  that takes 5–8 digits specific to the top. What remains for G2 is the cost of the 64-pair word
+  on a card: the benchmark.
+
 ## 2026-11-16 (cycle 7 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.36 invoiced of $30 (fleet $28.28);
