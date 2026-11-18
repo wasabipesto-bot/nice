@@ -87,7 +87,7 @@ fn main() -> Result<()> {
                 let vs = coord.start + t * q;
                 let ncount = coord.n_count(vs, q)?;
                 let adm = ncount as f64 * 8.0 / 63.0;
-                let (o, dc, tm) = search_field(&gj, &coord, vs, q, GpuOptions { group, host_threads: threads })?;
+                let (o, dc, tm) = search_field(&gj, &coord, vs, q, GpuOptions { group, host_threads: threads, device_tops: !args.iter().any(|a| a == "--host-tops") })?;
                 wall += tm.wall;
                 adm_all += adm;
                 println!(

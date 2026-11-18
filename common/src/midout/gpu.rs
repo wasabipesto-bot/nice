@@ -58,8 +58,8 @@
 
 use super::coord::Coord;
 use super::cpu::{FieldOutcome, Shape, key_digits};
-use crate::cubecl_join::{CheckShape, TOP_REC_WORDS, ballot_append, check_kernel};
-use crate::join_check::GATE_DIGITS;
+use crate::cubecl_join::{TOP_REC_WORDS, ballot_append, check_kernel};
+use crate::join_check::{CheckShape, GATE_DIGITS};
 use anyhow::{Result, anyhow, bail, ensure};
 use cubecl::prelude::*;
 use cubecl::server::Handle;
@@ -89,8 +89,6 @@ const C_ERR_PLANE: usize = 321;
 const C_ERR_PMAX: usize = 322;
 const C_ERR_SLAB: usize = 323;
 const NCNT: usize = 328;
-/// Jobs per slice: 63 classes × 64 units.
-const NJOBS: u32 = 4032;
 /// `check_kernel`'s `ran` words (production's `RAN_WORDS`: 4 stage counters,
 /// the work counter, entries checked, their index sum, the top account).
 const RAN_WORDS: usize = 9;
@@ -237,7 +235,11 @@ mod kernels {
         let rlo = select(rl >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(rl, 31u32)) - 1u32);
         let rhi = select(rl >= 32u32, (1u32 << (rl & 31u32)) - 1u32, 0u32);
         let c = jobs[(2u32 * CUBE_POS_X) as usize];
-        let d = jobs[(2u32 * CUBE_POS_X + 1u32) as usize];
+        // library path (midout): the job word is d | poff << 8, poff the job's first probe (0, or PMAX for the
+        // job's second instance, which runs only if the job has more than PMAX probes)
+        let dj = jobs[(2u32 * CUBE_POS_X + 1u32) as usize];
+        let d = dj & 255u32;
+        let poff = dj >> 8u32;
         let cc = (c + d) % M;
 
         if PLANE_DIM != w || t % w != lane {
@@ -263,7 +265,7 @@ mod kernels {
             }
             s_np[0usize] = n;
             s_nl[0usize].store(0u32);
-            if n > PMAX {
+            if poff > 0u32 && n > poff + PMAX {
                 cnt[C_ERR_PMAX].fetch_add(1u32);
             }
         }
@@ -282,14 +284,14 @@ mod kernels {
             let b1 = tseg[(s + 1u32) as usize];
             let mut j = t;
             while j < b1 - b0 {
-                if base + j < PMAX {
+                if base + j >= poff && base + j < poff + PMAX {
                     if comptime!(tdg == 1) {
                         let mut pv = Vector::<u32, Const<4>>::empty();
                         #[unroll]
                         for k in 0..4u32 {
                             pv[k as usize] = tdig[((b0 + j) * 4u32 + k) as usize];
                         }
-                        prob_d[(base + j) as usize] = pv;
+                        prob_d[(base + j - poff) as usize] = pv;
                     } else {
                         let mut x = tmask[(b0 + j) as usize];
                         let first = x.trailing_zeros();
@@ -309,7 +311,7 @@ mod kernels {
                         for k in 0..4u32 {
                             pv[k as usize] = dw[k as usize];
                         }
-                        prob_d[(base + j) as usize] = pv;
+                        prob_d[(base + j - poff) as usize] = pv;
                     }
                 }
                 j += NT;
@@ -318,7 +320,7 @@ mod kernels {
         }
         }
         sync_cube();
-        let nprobe = min(s_np[0usize], PMAX);
+        let nprobe = min(s_np[0usize] - min(s_np[0usize], poff), PMAX);
 
         let mut my_kept = 0u32;
         let mut my_surv = 0u32;
@@ -336,7 +338,7 @@ mod kernels {
         let mut npend = 0u32;
         let mut parity = 0u32;
         // no `loop`/`break`: cubecl-spirv 0.10 emitted a conditional branch without OpSelectionMerge for them
-        let mut going = true;
+        let mut going = nprobe > 0u32 || poff == 0u32;
         // a pending slot with odd index is ORed into its word after the next barrier (its even neighbour is written
         // by another lane, in this step or an earlier one); no atomics, no extra barrier per step
         let mut dsl = 0u32;
@@ -693,7 +695,7 @@ mod kernels {
                                 if slab_id < nslab_cap {
                                     if nza {
                                         let mut rv = Vector::<u32, Const<4>>::empty();
-                                        rv[0usize] = (pk[0usize] >> 4u32) | (d << 16u32);
+                                        rv[0usize] = ((pk[0usize] >> 4u32) + poff) | (d << 16u32);
                                         rv[1usize] = pend0;
                                         rv[2usize] = wlo[0usize];
                                         rv[3usize] = whi[0usize];
@@ -701,7 +703,7 @@ mod kernels {
                                     }
                                     if nzb {
                                         let mut rv = Vector::<u32, Const<4>>::empty();
-                                        rv[0usize] = (pk[1usize] >> 4u32) | (d << 16u32);
+                                        rv[0usize] = ((pk[1usize] >> 4u32) + poff) | (d << 16u32);
                                         rv[1usize] = pend0;
                                         rv[2usize] = wlo[1usize];
                                         rv[3usize] = whi[1usize];
@@ -758,7 +760,7 @@ mod kernels {
                 cnt[(d * 5u32 + 4u32) as usize].fetch_add(ss);
             }
         }
-        if t == 0u32 {
+        if t == 0u32 && poff == 0u32 {
             cnt[(d * 5u32) as usize].fetch_add(my_children);
             cnt[(d * 5u32 + 1u32) as usize].fetch_add(my_chunks);
             cnt[(d * 5u32 + 2u32) as usize].fetch_add(my_flat);
@@ -1123,7 +1125,7 @@ mod post {
         let mut sc = SharedMemory::<u32>::new(256usize);
         let t = UNIT_POS_X;
         let c = jobs[(2u32 * CUBE_POS_X) as usize];
-        let d = jobs[(2u32 * CUBE_POS_X + 1u32) as usize];
+        let d = jobs[(2u32 * CUBE_POS_X + 1u32) as usize] & 255u32;
         let pb = pseg[c as usize];
         let pe = pseg[(c + 1u32) as usize];
         let ob = 64u32 * (pb - pseg[c0 as usize]) + d * (pe - pb);
@@ -1294,6 +1296,235 @@ mod post {
     pub fn toprec_kernel(thd: &Array<u32>, top_rec: &mut Array<u32>, pip_hi: u32, ntops: u32) {
         let i = ABSOLUTE_POS_X;
         if i < ntops {
+            let h = thd[i as usize] & 0xFFFFu32;
+            let d = thd[i as usize] >> 16u32;
+            let w6 = (d << 24u32) | pip_hi;
+            let o = 8u32 * i;
+            top_rec[o as usize] = ((h & 3u32) << 30u32) | w6;
+            top_rec[(o + 1u32) as usize] = h >> 2u32;
+            top_rec[(o + 2u32) as usize] = 0u32;
+            top_rec[(o + 3u32) as usize] = 0u32;
+            top_rec[(o + 4u32) as usize] = 0u32;
+            top_rec[(o + 5u32) as usize] = 0u32;
+            top_rec[(o + 6u32) as usize] = w6;
+            top_rec[(o + 7u32) as usize] = 0u32;
+        }
+    }
+}
+
+
+/// The tops of a slice on the device (base 64, f0 4, k 10): one thread per
+/// prefix (unit d, lead h), the certificate by 32-bit limbs and shifts (the
+/// function of `cpu::top_cert`; n² has 26 digits and n³ 38 over the whole
+/// base, so the lengths always agree), then a count per segment (d, h mod
+/// 63), a scan, and a scatter into the segments. The order inside a
+/// segment is the device's; nothing downstream depends on it.
+mod dtops {
+    use super::MAXPOP;
+    use cubecl::prelude::*;
+
+    /// `r = x·y` for little-endian 32-bit limbs (comptime sizes).
+    #[cube]
+    fn mul(x: &Array<u32>, y: &Array<u32>, r: &mut Array<u32>, #[comptime] nx: u32, #[comptime] ny: u32) {
+        let mut acc = Array::<u64>::new(comptime!((nx + ny) as usize));
+        #[unroll]
+        for k in 0..comptime!(nx + ny) {
+            acc[k as usize] = 0u64;
+        }
+        #[unroll]
+        for i in 0..nx {
+            #[unroll]
+            for j in 0..ny {
+                let p = u64::cast_from(x[i as usize]) * u64::cast_from(y[j as usize]);
+                acc[comptime!(i + j) as usize] += p & 0xFFFF_FFFFu64;
+                acc[comptime!(i + j + 1) as usize] += p >> 32u64;
+            }
+        }
+        let mut carry = 0u64;
+        #[unroll]
+        for k in 0..comptime!(nx + ny) {
+            let v = acc[k as usize] + carry;
+            r[k as usize] = u32::cast_from(v & 0xFFFF_FFFFu64);
+            carry = v >> 32u64;
+        }
+    }
+
+    /// Base-64 digit j (comptime) of a limb array.
+    #[cube]
+    fn dg(x: &Array<u32>, #[comptime] j: u32) -> u32 {
+        let w = comptime!((6 * j) / 32);
+        let o = comptime!((6 * j) % 32);
+        let mut v = x[w as usize] >> o;
+        if comptime!(o > 26) {
+            v |= x[comptime!(w + 1) as usize] << comptime!(32 - o);
+        }
+        v & 63u32
+    }
+
+    /// One power's part of the certificate: digits top..=10 while x and y
+    /// agree; (mask, repeated).
+    #[cube]
+    fn cert_pow(x: &Array<u32>, y: &Array<u32>, mask_in: u64, #[comptime] top: u32) -> (u64, bool) {
+        let mut mask = mask_in;
+        let mut live = true;
+        let mut bad = false;
+        #[unroll]
+        for s in 0..comptime!(top - 9) {
+            let dx = dg(x, comptime!(top - s));
+            let dy = dg(y, comptime!(top - s));
+            if live {
+                if dx != dy {
+                    live = false;
+                } else {
+                    let bit = 1u64 << u64::cast_from(dx);
+                    if (mask & bit) != 0u64 {
+                        bad = true;
+                        live = false;
+                    }
+                    mask |= bit;
+                }
+            }
+        }
+        (mask, bad)
+    }
+
+    /// Thread i = d·2^15 + (h − 2^15): certificate, then a count in segc[d·63 + h mod 63].
+    #[cube(launch_unchecked)]
+    pub fn tops1_kernel(
+        tm: &mut Array<u64>,
+        tv: &mut Array<u32>,
+        segc: &mut Array<Atomic<u32>>,
+        tstat: &mut Array<Atomic<u32>>,
+        pip: u32,
+    ) {
+        let i = ABSOLUTE_POS_X;
+        if i < 2_097_152u32 {
+            let d = i >> 15u32;
+            let h = 32768u32 + (i & 32767u32);
+            // p = h·2^36 + d·2^30 + pip, a = p·2^24, c = a + 2^24 − 1, in 32-bit limbs
+            let p = (u64::cast_from(h) << 36u64) | (u64::cast_from(d) << 30u64) | u64::cast_from(pip);
+            let mut a = Array::<u32>::new(3usize);
+            let mut c = Array::<u32>::new(3usize);
+            a[0] = u32::cast_from((p & 0xFFu64) << 24u64);
+            a[1] = u32::cast_from((p >> 8u64) & 0xFFFF_FFFFu64);
+            a[2] = u32::cast_from(p >> 40u64);
+            c[0] = a[0] | 0x00FF_FFFFu32;
+            c[1] = a[1];
+            c[2] = a[2];
+            let mut a2 = Array::<u32>::new(6usize);
+            let mut c2 = Array::<u32>::new(6usize);
+            mul(&a, &a, &mut a2, 3u32, 3u32);
+            mul(&c, &c, &mut c2, 3u32, 3u32);
+            let mut a3 = Array::<u32>::new(9usize);
+            let mut c3 = Array::<u32>::new(9usize);
+            mul(&a2, &a, &mut a3, 6u32, 3u32);
+            mul(&c2, &c, &mut c3, 6u32, 3u32);
+            let (m1, bad1) = cert_pow(&a2, &c2, 0u64, 25u32);
+            let (m2, bad2) = cert_pow(&a3, &c3, m1, 37u32);
+            let ok = !bad1 && !bad2;
+            tm[i as usize] = m2;
+            tv[i as usize] = select(ok, 1u32, 0u32);
+            if ok {
+                segc[(d * 63u32 + h % 63u32) as usize].fetch_add(1u32);
+                if m2.count_ones() > MAXPOP {
+                    tstat[1usize].fetch_add(1u32);
+                }
+            }
+        }
+    }
+
+    /// One cube of 1,024: segment starts (tseg pairs), cursors, and the top count in tstat[0].
+    #[cube(launch_unchecked)]
+    pub fn tscan_kernel(segc: &Array<u32>, tseg: &mut Array<u32>, cur: &mut Array<Atomic<u32>>, tstat: &mut Array<u32>) {
+        let mut sums = SharedMemory::<u32>::new(1024usize);
+        let t = UNIT_POS_X;
+        let mut local = 0u32;
+        if t < 1008u32 {
+            for j in 0..4u32 {
+                local += segc[(t * 4u32 + j) as usize];
+            }
+        }
+        sums[t as usize] = local;
+        sync_cube();
+        let mut step = 1u32;
+        while step < 1024u32 {
+            let mut v = sums[t as usize];
+            if t >= step {
+                v += sums[(t - step) as usize];
+            }
+            sync_cube();
+            sums[t as usize] = v;
+            sync_cube();
+            step *= 2u32;
+        }
+        if t < 1008u32 {
+            let mut run = sums[t as usize] - local;
+            for j in 0..4u32 {
+                let k = t * 4u32 + j;
+                tseg[(2u32 * k) as usize] = run;
+                cur[k as usize].store(run);
+                run += segc[k as usize];
+                tseg[(2u32 * k + 1u32) as usize] = run;
+            }
+            if t == 1007u32 {
+                tstat[0usize] = run;
+            }
+        }
+    }
+
+    /// Each certified prefix into its segment: tmask and thd = h | d << 16.
+    #[cube(launch_unchecked)]
+    pub fn tops2_kernel(tm: &Array<u64>, tv: &Array<u32>, cur: &mut Array<Atomic<u32>>, tmask: &mut Array<u64>, thd: &mut Array<u32>, cap: u32) {
+        let i = ABSOLUTE_POS_X;
+        if i < 2_097_152u32 {
+            if tv[i as usize] == 1u32 {
+                let d = i >> 15u32;
+                let h = 32768u32 + (i & 32767u32);
+                let slot = cur[(d * 63u32 + h % 63u32) as usize].fetch_add(1u32);
+                if slot < cap {
+                    tmask[slot as usize] = tm[i as usize];
+                    thd[slot as usize] = h | (d << 16u32);
+                }
+            }
+        }
+    }
+
+    /// tdigz with the top count read on the device (tstat[0]).
+    #[cube(launch_unchecked)]
+    pub fn tdigz2_kernel(tmask: &Array<u64>, tdig: &mut Array<u32>, hist: &mut Array<u32>, lcnt: &mut Array<u32>, tstat: &Array<u32>, cap: u32) {
+        let i = ABSOLUTE_POS_X;
+        if i < 16128u32 {
+            hist[i as usize] = 0u32;
+        }
+        if i == 0u32 {
+            lcnt[0usize] = 0u32;
+        }
+        if i < min(tstat[0usize], cap) {
+            let mut x = tmask[i as usize];
+            let first = x.trailing_zeros();
+            let mut dw = Array::<u32>::new(4usize);
+            #[unroll]
+            for k in 0..4u32 {
+                dw[k as usize] = 0u32;
+            }
+            #[unroll]
+            for k in 0..20u32 {
+                let v = select(x != 0u64, x.trailing_zeros(), first);
+                x &= x - select(x != 0u64, 1u64, 0u64);
+                dw[comptime!(k / 5) as usize] |= v << comptime!(6 * (k % 5));
+            }
+            #[unroll]
+            for k in 0..4u32 {
+                tdig[(i * 4u32 + k) as usize] = dw[k as usize];
+            }
+        }
+    }
+
+    /// toprec with the top count read on the device.
+    #[cube(launch_unchecked)]
+    pub fn toprec2_kernel(thd: &Array<u32>, top_rec: &mut Array<u32>, tstat: &Array<u32>, pip_hi: u32, cap: u32) {
+        let i = ABSOLUTE_POS_X;
+        if i < min(tstat[0usize], cap) {
             let h = thd[i as usize] & 0xFFFFu32;
             let d = thd[i as usize] >> 16u32;
             let w6 = (d << 24u32) | pip_hi;
@@ -1590,6 +1821,8 @@ struct Ticket {
     ran: Handle,
     scount: Handle,
     stat: Handle,
+    /// Device tops: the slice's top count and tops over MAXPOP digits (first batch only).
+    tstat: Option<Handle>,
 }
 
 /// The device side: kernels compiled for one plane width, buffers allocated
@@ -1628,6 +1861,9 @@ pub struct GpuJoin<R: Runtime> {
     top_rec: Handle,
     nice_out: Handle,
     nice_count: Handle,
+    /// Device tops: every prefix's mask and validity.
+    tm: Handle,
+    tv: Handle,
 }
 
 impl<R: Runtime> GpuJoin<R> {
@@ -1647,14 +1883,17 @@ impl<R: Runtime> GpuJoin<R> {
         let mut c0 = 0;
         while c0 < 63 {
             let c1 = (c0 + caps.classes).min(63);
-            let jobs: Vec<u32> = (c0..c1).flat_map(|c| (0..64u32).flat_map(move |d| [c, d])).collect();
+            // every job twice: probes [0, PMAX), then [PMAX, 2·PMAX) (a cube with none exits at once)
+            let mut jobs: Vec<u32> = (c0..c1).flat_map(|c| (0..64u32).flat_map(move |d| [c, d])).collect();
+            let second: Vec<u32> = jobs.chunks(2).flat_map(|x| [x[0], x[1] | PMAX << 8]).collect();
+            jobs.extend(second);
             let nj = (jobs.len() / 2) as u32;
             batches.push((c0, c1, mk(jobs), nj));
             c0 = c1;
         }
         let share = |x: u32| -> u32 { ((x as u64 * caps.classes as u64).div_ceil(63) as u32).saturating_add(x / 16) };
         let scap = share(caps.survivors);
-        let jobs_max = caps.classes * 64;
+        let jobs_max = 2 * caps.classes * 64;
         let nslab_cap = scap / SLAB + jobs_max * (NT / w) + 64;
         let lcap = 64 * share(caps.parents);
         let np = caps.parents as usize;
@@ -1692,6 +1931,8 @@ impl<R: Runtime> GpuJoin<R> {
             top_rec: e(nt * TOP_REC_WORDS as usize * 4),
             nice_out: mk(vec![0u32; NICE_CAP as usize * NICE_STRIDE]),
             nice_count: mk(vec![0u32; 1]),
+            tm: e(8 << 21),
+            tv: e(4 << 21),
             client,
         })
     }
@@ -1714,9 +1955,133 @@ impl<R: Runtime> GpuJoin<R> {
     fn queue(&self, st: &SliceTops, cnt: &Handle, out: &mut Vec<Ticket>) -> Result<()> {
         let sb = self.queue_prep(st)?;
         for bi in 0..self.batches.len() {
-            out.push(self.queue_batch(st, &sb, bi, cnt));
+            out.push(self.queue_batch(st.pip, st.tmask.len(), &sb, bi, cnt));
         }
         Ok(())
+    }
+
+    /// Queue a slice with its tops made on the device; `rankh` its 8 key
+    /// digits (uploaded once per field).
+    fn queue_dev(&self, pip: u64, rankh: &Handle, cnt: &Handle, out: &mut Vec<Ticket>) {
+        let (sb, tstat) = self.queue_dev_prep(pip, rankh);
+        let nt = self.caps.tops as usize;
+        for bi in 0..self.batches.len() {
+            let mut t = self.queue_batch(pip, nt, &sb, bi, cnt);
+            if bi == 0 {
+                t.tstat = Some(tstat.clone());
+            }
+            out.push(t);
+        }
+    }
+
+    /// Device tops and parents of a slice; its buffers and top status.
+    fn queue_dev_prep(&self, pip: u64, rankh: &Handle) -> (SliceBufs, Handle) {
+        let nt = self.caps.tops as usize;
+        let c = &self.client;
+        let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
+        let segc = self.mk(vec![0u32; 4032]);
+        let tstat = self.mk(vec![0u32; 2]);
+        let tsegh = self.client.empty(4032 * 2 * 4);
+        let tmh = self.client.empty(nt * 8);
+        let thdh = self.client.empty(nt * 4);
+        let cur = self.client.empty(4032 * 4);
+        let full = 1u32 << 21;
+        unsafe {
+            dtops::tops1_kernel::launch_unchecked::<R>(
+                c,
+                CubeCount::Static(full / NT, 1, 1),
+                CubeDim::new_1d(NT),
+                a(&self.tm, full as usize),
+                a(&self.tv, full as usize),
+                a(&segc, 4032),
+                a(&tstat, 2),
+                pip as u32,
+            );
+            dtops::tscan_kernel::launch_unchecked::<R>(
+                c,
+                CubeCount::Static(1, 1, 1),
+                CubeDim::new_1d(1024),
+                a(&segc, 4032),
+                a(&tsegh, 4032 * 2),
+                a(&cur, 4032),
+                a(&tstat, 2),
+            );
+            dtops::tops2_kernel::launch_unchecked::<R>(
+                c,
+                CubeCount::Static(full / NT, 1, 1),
+                CubeDim::new_1d(NT),
+                a(&self.tm, full as usize),
+                a(&self.tv, full as usize),
+                a(&cur, 4032),
+                a(&tmh, nt),
+                a(&thdh, nt),
+                nt as u32,
+            );
+            dtops::tdigz2_kernel::launch_unchecked::<R>(
+                c,
+                CubeCount::Static((nt as u32).max(16128).div_ceil(NT), 1, 1),
+                CubeDim::new_1d(NT),
+                a(&tmh, nt),
+                a(&self.g_tdig, nt * 4),
+                a(&self.histh, 16128),
+                a(&self.lcnt, 1),
+                a(&tstat, 2),
+                nt as u32,
+            );
+            dtops::toprec2_kernel::launch_unchecked::<R>(
+                c,
+                CubeCount::Static((nt as u32).div_ceil(NT), 1, 1),
+                CubeDim::new_1d(NT),
+                a(&thdh, nt),
+                a(&self.top_rec, nt * 8),
+                a(&tstat, 2),
+                (pip >> 6) as u32,
+                nt as u32,
+            );
+        }
+        self.queue_parents(pip, rankh);
+        (SliceBufs { tmh, tsegh, thdh }, tstat)
+    }
+
+    /// One slice alone with device tops (tests): counts, survivors as n,
+    /// and the tops (h | d << 16, mask) the device made, read back per batch.
+    ///
+    /// # Errors
+    /// Device errors or a failed account.
+    pub fn run_slice_dev(&self, pip: u64, rank: &[u32; 8]) -> Result<(DevCounts, Vec<u128>, Vec<(u32, u64)>)> {
+        let cnt = self.mk(vec![0u32; NCNT]);
+        let rankh = self.mk(rank.to_vec());
+        let (sb, tstat) = self.queue_dev_prep(pip, &rankh);
+        let nt = self.caps.tops as usize;
+        let mut tk = Vec::new();
+        let mut v = Vec::new();
+        cubecl::future::block_on(self.client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
+        let ntops = (self.rd(&tstat)?[0] as usize).min(nt);
+        let thd = self.rd(&sb.thdh)?;
+        let tmw = self.rd(&sb.tmh)?;
+        let tops: Vec<(u32, u64)> =
+            (0..ntops).map(|i| (thd[i], u64::from(tmw[2 * i]) | u64::from(tmw[2 * i + 1]) << 32)).collect();
+        let pip_hi = pip >> 6;
+        for bi in 0..self.batches.len() {
+            let mut t = self.queue_batch(pip, nt, &sb, bi, &cnt);
+            if bi == 0 {
+                t.tstat = Some(tstat.clone());
+            }
+            cubecl::future::block_on(self.client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
+            let n = self.rd(&t.scount)?[0] as usize;
+            ensure!(n <= self.scap as usize, "run_slice_dev: list overflow");
+            let list = self.rd(&self.surv)?;
+            for i in 0..n {
+                let x = thd[list[2 * i] as usize];
+                let (h, d) = (u128::from(x & 0xFFFF), u128::from(x >> 16));
+                let p = (h << 30) | (d << 24) | u128::from(pip_hi);
+                v.push((p << 30) + u128::from(list[2 * i + 1]));
+            }
+            tk.push(t);
+        }
+        let mut dc = self.finish_group(&cnt, &tk)?;
+        dc.slices = 1;
+        Ok((dc, v, tops))
     }
 
     /// Upload a slice's tops and queue its preparation.
@@ -1724,8 +2089,7 @@ impl<R: Runtime> GpuJoin<R> {
         let ntops = st.tmask.len();
         ensure!(ntops <= self.caps.tops as usize, "middle-out: slice {} has {ntops} tops > cap", st.pip);
         ensure!(st.maxpop <= MAXPOP, "middle-out: slice {} has a top of {} digits > {MAXPOP}", st.pip, st.maxpop);
-        ensure!(st.maxprobe <= PMAX, "middle-out: slice {} has a job of {} probes > {PMAX}", st.pip, st.maxprobe);
-        let np = self.caps.parents as usize;
+        ensure!(st.maxprobe <= 2 * PMAX, "middle-out: slice {} has a job of {} probes > 2·{PMAX}", st.pip, st.maxprobe);
         let nt = ntops.max(1);
         let tm = unsafe { std::slice::from_raw_parts(st.tmask.as_ptr().cast::<u8>(), st.tmask.len() * 8) };
         let tmh = self.client.create_from_slice(if tm.is_empty() { &[0u8; 8] } else { tm });
@@ -1733,7 +2097,6 @@ impl<R: Runtime> GpuJoin<R> {
         let rankh = self.mk(st.rank.to_vec());
         let thdh = self.mk(if st.thd.is_empty() { vec![0] } else { st.thd.clone() });
         let c = &self.client;
-        let nroots = self.roots.len() as u32;
         let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
         unsafe {
             prep::tdigz_kernel::launch_unchecked::<R>(
@@ -1756,19 +2119,32 @@ impl<R: Runtime> GpuJoin<R> {
                 (st.pip >> 6) as u32,
                 ntops as u32,
             );
+        }
+        self.queue_parents(st.pip, &rankh);
+        Ok(SliceBufs { tmh, tsegh, thdh: thdh.clone() })
+    }
+
+    /// Queue the slice's parents: the preparation of the G2 port (histogram,
+    /// scan, scatter, per-bucket sort), unchanged.
+    fn queue_parents(&self, pip: u64, rankh: &Handle) {
+        let c = &self.client;
+        let np = self.caps.parents as usize;
+        let nroots = self.roots.len() as u32;
+        let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
+        unsafe {
             prep::hist2_kernel::launch_unchecked::<R>(
                 c,
                 CubeCount::Static(nroots.div_ceil(NT), 1, 1),
                 CubeDim::new_1d(NT),
                 a(&self.r4h, nroots as usize),
-                a(&rankh, 8),
+                a(rankh, 8),
                 a(&self.histh, 16128),
                 a(&self.g_lst, np),
                 a(&self.g_lkey, np),
                 a(&self.lcnt, 1),
                 nroots,
-                st.pip as u32,
-                (st.pip >> 32) as u32,
+                pip as u32,
+                (pip >> 32) as u32,
                 np as u32,
                 self.w,
             );
@@ -1801,15 +2177,14 @@ impl<R: Runtime> GpuJoin<R> {
                 a(&self.g_rec, np * 4),
             );
         }
-        Ok(SliceBufs { tmh, tsegh, thdh: thdh.clone() })
     }
 
     /// Queue one launch batch of a prepared slice.
-    fn queue_batch(&self, st: &SliceTops, sb: &SliceBufs, bi: usize, cnt: &Handle) -> Ticket {
+    fn queue_batch(&self, pip: u64, nt: usize, sb: &SliceBufs, bi: usize, cnt: &Handle) -> Ticket {
         let (c0, _c1, jobs, nj) = &self.batches[bi];
         let c = &self.client;
         let np = self.caps.parents as usize;
-        let nt = st.tmask.len().max(1);
+        let nt = nt.max(1);
         let (tmh, tsegh) = (&sb.tmh, &sb.tsegh);
         let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
         {
@@ -1827,7 +2202,7 @@ impl<R: Runtime> GpuJoin<R> {
                     a(&self.g_pseg, 64),
                     a(tmh, nt),
                     a(&self.g_tdig, nt * 4),
-                    a(tsegh, st.tseg.len()),
+                    a(tsegh, 64 * 63 * 2),
                     a(&self.roots_h, NROOT),
                     a(jobs, 2 * *nj as usize),
                     a(cnt, NCNT),
@@ -1848,7 +2223,7 @@ impl<R: Runtime> GpuJoin<R> {
                 );
                 post::clist_kernel::launch_unchecked::<R>(
                     c,
-                    CubeCount::Static(*nj, 1, 1),
+                    CubeCount::Static(*nj / 2, 1, 1),
                     CubeDim::new_1d(NT),
                     a(&self.g_rec, np),
                     a(&self.g_pseg, 64),
@@ -1867,7 +2242,7 @@ impl<R: Runtime> GpuJoin<R> {
                     a(&self.slabcnt, ns),
                     a(&self.g_rec, np),
                     a(&self.g_pseg, 64),
-                    a(tsegh, st.tseg.len()),
+                    a(tsegh, 64 * 63 * 2),
                     a(&self.roots_h, NROOT),
                     a(&self.clst, self.lcap as usize),
                     a(&self.jc, 63 * 64),
@@ -1878,8 +2253,8 @@ impl<R: Runtime> GpuJoin<R> {
                     self.nslab_cap,
                     self.scap,
                     *c0,
-                    (st.pip % 63) as u32,
-                    ((st.pip & 63) as u32) << 24,
+                    (pip % 63) as u32,
+                    ((pip & 63) as u32) << 24,
                 );
                 check_kernel::launch_unchecked::<R>(
                     c,
@@ -1898,7 +2273,7 @@ impl<R: Runtime> GpuJoin<R> {
                     self.ballot,
                 );
             }
-            Ticket { ran, scount, stat }
+            Ticket { ran, scount, stat, tstat: None }
         }
     }
 
@@ -1936,6 +2311,13 @@ impl<R: Runtime> GpuJoin<R> {
                 ran[5],
                 ran[6]
             );
+            if let Some(ts) = &t.tstat {
+                let v = self.rd(ts)?;
+                ensure!(v[0] <= self.caps.tops, "middle-out: {} tops > cap {}", v[0], self.caps.tops);
+                ensure!(v[1] == 0, "middle-out: {} tops of more than {MAXPOP} digits", v[1]);
+                dc.tops += u64::from(v[0]);
+                dc.tested += 1 << 21;
+            }
             let st = self.rd(&t.stat)?;
             ensure!(st[0] <= self.caps.parents, "middle-out: {} parents > cap {}", st[0], self.caps.parents);
             ensure!(st[1] <= self.nslab_cap, "middle-out: {} slabs > cap {}", st[1], self.nslab_cap);
@@ -1977,7 +2359,7 @@ impl<R: Runtime> GpuJoin<R> {
         let mut v = Vec::new();
         let pip_hi = st.pip >> 6;
         for bi in 0..self.batches.len() {
-            let t = self.queue_batch(st, &sb, bi, &cnt);
+            let t = self.queue_batch(st.pip, st.tmask.len(), &sb, bi, &cnt);
             cubecl::future::block_on(self.client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
             let n = self.rd(&t.scount)?[0] as usize;
             ensure!(n <= self.scap as usize, "run_slice: list overflow");
@@ -2001,8 +2383,11 @@ impl<R: Runtime> GpuJoin<R> {
 pub struct GpuOptions {
     /// Slices per synchronisation.
     pub group: usize,
-    /// Host threads making tops (in parallel with the device).
+    /// Host threads making tops (in parallel with the device), when the
+    /// tops are made on the host.
     pub host_threads: usize,
+    /// Tops on the device (the default: the box's 5-core quota cannot keep up).
+    pub device_tops: bool,
 }
 
 /// Search a base-64 field on the device: the field's slices' tops made on
@@ -2027,12 +2412,33 @@ pub fn search_field<R: Runtime>(
     let pips: Vec<u64> = ts.flat_map(|t| sh.slices_of(coord, t).map(|p| p as u64).collect::<Vec<_>>()).collect();
     let nice_before = gj.nice()?;
     let t0 = Instant::now();
-    let next = AtomicUsize::new(0);
-    let (tx, rx) = mpsc::sync_channel::<SliceTops>(2 * opt.host_threads.max(1) + opt.group);
-    let roots = gj.roots();
     let mut total = DevCounts::default();
     let mut host_wait = 0f64;
     let mut sync_s = 0f64;
+    if opt.device_tops {
+        // the key from the field's first slice on the host (it only orders the parents: any key is exact)
+        let rank = slice_tops(pips[0], gj.roots()).rank;
+        host_wait = t0.elapsed().as_secs_f64();
+        let rankh = gj.mk(rank.to_vec());
+        let mut done = 0usize;
+        while done < pips.len() {
+            let cnt = gj.mk(vec![0u32; NCNT]);
+            let mut tk = Vec::new();
+            let k0 = done;
+            while done < pips.len() && done - k0 < opt.group {
+                gj.queue_dev(pips[done], &rankh, &cnt, &mut tk);
+                done += 1;
+            }
+            let tsync = Instant::now();
+            let mut g = gj.finish_group(&cnt, &tk)?;
+            sync_s += tsync.elapsed().as_secs_f64();
+            g.slices = (done - k0) as u64;
+            total.add(&g);
+        }
+    } else {
+    let next = AtomicUsize::new(0);
+    let (tx, rx) = mpsc::sync_channel::<SliceTops>(2 * opt.host_threads.max(1) + opt.group);
+    let roots = gj.roots();
     let res: Result<()> = std::thread::scope(|s| {
         let rx = rx;
         for _ in 0..opt.host_threads.max(1) {
@@ -2077,6 +2483,7 @@ pub fn search_field<R: Runtime>(
         Ok(())
     });
     res?;
+    }
     let wall = t0.elapsed().as_secs_f64();
     let nice_all = gj.nice()?;
     let mut nice = nice_all;
@@ -2189,7 +2596,17 @@ mod tests {
                     let mut want = Vec::new();
                     let cn = slice_join::<u64>(&base, Shape { f0: 4, k: 10 }, u128::from(pip), |_, n| want.push(n));
                     want.sort_unstable();
-                    let (dc, mut got) = gj.run_slice(&st).unwrap();
+                    let (dc, mut got) = if std::env::var("MIDOUT_HOST_TOPS").is_ok() {
+                        gj.run_slice(&st).unwrap()
+                    } else {
+                        let (dc, got, mut tops) = gj.run_slice_dev(pip, &st.rank).unwrap();
+                        let mut htops: Vec<(u32, u64)> = st.thd.iter().copied().zip(st.tmask.iter().copied()).collect();
+                        htops.sort_unstable();
+                        tops.sort_unstable();
+                        assert!(tops == htops, "slice {pip}: device tops differ from the host's");
+                        println!("slice {pip}: device tops = host tops ({})", tops.len());
+                        (dc, got)
+                    };
                     got.sort_unstable();
                     println!("slice {pip}: device {dc:?}");
                     println!("slice {pip}: cpu    {cn:?}");
