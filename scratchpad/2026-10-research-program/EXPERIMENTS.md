@@ -5,6 +5,67 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## CX.0 Construction instead of search: where a second nice number is expected, and why it cannot be built (2026-11-18, director, no hardware; `CX/NOTES.md`, `CX/ecount.py`, `CX/ecount.txt`)
+
+- **Computed** [uniform heuristic, range count × b!/b^b over bases with a range and a root class]: bases 11–60
+  (all searched, none found) carried 0.033 expected nice numbers; b62 2.2e-4, b64 1.2e-4, b65 3.3e-4. The per-base
+  expectation is lowest near base 55 and then grows without bound: the running total passes 1 between bases 125
+  and 128; base 140 alone expects 4.7, base 200 about 4.5 million among 1e92 candidates. Density stays e^(−b).
+- **Argued, not run** (`CX/NOTES.md`): (1) generic n has no locality (any digit change rewrites 3L + 2 of the 5L
+  output digits), so local search is BX's lottery; (2) carry-free polynomial n needs s²(s + 1) = b(b − 1)/2 (only
+  (3, 9) for s ≤ 2,000,000, checked) and cannot give the square 2L distinct digits; (3) rational-type n (near-repdigits, Q | b − 1)
+  can give n² distinct digits by design (one arithmetic progression mod b − 1) but then n³'s digits are quadratic
+  in the position and would have to equal the progression's complementary run; (4) bases to 60 are exhaustively
+  searched and show no structural family.
+- **Conclusion: closed by argument.** No agent was started. A verified negative it is not: nothing was measured
+  beyond the table.
+
+## NM.1 Near misses as a by-product of the nice-only search: killed on yield (2026-11-18 05:50–07:50 UTC, investigator, ivory only; `NM/RESULTS.md`, `NM/PROPOSAL.md` ("do not build"), `NM/NOTES.md`, `NM/code/`, `NM/raw/`; prototype in worktree `.worktrees/nm-near-miss`, never pushed, diff saved as `NM/raw/nm-near-miss.patch`; base main 7e0113f)
+
+- **Question:** if the full check counted repeated digits up to a tolerance m instead of stopping at the first, how
+  many numbers with ≥ b − 2 distinct digits would the rest of base 62 plus base 64 give, and at what cost?
+  Kill: > 3 % of a field at m = 2, or < 30 expected numbers.
+- **Why the premise was wrong (mine)** [proved; I re-derived it]: every candidate the search examines is in a root
+  class, n² + n³ ≡ b(b − 1)/2 (mod b − 1), and the digit sum of n² ‖ n³ is ≡ n² + n³. With b − 1 distinct digits one
+  digit x is doubled and one y missing, digit sum b(b − 1)/2 + x − y, so x ≡ y (mod b − 1): only {x, y} = {0, b − 1}.
+  Among candidates the b − 1 near misses are exactly as many as the nice numbers (b! strings each): base 62's "0.4
+  numbers with 61 digits" is 4.5e-4 where the search looks. At b − 2 the filter keeps ≈ R/(b − 1) (2/61 at b62,
+  8/63 at b64). Nothing in the check or the join's later stages can undo this; probing all b − 1 classes costs
+  ×30 (b62) / ×8 (b64) the join.
+- **Exact definition and prototype** [M]: by-product(m) = {n reaching the check with ≥ b − m distinct digits}, a
+  property of the field and the join's shape only. Brute force of the definition = the prototype's output on all
+  20 cases (whole bases 20–30 at scaled shapes, b40 whole 1e10 fields, partitions at b44–b64, m = 1, 2, 3, 64). The
+  one subtlety was the top certificate's closure (without it brute force over-counts, 1,787 vs 1,451 at b40).
+- **Yield** [M + model]: repeat histogram of 2.2e9 checked survivors (30 sampled b62 / b64 1e17 runs) against the
+  uniform-middle model: ratio 1.03–1.09 for 7–13 repeats, lowest seen 6. Model × residue factor × 1.08:
+
+  | | fields | ≥ b − 1 | b − 2 | b − 3 |
+  |---|---|---|---|---|
+  | rest of b62 (86 %) | 82,070 | ≈ 1e-4 | 0.6–2.1 | 80–270 |
+  | all of b64 | 377,800 | ≈ 4e-4 | 3.8 (2.6–4.9) | 530 (370–680) |
+  | **sum** | | ≈ 5e-4 | **4.4–7.0** against the bar of 30 | 610–950 |
+  | b60, finished | 162,084 | ≈ 3e-4 | 2.7 | 320 |
+
+  Even a check that caught every root-class b − 2 number would get ≤ ≈ 21.
+- **Director's check of the b62 rate** [M, `../2026-11-fresh-eyes/recent_niceonly_1116b.json`]: the study's "72.6 %
+  of b62 fields check nothing, mean 1.22e10 checked per field" is a frontier artefact: 8,385 of the 12,038 fields
+  in that snapshot are the instantly empty opening (leading digits of n² and n³ both 1). Beyond it 14.1 % of fields
+  are empty and the mean is **3.83e10 checked per field** (4.45e10 per non-empty field; the study's own sampled runs
+  over the rest of the range gave 4.15e10 ± 0.9e10). So the rest of b62 sits at the top of the study's range
+  (≈ 2.0 at b − 2) and the sum is ≈ 5.8 (4.6–6.9). The verdict does not move.
+- **Cost** [M, CPU, one thread, 5 rotated rounds, counters identical]: m = 2 against unmodified main ×1.046 (b60
+  1e16), ×1.065 (b62 1e17), ×1.057 (b64 1e17), of which ×1.013–1.038 is the tolerance itself and the rest the
+  prototype's layout. GPU [priced from counts, not timed, no kernel written]: the gate between n² and n³'s upper
+  limbs passes 1.4e-3 of lanes today and 8.5e-2 at m = 2, so nearly every plane builds the whole cube: +6.5–7.7 %
+  of a b62 field, +10–12 % at b64 for the straight edit; ≈ +0.6 % / +1.0 % (±50 %) with a compacted second pass.
+- **Variants that widen coverage inside root classes** (tolerating a repeat in the prefilter, the AND or the
+  certificates) multiply the check's or the join's load by ×2.5–11 and are capped at ×2 more yield. Dead.
+- **The rest of the system** [read, lines in `NM/NOTES.md`]: nothing would mistake near misses for nice numbers and
+  nothing would show them: clients hard-code `num_uniques: base` for nice-only hits, the API stores nice-only
+  numbers as given, and the jobs publish a base's numbers only above 20 % detailed coverage.
+- **Conclusion: KILL by the yield criterion (≈ 5–6 against 30); the CPU cost misses its bar as well.** Numbers with
+  b − 3 digits would come in hundreds (610–950), which nobody asked for. Not proposed to the user as a feature.
+
 ## G2.5 The CubeCL port after its fixes: 1.499 fs, ×1.34 slower than hand CUDA; ×3.9 against main (2026-11-17 13:09–14:20 UTC, engineer; `G2/BENCH.md` "CubeCL port after fixes", `G2/PORT-NOTES.md`, `G2/WINDOW-PLAN.md`, `G2/port/raw/cuda_box2/` (incl. generated CUDA sources); box 61073296, RTX 3080 at a 300 W cap, 1.25 h, ~$0.17; port head 9ff100e, bundle current)
 
 - **Exact at 32 lanes on real hardware with the new common masks** [M]: both super-units, survivor sets, counts, the

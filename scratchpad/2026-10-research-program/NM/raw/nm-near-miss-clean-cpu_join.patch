@@ -1,0 +1,129 @@
+diff --git a/common/src/cpu_join.rs b/common/src/cpu_join.rs
+index e0fbf459..858c136e 100644
+--- a/common/src/cpu_join.rs
++++ b/common/src/cpu_join.rs
+@@ -127,6 +127,20 @@ pub struct PartitionResult {
+     /// ones that passed the prefilter (which the full check read).
+     pub survivors: u64,
+     pub checked: u64,
++    /// NM scratch, with a tolerance `m > 0` ([`CpuJoin::set_tolerance`]):
++    /// the checked survivors with `b − m` to `b − 1` distinct digits, as
++    /// `(n, distinct)`, and how many checked survivors had each count of
++    /// repeated digits (index `m + 1`: more than `m`).
++    pub near: Vec<(u128, u32)>,
++    pub reps: Vec<u64>,
++    /// With `m = 64`: checked survivors by (digits known at the check's
++    /// start, repeats), at `known·65 + repeats`.
++    pub kreps: Vec<u64>,
++    /// With `m = 64`: a 1/1024 sample of the checked survivors (by a hash).
++    pub sample: Vec<u128>,
++    /// With `m = 64`: survivors of the AND by repeats among the
++    /// prefilter's digits (0: passed the prefilter).
++    pub pre: Vec<u64>,
+ }
+ 
+ impl PartitionResult {
+@@ -135,6 +149,26 @@ impl PartitionResult {
+         self.hits.extend(other.hits);
+         self.survivors += other.survivors;
+         self.checked += other.checked;
++        self.near.extend(other.near);
++        if self.reps.len() < other.reps.len() {
++            self.reps.resize(other.reps.len(), 0);
++        }
++        for (a, b) in self.reps.iter_mut().zip(other.reps) {
++            *a += b;
++        }
++        self.sample.extend(other.sample);
++        if self.pre.len() < other.pre.len() {
++            self.pre.resize(other.pre.len(), 0);
++        }
++        for (a, b) in self.pre.iter_mut().zip(other.pre) {
++            *a += b;
++        }
++        if self.kreps.len() < other.kreps.len() {
++            self.kreps.resize(other.kreps.len(), 0);
++        }
++        for (a, b) in self.kreps.iter_mut().zip(other.kreps) {
++            *a += b;
++        }
+     }
+ }
+ 
+@@ -493,6 +527,8 @@ pub struct CpuJoin {
+     /// This join among the process's: what a [`Scratch`]'s failing runs
+     /// belong to.
+     id: u64,
++    /// NM scratch: the near-miss tolerance `m` (0: the production check).
++    tol: u32,
+ }
+ 
+ impl CpuJoin {
+@@ -572,10 +608,23 @@ impl CpuJoin {
+                 && std::arch::is_x86_feature_detected!("avx2"),
+             piece: PIECE,
+             id: JOINS.fetch_add(1, Ordering::Relaxed),
++            tol: 0,
+             fs,
+         })
+     }
+ 
++    /// NM scratch: report checked survivors with at least `b − m` distinct
++    /// digits (`PartitionResult::near`) and the histogram of repeats; `m`
++    /// is 0 (the production check), 1, 2, 3 or 64 (every checked survivor
++    /// counted in full).
++    ///
++    /// # Panics
++    /// Any other `m`.
++    pub fn set_tolerance(&mut self, m: u32) {
++        assert!(matches!(m, 0..=3 | 64), "tolerance {m}");
++        self.tol = m;
++    }
++
+     /// Partitions in the field (`b^p`); each is a [`Self::run_partition`].
+     ///
+     /// # Panics
+@@ -1063,8 +1112,42 @@ impl CpuJoin {
+                 ends,
+             });
+         }
+-        if self.check.nice(top.p, r0, low, top.seed, ends) {
++        if self.tol == 0 {
++            if self.check.nice(top.p, r0, low, top.seed, ends) {
++                out.hits.push(n());
++            }
++            return;
++        }
++        let rep = match self.tol {
++            1 => self.check.reps::<1>(top.p, r0, low, top.seed, ends),
++            2 => self.check.reps::<2>(top.p, r0, low, top.seed, ends),
++            3 => self.check.reps::<3>(top.p, r0, low, top.seed, ends),
++            _ => self.check.reps::<64>(top.p, r0, low, top.seed, ends),
++        };
++        if rep == 0 {
+             out.hits.push(n());
++        } else if rep <= self.tol.min(3) {
++            out.near.push((n(), self.fs.b - rep));
++        }
++        if self.tol == 64 {
++            // A 1/1024 sample of the checked survivors, by a hash of n.
++            let x = n();
++            #[allow(clippy::cast_possible_truncation)]
++            let h = (x as u64 ^ (x >> 64) as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
++            if h >> 54 == 0 {
++                out.sample.push(x);
++            }
++        }
++        let slot = rep.min(self.tol + 1) as usize;
++        if out.reps.len() <= slot {
++            out.reps.resize(self.tol as usize + 2, 0);
++        }
++        out.reps[slot] += 1;
++        if self.tol == 64 {
++            if out.kreps.is_empty() {
++                out.kreps.resize(65 * 65, 0);
++            }
++            out.kreps[(low | top.seed).count_ones() as usize * 65 + rep as usize] += 1;
+         }
+     }
+ 

@@ -1,0 +1,14 @@
+digraph {
+    0 [ label = "    branch;\l" ]
+    2 [ label = "    local(0).v2 = phi [bb7: local(0).v3][bb0: u32(0)];\l\l\l    loop(continue: bb7, merge: bb5)\l    branch bb3;\l" ]
+    3 [ label = "    binding(1) = local(0).v2 > scalar<u32>(0) : (u32, u32) -> (bool);\l    binding(2) = local(0).v2 == u32(3) : (u32, u32) -> (bool);\l    binding(3) = binding(1) || binding(2) : (bool, bool) -> (bool);\l    binding(3) ? bb5 : bb6; merge: None\l" ]
+    5 [ label = "    output(0)[u32(0)] = local(0).v2  : (u32, u32) -> (u32);\l    return;\l" ]
+    6 [ label = "    local(0).v3 = local(0).v2 + u32(1) : (u32, u32) -> (u32);\l    branch;\l" ]
+    7 [ label = "    branch;\l" ]
+    0 -> 2 [ ]
+    2 -> 3 [ ]
+    3 -> 5 [ ]
+    3 -> 6 [ ]
+    6 -> 7 [ ]
+    7 -> 2 [ ]
+}

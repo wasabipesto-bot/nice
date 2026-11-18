@@ -1,0 +1,96 @@
+Shared memories: [
+
+]
+
+uniform bb0 {
+    Live variables: []
+
+    Live shared memories: []
+
+    branch bb2;
+}
+
+bb2 {
+    Live variables: []
+
+    Live shared memories: []
+
+    local(0).v2 = phi [bb12: local(0).v4][bb0: u32(0)];
+
+    local(1).v2 = phi [bb12: local(1).v4][bb0: bool(true)];
+
+
+    loop(continue: bb12, merge: bb5)
+    branch bb3;
+}
+
+bb3 {
+    Live variables: []
+
+    Live shared memories: []
+
+    binding(2) = !local(1).v2 : (bool) -> (bool);
+    binding(2) ? bb5 : bb6; merge: None
+}
+
+bb5 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: []
+
+    output(0)[u32(0)] = local(0).v2  : (u32, u32) -> (u32); @ uniform
+    return;
+}
+
+bb6 {
+    Live variables: []
+
+    Live shared memories: []
+
+    binding(3) = local(0).v2 > scalar<u32>(0) : (u32, u32) -> (bool);
+    binding(3) ? bb7 : bb8; merge: bb9
+}
+
+bb7 {
+    Live variables: []
+
+    Live shared memories: []
+
+    branch bb9;
+}
+
+bb8 {
+    Live variables: []
+
+    Live shared memories: []
+
+    local(0).v3 = local(0).v2 + u32(1) : (u32, u32) -> (u32);
+    binding(4) = local(0).v3 == u32(3) : (u32, u32) -> (bool);
+    local(1).v3 = binding(4) ? bool(false) : local(1).v2 : (bool, bool, bool) -> (bool);
+    branch bb9;
+}
+
+bb9 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: []
+
+    local(0).v4 = phi [bb8: local(0).v3][bb7: local(0).v2];
+
+    local(1).v4 = phi [bb8: local(1).v3][bb7: bool(false)];
+
+
+    branch bb12;
+}
+
+bb12 {
+    Uses: [ContinueTarget]
+    Live variables: []
+
+    Live shared memories: []
+
+    branch bb2;
+}
+

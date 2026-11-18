@@ -1,0 +1,324 @@
+diff --git a/common/src/cpu_check.rs b/common/src/cpu_check.rs
+index 0f748b23..af74e7db 100644
+--- a/common/src/cpu_check.rs
++++ b/common/src/cpu_check.rs
+@@ -156,19 +156,25 @@ const SQ_LIMBS: usize = 2 * MAX_NL;
+ 
+ /// The digit mask a check runs against, whether a digit it took repeated,
+ /// and in count mode (`Check::count`) every digit it took.
+-struct Scan<const COUNT: bool> {
++struct Scan<const COUNT: bool, const TOL: u32 = 0> {
+     seen: u64,
++    /// With `TOL == 0`, whether a digit repeated; otherwise whether more
++    /// than `TOL` digits did (`rep > TOL`).
+     repeat: bool,
++    /// The digits taken that repeated one already seen (`TOL > 0` only):
++    /// `b − rep` distinct digits once every position is taken.
++    rep: u32,
+     /// Count mode: each power's digits by position (`u8::MAX` where none
+     /// was taken).
+     trace: [[u8; 48]; 2],
+ }
+ 
+-impl<const COUNT: bool> Scan<COUNT> {
++impl<const COUNT: bool, const TOL: u32> Scan<COUNT, TOL> {
+     fn new(seen: u64) -> Self {
+         Self {
+             seen,
+             repeat: false,
++            rep: 0,
+             trace: [[u8::MAX; 48]; 2],
+         }
+     }
+@@ -181,7 +187,12 @@ impl<const COUNT: bool> Scan<COUNT> {
+     #[inline(always)]
+     fn take(&mut self, j: usize, pos: u32, d: u32, on: bool) {
+         let bit = u64::from(on) << d;
+-        self.repeat |= self.seen & bit != 0;
++        if TOL == 0 {
++            self.repeat |= self.seen & bit != 0;
++        } else {
++            self.rep += u32::from(self.seen & bit != 0);
++            self.repeat = self.rep > TOL;
++        }
+         self.seen |= bit;
+         if COUNT && on {
+             self.trace[j][pos as usize] = d as u8;
+@@ -305,21 +316,55 @@ impl Check {
+         #[allow(clippy::cast_possible_truncation)]
+         let p64 = p as u64;
+         match self.nl {
+-            1 => self.columns::<1, false>(p64, r0, seen, ends).0,
+-            2 => self.columns::<2, false>(p64, r0, seen, ends).0,
+-            3 => self.columns::<3, false>(p64, r0, seen, ends).0,
+-            4 => self.columns::<4, false>(p64, r0, seen, ends).0,
+-            5 => self.columns::<5, false>(p64, r0, seen, ends).0,
+-            6 => self.columns::<6, false>(p64, r0, seen, ends).0,
+-            7 => self.columns::<7, false>(p64, r0, seen, ends).0,
+-            8 => self.columns::<8, false>(p64, r0, seen, ends).0,
++            1 => self.columns::<1, false, 0>(p64, r0, seen, ends).0,
++            2 => self.columns::<2, false, 0>(p64, r0, seen, ends).0,
++            3 => self.columns::<3, false, 0>(p64, r0, seen, ends).0,
++            4 => self.columns::<4, false, 0>(p64, r0, seen, ends).0,
++            5 => self.columns::<5, false, 0>(p64, r0, seen, ends).0,
++            6 => self.columns::<6, false, 0>(p64, r0, seen, ends).0,
++            7 => self.columns::<7, false, 0>(p64, r0, seen, ends).0,
++            8 => self.columns::<8, false, 0>(p64, r0, seen, ends).0,
+             _ => {
+-                self.long::<false>(p * self.w + u128::from(r0), seen, ends)
++                self.long::<false, 0>(p * self.w + u128::from(r0), seen, ends)
+                     .0
+             }
+         }
+     }
+ 
++    /// Variant A of the near-miss by-product (NM scratch): the digits of
++    /// `n²` and `n³` that repeat one already seen, counted up to `TOL`
++    /// (the scan stops at the first count above it, which it returns): `n`
++    /// has `b − reps` distinct digits when `reps <= TOL`, and is nice at 0.
++    /// The same arguments as [`Self::nice`].
++    #[inline(always)]
++    pub(crate) fn reps<const TOL: u32>(
++        &self,
++        p: u128,
++        r0: u32,
++        low: u64,
++        top: u64,
++        ends: [u32; 2],
++    ) -> u32 {
++        let seen = low | top;
++        #[allow(clippy::cast_possible_truncation)]
++        let p64 = p as u64;
++        match self.nl {
++            1 => self.columns::<1, false, TOL>(p64, r0, seen, ends).1.rep,
++            2 => self.columns::<2, false, TOL>(p64, r0, seen, ends).1.rep,
++            3 => self.columns::<3, false, TOL>(p64, r0, seen, ends).1.rep,
++            4 => self.columns::<4, false, TOL>(p64, r0, seen, ends).1.rep,
++            5 => self.columns::<5, false, TOL>(p64, r0, seen, ends).1.rep,
++            6 => self.columns::<6, false, TOL>(p64, r0, seen, ends).1.rep,
++            7 => self.columns::<7, false, TOL>(p64, r0, seen, ends).1.rep,
++            8 => self.columns::<8, false, TOL>(p64, r0, seen, ends).1.rep,
++            _ => {
++                self.long::<false, TOL>(p * self.w + u128::from(r0), seen, ends)
++                    .1
++                    .rep
++            }
++        }
++    }
++
+     /// [`Self::nice`] in count mode: every middle digit converted, none
+     /// skipped at a repeat (the path the field takes, or the long division
+     /// if `long`).
+@@ -328,15 +373,15 @@ impl Check {
+         #[allow(clippy::cast_possible_truncation)]
+         let p64 = p as u64;
+         let scan = match if long { 0 } else { self.nl } {
+-            1 => self.columns::<1, true>(p64, r0, seen, ends).1,
+-            2 => self.columns::<2, true>(p64, r0, seen, ends).1,
+-            3 => self.columns::<3, true>(p64, r0, seen, ends).1,
+-            4 => self.columns::<4, true>(p64, r0, seen, ends).1,
+-            5 => self.columns::<5, true>(p64, r0, seen, ends).1,
+-            6 => self.columns::<6, true>(p64, r0, seen, ends).1,
+-            7 => self.columns::<7, true>(p64, r0, seen, ends).1,
+-            8 => self.columns::<8, true>(p64, r0, seen, ends).1,
+-            _ => self.long::<true>(p * self.w + u128::from(r0), seen, ends).1,
++            1 => self.columns::<1, true, 0>(p64, r0, seen, ends).1,
++            2 => self.columns::<2, true, 0>(p64, r0, seen, ends).1,
++            3 => self.columns::<3, true, 0>(p64, r0, seen, ends).1,
++            4 => self.columns::<4, true, 0>(p64, r0, seen, ends).1,
++            5 => self.columns::<5, true, 0>(p64, r0, seen, ends).1,
++            6 => self.columns::<6, true, 0>(p64, r0, seen, ends).1,
++            7 => self.columns::<7, true, 0>(p64, r0, seen, ends).1,
++            8 => self.columns::<8, true, 0>(p64, r0, seen, ends).1,
++            _ => self.long::<true, 0>(p * self.w + u128::from(r0), seen, ends).1,
+         };
+         Count {
+             mask: scan.seen,
+@@ -395,15 +440,15 @@ impl Check {
+     /// first four middle digits).
+     #[allow(clippy::many_single_char_names)] // the arithmetic's names
+     #[inline(always)]
+-    fn columns<const NL: usize, const COUNT: bool>(
++    fn columns<const NL: usize, const COUNT: bool, const TOL: u32>(
+         &self,
+         p: u64,
+         r0: u32,
+         seen: u64,
+         ends: [u32; 2],
+-    ) -> (bool, Scan<COUNT>) {
++    ) -> (bool, Scan<COUNT, TOL>) {
+         let nn = self.limbs::<NL>(p, r0);
+-        let mut sc = Scan::<COUNT>::new(seen);
++        let mut sc = Scan::<COUNT, TOL>::new(seen);
+         let k2 = self.k2;
+         let mut sq = [0u32; SQ_LIMBS];
+         let mut carry = 0u32;
+@@ -471,8 +516,13 @@ impl Check {
+     }
+ 
+     /// The same digits by long division of `n²` and `n³` (any field).
+-    fn long<const COUNT: bool>(&self, n: u128, seen: u64, ends: [u32; 2]) -> (bool, Scan<COUNT>) {
+-        let mut sc = Scan::<COUNT>::new(seen);
++    fn long<const COUNT: bool, const TOL: u32>(
++        &self,
++        n: u128,
++        seen: u64,
++        ends: [u32; 2],
++    ) -> (bool, Scan<COUNT, TOL>) {
++        let mut sc = Scan::<COUNT, TOL>::new(seen);
+         let sq = U256::mul_u128_u128(n, n);
+         for (j, (mut x, end)) in [(sq, ends[0]), (sq.mul_u128_truncating(n), ends[1])]
+             .into_iter()
+diff --git a/common/src/cpu_join.rs b/common/src/cpu_join.rs
+index e0fbf459..9376aa68 100644
+--- a/common/src/cpu_join.rs
++++ b/common/src/cpu_join.rs
+@@ -127,6 +127,20 @@ pub struct PartitionResult {
+     /// ones that passed the prefilter (which the full check read).
+     pub survivors: u64,
+     pub checked: u64,
++    /// NM scratch, with a tolerance `m > 0` ([`CpuJoin::set_tolerance`]):
++    /// the checked survivors with `b − m` to `b − 1` distinct digits, as
++    /// `(n, distinct)`, and how many checked survivors had each count of
++    /// repeated digits (index `m + 1`: more than `m`).
++    pub near: Vec<(u128, u32)>,
++    pub reps: Vec<u64>,
++    /// With `m = 64`: checked survivors by (digits known at the check's
++    /// start, repeats), at `known·65 + repeats`.
++    pub kreps: Vec<u64>,
++    /// With `m = 64`: a 1/1024 sample of the checked survivors (by a hash).
++    pub sample: Vec<u128>,
++    /// With `m = 64`: survivors of the AND by repeats among the
++    /// prefilter's digits (0: passed the prefilter).
++    pub pre: Vec<u64>,
+ }
+ 
+ impl PartitionResult {
+@@ -135,6 +149,26 @@ impl PartitionResult {
+         self.hits.extend(other.hits);
+         self.survivors += other.survivors;
+         self.checked += other.checked;
++        self.near.extend(other.near);
++        if self.reps.len() < other.reps.len() {
++            self.reps.resize(other.reps.len(), 0);
++        }
++        for (a, b) in self.reps.iter_mut().zip(other.reps) {
++            *a += b;
++        }
++        self.sample.extend(other.sample);
++        if self.pre.len() < other.pre.len() {
++            self.pre.resize(other.pre.len(), 0);
++        }
++        for (a, b) in self.pre.iter_mut().zip(other.pre) {
++            *a += b;
++        }
++        if self.kreps.len() < other.kreps.len() {
++            self.kreps.resize(other.kreps.len(), 0);
++        }
++        for (a, b) in self.kreps.iter_mut().zip(other.kreps) {
++            *a += b;
++        }
+     }
+ }
+ 
+@@ -493,6 +527,8 @@ pub struct CpuJoin {
+     /// This join among the process's: what a [`Scratch`]'s failing runs
+     /// belong to.
+     id: u64,
++    /// NM scratch: the near-miss tolerance `m` (0: the production check).
++    tol: u32,
+ }
+ 
+ impl CpuJoin {
+@@ -572,10 +608,23 @@ impl CpuJoin {
+                 && std::arch::is_x86_feature_detected!("avx2"),
+             piece: PIECE,
+             id: JOINS.fetch_add(1, Ordering::Relaxed),
++            tol: 0,
+             fs,
+         })
+     }
+ 
++    /// NM scratch: report checked survivors with at least `b − m` distinct
++    /// digits (`PartitionResult::near`) and the histogram of repeats; `m`
++    /// is 0 (the production check), 1, 2, 3 or 64 (every checked survivor
++    /// counted in full).
++    ///
++    /// # Panics
++    /// Any other `m`.
++    pub fn set_tolerance(&mut self, m: u32) {
++        assert!(matches!(m, 0..=3 | 64), "tolerance {m}");
++        self.tol = m;
++    }
++
+     /// Partitions in the field (`b^p`); each is a [`Self::run_partition`].
+     ///
+     /// # Panics
+@@ -1028,6 +1077,23 @@ impl CpuJoin {
+             let rho = u64::from(ext.rho[row]) + u64::from(pass.d) * self.kb;
+             self.prefilter_any(top, bmask, info.carries, rho % self.bmid)
+         };
++        if self.tol == 64 && self.lean {
++            // NM: the prefilter's four digits against the bottom's and the
++            // gated certificate, by repeats (0..=4), for every survivor.
++            let (top, row) = (pass.top, info.row as usize);
++            let (h2, g2) = self.fx.digits(info.carries & 0xFFFF, ext.p2[row], top.dh);
++            let (h3, g3) = self.fx.digits(info.carries >> 16, ext.p3[row], top.dh);
++            let mut seen = bmask | top.gmask();
++            let mut rep = 0usize;
++            for d in [h2, g2, h3, g3] {
++                rep += usize::from(seen >> d & 1 == 1);
++                seen |= 1u64 << d;
++            }
++            if out.pre.is_empty() {
++                out.pre.resize(5, 0);
++            }
++            out.pre[rep] += 1;
++        }
+         if !pass_mid {
+             return;
+         }
+@@ -1063,8 +1129,42 @@ impl CpuJoin {
+                 ends,
+             });
+         }
+-        if self.check.nice(top.p, r0, low, top.seed, ends) {
++        if self.tol == 0 {
++            if self.check.nice(top.p, r0, low, top.seed, ends) {
++                out.hits.push(n());
++            }
++            return;
++        }
++        let rep = match self.tol {
++            1 => self.check.reps::<1>(top.p, r0, low, top.seed, ends),
++            2 => self.check.reps::<2>(top.p, r0, low, top.seed, ends),
++            3 => self.check.reps::<3>(top.p, r0, low, top.seed, ends),
++            _ => self.check.reps::<64>(top.p, r0, low, top.seed, ends),
++        };
++        if rep == 0 {
+             out.hits.push(n());
++        } else if rep <= self.tol.min(3) {
++            out.near.push((n(), self.fs.b - rep));
++        }
++        if self.tol == 64 {
++            // A 1/1024 sample of the checked survivors, by a hash of n.
++            let x = n();
++            #[allow(clippy::cast_possible_truncation)]
++            let h = (x as u64 ^ (x >> 64) as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
++            if h >> 54 == 0 {
++                out.sample.push(x);
++            }
++        }
++        let slot = rep.min(self.tol + 1) as usize;
++        if out.reps.len() <= slot {
++            out.reps.resize(self.tol as usize + 2, 0);
++        }
++        out.reps[slot] += 1;
++        if self.tol == 64 {
++            if out.kreps.is_empty() {
++                out.kreps.resize(65 * 65, 0);
++            }
++            out.kreps[(low | top.seed).count_ones() as usize * 65 + rep as usize] += 1;
+         }
+     }
+ 

@@ -35,6 +35,29 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   - Side task: a minimal reproduction and draft report of the second CubeCL defect (invalid
     SPIR-V for `loop` / `break`), by the engineer who hit it.
 
+- **07:50 UTC: NM killed by its yield criterion** (EXPERIMENTS NM.1). About 5–6 numbers with ≥ b − 2 digits
+  over the rest of b62 plus b64 against the bar of 30. **My premise this morning was wrong where the search
+  looks:** every candidate is in a root class, the digit sum is fixed mod b − 1, so a b − 1 near miss must have
+  swapped 0 and b − 1 and is as rare as a nice number; at b − 2 only R/(b − 1) survive. I should have seen this
+  before writing the brief: the residue filter is L1.0, from the program's first day. Lesson: before a "the search
+  discards X" claim, ask which candidates the search ever looks at.
+  - My own check of the study's side figure: "72.6 % of b62 fields check nothing" is the instantly empty opening
+    (8,385 of the snapshot's 12,038 fields); beyond it 14.1 % are empty and the mean is 3.83e10 checked per field.
+    The rest of b62 is at the top of the study's range; the verdict does not move.
+- **08:00–08:10 UTC, thinking (mine): could a second nice number be constructed?** (EXPERIMENTS CX.0,
+  `CX/NOTES.md`). The heuristic count per base has its minimum near base 55 and then grows without bound: the
+  running total passes 1 at base 125–128, base 200 expects 4.5 million. So a second nice number almost surely
+  exists, some sixty bases beyond what enumeration reaches. Construction fails by argument: no locality for
+  generic n; carry-free forms hit s²(s + 1) = b(b − 1)/2 (only (3, 9) to s = 2e6); rational-type n gives n²
+  designed digits but n³ quadratic ones; bases to 60 show no structural family. Closed without an agent.
+- **Where that leaves the program:** below-exhaustive (BX), pairing, by-products (NM) and construction (CX) are
+  closed; the one large lever standing is G2, which waits for the user. I found no further deep line today that
+  needs neither a GPU nor the user, and I say so in the report.
+- **08:15 UTC: G2 offline tuning started** (`G2/TUNE-BRIEF.md`, Opus, ivory only, hard stop 12:30 UTC): the RDNA4
+  path first (precomputed slice offsets, shared memory ≤ 21 KB for 12 waves, by ACO counts, exact on lavapipe),
+  then the ×1.34 gap to hand CUDA from generated code. Still the throwaway prototype (local branch, never
+  pushed); its purpose is that the one window on the card is taken with the best build. Not new research.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);
