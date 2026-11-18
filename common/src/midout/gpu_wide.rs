@@ -2473,9 +2473,9 @@ impl<R: Runtime> WideJoin<R> {
                 hi &= hi - 1;
             }
         }
-        Ok(key_digits(b, &fp, &ft)
+        key_digits(b, &fp, &ft)
             .try_into()
-            .map_err(|_| anyhow!("8 key digits"))?)
+            .map_err(|_| anyhow!("8 key digits"))
     }
 
     /// One slice alone (tests): counts, survivors as n (read back per
@@ -2738,10 +2738,10 @@ mod tests {
                     if let Some(c) = classes {
                         caps.classes = c.min(b - 1);
                     }
-                    if let Some(x) = std::env::var("MIDOUT_NINST").ok() {
+                    if let Ok(x) = std::env::var("MIDOUT_NINST") {
                         caps.ninst = x.parse().unwrap();
                     }
-                    if let Some(x) = std::env::var("MIDOUT_MAXPOP").ok() {
+                    if let Ok(x) = std::env::var("MIDOUT_MAXPOP") {
                         caps.maxpop = x.parse().unwrap();
                     }
                     let gj = WideJoin::new($client, caps, &coord, sh).unwrap();
