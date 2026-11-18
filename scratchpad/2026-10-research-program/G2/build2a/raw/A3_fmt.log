@@ -1,0 +1,35 @@
+Diff in /root/midout/common/src/midout/gpu.rs:1252:
+     /// digits at positions >= 12 (`top`).
+     #[cube]
+     fn pf(r0: u32, plo: u32, phi: u32, top: u64) -> bool {
+-        let xl = u64::cast_from(r0)
+-            | (u64::cast_from(plo) << 30u64)
+-            | (u64::cast_from(phi) << 62u64);
++        let xl =
++            u64::cast_from(r0) | (u64::cast_from(plo) << 30u64) | (u64::cast_from(phi) << 62u64);
+         let xh = (phi >> 2u32) & 255u32;
+         let x8 = u32::cast_from(xl & 255u64);
+         let (sl, s_hi) = mul64(xl, xl);
+Diff in /root/midout/common/src/midout/gpu.rs:1261:
+         let sh = (u32::cast_from(s_hi & 255u64) + 2u32 * x8 * xh) & 255u32;
+         let (cl, c_hi) = mul64(sl, xl);
+-        let ch = (u32::cast_from(c_hi & 255u64) + u32::cast_from(sl & 255u64) * xh + sh * x8)
+-            & 255u32;
++        let ch =
++            (u32::cast_from(c_hi & 255u64) + u32::cast_from(sl & 255u64) * xh + sh * x8) & 255u32;
+         let mut seen = 0u64;
+         #[unroll]
+         for j in 0..10u32 {
+Diff in /root/midout/common/src/midout/gpu.rs:2374:
+             st.thd.clone()
+         });
+         let mh: &[u64] = if st.tmhi.is_empty() { &[0] } else { &st.tmhi };
+-        let tmhih = self
+-            .client
+-            .create_from_slice(unsafe { std::slice::from_raw_parts(mh.as_ptr().cast::<u8>(), mh.len() * 8) });
++        let tmhih = self.client.create_from_slice(unsafe {
++            std::slice::from_raw_parts(mh.as_ptr().cast::<u8>(), mh.len() * 8)
++        });
+         let c = &self.client;
+         let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
+         unsafe {

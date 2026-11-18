@@ -172,6 +172,14 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   second box (`G2/BUILD-BRIEF-2E.md`, branch `dev/mo-wide`, hard stop 00:30): masks wider than 64 bits, exact
   at base 65, the first GPU number above base 64. Box 61303619 (California, $0.117/h, TTL ≈ 06:00 UTC).
 
+- **22:00 UTC: step 2A is back (EXPERIMENTS MO.2): ×4.02 on the 3080, target ×4.4 missed.** B, A and C are in
+  and exact; the work around the kernel fell 2.00 → 1.59 ms per slice; the kernel itself is 71 % of a slice.
+- **22:05 UTC: an independent soundness audit started on the freed box** (`G2/BUILD-BRIEF-3S.md`, Opus, branch
+  `dev/mo-audit`, hard stop 01:45): a parity sweep of ≥ 300 seeded slices against the CPU reference, every limit
+  with fault injection, what the host's accounts can catch, the known defect classes, the coordinate's coverage.
+  Reason: 4,500 new lines in seven hours resting on 5 slices of device parity, from a prototype that hid a
+  1-in-1,000 overflow for two days. Speed work waits for its verdict.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

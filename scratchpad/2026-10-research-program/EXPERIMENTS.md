@@ -5,6 +5,32 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## MO.2 The cost around the kernel (pieces B, A, C): ×4.02 against main on the RTX 3080; the ×4.4 target missed (2026-11-18 19:05–22:15 UTC, engineer; `G2/BUILD-BRIEF-2A.md`, `G2/BUILD-NOTES.md` §1, §6, §9, `G2/build2a/`; trunk `dev/middle-out-join` 7ba982c7 → 91ac0761 (7 commits, on the fork); box 61286074, RTX 3080 at a 240 W cap, same box session as its main run)
+
+- **The number** [M]: the same ten base-64 fields as MO.1: **1.647 fs** per admissible n (21:31–21:36 UTC)
+  against main 6.615 fs (21:42–21:57; identical to 0.1 s in all three of the day's runs on this box): **×4.02**
+  (MO.1: 1.752 fs, ×3.78).
+- **Per slice, field 77777, before → after in one session** [M] (at 03091f72): tops 0.47 → 0.36 ms; expansion
+  0.96 → 1.11 (it now contains the prefilter); check 0.58 → 0.12; around the kernel 2.00 → 1.59; whole slice
+  8.05 → 7.72 ms. Parents 0.65–0.67 and main kernel 5.40–5.46 ms unchanged.
+- **What each piece gave** [M]: B (records name their top and their position in the child list: no probe walk)
+  −0.07 ms; A (production's middle-digit prefilter inside the expansion, CPU mirror, `checked` now production's
+  meaning; 2.87 % of survivors pass) −0.05 ms net, then −0.11 with 32-bit limbs; C (coarser level certified once
+  per 64 slices, slice tops only under the 19 % of parents that are valid) −0.13; two records per lane −0.05.
+  A first form of B (entries written by the main kernel) slowed the kernel by 1.2 ms and is superseded in the
+  tree (it stays in history).
+- **Dropped as neutral or worse** (ten variants, list in `BUILD-NOTES.md` §9).
+- **Exact** [M]: CPU reference = brute force on whole bases 10–25 including `checked`; device = CPU on 5 slices
+  on CUDA at every commit from C on (tops, prefiltered lists n for n, all counts) and on 2 whole slices on
+  lavapipe at 8 lanes; production's check rebuilds the lists; all ten fields' survivor counts equal MO.1's;
+  production's 214 tests pass; fmt and clippy clean.
+- **Where the rest is:** the main kernel is 71 % of a slice (5.4 of 7.7 ms); the expansion 1.1 ms, apparently
+  bound by load latency (a timing-only probe: reading the records 0.32 ms, with top and child loads 0.94, full
+  1.17); parents 0.66 ms. The engineer's estimate: the expansion near its floor is worth ≈ ×4.3; ×4.4 needs the
+  main kernel or the preparation as well.
+- **Conclusion:** end to end the join is ×4.0 on NVIDIA at base 64 today, with exact device-independent
+  counters and production's prefilter and check. The RX 9070 XT has not run the library path.
+
 ## MO.1 The middle-out join in the client library, day one: exact end to end at base 64; ×3.78 against main on an RTX 3080 (2026-11-18 16:43–18:51 UTC, lead engineer; `G2/BUILD-BRIEF-1.md`, `G2/BUILD-NOTES.md`, `G2/build1/box/`, `G2/build1/raw/`; branch `dev/middle-out-join` 7ba982c7 (7 commits on upstream be9cc923), on ivory and on the fork, no PR; box 61286074, RTX 3080 at a 240 W cap, i9-9900 with a 5.12-CPU quota)
 
 - **What runs** [M]: `midout::gpu::search_field` on whole base-64 fields `(64, 2^75 + t·2^57, 2^57)` (digits 6–8
