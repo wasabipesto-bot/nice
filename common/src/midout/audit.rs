@@ -408,3 +408,198 @@ fn audit_stop_env_is_silent() {
         Err(e) => println!("MIDOUT_STOP=2: search_field failed: {e}"),
     }
 }
+
+/// The coordinate layer, base 64 and the padded base 65: the slices of all fields are a partition of the slice keys
+/// (digits 4-8: each value in exactly one field t and once in it), and every n (the ends of the range, the ends of
+/// the padding, random n) lies in the field its v names and in a slice of that field whose units and leads cover it.
+#[test]
+fn audit_coord_slices_partition() {
+    for b in [64u32, 65] {
+        let c = Coord::for_base(b).unwrap();
+        let sh = Shape::for_coord(&c);
+        let bb = u128::from(b);
+        let nkeys = bb.pow(5) as usize;
+        let mut seen = vec![0u64; nkeys.div_ceil(64)];
+        let nt = (c.v_end() - c.start) / c.quantum();
+        assert_eq!(nt, bb.pow(3));
+        let mut count = 0usize;
+        for t in 0..nt {
+            for p in sh.slices_of(&c, t) {
+                assert_eq!(p / (bb * bb), t, "b{b} slice {p} not in field {t}");
+                let p = p as usize;
+                assert!(p < nkeys);
+                assert_eq!((seen[p / 64] >> (p % 64)) & 1, 0, "b{b} slice {p} twice");
+                seen[p / 64] |= 1 << (p % 64);
+                count += 1;
+            }
+        }
+        assert_eq!(count, nkeys, "b{b}: slices of all fields");
+        let mut x = 0x5EED_u64;
+        let mut ns = vec![c.start, c.start + 1, c.end - 1, c.end - 2];
+        for _ in 0..200_000 {
+            let r = u128::from(splitmix(&mut x)) << 64 | u128::from(splitmix(&mut x));
+            ns.push(c.start + r % (c.end - c.start));
+        }
+        let (lead_lo, lead_hi) = (c.start / bb.pow(10), (c.end - 1) / bb.pow(10));
+        for n in ns {
+            let v = c.v_of_n(n);
+            assert_eq!(c.n_of_v(v), Some(n));
+            let t = (v - c.start) / c.quantum();
+            assert_eq!(c.field_digits(c.start + t * c.quantum(), c.quantum()).unwrap(), t..t + 1);
+            assert_eq!((n / bb.pow(6)) % bb.pow(3), t, "b{b} n {n}: field digits");
+            let pip = (n / bb.pow(4)) % bb.pow(5);
+            assert!(sh.slices_of(&c, t).any(|p| p == pip), "b{b} n {n}: slice not in its field");
+            // inside the slice: unit d = digit 9 < b, lead h = n div b^10 in the leads the tops enumerate
+            let h = n / bb.pow(10);
+            assert!(h >= lead_lo && h <= lead_hi);
+            if b == 64 {
+                assert!((H_LO as u128..H_HI as u128).contains(&h), "b64 n {n}: lead {h} outside the device's");
+            }
+        }
+    }
+}
+
+/// The production path takes the parents' key from the field's first slice; the sweep runs each slice with its own
+/// key. Any key must give the same survivors: per slice, the device's prefiltered list (n for n) and the whole
+/// survivor set (hash, prefilter off) with its own key equal those with foreign keys (other slices', the identity
+/// key 0-7, and a key of the rarest digits); and the production group path (`queue_dev` + `finish_group`, the field's
+/// key, several slices in one group, the 64-slice parent level reused across them) gives the per-slice sums.
+#[test]
+#[ignore = "needs CUDA"]
+fn audit_key_and_group_independence() {
+    let pips = audit_slices();
+    let client = cuda_client();
+    let gj = GpuJoin::new(client.clone(), Caps::b64(63)).unwrap();
+    let mut gn = GpuJoin::new(client, Caps::b64(63)).unwrap();
+    gn.set_fault(F_NOPF);
+    let roots = gj.roots().to_vec();
+    let mut keys: Vec<[u32; 8]> = vec![[0, 1, 2, 3, 4, 5, 6, 7], [63, 62, 61, 60, 59, 58, 57, 56]];
+    for &p in pips.iter().take(3) {
+        keys.push(slice_tops(p, &roots).rank);
+    }
+    let mut bad = 0;
+    let (mut sum_s, mut sum_c) = (0u64, 0u64);
+    for &pip in &pips {
+        let own = slice_tops(pip, &roots).rank;
+        let (d0, mut l0, _) = gj.run_slice_dev(pip, &own, usize::MAX).unwrap();
+        l0.sort_unstable();
+        let mut h0 = SetHash::default();
+        for n in gn.run_slice_dev(pip, &own, usize::MAX).unwrap().1 {
+            h0.add(n);
+        }
+        sum_s += d0.survivors;
+        sum_c += d0.checked;
+        for k in &keys {
+            let (d1, mut l1, _) = gj.run_slice_dev(pip, k, usize::MAX).unwrap();
+            l1.sort_unstable();
+            let mut h1 = SetHash::default();
+            for n in gn.run_slice_dev(pip, k, usize::MAX).unwrap().1 {
+                h1.add(n);
+            }
+            let ok = l1 == l0 && h1 == h0 && (d1.survivors, d1.checked, d1.children) == (d0.survivors, d0.checked, d0.children);
+            if !ok {
+                bad += 1;
+            }
+            println!(
+                "slice {pip} key {k:?}: {} (survivors {} checked {} chunks {} kept {}; own key chunks {} kept {})",
+                if ok { "equal" } else { "DIFFERS" },
+                d1.survivors,
+                d1.checked,
+                d1.chunks,
+                d1.kept,
+                d0.chunks,
+                d0.kept
+            );
+        }
+    }
+    for g in [pips.len(), 1.max(pips.len() / 2)] {
+        let mut s = (0u64, 0u64);
+        for ch in pips.chunks(g) {
+            let dc = group(&gj, ch).unwrap();
+            s.0 += dc.survivors;
+            s.1 += dc.checked;
+        }
+        println!("group path, groups of {g}: survivors {} checked {} (per-slice sums {sum_s} {sum_c})", s.0, s.1);
+        if s != (sum_s, sum_c) {
+            bad += 1;
+        }
+    }
+    assert_eq!(bad, 0);
+}
+
+/// A device allocation that fails (here: the card's memory filled first, `AUDIT_FILL_MB`) panics in CubeCL's stream
+/// thread, not in the caller; the kernels that use the missing buffer are dropped. Does the production group path
+/// notice? Prints what `GpuJoin::new` and a group of one slice return.
+#[test]
+#[ignore = "needs CUDA; fills the card's memory"]
+fn audit_oom_is_silent() {
+    let client = cuda_client();
+    let fill_mb = env_u64("AUDIT_FILL_MB", 0);
+    let mut hold = Vec::new();
+    for _ in 0..fill_mb / 64 {
+        hold.push(client.empty(64 << 20));
+    }
+    let _ = cubecl::future::block_on(client.sync());
+    println!("filled {} MiB", 64 * hold.len());
+    // AUDIT_HOLD_S: this process is only the helper that holds the memory (another process runs the join)
+    let hold_s = env_u64("AUDIT_HOLD_S", 0);
+    if hold_s > 0 {
+        std::thread::sleep(std::time::Duration::from_secs(hold_s));
+        return;
+    }
+    let gj = match GpuJoin::new(client, Caps::b64(63)) {
+        Ok(g) => g,
+        Err(e) => {
+            println!("GpuJoin::new failed: {e}");
+            return;
+        }
+    };
+    println!("GpuJoin::new returned Ok");
+    for pip in [712_012_851u64, 318_575_442] {
+        match group(&gj, &[pip]) {
+            Ok(dc) => println!("slice {pip}: group path returned Ok: {dc:?}"),
+            Err(e) => println!("slice {pip}: group path failed: {e}"),
+        }
+    }
+    let r = gj.nice();
+    println!("nice(): {r:?}");
+    drop(hold);
+}
+
+/// The production field path (groups of 16 slices, the field's key, the 64-slice parent level shared by consecutive
+/// slices) against the same slices run one at a time (`run_slice_dev`, the same key): equal sums. The first
+/// `AUDIT_NSL` (128) slices of field `AUDIT_T` (0), i.e. two 64-slice parent groups.
+#[test]
+#[ignore = "needs CUDA"]
+fn audit_group_vs_single() {
+    let t = u128::from(env_u64("AUDIT_T", 0));
+    let nsl = env_u64("AUDIT_NSL", 128) as usize;
+    let coord = Coord::for_base(64).unwrap();
+    let sh = Shape::for_coord(&coord);
+    let pips: Vec<u64> = sh.slices_of(&coord, t).take(nsl).map(|p| p as u64).collect();
+    let gj = GpuJoin::new(cuda_client(), Caps::b64(63)).unwrap();
+    let rank = slice_tops(pips[0], gj.roots()).rank;
+    let key = |d: &DevCounts| (d.survivors, d.checked, d.children, d.chunks, d.flat, d.kept, d.tops, d.tested);
+    let mut res = Vec::new();
+    for round in 0..env_u64("AUDIT_ROUNDS", 1) {
+        let mut single = DevCounts::default();
+        let mut per = Vec::new();
+        for &p in &pips {
+            let (dc, _, _) = gj.run_slice_dev(p, &rank, usize::MAX).unwrap();
+            per.push(dc.kept);
+            single.add(&dc);
+        }
+        let mut grouped = DevCounts::default();
+        for ch in pips.chunks(16) {
+            grouped.add(&group(&gj, ch).unwrap());
+        }
+        println!("field {t}, {nsl} slices, round {round}: single {:?}", key(&single));
+        println!("field {t}, {nsl} slices, round {round}: groups {:?}", key(&grouped));
+        println!("round {round}: per-slice kept (single) {:?}", &per[..8]);
+        res.push((key(&single), key(&grouped)));
+    }
+    // the result: survivors and checked (and the counts that do not depend on the order of work) must agree
+    for (a, b) in &res {
+        assert_eq!((a.0, a.1, a.2, a.3, a.4, a.6, a.7), (b.0, b.1, b.2, b.3, b.4, b.6, b.7));
+    }
+}

@@ -853,7 +853,8 @@ mod kernels {
             }
         }
         if !comptime!(noout) {
-            if lane == 0u32 && have_slab && slab_id < nslab_cap {
+            // (audit) F_SLABCNT (2048): cube 0 never writes its last slab's count
+            if lane == 0u32 && have_slab && slab_id < nslab_cap && !((fault & 2048u32) != 0u32 && CUBE_POS_X == 0u32) {
                 slabcnt[slab_id as usize] = slab_used;
             }
         }
@@ -954,6 +955,8 @@ mod prep {
         pip_lo: u32,
         pip_hi: u32,
         cap: u32,
+        // (audit) F_DROP_PARENT (8192): parents of r4 = 0 mod 997 taken as uncertified
+        fault: u32,
         #[comptime] w: u32,
     ) {
         let pip = u64::cast_from(pip_lo) | (u64::cast_from(pip_hi) << 32u64);
@@ -969,7 +972,7 @@ mod prep {
             c = cc;
             key = kk;
         }
-        let flag = m != 0u64;
+        let flag = m != 0u64 && !((fault & 8192u32) != 0u32 && r4 % 997u32 == 0u32);
         let b = plane_ballot(flag);
         let l = UNIT_POS_PLANE;
         let lo = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
@@ -1324,6 +1327,7 @@ mod post {
         r0hi: u32,
         pip_hi: u32,
         nopf: bool,
+        pfdrop: bool,
     ) -> (u32, u32) {
         let pos = rec[1usize];
         // P = n div 2^30 = h·2^30 + d·2^24 + digits 5-8 (the top record's words 0-1)
@@ -1344,7 +1348,8 @@ mod post {
             } else {
                 y &= y - 1u32;
             }
-            if nopf || pf(lst[(pos + off) as usize] + r0hi, plo, phi, top) {
+            let r0 = lst[(pos + off) as usize] + r0hi;
+            if nopf || (pf(r0, plo, phi, top) && !(pfdrop && ((r0 >> 10u32) & 1023u32) == 0u32)) {
                 if inlo {
                     klo |= 1u32 << b;
                 } else {
@@ -1419,6 +1424,8 @@ mod post {
         fault: u32,
     ) {
         let nopf = (fault & 1u32) != 0u32;
+        // (audit) F_PF_DROP (1024): the prefilter wrongly drops survivors whose r0 has bits 10-19 zero
+        let pfdrop = (fault & 1024u32) != 0u32;
         if ABSOLUTE_POS_X == 0u32 {
             stat[0usize].store(lcnt[0usize]);
             stat[1usize].store(slabn[0usize]);
@@ -1457,8 +1464,8 @@ mod post {
                     + reca[3usize].count_ones()
                     + recb[2usize].count_ones()
                     + recb[3usize].count_ones();
-                let (kla, kha) = keep_bits(reca, hda, topa, lst, r0hi, pip_hi, nopf);
-                let (klb, khb) = keep_bits(recb, hdb, topb, lst, r0hi, pip_hi, nopf);
+                let (kla, kha) = keep_bits(reca, hda, topa, lst, r0hi, pip_hi, nopf, pfdrop);
+                let (klb, khb) = keep_bits(recb, hdb, topb, lst, r0hi, pip_hi, nopf, pfdrop);
                 let nb = kla.count_ones() + kha.count_ones() + klb.count_ones() + khb.count_ones();
                 let excl = plane_exclusive_sum(nb);
                 let tot = plane_sum(nb);
@@ -2251,6 +2258,10 @@ pub(crate) const F_POP12: u32 = 64;
 pub(crate) const F_SLAB_CAP: u32 = 128;
 pub(crate) const F_SCAP: u32 = 256;
 pub(crate) const F_SKIP_CHECK: u32 = 512;
+pub(crate) const F_PF_DROP: u32 = 1024;
+pub(crate) const F_SLABCNT: u32 = 2048;
+pub(crate) const F_SKIP_TOPS: u32 = 4096;
+pub(crate) const F_DROP_PARENT: u32 = 8192;
 
 impl<R: Runtime> GpuJoin<R> {
     /// (audit) The slab capacity the kernels are told (shrunk by `F_SLAB_CAP`).
@@ -2456,7 +2467,7 @@ impl<R: Runtime> GpuJoin<R> {
         let tmhih = self.client.empty(nt * 8);
         let cur = self.client.empty(4032 * 4);
         unsafe {
-            if self.stop < 10 || self.stop - 10 >= 1 {
+            if (self.stop < 10 || self.stop - 10 >= 1) && self.fault & F_SKIP_TOPS == 0 {
                 dtops::tops1_kernel::launch_unchecked::<R>(
                     c,
                     CubeCount::Static(TOPS_CUBES, 1, 1),
@@ -2686,6 +2697,7 @@ impl<R: Runtime> GpuJoin<R> {
                 pip as u32,
                 (pip >> 32) as u32,
                 np as u32,
+                self.fault,
                 self.w,
             );
             prep::scan16_kernel::launch_unchecked::<R>(
