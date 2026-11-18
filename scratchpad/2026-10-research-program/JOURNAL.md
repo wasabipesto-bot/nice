@@ -72,6 +72,29 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   - Next on G2 when credit allows: one rented 3080, W = 32 exactness of the tuned head and a re-time (≈ $0.20).
     With the card: the window, unchanged in length.
 
+- **≈ 12:40 UTC, the user (four points):** (1) is G2 only useful at base 64 or also at higher bases: "If this
+  is a 5x improvement for all further work then I'm much more interested than a b64-specific optimization";
+  (2) are the three CubeCL defects still in 0.11, are they reported, would their fixes justify an upgrade;
+  (3) Vast credit topped up ($60.57); (4) the release should be out today.
+- **CubeCL check (mine, by reading the 0.11.3 sources in the cargo registry and searching the upstream tracker;
+  nothing run on 0.11):**
+  - atomic-store merge (T2.7): the 0.10 optimizer is gone in 0.11 (rewritten on pliron; `simple_cse` skips any
+    op with side effects and `AtomicStoreOp` carries `HasSideEffects`). Not reported upstream; no matching issue;
+  - atomic load as `atomicAdd(p, 0)` on CUDA: reported upstream in March as tracel-ai/cubecl #1217 (open, no
+    replies); 0.11.3's `cubecl-cpp/src/shared/atomic.rs` emits a volatile read instead;
+  - invalid SPIR-V for a loop with two breaks: unknown on 0.11 (needs an 0.11 build to test); not reported.
+  - Releases: 0.11.3 is latest (2026-10-22); 0.12.0-pre.2 2026-11-09.
+- **G2 above 64: the question was never asked.** The design was modelled at b62 and b64 and measured at b64.
+  Above 64 neither join runs (64-bit digit masks; production takes the stride path). Admissible n against b64
+  by my count: b65 ×0.9, b68 ×17, b69 ×42, b70 ×600; October's wide-join study priced b65 at 3–5 × b64.
+  **Started (`G2/BASES-BRIEF.md`, Opus, ivory, hard stop 18:00 UTC):** the exact prototype widened past 64
+  bits, counts per admissible n at 65 / 68 / 69 / 70, priced with v10's measured unit costs, against today's
+  design widened; the work unit without the power-of-two trick; one b65 unit staged for a GPU run tomorrow.
+- **Rented for the tuned port (`G2/BOX3-BRIEF.md`, Opus):** first box 61250182 (m137673, South Korea) was capped
+  at 150 W by its host and destroyed after 5 minutes; second box 61250912 (m11295, Spain, RTX 3080, 16 threads,
+  $0.124/h, TTL ≈ 15:55 UTC) is capped at 240 W, 10 W under my rule: accepted because every ratio is taken in
+  the one session (v10, pre-tuning port, tuned A and D, main). Exactness at 32 lanes first. Hard stop 15:30.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);
