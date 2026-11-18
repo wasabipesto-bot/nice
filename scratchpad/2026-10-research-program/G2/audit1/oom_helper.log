@@ -1,0 +1,66 @@
+warning: constant `F_DROP_PROBE` is never used
+    --> common/src/midout/gpu.rs:2254:18
+     |
+2254 | pub(crate) const F_DROP_PROBE: u32 = 8;
+     |                  ^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `F_IDX13` is never used
+    --> common/src/midout/gpu.rs:2255:18
+     |
+2255 | pub(crate) const F_IDX13: u32 = 16;
+     |                  ^^^^^^^
+
+warning: constant `F_DROP_REC` is never used
+    --> common/src/midout/gpu.rs:2256:18
+     |
+2256 | pub(crate) const F_DROP_REC: u32 = 32;
+     |                  ^^^^^^^^^^
+
+warning: constant `F_POP12` is never used
+    --> common/src/midout/gpu.rs:2257:18
+     |
+2257 | pub(crate) const F_POP12: u32 = 64;
+     |                  ^^^^^^^
+
+warning: constant `F_PF_DROP` is never used
+    --> common/src/midout/gpu.rs:2261:18
+     |
+2261 | pub(crate) const F_PF_DROP: u32 = 1024;
+     |                  ^^^^^^^^^
+
+warning: constant `F_SLABCNT` is never used
+    --> common/src/midout/gpu.rs:2262:18
+     |
+2262 | pub(crate) const F_SLABCNT: u32 = 2048;
+     |                  ^^^^^^^^^
+
+warning: constant `F_DROP_PARENT` is never used
+    --> common/src/midout/gpu.rs:2264:18
+     |
+2264 | pub(crate) const F_DROP_PARENT: u32 = 8192;
+     |                  ^^^^^^^^^^^^^
+
+warning: `nice_common` (lib test) generated 7 warnings
+    Finished `release` profile [optimized] target(s) in 0.20s
+     Running unittests src/lib.rs (/root/t/auditf/release/build/nice_common/c29ae11497f8b508/out/nice_common-c29ae11497f8b508)
+
+running 1 test
+
+thread 'DSD-0-0' (44777) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-cuda-0.10.0/src/runtime.rs:90:79:
+called `Result::unwrap()` on an `Err` value: DriverError(CUDA_ERROR_OUT_OF_MEMORY, "out of memory")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'midout::gpu::audit::audit_oom_is_silent' (44776) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-common-0.10.0/src/device/handle/channel.rs:327:35:
+called `Result::unwrap()` on an `Err` value: RecvError
+test midout::gpu::audit::audit_oom_is_silent ... FAILED
+
+failures:
+
+failures:
+    midout::gpu::audit::audit_oom_is_silent
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 323 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `-p nice_common --lib`

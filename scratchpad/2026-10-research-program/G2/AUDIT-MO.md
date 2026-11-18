@@ -32,6 +32,13 @@ loud rather than found by a parity sweep.
   `search_field`'s) on slices 712012851 and 318575442: **both return `Ok` with children 0, chunks 0, survivors 0,
   checked 0, tops 0** (only `tested`, from a buffer that existed, is non-zero), `nice()` returns `Ok([])`. Every
   account passed. A field run this way is reported searched and empty.
+- **Reproduced with a helper process** (the coordinator's request; `oom_helper_2048.log`, `oom_helper_2560.log`): a
+  second process holds 2–2.5 GiB (card at 7.8–8.4 of 10 GiB with the sweep's 5 GiB), then a fresh process runs
+  `GpuJoin::new` and the group path, unmodified (fault bits 0): CubeCL asks for one **2.59 GB pool page** for the
+  large buffers, fails, and the run returns `Ok` with **tops 238,813 (the tops ran) but children, chunks, survivors,
+  checked all 0**, accounts passed, `nice()` `Ok([])`. Holding more (3.5–4.5 GiB) fails CUDA context creation
+  instead, which is loud (a panic in the caller). So the silent window is "enough memory for a context and the small
+  buffers, not for the 2.6 GB page".
 - **Found by accident first:** my own two-`GpuJoin` key test ran while the sweep held 5 GiB; the second join's 647 MB
   record buffer failed, its kernels were dropped, and its comparisons came out "equal" because both sides were the
   same nothing (`keys.log`; the test was re-run alone, `keys2.log`). The same thing would happen to a client sharing a
@@ -40,9 +47,9 @@ loud rather than found by a parity sweep.
   (`T2/SOUNDNESS.md` §4: "Per-kernel cube counters against the launch"). The middle-out path dropped that: no kernel
   of its own reports that it ran.
 - **Fix:** (a) per launch batch, a "cubes done" counter for the main kernel (each cube's thread 0 adds 1 at exit;
-  must equal the batch's 2·classes·64 instances), the expansion (= `EXPAND_CUBES`) and the tops kernels; (b) per
-  slice, plausibility floors that hold for every base-64 slice: tops > 0, children > 0, survivors > 0 (the sweep's
-  minima are in §5); (c) in `GpuJoin::new`, write and read back one word of each large buffer (an allocation that
+  must equal the batch's 2·classes·64 instances), the expansion (= `EXPAND_CUBES`) and the tops kernels; (b) floors
+  are **not** enough per slice: slice 0 legitimately has 0 survivors, 0 checked and 504 jobs with no probe (in the
+  sweep), so only per-field floors (a field has ~4.7e10 survivors) or, better, the positive evidence of §4.1 work; (c) in `GpuJoin::new`, write and read back one word of each large buffer (an allocation that
   failed then fails the read or reads wrong); (d) treat any panic of the runtime's thread as fatal (a panic hook
   that aborts the process; the client must never submit after one).
 
@@ -108,7 +115,7 @@ parity tests. (Prefilter note: `checked` would change, but nothing compares it w
 
 1. **The pending parent index is 16 bits, unchecked** (`pq` slots, 422 `idx - pb`, 426, 465–467 `& 0xFFFF`): a class
    of more than 65,535 parents would alias parent indices (the even slot's write also spills into its odd
-   neighbour). Observed max class __CLSMAX__ (margin __CLSMARGIN__×), so not reachable at base 64; nothing would say so
+   neighbour). Observed max class 17,026 (margin 3.8×), so not reachable at base 64; nothing would say so
    if a later shape or base changed it (the 13-bit injection was loud only because the garbage overflowed the slabs).
    Fix: an error counter when `pe − pb > 65,535` (one compare per cube).
 2. **The top index rides in 20 bits** of the probe word (319, 340, 733): safe only because `Caps::tops` (480,000) <
@@ -124,8 +131,8 @@ parity tests. (Prefilter note: `checked` would change, but nothing compares it w
 5. **`search_field` checks the slice count against itself** (2945 vs 3016: both host loop counters). Make each slice
    report on the device (its `tstat` or a per-slice cube counter) and count those.
 6. **Reported nice numbers are checked to be nice but not to lie in the field** (3010–3014). Cheap to add.
-7. **u32 counters per unit per group** (`cnt`, 64 × 5): observed max per unit per slice: flat __FLATD__, survivors
-   __SURVD__; at group 16 the margin is ~__FLATMARGIN__×. `C_LSLOTS` wraps but is unused. Fine; a group-size cap of
+7. **u32 counters per unit per group** (`cnt`, 64 × 5): observed max per unit per slice: flat 4.65M, survivors
+   282k; at group 16 the margin is ~57×. `C_LSLOTS` wraps but is unused. Fine; a group-size cap of
    ~500 slices would keep it so.
 
 ## 4. What the host's accounts catch, and what they cannot
@@ -193,7 +200,23 @@ flat, survivors, checked equal; `kept` too where the keys agree. One JSON line p
 
 ### The limits (observed over the sweep and the tops scan of 16,384 seeded slices, `tops_scan.jsonl`)
 
-__LIMITS__
+| limit (where) | value | observed max (slice) | margin | past it |
+|---|---|---|---|---|
+| tops per slice, `Caps::tops` (2112) | 480,000 | 250,461 (slice 2; scan of 16,384: 240,907) | 1.9× | loud (2799); `tops2` drops past the cap (1769) |
+| top index in the probe word, 20 bits (319, 340, 733) | 1,048,575 | 250,461 | 4.2× | silent aliasing, but unreachable while `Caps::tops` < 2^20 (§3.2) |
+| probes per job, one instance, `PMAX` (82) | 576 | 619 (slice 2); 612 in the scan | exceeded by 22 of the sweep's slices, 36 of 16,384 | handled: second instance |
+| probes per job, both instances | 1,152 | 619 | 1.86× | loud (`C_ERR_PMAX`, shown) |
+| top popcount, `MAXPOP` (84) | 17 | 17 on every slice | 0, and none needed: 17 is the proven maximum at base 64 (§3.4) | loud (shown with 12); the kernel would over-report, not lose |
+| parents per slice, `Caps::parents` | 2,100,000 | 1,046,138 | 2.0× | loud (2814; `hist2` drops past the cap, 982) |
+| parents per class, u16 pending index (422, 467) | 65,535 | 17,026 | 3.8× | **unchecked**: silent aliasing (§3.1) |
+| parents per sort bucket (`hsort` paths) | 256 / 2,048 | 1,070 | — | correct on every path (the > 2,048 path is O(n²), slow only) |
+| child-list entries per batch, `lcap` (2259) | 142.8M | ~67M (64 × parents) | 2.1× | **unchecked write** (419); only the slice's parents cap is checked (§3.3) |
+| slabs per batch, `nslab_cap` | 164,185 | 64,502 | 2.5× | loud (`C_ERR_SLAB`, 2820; shown) |
+| list entries per batch, `scap` | 25,500,000 | 362,809 (slice 2); 12,101,464 with the prefilter off | 70× (2.1× unfiltered) | loud (2783; shown) |
+| per-unit u32 counters (`cnt`), per group of 16 | 4.29G | flat 4.65M, survivors 282k per unit per slice | 57× (flat) | silent wrap past ~900 slices per group |
+| `pq` words (shared) | 640 | 640 needed by construction ((FILL + NT)/2); probe list ≤ 607 | exact by construction | — |
+| nice numbers per `GpuJoin` life, `NICE_CAP` | 4,096 | 0 | — | loud (2841) |
+| check index sum | mod 2^32 | — | by design (production's) | — |
 
 ## 6. The coordinate layer
 

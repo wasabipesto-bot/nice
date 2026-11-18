@@ -192,6 +192,20 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   thing the channel is for), and tomorrow's cycle starts with re-verifying every submitted empty verdict since
   the audit of 11-15 by exact arithmetic (T2.8's tool) and a host-side guard PR.
 
+- **23:22 UTC: production is exposed on the stride route (EXPERIMENTS SRA.0).** The v3.4.8 client submitted
+  three unsearched fields as empty under a forced allocation failure; the join route caught every case. I read
+  the raw SUBMIT line and the 50 launch panics myself. Today's base-62 fields take the join, so nothing live is
+  exposed; past small-field and stride-route submissions on NVIDIA could be. One ntfy sent at 23:24 as promised,
+  scoped ("no action tonight").
+- **23:25 UTC: fix started** (`SRA/BRIEF.md`, Opus, box 61303619, branch `pr/stride-ran-account`, hard stop
+  02:30): the stride path proves its cubes ran, the detailed path checked for the same gap, a regression test
+  for lavapipe CI, the three reproductions turned into errors on the card. Review before the PR.
+- **For the 05:41 cycle, in this order:** (1) the audit's verdict on the trunk and the review of the stride
+  fix, PR opened; (2) a census of past submissions that took the stride route on the CUDA runtime, and what
+  re-checking them would cost; (3) merge `dev/mo-wide` into the trunk and port the prefilter and top hierarchy
+  to the wide kernels; (4) the accounts the audit asks for; (5) the client route against a local coordinator;
+  (6) a request for 45 minutes on demoux for the library path.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

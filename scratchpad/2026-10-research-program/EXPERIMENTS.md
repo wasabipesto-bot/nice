@@ -5,6 +5,38 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## SRA.0 Production's v3.4.8 client can submit an unsearched field as empty after a CUDA allocation failure, on the stride route only (2026-11-18 22:52–23:30 UTC, engineer; `G2/build2e/ALLOC-FAILURE.md`, `G2/build2e/raw/alloc/` (memory-hog program `hog.cu`, harness `arun.sh`, one directory per run); box 61303619, RTX 3080 20 GB; client 8c267de5 = tag v3.4.8, features `gpu,cubecl-cuda`, local stub only, production hosts blocked and proven)
+
+- **Setup:** a CUDA program holds all but N MiB of the card before the client starts or a few seconds in.
+- **Stride route, false empties** [M]: (1) a base-62 field of 5e12, which production routes to the stride path
+  itself (below the join's 1e13 minimum), with 290 MiB left: two allocations fail, 50 launches do nothing, the
+  client submits `nice_numbers: []` with no error (device wait 0.09 s against 0.64 s; I read the SUBMIT line and
+  the 50 panics in `runs/nat_hog290_qn62/` myself); (2), (3) forced-stride base-64 1e13 fields with 400 and
+  520 MiB left: 78 and 89 launches dropped, both submitted empty. At other memory points the host panics on an
+  unwrapped error and submits nothing.
+- **Join route, caught** [M]: with 800–7,800 MiB left the client warns that kernels finished [0,0,0,0] cubes,
+  shrinks its layout and submits correct counts; with 330 or 450 MiB left it exits with an error and submits
+  nothing; a failure after the buffers exist changes nothing (buffers are reused).
+- **Mechanism in CubeCL 0.10.0** [read, file and line]: the allocation panics at
+  `cubecl-cuda/src/compute/server.rs:124` (`reserve(size).unwrap()`); `cubecl-common/src/device/handle/
+  channel.rs:466, 480` catches it, logs "Task failed" and drops the task, the caller keeping a handle to memory
+  that does not exist; every later launch binding it panics at `cubecl-runtime/src/stream/event.rs:268` →
+  `cubecl-cuda/src/compute/stream.rs:101` and never runs; on CUDA that is never recorded as a stream error, so
+  `sync()` and production's fences return Ok. On wgpu a launch that cannot bind is recorded and the next sync
+  fails with `ServerUnhealthy` (seen on lavapipe; production's client on wgpu under memory pressure not
+  measured).
+- **What catches it:** the join's `ensure_ran` (`cubecl_join.rs:4400` at v3.4.8) compares cubes finished with
+  cubes launched. The stride path's `queue_complete` (`cubecl_backend.rs:3202`) passes at 0 − 0, `wait` (`:3301`)
+  reads only the hit count.
+- **Exposure:** the stride route serves nice-only fields under 1e13 and bases outside 40–64; today's base-62
+  fields are 1e17 and take the join. Nothing in a submission marks a false run. **Whether any past submission
+  was produced this way is not known**; the condition needs the card's memory nearly exhausted at allocation.
+- **Also seen:** with 150–230 MiB left the CUDA context cannot be created and the client switches without an
+  error to wgpu on llvmpipe (CPU): results correct, speed useless (a b64 1e16 field unfinished after 240 s).
+- **Next:** a fix branch `pr/stride-ran-account` (SRA.1, started 23:25 UTC): the stride path proves its cubes
+  ran, as the join does; the detailed path checked for the same gap. A census of which past submissions took
+  the stride route on CUDA goes to the next cycle.
+
 ## MO.3 Masks wider than 64 bits: base 65 exact on a GPU at 3.48 fs per admissible n; base 68 exact on two slices at 2.13 fs (2026-11-18 19:00–22:50 UTC, engineer; `G2/BUILD-BRIEF-2E.md`, `G2/BUILD-NOTES-WIDE.md`, `G2/build2e/raw/`, `G2/build2e/box/`; branch `dev/mo-wide` a8a76315 (4 commits on 7ba982c7, on the fork); box 61303619, RTX 3080 20 GB at a 320 W limit, one session)
 
 - **Design:** a second file `common/src/midout/gpu_wide.rs` (two-word masks, digits by division, 7-bit digit
