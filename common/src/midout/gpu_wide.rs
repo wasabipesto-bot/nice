@@ -19,8 +19,9 @@
 //! - **7-bit digit fields**: a top's digits are 7-bit fields, 4 per word, in
 //!   up to 5 words (20 digits; `maxpop` comptime, the fifth word only when
 //!   `maxpop > 16`);
-//! - **more slice rows**: `b | 1` rows per chunk (65 at b64 and b65, 69 at
-//!   b68/b69, 71 at b70); the digits 64..b are transposed by ballots
+//! - **more slice rows**: 65 rows per chunk up to base 64, `(b + 1) | 1`
+//!   above (67 at b65, 69 at b68, 71 at b69/b70), a zero row for the pad
+//!   digit of an empty top mask; the digits 64..b are transposed by ballots
 //!   (at most 6 per chunk segment) and their common masks taken from them;
 //! - **the padded coordinate**: the range's ends are clipped per top
 //!   (start's and end's low digits), and `h` runs over the leading values;
@@ -113,8 +114,8 @@ const RF_BITS: u32 = 25;
 // ------------------------------------------------------------------------------------------------ device
 mod wk {
     use super::{
-        C_ERR_CLASS, C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB, C_JOBS, C_LSLOTS, NT, PMAX, RF_BITS, SLAB,
-        TDW,
+        C_ERR_CLASS, C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB, C_JOBS, C_LSLOTS, NT, PMAX, RF_BITS,
+        SLAB, TDW,
     };
     use cubecl::prelude::*;
 
@@ -202,9 +203,11 @@ mod wk {
         #[comptime] maxpop: u32,
     ) {
         let m = comptime!(b - 1);
-        // rows per chunk: every digit 0..64 of the transpose has a row (65 below base 65), b | 1 above
-        let srow = comptime!(if b > 64 { b | 1 } else { 65 });
-        let slw = comptime!((if b > 64 { b | 1 } else { 65 }) * 32);
+        // rows per chunk: every digit 0..64 of the transpose has a row, and the pad digit (64 below base 65, b
+        // above) a row of zeros, never common: an odd stride (65 below base 65, (b + 1) | 1 above)
+        let srow = comptime!(if b > 64 { (b + 1) | 1 } else { 65 });
+        let slw = comptime!((if b > 64 { (b + 1) | 1 } else { 65 }) * 32);
+        let pad = comptime!(if b > 64 { b } else { 64 });
         let npl = comptime!(NT / w);
         let segs = comptime!(64 / w);
         let mut pq = SharedMemory::<u32>::new(comptime!(
@@ -217,7 +220,7 @@ mod wk {
         let mut sl = SharedMemory::<u32>::new(comptime!(slw as usize));
         let slt = SharedMemory::<Atomic<u32>>::new(comptime!(
             (if w < 32 {
-                (if b > 64 { b | 1 } else { 65 }) * 32
+                (if b > 64 { (b + 1) | 1 } else { 65 }) * 32
             } else {
                 32
             }) as usize
@@ -270,6 +273,11 @@ mod wk {
         if t < 32u32 {
             comm[t as usize].store(u32::MAX);
             commh[t as usize].store(u32::MAX);
+            // the pad digit's row of every chunk: zeros (no round writes it at W >= 32)
+            sl[(((t / 2u32) * srow + pad) * 2u32 + t % 2u32) as usize] = 0u32;
+        }
+        if t == 32u32 {
+            cmv[pad as usize] = 0u32;
         }
         sync_cube();
         // probes: the compatible top classes of unit d, each probe's digits as 7-bit fields (4 per word)
@@ -404,8 +412,8 @@ mod wk {
                     let mut ml = 0u64;
                     let mut mh = 0u32;
                     if q < nch && mi < ntake {
-                        let pi = pb
-                            + ((pq[(mi >> 1u32) as usize] >> ((mi & 1u32) << 4u32)) & 0xFFFFu32);
+                        let pi =
+                            pb + ((pq[(mi >> 1u32) as usize] >> ((mi & 1u32) << 4u32)) & 0xFFFFu32);
                         let pv = par[pi as usize];
                         let (a, bh) = child_w(
                             u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64),
@@ -440,11 +448,7 @@ mod wk {
                         }
                     }
                     let nv = min(w, ntake - min(ntake, q * 64u32 + sg * w));
-                    let vlo = select(
-                        nv >= 32u32,
-                        0xFFFF_FFFFu32,
-                        (1u32 << min(nv, 31u32)) - 1u32,
-                    );
+                    let vlo = select(nv >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(nv, 31u32)) - 1u32);
                     let vhi = select(
                         nv >= 64u32,
                         0xFFFF_FFFFu32,
@@ -467,7 +471,8 @@ mod wk {
                             } else if comptime!(w == 32) {
                                 eq = hv == vlo;
                             } else {
-                                eq = ((hv >> comptime!((sb * w) % 32)) & comptime!((1u32 << w) - 1))
+                                eq = ((hv >> comptime!((sb * w) % 32))
+                                    & comptime!((1u32 << w) - 1))
                                     == vlo;
                             }
                             let bal = plane_ballot(eq);
@@ -501,7 +506,8 @@ mod wk {
                                 sl[(row + sg) as usize] = hv;
                             } else {
                                 let bit = sg * w;
-                                let piece = (hv >> comptime!((sb * w) % 32)) & comptime!((1u32 << w) - 1);
+                                let piece =
+                                    (hv >> comptime!((sb * w) % 32)) & comptime!((1u32 << w) - 1);
                                 slt[(row + bit / 32u32) as usize].fetch_or(piece << (bit % 32u32));
                             }
                         }
@@ -754,8 +760,8 @@ mod wk {
 /// Preparation, tops, expansion and check for wide masks: everything is
 /// generic in (b, f0, k) and works on base-b digits and base-b² limbs.
 mod wp {
-    use super::{NT, RF_BITS, SLAB, TDW};
     use super::wk::dbit;
+    use super::{NT, RF_BITS, SLAB, TDW};
     use cubecl::prelude::*;
 
     /// `r = x·y` in base-b² limbs (comptime sizes; every column below 2^31).
@@ -1020,7 +1026,12 @@ mod wp {
     /// One cube per bucket: its records by r_f (the low RF_BITS of word 3), by rank for buckets of at most 256, by
     /// a bitonic sort up to 2,048, else by a quadratic rank (never seen).
     #[cube(launch_unchecked)]
-    pub fn wsort_kernel(off: &Array<u32>, hist: &Array<u32>, tmp: &Array<u32>, rec: &mut Array<u32>) {
+    pub fn wsort_kernel(
+        off: &Array<u32>,
+        hist: &Array<u32>,
+        tmp: &Array<u32>,
+        rec: &mut Array<u32>,
+    ) {
         let mut sk = SharedMemory::<u32>::new(2048usize);
         let mut si = SharedMemory::<u32>::new(2048usize);
         let km = comptime!((1u32 << RF_BITS) - 1);
@@ -1248,7 +1259,8 @@ mod wp {
                 #[unroll]
                 for j in 0..f0 {
                     ad[j as usize] = select(p == plo, ends[j as usize], 0u32);
-                    cd[j as usize] = select(p == phi, ends[comptime!(l + j) as usize], comptime!(b - 1));
+                    cd[j as usize] =
+                        select(p == phi, ends[comptime!(l + j) as usize], comptime!(b - 1));
                 }
                 #[unroll]
                 for j in 0..comptime!(k - 1 - f0) {
@@ -1341,7 +1353,10 @@ mod wp {
         tstat: &Array<u32>,
         nbk: u32,
         cap: u32,
+        #[comptime] b: u32,
     ) {
+        // an empty top mask (no certified digit) pads with the pad digit, whose slice row is zero
+        let pad = comptime!(if b > 64 { b } else { 64 });
         let i = ABSOLUTE_POS_X;
         if i < nbk {
             hist[i as usize] = 0u32;
@@ -1352,7 +1367,11 @@ mod wp {
         if i < min(tstat[0usize], cap) {
             let mut x = tmask[i as usize];
             let mut y = tmh[i as usize];
-            let first = select(x != 0u64, x.trailing_zeros(), 64u32 + y.trailing_zeros());
+            let first = select(
+                x != 0u64,
+                x.trailing_zeros(),
+                select(y != 0u32, 64u32 + y.trailing_zeros(), pad),
+            );
             let mut dw = Array::<u32>::new(5usize);
             #[unroll]
             for kk in 0..5u32 {
@@ -1501,6 +1520,7 @@ mod wp {
         nlead: u32,
         hlo: u32,
         pip: u32,
+        clip: &Array<u32>, // plo (lo, hi), phi (lo, hi), start mod b^f0, (end − 1) mod b^f0
         #[comptime] b: u32,
         #[comptime] f0: u32,
         #[comptime] k: u32,
@@ -1510,6 +1530,12 @@ mod wp {
         #[comptime] probe: bool,
     ) {
         let bb = comptime!(b * b);
+        let bw = comptime!(b as u64);
+        let plo = u64::cast_from(clip[0usize]) | (u64::cast_from(clip[1usize]) << 32u64);
+        let phi = u64::cast_from(clip[2usize]) | (u64::cast_from(clip[3usize]) << 32u64);
+        let slo = clip[4usize];
+        let ehi = clip[5usize];
+        let mut nclip = 0u32;
         let na = comptime!((l + 1) / 2);
         let count = min(scount[0usize], scap);
         let mut i = ABSOLUTE_POS_X;
@@ -1522,6 +1548,13 @@ mod wp {
             let ix = thd[ti as usize];
             let d = ix / nlead;
             let h = hlo + ix % nlead;
+            // a top the range's ends clip holds n outside the range: only its prefix p can be plo or phi
+            let mut p = u64::cast_from(h * b + d);
+            #[unroll]
+            for j in 0..comptime!(k - 1 - f0) {
+                p = p * bw + u64::cast_from(pipd[comptime!(k - 2 - f0 - j) as usize]);
+            }
+            let out = (p == plo && rf < slo) || (p == phi && rf > ehi);
             let mut nd = Array::<u32>::new(comptime!(l as usize));
             let mut x = rf;
             #[unroll]
@@ -1564,9 +1597,11 @@ mod wp {
             }
             let uniq = lo.count_ones() + hi.count_ones();
             if comptime!(probe) {
-                pr[i as usize] = uniq;
+                pr[i as usize] = select(out, u32::MAX, uniq);
             }
-            if uniq == b {
+            if out {
+                nclip += 1u32;
+            } else if uniq == b {
                 let pos = nice_count[0usize].fetch_add(1u32);
                 if pos < nice_cap {
                     let o = 4u32 * pos;
@@ -1583,6 +1618,9 @@ mod wp {
         if done > 0u32 {
             ran[0usize].fetch_add(done);
             ran[1usize].fetch_add(isum);
+        }
+        if nclip > 0u32 {
+            ran[2usize].fetch_add(nclip);
         }
     }
 }
@@ -1727,7 +1765,8 @@ impl WideBase {
         let bu = u128::from(self.b);
         let mut n = 0u64;
         for d in 0..bu {
-            let p0 = (u128::from(self.hlo) * bu + d) * bu.pow(self.k - 1 - self.f0) + u128::from(pip);
+            let p0 =
+                (u128::from(self.hlo) * bu + d) * bu.pow(self.k - 1 - self.f0) + u128::from(pip);
             let step = bu.pow(self.k - self.f0);
             let mut cnt = u64::from(self.nlead);
             if p0 < u128::from(self.plo) {
@@ -1843,6 +1882,7 @@ pub struct WideJoin<R: Runtime> {
     rfh: Handle,
     roots_h: Handle,
     ends_h: Handle,
+    clip_h: Handle,
     /// Per batch: (c0, c1, jobs buffer, job instances).
     pub batches: Vec<(u32, u32, Handle, u32)>,
     plast: u32,
@@ -1913,6 +1953,15 @@ impl<R: Runtime> WideJoin<R> {
         let rfh = mk(if rfs.is_empty() { vec![0] } else { rfs });
         let roots_h = mk(wb.roots.clone());
         let ends_h = mk(wb.ends.clone());
+        let bf = u128::from(wb.b).pow(wb.f0);
+        let clip_h = mk(vec![
+            wb.plo as u32,
+            (wb.plo >> 32) as u32,
+            wb.phi as u32,
+            (wb.phi >> 32) as u32,
+            (wb.start % bf) as u32,
+            ((wb.end - 1) % bf) as u32,
+        ]);
         let mut batches = Vec::new();
         let mut c0 = 0;
         while c0 < m {
@@ -1930,8 +1979,9 @@ impl<R: Runtime> WideJoin<R> {
             batches.push((c0, c1, mk(jobs), nj));
             c0 = c1;
         }
-        let share =
-            |x: u32| -> u32 { ((x as u64 * caps.classes as u64).div_ceil(m as u64) as u32).saturating_add(x / 16) };
+        let share = |x: u32| -> u32 {
+            ((x as u64 * caps.classes as u64).div_ceil(m as u64) as u32).saturating_add(x / 16)
+        };
         let scap = share(caps.survivors);
         let jobs_max = caps.ninst * caps.classes * wb.b;
         let nslab_cap = scap / SLAB + jobs_max * (NT / w) + 64;
@@ -1951,6 +2001,7 @@ impl<R: Runtime> WideJoin<R> {
             rfh,
             roots_h,
             ends_h,
+            clip_h,
             batches,
             plast: (caps.ninst - 1) * PMAX,
             nslab_cap,
@@ -2100,6 +2151,7 @@ impl<R: Runtime> WideJoin<R> {
                     a(&tstat, 2),
                     self.nbk,
                     nt as u32,
+                    b,
                 );
             }
             if self.upto(2) {
@@ -2180,7 +2232,7 @@ impl<R: Runtime> WideJoin<R> {
         let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n.max(1)) };
         let slabn = self.mk(vec![0u32]);
         let scount = self.mk(vec![0u32]);
-        let ran = self.mk(vec![0u32; 2]);
+        let ran = self.mk(vec![0u32; 3]);
         let stat = self.mk(vec![0u32; 2]);
         let ns = self.nslab_cap as usize;
         let npd = (wb.k - 1 - wb.f0) as usize;
@@ -2245,13 +2297,21 @@ impl<R: Runtime> WideJoin<R> {
                     a(&ws.pipd, npd),
                     a(&self.nice_out, self.caps.nice as usize * NICE_STRIDE),
                     a(&self.nice_count, 1),
-                    a(&ran, 2),
-                    a(&self.pr, if self.caps.probe { self.scap as usize } else { 1 }),
+                    a(&ran, 3),
+                    a(
+                        &self.pr,
+                        if self.caps.probe {
+                            self.scap as usize
+                        } else {
+                            1
+                        },
+                    ),
                     self.scap,
                     self.caps.nice,
                     wb.nlead,
                     wb.hlo,
                     ws.pip as u32,
+                    a(&self.clip_h, 6),
                     wb.b,
                     wb.f0,
                     wb.k,
@@ -2313,6 +2373,7 @@ impl<R: Runtime> WideJoin<R> {
             v[C_JOBS]
         );
         let mut listed = 0u64;
+        let mut clipped = 0u64;
         for t in tickets {
             let n = self.rd(&t.scount)?[0];
             ensure!(
@@ -2358,13 +2419,16 @@ impl<R: Runtime> WideJoin<R> {
                 self.nslab_cap
             );
             listed += u64::from(n);
-            dc.checked += u64::from(ran[0]);
+            clipped += u64::from(ran[2]);
+            dc.checked += u64::from(ran[0] - ran[2]);
         }
         ensure!(
             listed == dc.survivors,
             "middle-out wide: {listed} survivors listed, the kernel counted {}",
             dc.survivors
         );
+        // survivor bits of a clipped top outside the range are not survivors (the reference's `clipped`)
+        dc.survivors -= clipped;
         Ok(dc)
     }
 
@@ -2434,7 +2498,13 @@ impl<R: Runtime> WideJoin<R> {
         let tm = self.rd(&ws.tmh)?;
         let tmh = self.rd(&ws.tmhh)?;
         let tops: Vec<(u32, u64, u32)> = (0..ntops)
-            .map(|i| (thd[i], u64::from(tm[2 * i]) | u64::from(tm[2 * i + 1]) << 32, tmh[i]))
+            .map(|i| {
+                (
+                    thd[i],
+                    u64::from(tm[2 * i]) | u64::from(tm[2 * i + 1]) << 32,
+                    tmh[i],
+                )
+            })
             .collect();
         let mut tk = Vec::new();
         let mut v = Vec::new();
@@ -2445,7 +2515,11 @@ impl<R: Runtime> WideJoin<R> {
             }
             self.sync()?;
             let n = self.rd(&t.scount)?[0] as usize;
-            ensure!(n <= self.scap as usize, "run_slice: list overflow {n} > {}", self.scap);
+            ensure!(
+                n <= self.scap as usize,
+                "run_slice: list overflow {n} > {}",
+                self.scap
+            );
             let list = self.rd(&self.surv)?;
             let pr = if self.caps.probe {
                 self.rd(&self.pr)?
@@ -2454,7 +2528,17 @@ impl<R: Runtime> WideJoin<R> {
             };
             for i in 0..n {
                 let ix = thd[list[2 * i] as usize];
-                v.push((self.wb.n_of(pip, ix, list[2 * i + 1]), pr[i]));
+                let nn = self.wb.n_of(pip, ix, list[2 * i + 1]);
+                if !self.caps.probe {
+                    v.push((nn, 0));
+                } else if pr[i] != u32::MAX {
+                    v.push((nn, pr[i]));
+                } else {
+                    ensure!(
+                        nn < self.wb.start || nn >= self.wb.end,
+                        "run_slice: {nn} in the range marked clipped"
+                    );
+                }
             }
             tk.push(t);
         }
@@ -2568,7 +2652,16 @@ mod tests {
 
     #[test]
     fn wide_bases_fit_the_layouts() {
-        for (b, f0, k) in [(30, 2, 5), (40, 3, 6), (50, 3, 7), (64, 4, 10), (65, 4, 10), (68, 4, 10), (69, 4, 10), (70, 4, 10)] {
+        for (b, f0, k) in [
+            (30, 2, 5),
+            (40, 3, 6),
+            (50, 3, 7),
+            (64, 4, 10),
+            (65, 4, 10),
+            (68, 4, 10),
+            (69, 4, 10),
+            (70, 4, 10),
+        ] {
             let coord = Coord::with_digits(b, 0, 1, 0).unwrap();
             let wb = WideBase::new(&coord, Shape { f0, k }).unwrap();
             assert_eq!(wb.s2 + wb.s3, b);
@@ -2581,7 +2674,12 @@ mod tests {
                 let mut tested = 0u64;
                 for d in 0..u128::from(b) {
                     let uval = u128::from(pip) + d * base.pw[(k - 1 - f0) as usize];
-                    let _ = crate::midout::cpu::unit_tops::<u128>(&base, Shape { f0, k }, uval, &mut tested);
+                    let _ = crate::midout::cpu::unit_tops::<u128>(
+                        &base,
+                        Shape { f0, k },
+                        uval,
+                        &mut tested,
+                    );
                 }
                 assert_eq!(wb.tested(pip), tested, "b{b} pip {pip}");
                 // n_of inverts the digits
@@ -2627,7 +2725,9 @@ mod tests {
                 (f[0] as u32, f[1] as u32, f[2] as u32, f[3])
             })
             .collect();
-        let classes: Option<u32> = std::env::var("MIDOUT_CLASSES").ok().map(|s| s.parse().unwrap());
+        let classes: Option<u32> = std::env::var("MIDOUT_CLASSES")
+            .ok()
+            .map(|s| s.parse().unwrap());
         macro_rules! go {
             ($client:expr) => {{
                 for &(b, f0, k, pip) in &cases {
@@ -2638,8 +2738,18 @@ mod tests {
                     if let Some(c) = classes {
                         caps.classes = c.min(b - 1);
                     }
+                    if let Some(x) = std::env::var("MIDOUT_NINST").ok() {
+                        caps.ninst = x.parse().unwrap();
+                    }
+                    if let Some(x) = std::env::var("MIDOUT_MAXPOP").ok() {
+                        caps.maxpop = x.parse().unwrap();
+                    }
                     let gj = WideJoin::new($client, caps, &coord, sh).unwrap();
-                    println!("device {} W {} base {b} shape ({f0}, {k}) slice {pip}", ctx.device_name(), gj.w);
+                    println!(
+                        "device {} W {} base {b} shape ({f0}, {k}) slice {pip}",
+                        ctx.device_name(),
+                        gj.w
+                    );
                     let t0 = Instant::now();
                     let rank = gj.rank_of(pip).unwrap();
                     let (dc, mut got, tops) = gj.run_slice(pip, &rank).unwrap();
@@ -2647,7 +2757,10 @@ mod tests {
                     let t1 = Instant::now();
                     let (cn, want) = cpu_slice(&coord, sh, u128::from(pip));
                     println!("slice {pip}: device {dc:?} ({tdev:.1} s)");
-                    println!("slice {pip}: cpu    {cn:?} ({:.1} s)", t1.elapsed().as_secs_f64());
+                    println!(
+                        "slice {pip}: cpu    {cn:?} ({:.1} s)",
+                        t1.elapsed().as_secs_f64()
+                    );
                     assert_eq!(tops.len() as u64, cn.tops, "tops");
                     assert_eq!(gj.wb.tested(pip), cn.tops_tested, "tops tested");
                     got.sort_unstable();
@@ -2655,8 +2768,22 @@ mod tests {
                     assert_eq!(gn.len(), want.len(), "survivor count");
                     assert!(gn == want, "survivor sets differ");
                     assert_eq!(
-                        (dc.children, dc.chunks, dc.flat, dc.kept, dc.survivors, dc.checked),
-                        (cn.children, cn.chunks, cn.flat, cn.kept, cn.survivors, cn.survivors)
+                        (
+                            dc.children,
+                            dc.chunks,
+                            dc.flat,
+                            dc.kept,
+                            dc.survivors,
+                            dc.checked
+                        ),
+                        (
+                            cn.children,
+                            cn.chunks,
+                            cn.flat,
+                            cn.kept,
+                            cn.survivors,
+                            cn.survivors
+                        )
                     );
                     let mut bad = 0;
                     for &(n, u) in &got {
@@ -2664,10 +2791,103 @@ mod tests {
                             bad += 1;
                         }
                     }
-                    assert_eq!(bad, 0, "the check's distinct digits differ on {bad} survivors");
+                    assert_eq!(
+                        bad, 0,
+                        "the check's distinct digits differ on {bad} survivors"
+                    );
                     let nice: Vec<u128> = got.iter().filter(|x| x.1 == b).map(|x| x.0).collect();
                     assert_eq!(gj.nice().unwrap(), nice);
-                    println!("slice {pip}: PASS ({} survivors, {} tops, {} nice)", gn.len(), tops.len(), nice.len());
+                    println!(
+                        "slice {pip}: PASS ({} survivors, {} tops, {} nice)",
+                        gn.len(),
+                        tops.len(),
+                        nice.len()
+                    );
+                }
+            }};
+        }
+        match &ctx {
+            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => go!(client.clone()),
+            #[cfg(feature = "cubecl-cuda")]
+            crate::cubecl_backend::CubeclContext::Cuda { client, .. } => go!(client.clone()),
+            #[allow(unreachable_patterns)]
+            _ => panic!("unsupported runtime"),
+        }
+    }
+
+    /// Whole small bases through the wide device path against brute force:
+    /// every slice of the base on the device; the union of the survivors is
+    /// exactly the set of n passing the shape's predicate (no n twice), and
+    /// the device's check reports exactly the nice numbers (69 at base 10).
+    /// The CPU reference's own brute-force cases, here on the device.
+    #[test]
+    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime)"]
+    fn wide_whole_small_bases_vs_brute_force() {
+        use crate::midout::cpu::q_shape;
+        use std::collections::HashSet;
+        let ctx = device().expect("a device");
+        let classes: Option<u32> = std::env::var("MIDOUT_CLASSES")
+            .ok()
+            .map(|s| s.parse().unwrap());
+        let max_slices: u64 = std::env::var("MIDOUT_MAX_SLICES")
+            .ok()
+            .map_or(u64::MAX, |s| s.parse().unwrap());
+        let cases: &[(u32, &[(u32, u32)])] = &[
+            (10, &[(0, 2)]),
+            (12, &[(1, 3)]),
+            (13, &[(1, 3), (0, 3)]),
+            (14, &[(1, 3)]),
+            (17, &[(1, 3), (1, 4)]),
+            (18, &[(1, 3), (1, 4)]),
+            (19, &[(1, 3), (0, 4)]),
+            (20, &[(2, 4), (1, 4)]),
+            (22, &[(2, 4)]),
+            (24, &[(1, 4), (2, 4)]),
+            (25, &[(2, 5)]),
+        ];
+        macro_rules! go {
+            ($client:expr) => {{
+                for &(b, shapes) in cases {
+                    let coord = Coord::with_digits(b, 0, 1, 0).unwrap();
+                    let base = Base::new(&coord);
+                    let nice_brute: Vec<u128> =
+                        (coord.start..coord.end).filter(|&n| unique_digits(n, b).1).collect();
+                    for &(f0, k) in shapes {
+                        let sh = Shape { f0, k };
+                        let mut caps = WideCaps::for_base(b);
+                        caps.probe = true;
+                        if let Some(c) = classes {
+                            caps.classes = c.min(b - 1);
+                        }
+                        let gj = WideJoin::new($client, caps, &coord, sh).unwrap();
+                        let mut got = HashSet::new();
+                        let mut surv = 0u64;
+                        let npip = u64::from(b).pow(k - 1 - f0);
+                        if npip > max_slices {
+                            println!("b{b} shape ({f0}, {k}): {npip} slices > MIDOUT_MAX_SLICES, skipped");
+                            continue;
+                        }
+                        for pip in 0..npip {
+                            let rank = gj.rank_of(pip).unwrap();
+                            let (dc, v, _) = gj.run_slice(pip, &rank).unwrap();
+                            assert_eq!(dc.survivors, v.len() as u64);
+                            surv += dc.survivors;
+                            for (n, u) in v {
+                                assert!(got.insert(n), "b{b} {sh:?}: n {n} twice");
+                                assert_eq!(unique_digits(n, b).0, u, "b{b}: distinct digits of {n}");
+                            }
+                        }
+                        let want: HashSet<u128> =
+                            (coord.start..coord.end).filter(|&n| q_shape::<u128>(&base, sh, n)).collect();
+                        assert_eq!(got, want, "b{b} shape {sh:?}: survivors differ from brute force");
+                        assert_eq!(surv, want.len() as u64);
+                        assert_eq!(gj.nice().unwrap(), nice_brute, "b{b} shape {sh:?}: nice");
+                        println!(
+                            "b{b} shape ({f0}, {k}): {npip} slices, {} survivors = brute force, nice {:?}: PASS",
+                            want.len(),
+                            nice_brute
+                        );
+                    }
                 }
             }};
         }
@@ -2707,7 +2927,9 @@ mod tests {
         let coord = Coord::with_digits(b, 0, 1, 0).unwrap();
         macro_rules! go {
             ($client:expr) => {{
-                let gj = WideJoin::new($client, WideCaps::for_base(b), &coord, Shape { f0, k }).unwrap();
+                let mut caps = WideCaps::for_base(b);
+                caps.probe = true;
+                let gj = WideJoin::new($client, caps, &coord, Shape { f0, k }).unwrap();
                 let rank = gj.rank_of(pip).unwrap();
                 let (dc, got, tops) = gj.run_slice(pip, &rank).unwrap();
                 println!("staged b{b} slice {pip}: device {dc:?}");
@@ -2733,7 +2955,11 @@ mod tests {
                     assert_eq!(tby[d], tcounts[d], "unit {d} tops");
                     off += 16 * c;
                 }
-                println!("staged b{b} slice {pip}: PASS, {} units, {} survivors", counts.len(), counts.iter().sum::<usize>());
+                println!(
+                    "staged b{b} slice {pip}: PASS, {} units, {} survivors",
+                    counts.len(),
+                    counts.iter().sum::<usize>()
+                );
             }};
         }
         match &ctx {
