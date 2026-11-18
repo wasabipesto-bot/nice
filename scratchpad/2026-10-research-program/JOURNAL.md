@@ -136,6 +136,32 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   ×5.06 hand CUDA; above 64 by exact counts only. Head 1313018a (local, never pushed). Next: base 65 on a
   rented card (v10 or the port widened); then the user's explicit yes before client or server code.
 
+- **≈ 16:30 UTC, the user (four points):** (1) "I'm in favor of building this redesigned join. Do you have a
+  better name for it, for easy reference?" (2) "I appreciate the simplicity of the current field structure and
+  that we aren't pigeonholed into a specific search implementation. I want to ensure that this new field
+  structure won't prevent us from being able to incorporate a significant amount of optimizations (ie that
+  this isn't a hill climb to a local optimum, preventing/delaying us from reaching a true peak elsewhere)."
+  (3) "My expectation is that you would spend a day on the basic implementations then a few more days
+  optimizing it before review and merge. This would allow you to re-architecture the join or field structures
+  before licking in schema changes." (4) asked for the list of open decisions behind "decision 7".
+- **What I take from it:** the build is approved; server and schema work is explicitly last; review and merge
+  come after several days of optimisation; the field structure must stay independent of the join's internals.
+  Working name proposed: the **middle-out join**, unit = **slice**.
+- **Build day one started 16:45 UTC** (`G2/BUILD-BRIEF-1.md`, Opus, hard stop 22:30): branch
+  `dev/middle-out-join` from upstream main, fork only, no PR; a work-unit interface that hides the join's
+  shape; a CPU reference with exact device-independent counters; the GPU path moved into the library with a
+  pipelined field driver; parity on CUDA and lavapipe; one end-to-end number with tops and checks included.
+  Box 61284940 (RTX 3080, m146575, Poland, TTL 14 h to ≈ 06:35 UTC, ≈ $1.9).
+
+- **16:43 UTC: build day one is running** on box 61286074 (m11295, Spain, RTX 3080 at 240 W, 16 threads,
+  31 GB; TTL ≈ 06:40 UTC). Two boxes before it were discarded within minutes: 61284940 (m146575) refused ssh
+  keys, 61285829 (m137673 again: the wrapper's `machine_id!=` filter did not exclude it) had a 150 W cap and
+  7 GB of memory. Rent on m11295 by `--query "machine_id=11295"` while it is free.
+- **My slip:** while waiting for a box I used `ssh justin@demoux 'sleep 10'` five times as a timer at
+  16:38–16:39 UTC, after handing the lease back. Told the user. Waiting is done with a background until-loop.
+- **Upstream:** main is be9cc923 (#265 changelog, #266–#268 around the release: workspace versions for v3.4.8
+  and 3.4.9-dev). The release is v3.4.8, not the "v3.5.8" of the user's earlier message.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);
