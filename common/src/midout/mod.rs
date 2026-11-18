@@ -18,6 +18,8 @@
 pub mod arith;
 pub mod coord;
 pub mod cpu;
+#[cfg(feature = "cubecl")]
+pub mod gpu;
 pub mod mask;
 
 pub use coord::Coord;
