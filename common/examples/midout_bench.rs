@@ -42,7 +42,11 @@ fn main() -> Result<()> {
                             if i >= k {
                                 break;
                             }
-                            let st = slice_tops((fields[0] << 12 | u128::from(i)) as u64, &roots);
+                            let pip = (fields[0] << 12 | u128::from(i)) as u64;
+                            let st = slice_tops(pip, &roots);
+                            if st.maxprobe > nice_common::midout::gpu::PMAX {
+                                println!("slice {pip}: a job of {} probes", st.maxprobe);
+                            }
                             acc.0 += st.tmask.len();
                             acc.1 = acc.1.max(st.maxpop);
                             acc.2 = acc.2.max(st.maxprobe);

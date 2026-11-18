@@ -778,8 +778,11 @@ mod kernels {
             }
         }
         if t == 0u32 && poff == 0u32 {
+            // (midout) a job's second instance repeats its children and chunks: count them once
             cnt[(d * 5u32) as usize].fetch_add(my_children);
             cnt[(d * 5u32 + 1u32) as usize].fetch_add(my_chunks);
+        }
+        if t == 0u32 {
             cnt[(d * 5u32 + 2u32) as usize].fetch_add(my_flat);
             cnt[C_LSLOTS].fetch_add(my_lslots);
         }
@@ -1772,7 +1775,7 @@ pub struct GpuJoin<R: Runtime> {
     r4h: Handle,
     roots_h: Handle,
     /// Per batch: (c0, c1, jobs buffer, jobs).
-    batches: Vec<(u32, u32, Handle, u32)>,
+    pub(crate) batches: Vec<(u32, u32, Handle, u32)>,
     nslab_cap: u32,
     scap: u32,
     lcap: u32,
@@ -1987,7 +1990,12 @@ impl<R: Runtime> GpuJoin<R> {
     ///
     /// # Errors
     /// Device errors or a failed account.
-    pub fn run_slice_dev(&self, pip: u64, rank: &[u32; 8]) -> Result<(DevCounts, Vec<u128>, Vec<(u32, u64)>)> {
+    pub fn run_slice_dev(
+        &self,
+        pip: u64,
+        rank: &[u32; 8],
+        max_batches: usize,
+    ) -> Result<(DevCounts, Vec<u128>, Vec<(u32, u64)>)> {
         let cnt = self.mk(vec![0u32; NCNT]);
         let rankh = self.mk(rank.to_vec());
         let (sb, tstat) = self.queue_dev_prep(pip, &rankh);
@@ -2001,7 +2009,7 @@ impl<R: Runtime> GpuJoin<R> {
         let tops: Vec<(u32, u64)> =
             (0..ntops).map(|i| (thd[i], u64::from(tmw[2 * i]) | u64::from(tmw[2 * i + 1]) << 32)).collect();
         let pip_hi = pip >> 6;
-        for bi in 0..self.batches.len() {
+        for bi in 0..self.batches.len().min(max_batches) {
             let mut t = self.queue_batch(pip, nt, &sb, bi, &cnt);
             if bi == 0 {
                 t.tstat = Some(tstat.clone());
@@ -2530,11 +2538,16 @@ mod tests {
                     let st = slice_tops(pip, gj.roots());
                     let mut want = Vec::new();
                     let cn = slice_join::<u64>(&base, Shape { f0: 4, k: 10 }, u128::from(pip), |_, n| want.push(n));
+                    // a part of the slice (MIDOUT_BATCHES): survivors whose bottom's class is in the batches run
+                    let nb: usize = std::env::var("MIDOUT_BATCHES").ok().map_or(usize::MAX, |s| s.parse().unwrap());
+                    let part = nb < gj.batches.len();
+                    let c_end = if part { gj.batches[nb - 1].1 } else { 63 };
+                    want.retain(|&n| (((n & ((1u128 << 54) - 1)) % 63) as u32) < c_end);
                     want.sort_unstable();
                     let (dc, mut got) = if std::env::var("MIDOUT_HOST_TOPS").is_ok() {
                         gj.run_slice(&st).unwrap()
                     } else {
-                        let (dc, got, mut tops) = gj.run_slice_dev(pip, &st.rank).unwrap();
+                        let (dc, got, mut tops) = gj.run_slice_dev(pip, &st.rank, nb).unwrap();
                         let mut htops: Vec<(u32, u64)> = st.thd.iter().copied().zip(st.tmask.iter().copied()).collect();
                         htops.sort_unstable();
                         tops.sort_unstable();
@@ -2547,10 +2560,15 @@ mod tests {
                     println!("slice {pip}: cpu    {cn:?}");
                     assert_eq!(got.len(), want.len());
                     assert!(got == want, "slice {pip}: survivor sets differ");
-                    assert_eq!(
-                        (dc.children, dc.chunks, dc.flat, dc.survivors, dc.checked),
-                        (cn.children, cn.chunks, cn.flat, cn.survivors, cn.survivors)
-                    );
+                    assert_eq!((dc.survivors, dc.checked), (want.len() as u64, want.len() as u64));
+                    if !part {
+                        assert_eq!(
+                            (dc.children, dc.chunks, dc.flat, dc.survivors, dc.checked),
+                            (cn.children, cn.chunks, cn.flat, cn.survivors, cn.survivors)
+                        );
+                    } else {
+                        println!("slice {pip}: part of the slice, classes [0, {c_end}): {} survivors", want.len());
+                    }
                 }
             }};
         }
