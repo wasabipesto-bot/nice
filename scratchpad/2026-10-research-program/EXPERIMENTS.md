@@ -5,6 +5,50 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## MO.3 Masks wider than 64 bits: base 65 exact on a GPU at 3.48 fs per admissible n; base 68 exact on two slices at 2.13 fs (2026-11-18 19:00–22:50 UTC, engineer; `G2/BUILD-BRIEF-2E.md`, `G2/BUILD-NOTES-WIDE.md`, `G2/build2e/raw/`, `G2/build2e/box/`; branch `dev/mo-wide` a8a76315 (4 commits on 7ba982c7, on the fork); box 61303619, RTX 3080 20 GB at a 320 W limit, one session)
+
+- **Design:** a second file `common/src/midout/gpu_wide.rs` (two-word masks, digits by division, 7-bit digit
+  fields, more slice rows, the padded coordinate, jobs split into up to 12 parts of 576 probes, its own full
+  check: production's check holds digits in one 64-bit mask and refuses bases above 64). `gpu.rs` untouched, so
+  base 64 pays nothing and tonight's trunk merges without conflict. (b, f0, k) are compile-time values, so the
+  wide code also runs at small bases and at base 64 against the references there.
+- **Exact at base 65** [M], on CUDA at 32 lanes and on lavapipe at 8 (SPIR-V): the device equals the u128 CPU
+  reference on 5 real slices including both range ends and the slice where the range start clips a top (survivor
+  sets n for n, every count, the check's distinct-digit count for every survivor); equals the staged prototype
+  slice 717171717 unit by unit; every slice of 17 whole small bases (10–25) equals brute force and the device's
+  own check finds 69 at base 10. Base 64 through the wide path equals day one's counts; 15 whole b64 field runs
+  give the narrow path's survivors. Production's 214 tests pass; fmt and clippy clean.
+- **Numbers** [M, whole fields, end to end, one session, 303–320 W]:
+
+  | run | fs per admissible n | card-years on one RTX 3080 |
+  |---|---|---|
+  | base 64, narrow path | 1.709 | 0.26 |
+  | base 64, wide path forced | 1.772 (+3.7 %) | |
+  | base 65 (5 warm fields) | **3.484** (3.473–3.490) | **0.48** (study: 0.34–0.58) |
+  | base 68 (one warm field) | 2.129 (2.187 cold) | 5.6 (study: 3.5–5.4) |
+
+  Base 65 costs ×2.04 base 64's per admissible n (the study predicted ×2.5); its kept fraction is 0.615, the
+  study's number exactly. Where base 65's time goes: tops 0.69 fs, main kernel 1.70, check with no prefilter
+  0.54, expansion 0.30, parents 0.27. This branch predates tonight's trunk work (prefilter, top hierarchy).
+- **Base 68:** exact on two slices of about 143M survivors each, including the range-start slice. Will not
+  launch on Vulkan yet (the tops grid has 348k cubes in x, over the usual 65,535 limit: needs a 2D grid). Bases
+  69 and 70 have not run; base 70's (4, 11) shape needs a 64-bit slice value.
+- **Defects found and fixed on the way** [M]: (1) tops clipped by the range ends paired with every child, so n
+  just outside the range came out as survivors (base 20: 58,862 below the start 58,945), caught by brute force;
+  (2) a top with no certified digit read one entry past the common-mask table and lost survivors when a launch
+  held enough jobs (base 20 slice 6 lost 10 of 37): cannot happen at base 64 or above, where tops always
+  certify digits; the narrow kernel would write 64 into a 6-bit field there (matters only if it is ever run at
+  small bases).
+- **A soundness finding beyond this branch** [M, `build2e/raw/m2_oom_failed/`]: with another process holding
+  13.8 GB of the card, CubeCL's CUDA server failed an allocation and **every later launch silently did nothing**;
+  the narrow and wide paths then reported whole b64 fields as "survivors 0 = checked 0" and passed their
+  accounts. The wide path now counts job instances that ran and requires the number queued. The trunk's narrow
+  path lacks that account. **Whether production's client can report a false empty field this way was not
+  checked: under test since 22:55 UTC (`G2/build2e/ALLOC-FAILURE.md` when done).**
+- **Conclusion:** the join runs exactly above base 64 on a GPU, at a cost close to the CPU study's prediction.
+  Merging with the trunk needs tonight's `gpu.rs` changes ported by hand to the wide kernels, and a prefilter
+  with a second mask word.
+
 ## MO.2 The cost around the kernel (pieces B, A, C): ×4.02 against main on the RTX 3080; the ×4.4 target missed (2026-11-18 19:05–22:15 UTC, engineer; `G2/BUILD-BRIEF-2A.md`, `G2/BUILD-NOTES.md` §1, §6, §9, `G2/build2a/`; trunk `dev/middle-out-join` 7ba982c7 → 91ac0761 (7 commits, on the fork); box 61286074, RTX 3080 at a 240 W cap, same box session as its main run)
 
 - **The number** [M]: the same ten base-64 fields as MO.1: **1.647 fs** per admissible n (21:31–21:36 UTC)

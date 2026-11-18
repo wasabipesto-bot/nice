@@ -8,29 +8,32 @@ Brief: `G2/BUILD-BRIEF-2E.md` (rules of `BUILD-BRIEF-1.md`). Branch **`dev/mo-wi
 
 ## 1. Where it stands
 
-[HEAD] Nothing outside `common/src/midout/` (new `gpu_wide.rs`; one line in `mod.rs`; one match arm in `coord.rs`:
-bases 68–70 take the padded form), the new example `common/examples/midout_wide_bench.rs` and its `Cargo.toml`
+**2026-11-18 ~22:30 UTC.** Branch head **`a8a76315`** (4 commits on `7ba982c7`), on ivory and on
+`fork/dev/mo-wide`. Nothing outside `common/src/midout/` (new `gpu_wide.rs`; one line in `mod.rs`; one match arm in
+`coord.rs`: bases 68–70 take the padded form), the new example `common/examples/midout_wide_bench.rs` and its `Cargo.toml`
 entry. **`gpu.rs` is untouched.** No server, schema or API change; no route reaches it.
 
 - **Bases 65 and 68 run on a GPU, end to end and exactly**: whole fields of the padded coordinate through
   `midout::gpu_wide::search_field_wide` (tops, parents, main kernel, expansion, full check, all on the card).
-- **Exact at base 65**: the device equals the `u128` CPU reference on 6 real b65 slices, survivor sets n for n and
-  every count (tops, tested prefixes, children, chunks, flat, kept, survivors = checked) and the check's distinct-digit
-  count of every survivor; among them slice 532260419, where the range's start clips a top, and the first and last
-  slices. It equals the **staged prototype slice** 717171717 (`bases/proto`, an independent implementation) unit
+- **Exact at base 65**: the device equals the `u128` CPU reference on 5 real b65 slices (3 of them again on the
+  final code), survivor sets n for n and every count (tops, tested prefixes, children, chunks, flat, kept, survivors
+  = checked) and the check's distinct-digit count of every survivor; among them slice 532260419, where the range's
+  start clips a top, and the first and last slices. It equals the **staged prototype slice** 717171717 (`bases/proto`, an independent implementation) unit
   by unit. On CUDA (W 32) and on lavapipe W 8 (SPIR-V).
 - **The wide code checked where references are strong**: every slice of 17 whole small bases/shapes (10–25) against
   brute force, including 69 at base 10 found by the device's own check; bases 30, 40, 50 slices and base 64 slice
-  712012851 against the CPU reference; 9 whole base-64 fields against the narrow path (survivors equal).
+  712012851 against the CPU reference; 15 whole base-64 field runs (7 distinct fields) against the narrow path
+  (survivors equal field for field).
 - **Base 65: 3.484 fs per admissible n** (5 warm whole fields, 3.473–3.490), base 64 through the narrow path 1.709 in
   the same session: **×2.04**. **0.48 card-years** for the whole of base 65 on one RTX 3080 at this box's 320 W limit.
 - **Width costs base 64 +3.7 %** when forced on (1.772 against 1.709 fs, 5 warm field pairs, 3.6–3.8 % per field;
   +4.6 % in an earlier session on the code before the last fixes). Base 64 keeps its narrow path; nothing pays this.
-- **Base 68: exact on one slice** (143.4M survivors; every count and every survivor's digits equal the reference)
-  and **2.19 fs per admissible n on one whole field**: **5.8 card-years** for base 68 on one card.
+- **Base 68: exact on two slices** (143.4M and 143.1M survivors; every count and every survivor's digits equal the
+  reference) and **2.13 fs per admissible n on a warm whole field** (2.19 on the cold first): **5.6 card-years** for
+  base 68 on one card.
 - **Two exactness defects of the wide path were found by the brute-force test and fixed** (§2): survivors of tops
   the range's ends clip, and empty top masks. Neither touches base 64; neither occurred in the b65 slices tested
-  before the fixes; all exactness and timing results above are on the fixed code except the b68 field number (§5).
+  before the fixes; every exactness and timing result above is on the fixed code.
 
 ## 2. The design for width, and why
 
@@ -86,16 +89,16 @@ batch (4 at base 64: wgpu's 128 MiB binding limit).
 | test | what | CUDA | lavapipe W 8 |
 |---|---|---|---|
 | `wide_bases_fit_the_layouts` | layouts hold b30–70 shapes; tested-prefix count = `cpu::unit_tops`' rule (b30, b40) | pass | — |
-| `wide_whole_small_bases_vs_brute_force` | every slice of whole bases 10, 12, 13, 14, 17, 18, 19, 20, 22, 24, 25 in 17 shapes (every b mod 5 class, odd bases, f0 = 0): survivors = the brute-force predicate, no n twice, each survivor's distinct digits = `unique_digits`, nice = brute force (**69 at base 10, found by the device check**) | pass (17/17) | [LVPB] |
-| `wide_slices_equal_cpu`, small bases | b30 (2,5) 100, b30 (1,5) 5000, b40 (3,6) 1234, b40 (2,6) 7, b50 (4,8) 77777 (22.2M survivors): tops, tested, survivor sets, children, chunks, flat, kept, survivors = checked, every survivor's digits | pass | [LVPS] |
-| same, **base 64 forced wide** | slice 712012851: every count = day one's (children 33,705,647, chunks 528,635, flat 250,486,772, kept 123,163,397, survivors 11,768,560) | pass | [LVP64] |
-| same, **base 65** | 717171717, 532260419 (the range's start clips a top), 0; before the last fixes also 1160290624 (the last slice) and 1. 717171717: tops 1,701,945 of 13,410,973, children 42,191,028, chunks 661,279, flat 270,545,130, kept 166,499,336, survivors 16,482,926 | pass | [LVP65] |
+| `wide_whole_small_bases_vs_brute_force` | every slice of whole bases 10, 12, 13, 14, 17, 18, 19, 20, 22, 24, 25 in 17 shapes (every b mod 5 class, odd bases, f0 = 0): survivors = the brute-force predicate, no n twice, each survivor's distinct digits = `unique_digits`, nice = brute force (**69 at base 10, found by the device check**) | pass (17/17) | pass (16/17: b19 (0, 4), 6,859 slices, skipped for time) |
+| `wide_slices_equal_cpu`, small bases | b30 (2,5) 100, b30 (1,5) 5000, b40 (3,6) 1234, b40 (2,6) 7, b50 (4,8) 77777 (22.2M survivors): tops, tested, survivor sets, children, chunks, flat, kept, survivors = checked, every survivor's digits | pass | pass |
+| same, **base 64 forced wide** | slice 712012851: every count = day one's (children 33,705,647, chunks 528,635, flat 250,486,772, kept 123,163,397, survivors 11,768,560) | pass | pass (4 classes) |
+| same, **base 65** | 717171717, 532260419 (the range's start clips a top), 0; before the last fixes also 1160290624 (the last slice) and 1. 717171717: tops 1,701,945 of 13,410,973, children 42,191,028, chunks 661,279, flat 270,545,130, kept 166,499,336, survivors 16,482,926 | pass | pass (717171717, 532260419) |
 | `wide_slice_vs_staged`, **base 65** | `g2proto dumpsu 65 4 10 717171717` (staged on the box in 9 min): every unit's survivor set and top count | pass | — |
-| same, **base 68** | 123456789: tops 8,100,575 of 89,043,941, children 59,975,022, flat 3,340,314,669, kept 1,776,086,673, **survivors 143,407,016**, every survivor's digits (CPU side 16 min); on the final code also 634515713 (the range's start) | pass (fb6962ea); [B68F] | — |
+| same, **base 68** | 123456789: tops 8,100,575 of 89,043,941, children 59,975,022, flat 3,340,314,669, kept 1,776,086,673, **survivors 143,407,016**, every survivor's digits (CPU side 11 min); on the final code again, and 634515713 (the range's start's slice: 143,058,843 survivors) | pass (`fb6962ea`; both on the final code, `v2/b68_final.log`) | — |
 | whole b64 fields, wide vs narrow | 15 field runs in 3 sessions: survivors equal field for field (e.g. t 13107: 48,211,413,201) | pass | — |
 | whole b65 / b68 fields | every account (kernel errors, jobs ran, list = counted = checked + clipped, index sums, caps) | pass | — |
-| production suite | `cargo test --release -p nice_common --lib` (default features) | [SUITE] | — |
-| lint | `cargo fmt --all --check`; clippy `-D warnings`, `nice_common`, all targets, default and `cubecl-cuda,cubecl-spirv` | [LINT] | — |
+| production suite | `cargo test --release -p nice_common --lib` (default features) | 214 passed, 0 failed, 10 ignored (as on main) | — |
+| lint | `cargo fmt --all --check`; clippy `-D warnings`, `nice_common`, all targets, default and `cubecl-cuda,cubecl-spirv` | clean at `a8a76315` (`build2e/raw/lint2/`; `lint/` is the run that found 3 findings, fixed in `a8a76315`) | — |
 
 **The kept fraction at b65 is 0.615** (166.5M / 270.5M on 717171717): the study's 0.615 exactly.
 
@@ -113,16 +116,17 @@ compilation and the key's first read-back, ~1.5 s).
 | base 64, earlier sessions | `m2/` (code before the last fixes): narrow 1.705, wide 1.784, +4.6 %; `m1/` one cold process per field: +4.4–4.7 % | — | 268–273 W |
 | **base 65** | final session `m4/b65_warm.log`: 5 warm whole fields t = 13731 … 260893 (0.05 … 0.95 of the base) | **3.484** (3.473–3.490) | 303 W, 1,769 MHz |
 | base 65, earlier session | `m1/b65_5f.log` (first code): 3.468 warm, 3.607 cold | — | 301 W |
-| **base 68** | `m3/b68_f1.log`: 1 whole field t = 157216, cold process, code `fb6962ea` | **2.188** (575 s) | 271 W, 1,626 MHz |
+| **base 68** | final code `m5/b68_f2.log`: 2 whole fields in one process, t = 157216 cold, t = 200000 warm | **2.129** warm (560 s), 2.187 cold (575 s) | 275 W, 1,631 MHz |
+| base 68, earlier | `m3/b68_f1.log` (`fb6962ea`): t = 157216 cold, same survivors as the final code (661,500,986,289) | 2.188 | 271 W |
 
 **Base 65 against base 64 on the same box in the same session: ×2.04** per admissible n (3.484 / 1.709). The study
 predicted G2's b65 cost at ×2.5 of its b64 cost and 2.5–3.1–4.2 fs: 3.48 lies inside the band, 12 % above its
 centre (its "≤ 3.1 confirms" line is missed; its "> 4.2" line is not reached). Base 68: the study's band 1.3–1.6–2.1;
-measured 2.19, just above it (one cold field).
+measured 2.13 warm, at its top end.
 
 **Card-years**, measured fs × admissible n of the base on one RTX 3080 at this box's 320 W limit:
 - **base 65: 3.484e-15 s × 4.371e21 = 1.52e7 s = 0.48 card-years** (study 0.34–0.43–0.58);
-- base 68: 2.188e-15 s × 8.31e22 = 1.82e8 s = 5.8 card-years (study 3.5–4.2–5.4).
+- base 68: 2.129e-15 s × 8.31e22 = 1.77e8 s = 5.6 card-years (study 3.5–4.2–5.4).
 
 **Where the time goes at base 65** (cumulative `MIDOUT_STOP` = 1 tops, 2 + parents, 3 + main kernel, 5 + expansion,
 on field 137312, one cold process each, first code; per-slice deltas between stops cancel the ~1.5 s one-time cost;
@@ -138,7 +142,7 @@ on field 137312, one cold process each, first code; per-slice deltas between sto
 | **total** | ≈ 13.1 | 3.5 | 8.1 |
 
 - The main kernel per admissible n rises ×1.34 from b64 (6.37 ms over 3.74e12 admissible n per slice against 5.70
-  over 4.47e12): inside the study's word band (pop 18/17 × up to 1.15).
+  over 4.47e12), less than the study's counts alone (kept words ×1.61 per admissible n, `bases/RESULTS.md` §2).
 - What base 65 adds beyond it is what the study said it would: tops ×7.6 more per admissible n (one root class) and
   more survivors (4.40e-6 against 2.63e-6 per admissible n), here without a prefilter.
 - Width at base 64 (+3.7 %) is not bisected; the candidates are the fifth digit word (maxpop 17 > 16), 7-bit field
@@ -146,11 +150,11 @@ on field 137312, one cold process each, first code; per-slice deltas between sto
 
 ## 5. Base 68
 
-- Exact on slice 123456789 (above), on code `fb6962ea`; [B68F]. Its jobs reach 3.5k–6.3k probes: 12 instances of 576
-  probes ran without a PMAX error on that slice and on the whole field. Every instance re-runs the bottom side.
-- One whole field: 2.188 fs per admissible n, 124 ms per slice, measured on `fb6962ea`. The later fixes change
-  nothing at base 68's rows (69 per chunk before and after) and add one comparison per survivor to the check;
-  not re-timed.
+- Exact on slices 123456789 and 634515713 (the range's start) on the final code (above). Its jobs reach 3.5k–6.3k
+  probes: 12 instances of 576 probes ran without a PMAX error on those slices and on 3 whole fields. Every instance
+  re-runs the bottom side.
+- Two whole fields on the final code: 2.129 fs per admissible n warm (121 ms per slice), 2.187 cold. Not broken
+  down by stage. Per slice it holds 89M prefixes, 8.1M tops, 143M survivors (all checked, no prefilter).
 - **Will not launch on Vulkan**: its tops grid is b·nlead / 256 = 348k cubes in x, legal on CUDA, over the usual
   65,535 of Vulkan (lavapipe, RADV). Needs a 2D grid (§7).
 
@@ -158,12 +162,12 @@ on field 137312, one cold process each, first code; per-slice deltas between sto
 
 - **No lavapipe run at base 68** (grid above) and none at W 16 / W 64 (lavapipe W 16 aborts in day one's kernels;
   no AMD card). The RX 9070 XT has not run the wide path.
-- **Exactness at b65 rests on 6 slices** (every range end included) of 274,625 × 4,225, plus the staged one; at b68
-  on [B68N] slices. Whole fields pass every account but have no independent reference.
+- **Exactness at b65 rests on 5 slices** (both range ends included) of 274,625 × 4,225, plus the staged one; at b68
+  on 2 slices. Whole fields pass every account but have no independent reference.
 - **Bases 69 and 70 have not run.** b69 is b68's code with 193M prefixes per slice (a 3 GB prefix table); b70's study
   shape (4, 11) needs a 64-bit slice value (70^6 > 2^32), refused today.
 - `maxpop` per base (b65 18, b68 19) comes from the study's samples; a top with more digits stops the field with an
-  error (never seen in 16 b65 fields and 1 b68 field); it cannot lose survivors.
+  error (never seen in 12 whole b65 fields and 1 b68 field); it cannot lose survivors.
 - The b65 stage table mixes the stops' cold field with the full run of a warm one (±2 %), on the first code.
 - No baseline above 64 measured (production has no join there). Ratios against "today widened" stay the study's
   projection [D]: against its central 22.9 fs, b65's 3.48 would be ×6.6.
@@ -191,4 +195,15 @@ on field 137312, one cold process each, first code; per-slice deltas between sto
 
 ## 9. Commits (`dev/mo-wide`, on `7ba982c7`)
 
-[COMMITS]
+| commit | what |
+|---|---|
+| `2eddb54d` | the wide device path (`gpu_wide.rs`), the bench example, coordinates for bases 68–70; exact at b30–b65 slices |
+| `fb6962ea` | job-instance account (`C_JOBS`) after the allocation-failure surprise; base-68 capacities |
+| `415d3483` | survivors of clipped tops; zero pad row for empty top masks; whole-small-bases brute-force test |
+| `a8a76315` | clippy (no semantic change) |
+
+The tested binaries were built from the box's tree synced from ivory between commits (scp of the changed files);
+the final tree was then moved by bundle and checked: the box's checkout of `a8a76315` is clean. The CUDA and lavapipe
+verification binaries are of `415d3483`'s source before `cargo fmt`; `a8a76315` differs from it by formatting and
+three clippy rewrites (an `Ok(...?)` and two `if let Ok`), no change of behaviour.
+Not used: `m4_aborted/` (a concurrent build on the box) and `v2_badpath/` (a script picked a `.d` file as the test binary).

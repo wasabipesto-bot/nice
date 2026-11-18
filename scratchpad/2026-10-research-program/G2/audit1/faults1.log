@@ -1,0 +1,59 @@
+warning: constant `F_DROP_PROBE` is never used
+    --> common/src/midout/gpu.rs:2252:18
+     |
+2252 | pub(crate) const F_DROP_PROBE: u32 = 8;
+     |                  ^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `F_IDX13` is never used
+    --> common/src/midout/gpu.rs:2253:18
+     |
+2253 | pub(crate) const F_IDX13: u32 = 16;
+     |                  ^^^^^^^
+
+warning: constant `F_DROP_REC` is never used
+    --> common/src/midout/gpu.rs:2254:18
+     |
+2254 | pub(crate) const F_DROP_REC: u32 = 32;
+     |                  ^^^^^^^^^^
+
+warning: constant `F_POP12` is never used
+    --> common/src/midout/gpu.rs:2255:18
+     |
+2255 | pub(crate) const F_POP12: u32 = 64;
+     |                  ^^^^^^^
+
+warning: constant `F_PF_DROP` is never used
+    --> common/src/midout/gpu.rs:2259:18
+     |
+2259 | pub(crate) const F_PF_DROP: u32 = 1024;
+     |                  ^^^^^^^^^
+
+warning: constant `F_SLABCNT` is never used
+    --> common/src/midout/gpu.rs:2260:18
+     |
+2260 | pub(crate) const F_SLABCNT: u32 = 2048;
+     |                  ^^^^^^^^^
+
+warning: `nice_common` (lib test) generated 6 warnings
+    Finished `release` profile [optimized] target(s) in 0.17s
+     Running unittests src/lib.rs (/root/t/audit/release/build/nice_common/c29ae11497f8b508/out/nice_common-c29ae11497f8b508)
+
+running 1 test
+fault 0: accounts pass: DevCounts { children: 67359822, chunks: 1056477, flat: 500643648, kept: 246352966, survivors: 23525259, checked: 676095, slices: 0, tops: 477670, tested: 811404, slabs_max: 64467, list_max: 338191, flat_d_max: 8573425, surv_d_max: 467392 }
+fault 2: accounts PASS, counts CHANGED: SILENT (survivors 0 vs 23525259, checked 0 vs 676095, children 0 vs 67359822, flat 0 vs 500643648)
+fault 4: LOUD: middle-out kernel errors: plane 0 pmax 10 slab 0
+fault 8: accounts PASS, counts CHANGED: SILENT (survivors 23474847 vs 23525259, checked 674662 vs 676095, children 67359822 vs 67359822, flat 499576178 vs 500643648)
+fault 16: LOUD: middle-out kernel errors: plane 0 pmax 0 slab 758062
+fault 32: LOUD: middle-out: 23525333 survivors read by the prefilter, the kernel counted 23525259
+fault 64: LOUD: middle-out: 238857 tops of more than 17 digits
+fault 128: LOUD: middle-out kernel errors: plane 0 pmax 0 slab 117141
+fault 256: LOUD: middle-out: survivor list overflow 338191 > 100000
+fault 512: LOUD: middle-out: check incomplete: 0 of 338191 entries, index sum 0 (want 1351832297)
+fault 1024: accounts PASS, counts unchanged (survivors 23525259 vs 23525259, checked 676095 vs 676095, children 67359822 vs 67359822, flat 500643648 vs 500643648)
+fault 2048: LOUD: middle-out: 23526056 survivors read by the prefilter, the kernel counted 23525259
+test midout::gpu::audit::audit_faults ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 320 filtered out; finished in 6.23s
+

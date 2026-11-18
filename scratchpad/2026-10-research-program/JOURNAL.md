@@ -180,6 +180,18 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   Reason: 4,500 new lines in seven hours resting on 5 slices of device parity, from a prototype that hid a
   1-in-1,000 overflow for two days. Speed work waits for its verdict.
 
+- **22:50 UTC: the wide-mask engineer is back (EXPERIMENTS MO.3).** Base 65 is exact on a GPU: 3.484 fs per
+  admissible n, 0.48 card-years on one RTX 3080; base 68 exact on two slices at 2.13 fs (5.6 card-years); width
+  costs 3.7 % at base 64, which keeps its narrow path. The user's question of this morning has its GPU number.
+- **A finding that outranks the speed work:** after a CUDA allocation failure CubeCL's server skips every later
+  launch silently, and both middle-out paths reported whole fields as "0 survivors = 0 checked" with passing
+  accounts. All-zero is a legal result, so an account satisfied by zeros proves nothing. **22:55 UTC: the same
+  engineer is testing whether production's v3.4.8 client can submit a false empty field this way** (hard stop
+  00:20; `G2/build2e/ALLOC-FAILURE.md`); the auditor on the other box was told and adds "accounts satisfied by
+  all zeros" as a class. If production is exposed: one ntfy to the user (a live soundness defect is the kind of
+  thing the channel is for), and tomorrow's cycle starts with re-verifying every submitted empty verdict since
+  the audit of 11-15 by exact arithmetic (T2.8's tool) and a host-side guard PR.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

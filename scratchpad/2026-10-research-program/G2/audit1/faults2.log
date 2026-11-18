@@ -1,0 +1,59 @@
+warning: constant `F_DROP_PROBE` is never used
+    --> common/src/midout/gpu.rs:2254:18
+     |
+2254 | pub(crate) const F_DROP_PROBE: u32 = 8;
+     |                  ^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `F_IDX13` is never used
+    --> common/src/midout/gpu.rs:2255:18
+     |
+2255 | pub(crate) const F_IDX13: u32 = 16;
+     |                  ^^^^^^^
+
+warning: constant `F_DROP_REC` is never used
+    --> common/src/midout/gpu.rs:2256:18
+     |
+2256 | pub(crate) const F_DROP_REC: u32 = 32;
+     |                  ^^^^^^^^^^
+
+warning: constant `F_POP12` is never used
+    --> common/src/midout/gpu.rs:2257:18
+     |
+2257 | pub(crate) const F_POP12: u32 = 64;
+     |                  ^^^^^^^
+
+warning: constant `F_PF_DROP` is never used
+    --> common/src/midout/gpu.rs:2261:18
+     |
+2261 | pub(crate) const F_PF_DROP: u32 = 1024;
+     |                  ^^^^^^^^^
+
+warning: constant `F_SLABCNT` is never used
+    --> common/src/midout/gpu.rs:2262:18
+     |
+2262 | pub(crate) const F_SLABCNT: u32 = 2048;
+     |                  ^^^^^^^^^
+
+warning: constant `F_DROP_PARENT` is never used
+    --> common/src/midout/gpu.rs:2264:18
+     |
+2264 | pub(crate) const F_DROP_PARENT: u32 = 8192;
+     |                  ^^^^^^^^^^^^^
+
+warning: `nice_common` (lib test) generated 7 warnings
+    Finished `release` profile [optimized] target(s) in 0.22s
+     Running unittests src/lib.rs (/root/t/auditf/release/build/nice_common/c29ae11497f8b508/out/nice_common-c29ae11497f8b508)
+
+running 1 test
+fault 0: accounts pass: DevCounts { children: 67359822, chunks: 1056477, flat: 500643648, kept: 246352966, survivors: 23525259, checked: 676095, slices: 0, tops: 477670, tested: 811404, slabs_max: 64485, list_max: 338191, flat_d_max: 8573425, surv_d_max: 467392 }
+fault 1024: accounts PASS, counts CHANGED: SILENT (survivors 23525259 vs 23525259, checked 675423 vs 676095, children 67359822 vs 67359822, flat 500643648 vs 500643648)
+fault 4096: accounts PASS, counts CHANGED: SILENT (survivors 0 vs 23525259, checked 0 vs 676095, children 67359822 vs 67359822, flat 0 vs 500643648)
+fault 8192: accounts PASS, counts CHANGED: SILENT (survivors 23501296 vs 23525259, checked 675384 vs 676095, children 67291750 vs 67359822, flat 500138317 vs 500643648)
+fault 2: accounts PASS, counts CHANGED: SILENT (survivors 0 vs 23525259, checked 0 vs 676095, children 0 vs 67359822, flat 0 vs 500643648)
+fault 8: accounts PASS, counts CHANGED: SILENT (survivors 23473677 vs 23525259, checked 674606 vs 676095, children 67359822 vs 67359822, flat 499576178 vs 500643648)
+test midout::gpu::audit::audit_faults ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 320 filtered out; finished in 4.08s
+
