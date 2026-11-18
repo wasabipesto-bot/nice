@@ -1,0 +1,18 @@
+g2 port: --multi LIST, a client-like pipelined run over distinct super-units
+
+- --multi LIST: LIST names super-unit directories (tops.bin + meta.txt; one may repeat). The CPU
+  reference counts of every unit are computed up front in parallel. On the GPU: one exactness
+  cycle (each unit's preparation checked against the host's records, order, class segments and
+  top digits, and its counts against its CPU reference), a warm-up (--warm S), then --cycles C
+  cycles over the units: per unit the host uploads its top masks, top segments and key digits
+  (new buffers: CubeCL 0.10 has no write into an existing one) and queues its preparation and
+  the full kernel with records; one synchronisation per cycle; every other buffer allocated once.
+  Each unit's counters accumulate in its own buffer and must equal (1 + C) x its CPU reference.
+  Reports the host's upload time and bytes per unit.
+- scatter3_kernel: the scatter with the list length read on the device (hist2's count), launched
+  for the list's capacity, so the host needs no parent count per unit.
+
+The prototype's dumptops (dumpsu without bottoms and scalar join) staged the inputs on demoux;
+its tops are byte-identical to the staged su64_712012851 and su64_391856203.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

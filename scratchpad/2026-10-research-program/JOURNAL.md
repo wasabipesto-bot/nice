@@ -125,6 +125,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   distinct real super-units with per-unit input upload and per-unit count checks, since the pipelined number so
   far queues one unit 3,000 times. Lease ends 17:00; cleanup and the user's ping are mine (reminder 16:25).
 
+- **14:58 UTC: the distinct-unit run is back and my own run agrees (EXPERIMENTS G2.11):** 16 distinct real
+  super-units with per-unit upload, D: **×5.14** (mine ×5.17); with inputs resident ×5.48; every unit exact.
+  The gap is the 2 MB upload sitting in the compute queue, not cache warmth.
+- **14:59 UTC: lease handed back after 2 h of 4.** demoux: workspace and watchdog removed, nothing of mine
+  running, production client still stopped (never touched). One ntfy sent. Lesson for leftover checks over
+  that ssh: `ps | grep` matches both the ssh command line and grep's own argv; a bracketed pattern held in a
+  variable avoids both.
+- **Day's state of G2:** RX 9070 XT ×4.73 (pre-registered) / ×5.14–5.48 (pipelined); RTX 3080 ×4.61 portable,
+  ×5.06 hand CUDA; above 64 by exact counts only. Head 1313018a (local, never pushed). Next: base 65 on a
+  rented card (v10 or the port widened); then the user's explicit yes before client or server code.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

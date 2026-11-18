@@ -209,9 +209,19 @@ Brief: `G2/PORT-BRIEF.md`. Benchmark ported: `G2/BENCH.md` (kernel v10, ×5.13 o
   - **Exact:** card W = 64, A and D, both super-units, new prep; lavapipe W = 8 (prep + 128 jobs) on demoux.
   - New options: `--latency N`, `--prep-prof`, `--pipe K` + `--pipe-parts`, `--warm S`, `--warm-mode S`.
   - Commit `1f0754e8`'s message lost its body to a quoting error (not amended); `ef54ed59`'s message carries it.
+- **2026-11-18 14:37–14:56 UTC, distinct super-units (`G2/WINDOW-RESULTS.md` §"Distinct super-units", raw
+  `G2/port/raw/window_1118d/`):** head **`1313018a`** (`--multi LIST`, `scatter3_kernel`, `--no-upload`; bundle
+  re-created, ivory's worktree fast-forwarded). 16 distinct base-64 super-units were staged on demoux with
+  `g2proto dumptops` (a copy in the workspace; source in the raw dir).
+  - **Exact on all 16** in every run: the preparation and the counts against each unit's CPU reference.
+  - **Client-like run, D, per-unit upload through `client.create`, one sync per 16 units: 0.8303 fs, ×5.14.**
+  - Inputs resident: 0.7739 fs, ×5.48, the same as the same-unit pipe's 0.7717 fs. So cache warmth is nil, and the
+    1.94 MB upload, serialised in the queue, costs +0.27 ms per super-unit. A client should upload on a transfer queue
+    or into a double buffer.
 - **Next, in order:**
   1. The proposal's go (×4.0 passed): the client against option A's wire format, with D's form and the pipelined
-     launch pattern (queue super-units, sync rarely, buffers reused).
+     launch pattern (queue super-units, sync rarely, buffers reused, uploads off the compute queue's critical path:
+     ×5.14 with CubeCL's create in-queue, ×5.48 hidden).
   2. Records are DRAM-write-bound (175 MB per super-unit, 0.32 ms): an 8-byte record would save ≈ 0.15 ms
      (≈ +4 % ratio) but changes what the survivor checks read.
   3. The root pass (≈ 0.19 ms at the operating point): the next largest prep item.

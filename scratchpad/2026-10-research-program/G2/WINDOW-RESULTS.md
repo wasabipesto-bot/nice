@@ -144,3 +144,65 @@ in the note under the table.
 - The pre-registered protocol is still short bursts (8 busy samples per run); its ratio is reported as the rule
   requires, beside the warm and the pipelined ones.
 - Second super-unit timed only in the short pipelined check (`x_Dpipe_su2`: 3.435 ms, same as the first).
+
+## Distinct super-units (demoux, 2026-11-18 14:37–14:56 UTC)
+
+Follow-up task from the director. Raw logs in `G2/port/raw/window_1118d/` (`an_b_d.txt` is the table,
+`per_unit_checks.txt` has the per-unit checks, `meta/` has the 16 units' meta files; no staged data went to ivory).
+Code: `51a386f` (`--multi LIST`, `scatter3_kernel`) and `1313018a` (`--no-upload`), bundle re-created, ivory's
+worktree fast-forwarded. The binaries were `g2m` (`08fb75ce`) and `g2n` (`612ada0a`, the same plus `--no-upload`).
+The same-unit pipe used `g2z` (`8801a739`), as before.
+
+**Staging [M].** I added `g2proto dumptops b f0 k pip dir` to a copy of `G2/bases/proto` in the workspace. It is
+dumpsu without the bottoms and the scalar join; the source is in `scripts/g2proto_main_with_dumptops.rs`. It takes
+2.5 s per super-unit. Its tops are byte-identical to the staged `su64_712012851` and `su64_391856203`.
+- **N = 16 distinct base-64 super-units:** the two staged ones plus 14 π′ drawn with distinct digits, one per leading
+  digit band 2, 7, 11, …, 61 of π′ (seed 20261118).
+- Every unit has 238,347–239,698 tops and 1,040,227–1,044,431 parents. Survivors per unit range over
+  11,742,386–11,806,353.
+- **Per-unit CPU reference counts** come from the binary's own CPU reference (`cpu_job`), the same reference every
+  earlier run checked against. They are not the prototype's survivor sets, which were not dumped. Only the two staged
+  units also have prototype-verified sets (earlier runs).
+
+**The client-like run (`--multi`).**
+- One exactness cycle: per unit, its GPU preparation is checked against the host's (records, order, class segments,
+  top digits, list count), then its counts are read back and checked against its CPU reference.
+- A 5 s warm-up.
+- 360 timed cycles over the 16 units, 5,760 super-units in all. For each unit the host uploads its input: top masks,
+  top segments and key digits, 1.94 MB, as new buffers through `client.create`, because CubeCL 0.10 has no write into
+  an existing buffer. It then queues the unit's preparation and the full kernel with records.
+- One synchronisation per cycle, i.e. per 16 units. Every other buffer is allocated once.
+- The scatter reads the list length on the device, so the host never needs a unit's parent count.
+- Each unit's counters accumulate in its own buffer and are checked at the end against (1 + 360) × its CPU reference.
+
+**Exactness [M]: every unit equal, in every run.** 9 multi runs × 16 units: the preparation is equal in all 144
+exactness checks and the counts in all 144 single-pass checks. Every cumulative (1 + C) × check is equal. Kernel
+error counters are 0.
+
+| run (D unless marked) | units | per-unit upload | ms per super-unit | fs/adm | ratio (4.707 + 0.085) | clock, power (busy; ≥ 270 W) |
+|---|---|---|---|---|---|---|
+| **`mu16` r1 / r2 / r3** | **16 distinct** | **yes** | 3.710 / 3.705 / 3.738 | **0.8303** (median; 0.8294–0.8367) | **×5.14** | 2,899–2,916 MHz, 303 W (52; 49–50) |
+| `mu1x16` r1 / r2 | 712012851 × 16 | yes | 3.699 / 3.704 | 0.8285 | ×5.15 | 2,901–2,902 MHz, 303 W (50–52; 49–50) |
+| `nu16` r1 / r2 | 16 distinct | no (resident) | 3.453 / 3.463 | 0.7739 | ×5.48 | 2,847–2,858 MHz, 303–304 W (49; 47–48) |
+| `nu1x16` r1 | 712012851 × 16 | no | 3.463 | 0.7752 | ×5.47 | 2,849 MHz, 304 W (49; 49) |
+| `pp` r1 / r2 (same-unit pipe, as before, K = 6,000) | 712012851 | no | 3.447 / 3.449 | 0.7717 | ×5.49 | 2,843–2,845 MHz, 304 W (60–61; 57) |
+| `mu16` A | 16 distinct | yes | 3.863 | 0.8647 | ×4.96 | 2,924 MHz, 303 W (54; 51) |
+
+Main field 6, in the same stretch: 100.44 s at 3,135 MHz and 304 W. Today's earlier runs were 100.41, 100.31,
+102.17 and 101.44 s, so the base mean stays at 4.707.
+
+- **Distinct units cost the same as one unit repeated.** With inputs resident, 16 distinct units run at 0.7739 fs
+  against 0.7717 fs for the same-unit pipe, +0.3 %. With uploads, distinct and repeated units give the same number.
+  Cache warmth is not a factor.
+- **The per-unit upload is what costs: +0.26–0.29 ms per super-unit (+7 %), ×5.49 → ×5.14.**
+  - The host spends 0.62–0.73 ms per unit in `client.create` for 1.94 MB, and 0.75–0.83 ms per unit in all its
+    queueing, against 3.7 ms of GPU time. So the host keeps up, and the cost is on the device side.
+  - The copy goes through wgpu's staging write in the same queue, ahead of the unit's kernels, so it does not overlap
+    compute. The card idles slightly: its clock rises from about 2,850 to 2,900–2,920 MHz at the same 303 W.
+  - 1.94 MB in 0.27 ms is about 7 GB/s, far below the PCIe link.
+- **Which number a client would see:** ×5.14 for a CubeCL client written this way (create per unit, one queue).
+  About ×5.48 for a client that hides the upload: a separate transfer queue or a mapped double buffer, which CubeCL
+  0.10 does not expose. The difference is one engineering item for the client, not a property of the kernel.
+- A is ×4.96 on distinct units with uploads, 0.034 fs behind D, as on the single unit.
+- Not shown: survivor *sets* on the 14 new units (counts only, as asked); `--multi` with `--tdig 0` / other plane
+  widths (D and A at W = 64 only).

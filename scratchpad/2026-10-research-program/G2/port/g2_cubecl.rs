@@ -861,6 +861,22 @@ mod prep {
         }
     }
 
+    /// --multi (2026-11-18): scatter2 with the list's length read on the device (`lcnt`, written by hist2), launched
+    /// for the list's capacity, as a client that does not know a super-unit's parent count on the host would.
+    #[cube(launch_unchecked)]
+    pub fn scatter3_kernel(lst: &Array<Vector<u32, Const<4>>>, lkey: &Array<u32>, lcnt: &Array<u32>, cur: &mut Array<Atomic<u32>>, tmp: &mut Array<u32>) {
+        let i = ABSOLUTE_POS_X;
+        if i < lcnt[0usize] {
+            let key = lkey[i as usize];
+            let slot = cur[key as usize].fetch_add(1u32);
+            let v = lst[i as usize];
+            tmp[(4u32 * slot) as usize] = v[0usize];
+            tmp[(4u32 * slot + 1u32) as usize] = v[1usize];
+            tmp[(4u32 * slot + 2u32) as usize] = v[2usize];
+            tmp[(4u32 * slot + 3u32) as usize] = v[3usize];
+        }
+    }
+
     #[cube(launch_unchecked)]
     pub fn scatter2_kernel(lst: &Array<Vector<u32, Const<4>>>, lkey: &Array<u32>, cur: &mut Array<Atomic<u32>>, tmp: &mut Array<u32>, n: u32) {
         let i = ABSOLUTE_POS_X;
@@ -1689,6 +1705,9 @@ fn main() -> Result<()> {
     let reps: usize = opt("--reps").map_or(Ok(1), |s| s.parse())?;
     let modes: Vec<u32> = opt("--modes").unwrap_or_else(|| "0,1,2".into()).split(',').map(|s| s.parse().unwrap()).collect();
     let noout = args.iter().any(|a| a == "--noout");
+    if let Some(list) = opt("--multi") {
+        return main_multi(&args, &list);
+    }
     let t0 = Instant::now();
     let inp = load(dir)?;
     println!(
@@ -2697,6 +2716,305 @@ fn run_gpu<R: Runtime>(
     }
     println!("{}", if all_ok { "ALL CHECKS PASSED" } else { "SOME CHECK FAILED" });
     if !all_ok {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+
+// ------------------------------------------------------------------------------------------------ --multi
+/// --multi LIST (2026-11-18, demoux): the closest thing to a client this prototype allows. LIST names super-unit
+/// directories (tops.bin + meta.txt; a directory may repeat). Every unit's CPU reference counts are computed up front
+/// (in parallel). On the GPU: one exactness cycle (each unit's preparation checked against the host's records, class
+/// segments and top digits; each unit's counts read back and checked), a warm-up (--warm S), then --cycles C cycles
+/// over the units: per unit the host uploads its input (top masks, top segments, key digits: new buffers, as CubeCL
+/// has no write into an existing one) and queues its preparation and the full kernel with records; one
+/// synchronisation per cycle (per N units); every other buffer allocated once and reused. Each unit's counters
+/// accumulate in its own buffer and must equal (1 + C) x its CPU reference at the end; error counters 0.
+fn main_multi(args: &[String], list: &str) -> Result<()> {
+    let dirs: Vec<String> = std::fs::read_to_string(list)?.split_whitespace().map(String::from).collect();
+    if dirs.is_empty() {
+        bail!("--multi: empty list");
+    }
+    let t0 = Instant::now();
+    let jobs: Vec<(u32, u32)> = (0..63).flat_map(|c| (0..64).map(move |d| (c, d))).collect();
+    let jr = &jobs;
+    let res: Vec<Result<(Input, Counts)>> = std::thread::scope(|sc| {
+        let hs: Vec<_> = dirs
+            .iter()
+            .map(|d| {
+                sc.spawn(move || -> Result<(Input, Counts)> {
+                    let inp = load(d)?;
+                    let mut c = Counts::default();
+                    let mut scratch = Vec::new();
+                    for &(cc, dd) in jr {
+                        cpu_job(&inp, cc, dd, &mut c, &mut scratch);
+                        scratch.clear();
+                    }
+                    Ok((inp, c))
+                })
+            })
+            .collect();
+        hs.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+    let mut us = Vec::new();
+    let mut crefs = Vec::new();
+    for (r, d) in res.into_iter().zip(&dirs) {
+        let (u, c) = r.map_err(|e| anyhow!("{d}: {e}"))?;
+        println!("UNIT {} pip {} tops {} parents {} key digits {:?} CPU ref {:?}", us.len(), u.pip, u.ts.len(), u.par.len(), u.rank, c);
+        us.push(u);
+        crefs.push(c);
+    }
+    println!("loaded {} super-units and their CPU references in {:.1} s", us.len(), t0.elapsed().as_secs_f64());
+    let ctx = CubeclContext::new_default()?;
+    let name = ctx.device_name();
+    match ctx {
+        CubeclContext::Wgpu { client, .. } => run_multi(client, name, &us, &crefs, args),
+        #[allow(unreachable_patterns)]
+        _ => bail!("--multi: wgpu only"),
+    }
+}
+
+fn run_multi<R: Runtime>(client: ComputeClient<R>, name: String, us: &[Input], crefs: &[Counts], args: &[String]) -> Result<()> {
+    let opt = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
+    let w = client.properties().hardware.plane_size_max;
+    let fill: u32 = if w < 32 { 512 } else { FILL };
+    let xpose: u32 = opt("--xpose").map_or(Ok(1), |s| s.parse())?;
+    let ept: u32 = opt("--ept").map_or(Ok(2), |s| s.parse())?;
+    let ranks: u32 = 1;
+    let cmask: u32 = 1;
+    let cut: u32 = 0;
+    let tdg: u32 = opt("--tdig").map_or(Ok(0), |s| s.parse())?;
+    let cycles: usize = opt("--cycles").map_or(Ok(100), |s| s.parse())?;
+    let warm: f64 = opt("--warm").map_or(Ok(0.0), |s| s.parse())?;
+    // --no-upload: each unit's input uploaded once (in the exactness cycle) and its buffers reused in every cycle, to
+    // separate the cost of the per-unit uploads from the rest of the multi path
+    let no_upload = args.iter().any(|a| a == "--no-upload");
+    println!("device: {name}; W {w}; fill {fill}; xpose {xpose} ept {ept} tdig {tdg}; {} units, {cycles} cycles{}", us.len(), if no_upload { "; inputs uploaded once (--no-upload)" } else { "" });
+    if ![8u32, 16, 32, 64].contains(&w) {
+        bail!("plane width {w} not supported");
+    }
+    let mk = |v: Vec<u32>| client.create(cubecl::bytes::Bytes::from_elems(v));
+    let sync = || cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"));
+    let rd = |h: &cubecl::server::Handle| -> Result<Vec<u32>> { Ok(u32::from_bytes(&client.read_one(h.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec()) };
+    let n = us.len();
+    // constant and capacity buffers, allocated once
+    let jobs_h = mk((0..63u32).flat_map(|c| (0..64u32).flat_map(move |d| [c, d])).collect());
+    let r4s: Vec<u32> = (0..(1u32 << 24)).filter(|&r| root_mask(r as u64) != 0).collect();
+    let nroots = r4s.len() as u32;
+    let r4h = mk(r4s);
+    let roots = mk(ROOTS.to_vec());
+    let npmax = us.iter().map(|u| u.par.len()).max().unwrap();
+    let ntmax = us.iter().map(|u| u.ts.len()).max().unwrap();
+    let nslab_cap = crefs.iter().map(|c| (c.surv as usize / SLAB as usize) + 4032 * (NT / w) as usize + 64).max().unwrap() as u32;
+    let out = client.empty(nslab_cap as usize * SLAB as usize * 16);
+    let slabcnt = client.empty(nslab_cap as usize * 4);
+    let slabz = mk(vec![0u32; 1]);
+    let g_tmp = client.empty(npmax * 16);
+    let g_lst = client.empty(npmax * 16);
+    let g_lkey = client.empty(npmax * 4);
+    let g_rec = client.empty(npmax * 16);
+    let g_tdig = client.empty(ntmax * 16);
+    let histh = mk(vec![0u32; 16128]);
+    let lcnt = mk(vec![0u32; 1]);
+    let off = client.empty(16128 * 4);
+    let curh = client.empty(16128 * 4);
+    let g_pseg = client.empty(64 * 4);
+    let cnts: Vec<_> = (0..n).map(|_| mk(vec![0u32; NCNT])).collect();
+    let junk = mk(vec![0u32; NCNT]);
+    // what a client holds on the host per unit: the top masks (sorted as the kernel wants them), the top segments,
+    // the key digits; uploaded per unit per cycle
+    let tm_host: Vec<Vec<u64>> = us.iter().map(|u| u.ts.iter().map(|t| t.mask).collect()).collect();
+    let upload_ns = std::cell::Cell::new(0f64);
+    let upload_bytes = std::cell::Cell::new(0usize);
+    let upload = |j: usize| -> [cubecl::server::Handle; 3] {
+        let t = Instant::now();
+        let tm = &tm_host[j];
+        let b = unsafe { std::slice::from_raw_parts(tm.as_ptr() as *const u8, tm.len() * 8) };
+        let tsg = &us[j].tseg;
+        let b2 = unsafe { std::slice::from_raw_parts(tsg.as_ptr() as *const u8, tsg.len() * 4) };
+        let rk = &us[j].rank;
+        let b3 = unsafe { std::slice::from_raw_parts(rk.as_ptr() as *const u8, 32) };
+        let h = [client.create_from_slice(b), client.create_from_slice(b2), client.create_from_slice(b3)];
+        upload_ns.set(upload_ns.get() + t.elapsed().as_secs_f64());
+        upload_bytes.set(upload_bytes.get() + b.len() + b2.len() + b3.len());
+        h
+    };
+    // one unit: preparation (5 launches) + the full kernel with records into `cnt`; `stop_after_prep` for the check
+    let prep = |j: usize, inh: &[cubecl::server::Handle; 3]| unsafe {
+        let u = &us[j];
+        let ntops = u.ts.len();
+        prep::tdigz_kernel::launch_unchecked::<R>(
+            &client, CubeCount::Static((ntops as u32).max(16128).div_ceil(NT), 1, 1), CubeDim::new_1d(NT),
+            ArrayArg::from_raw_parts(inh[0].clone(), ntops), ArrayArg::from_raw_parts(g_tdig.clone(), ntops * 4),
+            ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(lcnt.clone(), 1),
+            ArrayArg::from_raw_parts(slabz.clone(), 1), ntops as u32,
+        );
+        prep::hist2_kernel::launch_unchecked::<R>(
+            &client, CubeCount::Static(nroots.div_ceil(NT), 1, 1), CubeDim::new_1d(NT),
+            ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(inh[2].clone(), 8),
+            ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(g_lst.clone(), npmax),
+            ArrayArg::from_raw_parts(g_lkey.clone(), npmax), ArrayArg::from_raw_parts(lcnt.clone(), 1),
+            nroots, u.pip as u32, (u.pip >> 32) as u32, npmax as u32, w,
+        );
+        prep::scan16_kernel::launch_unchecked::<R>(
+            &client, CubeCount::Static(1, 1, 1), CubeDim::new_1d(1024),
+            ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(off.clone(), 16128),
+            ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_pseg.clone(), 64),
+        );
+        prep::scatter3_kernel::launch_unchecked::<R>(
+            &client, CubeCount::Static((npmax as u32).div_ceil(NT), 1, 1), CubeDim::new_1d(NT),
+            ArrayArg::from_raw_parts(g_lst.clone(), npmax), ArrayArg::from_raw_parts(g_lkey.clone(), npmax),
+            ArrayArg::from_raw_parts(lcnt.clone(), 1), ArrayArg::from_raw_parts(curh.clone(), 16128),
+            ArrayArg::from_raw_parts(g_tmp.clone(), npmax * 4),
+        );
+        prep::hsort_kernel::launch_unchecked::<R>(
+            &client, CubeCount::Static(16128, 1, 1), CubeDim::new_1d(256),
+            ArrayArg::from_raw_parts(off.clone(), 16128), ArrayArg::from_raw_parts(histh.clone(), 16128),
+            ArrayArg::from_raw_parts(g_tmp.clone(), npmax * 4), ArrayArg::from_raw_parts(g_rec.clone(), npmax * 4),
+        );
+    };
+    let kern = |j: usize, inh: &[cubecl::server::Handle; 3], cnt: &cubecl::server::Handle| unsafe {
+        let u = &us[j];
+        kernels::g2_kernel::launch_unchecked::<R>(
+            &client,
+            CubeCount::Static(4032, 1, 1),
+            CubeDim::new_1d(NT),
+            ArrayArg::from_raw_parts(g_rec.clone(), npmax),
+            ArrayArg::from_raw_parts(g_pseg.clone(), 64),
+            ArrayArg::from_raw_parts(inh[0].clone(), u.ts.len()),
+            ArrayArg::from_raw_parts(g_tdig.clone(), u.ts.len() * 4),
+            ArrayArg::from_raw_parts(inh[1].clone(), u.tseg.len()),
+            ArrayArg::from_raw_parts(roots.clone(), NROOT),
+            ArrayArg::from_raw_parts(jobs_h.clone(), 2 * 4032),
+            ArrayArg::from_raw_parts(cnt.clone(), NCNT),
+            ArrayArg::from_raw_parts(out.clone(), nslab_cap as usize * SLAB as usize),
+            ArrayArg::from_raw_parts(slabz.clone(), 1),
+            ArrayArg::from_raw_parts(slabcnt.clone(), nslab_cap as usize),
+            nslab_cap,
+            2u32,
+            false,
+            w,
+            fill,
+            xpose,
+            ept,
+            ranks,
+            cut,
+            cmask,
+            tdg,
+        );
+    };
+    let sums = |v: &[u32]| -> Counts {
+        let mut c = Counts::default();
+        for d in 0..64 {
+            c.children += v[d * 5] as u64;
+            c.chunks += v[d * 5 + 1] as u64;
+            c.flat += v[d * 5 + 2] as u64;
+            c.kept += v[d * 5 + 3] as u64;
+            c.surv += v[d * 5 + 4] as u64;
+        }
+        c
+    };
+    let errs = |v: &[u32]| v[C_ERR_PLANE] as u64 + v[C_ERR_PMAX] as u64 + v[C_ERR_SLAB] as u64;
+    // ---- exactness cycle: per unit, the preparation checked against the host's, then the kernel; counts per unit
+    let mut all_ok = true;
+    let mut kept_inputs = Vec::new();
+    for j in 0..n {
+        let u = &us[j];
+        let inh = upload(j);
+        if no_upload {
+            kept_inputs.push(inh.clone());
+        }
+        prep(j, &inh);
+        sync()?;
+        let rec_host: Vec<u32> = u.par.iter().flat_map(|p| [p.mask as u32, (p.mask >> 32) as u32, p.cacc, (p.r - (u.pip << 24)) as u32]).collect();
+        let gr = rd(&g_rec)?;
+        let gp = rd(&g_pseg)?;
+        let gd = rd(&g_tdig)?;
+        let nl = rd(&lcnt)?[0] as usize;
+        let pok = nl == u.par.len() && gr[..rec_host.len()] == rec_host[..] && gp == u.pseg && gd[..u.ts.len() * 4] == top_digits(u)[..];
+        kern(j, &inh, &cnts[j]);
+        sync()?;
+        let v = rd(&cnts[j])?;
+        let c = sums(&v);
+        let cok = c == crefs[j] && errs(&v) == 0;
+        println!(
+            "CHECK unit {j} pip {}: prep (records, order, class segments, top digits, list {nl}) {}; counts {:?} {} the CPU reference{}",
+            u.pip,
+            if pok { "EQUAL" } else { "DIFFER" },
+            c,
+            if cok { "EQUAL to" } else { "DIFFER from" },
+            if errs(&v) != 0 { format!(" (kernel errors {})", errs(&v)) } else { String::new() }
+        );
+        all_ok &= pok && cok;
+    }
+    if !all_ok {
+        println!("EXACTNESS FAILED on some unit: no timing");
+        println!("SOME CHECK FAILED");
+        std::process::exit(1);
+    }
+    // ---- warm-up (untimed, counts discarded), one sync per cycle
+    let tw = Instant::now();
+    let mut nw = 0usize;
+    while tw.elapsed().as_secs_f64() < warm {
+        for j in 0..n {
+            let inh = if no_upload { kept_inputs[j].clone() } else { upload(j) };
+            prep(j, &inh);
+            kern(j, &inh, &junk);
+        }
+        sync()?;
+        nw += n;
+    }
+    // ---- timed: C cycles over the N units, one sync per cycle
+    upload_ns.set(0.0);
+    upload_bytes.set(0);
+    let mut host_queue = 0f64;
+    sync()?;
+    let t = Instant::now();
+    for _ in 0..cycles {
+        let tq = Instant::now();
+        for j in 0..n {
+            let inh = if no_upload { kept_inputs[j].clone() } else { upload(j) };
+            prep(j, &inh);
+            kern(j, &inh, &cnts[j]);
+        }
+        host_queue += tq.elapsed().as_secs_f64();
+        sync()?;
+    }
+    let el = t.elapsed().as_secs_f64();
+    let nu = (cycles * n) as f64;
+    let mut k_ok = true;
+    let mut bad = Vec::new();
+    for j in 0..n {
+        let v = rd(&cnts[j])?;
+        let c = sums(&v);
+        let k = 1 + cycles as u64;
+        let want = Counts { children: crefs[j].children * k, chunks: crefs[j].chunks * k, flat: crefs[j].flat * k, kept: crefs[j].kept * k, surv: crefs[j].surv * k };
+        // (u32 per-unit-and-digit counters: the check is meaningful while (1 + C) x a counter < 2^32)
+        if c != want || errs(&v) != 0 {
+            k_ok = false;
+            bad.push((j, c, want, errs(&v)));
+        }
+    }
+    let adm = us.iter().map(|u| u.adm).sum::<f64>() / n as f64;
+    let per = el / nu;
+    println!(
+        "MULTI {n} units x {cycles} cycles = {} super-units, one sync per cycle (warm-up {nw} units in {:.1} s): wall {:.2} s, {:.3} ms per super-unit = {:.4} fs per admissible n; host upload {:.1} µs per unit ({:.2} MB per unit), host queueing incl. upload {:.1} µs per unit; per-unit counts after 1 + {cycles} passes {}",
+        nu as usize,
+        tw.elapsed().as_secs_f64() - el,
+        el,
+        per * 1e3,
+        per / adm * 1e15,
+        upload_ns.get() / nu * 1e6,
+        upload_bytes.get() as f64 / nu / 1e6,
+        host_queue / nu * 1e6,
+        if k_ok { "ALL EQUAL to (1 + C) x each unit's CPU reference" } else { "DIFFER" }
+    );
+    for (j, c, want, e) in &bad {
+        println!("  DIFFER unit {j} pip {}: got {c:?} want {want:?} errors {e}", us[*j].pip);
+    }
+    println!("{}", if k_ok { "ALL CHECKS PASSED" } else { "SOME CHECK FAILED" });
+    if !k_ok {
         std::process::exit(1);
     }
     Ok(())

@@ -5,6 +5,38 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## G2.11 Pipelined over 16 distinct super-units with per-unit upload: ×5.14; the 7 % against the same-unit number is the upload in the compute queue (2026-11-18 14:37–14:58 UTC, engineer then director, demoux under the user's lease; `G2/WINDOW-RESULTS.md` "Distinct super-units", `G2/port/raw/window_1118d/` (logs, `per_unit_checks.txt`, the 16 units' meta files, scripts), `G2/port/raw/window_1118e/` (my run); head 1313018a (commits 51a386f8 `--multi LIST`, 1313018a `--no-upload`), bundle current, ivory's worktree fast-forwarded)
+
+- **Units:** the two staged base-64 super-units plus 14 new π′, one per leading-digit band, staged on demoux by a
+  new `g2proto dumptops` (2.5 s per unit; byte-identical tops for the two staged units). 238,347–239,698 tops,
+  1,040,227–1,044,431 parents, 11,742,386–11,806,353 survivors per unit. Reference counts for the 14 new units
+  are the binary's own CPU reference (`cpu_job`), not prototype survivor sets.
+- **Protocol:** per unit the host uploads its input (1.94 MB, new buffers: CubeCL 0.10 cannot write into an
+  existing one), queues its preparation and the full kernel with records; one synchronisation per 16 units;
+  360 cycles (5,760 super-units) after a 5 s warm-up; per-unit counters checked at the end.
+- **Exact** [M]: 9 runs × 16 units (and my run): preparation equal to the host's and counts equal to the CPU
+  reference for every unit; cumulative counts equal (1 + 360) × the reference; error counters 0.
+- **Timing, variant D** [M] (main base 4.707 fs + 0.085 fs; main field 6 in the same stretch 100.44 s):
+
+  | run | ms per super-unit | fs per admissible n | ratio | clock, power |
+  |---|---|---|---|---|
+  | 16 distinct, upload per unit (3 runs; mine) | 3.705–3.738; 3.692 | 0.8303 median; 0.8263 | **×5.14**; ×5.17 | 2,899–2,916 MHz, 303 W, 49–50 samples ≥ 270 W |
+  | one unit × 16, upload per unit | 3.699 / 3.704 | 0.8285 | ×5.15 | 2,901 MHz, 303 W |
+  | 16 distinct, inputs resident (no upload) | 3.453 / 3.463 | 0.7739 | ×5.48 | 2,847–2,858 MHz, 304 W |
+  | one unit × 16, no upload | 3.463 | 0.7752 | ×5.47 | 2,849 MHz, 304 W |
+  | same-unit pipe as G2.10 | 3.447 / 3.449 | 0.7717 | ×5.49 | 2,843–2,845 MHz, 304 W |
+  | 16 distinct, upload, variant A | 3.863 | 0.8647 | ×4.96 | 2,924 MHz, 303 W |
+
+- **The whole 7 % is the upload, none of it cache warmth:** distinct units cost the same as one unit repeated;
+  the 2 MB copy goes through the same queue ahead of the unit's kernels and costs about 0.27 ms on the card
+  (about 7 GB/s; it does not overlap compute). The host spends 0.48–0.73 ms per unit on it and keeps up.
+- **My reading:** a client that uploads each unit's tops from the host through the compute queue sees ×5.14. One
+  that keeps the tops on the card sees ×5.48, and today's main already builds its tops on the card (the FD top
+  kernel), which is how the 0.085 fs term is priced. So ×5.1 is the floor for the obvious client and ×5.5 the
+  design's number; neither is a client measurement.
+- **Lease:** 13:02–14:59 UTC, 2 h of the 4 granted. Workspace and watchdog removed, nothing left running, the
+  production client untouched and still stopped; one ntfy sent at 14:59.
+
 ## G2.10 The port on the RX 9070 XT after the preparation fix: ×4.7 by the pre-registered protocol, ×5.5 pipelined (2026-11-18 13:36–14:37 UTC, engineer then director, demoux under the user's lease; `G2/DEMOUX-BRIEF.md`, `G2/WINDOW-RESULTS.md`, `G2/port/raw/window_1118b/` (engineer's stretch in `m/`), `G2/port/raw/window_1118c/` (my cross-check); branch `g2-cubecl-local` 4170a781 → ef54ed59, two commits made on demoux, bundle `G2/port/g2-cubecl-demoux.bundle`, ivory's worktree fast-forwarded; timed binary md5 8801a739; main = the window's binary)
 
 - **What the 1.84 ms preparation was** [M, device timestamps per launch]: device work, not launch latency and not
