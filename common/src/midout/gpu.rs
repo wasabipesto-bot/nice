@@ -10,10 +10,10 @@
 //! 3. the main kernel (the port's kernel v10 in form D, unchanged): 64-pair
 //!    words, one record per nonzero word;
 //! 4. new here: the main kernel also writes each job's certified children
-//!    (their r4, in order) as phase 1 appends them, and writes production's
-//!    survivor-list entries `(top, r0)`, `n = P·b^5 + r0`, straight from its
-//!    words into plane-private slabs; `compact_kernel` packs the slabs into
-//!    the dense list;
+//!    (their r4, in order) as phase 1 appends them, and its records name
+//!    their top and their chunk's position in the child lists;
+//!    `expand_kernel` turns records into production's survivor-list entries
+//!    `(top, r0)`, `n = P·b^5 + r0`;
 //! 5. production's full check, `cubecl_join::check_kernel`, unchanged, with
 //!    `P` and `w6` in production's top-record layout.
 //!
@@ -97,7 +97,7 @@ const RAN_WORDS: usize = 9;
 /// Its grid (production's `CHECK_CUBES`, `JOIN_WG`).
 const CHECK_CUBES: u32 = 2048;
 const CHECK_WG: u32 = 256;
-/// Grid of the slab compaction (a grid-stride loop over the used slabs).
+/// Grid of the record expansion (a grid-stride loop over the used slabs).
 const EXPAND_CUBES: u32 = 4096;
 /// Nice numbers a group may report.
 const NICE_CAP: u32 = 4096;
@@ -194,8 +194,7 @@ mod kernels {
         roots: &Array<u32>,
         jobs: &Array<u32>,
         cnt: &mut Array<Atomic<u32>>,
-        // (midout) survivor-list entries (top, r0), two words each, in plane-private slabs of SLAB entries
-        out: &mut Array<u32>,
+        out: &mut Array<Vector<u32, Const<4>>>, // survivor records, one 16-byte vector each (one STG.128 on CUDA)
         slabn: &mut Array<Atomic<u32>>,
         slabcnt: &mut Array<u32>,
         nslab_cap: u32,
@@ -203,8 +202,6 @@ mod kernels {
         // 64·(pseg[c] − pseg[c0]) + d·(class size) + position (written by phase 1)
         clst: &mut Array<u32>,
         c0: u32,
-        // (midout) the slice's digit 4 at bits 24-29 of r0 = n mod 2^30
-        r0hi: u32,
         #[comptime] mode: u32,
         #[comptime] noout: bool,
         #[comptime] w: u32,
@@ -268,10 +265,12 @@ mod kernels {
         if comptime!(mode == 0) {
             // lane map of cube 0, for the host's --debug-lanes (mode 0 writes no records)
             if CUBE_POS_X == 0u32 {
-                out[(4u32 * t) as usize] = t;
-                out[(4u32 * t + 1u32) as usize] = lane;
-                out[(4u32 * t + 2u32) as usize] = PLANE_DIM;
-                out[(4u32 * t + 3u32) as usize] = plane_sum(1u32);
+                let mut lv = Vector::<u32, Const<4>>::empty();
+                lv[0usize] = t;
+                lv[1usize] = lane;
+                lv[2usize] = PLANE_DIM;
+                lv[3usize] = plane_sum(1u32);
+                out[t as usize] = lv;
             }
         }
         if t == 0u32 {
@@ -434,10 +433,6 @@ mod kernels {
                 dhave = false;
             }
             sync_cube();
-            if comptime!(mode == 2 && !noout) {
-                // (midout) phase 1's child-list stores, read by other threads of the cube in 3b
-                sync_storage();
-            }
             let done = cur >= pe;
             let nch = min(
                 comptime!(fill / 64),
@@ -731,7 +726,7 @@ mod kernels {
                             let mut alo = 0u32;
                             let mut ahi = 0u32;
                             let dws = prob_d[(p16 >> 4u32) as usize];
-                            // (midout) the entry's top index, not its probe slot
+                            // (midout) the record names its top, not its probe slot
                             pk[h as usize] = dws[3usize] >> 12u32;
                             #[unroll]
                             for k in 0..MAXPOP {
@@ -747,81 +742,67 @@ mod kernels {
                         if t == 0u32 {
                             my_lslots += min(comptime!(16 * ept), nlist - e0) * nch;
                         }
+                        let nza = (wlo[0usize] | whi[0usize]) != 0u32;
+                        let nzb = (wlo[1usize] | whi[1usize]) != 0u32;
                         if comptime!(noout) {
                             my_surv += wlo[0usize].count_ones()
                                 + whi[0usize].count_ones()
                                 + wlo[1usize].count_ones()
                                 + whi[1usize].count_ones();
                         } else {
-                            // (midout) survivor-list entries straight from the words: (top, r0) per set bit, the
-                            // child's r4 from the job's child list; a plane's entries of one step are contiguous in
-                            // its slab (or in fresh consecutive slabs when they do not fit), so the step costs one
-                            // scan and, per SLAB entries, one atomic
-                            let ea = wlo[0usize].count_ones() + whi[0usize].count_ones();
-                            let eb = wlo[1usize].count_ones() + whi[1usize].count_ones();
-                            let nz = (ea + eb) != 0u32;
-                            let nn = plane_count(nz, select(nz, 1u32, 0u32), w, ranks);
+                            let fa = select(nza, 1u32, 0u32);
+                            let fb = select(nzb, 1u32, 0u32);
+                            let na = plane_count(nza, fa, w, ranks);
+                            let nn = na + plane_count(nzb, fb, w, ranks);
+                            let mut ra = 0u32;
+                            let mut rb = 0u32;
+                            if comptime!(ranks == 0) {
+                                ra = plane_rank(nza, fa, w, ranks);
+                                rb = plane_rank(nzb, fb, w, ranks);
+                            } else {
+                                ra = plane_rank_m(nza, rlo, rhi, w);
+                                rb = plane_rank_m(nzb, rlo, rhi, w);
+                            }
                             if nn > 0u32 {
-                                let e = ea + eb;
-                                let excl = plane_exclusive_sum(e);
-                                let tot = plane_sum(e);
-                                let mut ebase = 0u32;
-                                if slab_used + tot > SLAB {
+                                if slab_used + nn > SLAB {
                                     if lane == 0u32 && have_slab {
                                         slabcnt[slab_id as usize] = slab_used;
                                     }
-                                    let k = (tot + SLAB - 1u32) / SLAB;
                                     let mut sid = 0u32;
                                     if lane == 0u32 {
-                                        sid = slabn[0usize].fetch_add(k);
+                                        sid = slabn[0usize].fetch_add(1u32);
                                     }
-                                    let s0 = plane_sum(sid); // only lane 0 holds it
-                                    // the slabs before the last are full
-                                    let mut z = lane;
-                                    while z + 1u32 < k {
-                                        if s0 + z < nslab_cap {
-                                            slabcnt[(s0 + z) as usize] = SLAB;
-                                        }
-                                        z += w;
-                                    }
-                                    slab_id = s0 + k - 1u32;
-                                    slab_used = tot - (k - 1u32) * SLAB;
+                                    slab_id = plane_sum(sid); // only lane 0 holds it
+                                    slab_used = 0u32;
                                     have_slab = true;
-                                    ebase = s0 * SLAB;
                                     if slab_id >= nslab_cap && lane == 0u32 {
                                         cnt[C_ERR_SLAB].fetch_add(1u32);
                                     }
-                                } else {
-                                    ebase = slab_id * SLAB + slab_used;
-                                    slab_used += tot;
                                 }
+                                let sbase = slab_id * SLAB + slab_used;
                                 if slab_id < nslab_cap {
-                                    let lp = lb + cpos;
-                                    let mut o = ebase + excl;
-                                    #[unroll]
-                                    for h in 0..2u32 {
-                                        let ti = pk[h as usize];
-                                        let mut x = wlo[h as usize];
-                                        while x != 0u32 {
-                                            let b = x.trailing_zeros();
-                                            x &= x - 1u32;
-                                            out[(2u32 * o) as usize] = ti;
-                                            out[(2u32 * o + 1u32) as usize] =
-                                                clst[(lp + b) as usize] + r0hi;
-                                            o += 1u32;
-                                        }
-                                        let mut y = whi[h as usize];
-                                        while y != 0u32 {
-                                            let b = y.trailing_zeros();
-                                            y &= y - 1u32;
-                                            out[(2u32 * o) as usize] = ti;
-                                            out[(2u32 * o + 1u32) as usize] =
-                                                clst[(lp + 32u32 + b) as usize] + r0hi;
-                                            o += 1u32;
-                                        }
+                                    if nza {
+                                        let mut rv = Vector::<u32, Const<4>>::empty();
+                                        rv[0usize] = pk[0usize];
+                                        rv[1usize] = lb + cpos;
+                                        rv[2usize] = wlo[0usize];
+                                        rv[3usize] = whi[0usize];
+                                        out[(sbase + ra) as usize] = rv;
+                                    }
+                                    if nzb {
+                                        let mut rv = Vector::<u32, Const<4>>::empty();
+                                        rv[0usize] = pk[1usize];
+                                        rv[1usize] = lb + cpos;
+                                        rv[2usize] = wlo[1usize];
+                                        rv[3usize] = whi[1usize];
+                                        out[(sbase + na + rb) as usize] = rv;
                                     }
                                 }
-                                my_surv += e;
+                                my_surv += wlo[0usize].count_ones()
+                                    + whi[0usize].count_ones()
+                                    + wlo[1usize].count_ones()
+                                    + whi[1usize].count_ones();
+                                slab_used += nn;
                             }
                         }
                         e0 += comptime!(16 * ept);
@@ -1244,47 +1225,86 @@ mod post {
     use super::{NT, SLAB};
     use cubecl::prelude::*;
 
-    /// The main kernel's slabs → production's dense survivor list `(top,
-    /// r0)`, `n = P·b^5 + r0`: each plane takes the used slabs in a
-    /// grid-stride loop, reserves its slab's count with one atomic and copies
-    /// the entries. Thread 0 also copies the slice's parent and slab counts to
-    /// `stat`.
+    /// Records → production's survivor-list entries `(top, r0)`, `r0 = n mod
+    /// 2^30` (the child's r4 and the slice's digit 4): each plane takes the
+    /// used slabs in a grid-stride loop and its lanes the slab's records,
+    /// appended in plane-sized takes. A record names its top and its chunk's
+    /// first position in the child lists (`lst`, written by the main
+    /// kernel's phase 1), so a set bit b is the child at that position + b.
+    /// Thread 0 also copies the slice's parent and slab counts to `stat`.
     #[cube(launch_unchecked)]
-    pub fn compact_kernel(
-        ent: &Array<u32>,
+    pub fn expand_kernel(
+        out: &Array<Vector<u32, Const<4>>>,
         slabn: &Array<u32>,
         slabcnt: &Array<u32>,
+        lst: &Array<u32>,
         lcnt: &Array<u32>,
         surv: &mut Array<u32>,
         scount: &mut Array<Atomic<u32>>,
         stat: &mut Array<u32>,
         nslab_cap: u32,
         scap: u32,
+        r0hi: u32,
     ) {
         if ABSOLUTE_POS_X == 0u32 {
             stat[0usize] = lcnt[0usize];
             stat[1usize] = slabn[0usize];
         }
+        // one plane per slab at a time, its lanes over the slab's rows: no idle slots past a slab's count
         let ns = min(slabn[0usize], nslab_cap);
         let ppc = NT / PLANE_DIM;
         let pstride = CUBE_COUNT_X * ppc;
         let mut s = CUBE_POS_X * ppc + UNIT_POS_X / PLANE_DIM;
         while s < ns {
             let cnt = slabcnt[s as usize];
-            let mut b0 = 0u32;
-            if UNIT_POS_PLANE == 0u32 && cnt > 0u32 {
-                b0 = scount[0usize].fetch_add(cnt);
-            }
-            let base = plane_sum(b0);
-            let mut r = UNIT_POS_PLANE;
-            while r < cnt {
-                let o = base + r;
+            let mut r0 = 0u32;
+            while r0 < cnt {
+                let r = r0 + UNIT_POS_PLANE;
                 let i = s * SLAB + r;
-                if o < scap {
-                    surv[(2u32 * o) as usize] = ent[(2u32 * i) as usize];
-                    surv[(2u32 * o + 1u32) as usize] = ent[(2u32 * i + 1u32) as usize];
+                let live = r < cnt;
+                let mut wlo = 0u32;
+                let mut whi = 0u32;
+                let mut ti = 0u32;
+                let mut pos = 0u32;
+                if live {
+                    let rec = out[i as usize];
+                    ti = rec[0usize];
+                    pos = rec[1usize];
+                    wlo = rec[2usize];
+                    whi = rec[3usize];
                 }
-                r += PLANE_DIM;
+                let nb = wlo.count_ones() + whi.count_ones();
+                let excl = plane_exclusive_sum(nb);
+                let tot = plane_sum(nb);
+                let mut b0 = 0u32;
+                if UNIT_POS_PLANE == 0u32 && tot > 0u32 {
+                    b0 = scount[0usize].fetch_add(tot);
+                }
+                let mut slot = plane_sum(b0) + excl;
+                if live {
+                    let mut x = wlo;
+                    while x != 0u32 {
+                        let b = x.trailing_zeros();
+                        x &= x - 1u32;
+                        if slot < scap {
+                            surv[(2u32 * slot) as usize] = ti;
+                            surv[(2u32 * slot + 1u32) as usize] = lst[(pos + b) as usize] + r0hi;
+                        }
+                        slot += 1u32;
+                    }
+                    let mut y = whi;
+                    while y != 0u32 {
+                        let b = y.trailing_zeros();
+                        y &= y - 1u32;
+                        if slot < scap {
+                            surv[(2u32 * slot) as usize] = ti;
+                            surv[(2u32 * slot + 1u32) as usize] =
+                                lst[(pos + 32u32 + b) as usize] + r0hi;
+                        }
+                        slot += 1u32;
+                    }
+                }
+                r0 += PLANE_DIM;
             }
             s += pstride;
         }
@@ -1984,7 +2004,7 @@ impl<R: Runtime> GpuJoin<R> {
             nslab_cap,
             scap,
             lcap,
-            out: e(nslab_cap as usize * SLAB as usize * 8),
+            out: e(nslab_cap as usize * SLAB as usize * 16),
             slabcnt: e(nslab_cap as usize * 4),
             g_tmp: e(np * 16),
             g_lst: e(np * 16),
@@ -2342,13 +2362,12 @@ impl<R: Runtime> GpuJoin<R> {
                         a(&self.roots_h, NROOT),
                         a(jobs, 2 * *nj as usize),
                         a(cnt, NCNT),
-                        a(&self.out, 2 * ns * SLAB as usize),
+                        a(&self.out, ns * SLAB as usize),
                         a(&slabn, 1),
                         a(&self.slabcnt, ns),
                         self.nslab_cap,
                         a(&self.clst, self.lcap as usize),
                         *c0,
-                        ((pip & 63) as u32) << 24,
                         2u32,
                         false,
                         self.w,
@@ -2362,19 +2381,21 @@ impl<R: Runtime> GpuJoin<R> {
                     );
                 }
                 if self.upto(5) {
-                    post::compact_kernel::launch_unchecked::<R>(
+                    post::expand_kernel::launch_unchecked::<R>(
                         c,
                         CubeCount::Static(EXPAND_CUBES, 1, 1),
                         CubeDim::new_1d(NT),
-                        a(&self.out, 2 * ns * SLAB as usize),
+                        a(&self.out, ns * SLAB as usize),
                         a(&slabn, 1),
                         a(&self.slabcnt, ns),
+                        a(&self.clst, self.lcap as usize),
                         a(&self.lcnt, 1),
                         a(&self.surv, 2 * self.scap as usize),
                         a(&scount, 1),
                         a(&stat, 2),
                         self.nslab_cap,
                         self.scap,
+                        ((pip & 63) as u32) << 24,
                     );
                 }
                 if self.upto(6) {
