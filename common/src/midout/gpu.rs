@@ -217,17 +217,26 @@ mod kernels {
         // pending children as u16 (parent index - class start) two per word, and the round's probe list (u32
         // entries) in the same words: the list is live only in 3a/3b, when the pending slots still needed (each
         // chunk's first, the carried rest) are already in registers. 12 waves per SIMD on RDNA4 need <= 21 KB.
-        let mut pq = SharedMemory::<u32>::new(comptime!((if (fill + NT) / 2 > PMAX + 32 { (fill + NT) / 2 } else { PMAX + 64 }) as usize));
+        let mut pq = SharedMemory::<u32>::new(comptime!(
+            (if (fill + NT) / 2 > PMAX + 32 {
+                (fill + NT) / 2
+            } else {
+                PMAX + 64
+            }) as usize
+        ));
         // slices [(v + 65 q)*2 + half] (SROW = 65: the 3b address is one add and one shift of the digit, and a 16-lane group's
         // reads still fall on 16 distinct 8-byte bank pairs, (v + q) mod 16)
         let mut sl = SharedMemory::<u32>::new(comptime!((SLW) as usize));
         // every shared array a multiple of 128 bytes, so that every array starts 128-byte aligned whatever order
         // CubeCL places them in (its placement changed per build, and the full kernel's time with it)
-        let slt = SharedMemory::<Atomic<u32>>::new(comptime!((if w < 32 { SLW } else { 32 }) as usize));
+        let slt =
+            SharedMemory::<Atomic<u32>>::new(comptime!((if w < 32 { SLW } else { 32 }) as usize));
         let comm = SharedMemory::<Atomic<u32>>::new(32usize); // [2q + half]
         // each probe's 4 digit words as one 16-byte vector (one LDS.128 / ds_read_b128 per list entry)
         let mut prob_d = SharedMemory::<Vector<u32, Const<4>>>::new(comptime!(PMAX as usize));
-        let mut wcnt = SharedMemory::<u32>::new(comptime!((if 2 * NT / w < 32 { 32 } else { 2 * NT / w }) as usize));
+        let mut wcnt = SharedMemory::<u32>::new(comptime!(
+            (if 2 * NT / w < 32 { 32 } else { 2 * NT / w }) as usize
+        ));
         let s_nl = SharedMemory::<Atomic<u32>>::new(32usize);
         let mut s_np = SharedMemory::<u32>::new(32usize);
         let mut cmv = SharedMemory::<u32>::new(64usize);
@@ -277,54 +286,58 @@ mod kernels {
             }
         }
         if t < 32u32 {
-            comm[t as usize].store(comptime!(if xpose == 0 || cmask == 0 { 0u32 } else { u32::MAX }));
+            comm[t as usize].store(comptime!(if xpose == 0 || cmask == 0 {
+                0u32
+            } else {
+                u32::MAX
+            }));
         }
         sync_cube();
         // probes: the 8 compatible top classes of unit d, each probe's digits as 20 6-bit fields (5 per word),
         // padded with its first digit (OR is idempotent)
         if comptime!(cut & 4 == 0) {
-        let mut base = 0u32;
-        for i in 0..8u32 {
-            let ct = (roots[i as usize] + M - cc) % M;
-            let s = (d * M + ct) * 2u32;
-            let b0 = tseg[s as usize];
-            let b1 = tseg[(s + 1u32) as usize];
-            let mut j = t;
-            while j < b1 - b0 {
-                if base + j >= poff && base + j < poff + PMAX {
-                    if comptime!(tdg == 1) {
-                        let mut pv = Vector::<u32, Const<4>>::empty();
-                        #[unroll]
-                        for k in 0..4u32 {
-                            pv[k as usize] = tdig[((b0 + j) * 4u32 + k) as usize];
+            let mut base = 0u32;
+            for i in 0..8u32 {
+                let ct = (roots[i as usize] + M - cc) % M;
+                let s = (d * M + ct) * 2u32;
+                let b0 = tseg[s as usize];
+                let b1 = tseg[(s + 1u32) as usize];
+                let mut j = t;
+                while j < b1 - b0 {
+                    if base + j >= poff && base + j < poff + PMAX {
+                        if comptime!(tdg == 1) {
+                            let mut pv = Vector::<u32, Const<4>>::empty();
+                            #[unroll]
+                            for k in 0..4u32 {
+                                pv[k as usize] = tdig[((b0 + j) * 4u32 + k) as usize];
+                            }
+                            prob_d[(base + j - poff) as usize] = pv;
+                        } else {
+                            let mut x = tmask[(b0 + j) as usize];
+                            let first = x.trailing_zeros();
+                            let mut dw = Array::<u32>::new(4usize);
+                            #[unroll]
+                            for k in 0..4u32 {
+                                dw[k as usize] = 0u32;
+                            }
+                            #[unroll]
+                            for k in 0..20u32 {
+                                let v = select(x != 0u64, x.trailing_zeros(), first);
+                                x &= x - select(x != 0u64, 1u64, 0u64);
+                                dw[comptime!(k / 5) as usize] |= v << comptime!(6 * (k % 5));
+                            }
+                            let mut pv = Vector::<u32, Const<4>>::empty();
+                            #[unroll]
+                            for k in 0..4u32 {
+                                pv[k as usize] = dw[k as usize];
+                            }
+                            prob_d[(base + j - poff) as usize] = pv;
                         }
-                        prob_d[(base + j - poff) as usize] = pv;
-                    } else {
-                        let mut x = tmask[(b0 + j) as usize];
-                        let first = x.trailing_zeros();
-                        let mut dw = Array::<u32>::new(4usize);
-                        #[unroll]
-                        for k in 0..4u32 {
-                            dw[k as usize] = 0u32;
-                        }
-                        #[unroll]
-                        for k in 0..20u32 {
-                            let v = select(x != 0u64, x.trailing_zeros(), first);
-                            x &= x - select(x != 0u64, 1u64, 0u64);
-                            dw[comptime!(k / 5) as usize] |= v << comptime!(6 * (k % 5));
-                        }
-                        let mut pv = Vector::<u32, Const<4>>::empty();
-                        #[unroll]
-                        for k in 0..4u32 {
-                            pv[k as usize] = dw[k as usize];
-                        }
-                        prob_d[(base + j - poff) as usize] = pv;
                     }
+                    j += NT;
                 }
-                j += NT;
+                base += b1 - b0;
             }
-            base += b1 - b0;
-        }
         }
         sync_cube();
         let nprobe = min(s_np[0usize] - min(s_np[0usize], poff), PMAX);
@@ -364,7 +377,11 @@ mod kernels {
                 if idx < pe {
                     let pv = par[idx as usize];
                     r4v = pv[3usize];
-                    m = child_mask(u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64), pv[2usize], d);
+                    m = child_mask(
+                        u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64),
+                        pv[2usize],
+                        d,
+                    );
                 }
                 let f = select(m != 0u64, 1u32, 0u32);
                 let mut r = 0u32;
@@ -413,7 +430,10 @@ mod kernels {
             }
             sync_cube();
             let done = cur >= pe;
-            let nch = min(comptime!(fill / 64), select(done, (npend + 63u32) / 64u32, 64u32));
+            let nch = min(
+                comptime!(fill / 64),
+                select(done, (npend + 63u32) / 64u32, 64u32),
+            );
             if nch == 0u32 {
                 going = false;
             } else {
@@ -427,127 +447,156 @@ mod kernels {
                     sync_cube();
                 }
                 if comptime!(cut & 1 == 0) {
-                // phase 2: transpose by ballots. Plane task i covers chunk q, segment s (members s*W .. s*W+W-1).
-                for i in 0..4u32 {
-                    let task = pl + npl * i;
-                    let q = task / segs;
-                    let sg = task % segs;
-                    let mi = q * 64u32 + sg * w + lane;
-                    let mut m = 0u64;
-                    if q < nch && mi < ntake {
-                        let pi = pb + ((pq[(mi >> 1u32) as usize] >> ((mi & 1u32) << 4u32)) & 0xFFFFu32);
-                        let pv = par[pi as usize];
-                        m = child_mask(u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64), pv[2usize], d);
-                    }
-                    if comptime!(xpose == 0) {
-                        for v in 0..64u32 {
-                            let bal = plane_ballot(((m >> u64::cast_from(v)) & 1u64) != 0u64);
-                            if lane == v % w && q < nch {
-                                let row = (v + 65u32 * q) * 2u32;
-                                if comptime!(w == 64) {
-                                    sl[row as usize] = bal[0usize];
-                                    sl[(row + 1u32) as usize] = bal[1usize];
-                                } else if comptime!(w == 32) {
-                                    sl[(row + sg) as usize] = bal[0usize];
-                                } else {
-                                    let bit = sg * w;
-                                    let seg = bal[0usize] & comptime!((1u32 << w) - 1);
-                                    slt[(row + bit / 32u32) as usize].fetch_or(seg << (bit % 32u32));
-                                }
-                            }
+                    // phase 2: transpose by ballots. Plane task i covers chunk q, segment s (members s*W .. s*W+W-1).
+                    for i in 0..4u32 {
+                        let task = pl + npl * i;
+                        let q = task / segs;
+                        let sg = task % segs;
+                        let mi = q * 64u32 + sg * w + lane;
+                        let mut m = 0u64;
+                        if q < nch && mi < ntake {
+                            let pi = pb
+                                + ((pq[(mi >> 1u32) as usize] >> ((mi & 1u32) << 4u32))
+                                    & 0xFFFFu32);
+                            let pv = par[pi as usize];
+                            m = child_mask(
+                                u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64),
+                                pv[2usize],
+                                d,
+                            );
                         }
-                    } else {
-                        // shuffle transpose: the plane's W rows, as 64/W blocks of W x W bits, each transposed in
-                        // log2(W) shuffle_xor stages on the whole u64 (the stage masks are the same per block);
-                        // lane l then holds, in block s, column s*W + l over this plane's rows.
-                        // on the two 32-bit halves (ACO paid a v_lshlrev_b64 and two ORs per stage to rebuild the u64):
-                        // for j < 32 the stage moves bits within each half, and (y >> j) & !mj, (y << j) & mj are a
-                        // 32-bit rotation right by j or by 32 - j, masked: one v_alignbit and one v_bfi per half;
-                        // j = 32 (W = 64) swaps halves between the lane pairs
-                        let mut xl = u32::cast_from(m & 0xFFFF_FFFFu64);
-                        let mut xh = u32::cast_from(m >> 32u64);
-                        #[unroll]
-                        for st in 0..comptime!(w.trailing_zeros()) {
-                            let j = comptime!(w >> (st + 1));
-                            let yl = plane_shuffle_xor(xl, j);
-                            let yh = plane_shuffle_xor(xh, j);
-                            let hit = (lane & j) != 0u32;
-                            if comptime!(j == 32) {
-                                xl = select(hit, yh, xl);
-                                xh = select(hit, xh, yl);
-                            } else {
-                                let mj = comptime!(stage_mask(w >> (st + 1)) as u32);
-                                let keep = select(hit, mj, !mj);
-                                let sr = select(hit, j, 32u32 - j);
-                                let rl = (yl >> sr) | (yl << (32u32 - sr));
-                                let rh = (yh >> sr) | (yh << (32u32 - sr));
-                                xl = (xl & keep) | (rl & !keep);
-                                xh = (xh & keep) | (rh & !keep);
-                            }
-                        }
-                        if comptime!(cmask == 1) {
-                        if q < nch {
-                            // common masks from the registers (no pass over the slices): digit v is common to the
-                            // chunk iff, in every plane of it, the column holds all of that plane's valid rows
-                            let nv = min(w, ntake - min(ntake, q * 64u32 + sg * w));
-                            // valid rows as a u64, built from u32 shifts (a variable 64-bit shift crashed lavapipe's
-                            // 512-bit JIT)
-                            let vlo = select(nv >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(nv, 31u32)) - 1u32);
-                            let vhi = select(nv >= 64u32, 0xFFFF_FFFFu32, select(nv > 32u32, (1u32 << ((nv - min(nv, 32u32)) & 31u32)) - 1u32, 0u32));
-                            #[unroll]
-                            for sb in 0..segs {
-                                // this segment's column piece (W bits), from the half that holds it
-                                let mut hv = xh;
-                                if comptime!(sb * w < 32) {
-                                    hv = xl;
-                                }
-                                let mut eq = false;
-                                if comptime!(w == 64) {
-                                    eq = xl == vlo && xh == vhi;
-                                } else if comptime!(w == 32) {
-                                    eq = hv == vlo;
-                                } else {
-                                    eq = ((hv >> comptime!((sb * w) % 32)) & comptime!((1u32 << w) - 1)) == vlo;
-                                }
-                                let bal = plane_ballot(eq);
-                                if lane == 0u32 {
+                        if comptime!(xpose == 0) {
+                            for v in 0..64u32 {
+                                let bal = plane_ballot(((m >> u64::cast_from(v)) & 1u64) != 0u64);
+                                if lane == v % w && q < nch {
+                                    let row = (v + 65u32 * q) * 2u32;
                                     if comptime!(w == 64) {
-                                        comm[(2u32 * q) as usize].fetch_and(bal[0usize]);
-                                        comm[(2u32 * q + 1u32) as usize].fetch_and(bal[1usize]);
+                                        sl[row as usize] = bal[0usize];
+                                        sl[(row + 1u32) as usize] = bal[1usize];
                                     } else if comptime!(w == 32) {
-                                        comm[(2u32 * q + comptime!(sb)) as usize].fetch_and(bal[0usize]);
+                                        sl[(row + sg) as usize] = bal[0usize];
                                     } else {
-                                        let wm = comptime!((1u32 << w) - 1);
-                                        let sh = comptime!((sb * w) % 32);
-                                        comm[(2u32 * q + comptime!((sb * w) / 32)) as usize].fetch_and(!(wm << sh) | ((bal[0usize] & wm) << sh));
+                                        let bit = sg * w;
+                                        let seg = bal[0usize] & comptime!((1u32 << w) - 1);
+                                        slt[(row + bit / 32u32) as usize]
+                                            .fetch_or(seg << (bit % 32u32));
+                                    }
+                                }
+                            }
+                        } else {
+                            // shuffle transpose: the plane's W rows, as 64/W blocks of W x W bits, each transposed in
+                            // log2(W) shuffle_xor stages on the whole u64 (the stage masks are the same per block);
+                            // lane l then holds, in block s, column s*W + l over this plane's rows.
+                            // on the two 32-bit halves (ACO paid a v_lshlrev_b64 and two ORs per stage to rebuild the u64):
+                            // for j < 32 the stage moves bits within each half, and (y >> j) & !mj, (y << j) & mj are a
+                            // 32-bit rotation right by j or by 32 - j, masked: one v_alignbit and one v_bfi per half;
+                            // j = 32 (W = 64) swaps halves between the lane pairs
+                            let mut xl = u32::cast_from(m & 0xFFFF_FFFFu64);
+                            let mut xh = u32::cast_from(m >> 32u64);
+                            #[unroll]
+                            for st in 0..comptime!(w.trailing_zeros()) {
+                                let j = comptime!(w >> (st + 1));
+                                let yl = plane_shuffle_xor(xl, j);
+                                let yh = plane_shuffle_xor(xh, j);
+                                let hit = (lane & j) != 0u32;
+                                if comptime!(j == 32) {
+                                    xl = select(hit, yh, xl);
+                                    xh = select(hit, xh, yl);
+                                } else {
+                                    let mj = comptime!(stage_mask(w >> (st + 1)) as u32);
+                                    let keep = select(hit, mj, !mj);
+                                    let sr = select(hit, j, 32u32 - j);
+                                    let rl = (yl >> sr) | (yl << (32u32 - sr));
+                                    let rh = (yh >> sr) | (yh << (32u32 - sr));
+                                    xl = (xl & keep) | (rl & !keep);
+                                    xh = (xh & keep) | (rh & !keep);
+                                }
+                            }
+                            if comptime!(cmask == 1) {
+                                if q < nch {
+                                    // common masks from the registers (no pass over the slices): digit v is common to the
+                                    // chunk iff, in every plane of it, the column holds all of that plane's valid rows
+                                    let nv = min(w, ntake - min(ntake, q * 64u32 + sg * w));
+                                    // valid rows as a u64, built from u32 shifts (a variable 64-bit shift crashed lavapipe's
+                                    // 512-bit JIT)
+                                    let vlo = select(
+                                        nv >= 32u32,
+                                        0xFFFF_FFFFu32,
+                                        (1u32 << min(nv, 31u32)) - 1u32,
+                                    );
+                                    let vhi = select(
+                                        nv >= 64u32,
+                                        0xFFFF_FFFFu32,
+                                        select(
+                                            nv > 32u32,
+                                            (1u32 << ((nv - min(nv, 32u32)) & 31u32)) - 1u32,
+                                            0u32,
+                                        ),
+                                    );
+                                    #[unroll]
+                                    for sb in 0..segs {
+                                        // this segment's column piece (W bits), from the half that holds it
+                                        let mut hv = xh;
+                                        if comptime!(sb * w < 32) {
+                                            hv = xl;
+                                        }
+                                        let mut eq = false;
+                                        if comptime!(w == 64) {
+                                            eq = xl == vlo && xh == vhi;
+                                        } else if comptime!(w == 32) {
+                                            eq = hv == vlo;
+                                        } else {
+                                            eq = ((hv >> comptime!((sb * w) % 32))
+                                                & comptime!((1u32 << w) - 1))
+                                                == vlo;
+                                        }
+                                        let bal = plane_ballot(eq);
+                                        if lane == 0u32 {
+                                            if comptime!(w == 64) {
+                                                comm[(2u32 * q) as usize].fetch_and(bal[0usize]);
+                                                comm[(2u32 * q + 1u32) as usize]
+                                                    .fetch_and(bal[1usize]);
+                                            } else if comptime!(w == 32) {
+                                                comm[(2u32 * q + comptime!(sb)) as usize]
+                                                    .fetch_and(bal[0usize]);
+                                            } else {
+                                                let wm = comptime!((1u32 << w) - 1);
+                                                let sh = comptime!((sb * w) % 32);
+                                                comm[(2u32 * q + comptime!((sb * w) / 32))
+                                                    as usize]
+                                                    .fetch_and(
+                                                        !(wm << sh) | ((bal[0usize] & wm) << sh),
+                                                    );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if q < nch {
+                                #[unroll]
+                                for sb in 0..segs {
+                                    let v = comptime!(sb * w) + lane;
+                                    let row = (v + 65u32 * q) * 2u32;
+                                    let mut hv = xh;
+                                    if comptime!(sb * w < 32) {
+                                        hv = xl;
+                                    }
+                                    if comptime!(w == 64) {
+                                        sl[row as usize] = xl;
+                                        sl[(row + 1u32) as usize] = xh;
+                                    } else if comptime!(w == 32) {
+                                        sl[(row + sg) as usize] = hv;
+                                    } else {
+                                        let bit = sg * w;
+                                        let piece = (hv >> comptime!((sb * w) % 32))
+                                            & comptime!((1u32 << w) - 1);
+                                        slt[(row + bit / 32u32) as usize]
+                                            .fetch_or(piece << (bit % 32u32));
                                     }
                                 }
                             }
                         }
-                        }
-                        if q < nch {
-                            #[unroll]
-                            for sb in 0..segs {
-                                let v = comptime!(sb * w) + lane;
-                                let row = (v + 65u32 * q) * 2u32;
-                                let mut hv = xh;
-                                if comptime!(sb * w < 32) {
-                                    hv = xl;
-                                }
-                                if comptime!(w == 64) {
-                                    sl[row as usize] = xl;
-                                    sl[(row + 1u32) as usize] = xh;
-                                } else if comptime!(w == 32) {
-                                    sl[(row + sg) as usize] = hv;
-                                } else {
-                                    let bit = sg * w;
-                                    let piece = (hv >> comptime!((sb * w) % 32)) & comptime!((1u32 << w) - 1);
-                                    slt[(row + bit / 32u32) as usize].fetch_or(piece << (bit % 32u32));
-                                }
-                            }
-                        }
                     }
-                }
                 }
                 // the pending slots needed after phase 2 (the carried rest; each chunk's first parent for the records)
                 // into registers: 3a overwrites the words with the probe list
@@ -570,24 +619,33 @@ mod kernels {
                     sync_cube();
                 }
                 if comptime!(cut & 2 == 0 && (xpose == 0 || cmask == 0)) {
-                // common masks (ballot transpose only): digit v is common to chunk q iff its slice equals the chunk's valid mask
-                {
-                    let mut j = t;
-                    while j < 1024u32 {
-                        let q = j / 64u32;
-                        let v = j % 64u32;
-                        if q < nch {
-                            let nq = min(64u32, ntake - q * 64u32);
-                            let vlo = select(nq >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nq % 32u32)) - 1u32);
-                            let vhi = select(nq == 64u32, 0xFFFF_FFFFu32, select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32));
-                            let row = (v + 65u32 * q) * 2u32;
-                            if sl[row as usize] == vlo && sl[(row + 1u32) as usize] == vhi {
-                                comm[(2u32 * q + v / 32u32) as usize].fetch_or(1u32 << (v % 32u32));
+                    // common masks (ballot transpose only): digit v is common to chunk q iff its slice equals the chunk's valid mask
+                    {
+                        let mut j = t;
+                        while j < 1024u32 {
+                            let q = j / 64u32;
+                            let v = j % 64u32;
+                            if q < nch {
+                                let nq = min(64u32, ntake - q * 64u32);
+                                let vlo = select(
+                                    nq >= 32u32,
+                                    0xFFFF_FFFFu32,
+                                    (1u32 << (nq % 32u32)) - 1u32,
+                                );
+                                let vhi = select(
+                                    nq == 64u32,
+                                    0xFFFF_FFFFu32,
+                                    select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32),
+                                );
+                                let row = (v + 65u32 * q) * 2u32;
+                                if sl[row as usize] == vlo && sl[(row + 1u32) as usize] == vhi {
+                                    comm[(2u32 * q + v / 32u32) as usize]
+                                        .fetch_or(1u32 << (v % 32u32));
+                                }
                             }
+                            j += NT;
                         }
-                        j += NT;
                     }
-                }
                 }
                 sync_cube();
                 if comptime!(mode == 2) {
@@ -614,7 +672,8 @@ mod kernels {
                             let pv = prob_d[pp as usize];
                             #[unroll]
                             for k in 0..MAXPOP {
-                                let dg = (pv[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5))) & 63u32;
+                                let dg = (pv[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5)))
+                                    & 63u32;
                                 hitm |= cmv[dg as usize];
                             }
                             km = allq & !hitm;
@@ -633,7 +692,11 @@ mod kernels {
                     let st = t / 16u32;
                     let nq = select(q < nch, min(64u32, ntake - min(ntake, q * 64u32)), 0u32);
                     let vlo = select(nq >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nq % 32u32)) - 1u32);
-                    let vhi = select(nq == 64u32, 0xFFFF_FFFFu32, select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32));
+                    let vhi = select(
+                        nq == 64u32,
+                        0xFFFF_FFFFu32,
+                        select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32),
+                    );
                     let q65 = 65u32 * q;
                     let qs = 16u32 + q;
                     let mut e0 = 0u32;
@@ -662,7 +725,8 @@ mod kernels {
                             let dws = prob_d[(p16 >> 4u32) as usize];
                             #[unroll]
                             for k in 0..MAXPOP {
-                                let dg = (dws[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5))) & 63u32;
+                                let dg = (dws[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5)))
+                                    & 63u32;
                                 let row = (dg + q65) * 2u32;
                                 alo |= sl[row as usize];
                                 ahi |= sl[(row + 1u32) as usize];
@@ -676,7 +740,10 @@ mod kernels {
                         let nza = (wlo[0usize] | whi[0usize]) != 0u32;
                         let nzb = (wlo[1usize] | whi[1usize]) != 0u32;
                         if comptime!(noout) {
-                            my_surv += wlo[0usize].count_ones() + whi[0usize].count_ones() + wlo[1usize].count_ones() + whi[1usize].count_ones();
+                            my_surv += wlo[0usize].count_ones()
+                                + whi[0usize].count_ones()
+                                + wlo[1usize].count_ones()
+                                + whi[1usize].count_ones();
                         } else {
                             let fa = select(nza, 1u32, 0u32);
                             let fb = select(nzb, 1u32, 0u32);
@@ -711,7 +778,9 @@ mod kernels {
                                 if slab_id < nslab_cap {
                                     if nza {
                                         let mut rv = Vector::<u32, Const<4>>::empty();
-                                        rv[0usize] = ((pk[0usize] >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
+                                        rv[0usize] = ((pk[0usize] >> 4u32) + poff)
+                                            | (d << 16u32)
+                                            | (c << 24u32);
                                         rv[1usize] = cpos;
                                         rv[2usize] = wlo[0usize];
                                         rv[3usize] = whi[0usize];
@@ -719,14 +788,19 @@ mod kernels {
                                     }
                                     if nzb {
                                         let mut rv = Vector::<u32, Const<4>>::empty();
-                                        rv[0usize] = ((pk[1usize] >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
+                                        rv[0usize] = ((pk[1usize] >> 4u32) + poff)
+                                            | (d << 16u32)
+                                            | (c << 24u32);
                                         rv[1usize] = cpos;
                                         rv[2usize] = wlo[1usize];
                                         rv[3usize] = whi[1usize];
                                         out[(sbase + na + rb) as usize] = rv;
                                     }
                                 }
-                                my_surv += wlo[0usize].count_ones() + whi[0usize].count_ones() + wlo[1usize].count_ones() + whi[1usize].count_ones();
+                                my_surv += wlo[0usize].count_ones()
+                                    + whi[0usize].count_ones()
+                                    + wlo[1usize].count_ones()
+                                    + whi[1usize].count_ones();
                                 slab_used += nn;
                             }
                         }
@@ -752,7 +826,11 @@ mod kernels {
                     s_nl[0usize].store(0u32);
                 }
                 if t >= 32u32 && t < 64u32 {
-                    comm[(t - 32u32) as usize].store(comptime!(if xpose == 0 || cmask == 0 { 0u32 } else { u32::MAX }));
+                    comm[(t - 32u32) as usize].store(comptime!(if xpose == 0 || cmask == 0 {
+                        0u32
+                    } else {
+                        u32::MAX
+                    }));
                 }
                 npend = left;
                 cdone += ntake;
@@ -821,18 +899,25 @@ mod prep {
         let mut m = 0u64;
         #[unroll]
         for j in 0..9u32 {
-            m |= (1u64 << u64::cast_from(dig2(slo, shi, j))) | (1u64 << u64::cast_from(dig2(clo, chi, j)));
+            m |= (1u64 << u64::cast_from(dig2(slo, shi, j)))
+                | (1u64 << u64::cast_from(dig2(clo, chi, j)));
         }
         let ok = m.count_ones() == 18u32;
         let r0 = r4 & 63u32;
-        let cacc = dig2(slo, shi, 9u32) | (dig2(clo, chi, 9u32) << 8u32) | (((2u32 * r0) & 63u32) << 16u32) | (((3u32 * r0 * r0) & 63u32) << 24u32);
+        let cacc = dig2(slo, shi, 9u32)
+            | (dig2(clo, chi, 9u32) << 8u32)
+            | (((2u32 * r0) & 63u32) << 16u32)
+            | (((3u32 * r0 * r0) & 63u32) << 24u32);
         // pip mod 63 from its halves (2^32 = 4 mod 63); uniform
-        let pm63 = (u32::cast_from(pip >> 32u64) % 63u32 * 4u32 + u32::cast_from(pip & 0xFFFF_FFFFu64) % 63u32) % 63u32;
+        let pm63 = (u32::cast_from(pip >> 32u64) % 63u32 * 4u32
+            + u32::cast_from(pip & 0xFFFF_FFFFu64) % 63u32)
+            % 63u32;
         let cls = (r4 % 63u32 + pm63) % 63u32;
         let mut k8 = 0u32;
         #[unroll]
         for i in 0..8u32 {
-            k8 |= u32::cast_from((m >> u64::cast_from(rank[i as usize])) & 1u64) << comptime!(7 - i);
+            k8 |=
+                u32::cast_from((m >> u64::cast_from(rank[i as usize])) & 1u64) << comptime!(7 - i);
         }
         let key = cls * 256u32 + (255u32 - k8);
         let mut mm = m;
@@ -841,7 +926,6 @@ mod prep {
         }
         (mm, cacc, key)
     }
-
 
     /// --prep2 1 (default): the histogram pass also appends each parent's record and key to a compact list (one
     /// atomic per plane), so the scatter reads 1.04M list entries instead of making the parents of all 9.3M roots
@@ -907,7 +991,13 @@ mod prep {
     /// --multi (2026-11-18): scatter2 with the list's length read on the device (`lcnt`, written by hist2), launched
     /// for the list's capacity, as a client that does not know a super-unit's parent count on the host would.
     #[cube(launch_unchecked)]
-    pub fn scatter3_kernel(lst: &Array<Vector<u32, Const<4>>>, lkey: &Array<u32>, lcnt: &Array<u32>, cur: &mut Array<Atomic<u32>>, tmp: &mut Array<u32>) {
+    pub fn scatter3_kernel(
+        lst: &Array<Vector<u32, Const<4>>>,
+        lkey: &Array<u32>,
+        lcnt: &Array<u32>,
+        cur: &mut Array<Atomic<u32>>,
+        tmp: &mut Array<u32>,
+    ) {
         let i = ABSOLUTE_POS_X;
         if i < lcnt[0usize] {
             let key = lkey[i as usize];
@@ -924,7 +1014,12 @@ mod prep {
     /// record, the bucket's r4s read from shared memory four at a time, padded with keys above every r4), larger
     /// ones by the bitonic sort of `bsort_kernel`'s form.
     #[cube(launch_unchecked)]
-    pub fn hsort_kernel(off: &Array<u32>, hist: &Array<u32>, tmp: &Array<u32>, rec: &mut Array<u32>) {
+    pub fn hsort_kernel(
+        off: &Array<u32>,
+        hist: &Array<u32>,
+        tmp: &Array<u32>,
+        rec: &mut Array<u32>,
+    ) {
         let mut sk = SharedMemory::<u32>::new(2048usize);
         let mut si = SharedMemory::<u32>::new(2048usize);
         let k = CUBE_POS_X;
@@ -1037,7 +1132,12 @@ mod prep {
     /// --scan 1 (default since 2026-11-18): the scan of `scan_kernel` with 1,008 threads of 16 buckets each (63 x 16
     /// = 1,008 x 16 = 16,128) instead of 256 of 63: the single cube's serial chain is 4x shorter.
     #[cube(launch_unchecked)]
-    pub fn scan16_kernel(hist: &Array<u32>, off: &mut Array<u32>, cur: &mut Array<Atomic<u32>>, pseg: &mut Array<u32>) {
+    pub fn scan16_kernel(
+        hist: &Array<u32>,
+        off: &mut Array<u32>,
+        cur: &mut Array<Atomic<u32>>,
+        pseg: &mut Array<u32>,
+    ) {
         let mut sums = SharedMemory::<u32>::new(1024usize);
         let t = UNIT_POS_X;
         let mut local = 0u32;
@@ -1076,12 +1176,18 @@ mod prep {
         }
     }
 
-
     /// --prep3 1 (default since 2026-11-18 on demoux): the top digits plus the zeroing that the host used to do by
     /// uploading fresh buffers every super-unit (the 16,128 bucket counts, the list count, and for the pipelined
     /// protocol the slab counter): no host write between super-units. Launched over max(ntops, 16128) threads.
     #[cube(launch_unchecked)]
-    pub fn tdigz_kernel(tmask: &Array<u64>, tdig: &mut Array<u32>, hist: &mut Array<u32>, lcnt: &mut Array<u32>, slabn: &mut Array<u32>, ntops: u32) {
+    pub fn tdigz_kernel(
+        tmask: &Array<u64>,
+        tdig: &mut Array<u32>,
+        hist: &mut Array<u32>,
+        lcnt: &mut Array<u32>,
+        slabn: &mut Array<u32>,
+        ntops: u32,
+    ) {
         let i = ABSOLUTE_POS_X;
         if i < 16128u32 {
             hist[i as usize] = 0u32;
@@ -1153,78 +1259,79 @@ mod post {
         let pstride = CUBE_COUNT_X * ppc;
         let mut s = CUBE_POS_X * ppc + UNIT_POS_X / PLANE_DIM;
         while s < ns {
-          let cnt = slabcnt[s as usize];
-          let mut r0 = 0u32;
-          while r0 < cnt {
-            let r = r0 + UNIT_POS_PLANE;
-            let i = s * SLAB + r;
-            let live = r < cnt;
-            let mut wlo = 0u32;
-            let mut whi = 0u32;
-            let mut ti = 0u32;
-            let mut pos = 0u32;
-            if live {
-                let rec = out[i as usize];
-                let ps = rec[0usize] & 0xFFFFu32;
-                let du = (rec[0usize] >> 16u32) & 255u32;
-                let c = rec[0usize] >> 24u32;
-                wlo = rec[2usize];
-                whi = rec[3usize];
-                // the probe slot -> the top: the job's probes are the 8 root classes' segments in order
-                let cc = (c + du) % M;
-                let mut rem = ps;
-                let mut found = false;
-                for k in 0..8u32 {
-                    let ct = (roots[k as usize] + M - cc) % M;
-                    let sx = (du * M + ct) * 2u32;
-                    let b0 = tseg[sx as usize];
-                    let len = tseg[(sx + 1u32) as usize] - b0;
-                    if !found {
-                        if rem < len {
-                            ti = b0 + rem;
-                            found = true;
-                        } else {
-                            rem -= len;
+            let cnt = slabcnt[s as usize];
+            let mut r0 = 0u32;
+            while r0 < cnt {
+                let r = r0 + UNIT_POS_PLANE;
+                let i = s * SLAB + r;
+                let live = r < cnt;
+                let mut wlo = 0u32;
+                let mut whi = 0u32;
+                let mut ti = 0u32;
+                let mut pos = 0u32;
+                if live {
+                    let rec = out[i as usize];
+                    let ps = rec[0usize] & 0xFFFFu32;
+                    let du = (rec[0usize] >> 16u32) & 255u32;
+                    let c = rec[0usize] >> 24u32;
+                    wlo = rec[2usize];
+                    whi = rec[3usize];
+                    // the probe slot -> the top: the job's probes are the 8 root classes' segments in order
+                    let cc = (c + du) % M;
+                    let mut rem = ps;
+                    let mut found = false;
+                    for k in 0..8u32 {
+                        let ct = (roots[k as usize] + M - cc) % M;
+                        let sx = (du * M + ct) * 2u32;
+                        let b0 = tseg[sx as usize];
+                        let len = tseg[(sx + 1u32) as usize] - b0;
+                        if !found {
+                            if rem < len {
+                                ti = b0 + rem;
+                                found = true;
+                            } else {
+                                rem -= len;
+                            }
                         }
                     }
+                    let pb = pseg[c as usize];
+                    let pe = pseg[(c + 1u32) as usize];
+                    pos = 64u32 * (pb - pseg[c0 as usize]) + du * (pe - pb) + rec[1usize];
                 }
-                let pb = pseg[c as usize];
-                let pe = pseg[(c + 1u32) as usize];
-                pos = 64u32 * (pb - pseg[c0 as usize]) + du * (pe - pb) + rec[1usize];
-            }
-            let nb = wlo.count_ones() + whi.count_ones();
-            let excl = plane_exclusive_sum(nb);
-            let tot = plane_sum(nb);
-            let mut b0 = 0u32;
-            if UNIT_POS_PLANE == 0u32 && tot > 0u32 {
-                b0 = scount[0usize].fetch_add(tot);
-            }
-            let mut slot = plane_sum(b0) + excl;
-            if live {
-                let mut x = wlo;
-                while x != 0u32 {
-                    let b = x.trailing_zeros();
-                    x &= x - 1u32;
-                    if slot < scap {
-                        surv[(2u32 * slot) as usize] = ti;
-                        surv[(2u32 * slot + 1u32) as usize] = lst[(pos + b) as usize] + r0hi;
+                let nb = wlo.count_ones() + whi.count_ones();
+                let excl = plane_exclusive_sum(nb);
+                let tot = plane_sum(nb);
+                let mut b0 = 0u32;
+                if UNIT_POS_PLANE == 0u32 && tot > 0u32 {
+                    b0 = scount[0usize].fetch_add(tot);
+                }
+                let mut slot = plane_sum(b0) + excl;
+                if live {
+                    let mut x = wlo;
+                    while x != 0u32 {
+                        let b = x.trailing_zeros();
+                        x &= x - 1u32;
+                        if slot < scap {
+                            surv[(2u32 * slot) as usize] = ti;
+                            surv[(2u32 * slot + 1u32) as usize] = lst[(pos + b) as usize] + r0hi;
+                        }
+                        slot += 1u32;
                     }
-                    slot += 1u32;
-                }
-                let mut y = whi;
-                while y != 0u32 {
-                    let b = y.trailing_zeros();
-                    y &= y - 1u32;
-                    if slot < scap {
-                        surv[(2u32 * slot) as usize] = ti;
-                        surv[(2u32 * slot + 1u32) as usize] = lst[(pos + 32u32 + b) as usize] + r0hi;
+                    let mut y = whi;
+                    while y != 0u32 {
+                        let b = y.trailing_zeros();
+                        y &= y - 1u32;
+                        if slot < scap {
+                            surv[(2u32 * slot) as usize] = ti;
+                            surv[(2u32 * slot + 1u32) as usize] =
+                                lst[(pos + 32u32 + b) as usize] + r0hi;
+                        }
+                        slot += 1u32;
                     }
-                    slot += 1u32;
                 }
+                r0 += PLANE_DIM;
             }
-            r0 += PLANE_DIM;
-          }
-          s += pstride;
+            s += pstride;
         }
     }
 
@@ -1250,7 +1357,6 @@ mod post {
     }
 }
 
-
 /// The tops of a slice on the device (base 64, f0 4, k 10): one thread per
 /// prefix (unit d, lead h), the certificate by 32-bit limbs and shifts (the
 /// function of `cpu::top_cert`; n² has 26 digits and n³ 38 over the whole
@@ -1263,7 +1369,13 @@ mod dtops {
 
     /// `r = x·y` for little-endian 32-bit limbs (comptime sizes).
     #[cube]
-    fn mul(x: &Array<u32>, y: &Array<u32>, r: &mut Array<u32>, #[comptime] nx: u32, #[comptime] ny: u32) {
+    fn mul(
+        x: &Array<u32>,
+        y: &Array<u32>,
+        r: &mut Array<u32>,
+        #[comptime] nx: u32,
+        #[comptime] ny: u32,
+    ) {
         let mut acc = Array::<u64>::new(comptime!((nx + ny) as usize));
         #[unroll]
         for k in 0..comptime!(nx + ny) {
@@ -1340,7 +1452,8 @@ mod dtops {
             let d = i >> 15u32;
             let h = 32768u32 + (i & 32767u32);
             // p = h·2^36 + d·2^30 + pip, a = p·2^24, c = a + 2^24 − 1, in 32-bit limbs
-            let p = (u64::cast_from(h) << 36u64) | (u64::cast_from(d) << 30u64) | u64::cast_from(pip);
+            let p =
+                (u64::cast_from(h) << 36u64) | (u64::cast_from(d) << 30u64) | u64::cast_from(pip);
             let mut a = Array::<u32>::new(3usize);
             let mut c = Array::<u32>::new(3usize);
             a[0] = u32::cast_from((p & 0xFFu64) << 24u64);
@@ -1373,7 +1486,12 @@ mod dtops {
 
     /// One cube of 1,024: segment starts (tseg pairs), cursors, and the top count in tstat[0].
     #[cube(launch_unchecked)]
-    pub fn tscan_kernel(segc: &Array<u32>, tseg: &mut Array<u32>, cur: &mut Array<Atomic<u32>>, tstat: &mut Array<u32>) {
+    pub fn tscan_kernel(
+        segc: &Array<u32>,
+        tseg: &mut Array<u32>,
+        cur: &mut Array<Atomic<u32>>,
+        tstat: &mut Array<u32>,
+    ) {
         let mut sums = SharedMemory::<u32>::new(1024usize);
         let t = UNIT_POS_X;
         let mut local = 0u32;
@@ -1412,7 +1530,14 @@ mod dtops {
 
     /// Each certified prefix into its segment: tmask and thd = h | d << 16.
     #[cube(launch_unchecked)]
-    pub fn tops2_kernel(tm: &Array<u64>, tv: &Array<u32>, cur: &mut Array<Atomic<u32>>, tmask: &mut Array<u64>, thd: &mut Array<u32>, cap: u32) {
+    pub fn tops2_kernel(
+        tm: &Array<u64>,
+        tv: &Array<u32>,
+        cur: &mut Array<Atomic<u32>>,
+        tmask: &mut Array<u64>,
+        thd: &mut Array<u32>,
+        cap: u32,
+    ) {
         let i = ABSOLUTE_POS_X;
         if i < 2_097_152u32 {
             if tv[i as usize] == 1u32 {
@@ -1429,7 +1554,14 @@ mod dtops {
 
     /// tdigz with the top count read on the device (tstat[0]).
     #[cube(launch_unchecked)]
-    pub fn tdigz2_kernel(tmask: &Array<u64>, tdig: &mut Array<u32>, hist: &mut Array<u32>, lcnt: &mut Array<u32>, tstat: &Array<u32>, cap: u32) {
+    pub fn tdigz2_kernel(
+        tmask: &Array<u64>,
+        tdig: &mut Array<u32>,
+        hist: &mut Array<u32>,
+        lcnt: &mut Array<u32>,
+        tstat: &Array<u32>,
+        cap: u32,
+    ) {
         let i = ABSOLUTE_POS_X;
         if i < 16128u32 {
             hist[i as usize] = 0u32;
@@ -1460,7 +1592,13 @@ mod dtops {
 
     /// toprec with the top count read on the device.
     #[cube(launch_unchecked)]
-    pub fn toprec2_kernel(thd: &Array<u32>, top_rec: &mut Array<u32>, tstat: &Array<u32>, pip_hi: u32, cap: u32) {
+    pub fn toprec2_kernel(
+        thd: &Array<u32>,
+        top_rec: &mut Array<u32>,
+        tstat: &Array<u32>,
+        pip_hi: u32,
+        cap: u32,
+    ) {
         let i = ABSOLUTE_POS_X;
         if i < min(tstat[0usize], cap) {
             let h = thd[i as usize] & 0xFFFFu32;
@@ -1609,7 +1747,9 @@ fn parent_mask(r4: u64, pip: u64) -> u64 {
 
 /// Every depth-4 root, ascending (9,298,544 of them).
 pub fn depth4_roots() -> Vec<u32> {
-    (0..(1u32 << 24)).filter(|&r| root_mask(r as u64) != 0).collect()
+    (0..(1u32 << 24))
+        .filter(|&r| root_mask(r as u64) != 0)
+        .collect()
 }
 
 /// A slice's tops, as the device reads them.
@@ -1691,7 +1831,16 @@ pub fn slice_tops(pip: u64, roots: &[u32]) -> SliceTops {
         }
     }
     let rank: [u32; 8] = key_digits(64, &fp, &ft).try_into().expect("8 key digits");
-    SliceTops { pip, tmask, thd, tseg, rank, tested, maxpop, maxprobe }
+    SliceTops {
+        pip,
+        tmask,
+        thd,
+        tseg,
+        rank,
+        tested,
+        maxpop,
+        maxprobe,
+    }
 }
 
 // ------------------------------------------------------------------------------------------------ host: device
@@ -1720,7 +1869,14 @@ impl Caps {
     /// survivors: about twice that.
     #[must_use]
     pub fn b64(classes: u32) -> Self {
-        Caps { parents: 2_100_000, tops: 480_000, survivors: 24_000_000, classes, nice: NICE_CAP, probe: false }
+        Caps {
+            parents: 2_100_000,
+            tops: 480_000,
+            survivors: 24_000_000,
+            classes,
+            nice: NICE_CAP,
+            probe: false,
+        }
     }
 }
 
@@ -1819,8 +1975,14 @@ impl<R: Runtime> GpuJoin<R> {
     /// A device whose plane width the kernel does not take.
     pub fn new(client: ComputeClient<R>, caps: Caps) -> Result<Self> {
         let w = client.properties().hardware.plane_size_max;
-        ensure!([8u32, 16, 32, 64].contains(&w), "middle-out: plane width {w} not supported");
-        ensure!(caps.classes >= 1 && caps.classes <= 63, "middle-out: classes per batch 1-63");
+        ensure!(
+            [8u32, 16, 32, 64].contains(&w),
+            "middle-out: plane width {w} not supported"
+        );
+        ensure!(
+            caps.classes >= 1 && caps.classes <= 63,
+            "middle-out: classes per batch 1-63"
+        );
         let fill = if w < 32 { 512 } else { FILL };
         let check = CheckShape::new(64, 13, 26, 38, 5, 10, GATE_DIGITS)?;
         let roots = depth4_roots();
@@ -1832,14 +1994,21 @@ impl<R: Runtime> GpuJoin<R> {
         while c0 < 63 {
             let c1 = (c0 + caps.classes).min(63);
             // every job twice: probes [0, PMAX), then [PMAX, 2·PMAX) (a cube with none exits at once)
-            let mut jobs: Vec<u32> = (c0..c1).flat_map(|c| (0..64u32).flat_map(move |d| [c, d])).collect();
-            let second: Vec<u32> = jobs.chunks(2).flat_map(|x| [x[0], x[1] | PMAX << 8]).collect();
+            let mut jobs: Vec<u32> = (c0..c1)
+                .flat_map(|c| (0..64u32).flat_map(move |d| [c, d]))
+                .collect();
+            let second: Vec<u32> = jobs
+                .chunks(2)
+                .flat_map(|x| [x[0], x[1] | PMAX << 8])
+                .collect();
             jobs.extend(second);
             let nj = (jobs.len() / 2) as u32;
             batches.push((c0, c1, mk(jobs), nj));
             c0 = c1;
         }
-        let share = |x: u32| -> u32 { ((x as u64 * caps.classes as u64).div_ceil(63) as u32).saturating_add(x / 16) };
+        let share = |x: u32| -> u32 {
+            ((x as u64 * caps.classes as u64).div_ceil(63) as u32).saturating_add(x / 16)
+        };
         let scap = share(caps.survivors);
         let jobs_max = 2 * caps.classes * 64;
         let nslab_cap = scap / SLAB + jobs_max * (NT / w) + 64;
@@ -1880,7 +2049,10 @@ impl<R: Runtime> GpuJoin<R> {
             nice_count: mk(vec![0u32; 1]),
             tm: e(8 << 21),
             tv: e(4 << 21),
-            stop: std::env::var("MIDOUT_STOP").ok().and_then(|x| x.parse().ok()).unwrap_or(6),
+            stop: std::env::var("MIDOUT_STOP")
+                .ok()
+                .and_then(|x| x.parse().ok())
+                .unwrap_or(6),
             client,
         })
     }
@@ -1900,7 +2072,13 @@ impl<R: Runtime> GpuJoin<R> {
     }
 
     fn rd(&self, h: &Handle) -> Result<Vec<u32>> {
-        Ok(u32::from_bytes(&self.client.read_one(h.clone()).map_err(|e| anyhow!("read: {e:?}"))?).to_vec())
+        Ok(u32::from_bytes(
+            &self
+                .client
+                .read_one(h.clone())
+                .map_err(|e| anyhow!("read: {e:?}"))?,
+        )
+        .to_vec())
     }
 
     /// Queue one slice (every batch) into the group's counters `cnt`;
@@ -2029,8 +2207,14 @@ impl<R: Runtime> GpuJoin<R> {
         let ntops = (self.rd(&tstat)?[0] as usize).min(nt);
         let thd = self.rd(&sb.thdh)?;
         let tmw = self.rd(&sb.tmh)?;
-        let tops: Vec<(u32, u64)> =
-            (0..ntops).map(|i| (thd[i], u64::from(tmw[2 * i]) | u64::from(tmw[2 * i + 1]) << 32)).collect();
+        let tops: Vec<(u32, u64)> = (0..ntops)
+            .map(|i| {
+                (
+                    thd[i],
+                    u64::from(tmw[2 * i]) | u64::from(tmw[2 * i + 1]) << 32,
+                )
+            })
+            .collect();
         let pip_hi = pip >> 6;
         for bi in 0..self.batches.len().min(max_batches) {
             let mut t = self.queue_batch(pip, nt, &sb, bi, &cnt);
@@ -2057,15 +2241,37 @@ impl<R: Runtime> GpuJoin<R> {
     /// Upload a slice's tops and queue its preparation.
     fn queue_prep(&self, st: &SliceTops) -> Result<SliceBufs> {
         let ntops = st.tmask.len();
-        ensure!(ntops <= self.caps.tops as usize, "middle-out: slice {} has {ntops} tops > cap", st.pip);
-        ensure!(st.maxpop <= MAXPOP, "middle-out: slice {} has a top of {} digits > {MAXPOP}", st.pip, st.maxpop);
-        ensure!(st.maxprobe <= 2 * PMAX, "middle-out: slice {} has a job of {} probes > 2·{PMAX}", st.pip, st.maxprobe);
+        ensure!(
+            ntops <= self.caps.tops as usize,
+            "middle-out: slice {} has {ntops} tops > cap",
+            st.pip
+        );
+        ensure!(
+            st.maxpop <= MAXPOP,
+            "middle-out: slice {} has a top of {} digits > {MAXPOP}",
+            st.pip,
+            st.maxpop
+        );
+        ensure!(
+            st.maxprobe <= 2 * PMAX,
+            "middle-out: slice {} has a job of {} probes > 2·{PMAX}",
+            st.pip,
+            st.maxprobe
+        );
         let nt = ntops.max(1);
-        let tm = unsafe { std::slice::from_raw_parts(st.tmask.as_ptr().cast::<u8>(), st.tmask.len() * 8) };
-        let tmh = self.client.create_from_slice(if tm.is_empty() { &[0u8; 8] } else { tm });
+        let tm = unsafe {
+            std::slice::from_raw_parts(st.tmask.as_ptr().cast::<u8>(), st.tmask.len() * 8)
+        };
+        let tmh = self
+            .client
+            .create_from_slice(if tm.is_empty() { &[0u8; 8] } else { tm });
         let tsegh = self.mk(st.tseg.clone());
         let rankh = self.mk(st.rank.to_vec());
-        let thdh = self.mk(if st.thd.is_empty() { vec![0] } else { st.thd.clone() });
+        let thdh = self.mk(if st.thd.is_empty() {
+            vec![0]
+        } else {
+            st.thd.clone()
+        });
         let c = &self.client;
         let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
         unsafe {
@@ -2091,7 +2297,11 @@ impl<R: Runtime> GpuJoin<R> {
             );
         }
         self.queue_parents(st.pip, &rankh);
-        Ok(SliceBufs { tmh, tsegh, thdh: thdh.clone() })
+        Ok(SliceBufs {
+            tmh,
+            tsegh,
+            thdh: thdh.clone(),
+        })
     }
 
     /// Queue the slice's parents: the preparation of the G2 port (histogram,
@@ -2165,78 +2375,87 @@ impl<R: Runtime> GpuJoin<R> {
             let ns = self.nslab_cap as usize;
             unsafe {
                 if self.upto(3) {
-                kernels::g2_kernel::launch_unchecked::<R>(
-                    c,
-                    CubeCount::Static(*nj, 1, 1),
-                    CubeDim::new_1d(NT),
-                    a(&self.g_rec, np),
-                    a(&self.g_pseg, 64),
-                    a(tmh, nt),
-                    a(&self.g_tdig, nt * 4),
-                    a(tsegh, 64 * 63 * 2),
-                    a(&self.roots_h, NROOT),
-                    a(jobs, 2 * *nj as usize),
-                    a(cnt, NCNT),
-                    a(&self.out, ns * SLAB as usize),
-                    a(&slabn, 1),
-                    a(&self.slabcnt, ns),
-                    self.nslab_cap,
-                    a(&self.clst, self.lcap as usize),
-                    *c0,
-                    2u32,
-                    false,
-                    self.w,
-                    self.fill,
-                    1u32,
-                    2u32,
-                    1u32,
-                    0u32,
-                    1u32,
-                    1u32,
-                );
+                    kernels::g2_kernel::launch_unchecked::<R>(
+                        c,
+                        CubeCount::Static(*nj, 1, 1),
+                        CubeDim::new_1d(NT),
+                        a(&self.g_rec, np),
+                        a(&self.g_pseg, 64),
+                        a(tmh, nt),
+                        a(&self.g_tdig, nt * 4),
+                        a(tsegh, 64 * 63 * 2),
+                        a(&self.roots_h, NROOT),
+                        a(jobs, 2 * *nj as usize),
+                        a(cnt, NCNT),
+                        a(&self.out, ns * SLAB as usize),
+                        a(&slabn, 1),
+                        a(&self.slabcnt, ns),
+                        self.nslab_cap,
+                        a(&self.clst, self.lcap as usize),
+                        *c0,
+                        2u32,
+                        false,
+                        self.w,
+                        self.fill,
+                        1u32,
+                        2u32,
+                        1u32,
+                        0u32,
+                        1u32,
+                        1u32,
+                    );
                 }
                 if self.upto(5) {
-                post::expand_kernel::launch_unchecked::<R>(
-                    c,
-                    CubeCount::Static(EXPAND_CUBES, 1, 1),
-                    CubeDim::new_1d(NT),
-                    a(&self.out, ns * SLAB as usize),
-                    a(&slabn, 1),
-                    a(&self.slabcnt, ns),
-                    a(&self.g_pseg, 64),
-                    a(tsegh, 64 * 63 * 2),
-                    a(&self.roots_h, NROOT),
-                    a(&self.clst, self.lcap as usize),
-                    a(&self.lcnt, 1),
-                    a(&self.surv, 2 * self.scap as usize),
-                    a(&scount, 1),
-                    a(&stat, 2),
-                    self.nslab_cap,
-                    self.scap,
-                    *c0,
-                    ((pip & 63) as u32) << 24,
-                );
+                    post::expand_kernel::launch_unchecked::<R>(
+                        c,
+                        CubeCount::Static(EXPAND_CUBES, 1, 1),
+                        CubeDim::new_1d(NT),
+                        a(&self.out, ns * SLAB as usize),
+                        a(&slabn, 1),
+                        a(&self.slabcnt, ns),
+                        a(&self.g_pseg, 64),
+                        a(tsegh, 64 * 63 * 2),
+                        a(&self.roots_h, NROOT),
+                        a(&self.clst, self.lcap as usize),
+                        a(&self.lcnt, 1),
+                        a(&self.surv, 2 * self.scap as usize),
+                        a(&scount, 1),
+                        a(&stat, 2),
+                        self.nslab_cap,
+                        self.scap,
+                        *c0,
+                        ((pip & 63) as u32) << 24,
+                    );
                 }
                 if self.upto(6) {
-                check_kernel::launch_unchecked::<R>(
-                    c,
-                    CubeCount::Static(CHECK_CUBES, 1, 1),
-                    CubeDim::new_1d(CHECK_WG),
-                    a(&self.surv, 2 * self.scap as usize),
-                    a(&scount, 1),
-                    a(&self.top_rec, nt * 8),
-                    a(&self.nice_out, self.caps.nice as usize * NICE_STRIDE),
-                    a(&self.nice_count, 1),
-                    a(&ran, RAN_WORDS),
-                    self.scap,
-                    self.caps.nice,
-                    self.check,
-                    if self.caps.probe { crate::cubecl_join::CHECK_PROBE } else { crate::cubecl_join::CHECK_HITS },
-                    self.ballot,
-                );
+                    check_kernel::launch_unchecked::<R>(
+                        c,
+                        CubeCount::Static(CHECK_CUBES, 1, 1),
+                        CubeDim::new_1d(CHECK_WG),
+                        a(&self.surv, 2 * self.scap as usize),
+                        a(&scount, 1),
+                        a(&self.top_rec, nt * 8),
+                        a(&self.nice_out, self.caps.nice as usize * NICE_STRIDE),
+                        a(&self.nice_count, 1),
+                        a(&ran, RAN_WORDS),
+                        self.scap,
+                        self.caps.nice,
+                        self.check,
+                        if self.caps.probe {
+                            crate::cubecl_join::CHECK_PROBE
+                        } else {
+                            crate::cubecl_join::CHECK_HITS
+                        },
+                        self.ballot,
+                    );
                 }
             }
-            Ticket { ran, scount, stat, tstat: None }
+            Ticket {
+                ran,
+                scount,
+                stat,
+                tstat: None,
+            }
         }
     }
 
@@ -2268,7 +2487,11 @@ impl<R: Runtime> GpuJoin<R> {
         let mut listed = 0u64;
         for t in tickets {
             let n = self.rd(&t.scount)?[0];
-            ensure!(n <= self.scap, "middle-out: survivor list overflow {n} > {}", self.scap);
+            ensure!(
+                n <= self.scap,
+                "middle-out: survivor list overflow {n} > {}",
+                self.scap
+            );
             let ran = self.rd(&t.ran)?;
             let want_sum = (u64::from(n) * u64::from(n.saturating_sub(1)) / 2 % (1 << 32)) as u32;
             ensure!(
@@ -2279,14 +2502,33 @@ impl<R: Runtime> GpuJoin<R> {
             );
             if let Some(ts) = &t.tstat {
                 let v = self.rd(ts)?;
-                ensure!(v[0] <= self.caps.tops, "middle-out: {} tops > cap {}", v[0], self.caps.tops);
-                ensure!(v[1] == 0, "middle-out: {} tops of more than {MAXPOP} digits", v[1]);
+                ensure!(
+                    v[0] <= self.caps.tops,
+                    "middle-out: {} tops > cap {}",
+                    v[0],
+                    self.caps.tops
+                );
+                ensure!(
+                    v[1] == 0,
+                    "middle-out: {} tops of more than {MAXPOP} digits",
+                    v[1]
+                );
                 dc.tops += u64::from(v[0]);
                 dc.tested += 1 << 21;
             }
             let st = self.rd(&t.stat)?;
-            ensure!(st[0] <= self.caps.parents, "middle-out: {} parents > cap {}", st[0], self.caps.parents);
-            ensure!(st[1] <= self.nslab_cap, "middle-out: {} slabs > cap {}", st[1], self.nslab_cap);
+            ensure!(
+                st[0] <= self.caps.parents,
+                "middle-out: {} parents > cap {}",
+                st[0],
+                self.caps.parents
+            );
+            ensure!(
+                st[1] <= self.nslab_cap,
+                "middle-out: {} slabs > cap {}",
+                st[1],
+                self.nslab_cap
+            );
             listed += u64::from(n);
             dc.checked += u64::from(ran[5]);
         }
@@ -2301,12 +2543,16 @@ impl<R: Runtime> GpuJoin<R> {
     /// The nice numbers the check has written so far, ascending.
     pub(crate) fn nice(&self) -> Result<Vec<u128>> {
         let n = self.rd(&self.nice_count)?[0] as usize;
-        ensure!(n <= self.caps.nice as usize, "middle-out: nice output overflow {n}");
+        ensure!(
+            n <= self.caps.nice as usize,
+            "middle-out: nice output overflow {n}"
+        );
         let w = self.rd(&self.nice_out)?;
         let mut v: Vec<u128> = (0..n)
             .map(|i| {
                 let o = i * NICE_STRIDE;
-                (u128::from(w[o]) | u128::from(w[o + 1]) << 32) | (u128::from(w[o + 2]) | u128::from(w[o + 3]) << 32) << 64
+                (u128::from(w[o]) | u128::from(w[o + 1]) << 32)
+                    | (u128::from(w[o + 2]) | u128::from(w[o + 3]) << 32) << 64
             })
             .collect();
         v.sort_unstable();
@@ -2372,10 +2618,15 @@ pub fn search_field<R: Runtime>(
 ) -> Result<(FieldOutcome, DevCounts, FieldTiming)> {
     ensure!(coord.b == 64, "middle-out device path: base 64 only");
     let sh = Shape::for_coord(coord);
-    ensure!(sh == (Shape { f0: 4, k: 10 }), "middle-out device path: shape (4, 10) only");
+    ensure!(
+        sh == (Shape { f0: 4, k: 10 }),
+        "middle-out device path: shape (4, 10) only"
+    );
     sh.fits(coord)?;
     let ts = coord.field_digits(v_start, v_size)?;
-    let pips: Vec<u64> = ts.flat_map(|t| sh.slices_of(coord, t).map(|p| p as u64).collect::<Vec<_>>()).collect();
+    let pips: Vec<u64> = ts
+        .flat_map(|t| sh.slices_of(coord, t).map(|p| p as u64).collect::<Vec<_>>())
+        .collect();
     let nice_before = gj.nice()?;
     let t0 = Instant::now();
     let mut total = DevCounts::default();
@@ -2402,53 +2653,55 @@ pub fn search_field<R: Runtime>(
             total.add(&g);
         }
     } else {
-    let next = AtomicUsize::new(0);
-    let (tx, rx) = mpsc::sync_channel::<SliceTops>(2 * opt.host_threads.max(1) + opt.group);
-    let roots = gj.roots();
-    let res: Result<()> = std::thread::scope(|s| {
-        let rx = rx;
-        for _ in 0..opt.host_threads.max(1) {
-            let tx = tx.clone();
-            let (next, pips) = (&next, &pips);
-            s.spawn(move || {
-                loop {
-                    let i = next.fetch_add(1, Ordering::Relaxed);
-                    if i >= pips.len() {
-                        break;
+        let next = AtomicUsize::new(0);
+        let (tx, rx) = mpsc::sync_channel::<SliceTops>(2 * opt.host_threads.max(1) + opt.group);
+        let roots = gj.roots();
+        let res: Result<()> = std::thread::scope(|s| {
+            let rx = rx;
+            for _ in 0..opt.host_threads.max(1) {
+                let tx = tx.clone();
+                let (next, pips) = (&next, &pips);
+                s.spawn(move || {
+                    loop {
+                        let i = next.fetch_add(1, Ordering::Relaxed);
+                        if i >= pips.len() {
+                            break;
+                        }
+                        if tx.send(slice_tops(pips[i], roots)).is_err() {
+                            break;
+                        }
                     }
-                    if tx.send(slice_tops(pips[i], roots)).is_err() {
-                        break;
-                    }
-                }
-            });
-        }
-        drop(tx);
-        let mut done = 0usize;
-        while done < pips.len() {
-            let cnt = gj.mk(vec![0u32; NCNT]);
-            let mut tk = Vec::new();
-            let mut g = DevCounts::default();
-            let mut k = 0;
-            while k < opt.group && done < pips.len() {
-                let tw = Instant::now();
-                let st = rx.recv().map_err(|_| anyhow!("middle-out: top workers ended early"))?;
-                host_wait += tw.elapsed().as_secs_f64();
-                g.tops += st.tmask.len() as u64;
-                g.tested += st.tested;
-                gj.queue(&st, &cnt, &mut tk)?;
-                k += 1;
-                done += 1;
+                });
             }
-            let tsync = Instant::now();
-            let dc = gj.finish_group(&cnt, &tk)?;
-            sync_s += tsync.elapsed().as_secs_f64();
-            g.add(&dc);
-            g.slices = k as u64;
-            total.add(&g);
-        }
-        Ok(())
-    });
-    res?;
+            drop(tx);
+            let mut done = 0usize;
+            while done < pips.len() {
+                let cnt = gj.mk(vec![0u32; NCNT]);
+                let mut tk = Vec::new();
+                let mut g = DevCounts::default();
+                let mut k = 0;
+                while k < opt.group && done < pips.len() {
+                    let tw = Instant::now();
+                    let st = rx
+                        .recv()
+                        .map_err(|_| anyhow!("middle-out: top workers ended early"))?;
+                    host_wait += tw.elapsed().as_secs_f64();
+                    g.tops += st.tmask.len() as u64;
+                    g.tested += st.tested;
+                    gj.queue(&st, &cnt, &mut tk)?;
+                    k += 1;
+                    done += 1;
+                }
+                let tsync = Instant::now();
+                let dc = gj.finish_group(&cnt, &tk)?;
+                sync_s += tsync.elapsed().as_secs_f64();
+                g.add(&dc);
+                g.slices = k as u64;
+                total.add(&g);
+            }
+            Ok(())
+        });
+        res?;
     }
     let wall = t0.elapsed().as_secs_f64();
     let nice_all = gj.nice()?;
@@ -2461,14 +2714,30 @@ pub fn search_field<R: Runtime>(
     if !nice.is_empty() {
         // every nice number the device reports must be nice and in the field
         for &n in &nice {
-            ensure!(super::arith::unique_digits(n, 64).1, "middle-out: device reported {n}, not nice");
+            ensure!(
+                super::arith::unique_digits(n, 64).1,
+                "middle-out: device reported {n}, not nice"
+            );
         }
     }
     if total.slices != pips.len() as u64 {
         bail!("middle-out: {} of {} slices", total.slices, pips.len());
     }
-    let out = FieldOutcome { nice, survivors: total.survivors, checked: total.checked, slices: total.slices };
-    Ok((out, total, FieldTiming { wall, host_wait, sync: sync_s }))
+    let out = FieldOutcome {
+        nice,
+        survivors: total.survivors,
+        checked: total.checked,
+        slices: total.slices,
+    };
+    Ok((
+        out,
+        total,
+        FieldTiming {
+            wall,
+            host_wait,
+            sync: sync_s,
+        },
+    ))
 }
 
 /// Where a field's time went (host side).
@@ -2516,7 +2785,12 @@ mod tests {
         let st = slice_tops(pip, &[]);
         for d in [0u64, 17, 63] {
             let mut tested = 0;
-            let want = unit_tops::<u64>(&base, Shape { f0: 4, k: 10 }, u128::from(pip + (d << 30)), &mut tested);
+            let want = unit_tops::<u64>(
+                &base,
+                Shape { f0: 4, k: 10 },
+                u128::from(pip + (d << 30)),
+                &mut tested,
+            );
             let mut got: Vec<(u128, u64)> = (0..st.tmask.len())
                 .filter(|&i| u64::from(st.thd[i] >> 16) == d)
                 .map(|i| (u128::from(st.thd[i] & 0xFFFF), st.tmask[i]))
@@ -2538,13 +2812,22 @@ mod tests {
         let pip = 712_012_851u64;
         macro_rules! go {
             ($client:expr) => {{
-                let caps = Caps { classes: 1, nice: 1 << 19, probe: true, ..Caps::b64(1) };
+                let caps = Caps {
+                    classes: 1,
+                    nice: 1 << 19,
+                    probe: true,
+                    ..Caps::b64(1)
+                };
                 let gj = GpuJoin::new($client, caps).unwrap();
                 let st = slice_tops(pip, gj.roots());
                 let (dc, mut got, _) = gj.run_slice_dev(pip, &st.rank, 1).unwrap();
                 got.sort_unstable();
                 let rebuilt = gj.nice().unwrap();
-                println!("class 0 of slice {pip}: {} survivors, the check rebuilt {}", got.len(), rebuilt.len());
+                println!(
+                    "class 0 of slice {pip}: {} survivors, the check rebuilt {}",
+                    got.len(),
+                    rebuilt.len()
+                );
                 assert_eq!(dc.checked, got.len() as u64);
                 assert!(rebuilt == got, "the check's n differ from the survivors");
             }};
@@ -2579,7 +2862,9 @@ mod tests {
             .split(',')
             .map(|s| s.parse().unwrap())
             .collect();
-        let classes: u32 = std::env::var("MIDOUT_CLASSES").ok().map_or(63, |s| s.parse().unwrap());
+        let classes: u32 = std::env::var("MIDOUT_CLASSES")
+            .ok()
+            .map_or(63, |s| s.parse().unwrap());
         let coord = Coord::for_base(64).unwrap();
         let base = Base::new(&coord);
         macro_rules! go {

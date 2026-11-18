@@ -113,7 +113,16 @@ impl Coord {
         // v must fit: start + H·b^k1 (checked_mul guards the extreme bases).
         let span = hn.checked_mul(bk1).and_then(|s| s.checked_add(start));
         ensure!(span.is_some(), "middle-out: v overflows u128 at base {b}");
-        Ok(Self { b, start, end, k0, k1, q0, h0, hn })
+        Ok(Self {
+            b,
+            start,
+            end,
+            k0,
+            k1,
+            q0,
+            h0,
+            hn,
+        })
     }
 
     /// `b^e`.
@@ -134,7 +143,10 @@ impl Coord {
     /// `n` outside the range.
     #[must_use]
     pub fn v_of_n(&self, n: u128) -> u128 {
-        assert!(n >= self.start && n < self.end, "v_of_n: {n} outside the range");
+        assert!(
+            n >= self.start && n < self.end,
+            "v_of_n: {n} outside the range"
+        );
         let (bk0, bk1) = (self.pw(self.k0), self.pw(self.k1));
         let h = n / bk1;
         let key = (n % bk1) / bk0;
@@ -148,7 +160,10 @@ impl Coord {
     /// `v` outside `[start, v_end)`.
     #[must_use]
     pub fn n_of_v(&self, v: u128) -> Option<u128> {
-        assert!(v >= self.start && v < self.v_end(), "n_of_v: {v} outside the coordinate");
+        assert!(
+            v >= self.start && v < self.v_end(),
+            "n_of_v: {v} outside the coordinate"
+        );
         let (bk0, bk1) = (self.pw(self.k0), self.pw(self.k1));
         let x = v - self.start;
         let key = x / (self.hn * bk0);
@@ -287,7 +302,10 @@ mod tests {
         assert!(c.field_digits(c.start + 1, q).is_err());
         assert!(c.field_digits(c.start, q / 2).is_err());
         assert!(c.field_digits(c.v_end() - q, 2 * q).is_err());
-        assert_eq!(c.field_digits(c.start, c.v_end() - c.start).unwrap(), 0..1 << 18);
+        assert_eq!(
+            c.field_digits(c.start, c.v_end() - c.start).unwrap(),
+            0..1 << 18
+        );
     }
 
     /// Exhaustive bijection and field counts on small padded bases, every b

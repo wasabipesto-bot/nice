@@ -16,7 +16,12 @@ use std::time::Instant;
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    let opt = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
+    let opt = |name: &str| {
+        args.iter()
+            .position(|a| a == name)
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+    };
     let threads: usize = opt("--threads").map_or(Ok(15), |s| s.parse())?;
     let group: usize = opt("--group").map_or(Ok(16), |s| s.parse())?;
     let classes: u32 = opt("--classes").map_or(Ok(63), |s| s.parse())?;

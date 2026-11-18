@@ -43,7 +43,10 @@ impl Shape {
     /// (4, 10), the measured design).
     #[must_use]
     pub fn for_coord(c: &Coord) -> Self {
-        Shape { f0: c.k0, k: c.k1 + 1 }
+        Shape {
+            f0: c.k0,
+            k: c.k1 + 1,
+        }
     }
 
     /// Whether a field of `c` is a whole number of this shape's slices: the
@@ -103,7 +106,14 @@ impl Base {
             let last = *pw.last().unwrap();
             pw.push(last.saturating_mul(u128::from(c.b)));
         }
-        Base { b: c.b, start: c.start, end: c.end, l: ndigits(c.end - 1, c.b), pw, roots: roots(c.b) }
+        Base {
+            b: c.b,
+            start: c.start,
+            end: c.end,
+            l: ndigits(c.end - 1, c.b),
+            pw,
+            roots: roots(c.b),
+        }
     }
 }
 
@@ -192,8 +202,16 @@ pub fn bottoms<M: Mask>(base: &Base, k: u32, f: u32, forced: u128) -> Vec<Bot<M>
             continue;
         }
         let bj = base.pw[j as usize];
-        let b2j = if 2 * j < k { base.pw[(2 * j) as usize] } else { 0 };
-        let b3j = if 3 * j < k { base.pw[(3 * j) as usize] } else { 0 };
+        let b2j = if 2 * j < k {
+            base.pw[(2 * j) as usize]
+        } else {
+            0
+        };
+        let b3j = if 3 * j < k {
+            base.pw[(3 * j) as usize]
+        } else {
+            0
+        };
         let (dlo, dhi) = if j < f {
             (0u128, b - 1)
         } else {
@@ -253,7 +271,12 @@ pub fn unit_tops<M: Mask>(base: &Base, sh: Shape, uval: u128, tested: &mut u64) 
         }
         *tested += 1;
         if let Some(mask) = top_cert::<M>(base, a, c, k) {
-            out.push(Top { h: lead, mask, lo: a, hi: c });
+            out.push(Top {
+                h: lead,
+                mask,
+                lo: a,
+                hi: c,
+            });
         }
     }
     out
@@ -429,7 +452,8 @@ pub fn slice_join<M: Mask>(
     }
     let bk1 = base.pw[(sh.k - 1) as usize];
     let bkk = base.pw[sh.k as usize];
-    let (mut cm, mut cp, mut probes): (Vec<M>, Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut cm, mut cp, mut probes): (Vec<M>, Vec<usize>, Vec<usize>) =
+        (Vec::new(), Vec::new(), Vec::new());
     let mut sl = vec![0u64; b];
     for c in 0..m {
         for d in 0..b {
@@ -555,11 +579,17 @@ pub fn search_field<M: Mask>(
     v_size: u128,
     threads: usize,
 ) -> Result<(FieldOutcome, Counts)> {
-    ensure!(coord.b <= M::BITS, "middle-out CPU: base {} needs wider masks", coord.b);
+    ensure!(
+        coord.b <= M::BITS,
+        "middle-out CPU: base {} needs wider masks",
+        coord.b
+    );
     sh.fits(coord)?;
     let ts = coord.field_digits(v_start, v_size)?;
     let base = Base::new(coord);
-    let pips: Vec<u128> = ts.flat_map(|t| sh.slices_of(coord, t).collect::<Vec<_>>()).collect();
+    let pips: Vec<u128> = ts
+        .flat_map(|t| sh.slices_of(coord, t).collect::<Vec<_>>())
+        .collect();
     let next = AtomicU64::new(0);
     let threads = threads.max(1);
     let parts: Vec<(Vec<u128>, u64, Counts)> = std::thread::scope(|s| {
@@ -588,7 +618,10 @@ pub fn search_field<M: Mask>(
             .collect();
         hs.into_iter().map(|h| h.join().unwrap()).collect()
     });
-    let mut out = FieldOutcome { slices: pips.len() as u64, ..Default::default() };
+    let mut out = FieldOutcome {
+        slices: pips.len() as u64,
+        ..Default::default()
+    };
     let mut cn = Counts::default();
     for (n, ch, c) in parts {
         out.nice.extend(n);
@@ -644,7 +677,8 @@ mod tests {
                 // one field per quantum, plus one field of everything
                 for t in 0..nq {
                     let mut sink = Vec::new();
-                    let (o, _) = search_field::<u64>(&coord, sh, coord.start + t * q, q, 2).unwrap();
+                    let (o, _) =
+                        search_field::<u64>(&coord, sh, coord.start + t * q, q, 2).unwrap();
                     surv += o.survivors;
                     checked += o.checked;
                     nice.extend(o.nice);
@@ -653,20 +687,33 @@ mod tests {
                         slice_join::<u64>(&base_t, sh, pip, |_, n| sink.push(n));
                     }
                     for n in sink {
-                        assert_eq!((n / coord.pw(q0)) % coord.pw(k1 - q0), t, "b{b}: n {n} outside its field");
+                        assert_eq!(
+                            (n / coord.pw(q0)) % coord.pw(k1 - q0),
+                            t,
+                            "b{b}: n {n} outside its field"
+                        );
                         assert!(got.insert(n), "b{b}: n {n} twice");
                     }
                 }
-                let want: HashSet<u128> =
-                    (coord.start..coord.end).filter(|&n| q_shape::<u64>(&base, sh, n)).collect();
-                assert_eq!(got, want, "b{b} shape {sh:?}: survivors differ from brute force");
+                let want: HashSet<u128> = (coord.start..coord.end)
+                    .filter(|&n| q_shape::<u64>(&base, sh, n))
+                    .collect();
+                assert_eq!(
+                    got, want,
+                    "b{b} shape {sh:?}: survivors differ from brute force"
+                );
                 assert_eq!(surv, want.len() as u64);
                 assert_eq!(checked, surv);
                 nice.sort_unstable();
                 assert_eq!(nice, nice_brute, "b{b} shape {sh:?}");
                 let (all, _) =
-                    search_field::<u128>(&coord, sh, coord.start, coord.v_end() - coord.start, 3).unwrap();
-                assert_eq!((all.survivors, all.nice.clone()), (surv, nice_brute.clone()), "b{b} u128 masks");
+                    search_field::<u128>(&coord, sh, coord.start, coord.v_end() - coord.start, 3)
+                        .unwrap();
+                assert_eq!(
+                    (all.survivors, all.nice.clone()),
+                    (surv, nice_brute.clone()),
+                    "b{b} u128 masks"
+                );
                 if b == 10 {
                     assert_eq!(all.nice, vec![69]);
                 }
@@ -715,8 +762,10 @@ mod tests {
         let cn = slice_join::<u64>(&base, sh, pip, |d, n| got[d as usize].push(n));
         let mut off = 0;
         for (d, &c) in counts.iter().enumerate() {
-            let mut want: Vec<u128> =
-                raw[off..off + 16 * c].chunks_exact(16).map(|x| u128::from_le_bytes(x.try_into().unwrap())).collect();
+            let mut want: Vec<u128> = raw[off..off + 16 * c]
+                .chunks_exact(16)
+                .map(|x| u128::from_le_bytes(x.try_into().unwrap()))
+                .collect();
             want.sort_unstable();
             got[d].sort_unstable();
             assert_eq!(got[d], want, "unit {d}");

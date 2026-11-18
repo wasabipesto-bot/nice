@@ -15,6 +15,21 @@
 //! `survivors` and `checked` ([`cpu::FieldOutcome`]); both are properties of
 //! (shape, field), so they are reported with the shape's label.
 
+// Development code (the port's kernels keep their own style; arithmetic
+// names follow the papers' single letters).
+#![allow(
+    clippy::chunks_exact_to_as_chunks,
+    clippy::manual_midpoint,
+    clippy::manual_range_contains,
+    clippy::manual_rotate,
+    clippy::many_single_char_names,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate,
+    clippy::needless_for_each,
+    clippy::too_many_lines,
+    clippy::type_complexity
+)]
+
 pub mod arith;
 pub mod coord;
 pub mod cpu;

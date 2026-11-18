@@ -38,7 +38,10 @@ impl U384 {
                 }
                 carry = cur >> 64;
             }
-            assert!(carry == 0 && (NL - i..NL).all(|j| o.0[j] == 0), "U384 overflow");
+            assert!(
+                carry == 0 && (NL - i..NL).all(|j| o.0[j] == 0),
+                "U384 overflow"
+            );
         }
         U384(r)
     }
@@ -87,7 +90,11 @@ pub fn unique_digits(n: u128, b: u32) -> (u32, bool) {
     let mut seen = [false; 256];
     let mut tot = 0u32;
     let mut u = 0u32;
-    for d in sq.digits(u64::from(b)).into_iter().chain(cu.digits(u64::from(b))) {
+    for d in sq
+        .digits(u64::from(b))
+        .into_iter()
+        .chain(cu.digits(u64::from(b)))
+    {
         if !seen[d as usize] {
             seen[d as usize] = true;
             u += 1;
