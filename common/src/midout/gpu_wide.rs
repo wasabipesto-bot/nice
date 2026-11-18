@@ -96,6 +96,8 @@ const C_ERR_PLANE: usize = 361;
 const C_ERR_PMAX: usize = 362;
 const C_ERR_SLAB: usize = 363;
 const C_ERR_CLASS: usize = 364;
+/// Job instances that ran to their end (a launch that never ran leaves every other counter at a consistent zero).
+const C_JOBS: usize = 365;
 const NCNT: usize = 368;
 /// The check's grid.
 const CHECK_CUBES: u32 = 2048;
@@ -111,7 +113,8 @@ const RF_BITS: u32 = 25;
 // ------------------------------------------------------------------------------------------------ device
 mod wk {
     use super::{
-        C_ERR_CLASS, C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB, C_LSLOTS, NT, PMAX, RF_BITS, SLAB, TDW,
+        C_ERR_CLASS, C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB, C_JOBS, C_LSLOTS, NT, PMAX, RF_BITS, SLAB,
+        TDW,
     };
     use cubecl::prelude::*;
 
@@ -743,6 +746,7 @@ mod wk {
         if t == 0u32 {
             cnt[(d * 5u32 + 2u32) as usize].fetch_add(my_flat);
             cnt[C_LSLOTS].fetch_add(my_lslots);
+            cnt[C_JOBS].fetch_add(1u32);
         }
     }
 }
@@ -1764,7 +1768,8 @@ impl WideCaps {
             0..=40 => (1 << 20, 1 << 20, 1 << 22, 4, 20),
             41..=64 => (2_100_000, 480_000, 24_000_000, 2, 17),
             65 => (4_000_000, 3_000_000, 40_000_000, 2, 18),
-            _ => (4_000_000, 12_000_000, 40_000_000, 12, 19),
+            // base 68: 89M prefixes and ~143M survivors per slice; 3.5k-6.3k probes per job (bases/RESULTS.md)
+            _ => (4_000_000, 16_000_000, 200_000_000, 12, 19),
         };
         WideCaps {
             parents,
@@ -1816,6 +1821,8 @@ struct WSlice {
 }
 
 struct WTicket {
+    /// Job instances the batch launched.
+    jobs: u32,
     ran: Handle,
     scount: Handle,
     stat: Handle,
@@ -2256,6 +2263,7 @@ impl<R: Runtime> WideJoin<R> {
             }
         }
         WTicket {
+            jobs: if self.upto(3) { *nj } else { 0 },
             ran,
             scount,
             stat,
@@ -2298,6 +2306,12 @@ impl<R: Runtime> WideJoin<R> {
             dc.kept += v[d * 5 + 3] as u64;
             dc.survivors += v[d * 5 + 4] as u64;
         }
+        let jobs: u64 = tickets.iter().map(|t| u64::from(t.jobs)).sum();
+        ensure!(
+            u64::from(v[C_JOBS]) == jobs,
+            "middle-out wide: {} of {jobs} job instances ran",
+            v[C_JOBS]
+        );
         let mut listed = 0u64;
         for t in tickets {
             let n = self.rd(&t.scount)?[0];
