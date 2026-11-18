@@ -4,6 +4,37 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);
+  **credit $10.96: $0.96 above my floor, and the fleet's ≈ $1.85 a day takes it under $10 today:
+  no rentals from here until the account is topped up; at that rate it is empty in about six
+  days.** No day missed. No user message since 11-16 16:20 UTC: decision 9 (pursue G2 or not)
+  unanswered. Main unchanged (7e0113f), no release (latest v3.4.7), only the user's draft #255
+  open. Nothing deployed since yesterday's measurements.
+- **G2** is complete up to the point that needs the user (hand CUDA ×5.1, portable port ×3.9 on
+  NVIDIA, the 9070 XT predicted ≈ ×4.7 against a stop line of ×4.0, a 45-minute window staged).
+- **Thinking before starting anything (mine, an hour):** what else could be novel and large?
+  The pairing floor is real (a bit-sliced word tests a pair in 0.25 lookups; tries over tops
+  cannot beat it at these list sizes: checked again by hand). Power-of-two digit structure at
+  b64 gives bit-count identities with no arithmetic handle. Sub-exhaustive detailed statistics
+  would change what the project records. **One idea survives: the search throws away its near
+  misses.** A number with b − 1 distinct digits is ≈ C(b, 2) times likelier than a nice one
+  (≈ 0.4 expected in base 62), b − 2 about a million times (hundreds). The full check already
+  computes the digits of every candidate that reaches it; counting repeats instead of stopping
+  would find the near misses whose end digits are clean (over half by a rough count) for a
+  small cost, and the wire format and the server already carry `num_uniques`. Base 62 is 14 %
+  done and loses ≈ 1.2 % a day.
+- **Plan (CPU only today):**
+  - **NM, near misses as a by-product** (`NM/BRIEF.md`, Opus): exact definition and coverage
+    (model and brute force), yield from the measured niceness tail on real b62 / b64 partitions,
+    a CPU prototype in a scratch worktree, a priced design for the GPU check kernel, how the
+    server and site treat such entries, a one-page proposal (a new feature: the user's yes
+    first). **Kill: more than 3 % of a field at m = 2, or fewer than 30 expected numbers with
+    ≥ b − 2 digits over the rest of b62 plus b64.** Hard stop 11:30 UTC.
+  - Side task: a minimal reproduction and draft report of the second CubeCL defect (invalid
+    SPIR-V for `loop` / `break`), by the engineer who hit it.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);
