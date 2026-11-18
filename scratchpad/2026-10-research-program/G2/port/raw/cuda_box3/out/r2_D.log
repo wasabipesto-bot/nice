@@ -1,0 +1,20 @@
+loaded 238813 tops, pip 712012851, 1042046 parents; key digits [1, 2, 3, 16, 36, 0, 4, 17]; admissible n in the super-unit 4.4679e12 (0.6s)
+jobs: 4032 (all)
+CPU ref (4032 jobs): Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 123163397, surv: 11768560 } (7.3s)
+device: NVIDIA GeForce RTX 3080; plane size min 32 max 32; compiler: CUDA (cubecl-cpp)
+fill 1024 children per round (16 chunks)
+transpose: shuffle_xor stages
+entries per unit per step: 2
+plane ranks: ballot + popcount
+common masks: from the transpose
+prep: one root pass + list scatter (list 1042046 of 1042046)
+PREP (GPU, 5 launches) median 0.645 ms (200 reps) for 1042046 parents from 9298544 roots: 619.4 ps per parent; largest bucket 573; order, records, class segments and top digits EQUAL to the CPU's
+MODE probes off median 1.684 ms (200 reps) Counts { children: 33705647, chunks: 528635, flat: 0, kept: 0, surv: 0 } lane slots 0 errors: plane 0 pmax 0 slab 0
+COUNTS probes off: EQUAL to the CPU reference
+MODE skip off   median 5.534 ms (200 reps) Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 250486772, surv: 11768560 } lane slots 250486772 errors: plane 0 pmax 0 slab 0
+COUNTS skip off: EQUAL to the CPU reference
+MODE full       median 5.262 ms (200 reps) Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 123163397, surv: 11768560 } lane slots 203564717 errors: plane 0 pmax 0 slab 0
+COUNTS full: EQUAL to the CPU reference
+RESULT ps per child 49.97; ps per kept word all-in 29.05; kernel full 1.1778 fs per admissible n (scaled by jobs/4032)
+RESULT end-to-end (GPU prep + full) 5.908 ms = 1.3222 fs per admissible n (tops and survivor checks not included)
+ALL CHECKS PASSED

@@ -145,15 +145,18 @@ pub fn run_su(base: &Base, f0: u32, k: u32, pip: u128, q: f64, seed: u64, want_s
     let mut dg: Vec<usize> = (0..b).collect();
     // stable tie-break by digit index ascending (std::sort in the bench is not stable; ties are rare)
     dg.sort_by(|&x, &y| (fp[y] * ft[y]).partial_cmp(&(fp[x] * ft[x])).unwrap().then(x.cmp(&y)));
-    let rank: Vec<usize> = dg[..8].to_vec();
+    // key width: 8 bits (the benchmark's); G2_KEYBITS overrides (tuning experiment only)
+    let kb: usize = std::env::var("G2_KEYBITS").ok().and_then(|x| x.parse().ok()).unwrap_or(8).min(32);
+    let rank: Vec<usize> = dg[..kb].to_vec();
     cn.key_digits = rank.iter().map(|&x| x as u32).collect();
-    let key8 = |mk: Mask| -> u32 {
-        let mut kk = 0u32;
-        for (i, &v) in rank.iter().enumerate() { kk |= (((mk >> v) & 1) as u32) << (7 - i); }
+    let key8 = |mk: Mask| -> u64 {
+        let mut kk = 0u64;
+        for (i, &v) in rank.iter().enumerate() { kk |= (((mk >> v) & 1) as u64) << (kb - 1 - i); }
         kk
     };
     let mut ps = ps;
-    ps.sort_by_key(|p| p.cls * 256 + (255 - key8(p.mask))); // stable
+    let kmax = (1u64 << kb) - 1;
+    ps.sort_by_key(|p| ((p.cls as u64) << kb) + (kmax - key8(p.mask))); // stable
     let mut pseg = vec![0usize; m + 1];
     {
         let mut i = 0;

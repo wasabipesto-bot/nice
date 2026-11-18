@@ -5,6 +5,77 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## G2.8 G2 above base 64: the counts carry to bases 65–70; the price rests on guesses on both sides (2026-11-18 12:58–13:37 UTC, investigator, ivory CPU only; `G2/BASES-BRIEF.md`, `G2/bases/RESULTS.md`, `NOTES.md`, `proto/` (the prototype with u128 masks and 384-bit integers), `price.py`, `today_wide.py`, `indep.py`, `raw/`)
+
+- **Question (the user's, 2026-11-18):** is G2 only useful at base 64, or at the bases after it too?
+- **The widened prototype is exact** [M]: reproduces every recorded b62 / b64 count including the benchmark
+  super-unit (parents 1,042,046, children 33,705,647, chunks 528,635, flat 250,486,772, kept 123,163,397,
+  survivors 11,768,560); 21 whole small bases b10–b29 (every b mod 5 class, odd bases 13, 17, 25, 29) equal
+  brute force through the super-unit pipeline; above 64, 8 real units (two per base) equal an independent
+  Python enumeration, with masks reaching bit 64 (b65) and bit 69 (b70).
+- **Counts on 6 random real super-units per base** (4 at b64), sampling error ≤ 0.2 % [M]. Shape (4, 10) stays
+  right at 65, 68, 69; base 70 moves to (4, 11).
+- **Priced with v10's measured unit costs at b64 and guessed width factors** (64-pair word ×1.0–1.35 above 64)
+  [D/G], per admissible n on one RTX 3080, low–central–high:
+
+  | base | admissible n vs b64 [M] | G2 fs | today's join widened, fs [D from October's CPU `exp/join-wide`] | ratio worst–central–best | card-years G2 | card-years widened today |
+  |---|---|---|---|---|---|---|
+  | 64 | ×1.00 | 1.23–1.24–1.34 | 6.35 [M] | ×4.7–5.1–5.2 | 0.19 | 0.97 |
+  | 65 | ×0.905 | 2.5–3.1–4.2 | 19.7–22.9–37.9 | ×4.7–7.4–15 | 0.34–0.43–0.58 | 2.7–3.1–5.2 |
+  | 68 | ×17.2 | 1.3–1.6–2.1 | 12.2–14.2–23.5 | ×5.9–8.8–18 | 3.5–4.2–5.4 | 32–37–62 |
+  | 69 | ×42.0 | 1.1–1.3–1.7 | 9.0–10.5–17.3 | ×5.2–7.8–16 | 7.0–8.5–11 | 57–67–110 |
+  | 70 | ×620.7 | 0.79–1.00–1.30 (shape (4, 11)) | 6.7–8.8–16.1 | ×5.1–8.7–20 | 74–94–123 | 630–830–1,520 |
+
+- **Why the ratio rises above 64** [D]: today's join pays per n, and a base with few roots has few admissible n
+  per n (b65 has one root of 64 classes); G2 spreads its bottoms and preparation over a leading range b times
+  wider at 14 digits. Base 65's single root makes tops ×7.6 dearer per admissible n (0.6 fs, 19 % of its G2
+  cost). The common-mask skip weakens above 64 (kept 0.53–0.62 against 0.49; structural).
+- **Not counted:** at b68 / b69 a (class, unit) block has 3.5k–6.3k probes against v10's 576-probe shared table,
+  so probe tiling is required (four-Russians tables would pay there).
+- **Work unit above 64** [D]: same super-unit; the coordinate is padded (≤ 0.0002 % of the range, no more bits
+  than n); fields must be integer multiples of H·b^5 (239,394,642,621,875 at b65), not powers of 2 or 10.
+- **What production runs above 64 today is the stride path**, ×209–435 slower than a widened join on the CPU
+  (October): against it G2 is ×1,000 or more.
+- **Conclusion:** the design is not base-64-specific; the exact counts say its cost per admissible n stays
+  within ×0.8–2.5 of base 64's through base 70, and no band against today's design widened falls below ×4.7.
+  Nothing above 64 has run on a GPU. One run settles G2's side: v10 widened on one real b65 super-unit on a
+  3080 (≤ 3.1 fs confirms the central figure; above 4.2 fs puts b65 under ×5).
+- **Rule notes:** ivory's disk fell to 0.8–1.2 GB free at 13:13 UTC (another session's 5.4 GB debug build in
+  `.worktrees/gpu-probe-msg`); the investigator deleted its own dumps and once rebuilt its 1 MB prototype below
+  the 5 GB rule. The b65 super-unit was not staged for lack of disk (command in `bases/RESULTS.md` §6). I freed
+  3.5 GB of my own afterwards (a rebuildable target directory; BX's raw samples archived to braize, checksum
+  verified, list in `BX/a3-adversary/DATA-ARCHIVED.txt`).
+
+## G2.7 The tuned port on the RX 9070 XT, first run: exact at 64 lanes; ×3.92 by the protocol, off the operating point, preparation 1.84 ms (2026-11-18 13:05–13:33 UTC, director, demoux under the user's 4-hour lease; `G2/WINDOW-PLAN.md`, `G2/port/raw/window_1118/` (go.out, 96 logs and samples); builds on demoux: g2 = 4170a781, g2_pre = 9ff100e6, main = nice_common's test binary at 7e0113fc with `gpu,cubecl-spirv`; Mesa 26.1.6 RADV)
+
+- **Exact** [M]: variants A (both super-units), B and D (first super-unit) print ALL CHECKS PASSED (survivor
+  sets, counts, GPU preparation's records and order, plane and slab errors 0): the first hardware run of the
+  64-lane path. Counts equal in all 34 timing runs.
+- **Main** [M]: ten base-64 1e17 fields 597.8 s (77.58, 90.83, 0.02, 97.88, 0.03, 100.41, 107.68, 0.02, 15.05,
+  108.25), 4.707 fs per admissible n, at 3,107–3,142 MHz and 304 W.
+- **G2 by the pre-registered formula** [M] (end to end = GPU preparation + full kernel, + 0.085 fs for tops and
+  survivor checks):
+
+  | variant | prep ms | full ms | end to end fs (median, min) | ratio |
+  |---|---|---|---|---|
+  | A (tuned, `--tdig 0`) | 1.83–1.92 | 3.32 | 1.156, 1.154 | ×3.79 |
+  | D (tuned, `--tdig 1`) | 1.84–1.91 | 3.13–3.15 | 1.114, 1.111 | **×3.92** |
+  | C (one entry per step) | 1.83–1.92 | 3.32 | 1.153 | ×3.80 |
+  | B (ballot transpose) | 1.84–1.92 | 4.97 | 1.524 | ×2.93 |
+  | P (pre-tuning build) | 2.37 | 4.56 | 1.550 | ×2.88 |
+
+- **The tuning was worth ×1.36 on the card** (P against D), about what the ACO counts said for the kernel
+  (4.56 → 3.13 ms); D beats A as predicted.
+- **Every G2 timing run is off the operating point** [M]: 6–10 samples at ≥ 80 % busy, clock medians
+  1,958–2,878 MHz against 3,150, power 148–303 W: the runs are 2–4 s bursts. **The times barely move with the
+  sampled clock** (prep 1.83–1.92 ms and full 3.32 ms at 1,958 and at 2,864 MHz alike).
+- **The miss against the model is the preparation**: 1.84 ms for five launches where the model said 0.15–0.45
+  and a 3080 measured 0.70 before today's changes; the kernel (2.76–3.32 ms) is near the model's central
+  2.9 ms. With the preparation at 0.4 ms, D would read about ×5.3 [D].
+- **Reading:** below ×4.0 by the letter of the proposal's rule, on runs the plan itself says to read by their
+  clock. Not a verdict yet: an engineer uses the rest of the lease on the launch cost, the preparation and a
+  pipelined protocol (`G2/DEMOUX-BRIEF.md`).
+
 ## G2.6 The port tuned offline for RDNA4 and against the CUDA gap: kernel issue cost −30 % by ACO, 12 waves; nothing timed (2026-11-18 08:15–10:52 UTC, engineer, ivory only; `G2/TUNE-BRIEF.md`, `G2/TUNE-RESULTS.md`, `G2/PORT-NOTES.md`, `G2/WINDOW-PLAN.md`, `G2/port/raw/tune/` (ACO and SASS counts, exactness logs, scripts, `dircheck/` = my runs); branch `g2-cubecl-local` 9ff100e6 → 4170a781, eleven commits, never pushed; bundle current)
 
 - **Measured, ACO for GFX1201 (Mesa 26.0.8, drm-shim), per wave-iteration** [M]: 3b step 217 → 169 VALU (−22 %),

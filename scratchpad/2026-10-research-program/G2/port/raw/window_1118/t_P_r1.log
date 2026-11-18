@@ -1,0 +1,22 @@
+START t_P_r1 13:31:29 dev=card md5=d7b18bd7 su=su64_712012851 args=[--gpu-prep --no-sets --reps 400]
+loaded 238813 tops, pip 712012851, 1042046 parents; key digits [1, 2, 3, 16, 36, 0, 4, 17]; admissible n in the super-unit 4.4679e12 (0.5s)
+jobs: 4032 (all)
+CPU ref (4032 jobs): Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 123163397, surv: 11768560 } (5.9s)
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+device: AMD Radeon RX 9070 XT (RADV GFX1201) (Vulkan, wgpu<spirv>); plane size min 32 max 64; compiler: SPIR-V (cubecl-spirv)
+fill 1024 children per round (16 chunks)
+transpose: shuffle_xor stages
+entries per unit per step: 2
+plane ranks: ballot + popcount
+common masks: from the transpose
+PREP (GPU, 5 launches) median 2.370 ms (400 reps) for 1042046 parents from 9298544 roots: 2273.9 ps per parent; largest bucket 573; order, records, class segments and top digits EQUAL to the CPU's
+MODE probes off median 2.493 ms (400 reps) Counts { children: 33705647, chunks: 528635, flat: 0, kept: 0, surv: 0 } lane slots 0 errors: plane 0 pmax 0 slab 0
+COUNTS probes off: EQUAL to the CPU reference
+MODE skip off   median 4.737 ms (400 reps) Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 250486772, surv: 11768560 } lane slots 250486772 errors: plane 0 pmax 0 slab 0
+COUNTS skip off: EQUAL to the CPU reference
+MODE full       median 4.555 ms (400 reps) Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 123163397, surv: 11768560 } lane slots 203564717 errors: plane 0 pmax 0 slab 0
+COUNTS full: EQUAL to the CPU reference
+RESULT ps per child 73.96; ps per kept word all-in 16.74; kernel full 1.0195 fs per admissible n (scaled by jobs/4032)
+RESULT end-to-end (GPU prep + full) 6.925 ms = 1.5499 fs per admissible n (tops and survivor checks not included)
+ALL CHECKS PASSED
+END t_P_r1 13:31:48 rc=0

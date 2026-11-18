@@ -1,7 +1,6 @@
-mod andv;
-mod pipe;
 mod arith;
 mod join;
+mod su;
 
 use join::*;
 use std::collections::HashSet;
@@ -106,73 +105,12 @@ fn main() {
                     stn.top_tested as f64 / adm, stn.top_cert as f64 / adm, stn.bot.visits as f64 / adm,
                     stn.bot_cert as f64 / adm, stn.pairs as f64 / adm, stn.survivors as f64 / adm
                 );
-                // pairing variants
-                if std::env::var("G2_PIPE").is_ok() {
-                    for cl in [false, true] {
-                        pipe::run(&base, f0, k, uval, &ln.tops, stn.survivors, adm, cl);
-                    }
-                }
-                if std::env::var("G2_NOCLUSTER").is_err() {
-                    // clustering counts, both orientations
-                    let m = (b - 1) as usize;
-                    let mut tg: Vec<Vec<u64>> = vec![Vec::new(); m];
-                    for (_, t) in &ln.tops { tg[(t.h % m as u128) as usize].push(t.mask); }
-                    let mut bg: Vec<Vec<u64>> = vec![Vec::new(); m];
-                    for x in &ln.bots { bg[(x.r % m as u128) as usize].push(x.mask); }
-                    let mut pb = Vec::new();
-                    for x in &ln.bots { let cb = (x.r % m as u128) as u64; for &rt in &base.roots { pb.push((x.mask, ((rt + m as u64 - cb) % m as u64) as usize)); } }
-                    let mut pt = Vec::new();
-                    for (_, t) in &ln.tops { let ct = (t.h % m as u128) as u64; for &rt in &base.roots { pt.push((t.mask, ((rt + m as u64 - ct) % m as u64) as usize)); } }
-                    {
-                        // TD with flat chunks sorted by (a) the child's own mask, (b) the parent's mask (shareable by the 62-64 sibling units)
-                        let bk1 = base.pw[(k - 1) as usize];
-                        let bkk = base.pw[k as usize];
-                        let mut it_child: Vec<Vec<(u64, u64)>> = vec![Vec::new(); m];
-                        let mut it_par: Vec<Vec<(u64, u64)>> = vec![Vec::new(); m];
-                        for x in &ln.bots {
-                            let r2 = (x.r * x.r) % bkk; let r3 = (r2 * x.r) % bkk;
-                            let e2 = (r2 / bk1) % b as u128; let e3 = (r3 / bk1) % b as u128;
-                            let pm = x.mask & !((1u64 << e2) | (1u64 << e3));
-                            let g = (x.r % m as u128) as usize;
-                            it_child[g].push((x.mask, x.mask));
-                            it_par[g].push((x.mask, pm));
-                        }
-                        let (f1, k1) = andv::sorted_chunks_eval(&it_child, &pt);
-                        let (f2, k2) = andv::sorted_chunks_eval(&it_par, &pt);
-                        println!("  SORTED TD: flat {} | child-key kept {} ({:.3}, {:.3e}/adm) | parent-key kept {} ({:.3}, {:.3e}/adm)",
-                            f1, k1, k1 as f64 / f1 as f64, k1 as f64 / adm, k2, k2 as f64 / f2 as f64, k2 as f64 / adm);
-                    }
-                    for (name, items, probes) in [("bottom-driven (tops chunked)", &tg, &pb), ("top-driven (bottoms chunked)", &bg, &pt)] {
-                        for w in [false, true] {
-                        let o = andv::cluster_eval_w(items, probes, w);
-                        println!("  CLUSTER{} {}: pairs {} flat_chunks {} ({:.3e}/adm) trie_leaves {} kept {} ({:.3} of flat, {:.3e}/adm) descent_nodes {} ({:.3} of flat)",
-                            if w { "(probe-weighted)" } else { "" }, name, o[0], o[1], o[1] as f64 / adm, o[2], o[3], o[3] as f64 / o[1] as f64, o[3] as f64 / adm, o[4], o[4] as f64 / o[1] as f64);
-                        }
-                    }
-                }
-                for by_mask in (if std::env::var("G2_NOVAR").is_ok() { vec![] } else { vec![false, true] }) {
-                let groups = andv::build_groups(&base, &ln.tops, by_mask);
-                let vs = andv::run_variants(&base, &groups, &ln.bots, reps);
-                println!("  [chunk order: {}]", if by_mask { "mask-clustered" } else { "leading digits" });
-                println!(
-                    "  variants: pairs {} chunk_inc {} kept {} ({:.3}) schunk_inc {} kept {} ({:.3}) digit_ops {} surv {:?}",
-                    vs.pairs, vs.chunk_inc, vs.chunk_kept, vs.chunk_kept as f64 / vs.chunk_inc as f64,
-                    vs.schunk_inc, vs.schunk_kept, vs.schunk_kept as f64 / vs.schunk_inc.max(1) as f64, vs.digit_ops, vs.surv
-                );
-                println!(
-                    "  ns/pair: scalar {:.4} sliced {:.4} 4R {:.4} 4R+skip {:.4} 4R+2skip {:.4} | ns/bottom-chunk: sliced {:.3} 4R {:.3}",
-                    vs.secs[0] * 1e9 / vs.pairs as f64, vs.secs[1] * 1e9 / vs.pairs as f64,
-                    vs.secs[2] * 1e9 / vs.pairs as f64, vs.secs[3] * 1e9 / vs.pairs as f64,
-                    vs.secs[4] * 1e9 / vs.pairs as f64,
-                    vs.secs[1] * 1e9 / vs.chunk_inc as f64, vs.secs[2] * 1e9 / vs.chunk_inc as f64
-                );
-                }
                 if a.get(8).map(|x| x == "streamref").unwrap_or(false) {
                     // streamed reference: every S_ref member that satisfies Q_new (by list lookup) must be in S_new
                     use std::collections::HashMap;
                     let setn: HashSet<u128> = sn_out.iter().copied().collect();
-                    let tmap: HashMap<u128, u64> = ln.tops.iter().map(|(_, t)| (t.h, t.mask)).collect();
-                    let bmap: HashMap<u128, u64> = ln.bots.iter().map(|x| (x.r, x.mask)).collect();
+                    let tmap: HashMap<u128, Mask> = ln.tops.iter().map(|(_, t)| (t.h, t.mask)).collect();
+                    let bmap: HashMap<u128, Mask> = ln.bots.iter().map(|x| (x.r, x.mask)).collect();
                     let mut str_ = JoinStats::default();
                     let tr0 = Instant::now();
                     let lr = unit_lists(&base, &sr, f0, k, uval, &mut str_);
@@ -290,11 +228,13 @@ fn main() {
                 let mut st = JoinStats::default();
                 let ln = unit_lists(&base, &sn, f0, k, uval, &mut st);
                 let out_n = join_scalar(&base, &sn, f0, &ln, &mut st);
-                // tops record: d u32, h u64, mask u64, lo u128, hi u128  (little endian)
+                // tops record: d u32, h u64, mask (u64 if b <= 64 = the bench's 40-byte format; u128 above: 48 bytes),
+                // lo u128, hi u128 (little endian)
                 for (_, t) in &ln.tops {
                     tf.write_all(&(d as u32).to_le_bytes()).unwrap();
+                    assert!(t.h < (1u128 << 64));
                     tf.write_all(&(t.h as u64).to_le_bytes()).unwrap();
-                    tf.write_all(&t.mask.to_le_bytes()).unwrap();
+                    if b <= 64 { tf.write_all(&(t.mask as u64).to_le_bytes()).unwrap(); } else { tf.write_all(&t.mask.to_le_bytes()).unwrap(); }
                     tf.write_all(&t.lo.to_le_bytes()).unwrap();
                     tf.write_all(&t.hi.to_le_bytes()).unwrap();
                 }
@@ -306,6 +246,120 @@ fn main() {
             }
             writeln!(meta, "total tops {} bottoms {} pairs {} surv {}", tt, bb, pp, ss).unwrap();
         }
+
+        // su b f0 k pip q seed [verify_units]: one super-unit (digits [f0,k-1) = pip) through the G2 CPU reference;
+        // verify_units > 0: the first V units' survivor sets against the scalar keyed join (direct depth-k bottoms DFS,
+        // same sampled tops), an independent path inside this crate
+        "su" => {
+            let b: u64 = a[2].parse().unwrap();
+            let f0: u32 = a[3].parse().unwrap();
+            let k: u32 = a[4].parse().unwrap();
+            let pip: u128 = a[5].parse().unwrap();
+            let q: f64 = a[6].parse().unwrap();
+            let seed: u64 = a[7].parse().unwrap();
+            let nver: usize = a.get(8).map(|x| x.parse().unwrap()).unwrap_or(0);
+            let base = Base::new(b);
+            let t0 = Instant::now();
+            let (cn, sets, tops) = su::run_su(&base, f0, k, pip, q, seed, nver > 0, true);
+            let secs = t0.elapsed().as_secs_f64();
+            print_su(&base, f0, k, pip, q, &cn, secs);
+            if nver > 0 {
+                let step = base.pw[(k - 1 - f0) as usize];
+                let s = Shape { fr: f0, kr: k };
+                for d in 0..nver.min(b as usize) {
+                    let uval = pip + d as u128 * step;
+                    let mut st = JoinStats::default();
+                    let bots = bottoms(&base, k, f0, uval, &mut st.bot);
+                    let lists = UnitLists { tops: tops[d].iter().map(|t| (0u64, *t)).collect(), bots };
+                    let mut v = Vec::new();
+                    join_cb(&base, &s, f0, &lists, &mut st, |n| v.push(n));
+                    v.sort();
+                    // and every survivor satisfies the direct predicate (sampled up to 2000)
+                    for &n in v.iter().step_by((v.len() / 2000).max(1)) { assert!(q_shape(&base, &s, n), "q_shape fails {n}"); }
+                    println!("  VERIFY unit {d}: pipeline {} scalar join {} equal={}", sets[d].len(), v.len(), sets[d] == v);
+                    assert!(sets[d] == v);
+                }
+            }
+        }
+        // unitat b f0 k uval [dumpfile]: one unit's lists + scalar join (counts as the recorded UNIT lines)
+        "unitat" => {
+            let b: u64 = a[2].parse().unwrap();
+            let f0: u32 = a[3].parse().unwrap();
+            let k: u32 = a[4].parse().unwrap();
+            let uval: u128 = a[5].parse().unwrap();
+            let base = Base::new(b);
+            let s = Shape { fr: f0, kr: k };
+            let mut st = JoinStats::default();
+            let ln = unit_lists(&base, &s, f0, k, uval, &mut st);
+            let mut out = join_scalar(&base, &s, f0, &ln, &mut st);
+            out.sort();
+            println!("UNITAT b{} pi={} shape(f0 {}, k {}) tops {}/{} bots {} (visits {}, nodes {}) pairs {} surv {} maxuniq {} nice {}",
+                b, uval, f0, k, st.top_cert, st.top_tested, st.bot_cert, st.bot.visits, st.bot.nodes, st.pairs, st.survivors, st.max_unique, st.nice.len());
+            if let Some(f) = a.get(6) {
+                use std::io::Write;
+                let mut w = std::io::BufWriter::new(std::fs::File::create(f).unwrap());
+                for n in &out { writeln!(w, "{n}").unwrap(); }
+            }
+        }
+        // sample b f0 k nsu q seed: random super-units, one SU line each
+        "sample" => {
+            let b: u64 = a[2].parse().unwrap();
+            let f0: u32 = a[3].parse().unwrap();
+            let k: u32 = a[4].parse().unwrap();
+            let nsu: u32 = a[5].parse().unwrap();
+            let q: f64 = a[6].parse().unwrap();
+            let mut seed: u64 = a[7].parse().unwrap();
+            let base = Base::new(b);
+            let span = base.pw[(k - 1 - f0) as usize];
+            for _ in 0..nsu {
+                let pip = (((rng(&mut seed) as u128) << 64) | rng(&mut seed) as u128) % span;
+                let t0 = Instant::now();
+                let (cn, _, _) = su::run_su(&base, f0, k, pip, q, seed, false, false);
+                print_su(&base, f0, k, pip, q, &cn, t0.elapsed().as_secs_f64());
+            }
+        }
+        // smallsu b f0 k: every super-unit of a small base through the G2 pipeline vs brute force (q_shape on every n)
+        "smallsu" => {
+            let b: u64 = a[2].parse().unwrap();
+            let f0: u32 = a[3].parse().unwrap();
+            let k: u32 = a[4].parse().unwrap();
+            let base = Base::new(b);
+            let s = Shape { fr: f0, kr: k };
+            let span = base.pw[(k - 1 - f0) as usize];
+            let mut got: Vec<u128> = Vec::new();
+            let mut tot = su::SuCounts::default();
+            for pip in 0..span {
+                let (cn, sets, _) = su::run_su(&base, f0, k, pip, 1.0, 0, true, false);
+                for v in sets { got.extend(v); }
+                tot.pairs += cn.pairs; tot.kept += cn.kept; tot.flat += cn.flat; tot.surv += cn.surv; tot.clipped += cn.clipped; tot.children += cn.children;
+            }
+            got.sort();
+            let n_got = got.len();
+            got.dedup();
+            let mut want = Vec::new();
+            let mut nice = Vec::new();
+            for n in base.start..base.end {
+                if q_shape(&base, &s, n) { want.push(n); }
+                if arith::unique_digits(n, base.b).1 { nice.push(n); }
+            }
+            let nice_ok = nice.iter().all(|n| got.binary_search(n).is_ok());
+            println!("SMALLSU b{} L{} (f0 {}, k {}) super-units {} : pipeline {} (dups {}) brute {} equal={} | nice {:?} all found={} | children {} pairs {} flat {} kept {} clipped {}",
+                b, base.l, f0, k, span, n_got, n_got - got.len(), want.len(), got == want, nice, nice_ok, tot.children, tot.pairs, tot.flat, tot.kept, tot.clipped);
+            assert!(got == want && nice_ok && n_got == got.len());
+        }
         _ => panic!("unknown command"),
     }
+}
+
+fn print_su(base: &Base, f0: u32, k: u32, pip: u128, q: f64, cn: &su::SuCounts, secs: f64) {
+    let b = base.b;
+    let nsu = base.pw[(k - 1 - f0) as usize] as f64;
+    let adm = (base.end - base.start) as f64 / nsu * base.roots.len() as f64 / (b - 1) as f64;
+    let at = adm * q.min(1.0); // admissible n covered by the sampled tops
+    println!("SU b{} (f0 {}, k {}) pip {} q {} adm {:.4e} | roots_f0 {} parents {} children {} chunks {} | tops {}/{} probes {} pairs {} flat {} kept {} ({:.4}) words_nz {} surv {} clipped {} pop_kept_mean {:.2} pop_max {} key {:?} | {:.1}s",
+        b, f0, k, pip, q, adm, cn.roots_f0, cn.parents, cn.children, cn.chunks, cn.tops, cn.tops_tested, cn.probes, cn.pairs, cn.flat, cn.kept,
+        cn.kept as f64 / cn.flat.max(1) as f64, cn.words_nz, cn.surv, cn.clipped, cn.pop_kept as f64 / cn.kept.max(1) as f64, cn.pop_max, cn.key_digits, secs);
+    println!("  PERADM b{} f0 {} k {} roots_scan {:.4e} parents {:.4e} children {:.4e} chunks {:.4e} tops_tested {:.4e} tops {:.4e} pairs {:.4e} flat {:.4e} kept {:.4e} words_nz {:.4e} surv {:.4e}",
+        b, f0, k, cn.roots_f0 as f64 / adm, cn.parents as f64 / adm, cn.children as f64 / adm, cn.chunks as f64 / adm,
+        cn.tops_tested as f64 / at, cn.tops as f64 / at, cn.pairs as f64 / at, cn.flat as f64 / at, cn.kept as f64 / at, cn.words_nz as f64 / at, cn.surv as f64 / at);
 }

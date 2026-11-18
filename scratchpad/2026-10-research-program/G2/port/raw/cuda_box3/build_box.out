@@ -1,0 +1,112 @@
++ cd /root
++ '[' -f /root/.cargo/env ']'
++ curl -sSf https://sh.rustup.rs
++ sh -s -- -y --profile minimal
+info: downloading installer
+info: profile set to minimal
+info: default host tuple is x86_64-unknown-linux-gnu
+info: syncing channel updates for stable-x86_64-unknown-linux-gnu
+info: latest update on 2026-11-12 for version 1.100.0 (0ef1bc386 2026-11-09)
+info: downloading 3 components
+info: default toolchain set to stable-x86_64-unknown-linux-gnu
+
+  stable-x86_64-unknown-linux-gnu installed - rustc 1.100.0 (0ef1bc386 2026-11-09)
+
+
+Rust is installed now. Great!
+
+To get started you may need to restart your current shell.
+This would reload your PATH environment variable to include
+Cargo's bin directory ($HOME/.cargo/bin).
+
+To configure your current shell, you need to source the
+corresponding env file under $HOME/.cargo.
+
+Consider running the right command for your shell (note the leading DOT):
+. "$HOME/.cargo/env" # For sh/ash/dash/pdksh/bash
+cargo:rerun-if-env-changed=CC_x86_64-unknown-linux-gnu
+CC_x86_64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+CC_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=HOST_CC
+HOST_CC = None
+cargo:rerun-if-env-changed=CC
+CC = None
+cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+cargo:rerun-if-env-changed=CPATH
+cargo:rerun-if-env-changed=C_INCLUDE_PATH
+cargo:rerun-if-env-changed=CPLUS_INCLUDE_PATH
+cargo:rerun-if-env-changed=OBJC_INCLUDE_PATH
+cargo:rerun-if-env-changed=OBJCPLUS_INCLUDE_PATH
+cargo:rerun-if-env-changed=COMPILER_PATH
+cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH
+cargo:rerun-if-env-changed=GCC_EXEC_PREFIX
+cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+CRATE_CC_NO_DEFAULTS = None
+cargo:rerun-if-env-changed=CFLAGS
+CFLAGS = None
+cargo:rerun-if-env-changed=HOST_CFLAGS
+HOST_CFLAGS = None
+cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+CFLAGS_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+CFLAGS_x86_64-unknown-linux-gnu = None
++ source /root/.cargo/env
+++ case ":${PATH}:" in
+++ export PATH=/root/.cargo/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/root/.cargo/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++ export PATH=/usr/local/cuda/bin:/root/.cargo/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++ PATH=/usr/local/cuda/bin:/root/.cargo/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++ '[' -d nice ']'
++ git clone -q https://github.com/wasabipesto/nice.git
++ cd /root/nice
++ git checkout -q --detach 7e0113fc
++ git log --oneline -1
+7e0113f Overlap join: append the FD kernel's tops without assuming lane 0 (#260)
++ git fetch -q /root/g2/g2-cubecl-local.bundle g2-cubecl-local:g2-cubecl-local
++ git log --oneline -1 g2-cubecl-local
+4170a78 g2 port: GPU prep's parent() with 32-bit digit extraction, a popcount distinctness test, 32-bit mod 63
++ '[' -d /root/g2/wtT ']'
++ git worktree add -f --detach /root/g2/wtT 4170a781
+Preparing worktree (detached HEAD 4170a78)
+HEAD is now at 4170a78 g2 port: GPU prep's parent() with 32-bit digit extraction, a popcount distinctness test, 32-bit mod 63
++ '[' -d /root/g2/wtP ']'
++ git worktree add -f --detach /root/g2/wtP 9ff100e6
+Preparing worktree (detached HEAD 9ff100e)
+HEAD is now at 9ff100e g2 port: --tdig 0 by default (precomputed digits slowed CUDA's full kernel by 2.8 ms)
++ export CARGO_TARGET_DIR=/root/t/g2 NICE_BUILD_SHA=test
++ CARGO_TARGET_DIR=/root/t/g2
++ NICE_BUILD_SHA=test
++ cd /root/g2
++ nvcc -O3 -arch=sm_86 -std=c++17 -lineinfo -Xptxas -v -DKVER=10 -DMINB=3 -o bin/v10 g2bench.cu
++ echo 'v10 rc=0'
+v10 rc=0
++ cd /root/g2/wtT
++ git log --oneline -1
+4170a78 g2 port: GPU prep's parent() with 32-bit digit extraction, a popcount distinctness test, 32-bit mod 63
++ cargo build --release -j 14 -p nice_common --example g2_cubecl --features cubecl-cuda
++ echo 'T rc=0'
+T rc=0
++ cp /root/t/g2/release/examples/g2_cubecl /root/g2/bin/g2_T
++ cd /root/g2/wtP
++ git log --oneline -1
+9ff100e g2 port: --tdig 0 by default (precomputed digits slowed CUDA's full kernel by 2.8 ms)
++ cargo build --release -j 14 -p nice_common --example g2_cubecl --features cubecl-cuda
++ echo 'P rc=0'
+P rc=0
++ cp /root/t/g2/release/examples/g2_cubecl /root/g2/bin/g2_P
++ cd /root/nice
++ git log --oneline -1
+7e0113f Overlap join: append the FD kernel's tops without assuming lane 0 (#260)
++ cargo build --release -j 14 -p nice_client --features gpu,cubecl-cuda
++ echo 'client rc=0'
+client rc=0
++ cp /root/t/g2/release/nice_client /root/g2/nice-main
++ git -C /root/nice rev-parse HEAD
++ md5sum /root/g2/bin/g2_P /root/g2/bin/g2_T /root/g2/bin/v10 /root/g2/nice-main
+0b71eb26b1f7189117cfe7d92e3b2b39  /root/g2/bin/g2_P
+0b71eb26b1f7189117cfe7d92e3b2b39  /root/g2/bin/g2_T
+180d7ac69583618ccc64cd41dad73295  /root/g2/bin/v10
+1431dbc14dd90f5ffbc7aec9948dd49b  /root/g2/nice-main
++ echo BUILD_DONE
+BUILD_DONE

@@ -95,6 +95,21 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   $0.124/h, TTL ≈ 15:55 UTC) is capped at 240 W, 10 W under my rule: accepted because every ratio is taken in
   the one session (v10, pre-tuning port, tuned A and D, main). Exactness at 32 lanes first. Hard stop 15:30.
 
+- **13:00 UTC, the user:** "You now have a lease on demoux for 4 hours max, use it for whatever you need and
+  ping me when finished." Its production client was already stopped (I did not touch it). Workspace
+  `~/claude-exp-2026-11-18-g2`, watchdog at 16:50 UTC.
+- **13:05–13:33 UTC, the window run, by me (EXPERIMENTS G2.7):** exact at 64 lanes; main 4.707 fs; best
+  variant ×3.92 by the formula against the ×4.0 line and a predicted ×6.4. All G2 runs off the operating point;
+  the preparation is 1.84 ms (five launches) against 0.15–0.45 predicted and is the whole miss. I do not call
+  the stop on bursts the plan says to read by their clock; I also do not call it a pass.
+- **13:36 UTC: an engineer has the rest of the lease** (`G2/DEMOUX-BRIEF.md`, hard stop 16:20): launch cost on
+  wgpu / RADV, the preparation restructured, a pipelined protocol with buffers reused, operating-point runs,
+  re-measurement bracketed by main's fields 2 and 6.
+- **13:37 UTC: the bases study is back (EXPERIMENTS G2.8):** the widened prototype is exact; G2's cost per
+  admissible n stays within ×0.8–2.5 of base 64's through base 70; against today's design widened the bands
+  are ×4.7 at worst, ×7.4–8.8 central, resting on guesses on both sides. b65 0.34–0.58 card-years, b68 3.5–5.4,
+  b70 about 94. Disk incident on ivory (another session's build): freed 3.5 GB of mine, BX samples to braize.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

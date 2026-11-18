@@ -1,0 +1,28 @@
+START x_A_su1 13:11:23 dev=card md5=be8270d0 su=su64_712012851 args=[--gpu-prep --xpose 1 --ept 2 --reps 1]
+loaded 238813 tops, pip 712012851, 1042046 parents; key digits [1, 2, 3, 16, 36, 0, 4, 17]; admissible n in the super-unit 4.4679e12 (0.5s)
+jobs: 4032 (all)
+CPU ref (4032 jobs): Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 123163397, surv: 11768560 } (5.9s)
+VERIFY cpu: 11768560 survivors (0 outside a clipped top), every job unit's set EQUAL to the prototype's
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+device: AMD Radeon RX 9070 XT (RADV GFX1201) (Vulkan, wgpu<spirv>); plane size min 32 max 64; compiler: SPIR-V (cubecl-spirv)
+fill 1024 children per round (16 chunks)
+transpose: shuffle_xor stages
+entries per unit per step: 2
+plane ranks: ballot + popcount
+common masks: from the transpose
+prep: one root pass + list scatter (list 1042046 of 1042046)
+PREP (GPU, 5 launches) median 28.134 ms (1 reps) for 1042046 parents from 9298544 roots: 26999.1 ps per parent; largest bucket 573; order, records, class segments and top digits EQUAL to the CPU's
+MODE probes off median 36.082 ms (1 reps) Counts { children: 33705647, chunks: 528635, flat: 0, kept: 0, surv: 0 } lane slots 0 errors: plane 0 pmax 0 slab 0
+COUNTS probes off: EQUAL to the CPU reference
+MODE skip off   median 60.171 ms (1 reps) Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 250486772, surv: 11768560 } lane slots 250486772 errors: plane 0 pmax 0 slab 0
+COUNTS skip off: EQUAL to the CPU reference
+records 10929765 in 49059 slabs (1.08 survivors per record)
+VERIFY skip off: 11768560 survivors (0 outside a clipped top), every job unit's set EQUAL to the prototype's
+MODE full       median 68.831 ms (1 reps) Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 123163397, surv: 11768560 } lane slots 203564717 errors: plane 0 pmax 0 slab 0
+COUNTS full: EQUAL to the CPU reference
+records 10929765 in 48982 slabs (1.08 survivors per record)
+VERIFY full: 11768560 survivors (0 outside a clipped top), every job unit's set EQUAL to the prototype's
+RESULT ps per child 1070.52; ps per kept word all-in 265.90; kernel full 15.4059 fs per admissible n (scaled by jobs/4032)
+RESULT end-to-end (GPU prep + full) 96.966 ms = 21.7030 fs per admissible n (tops and survivor checks not included)
+ALL CHECKS PASSED
+END x_A_su1 13:11:49 rc=0
