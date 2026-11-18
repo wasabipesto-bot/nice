@@ -74,3 +74,12 @@ where you can, and do not rename or move code you do not need to touch, so the b
 
 ## The box
 
+    ssh -p 28120 root@ssh6.vast.ai
+
+Vast instance 61303619: RTX 3080 with 20 GB, power limit 320 W (uncapped), 64 threads, 251 GB of memory, 48 GB
+of disk, Ubuntu 24.04, image nvidia/cuda:12.8.1-devel-ubuntu24.04 (nvcc present). ivory's ssh key is accepted;
+I logged in at 18:54 UTC. It destroys itself at about 06:00 UTC.
+
+A build trap seen on these boxes: two worktrees building into one cargo target directory can hand you the
+other worktree's binary. One target directory per worktree or commit you compare, and check a binary by a
+string only it contains.
