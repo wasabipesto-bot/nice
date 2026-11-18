@@ -9,9 +9,10 @@
 //!    roots under the slice's digits, counting-sorted by (class, key);
 //! 3. the main kernel (the port's kernel v10 in form D, unchanged): 64-pair
 //!    words, one record per nonzero word;
-//! 4. new here: `clist_kernel` (each job's certified children in order) and
-//!    `expand_kernel` (records → production's survivor-list entries,
-//!    `(top, r0)` with `n = P·b^5 + r0`);
+//! 4. new here: the main kernel also writes each job's certified children
+//!    (their r4, in order) as phase 1 appends them, and its records name
+//!    their job and chunk position; `expand_kernel` turns records into
+//!    production's survivor-list entries `(top, r0)`, `n = P·b^5 + r0`;
 //! 5. production's full check, `cubecl_join::check_kernel`, unchanged, with
 //!    `P` and `w6` in production's top-record layout.
 //!
@@ -95,6 +96,8 @@ const RAN_WORDS: usize = 9;
 /// Its grid (production's `CHECK_CUBES`, `JOIN_WG`).
 const CHECK_CUBES: u32 = 2048;
 const CHECK_WG: u32 = 256;
+/// Grid of the record expansion (a grid-stride loop over the used slabs).
+const EXPAND_CUBES: u32 = 4096;
 /// Nice numbers a group may report.
 const NICE_CAP: u32 = 4096;
 /// Production's nice-output stride (four words per n).
@@ -194,6 +197,10 @@ mod kernels {
         slabn: &mut Array<Atomic<u32>>,
         slabcnt: &mut Array<u32>,
         nslab_cap: u32,
+        // library path (midout): each job's certified children's r4 in order, at
+        // 64·(pseg[c] − pseg[c0]) + d·(class size) + position (written by phase 1)
+        clst: &mut Array<u32>,
+        c0: u32,
         #[comptime] mode: u32,
         #[comptime] noout: bool,
         #[comptime] w: u32,
@@ -339,6 +346,9 @@ mod kernels {
         let mut parity = 0u32;
         // no `loop`/`break`: cubecl-spirv 0.10 emitted a conditional branch without OpSelectionMerge for them
         let mut going = nprobe > 0u32 || poff == 0u32;
+        // the job's child list (midout) and the position of the round's first pending child in it
+        let lb = 64u32 * (pb - pseg[c0 as usize]) + d * (pe - pb);
+        let mut cdone = 0u32;
         // a pending slot with odd index is ORed into its word after the next barrier (its even neighbour is written
         // by another lane, in this step or an earlier one); no atomics, no extra barrier per step
         let mut dsl = 0u32;
@@ -350,8 +360,10 @@ mod kernels {
             while npend < fill && cur < pe {
                 let idx = cur + t;
                 let mut m = 0u64;
+                let mut r4v = 0u32;
                 if idx < pe {
                     let pv = par[idx as usize];
+                    r4v = pv[3usize];
                     m = child_mask(u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64), pv[2usize], d);
                 }
                 let f = select(m != 0u64, 1u32, 0u32);
@@ -379,6 +391,9 @@ mod kernels {
                 }
                 if m != 0u64 {
                     let sl16 = npend + off + r;
+                    if comptime!(mode == 2 && !noout) {
+                        clst[(lb + cdone + sl16) as usize] = r4v;
+                    }
                     if (sl16 & 1u32) == 0u32 {
                         pq[(sl16 >> 1u32) as usize] = idx - pb;
                     } else {
@@ -542,8 +557,9 @@ mod kernels {
                     let s16 = ntake + t;
                     keep = (pq[(s16 >> 1u32) as usize] >> ((s16 & 1u32) << 4u32)) & 0xFFFFu32;
                 }
-                let s0 = min((t % 16u32) * 64u32, comptime!(fill + NT - 1));
-                let pend0 = pb + ((pq[(s0 >> 1u32) as usize] >> ((s0 & 1u32) << 4u32)) & 0xFFFFu32);
+                // (the port's record held the chunk's first parent here, read from the pending slots)
+                // (midout) the record's chunk q = t % 16 starts at child cdone + 64·q of the job's list
+                let cpos = cdone + (t % 16u32) * 64u32;
                 sync_cube();
                 if comptime!(w < 32) {
                     let mut z = t;
@@ -695,16 +711,16 @@ mod kernels {
                                 if slab_id < nslab_cap {
                                     if nza {
                                         let mut rv = Vector::<u32, Const<4>>::empty();
-                                        rv[0usize] = ((pk[0usize] >> 4u32) + poff) | (d << 16u32);
-                                        rv[1usize] = pend0;
+                                        rv[0usize] = ((pk[0usize] >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
+                                        rv[1usize] = cpos;
                                         rv[2usize] = wlo[0usize];
                                         rv[3usize] = whi[0usize];
                                         out[(sbase + ra) as usize] = rv;
                                     }
                                     if nzb {
                                         let mut rv = Vector::<u32, Const<4>>::empty();
-                                        rv[0usize] = ((pk[1usize] >> 4u32) + poff) | (d << 16u32);
-                                        rv[1usize] = pend0;
+                                        rv[0usize] = ((pk[1usize] >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
+                                        rv[1usize] = cpos;
                                         rv[2usize] = wlo[1usize];
                                         rv[3usize] = whi[1usize];
                                         out[(sbase + na + rb) as usize] = rv;
@@ -739,6 +755,7 @@ mod kernels {
                     comm[(t - 32u32) as usize].store(comptime!(if xpose == 0 || cmask == 0 { 0u32 } else { u32::MAX }));
                 }
                 npend = left;
+                cdone += ntake;
                 sync_cube();
                 if done && left == 0u32 {
                     going = false;
@@ -1098,93 +1115,22 @@ mod post {
     use super::{M, NT, SLAB};
     use cubecl::prelude::*;
 
-    #[cube]
-    fn child_ok(pm: u64, cacc: u32, d: u32) -> bool {
-        let d6 = d & 63u32;
-        let e2 = ((cacc & 63u32) + ((cacc >> 16u32) & 63u32) * d6) & 63u32;
-        let e3 = (((cacc >> 8u32) & 63u32) + ((cacc >> 24u32) & 63u32) * d6) & 63u32;
-        let add = (1u64 << u64::cast_from(e2)) | (1u64 << u64::cast_from(e3));
-        e2 != e3 && (pm & add) == 0u64
-    }
-
-    /// One cube per job (class c, unit d) of a batch of classes `[c0, c1)`:
-    /// the indices of the parents whose child at d is certified, in parent
-    /// order, at `lst[64·(pseg[c] − pseg[c0]) + d·(pseg[c+1] − pseg[c]) + j]`,
-    /// and their number in `jc[c·64 + d]`. Ordered compaction of NT parents
-    /// at a time by a shared-memory scan (no plane operations).
-    #[cube(launch_unchecked)]
-    pub fn clist_kernel(
-        par: &Array<Vector<u32, Const<4>>>,
-        pseg: &Array<u32>,
-        jobs: &Array<u32>,
-        lst: &mut Array<u32>,
-        jc: &mut Array<u32>,
-        c0: u32,
-        lcap: u32,
-    ) {
-        let mut sc = SharedMemory::<u32>::new(256usize);
-        let t = UNIT_POS_X;
-        let c = jobs[(2u32 * CUBE_POS_X) as usize];
-        let d = jobs[(2u32 * CUBE_POS_X + 1u32) as usize] & 255u32;
-        let pb = pseg[c as usize];
-        let pe = pseg[(c + 1u32) as usize];
-        let ob = 64u32 * (pb - pseg[c0 as usize]) + d * (pe - pb);
-        let mut cur = pb;
-        let mut n = 0u32;
-        while cur < pe {
-            let idx = cur + t;
-            let mut f = 0u32;
-            if idx < pe {
-                let pv = par[idx as usize];
-                if child_ok(u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64), pv[2usize], d) {
-                    f = 1u32;
-                }
-            }
-            sc[t as usize] = f;
-            sync_cube();
-            let mut step = 1u32;
-            while step < NT {
-                let mut v = sc[t as usize];
-                if t >= step {
-                    v += sc[(t - step) as usize];
-                }
-                sync_cube();
-                sc[t as usize] = v;
-                sync_cube();
-                step *= 2u32;
-            }
-            let incl = sc[t as usize];
-            let tot = sc[255usize];
-            if f == 1u32 {
-                let o = ob + n + incl - 1u32;
-                if o < lcap {
-                    lst[o as usize] = idx;
-                }
-            }
-            sync_cube();
-            n += tot;
-            cur += NT;
-        }
-        if t == 0u32 {
-            jc[(c * 64u32 + d) as usize] = n;
-        }
-    }
-
-    /// One thread per record slot (slab s, row r): the record's survivors as
-    /// production's list entries `(top, r0)`, `r0 = n mod 2^30` (the parent's
-    /// r4 and the slice's digit 4), appended in plane-sized takes. Thread 0
-    /// also copies the slice's parent count and slab count to `stat`.
+    /// Records → production's survivor-list entries `(top, r0)`, `r0 = n mod
+    /// 2^30` (the child's r4 and the slice's digit 4): a grid-stride loop
+    /// over the record slots (slab s, row r) of the slabs the kernel used,
+    /// appended in plane-sized takes. A record names its job (class, unit),
+    /// its probe slot and its chunk's first position in the job's child list
+    /// (`clst`, written by the main kernel's phase 1). Thread 0 also copies
+    /// the slice's parent and slab counts to `stat`.
     #[cube(launch_unchecked)]
     pub fn expand_kernel(
         out: &Array<Vector<u32, Const<4>>>,
         slabn: &Array<u32>,
         slabcnt: &Array<u32>,
-        par: &Array<Vector<u32, Const<4>>>,
         pseg: &Array<u32>,
         tseg: &Array<u32>,
         roots: &Array<u32>,
         lst: &Array<u32>,
-        jc: &Array<u32>,
         lcnt: &Array<u32>,
         surv: &mut Array<u32>,
         scount: &mut Array<Atomic<u32>>,
@@ -1192,101 +1138,89 @@ mod post {
         nslab_cap: u32,
         scap: u32,
         c0: u32,
-        pip63: u32,
         r0hi: u32,
     ) {
-        let i = ABSOLUTE_POS_X;
-        if i == 0u32 {
+        if ABSOLUTE_POS_X == 0u32 {
             stat[0usize] = lcnt[0usize];
             stat[1usize] = slabn[0usize];
         }
-        let s = i / SLAB;
-        let r = i % SLAB;
-        let ns = min(slabn[0usize], nslab_cap);
-        let mut live = false;
-        let mut wlo = 0u32;
-        let mut whi = 0u32;
-        let mut ti = 0u32;
-        let mut pos = 0u32;
-        if s < ns {
-            if r < slabcnt[s as usize] {
-                live = true;
+        let lim = min(slabn[0usize], nslab_cap) * SLAB;
+        let stride = CUBE_COUNT_X * NT;
+        let mut base = CUBE_POS_X * NT;
+        while base < lim {
+            let i = base + UNIT_POS_X;
+            let s = i / SLAB;
+            let r = i % SLAB;
+            let mut live = false;
+            let mut wlo = 0u32;
+            let mut whi = 0u32;
+            let mut ti = 0u32;
+            let mut pos = 0u32;
+            if i < lim {
+                if r < slabcnt[s as usize] {
+                    live = true;
+                }
             }
-        }
-        if live {
-            let rec = out[i as usize];
-            let du = rec[0usize] >> 16u32;
-            let ps = rec[0usize] & 0xFFFFu32;
-            let pf = rec[1usize];
-            wlo = rec[2usize];
-            whi = rec[3usize];
-            let pv = par[pf as usize];
-            let c = (pv[3usize] % M + pip63) % M;
-            // the record's probe slot -> the top: the job's probes are the 8 root classes' segments in order
-            let cc = (c + du) % M;
-            let mut rem = ps;
-            let mut found = false;
-            for k in 0..8u32 {
-                let ct = (roots[k as usize] + M - cc) % M;
-                let sx = (du * M + ct) * 2u32;
-                let b0 = tseg[sx as usize];
-                let len = tseg[(sx + 1u32) as usize] - b0;
-                if !found {
-                    if rem < len {
-                        ti = b0 + rem;
-                        found = true;
-                    } else {
-                        rem -= len;
+            if live {
+                let rec = out[i as usize];
+                let ps = rec[0usize] & 0xFFFFu32;
+                let du = (rec[0usize] >> 16u32) & 255u32;
+                let c = rec[0usize] >> 24u32;
+                wlo = rec[2usize];
+                whi = rec[3usize];
+                // the probe slot -> the top: the job's probes are the 8 root classes' segments in order
+                let cc = (c + du) % M;
+                let mut rem = ps;
+                let mut found = false;
+                for k in 0..8u32 {
+                    let ct = (roots[k as usize] + M - cc) % M;
+                    let sx = (du * M + ct) * 2u32;
+                    let b0 = tseg[sx as usize];
+                    let len = tseg[(sx + 1u32) as usize] - b0;
+                    if !found {
+                        if rem < len {
+                            ti = b0 + rem;
+                            found = true;
+                        } else {
+                            rem -= len;
+                        }
                     }
                 }
+                let pb = pseg[c as usize];
+                let pe = pseg[(c + 1u32) as usize];
+                pos = 64u32 * (pb - pseg[c0 as usize]) + du * (pe - pb) + rec[1usize];
             }
-            // the chunk's first child in the job's child list
-            let pb = pseg[c as usize];
-            let pe = pseg[(c + 1u32) as usize];
-            let lb = 64u32 * (pb - pseg[c0 as usize]) + du * (pe - pb);
-            let mut lo = 0u32;
-            let mut hi = jc[(c * 64u32 + du) as usize];
-            while lo < hi {
-                let mid = (lo + hi) / 2u32;
-                if lst[(lb + mid) as usize] < pf {
-                    lo = mid + 1u32;
-                } else {
-                    hi = mid;
+            let nb = wlo.count_ones() + whi.count_ones();
+            let excl = plane_exclusive_sum(nb);
+            let tot = plane_sum(nb);
+            let mut b0 = 0u32;
+            if UNIT_POS_PLANE == 0u32 && tot > 0u32 {
+                b0 = scount[0usize].fetch_add(tot);
+            }
+            let mut slot = plane_sum(b0) + excl;
+            if live {
+                let mut x = wlo;
+                while x != 0u32 {
+                    let b = x.trailing_zeros();
+                    x &= x - 1u32;
+                    if slot < scap {
+                        surv[(2u32 * slot) as usize] = ti;
+                        surv[(2u32 * slot + 1u32) as usize] = lst[(pos + b) as usize] + r0hi;
+                    }
+                    slot += 1u32;
+                }
+                let mut y = whi;
+                while y != 0u32 {
+                    let b = y.trailing_zeros();
+                    y &= y - 1u32;
+                    if slot < scap {
+                        surv[(2u32 * slot) as usize] = ti;
+                        surv[(2u32 * slot + 1u32) as usize] = lst[(pos + 32u32 + b) as usize] + r0hi;
+                    }
+                    slot += 1u32;
                 }
             }
-            pos = lb + lo;
-        }
-        let nb = wlo.count_ones() + whi.count_ones();
-        let excl = plane_exclusive_sum(nb);
-        let tot = plane_sum(nb);
-        let mut b0 = 0u32;
-        if UNIT_POS_PLANE == 0u32 && tot > 0u32 {
-            b0 = scount[0usize].fetch_add(tot);
-        }
-        let mut slot = plane_sum(b0) + excl;
-        if live {
-            let mut x = wlo;
-            while x != 0u32 {
-                let b = x.trailing_zeros();
-                x &= x - 1u32;
-                if slot < scap {
-                    let pi = lst[(pos + b) as usize];
-                    surv[(2u32 * slot) as usize] = ti;
-                    surv[(2u32 * slot + 1u32) as usize] = par[pi as usize][3usize] + r0hi;
-                }
-                slot += 1u32;
-            }
-            let mut y = whi;
-            while y != 0u32 {
-                let b = y.trailing_zeros();
-                y &= y - 1u32;
-                if slot < scap {
-                    let pi = lst[(pos + 32u32 + b) as usize];
-                    surv[(2u32 * slot) as usize] = ti;
-                    surv[(2u32 * slot + 1u32) as usize] = par[pi as usize][3usize] + r0hi;
-                }
-                slot += 1u32;
-            }
+            base += stride;
         }
     }
 
@@ -1856,7 +1790,6 @@ pub struct GpuJoin<R: Runtime> {
     g_pseg: Handle,
     slabz: Handle,
     clst: Handle,
-    jc: Handle,
     surv: Handle,
     top_rec: Handle,
     nice_out: Handle,
@@ -1864,6 +1797,10 @@ pub struct GpuJoin<R: Runtime> {
     /// Device tops: every prefix's mask and validity.
     tm: Handle,
     tv: Handle,
+    /// Timing only (`MIDOUT_STOP`): queue the stages up to this one
+    /// (1 tops, 2 parents, 3 main kernel, 5 expansion, 6 all)
+    /// and skip the accounts. 6 in production.
+    stop: u32,
 }
 
 impl<R: Runtime> GpuJoin<R> {
@@ -1926,13 +1863,13 @@ impl<R: Runtime> GpuJoin<R> {
             g_pseg: e(64 * 4),
             slabz: mk(vec![0u32; 1]),
             clst: e(lcap as usize * 4),
-            jc: e(63 * 64 * 4),
             surv: e(scap as usize * 8),
             top_rec: e(nt * TOP_REC_WORDS as usize * 4),
             nice_out: mk(vec![0u32; NICE_CAP as usize * NICE_STRIDE]),
             nice_count: mk(vec![0u32; 1]),
             tm: e(8 << 21),
             tv: e(4 << 21),
+            stop: std::env::var("MIDOUT_STOP").ok().and_then(|x| x.parse().ok()).unwrap_or(6),
             client,
         })
     }
@@ -2039,7 +1976,9 @@ impl<R: Runtime> GpuJoin<R> {
                 nt as u32,
             );
         }
-        self.queue_parents(pip, rankh);
+        if self.stop >= 2 {
+            self.queue_parents(pip, rankh);
+        }
         (SliceBufs { tmh, tsegh, thdh }, tstat)
     }
 
@@ -2194,6 +2133,7 @@ impl<R: Runtime> GpuJoin<R> {
             let stat = self.mk(vec![0u32; 2]);
             let ns = self.nslab_cap as usize;
             unsafe {
+                if self.stop >= 3 {
                 kernels::g2_kernel::launch_unchecked::<R>(
                     c,
                     CubeCount::Static(*nj, 1, 1),
@@ -2210,6 +2150,8 @@ impl<R: Runtime> GpuJoin<R> {
                     a(&slabn, 1),
                     a(&self.slabcnt, ns),
                     self.nslab_cap,
+                    a(&self.clst, self.lcap as usize),
+                    *c0,
                     2u32,
                     false,
                     self.w,
@@ -2221,31 +2163,19 @@ impl<R: Runtime> GpuJoin<R> {
                     1u32,
                     1u32,
                 );
-                post::clist_kernel::launch_unchecked::<R>(
-                    c,
-                    CubeCount::Static(*nj / 2, 1, 1),
-                    CubeDim::new_1d(NT),
-                    a(&self.g_rec, np),
-                    a(&self.g_pseg, 64),
-                    a(jobs, 2 * *nj as usize),
-                    a(&self.clst, self.lcap as usize),
-                    a(&self.jc, 63 * 64),
-                    *c0,
-                    self.lcap,
-                );
+                }
+                if self.stop >= 5 {
                 post::expand_kernel::launch_unchecked::<R>(
                     c,
-                    CubeCount::Static((self.nslab_cap * SLAB).div_ceil(NT), 1, 1),
+                    CubeCount::Static(EXPAND_CUBES, 1, 1),
                     CubeDim::new_1d(NT),
                     a(&self.out, ns * SLAB as usize),
                     a(&slabn, 1),
                     a(&self.slabcnt, ns),
-                    a(&self.g_rec, np),
                     a(&self.g_pseg, 64),
                     a(tsegh, 64 * 63 * 2),
                     a(&self.roots_h, NROOT),
                     a(&self.clst, self.lcap as usize),
-                    a(&self.jc, 63 * 64),
                     a(&self.lcnt, 1),
                     a(&self.surv, 2 * self.scap as usize),
                     a(&scount, 1),
@@ -2253,9 +2183,10 @@ impl<R: Runtime> GpuJoin<R> {
                     self.nslab_cap,
                     self.scap,
                     *c0,
-                    (pip % 63) as u32,
                     ((pip & 63) as u32) << 24,
                 );
+                }
+                if self.stop >= 6 {
                 check_kernel::launch_unchecked::<R>(
                     c,
                     CubeCount::Static(CHECK_CUBES, 1, 1),
@@ -2272,6 +2203,7 @@ impl<R: Runtime> GpuJoin<R> {
                     crate::cubecl_join::CHECK_HITS,
                     self.ballot,
                 );
+                }
             }
             Ticket { ran, scount, stat, tstat: None }
         }
@@ -2283,6 +2215,9 @@ impl<R: Runtime> GpuJoin<R> {
     /// and the survivors the kernel counted = the entries listed = checked.
     fn finish_group(&self, cnt: &Handle, tickets: &[Ticket]) -> Result<DevCounts> {
         cubecl::future::block_on(self.client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
+        if self.stop < 6 {
+            return Ok(DevCounts::default());
+        }
         let v = self.rd(cnt)?;
         ensure!(
             v[C_ERR_PLANE] == 0 && v[C_ERR_PMAX] == 0 && v[C_ERR_SLAB] == 0,
