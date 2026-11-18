@@ -1,0 +1,48 @@
+7ba982c midout: cargo fmt and clippy (-D warnings, with and without cubecl-cuda/spirv)
+test midout::arith::tests::known_nice_and_roots ... ok
+test midout::cpu::tests::b64_slice_vs_staged ... ignored, needs MIDOUT_SU_DIR (a staged base-64 slice) and minutes of CPU
+test midout::coord::tests::b64_quantum_fixes_digits_6_to_8 ... ok
+test midout::cpu::tests::shapes_that_do_not_fit_are_refused ... ok
+test midout::gpu::tests::gpu_check_rebuilds_the_survivors ... ignored, needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime)
+test midout::gpu::tests::gpu_slices_equal_cpu ... ignored, needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime) and minutes of CPU
+test midout::coord::tests::b64_is_the_bit_renumbering ... ok
+test midout::coord::tests::b65_padded ... ok
+test midout::gpu::tests::top_cert_b64_equals_the_reference ... ok
+test midout::coord::tests::small_bases_bijection_and_counts ... ok
+test midout::gpu::tests::slice_tops_equal_the_reference_units ... ok
+test midout::cpu::tests::whole_small_bases_vs_brute_force ... ok
+test result: ok. 9 passed; 0 failed; 3 ignored; 0 measured; 304 filtered out; finished in 12.83s
+b64 slice 712012851: Counts { tops_tested: 2097152, tops: 238813, parents: 1042046, children: 33705647, chunks: 528635, pairs: 15970966125, flat: 250486772, kept: 123163397, words: 10929765, survivors: 11768560, clipped: 0 }
+test midout::cpu::tests::b64_slice_vs_staged ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 315 filtered out; finished in 19.93s
+b64 slice 391856203: Counts { tops_tested: 2097152, tops: 238879, parents: 1041133, children: 33677689, chunks: 528202, pairs: 15962156269, flat: 250350298, kept: 123133583, words: 10930197, survivors: 11769950, clipped: 0 }
+test midout::cpu::tests::b64_slice_vs_staged ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 315 filtered out; finished in 19.72s
+test midout::gpu::tests::gpu_check_rebuilds_the_survivors ... class 0 of slice 712012851: 188905 survivors, the check rebuilt 188905
+test midout::gpu::tests::gpu_slices_equal_cpu ... device NVIDIA GeForce RTX 3080 W 32
+slice 712012851: device tops = host tops (238813)
+slice 712012851: device DevCounts { children: 33705647, chunks: 528635, flat: 250486772, kept: 123163397, survivors: 11768560, checked: 11768560, slices: 1, tops: 238813, tested: 2097152 }
+slice 712012851: cpu    Counts { tops_tested: 2097152, tops: 238813, parents: 1042046, children: 33705647, chunks: 528635, pairs: 15970966125, flat: 250486772, kept: 123163397, words: 10929765, survivors: 11768560, clipped: 0 }
+slice 318575442: device tops = host tops (238759)
+slice 318575442: device DevCounts { children: 33728715, chunks: 528999, flat: 250601220, kept: 123162869, survivors: 11790714, checked: 11790714, slices: 1, tops: 238759, tested: 2097152 }
+slice 318575442: cpu    Counts { tops_tested: 2097152, tops: 238759, parents: 1043101, children: 33728715, chunks: 528999, pairs: 15978221999, flat: 250601220, kept: 123162869, words: 10949358, survivors: 11790714, clipped: 0 }
+slice 391856203: device tops = host tops (238879)
+slice 391856203: device DevCounts { children: 33677689, chunks: 528202, flat: 250350298, kept: 123133583, survivors: 11769950, checked: 11769950, slices: 1, tops: 238879, tested: 2097152 }
+slice 391856203: cpu    Counts { tops_tested: 2097152, tops: 238879, parents: 1041133, children: 33677689, chunks: 528202, pairs: 15962156269, flat: 250350298, kept: 123133583, words: 10930197, survivors: 11769950, clipped: 0 }
+slice 1: device tops = host tops (191611)
+slice 1: device DevCounts { children: 32612782, chunks: 511521, flat: 196321600, kept: 38533873, survivors: 3812011, checked: 3812011, slices: 1, tops: 191611, tested: 2097152 }
+slice 1: cpu    Counts { tops_tested: 2097152, tops: 191611, parents: 1045232, children: 32612782, chunks: 511521, pairs: 12517272220, flat: 196321600, kept: 38501362, words: 3517148, survivors: 3812011, clipped: 0 }
+slice 1073741823: device tops = host tops (190581)
+slice 1073741823: device DevCounts { children: 25362171, chunks: 398238, flat: 157262759, kept: 45317999, survivors: 5552884, checked: 5552884, slices: 1, tops: 190581, tested: 2097152 }
+slice 1073741823: cpu    Counts { tops_tested: 2097152, tops: 190581, parents: 815154, children: 25362171, chunks: 398238, pairs: 10015978735, flat: 157262759, kept: 45317999, words: 5066885, survivors: 5552884, clipped: 0 }
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 314 filtered out; finished in 99.46s
+device llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>) W 8
+slice 712012851: device tops = host tops (238813)
+slice 712012851: device DevCounts { children: 33705647, chunks: 528635, flat: 250486772, kept: 123163397, survivors: 11768560, checked: 11768560, slices: 1, tops: 238813, tested: 2097152 }
+slice 712012851: cpu    Counts { tops_tested: 2097152, tops: 238813, parents: 1042046, children: 33705647, chunks: 528635, pairs: 15970966125, flat: 250486772, kept: 123163397, words: 10929765, survivors: 11768560, clipped: 0 }
+test midout::gpu::tests::gpu_slices_equal_cpu has been running for over 60 seconds
+slice 318575442: device tops = host tops (238759)
+slice 318575442: device DevCounts { children: 33728715, chunks: 528999, flat: 250601220, kept: 123162869, survivors: 11790714, checked: 11790714, slices: 1, tops: 238759, tested: 2097152 }
+slice 318575442: cpu    Counts { tops_tested: 2097152, tops: 238759, parents: 1043101, children: 33728715, chunks: 528999, pairs: 15978221999, flat: 250601220, kept: 123162869, words: 10949358, survivors: 11790714, clipped: 0 }
+test midout::gpu::tests::gpu_slices_equal_cpu ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 297 filtered out; finished in 64.52s

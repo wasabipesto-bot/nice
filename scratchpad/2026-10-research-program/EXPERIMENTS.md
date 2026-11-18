@@ -5,6 +5,46 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## MO.1 The middle-out join in the client library, day one: exact end to end at base 64; ×3.78 against main on an RTX 3080 (2026-11-18 16:43–18:51 UTC, lead engineer; `G2/BUILD-BRIEF-1.md`, `G2/BUILD-NOTES.md`, `G2/build1/box/`, `G2/build1/raw/`; branch `dev/middle-out-join` 7ba982c7 (7 commits on upstream be9cc923), on ivory and on the fork, no PR; box 61286074, RTX 3080 at a 240 W cap, i9-9900 with a 5.12-CPU quota)
+
+- **What runs** [M]: `midout::gpu::search_field` on whole base-64 fields `(64, 2^75 + t·2^57, 2^57)` (digits 6–8
+  fixed, 4,096 slices): tops, parents, the port's main kernel (form D), record expansion and production's
+  `check_kernel`, all on the card; slices queued without waiting, one synchronisation and a full account check
+  per 16 slices. Additive: `common/src/midout/` (4,300 lines), one example, one line of `lib.rs`; no route
+  reaches it; production's 214 tests pass; fmt and clippy clean.
+- **Exact** [M]: the CPU reference equals brute force on whole bases 10–25 (every b mod 5 class, odd bases, two
+  shapes, 69 at base 10) and the staged prototype on two real b64 slices; the device equals the CPU reference on
+  5 b64 slices on CUDA (tops, survivor sets n for n, every count); production's check in probe mode rebuilds
+  exactly the join's survivors; two whole slices exact on lavapipe at 8 lanes through SPIR-V.
+- **The number** [M, one session, both runs at the 239 W cap]: production main be9cc923, the ten b64 1e17
+  fields: 840.0 s, **6.615 fs** per admissible n; middle-out 7ba982c7, ten whole fields at 0.05–0.95 of the base:
+  320.6 s, **1.752 fs**. **×3.78.**
+- **Per slice** [M, cumulative stops on one field]: tops 0.46 ms, parents 0.66, main kernel with child-list
+  stores 5.44, expansion 0.92, check 0.57: 8.05 ms. Kernel + preparation (6.1 ms) equals the example's own
+  measurement: the move into the library cost nothing.
+- **What the earlier ratios got wrong (mine, G2.7–G2.11 and the reports built on them):** "tops and survivor
+  checks 0.085–0.115 fs" was an assumption carried from main-type kernels and left out the step that turns the
+  kernel's 10.9M records per slice into checkable n on the card. Measured: tops 0.10 + expansion 0.22 +
+  unprefiltered check 0.13 = **0.45 fs**. The ×4.6 (3080) and ×4.7–5.5 (9070 XT) were kernel-plus-assumption
+  numbers; the first end-to-end number is ×3.78 on the 3080, and ≈ ×4.3 is the engineer's projection for the
+  9070 XT [E], not a measurement.
+- **Also found:** the port's kernel was not exact on every slice: slice 318575442 has a job with 587 probes
+  against the 576-probe table (1 slice in 1,024 sampled); the port counted an error and dropped the excess (no
+  silent loss: the error counter fired). Fixed by a second job instance. The largest top seen has 17 digits =
+  the limit; an 18-digit top stops the field with an error.
+- **Other corrections to the design documents:** host-side tops cannot keep up on rented boxes (CPU quota):
+  everything per slice must be on the device; the port's record format cannot be expanded on the device without
+  a search (the library records job + chunk position and writes child lists in phase 1); a field that fixes only
+  central digits is a multiple of H·b^6 (1.011e18 at b65), not of whole slices.
+- **The interface** (`BUILD-NOTES.md` §2): a field is a range of a per-base coordinate; it permits any shape with
+  f0 ≤ 6 and k ≥ 10, any key, kernel, mask width or prefilter, and work shared within a field; it forbids joins
+  that need digits 6–8 to vary within one unit, anything that needs a field to be an interval of n, fields under
+  2^57, and changing base 64's coordinate once fields exist. Fixing digits 6–8 or only 7–8 is the open choice.
+- **Not yet:** lavapipe at 16 lanes (its 512-bit JIT crashes in the device-top and preparation kernels), the
+  RX 9070 XT, masks above 64 bits on the device, a client route, a prefilter before the check.
+- **Next** (`BUILD-NOTES.md` §7, ten pieces): B expansion, A prefilter, C top hierarchy (together ≈ −1.4 of
+  8.05 ms per slice), E wide masks, F local coordinator and client route, D kernel items and the AMD window.
+
 ## G2.11 Pipelined over 16 distinct super-units with per-unit upload: ×5.14; the 7 % against the same-unit number is the upload in the compute queue (2026-11-18 14:37–14:58 UTC, engineer then director, demoux under the user's lease; `G2/WINDOW-RESULTS.md` "Distinct super-units", `G2/port/raw/window_1118d/` (logs, `per_unit_checks.txt`, the 16 units' meta files, scripts), `G2/port/raw/window_1118e/` (my run); head 1313018a (commits 51a386f8 `--multi LIST`, 1313018a `--no-upload`), bundle current, ivory's worktree fast-forwarded)
 
 - **Units:** the two staged base-64 super-units plus 14 new π′, one per leading-digit band, staged on demoux by a

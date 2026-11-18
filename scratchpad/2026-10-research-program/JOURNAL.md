@@ -162,6 +162,16 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **Upstream:** main is be9cc923 (#265 changelog, #266–#268 around the release: workspace versions for v3.4.8
   and 3.4.9-dev). The release is v3.4.8, not the "v3.5.8" of the user's earlier message.
 
+- **18:51 UTC: build day one is back, early (EXPERIMENTS MO.1).** Exact end to end at base 64 in the library;
+  **×3.78 against main on the 3080, not the ×4.6 the kernel-level numbers implied.** The steps around the
+  kernel cost 0.45 fs where every report today assumed 0.085–0.115: the assumption was mine to check and I
+  carried it from the benchmark through four reports. The kernel also was not exact on 1 slice in about 1,000
+  (a probe-table overrun, caught by its own error counter; fixed). Both go to the user tonight in plain words.
+- **19:05 UTC: step two started, two engineers.** 2A on the day-one box (`G2/BUILD-BRIEF-2A.md`, hard stop
+  23:45): expansion, a prefilter before the check, a top hierarchy; target ×4.4 end to end on that box. 2E on a
+  second box (`G2/BUILD-BRIEF-2E.md`, branch `dev/mo-wide`, hard stop 00:30): masks wider than 64 bits, exact
+  at base 65, the first GPU number above base 64. Box 61303619 (California, $0.117/h, TTL ≈ 06:00 UTC).
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);
