@@ -50,6 +50,8 @@ const PMAX: u32 = 576;
 const MAXPOP: u32 = 17;
 /// Records per plane-private output slab.
 const SLAB: u32 = 256;
+/// Slice words in shared memory: 16 chunks x 64 digits x 2 halves at row stride 65 (65 x 15 + 64 rows of 2 words).
+const SLW: u32 = 2080;
 /// Counter layout: 64 units x 5 (children, chunks, flat, kept, surv), then extras.
 const C_LSLOTS: usize = 320;
 const C_ERR_PLANE: usize = 321;
@@ -59,7 +61,7 @@ const NCNT: usize = 328;
 
 // ------------------------------------------------------------------------------------------------ device
 mod kernels {
-    use super::{C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB, C_LSLOTS, M, MAXPOP, NT, PMAX, SLAB};
+    use super::{C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB, C_LSLOTS, M, MAXPOP, NT, PMAX, SLAB, SLW};
     use cubecl::prelude::*;
 
     /// Bits of a u64 whose index has bit j set (the shuffle transpose's stage-j mask; j < 64, a power of two).
@@ -95,6 +97,18 @@ mod kernels {
         r
     }
 
+    /// plane_rank (ranks 1) with the lane's masks below it made once, outside the loop: ACO recomputed them in every
+    /// 3b step. (lo, hi) = (rank_masks().0, rank_masks().1).
+    #[cube]
+    fn plane_rank_m(flag: bool, lo: u32, hi: u32, #[comptime] w: u32) -> u32 {
+        let b = plane_ballot(flag);
+        let mut r = (b[0usize] & lo).count_ones();
+        if comptime!(w > 32) {
+            r += (b[1usize] & hi).count_ones();
+        }
+        r
+    }
+
     #[cube]
     fn plane_count(flag: bool, f: u32, #[comptime] w: u32, #[comptime] ranks: u32) -> u32 {
         let mut n = 0u32;
@@ -112,8 +126,10 @@ mod kernels {
 
     #[cube]
     fn child_mask(pm: u64, cacc: u32, d: u32) -> u64 {
-        let e2 = ((cacc & 63u32) + ((cacc >> 16u32) & 63u32) * d) & 63u32;
-        let e3 = (((cacc >> 8u32) & 63u32) + ((cacc >> 24u32) & 63u32) * d) & 63u32;
+        // d & 63 (d < 64 anyway): both factors < 64, so ACO emits a full-rate 24-bit multiply, not v_mul_lo_u32
+        let d6 = d & 63u32;
+        let e2 = ((cacc & 63u32) + ((cacc >> 16u32) & 63u32) * d6) & 63u32;
+        let e3 = (((cacc >> 8u32) & 63u32) + ((cacc >> 24u32) & 63u32) * d6) & 63u32;
         let add = (1u64 << u64::cast_from(e2)) | (1u64 << u64::cast_from(e3));
         let mut out = pm | add;
         if e2 == e3 || (pm & add) != 0u64 {
@@ -125,7 +141,7 @@ mod kernels {
     /// One cube per job (class c, unit d). MODE 0: bottom side only; 1: skip off; 2: full.
     #[cube(launch_unchecked)]
     pub fn g2_kernel(
-        par: &Array<u32>, // parent records, 4 words each (mask lo, mask hi, cacc, r4), loaded as one 16-byte run
+        par: &Array<Vector<u32, Const<4>>>, // parent records (mask lo, mask hi, cacc, r4), one 16-byte vector each (one LDG.128 on CUDA)
         pseg: &Array<u32>,
         tmask: &Array<u64>, // the tops' masks (only for --tdig 0: digits made in every cube, as before the fixes)
         tdig: &Array<u32>, // each top's digits, 20 6-bit fields in 4 words (`tdig_kernel`), computed once per super-unit
@@ -133,7 +149,7 @@ mod kernels {
         roots: &Array<u32>,
         jobs: &Array<u32>,
         cnt: &mut Array<Atomic<u32>>,
-        out: &mut Array<u32>,
+        out: &mut Array<Vector<u32, Const<4>>>, // survivor records, one 16-byte vector each (one STG.128 on CUDA)
         slabn: &mut Array<Atomic<u32>>,
         slabcnt: &mut Array<u32>,
         nslab_cap: u32,
@@ -150,21 +166,33 @@ mod kernels {
     ) {
         let npl = comptime!(NT / w);
         let segs = comptime!(64 / w); // ballot segments per chunk (W <= 64)
-        let mut pend_p = SharedMemory::<u32>::new(comptime!((fill + NT) as usize));
-        let mut sl = SharedMemory::<u32>::new(comptime!((64 * 16 * 2) as usize)); // [(v*16+q)*2 + half]
+        // pending children as u16 (parent index - class start) two per word, and the round's probe list (u32
+        // entries) in the same words: the list is live only in 3a/3b, when the pending slots still needed (each
+        // chunk's first, the carried rest) are already in registers. 12 waves per SIMD on RDNA4 need <= 21 KB.
+        let mut pq = SharedMemory::<u32>::new(comptime!((if (fill + NT) / 2 > PMAX + 32 { (fill + NT) / 2 } else { PMAX + 64 }) as usize));
+        // slices [(v + 65 q)*2 + half] (SROW = 65: the 3b address is one add and one shift of the digit, and a 16-lane group's
+        // reads still fall on 16 distinct 8-byte bank pairs, (v + q) mod 16)
+        let mut sl = SharedMemory::<u32>::new(comptime!((SLW) as usize));
         // every shared array a multiple of 128 bytes, so that every array starts 128-byte aligned whatever order
         // CubeCL places them in (its placement changed per build, and the full kernel's time with it)
-        let slt = SharedMemory::<Atomic<u32>>::new(comptime!((if w < 32 { 64 * 16 * 2 } else { 32 }) as usize));
+        let slt = SharedMemory::<Atomic<u32>>::new(comptime!((if w < 32 { SLW } else { 32 }) as usize));
         let comm = SharedMemory::<Atomic<u32>>::new(32usize); // [2q + half]
-        let mut prob_d = SharedMemory::<u32>::new(comptime!((PMAX * 4) as usize));
-        let mut plist = SharedMemory::<u32>::new(comptime!(PMAX as usize));
+        // each probe's 4 digit words as one 16-byte vector (one LDS.128 / ds_read_b128 per list entry)
+        let mut prob_d = SharedMemory::<Vector<u32, Const<4>>>::new(comptime!(PMAX as usize));
         let mut wcnt = SharedMemory::<u32>::new(comptime!((if 2 * NT / w < 32 { 32 } else { 2 * NT / w }) as usize));
         let s_nl = SharedMemory::<Atomic<u32>>::new(32usize);
         let mut s_np = SharedMemory::<u32>::new(32usize);
+        let mut cmv = SharedMemory::<u32>::new(64usize);
 
         let t = UNIT_POS_X;
         let lane = UNIT_POS_PLANE;
-        let pl = t / w;
+        // the plane's index as a uniform value (a reduction of lane 0's), so that ACO keeps it, the phase 1 offsets
+        // and the phase 2 task numbers in scalar registers
+        let pl = plane_sum(select(lane == 0u32, t / w, 0u32));
+        // each lane's ballot masks below it, for the ordered compaction and the record ranks (made once)
+        let rl = UNIT_POS_PLANE;
+        let rlo = select(rl >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(rl, 31u32)) - 1u32);
+        let rhi = select(rl >= 32u32, (1u32 << (rl & 31u32)) - 1u32, 0u32);
         let c = jobs[(2u32 * CUBE_POS_X) as usize];
         let d = jobs[(2u32 * CUBE_POS_X + 1u32) as usize];
         let cc = (c + d) % M;
@@ -175,10 +203,12 @@ mod kernels {
         if comptime!(mode == 0) {
             // lane map of cube 0, for the host's --debug-lanes (mode 0 writes no records)
             if CUBE_POS_X == 0u32 {
-                out[(t * 4u32) as usize] = t;
-                out[(t * 4u32 + 1u32) as usize] = lane;
-                out[(t * 4u32 + 2u32) as usize] = PLANE_DIM;
-                out[(t * 4u32 + 3u32) as usize] = plane_sum(1u32);
+                let mut lv = Vector::<u32, Const<4>>::empty();
+                lv[0usize] = t;
+                lv[1usize] = lane;
+                lv[2usize] = PLANE_DIM;
+                lv[3usize] = plane_sum(1u32);
+                out[t as usize] = lv;
             }
         }
         if t == 0u32 {
@@ -211,10 +241,12 @@ mod kernels {
             while j < b1 - b0 {
                 if base + j < PMAX {
                     if comptime!(tdg == 1) {
+                        let mut pv = Vector::<u32, Const<4>>::empty();
                         #[unroll]
                         for k in 0..4u32 {
-                            prob_d[((base + j) * 4u32 + k) as usize] = tdig[((b0 + j) * 4u32 + k) as usize];
+                            pv[k as usize] = tdig[((b0 + j) * 4u32 + k) as usize];
                         }
+                        prob_d[(base + j) as usize] = pv;
                     } else {
                         let mut x = tmask[(b0 + j) as usize];
                         let first = x.trailing_zeros();
@@ -229,10 +261,12 @@ mod kernels {
                             x &= x - select(x != 0u64, 1u64, 0u64);
                             dw[comptime!(k / 5) as usize] |= v << comptime!(6 * (k % 5));
                         }
+                        let mut pv = Vector::<u32, Const<4>>::empty();
                         #[unroll]
                         for k in 0..4u32 {
-                            prob_d[((base + j) * 4u32 + k) as usize] = dw[k as usize];
+                            pv[k as usize] = dw[k as usize];
                         }
+                        prob_d[(base + j) as usize] = pv;
                     }
                 }
                 j += NT;
@@ -260,22 +294,37 @@ mod kernels {
         let mut parity = 0u32;
         // no `loop`/`break`: cubecl-spirv 0.10 emitted a conditional branch without OpSelectionMerge for them
         let mut going = true;
+        // a pending slot with odd index is ORed into its word after the next barrier (its even neighbour is written
+        // by another lane, in this step or an earlier one); no atomics, no extra barrier per step
+        let mut dsl = 0u32;
+        let mut dv = 0u32;
+        let mut dhave = false;
+        let mut keep = 0u32;
         while going {
             // phase 1: append children of NT parents at a time (ordered) until 16 chunks are pending or the class ends
             while npend < fill && cur < pe {
                 let idx = cur + t;
                 let mut m = 0u64;
                 if idx < pe {
-                    let pb = 4u32 * idx;
-                    m = child_mask(u64::cast_from(par[pb as usize]) | (u64::cast_from(par[(pb + 1u32) as usize]) << 32u64), par[(pb + 2u32) as usize], d);
+                    let pv = par[idx as usize];
+                    m = child_mask(u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64), pv[2usize], d);
                 }
                 let f = select(m != 0u64, 1u32, 0u32);
-                let r = plane_rank(m != 0u64, f, w, ranks);
+                let mut r = 0u32;
+                if comptime!(ranks == 0) {
+                    r = plane_rank(m != 0u64, f, w, ranks);
+                } else {
+                    r = plane_rank_m(m != 0u64, rlo, rhi, w);
+                }
                 let tot = plane_count(m != 0u64, f, w, ranks);
                 if lane == 0u32 {
                     wcnt[(parity * npl + pl) as usize] = tot;
                 }
                 sync_cube();
+                if dhave {
+                    pq[dsl as usize] = pq[dsl as usize] | (dv << 16u32);
+                    dhave = false;
+                }
                 let mut off = 0u32;
                 let mut all = 0u32;
                 for i in 0..npl {
@@ -284,11 +333,23 @@ mod kernels {
                     all += x;
                 }
                 if m != 0u64 {
-                    pend_p[(npend + off + r) as usize] = idx;
+                    let sl16 = npend + off + r;
+                    if (sl16 & 1u32) == 0u32 {
+                        pq[(sl16 >> 1u32) as usize] = idx - pb;
+                    } else {
+                        dsl = sl16 >> 1u32;
+                        dv = idx - pb;
+                        dhave = true;
+                    }
                 }
                 npend += all;
                 parity ^= 1u32;
                 cur += NT;
+            }
+            sync_cube();
+            if dhave {
+                pq[dsl as usize] = pq[dsl as usize] | (dv << 16u32);
+                dhave = false;
             }
             sync_cube();
             let done = cur >= pe;
@@ -299,7 +360,7 @@ mod kernels {
                 let ntake = min(npend, nch * 64u32);
                 if comptime!(w < 32) {
                     let mut z = t;
-                    while z < 2048u32 {
+                    while z < 2080u32 {
                         slt[z as usize].store(0u32);
                         z += NT;
                     }
@@ -314,15 +375,15 @@ mod kernels {
                     let mi = q * 64u32 + sg * w + lane;
                     let mut m = 0u64;
                     if q < nch && mi < ntake {
-                        let pi = pend_p[mi as usize];
-                        let pb = 4u32 * pi;
-                        m = child_mask(u64::cast_from(par[pb as usize]) | (u64::cast_from(par[(pb + 1u32) as usize]) << 32u64), par[(pb + 2u32) as usize], d);
+                        let pi = pb + ((pq[(mi >> 1u32) as usize] >> ((mi & 1u32) << 4u32)) & 0xFFFFu32);
+                        let pv = par[pi as usize];
+                        m = child_mask(u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64), pv[2usize], d);
                     }
                     if comptime!(xpose == 0) {
                         for v in 0..64u32 {
                             let bal = plane_ballot(((m >> u64::cast_from(v)) & 1u64) != 0u64);
                             if lane == v % w && q < nch {
-                                let row = (v * 16u32 + q) * 2u32;
+                                let row = (v + 65u32 * q) * 2u32;
                                 if comptime!(w == 64) {
                                     sl[row as usize] = bal[0usize];
                                     sl[(row + 1u32) as usize] = bal[1usize];
@@ -339,18 +400,29 @@ mod kernels {
                         // shuffle transpose: the plane's W rows, as 64/W blocks of W x W bits, each transposed in
                         // log2(W) shuffle_xor stages on the whole u64 (the stage masks are the same per block);
                         // lane l then holds, in block s, column s*W + l over this plane's rows.
-                        let mut x = m;
+                        // on the two 32-bit halves (ACO paid a v_lshlrev_b64 and two ORs per stage to rebuild the u64):
+                        // for j < 32 the stage moves bits within each half, and (y >> j) & !mj, (y << j) & mj are a
+                        // 32-bit rotation right by j or by 32 - j, masked: one v_alignbit and one v_bfi per half;
+                        // j = 32 (W = 64) swaps halves between the lane pairs
+                        let mut xl = u32::cast_from(m & 0xFFFF_FFFFu64);
+                        let mut xh = u32::cast_from(m >> 32u64);
                         #[unroll]
                         for st in 0..comptime!(w.trailing_zeros()) {
                             let j = comptime!(w >> (st + 1));
-                            let mj = comptime!(stage_mask(w >> (st + 1)));
-                            let ylo = plane_shuffle_xor(u32::cast_from(x & 0xFFFF_FFFFu64), j);
-                            let yhi = plane_shuffle_xor(u32::cast_from(x >> 32u64), j);
-                            let y = u64::cast_from(ylo) | (u64::cast_from(yhi) << 32u64);
-                            if (lane & j) != 0u32 {
-                                x = (x & mj) | ((y >> comptime!(j as u64)) & comptime!(!stage_mask(w >> (st + 1))));
+                            let yl = plane_shuffle_xor(xl, j);
+                            let yh = plane_shuffle_xor(xh, j);
+                            let hit = (lane & j) != 0u32;
+                            if comptime!(j == 32) {
+                                xl = select(hit, yh, xl);
+                                xh = select(hit, xh, yl);
                             } else {
-                                x = (x & comptime!(!stage_mask(w >> (st + 1)))) | ((y << comptime!(j as u64)) & mj);
+                                let mj = comptime!(stage_mask(w >> (st + 1)) as u32);
+                                let keep = select(hit, mj, !mj);
+                                let sr = select(hit, j, 32u32 - j);
+                                let rl = (yl >> sr) | (yl << (32u32 - sr));
+                                let rh = (yh >> sr) | (yh << (32u32 - sr));
+                                xl = (xl & keep) | (rl & !keep);
+                                xh = (xh & keep) | (rh & !keep);
                             }
                         }
                         if comptime!(cmask == 1) {
@@ -362,11 +434,22 @@ mod kernels {
                             // 512-bit JIT)
                             let vlo = select(nv >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(nv, 31u32)) - 1u32);
                             let vhi = select(nv >= 64u32, 0xFFFF_FFFFu32, select(nv > 32u32, (1u32 << ((nv - min(nv, 32u32)) & 31u32)) - 1u32, 0u32));
-                            let vp = u64::cast_from(vlo) | (u64::cast_from(vhi) << 32u64);
                             #[unroll]
                             for sb in 0..segs {
-                                let piece = (x >> comptime!((sb * w) as u64)) & comptime!(if w == 64 { u64::MAX } else { (1u64 << w) - 1 });
-                                let bal = plane_ballot(piece == vp);
+                                // this segment's column piece (W bits), from the half that holds it
+                                let mut hv = xh;
+                                if comptime!(sb * w < 32) {
+                                    hv = xl;
+                                }
+                                let mut eq = false;
+                                if comptime!(w == 64) {
+                                    eq = xl == vlo && xh == vhi;
+                                } else if comptime!(w == 32) {
+                                    eq = hv == vlo;
+                                } else {
+                                    eq = ((hv >> comptime!((sb * w) % 32)) & comptime!((1u32 << w) - 1)) == vlo;
+                                }
+                                let bal = plane_ballot(eq);
                                 if lane == 0u32 {
                                     if comptime!(w == 64) {
                                         comm[(2u32 * q) as usize].fetch_and(bal[0usize]);
@@ -386,15 +469,19 @@ mod kernels {
                             #[unroll]
                             for sb in 0..segs {
                                 let v = comptime!(sb * w) + lane;
-                                let row = (v * 16u32 + q) * 2u32;
+                                let row = (v + 65u32 * q) * 2u32;
+                                let mut hv = xh;
+                                if comptime!(sb * w < 32) {
+                                    hv = xl;
+                                }
                                 if comptime!(w == 64) {
-                                    sl[row as usize] = u32::cast_from(x & 0xFFFF_FFFFu64);
-                                    sl[(row + 1u32) as usize] = u32::cast_from(x >> 32u64);
+                                    sl[row as usize] = xl;
+                                    sl[(row + 1u32) as usize] = xh;
                                 } else if comptime!(w == 32) {
-                                    sl[(row + sg) as usize] = u32::cast_from((x >> comptime!((sb * 32) as u64)) & 0xFFFF_FFFFu64);
+                                    sl[(row + sg) as usize] = hv;
                                 } else {
                                     let bit = sg * w;
-                                    let piece = u32::cast_from((x >> comptime!((sb * w) as u64)) & comptime!((1u64 << w) - 1));
+                                    let piece = (hv >> comptime!((sb * w) % 32)) & comptime!((1u32 << w) - 1);
                                     slt[(row + bit / 32u32) as usize].fetch_or(piece << (bit % 32u32));
                                 }
                             }
@@ -402,10 +489,20 @@ mod kernels {
                     }
                 }
                 }
+                // the pending slots needed after phase 2 (the carried rest; each chunk's first parent for the records)
+                // into registers: 3a overwrites the words with the probe list
+                let left0 = npend - ntake;
+                keep = 0u32;
+                if t < left0 {
+                    let s16 = ntake + t;
+                    keep = (pq[(s16 >> 1u32) as usize] >> ((s16 & 1u32) << 4u32)) & 0xFFFFu32;
+                }
+                let s0 = min((t % 16u32) * 64u32, comptime!(fill + NT - 1));
+                let pend0 = pb + ((pq[(s0 >> 1u32) as usize] >> ((s0 & 1u32) << 4u32)) & 0xFFFFu32);
                 sync_cube();
                 if comptime!(w < 32) {
                     let mut z = t;
-                    while z < 2048u32 {
+                    while z < 2080u32 {
                         sl[z as usize] = slt[z as usize].load();
                         z += NT;
                     }
@@ -422,7 +519,7 @@ mod kernels {
                             let nq = min(64u32, ntake - q * 64u32);
                             let vlo = select(nq >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nq % 32u32)) - 1u32);
                             let vhi = select(nq == 64u32, 0xFFFF_FFFFu32, select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32));
-                            let row = (v * 16u32 + q) * 2u32;
+                            let row = (v + 65u32 * q) * 2u32;
                             if sl[row as usize] == vlo && sl[(row + 1u32) as usize] == vhi {
                                 comm[(2u32 * q + v / 32u32) as usize].fetch_or(1u32 << (v % 32u32));
                             }
@@ -432,35 +529,39 @@ mod kernels {
                 }
                 }
                 sync_cube();
+                if comptime!(mode == 2) {
+                    // the common masks per digit: cmv[v] bit q = digit v is common to chunk q (one wave, once per
+                    // round), so that 3a ORs one word per probe digit instead of testing every chunk's two words
+                    if t < 64u32 {
+                        let mut cmk = 0u32;
+                        for qq in 0..nch {
+                            let wv = comm[(2u32 * qq + t / 32u32) as usize].load();
+                            cmk |= ((wv >> (t % 32u32)) & 1u32) << qq;
+                        }
+                        cmv[t as usize] = cmk;
+                    }
+                    sync_cube();
+                }
                 if comptime!(mode != 0) {
                     // phase 3a: per probe, its 16-bit mask of chunks kept by the common-mask skip -> list
+                    let allq = (1u32 << nch) - 1u32; // nch <= 16
                     let mut pp = t;
                     while pp < nprobe {
-                        let mut tlo = 0u32;
-                        let mut thi = 0u32;
-                        #[unroll]
-                        for k in 0..MAXPOP {
-                            let dg = (prob_d[(pp * 4u32 + comptime!(k / 5)) as usize] >> comptime!(6 * (k % 5))) & 63u32;
-                            if dg < 32u32 {
-                                tlo |= 1u32 << dg;
-                            } else {
-                                thi |= 1u32 << (dg - 32u32);
+                        let mut km = allq;
+                        if comptime!(mode == 2) {
+                            let mut hitm = 0u32;
+                            let pv = prob_d[pp as usize];
+                            #[unroll]
+                            for k in 0..MAXPOP {
+                                let dg = (pv[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5))) & 63u32;
+                                hitm |= cmv[dg as usize];
                             }
+                            km = allq & !hitm;
                         }
-                        let mut km = 0u32;
-                        for qq in 0..nch {
-                            let hit = (comm[(2u32 * qq) as usize].load() & tlo) | (comm[(2u32 * qq + 1u32) as usize].load() & thi);
-                            let mut keepq = hit == 0u32;
-                            if comptime!(mode == 1) {
-                                keepq = true;
-                            }
-                            if keepq {
-                                km |= 1u32 << qq;
-                            }
-                        }
+                        my_kept += km.count_ones();
                         if km != 0u32 {
                             let slot = s_nl[0usize].fetch_add(1u32);
-                            plist[slot as usize] = pp | (km << 16u32);
+                            pq[slot as usize] = (pp * 16u32) | (km << 16u32); // the probe's byte offset in prob_d: no shift in 3b
                         }
                         pp += NT;
                     }
@@ -472,7 +573,8 @@ mod kernels {
                     let nq = select(q < nch, min(64u32, ntake - min(ntake, q * 64u32)), 0u32);
                     let vlo = select(nq >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nq % 32u32)) - 1u32);
                     let vhi = select(nq == 64u32, 0xFFFF_FFFFu32, select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32));
-                    let pend0 = pend_p[min(q * 64u32, comptime!(fill + NT - 1)) as usize];
+                    let q65 = 65u32 * q;
+                    let qs = 16u32 + q;
                     let mut e0 = 0u32;
                     while e0 < nlist {
                         let mut wlo = Array::<u32>::new(2usize);
@@ -486,31 +588,26 @@ mod kernels {
                         }
                         #[unroll]
                         for h in 0..ept {
+                            // branch-free: an entry past the list reads as 0 (probe 0, no chunk kept), and a lane whose
+                            // chunk is not kept computes its word and masks it (a wave skipped only when all 64 lanes
+                            // were idle, which is rare; the branches cost more than they saved). e < nlist + 31 <= pq's size.
                             let e = e0 + st + comptime!(16 * h);
-                            if e < nlist {
-                                let ent = plist[e as usize];
-                                let p = ent & 0xFFFFu32;
-                                pk[h as usize] = p;
-                                if ((ent >> (16u32 + q)) & 1u32) != 0u32 {
-                                    my_kept += 1u32;
-                                    let mut alo = 0u32;
-                                    let mut ahi = 0u32;
-                                    let mut dws = Array::<u32>::new(4usize);
-                                    #[unroll]
-                                    for k4 in 0..4u32 {
-                                        dws[k4 as usize] = prob_d[(p * 4u32 + k4) as usize];
-                                    }
-                                    #[unroll]
-                                    for k in 0..MAXPOP {
-                                        let dg = (dws[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5))) & 63u32;
-                                        let row = (dg * 16u32 + q) * 2u32;
-                                        alo |= sl[row as usize];
-                                        ahi |= sl[(row + 1u32) as usize];
-                                    }
-                                    wlo[h as usize] = !alo & vlo;
-                                    whi[h as usize] = !ahi & vhi;
-                                }
+                            let ent = select(e < nlist, pq[e as usize], 0u32);
+                            let p16 = ent & 0xFFFFu32;
+                            pk[h as usize] = p16;
+                            let kmask = 0u32 - ((ent >> qs) & 1u32);
+                            let mut alo = 0u32;
+                            let mut ahi = 0u32;
+                            let dws = prob_d[(p16 >> 4u32) as usize];
+                            #[unroll]
+                            for k in 0..MAXPOP {
+                                let dg = (dws[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5))) & 63u32;
+                                let row = (dg + q65) * 2u32;
+                                alo |= sl[row as usize];
+                                ahi |= sl[(row + 1u32) as usize];
                             }
+                            wlo[h as usize] = !alo & vlo & kmask;
+                            whi[h as usize] = !ahi & vhi & kmask;
                         }
                         if t == 0u32 {
                             my_lslots += min(comptime!(16 * ept), nlist - e0) * nch;
@@ -524,8 +621,15 @@ mod kernels {
                             let fb = select(nzb, 1u32, 0u32);
                             let na = plane_count(nza, fa, w, ranks);
                             let nn = na + plane_count(nzb, fb, w, ranks);
-                            let ra = plane_rank(nza, fa, w, ranks);
-                            let rb = plane_rank(nzb, fb, w, ranks);
+                            let mut ra = 0u32;
+                            let mut rb = 0u32;
+                            if comptime!(ranks == 0) {
+                                ra = plane_rank(nza, fa, w, ranks);
+                                rb = plane_rank(nzb, fb, w, ranks);
+                            } else {
+                                ra = plane_rank_m(nza, rlo, rhi, w);
+                                rb = plane_rank_m(nzb, rlo, rhi, w);
+                            }
                             if nn > 0u32 {
                                 if slab_used + nn > SLAB {
                                     if lane == 0u32 && have_slab {
@@ -545,18 +649,20 @@ mod kernels {
                                 let sbase = slab_id * SLAB + slab_used;
                                 if slab_id < nslab_cap {
                                     if nza {
-                                        let o = (sbase + ra) * 4u32;
-                                        out[o as usize] = pk[0usize] | (d << 16u32);
-                                        out[(o + 1u32) as usize] = pend0;
-                                        out[(o + 2u32) as usize] = wlo[0usize];
-                                        out[(o + 3u32) as usize] = whi[0usize];
+                                        let mut rv = Vector::<u32, Const<4>>::empty();
+                                        rv[0usize] = (pk[0usize] >> 4u32) | (d << 16u32);
+                                        rv[1usize] = pend0;
+                                        rv[2usize] = wlo[0usize];
+                                        rv[3usize] = whi[0usize];
+                                        out[(sbase + ra) as usize] = rv;
                                     }
                                     if nzb {
-                                        let o = (sbase + na + rb) * 4u32;
-                                        out[o as usize] = pk[1usize] | (d << 16u32);
-                                        out[(o + 1u32) as usize] = pend0;
-                                        out[(o + 2u32) as usize] = wlo[1usize];
-                                        out[(o + 3u32) as usize] = whi[1usize];
+                                        let mut rv = Vector::<u32, Const<4>>::empty();
+                                        rv[0usize] = (pk[1usize] >> 4u32) | (d << 16u32);
+                                        rv[1usize] = pend0;
+                                        rv[2usize] = wlo[1usize];
+                                        rv[3usize] = whi[1usize];
+                                        out[(sbase + na + rb) as usize] = rv;
                                     }
                                 }
                                 my_surv += wlo[0usize].count_ones() + whi[0usize].count_ones() + wlo[1usize].count_ones() + whi[1usize].count_ones();
@@ -576,13 +682,10 @@ mod kernels {
                 sync_cube();
                 // phase 4: carry the rest (< NT) to the front; reset the round's list and common masks
                 let left = npend - ntake;
-                let mut keep = 0u32;
-                if t < left {
-                    keep = pend_p[(ntake + t) as usize];
-                }
-                sync_cube();
-                if t < left {
-                    pend_p[t as usize] = keep;
+                // slots t and t + 1 are lanes l and l ^ 1 of one plane: one store per word
+                let nb = plane_shuffle_xor(keep, 1u32);
+                if t < left && (t & 1u32) == 0u32 {
+                    pq[(t >> 1u32) as usize] = keep | select(t + 1u32 < left, nb << 16u32, 0u32);
                 }
                 if t == 0u32 {
                     s_nl[0usize].store(0u32);
@@ -634,27 +737,44 @@ mod prep {
         u32::cast_from((x >> comptime!(6 * j) as u64) & 63u64)
     }
 
+    /// Digit j (6 bits) of a 60-bit value given as 32-bit halves (j comptime; digit 5 spans the halves).
+    #[cube]
+    fn dig2(lo: u32, hi: u32, #[comptime] j: u32) -> u32 {
+        let mut v = 0u32;
+        if comptime!(6 * j + 6 <= 32) {
+            v = (lo >> comptime!(6 * j)) & 63u32;
+        } else if comptime!(6 * j >= 32) {
+            v = (hi >> comptime!(6 * j - 32)) & 63u32;
+        } else {
+            v = ((lo >> comptime!(6 * j)) | (hi << comptime!(32 - 6 * j))) & 63u32;
+        }
+        v
+    }
+
     /// The parent of root r4 under π′ (pip): (mask, cacc, key), or mask 0 when a digit 0..8 repeats.
+    /// (2026-11-18: digits from 32-bit halves; the 18 digits are distinct iff the mask has 18 bits, so no per-digit
+    /// tests; r mod 63 = (r4 mod 63 + pip mod 63) mod 63, as 2^24 = 1 mod 63.)
     #[cube]
     fn parent(r4: u32, pip: u64, rank: &Array<u32>) -> (u64, u32, u32) {
         let mask60 = (1u64 << 60u64) - 1u64;
         let r = u64::cast_from(r4) + (pip << 24u64);
         let s = (r * r) & mask60;
         let c = (s * r) & mask60;
+        let slo = u32::cast_from(s & 0xFFFF_FFFFu64);
+        let shi = u32::cast_from(s >> 32u64);
+        let clo = u32::cast_from(c & 0xFFFF_FFFFu64);
+        let chi = u32::cast_from(c >> 32u64);
         let mut m = 0u64;
-        let mut ok = true;
         #[unroll]
         for j in 0..9u32 {
-            let a = 1u64 << u64::cast_from(dig(s, j));
-            let b = 1u64 << u64::cast_from(dig(c, j));
-            if (m & a) != 0u64 || (m & b) != 0u64 || a == b {
-                ok = false;
-            }
-            m |= a | b;
+            m |= (1u64 << u64::cast_from(dig2(slo, shi, j))) | (1u64 << u64::cast_from(dig2(clo, chi, j)));
         }
-        let r0 = u32::cast_from(r & 63u64);
-        let cacc = dig(s, 9u32) | (dig(c, 9u32) << 8u32) | (((2u32 * r0) & 63u32) << 16u32) | (((3u32 * r0 * r0) & 63u32) << 24u32);
-        let cls = u32::cast_from(r % 63u64);
+        let ok = m.count_ones() == 18u32;
+        let r0 = r4 & 63u32;
+        let cacc = dig2(slo, shi, 9u32) | (dig2(clo, chi, 9u32) << 8u32) | (((2u32 * r0) & 63u32) << 16u32) | (((3u32 * r0 * r0) & 63u32) << 24u32);
+        // pip mod 63 from its halves (2^32 = 4 mod 63); uniform
+        let pm63 = (u32::cast_from(pip >> 32u64) % 63u32 * 4u32 + u32::cast_from(pip & 0xFFFF_FFFFu64) % 63u32) % 63u32;
+        let cls = (r4 % 63u32 + pm63) % 63u32;
         let mut k8 = 0u32;
         #[unroll]
         for i in 0..8u32 {
@@ -677,6 +797,81 @@ mod prep {
             if m != 0u64 {
                 hist[key as usize].fetch_add(1u32);
             }
+        }
+    }
+
+    /// --prep2 1 (default): the histogram pass also appends each parent's record and key to a compact list (one
+    /// atomic per plane), so the scatter reads 1.04M list entries instead of making the parents of all 9.3M roots
+    /// a second time. The list's order is arbitrary; the rank sort restores the CPU's order (ranks by r4).
+    #[cube(launch_unchecked)]
+    pub fn hist2_kernel(
+        r4s: &Array<u32>,
+        rank: &Array<u32>,
+        hist: &mut Array<Atomic<u32>>,
+        lst: &mut Array<Vector<u32, Const<4>>>,
+        lkey: &mut Array<u32>,
+        lcnt: &mut Array<Atomic<u32>>,
+        nroots: u32,
+        pip_lo: u32,
+        pip_hi: u32,
+        cap: u32,
+        #[comptime] w: u32,
+    ) {
+        let pip = u64::cast_from(pip_lo) | (u64::cast_from(pip_hi) << 32u64);
+        let i = ABSOLUTE_POS_X;
+        let mut m = 0u64;
+        let mut c = 0u32;
+        let mut key = 0u32;
+        let mut r4 = 0u32;
+        if i < nroots {
+            r4 = r4s[i as usize];
+            let (mm, cc, kk) = parent(r4, pip, rank);
+            m = mm;
+            c = cc;
+            key = kk;
+        }
+        let flag = m != 0u64;
+        let b = plane_ballot(flag);
+        let l = UNIT_POS_PLANE;
+        let lo = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
+        let mut r = (b[0usize] & lo).count_ones();
+        let mut n = b[0usize].count_ones();
+        if comptime!(w > 32) {
+            let hi = select(l >= 32u32, (1u32 << (l & 31u32)) - 1u32, 0u32);
+            r += (b[1usize] & hi).count_ones();
+            n += b[1usize].count_ones();
+        }
+        let mut base0 = 0u32;
+        if l == 0u32 && n > 0u32 {
+            base0 = lcnt[0usize].fetch_add(n);
+        }
+        let base = plane_sum(base0); // only lane 0 holds it
+        if flag {
+            let slot = base + r;
+            if slot < cap {
+                let mut v = Vector::<u32, Const<4>>::empty();
+                v[0usize] = u32::cast_from(m & 0xFFFF_FFFFu64);
+                v[1usize] = u32::cast_from(m >> 32u64);
+                v[2usize] = c;
+                v[3usize] = r4;
+                lst[slot as usize] = v;
+                lkey[slot as usize] = key;
+            }
+            hist[key as usize].fetch_add(1u32);
+        }
+    }
+
+    #[cube(launch_unchecked)]
+    pub fn scatter2_kernel(lst: &Array<Vector<u32, Const<4>>>, lkey: &Array<u32>, cur: &mut Array<Atomic<u32>>, tmp: &mut Array<u32>, n: u32) {
+        let i = ABSOLUTE_POS_X;
+        if i < n {
+            let key = lkey[i as usize];
+            let slot = cur[key as usize].fetch_add(1u32);
+            let v = lst[i as usize];
+            tmp[(4u32 * slot) as usize] = v[0usize];
+            tmp[(4u32 * slot + 1u32) as usize] = v[1usize];
+            tmp[(4u32 * slot + 2u32) as usize] = v[2usize];
+            tmp[(4u32 * slot + 3u32) as usize] = v[3usize];
         }
     }
 
@@ -996,6 +1191,11 @@ fn load(dir: &str) -> Result<Input> {
         }
     }
     pseg[63] = par.len() as u32;
+    // the kernel keeps pending children as u16 offsets from their class's start
+    let big = (0..63).map(|c| pseg[c + 1] - pseg[c]).max().unwrap_or(0);
+    if big > 65536 {
+        bail!("a parent class has {big} parents: the kernel's u16 pending slots need <= 65536");
+    }
     let w = (end - start) as f64;
     let adm = w / (1u64 << 30) as f64 / 64.0 * 64.0 * 8.0 / 63.0;
     Ok(Input { pip, ts, tseg, expect, par, pseg, rank, adm })
@@ -1375,6 +1575,11 @@ fn run_gpu<R: Runtime>(
         let tmask = client.create(cubecl::bytes::Bytes::from_elems(inp.ts.iter().map(|t| t.mask).collect::<Vec<u64>>()));
         let npar = inp.par.len();
         let g_tmp = client.empty(npar * 16);
+        // --prep2 1 (default): one pass over the roots, a compact parent list, a scatter over the list
+        let prep2: u32 = opt("--prep2").map_or(Ok(1), |s| s.parse())?;
+        let g_lst = client.empty(npar * 16);
+        let g_lkey = client.empty(npar * 4);
+        let mut lcnt = mk(vec![0u32; 1]);
         let g_rec = client.empty(npar * 16);
         let g_tdig = client.empty(ntops * 16);
         let off = client.empty(16128 * 4);
@@ -1386,6 +1591,7 @@ fn run_gpu<R: Runtime>(
         let mut pt0: Option<Instant> = None;
         for prep_rep in 0..reps.max(1) {
             histh = mk(vec![0u32; 16128]);
+            lcnt = mk(vec![0u32; 1]);
             if !pburst || prep_rep == 0 {
                 cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
             }
@@ -1400,22 +1606,43 @@ fn run_gpu<R: Runtime>(
                     ArrayArg::from_raw_parts(tmask.clone(), ntops), ArrayArg::from_raw_parts(g_tdig.clone(), ntops * 4),
                     ntops as u32,
                 );
-                prep::hist_kernel::launch_unchecked::<R>(
-                    &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
-                    ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
-                    ArrayArg::from_raw_parts(histh.clone(), 16128), nroots, inp.pip as u32, (inp.pip >> 32) as u32,
-                );
+                if prep2 == 1 {
+                    prep::hist2_kernel::launch_unchecked::<R>(
+                        &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
+                        ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
+                        ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(g_lst.clone(), npar),
+                        ArrayArg::from_raw_parts(g_lkey.clone(), npar), ArrayArg::from_raw_parts(lcnt.clone(), 1),
+                        nroots, inp.pip as u32, (inp.pip >> 32) as u32, npar as u32, w,
+                    );
+                } else {
+                    prep::hist_kernel::launch_unchecked::<R>(
+                        &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
+                        ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
+                        ArrayArg::from_raw_parts(histh.clone(), 16128), nroots, inp.pip as u32, (inp.pip >> 32) as u32,
+                    );
+                }
                 prep::scan_kernel::launch_unchecked::<R>(
                     &client, CubeCount::Static(1, 1, 1), CubeDim::new_1d(256),
                     ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(off.clone(), 16128),
                     ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_pseg.clone(), 64),
                 );
-                prep::scatter_kernel::launch_unchecked::<R>(
-                    &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
-                    ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
-                    ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4),
-                    nroots, inp.pip as u32, (inp.pip >> 32) as u32,
-                );
+                if prep2 == 1 {
+                    // (the host knows npar from its own prep here; a client would launch for the list's capacity
+                    // and read the count on the device)
+                    prep::scatter2_kernel::launch_unchecked::<R>(
+                        &client, CubeCount::Static((npar as u32).div_ceil(NT), 1, 1), CubeDim::new_1d(NT),
+                        ArrayArg::from_raw_parts(g_lst.clone(), npar), ArrayArg::from_raw_parts(g_lkey.clone(), npar),
+                        ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4),
+                        npar as u32,
+                    );
+                } else {
+                    prep::scatter_kernel::launch_unchecked::<R>(
+                        &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
+                        ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
+                        ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4),
+                        nroots, inp.pip as u32, (inp.pip >> 32) as u32,
+                    );
+                }
                 prep::rsort_kernel::launch_unchecked::<R>(
                     &client, CubeCount::Static(16128, 1, 1), CubeDim::new_1d(64),
                     ArrayArg::from_raw_parts(off.clone(), 16128), ArrayArg::from_raw_parts(histh.clone(), 16128),
@@ -1439,7 +1666,9 @@ fn run_gpu<R: Runtime>(
         let gp = u32::from_bytes(&client.read_one(g_pseg.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
         let gh = u32::from_bytes(&client.read_one(histh.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
         let total: u64 = gh.iter().map(|&x| x as u64).sum();
-        let ok = total == npar as u64 && gp == inp.pseg && gr == rec_host && gd == tdig_host;
+        let nl = u32::from_bytes(&client.read_one(lcnt.clone()).map_err(|e| anyhow!("{e:?}"))?)[0];
+        let ok = total == npar as u64 && gp == inp.pseg && gr == rec_host && gd == tdig_host && (prep2 == 0 || nl as usize == npar);
+        println!("prep: {}", if prep2 == 1 { format!("one root pass + list scatter (list {nl} of {npar})") } else { "two root passes".into() });
         println!(
             "PREP (GPU, 5 launches) median {:.3} ms ({} reps) for {npar} parents from {nroots} roots: {:.1} ps per parent; largest bucket {}; order, records, class segments and top digits {}",
             prep_secs * 1e3,
@@ -1455,6 +1684,57 @@ fn run_gpu<R: Runtime>(
     } else {
         (rec, pseg, tdig)
     };
+    // --cuda-src DIR (with the cubecl-cuda feature, no CUDA device needed): the kernel's definition from this runtime,
+    // compiled by CubeCL's CUDA compiler (as cubecl-cuda would for an sm_86 card: warp 32, grid constants, fast
+    // math) and written to DIR/g2_m<mode>[_noout]_w<W>.cu, for NVRTC/ptxas offline; then exit
+    #[cfg(feature = "cubecl-cuda")]
+    if let Some(dir) = opt("--cuda-src") {
+        use cubecl::Compiler;
+        std::fs::create_dir_all(&dir)?;
+        for &mode in modes {
+            let mut settings = cubecl::prelude::KernelSettings::default().cube_dim(CubeDim::new_1d(NT));
+            settings.address_type = cubecl::prelude::AddressType::U32;
+            let mut launcher = cubecl::prelude::KernelLauncher::<R>::new(settings.clone());
+            launcher.with_scope(|scope| scope.device_properties(client.properties()));
+            let jl = jobs.len().min(batch);
+            macro_rules! reg {
+                ($t:ty, $h:expr, $n:expr) => {
+                    <$t as LaunchArg>::register(unsafe { ArrayArg::from_raw_parts($h.clone(), $n) }, &mut launcher)
+                };
+            }
+            let a0 = reg!(Array<Vector<u32, Const<4>>>, rec, inp.par.len());
+            let a1 = reg!(Array<u32>, pseg, 64);
+            let a2 = reg!(Array<u64>, tmask_k, inp.ts.len());
+            let a3 = reg!(Array<u32>, tdig, inp.ts.len() * 4);
+            let a4 = reg!(Array<u32>, tseg, inp.tseg.len());
+            let a5 = reg!(Array<u32>, roots, NROOT);
+            let a6 = reg!(Array<u32>, jobs_h[0], 2 * jl);
+            let cnt = mk(vec![0u32; NCNT]);
+            let slabn = mk(vec![0u32; 1]);
+            let a7 = reg!(Array<Atomic<u32>>, cnt, NCNT);
+            let a8 = reg!(Array<Vector<u32, Const<4>>>, out, nslab_cap as usize * SLAB as usize);
+            let a9 = reg!(Array<Atomic<u32>>, slabn, 1);
+            let a10 = reg!(Array<u32>, slabcnt, nslab_cap as usize);
+            let a11 = <u32 as LaunchArg>::register(nslab_cap, &mut launcher);
+            let k = kernels::g2_kernel::G2Kernel::<R>::new(
+                settings, client.clone(), a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11,
+                mode.min(2), noout || mode == 0, w, fill, xpose, ept, ranks, cut, cmask, tdg,
+            );
+            let def = k.define();
+            let mut comp = cubecl::cuda::CudaCompiler::default();
+            let mut o = <cubecl::cuda::CudaCompiler as Compiler>::CompilationOptions::default();
+            o.warp_size = 32;
+            o.supports_features.grid_constants = true;
+            o.supports_features.fast_math = true;
+            let src = comp
+                .compile(def, &o, cubecl::prelude::ExecutionMode::Unchecked, k.address_type())
+                .map_err(|e| anyhow!("cuda compile: {e:?}"))?;
+            let f = format!("{dir}/g2_m{mode}{}_w{w}_tdig{tdg}.cu", if noout && mode != 0 { "_noout" } else { "" });
+            std::fs::write(&f, format!("{src}"))?;
+            println!("CUDA source: {f}");
+        }
+        return Ok(());
+    }
     let names = ["probes off", "skip off", "full"];
     let mut times = [0f64; 3];
     let mut all_ok = !all_prep_bad;
@@ -1486,7 +1766,7 @@ fn run_gpu<R: Runtime>(
                                 &client,
                                 CubeCount::Static(bj.len() as u32, 1, 1),
                                 CubeDim::new_1d(NT),
-                                ArrayArg::from_raw_parts(rec.clone(), inp.par.len() * 4),
+                                ArrayArg::from_raw_parts(rec.clone(), inp.par.len()),
                                 ArrayArg::from_raw_parts(pseg.clone(), 64),
                                 ArrayArg::from_raw_parts(tmask_k.clone(), inp.ts.len()),
                                 ArrayArg::from_raw_parts(tdig.clone(), inp.ts.len() * 4),
@@ -1494,7 +1774,7 @@ fn run_gpu<R: Runtime>(
                                 ArrayArg::from_raw_parts(roots.clone(), NROOT),
                                 ArrayArg::from_raw_parts(jobs_h[bi].clone(), 2 * bj.len()),
                                 ArrayArg::from_raw_parts(cnt.clone(), NCNT),
-                                ArrayArg::from_raw_parts(out.clone(), nslab_cap as usize * SLAB as usize * 4),
+                                ArrayArg::from_raw_parts(out.clone(), nslab_cap as usize * SLAB as usize),
                                 ArrayArg::from_raw_parts(slabn.clone(), 1),
                                 ArrayArg::from_raw_parts(slabcnt.clone(), nslab_cap as usize),
                                 nslab_cap,

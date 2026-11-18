@@ -16,6 +16,8 @@ NS=$(grep -c 'busy=' $OUT/x_A_su1.gpu 2>/dev/null); echo "SAMPLER: $NS samples w
 [ "$DEV" = card ] && [ "${NS:-0}" -eq 0 ] && { echo "SAMPLER EMPTY on the card: stop, fix smp.sh (sysfs paths), re-run"; exit 1; }
 ok; sh $S/run_g2.sh x_A_su2 $SU2 --gpu-prep --xpose 1 --ept 2 --reps 1
 ok; sh $S/run_g2.sh x_B_su1 $SU1 --gpu-prep --xpose 0 --ept 2 --reps 1
+# D (--tdig 1) is predicted the best form on the card since the 2026-11-18 tuning: check its sets too
+ok; sh $S/run_g2.sh x_D_su1 $SU1 --gpu-prep --xpose 1 --ept 2 --tdig 1 --reps 1
 grep -q 'ALL CHECKS PASSED' $OUT/x_A_su1.log && grep -q 'ALL CHECKS PASSED' $OUT/x_A_su2.log && XA=1 || XA=0
 grep -q 'ALL CHECKS PASSED' $OUT/x_B_su1.log && XB=1 || XB=0
 echo "EXACT A=$XA B=$XB"
@@ -23,21 +25,23 @@ echo "EXACT A=$XA B=$XB"
 # timing variants: A = shuffle transpose, 2 entries per step (the predicted default); B = ballot transpose; C = 1 entry
 VA="--xpose 1 --ept 2"; VB="--xpose 0 --ept 2"; VC="--xpose 1 --ept 1"; VD="--xpose 1 --ept 2 --tdig 1"
 g2t() { # round variant
-  eval V=\$V$2; [ "$2" = D ] && [ $XA = 0 ] && return; [ "$2" = A ] && [ $XA = 0 ] && return; [ "$2" = C ] && [ $XA = 0 ] && return; [ "$2" = B ] && [ $XB = 0 ] && return
+  eval V=\$V$2; [ "$2" = P ] && [ $XA = 0 ] && return; [ "$2" = D ] && [ $XA = 0 ] && return; [ "$2" = A ] && [ $XA = 0 ] && return; [ "$2" = C ] && [ $XA = 0 ] && return; [ "$2" = B ] && [ $XB = 0 ] && return
   ok; sh $S/run_g2.sh t_$2_r$1 $SU1 --gpu-prep --no-sets --reps $REPS $V
   ok; sh $S/run_g2.sh o_$2_r$1 $SU1 --no-sets --noout --modes 0,1,2 --reps $REPS $V
 }
 # NMAIN (default 5): main fields per block (the dry run uses 1: fields 1 and 6 only)
 mainf() { i=0; for f in $F64S; do i=$((i+1)); [ $i -ge $1 ] && [ $i -lt $(( $1 + ${NMAIN:-5} )) ] && [ $i -le $2 ] && { ok; sh $S/run_main.sh main_f$i $f; }; done; }
-g2t 1 A; g2t 1 B; g2t 1 C
+# (2026-11-18) D in every round: --tdig 1 is predicted -0.07 ms on the card (setup), and the CUDA penalty it showed
+# was nvcc's per-lane atomic loads in 3a, which the tuned kernel no longer has (G2/TUNE-RESULTS.md)
+g2t 1 A; g2t 1 D; g2t 1 B; g2t 1 C
 mainf 1 5
-g2t 2 B; g2t 2 C; g2t 2 A
+g2t 2 D; g2t 2 B; g2t 2 C; g2t 2 A
 mainf 6 10
-g2t 3 C; g2t 3 A; g2t 3 B
-# round 4 of A (the CubeCL kernel's timing was bimodal across processes on a 3080: four rounds, median and minimum)
-g2t 4 A
-# D: the precomputed top digits (3 ms slower on CUDA's full kernel; is it the same on the card?)
-g2t 1 D
+g2t 3 C; g2t 3 A; g2t 3 D; g2t 3 B
+# round 4 of A and of D (the CubeCL kernel's timing was bimodal across processes on a 3080: four rounds, median and minimum)
+g2t 4 A; g2t 4 D
+# P: the pre-tuning build (9ff100e6) as $BIN/g2_pre, one round with its defaults, if it was built: the tuning's worth
+[ -x "$BIN/g2_pre" ] && { VP=""; G2BIN=$BIN/g2_pre; export G2BIN; g2t 1 P; unset G2BIN; }
 echo "SPARE_START $(date -u +%T)"
 # spare: re-run once any main field the analysis marks OFF-POINT (the director's call), else round 5 of A
 ok; g2t 5 A

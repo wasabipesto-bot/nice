@@ -58,6 +58,20 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   then the ×1.34 gap to hand CUDA from generated code. Still the throwaway prototype (local branch, never
   pushed); its purpose is that the one window on the card is taken with the best build. Not new research.
 
+- **10:52 UTC: G2 offline tuning done** (EXPERIMENTS G2.6, 561 k tokens). Eleven commits, 9ff100e6 → 4170a781:
+  3b −22 % VALU, 3a 222 → 52, whole kernel 1,746 → 1,228 vcyc, shared memory under 21.5 KB so 12 waves; every
+  commit exact on lavapipe. The model's prediction for the card moves from ×4.5 (×3.4–5.6) to ×6.4 (×4.4–8.7).
+  **I treat that as a count, not a speed:** the model sees issue only and has never met the card, and the tuned
+  build's W = 32 / 64 paths have run nowhere. My own check: the final head with `--tdig 1` (the variant the window
+  times every round, last proven four commits earlier) is exact on both super-units at W = 8 and 16.
+  - Two findings worth more than the counts: yesterday's "bottom side ×2.8 slower than v10" was a comparison
+    against a kernel nvcc had half deleted as dead code (my report repeated it; corrected today), and CubeCL
+    lowers shared atomic loads to `atomicAdd(p, 0)`, which nvcc aggregates or not depending on unrelated code:
+    the mechanism of the +2.8 ms that G2.5 could not explain. A third CubeCL note for the user to file upstream
+    if they wish (not drafted yet).
+  - Next on G2 when credit allows: one rented 3080, W = 32 exactness of the tuned head and a re-time (≈ $0.20).
+    With the card: the window, unchanged in length.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

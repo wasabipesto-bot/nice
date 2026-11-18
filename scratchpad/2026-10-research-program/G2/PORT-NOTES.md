@@ -150,6 +150,30 @@ Brief: `G2/PORT-BRIEF.md`. Benchmark ported: `G2/BENCH.md` (kernel v10, ×5.13 o
   - **RX 9070 XT prediction:** by the CUDA-component method, prep 0.70 instead of 1.03 ms and the rest as
     measured: central about ×4.7 (×3.4–5.9). The stop line ×4.0 is still inside the band.
 
+- **2026-11-18 08:10–12:30 UTC, offline tuning (ivory only; `G2/TUNE-RESULTS.md`):** head **`4170a781`**, bundle
+  current, `G2/port/g2_cubecl.rs` a copy.
+  - **ACO GFX1201 [M]:** 3b VALU 217 → 169, 3a 222 → 52, phase 1 vcyc 74 → 58, transpose ≈ 131 → 40 vcyc per task,
+    whole kernel vcyc 1,746 → 1,228; **LDS 25,600 → 21,504 B, VGPRs 192 → 120, 12 waves per SIMD (was 8)**.
+    Prep: one root pass (`--prep2 1`) instead of two, 229 instead of 311 + 338 vcyc per root.
+  - **Eleven commits, each exact on lavapipe** (W = 8 GPU prep and W = 16 host prep, both super-units, whole), and new
+    proofs: **fill 1024 (16-chunk rounds) at W = 8 and 16** (before: only the 3080 at W = 32), **W = 16 with `--cmask 1`** (the 512-bit crash is gone
+    with the 64-bit piece shifts). W = 32 / 64 still run nowhere; the transpose's W = 64 logic is checked by
+    `raw/tune/xpose_sim.py`.
+  - **Issue-bound model [P]:** kernel 3.19 → 2.15 ms; **ratio central ×6.4 (×4.8–8.1; ×4.4–8.7 with main's ±8 %)**,
+    against ×4.5 (×3.4–5.6) before by the same model. D (`--tdig 1`) predicted a further −0.07 ms.
+  - **The CUDA ×1.34, from SASS [M]:** (1) v10's probes-off kernel has its transpose and setup removed by nvcc as
+    dead code, so "bottom side 0.63 ms" was phase 1 only; (2) CubeCL emits `atomicAdd(p, 0)` for atomic loads, and
+    3a did 32 per probe; nvcc warp-aggregated them in the `--tdig 0` build and not in the `--tdig 1` build — the
+    mechanism of the +2.8 ms. Fixed by the per-digit masks (no atomics in 3a). (3) Records, probe words and parent
+    loads are now 128-bit vectors on CUDA. Predicted ×1.1–1.3 of v10, not timed.
+  - **New tools:** `--cuda-src DIR` (CubeCL's CUDA without a device, build with `cubecl-cuda`), NVRTC/ptxas/nvdisasm
+    scripts (`raw/tune/cuda/`), `bda.sh`, `ex.sh`, `model_rdna4.py --tune`.
+- **Next, in order:**
+  1. **The window** with `4170a781` (`WINDOW-PLAN.md`: D every round, optional P = `9ff100e6` for one round).
+  2. A CUDA re-time of the tuned port, if a 3080 is rented anyway.
+  3. If the card lands below the model: setup in 32-bit halves (or D as default), 32-bit child masks, the prep's
+     64-bit multiplies.
+
 ## Worktree, branch, build
 
 - **Worktree and branch:**
@@ -296,6 +320,9 @@ The full super-unit means 4032 jobs, in launches of 252.
 - **The card's clocks, occupancy in practice, and main's base mean on the card.** These have to be measured.
 
 ## RDNA4 pricing [M for ACO, E for time] (`g2out/aco_*/`, model `G2/port/model_rdna4.py`)
+
+**Superseded in its numbers by the 2026-11-18 tuning** (`G2/TUNE-RESULTS.md`, `model_rdna4.py --tune --b3=169
+--xp=40`); the section below is the pre-tuning state of `997339bc` / `9ff100e6`.
 
 **ACO, GFX1201, wave64** (the main kernel, W = 64, fill 1024, full mode):
 - 192 VGPRs (pre-scheduling demand 31), 108 SGPRs, no spills;

@@ -5,6 +5,44 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## G2.6 The port tuned offline for RDNA4 and against the CUDA gap: kernel issue cost −30 % by ACO, 12 waves; nothing timed (2026-11-18 08:15–10:52 UTC, engineer, ivory only; `G2/TUNE-BRIEF.md`, `G2/TUNE-RESULTS.md`, `G2/PORT-NOTES.md`, `G2/WINDOW-PLAN.md`, `G2/port/raw/tune/` (ACO and SASS counts, exactness logs, scripts, `dircheck/` = my runs); branch `g2-cubecl-local` 9ff100e6 → 4170a781, eleven commits, never pushed; bundle current)
+
+- **Measured, ACO for GFX1201 (Mesa 26.0.8, drm-shim), per wave-iteration** [M]: 3b step 217 → 169 VALU (−22 %),
+  3a 222 → 52, phase 1 74 → 58 vcyc, transpose ≈ 131 → 40 vcyc per task, whole kernel 1,746 → 1,228 vcyc;
+  shared memory 25,600 → 21,504 B and VGPRs 192 → 120, so **12 waves per SIMD instead of 8**; GPU prep one root
+  pass at 229 vcyc per root instead of two at 311 + 338.
+- **The changes** (one commit each): slice rows at stride 65 (address 3 VALU per digit, was 4); u16 pending slots
+  with the probe list in the same words; branch-free 3b with byte offsets in the list; 3a from per-digit common
+  masks; uniform plane index and 24-bit multiplies; parent records, probe words and survivor records as 16-byte
+  vectors; prep in one pass; the shuffle transpose on 32-bit halves; the prep's distinctness test as a popcount.
+- **Exact on lavapipe 26.0.8** [M]: every commit, both staged super-units whole, SPIR-V, W = 8 with GPU prep and
+  W = 16 with host prep, fill 512 and 1024 (16-chunk rounds ran on lavapipe for the first time), survivor sets
+  equal to the prototype's, counts equal to the CPU reference, 0 kernel errors. **My own runs of the final head**
+  with `--tdig 1` (the variant the window now times in every round, last proven at commit 7 of 11): W = 8 GPU
+  prep and W = 16 host prep on both super-units, all sets EQUAL, 11,768,560 and 11,769,950 survivors, 0 errors.
+- **Not run anywhere: the tuned build's W = 32 and W = 64 paths.** The pre-tuning build ran W = 32 exactly on a
+  3080; the tuned transpose is checked at W = 32 / 64 only in a CPU simulation of its definition.
+- **Predicted, not timed** [P]: the issue-bound model for the card gives a kernel bound of 3.19 → 2.15 ms and a
+  ratio of **×6.4 central (×4.8–8.1 over the efficiency and prep bands, ×4.4–8.7 with main's ±8 %)**; the same
+  model gave ×4.5 (×3.4–5.6) before. The model sees instruction issue only and has never been checked against
+  the card. On the RTX 3080: ≈ 1.25–1.45 fs against v10's 1.12 (×1.1–1.3, was ×1.34), ×4.4–5.1 against main.
+- **Why the port was ×1.34 slower than hand CUDA** [M, SASS by NVRTC + ptxas for sm_86, offline]:
+  1. yesterday's "bottom side 1.75 against 0.63 ms" was not like for like: nvcc removed v10's transpose and probe
+     setup from its probes-off kernel as dead code (5,184 B of shared memory against 32,200 B). The honest
+     comparison is the full kernel, 6.0 against 4.54 ms;
+  2. **CubeCL compiles every shared atomic load to `atomicAdd(p, 0)`** (cubecl-cpp `compile_atomic_load`); 3a did
+     32 of them per probe on one address, and nvcc aggregates them per warp or issues them per lane depending on
+     unrelated code: aggregated at `--tdig 0`, per lane at `--tdig 1`. That is the mechanism of G2.5's unexplained
+     +2.8 ms (mechanism found in the SASS of both builds; not re-timed). The tuned 3a has no atomics;
+  3. three or four scalar accesses where v10 has one 128-bit access (parents, probe words, records): now vectors.
+- **Dropped with reasons** (`TUNE-RESULTS.md`): four list entries per step (neutral), a uniform skip of the second
+  entry, 8-chunk rounds, `v_perm` addresses, 32-bit child masks.
+- **Window plan now:** build 4170a781; variant D (`--tdig 1`) in every round with its own exactness run; optional
+  variant P (the pre-tuning binary) for one round to measure the tuning itself.
+- **Conclusion:** the build that would be timed on the card issues about 30 % fewer instruction-cycles per unit
+  and fits 12 waves; whether that becomes time is unknown until the card or a rented 3080 runs it. A 3080 run
+  (W = 32 exactness and a re-time, about $0.20) is the first thing to do when credit allows.
+
 ## CX.0 Construction instead of search: where a second nice number is expected, and why it cannot be built (2026-11-18, director, no hardware; `CX/NOTES.md`, `CX/ecount.py`, `CX/ecount.txt`)
 
 - **Computed** [uniform heuristic, range count × b!/b^b over bases with a range and a root class]: bases 11–60

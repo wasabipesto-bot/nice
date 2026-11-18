@@ -1,0 +1,2343 @@
+	.headerflags	@"EF_CUDA_TEXMODE_UNIFIED EF_CUDA_64BIT_ADDRESS EF_CUDA_SM86 EF_CUDA_VIRTUAL_SM(EF_CUDA_SM86)"
+	.elftype	@"ET_EXEC"
+
+
+//--------------------- .text.g2_kernel           --------------------------
+	.section	.text.g2_kernel,"ax",@progbits
+	.sectionflags	@"SHF_BARRIERS=1"
+	.sectioninfo	@"SHI_REGISTERS=40"
+	.align	128
+        .global         g2_kernel
+        .type           g2_kernel,@function
+        .size           g2_kernel,(.L_x_116 - g2_kernel)
+        .other          g2_kernel,@"STO_CUDA_ENTRY STV_DEFAULT"
+g2_kernel:
+.text.g2_kernel:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 23
+        /*0000*/                   IMAD.MOV.U32 R1, RZ, RZ, c[0x0][0x28] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*0010*/                   S2R R3, SR_CTAID.X ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 100
+        /*0020*/                   IMAD.MOV.U32 R15, RZ, RZ, 0x4 ;
+        /*0030*/                   ULDC.64 UR6, c[0x0][0x118] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 99
+        /*0040*/                   IMAD.SHL.U32 R6, R3, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 100
+        /*0050*/                   IMAD.WIDE.U32 R6, R6, R15, c[0x0][0x190] ;
+        /*0060*/                   LDG.E.CONSTANT R9, [R6.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 103
+        /*0070*/                   LDG.E.CONSTANT R0, [R6.64+0x4] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*0080*/                   I2F.U32.RP R5, 0x20 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 114
+        /*0090*/                   ISETP.NE.AND P2, PT, R3, RZ, PT ;
+        /*00a0*/                   IMAD.MOV.U32 R18, RZ, RZ, c[0x0][0x198] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 29
+        /*00b0*/                   S2R R2, SR_CTAID.Z ;
+        /*00c0*/                   S2R R13, SR_TID.Z ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 28
+        /*00d0*/                   S2R R17, SR_CTAID.Y ;
+        /*00e0*/                   S2R R19, SR_TID.Y ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*00f0*/                   MUFU.RCP R5, R5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*0100*/                   S2R R4, SR_TID.X ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 29
+        /*0110*/                   IMAD R2, R2, c[0x0][0x8], R13 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*0120*/                   IADD3 R10, R5, 0xffffffe, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 28
+        /*0130*/                   IMAD R2, R2, c[0x0][0x10], R17 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*0140*/                   F2I.FTZ.U32.TRUNC.NTZ R11, R10 ;
+        /*0150*/                   IMAD.MOV.U32 R17, RZ, RZ, 0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 28
+        /*0160*/                   IMAD R2, R2, c[0x0][0x4], R19 ;
+        /*0170*/                   IMAD.WIDE.U32 R18, R17, R18, c[0x2][0x0] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 107
+        /*0180*/                   LOP3.LUT R8, R4, 0x1f, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*0190*/                   IMAD.MOV.U32 R10, RZ, RZ, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*01a0*/                   IMAD R5, R2, c[0x0][0xc], R3 ;
+        /*01b0*/                   IMAD R13, R17, c[0x0][0x19c], RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 34
+        /*01c0*/                   IMAD R5, R5, c[0x0][0x0], R4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*01d0*/                   IMAD.U32 R7, R11, -0x20, RZ ;
+        /*01e0*/                   IMAD.IADD R19, R19, 0x1, R13 ;
+        /*01f0*/                   IMAD.HI.U32 R2, R11, R7, R10 ;
+        /*0200*/                   IMAD.HI.U32 R2, R2, R5, RZ ;
+        /*0210*/                   IMAD R5, R2, -0x20, R5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 35
+        /*0220*/                   IMAD.MOV.U32 R2, RZ, RZ, c[0x0][0x0] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*0230*/                   ISETP.GE.U32.AND P0, PT, R5, 0x20, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 35
+        /*0240*/                   IMAD R2, R2, c[0x0][0x4], RZ ;
+        /*0250*/                   IMAD R2, R2, c[0x0][0x8], RZ ;
+        /*0260*/                   IMNMX.U32 R2, R2, 0x20, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*0270*/               @P0 IADD3 R5, R5, -0x20, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 83
+        /*0280*/                   ISETP.GE.U32.AND P3, PT, R2, 0x2, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*0290*/                   ISETP.GE.U32.AND P0, PT, R5, 0x20, PT ;
+        /*02a0*/               @P0 IADD3 R5, R5, -0x20, RZ ;
+        /*02b0*/                   ISETP.NE.AND P0, PT, R5, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 108
+        /*02c0*/                   ISETP.NE.AND P1, PT, R8, R5, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 104
+        /*02d0*/                   IMAD.IADD R11, R9, 0x1, R0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 105
+        /*02e0*/                   IMAD.WIDE.U32 R6, R11, 0x4104105, RZ ;
+        /*02f0*/                   IMAD.IADD R3, R11, 0x1, -R7 ;
+        /*0300*/                   LEA.HI R6, R3, R7, RZ, 0x1f ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 79
+        /*0310*/                   SHF.R.U32.HI R3, RZ, 0x5, R4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 105
+        /*0320*/                   SHF.R.U32.HI R10, RZ, 0x5, R6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 80
+        /*0330*/                   SEL R3, R3, RZ, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 83
+        /*0340*/              @!P3 BRA `(.L_x_0) ;
+        /*0350*/                   IMAD.MOV.U32 R6, RZ, RZ, 0x1 ;
+.L_x_1:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 84
+        /*0360*/                   SHFL.BFLY PT, R8, R3, R6, 0x1f ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 83
+        /*0370*/                   IMAD.SHL.U32 R6, R6, 0x2, RZ ;
+        /*0380*/                   ISETP.GE.U32.AND P0, PT, R6, R2, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 84
+        /*0390*/                   IMAD.IADD R3, R8, 0x1, R3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 83
+        /*03a0*/              @!P0 BRA `(.L_x_1) ;
+.L_x_0:
+        /*03b0*/                   BSSY B0, `(.L_x_2) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 110
+        /*03c0*/              @!P1 BRA `(.L_x_3) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 112
+        /*03d0*/                   S2R R6, SR_LANEID ;
+.L_x_73:
+        /*03e0*/                   VOTEU.ANY UR4, UPT, PT ;
+        /*03f0*/                   UFLO.U32 UR5, UR4 ;
+        /*0400*/                   POPC R7, UR4 ;
+        /*0410*/                   ISETP.EQ.U32.AND P0, PT, R6, UR5, PT ;
+        /*0420*/               @P0 RED.E.ADD.STRONG.GPU [R18.64], R7 ;
+.L_x_3:
+        /*0430*/                   BSYNC B0 ;
+.L_x_2:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 105
+        /*0440*/                   IMAD R8, R10, -0x3f, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 115
+        /*0450*/               @P2 BRA `(.L_x_4) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 132
+        /*0460*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x10 ;
+        /*0470*/                   IMAD.MOV.U32 R6, RZ, RZ, 0x20 ;
+        /*0480*/                   IMAD.WIDE.U32 R10, R4, R11, c[0x0][0x1a0] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 125
+        /*0490*/                   IMAD.MOV.U32 R7, RZ, RZ, 0x1 ;
+        /*04a0*/              @!P3 BRA `(.L_x_5) ;
+        /*04b0*/                   IMAD.MOV.U32 R7, RZ, RZ, 0x1 ;
+        /*04c0*/                   UMOV UR4, 0x1 ;
+.L_x_6:
+        /*04d0*/                   USHF.L.U32 UR4, UR4, 0x1, URZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 126
+        /*04e0*/                   IMAD.IADD R7, R7, 0x1, R7 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 125
+        /*04f0*/                   ISETP.LE.U32.AND P0, PT, R2, UR4, PT ;
+        /*0500*/              @!P0 BRA `(.L_x_6) ;
+.L_x_5:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 132
+        /*0510*/                   STG.E.128 [R10.64], R4 ;
+.L_x_4:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 134
+        /*0520*/                   ISETP.NE.AND P0, PT, R4.reuse, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 161
+        /*0530*/                   BSSY B0, `(.L_x_7) ;
+        /*0540*/                   ISETP.GT.U32.AND P1, PT, R4, 0x1f, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 135
+        /*0550*/               @P0 BRA `(.L_x_8) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 139
+        /*0560*/                   IMAD.MOV.U32 R12, RZ, RZ, c[0x0][0x188] ;
+        /*0570*/                   IMAD.MOV.U32 R13, RZ, RZ, c[0x0][0x18c] ;
+        /*0580*/                   LDG.E.CONSTANT R7, [R12.64] ;
+        /*0590*/                   LDG.E.CONSTANT R11, [R12.64+0x4] ;
+        /*05a0*/                   LDG.E.CONSTANT R35, [R12.64+0x8] ;
+        /*05b0*/                   LDG.E.CONSTANT R21, [R12.64+0xc] ;
+        /*05c0*/                   LDG.E.CONSTANT R25, [R12.64+0x10] ;
+        /*05d0*/                   LDG.E.CONSTANT R33, [R12.64+0x14] ;
+        /*05e0*/                   LDG.E.CONSTANT R27, [R12.64+0x18] ;
+        /*05f0*/                   LDG.E.CONSTANT R29, [R12.64+0x1c] ;
+        /*0600*/                   LOP3.LUT R22, R8, 0x3f, RZ, 0x3c, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 141
+        /*0610*/                   IMAD.IADD R23, R22, 0x1, R7 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0620*/                   IMAD.WIDE.U32 R6, R23, 0x4104105, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 141
+        /*0630*/                   IMAD.IADD R31, R22, 0x1, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0640*/                   IMAD.IADD R6, R23, 0x1, -R7 ;
+        /*0650*/                   IMAD.WIDE.U32 R10, R31, 0x4104105, RZ ;
+        /*0660*/                   LEA.HI R6, R6, R7, RZ, 0x1f ;
+        /*0670*/                   IMAD.IADD R7, R31, 0x1, -R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 141
+        /*0680*/                   IMAD.IADD R21, R22.reuse, 0x1, R21 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0690*/                   SHF.R.U32.HI R6, RZ, 0x5, R6 ;
+        /*06a0*/                   LEA.HI R7, R7, R11, RZ, 0x1f ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 141
+        /*06b0*/                   IMAD.IADD R11, R22, 0x1, R35 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*06c0*/                   IMAD R23, R6, -0x3f, R23 ;
+        /*06d0*/                   SHF.R.U32.HI R10, RZ, 0x5, R7 ;
+        /*06e0*/                   IMAD.WIDE.U32 R6, R11, 0x4104105, RZ ;
+        /*06f0*/                   IMAD R31, R10, -0x3f, R31 ;
+        /*0700*/                   IMAD.IADD R13, R11, 0x1, -R7 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 144
+        /*0710*/                   IMAD R6, R0.reuse, 0x3f, R31 ;
+        /*0720*/                   IMAD R23, R0, 0x3f, R23 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0730*/                   LEA.HI R13, R13, R7, RZ, 0x1f ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 145
+        /*0740*/                   IMAD.SHL.U32 R12, R6, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0750*/                   IMAD.WIDE.U32 R6, R21, 0x4104105, RZ ;
+        /*0760*/                   SHF.R.U32.HI R10, RZ, 0x5, R13 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 145
+        /*0770*/                   IMAD.SHL.U32 R30, R23, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 141
+        /*0780*/                   IMAD.IADD R25, R22, 0x1, R25 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0790*/                   IMAD.IADD R6, R21, 0x1, -R7 ;
+        /*07a0*/                   IMAD R35, R10, -0x3f, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 141
+        /*07b0*/                   IMAD.IADD R33, R22, 0x1, R33 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*07c0*/                   IMAD.WIDE.U32 R30, R30, R15, c[0x0][0x180] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*07d0*/                   LEA.HI R24, R6, R7, RZ, 0x1f ;
+        /*07e0*/                   IMAD.WIDE.U32 R10, R25, 0x4104105, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 148
+        /*07f0*/                   LDG.E.CONSTANT R14, [R30.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0800*/                   IMAD.WIDE.U32 R6, R33, 0x4104105, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0810*/                   LDG.E.CONSTANT R16, [R30.64+0x4] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 144
+        /*0820*/                   IMAD R35, R0, 0x3f, R35 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0830*/                   IMAD.IADD R10, R25, 0x1, -R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0840*/                   IMAD.WIDE.U32 R12, R12, R15, c[0x0][0x180] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 141
+        /*0850*/                   IMAD.IADD R31, R22, 0x1, R27 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0860*/                   LEA.HI R26, R10, R11, RZ, 0x1f ;
+        /*0870*/                   IMAD.IADD R27, R33, 0x1, -R7 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0880*/                   LDG.E.CONSTANT R23, [R12.64+0x4] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 145
+        /*0890*/                   IMAD.SHL.U32 R6, R35, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 141
+        /*08a0*/                   IMAD.IADD R29, R22, 0x1, R29 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 148
+        /*08b0*/                   LDG.E.CONSTANT R20, [R12.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*08c0*/                   IMAD.WIDE.U32 R10, R31, 0x4104105, RZ ;
+        /*08d0*/                   LEA.HI R10, R27, R7, RZ, 0x1f ;
+        /*08e0*/                   SHF.R.U32.HI R24, RZ, 0x5, R24 ;
+        /*08f0*/                   IMAD.IADD R35, R31, 0x1, -R11 ;
+        /*0900*/                   SHF.R.U32.HI R26, RZ, 0x5, R26 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0910*/                   IMAD.WIDE.U32 R12, R6, R15, c[0x0][0x180] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0920*/                   IMAD.WIDE.U32 R6, R29, 0x4104105, RZ ;
+        /*0930*/                   LEA.HI R35, R35, R11, RZ, 0x1f ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0940*/                   LDG.E.CONSTANT R27, [R12.64+0x4] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0950*/                   IMAD R21, R24, -0x3f, R21 ;
+        /*0960*/                   IMAD.IADD R6, R29, 0x1, -R7 ;
+        /*0970*/                   SHF.R.U32.HI R10, RZ, 0x5, R10 ;
+        /*0980*/                   IMAD R25, R26, -0x3f, R25 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 148
+        /*0990*/                   LDG.E.CONSTANT R22, [R12.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 144
+        /*09a0*/                   IMAD R21, R0, 0x3f, R21 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*09b0*/                   LEA.HI R7, R6, R7, RZ, 0x1f ;
+        /*09c0*/                   IMAD R33, R10, -0x3f, R33 ;
+        /*09d0*/                   SHF.R.U32.HI R6, RZ, 0x5, R35 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 144
+        /*09e0*/                   IMAD R25, R0, 0x3f, R25 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 145
+        /*09f0*/                   IMAD.SHL.U32 R10, R21, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0a00*/                   IMAD R31, R6, -0x3f, R31 ;
+        /*0a10*/                   SHF.R.U32.HI R12, RZ, 0x5, R7 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 144
+        /*0a20*/                   IMAD R33, R0, 0x3f, R33 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 145
+        /*0a30*/                   IMAD.SHL.U32 R6, R25, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0a40*/                   IMAD.WIDE.U32 R10, R10, R15, c[0x0][0x180] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 142
+        /*0a50*/                   IMAD R29, R12, -0x3f, R29 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0a60*/                   LDG.E.CONSTANT R21, [R10.64+0x4] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 144
+        /*0a70*/                   IMAD R31, R0, 0x3f, R31 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 145
+        /*0a80*/                   IMAD.SHL.U32 R12, R33, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 148
+        /*0a90*/                   LDG.E.CONSTANT R26, [R10.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0aa0*/                   IMAD.WIDE.U32 R6, R6, R15, c[0x0][0x180] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 144
+        /*0ab0*/                   IMAD R29, R0, 0x3f, R29 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 148
+        /*0ac0*/                   LDG.E.CONSTANT R30, [R6.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 145
+        /*0ad0*/                   IMAD.SHL.U32 R24, R31, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0ae0*/                   IMAD.WIDE.U32 R12, R12, R15.reuse, c[0x0][0x180] ;
+        /*0af0*/                   LDG.E.CONSTANT R31, [R6.64+0x4] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 145
+        /*0b00*/                   IMAD.SHL.U32 R28, R29, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0b10*/                   LDG.E.CONSTANT R33, [R12.64+0x4] ;
+        /*0b20*/                   IMAD.WIDE.U32 R24, R24, R15, c[0x0][0x180] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 148
+        /*0b30*/                   LDG.E.CONSTANT R35, [R12.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0b40*/                   IMAD.WIDE.U32 R28, R28, R15, c[0x0][0x180] ;
+        /*0b50*/                   LDG.E.CONSTANT R10, [R24.64+0x4] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 148
+        /*0b60*/                   LDG.E.CONSTANT R11, [R24.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 147
+        /*0b70*/                   LDG.E.CONSTANT R32, [R28.64+0x4] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 148
+        /*0b80*/                   LDG.E.CONSTANT R37, [R28.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 149
+        /*0b90*/                   IADD3 R14, R23, R16, -R14 ;
+        /*0ba0*/                   IADD3 R14, R27, R14, -R20 ;
+        /*0bb0*/                   IADD3 R14, R21, R14, -R22 ;
+        /*0bc0*/                   IADD3 R14, R31, R14, -R26 ;
+        /*0bd0*/                   IADD3 R14, R33, R14, -R30 ;
+        /*0be0*/                   IADD3 R10, R10, R14, -R35 ;
+        /*0bf0*/                   IADD3 R10, R32, R10, -R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 150
+        /*0c00*/                   IMAD.IADD R10, R10, 0x1, -R37 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 155
+        /*0c10*/                   ISETP.GE.U32.AND P0, PT, R10, 0x241, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 152
+        /*0c20*/                   STS [0x4f80], R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 154
+        /*0c30*/                   ATOMS.EXCH RZ, [RZ], RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 156
+        /*0c40*/              @!P0 BRA `(.L_x_8) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 158
+        /*0c50*/                   RED.E.ADD.STRONG.GPU [R18.64+0x4], R17 ;
+.L_x_8:
+        /*0c60*/                   BSYNC B0 ;
+.L_x_7:
+        /*0c70*/                   BSSY B0, `(.L_x_9) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 162
+        /*0c80*/               @P1 BRA `(.L_x_10) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 163
+        /*0c90*/                   IMAD R15, R4, R15, c[0x2][0x8] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 164
+        /*0ca0*/                   IMAD.MOV.U32 R6, RZ, RZ, -0x1 ;
+        /*0cb0*/                   ATOMS.EXCH RZ, [R15], R6 ;
+.L_x_10:
+        /*0cc0*/                   BSYNC B0 ;
+.L_x_9:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 166
+        /*0cd0*/                   BAR.SYNC.DEFER_BLOCKING 0x0 ;
+        /*0ce0*/                   LOP3.LUT R8, R8, 0x3f, RZ, 0x3c, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*0cf0*/                   CS2R R6, SRZ ;
+.L_x_17:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 171
+        /*0d00*/                   IMAD.MOV.U32 R17, RZ, RZ, 0x4 ;
+        /*0d10*/                   IMAD.WIDE.U32 R10, R6, R17, c[0x0][0x188] ;
+        /*0d20*/                   LDG.E.CONSTANT R11, [R10.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 173
+        /*0d30*/                   IMAD.IADD R15, R8, 0x1, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 174
+        /*0d40*/                   IMAD.WIDE.U32 R12, R15, 0x4104105, RZ ;
+        /*0d50*/                   IMAD.IADD R12, R15, 0x1, -R13 ;
+        /*0d60*/                   LEA.HI R12, R12, R13, RZ, 0x1f ;
+        /*0d70*/                   SHF.R.U32.HI R12, RZ, 0x5, R12 ;
+        /*0d80*/                   IMAD R15, R12, -0x3f, R15 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 176
+        /*0d90*/                   IMAD R15, R0, 0x3f, R15 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 177
+        /*0da0*/                   IMAD.SHL.U32 R12, R15, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 178
+        /*0db0*/                   IMAD.WIDE.U32 R12, R12, R17, c[0x0][0x180] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 180
+        /*0dc0*/                   LDG.E.CONSTANT R15, [R12.64+0x4] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 178
+        /*0dd0*/                   LDG.E.CONSTANT R10, [R12.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 170
+        /*0de0*/                   IADD3 R6, R6, 0x1, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 184
+        /*0df0*/                   BSSY B0, `(.L_x_11) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 170
+        /*0e00*/                   ISETP.GE.U32.AND P4, PT, R6, 0x8, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 183
+        /*0e10*/                   IMAD.IADD R11, R15, 0x1, -R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 184
+        /*0e20*/                   ISETP.GE.U32.AND P0, PT, R4, R11, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 186
+        /*0e30*/               @P0 BRA `(.L_x_12) ;
+        /*0e40*/                   IMAD.MOV.U32 R16, RZ, RZ, R4 ;
+.L_x_15:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 188
+        /*0e50*/                   IMAD.IADD R17, R16, 0x1, R7 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 189
+        /*0e60*/                   BSSY B1, `(.L_x_13) ;
+        /*0e70*/                   ISETP.GT.U32.AND P0, PT, R17, 0x23f, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 190
+        /*0e80*/               @P0 BRA `(.L_x_14) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 191
+        /*0e90*/                   IMAD.IADD R12, R10, 0x1, R16 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 192
+        /*0ea0*/                   IMAD.MOV.U32 R13, RZ, RZ, 0x8 ;
+        /*0eb0*/                   IMAD.WIDE.U32 R12, R12, R13, c[0x0][0x170] ;
+        /*0ec0*/                   LDG.E.64.CONSTANT R12, [R12.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 202
+        /*0ed0*/                   ISETP.NE.U32.AND P0, PT, R12, RZ, PT ;
+        /*0ee0*/                   ISETP.NE.AND.EX P0, PT, R13, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 203
+        /*0ef0*/                   SEL R27, RZ, 0x1, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 204
+        /*0f00*/                   IADD3 R27, P0, R12, -R27, RZ ;
+        /*0f10*/                   IADD3.X R15, R13, -0x1, RZ, P0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 205
+        /*0f20*/                   LOP3.LUT R27, R27, R12, RZ, 0xc0, !PT ;
+        /*0f30*/                   LOP3.LUT R20, R15, R13, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 213
+        /*0f40*/                   ISETP.NE.U32.AND P0, PT, R27, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 211
+        /*0f50*/                   IADD3 R14, P2, RZ, -R27, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 213
+        /*0f60*/                   ISETP.NE.AND.EX P0, PT, R20, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 211
+        /*0f70*/                   IMAD.X R15, RZ, RZ, ~R20, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 214
+        /*0f80*/                   SEL R22, RZ, 0x1, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 194
+        /*0f90*/                   IADD3 R25, P0, RZ, -R12, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 215
+        /*0fa0*/                   IADD3 R22, P1, -R22, R27, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 211
+        /*0fb0*/                   LOP3.LUT R26, R20.reuse, R15, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 194
+        /*0fc0*/                   IMAD.X R23, RZ, RZ, ~R13, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 215
+        /*0fd0*/                   IADD3.X R21, R20, -0x1, RZ, P1, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 216
+        /*0fe0*/                   LOP3.LUT R22, R22, R27, RZ, 0xc0, !PT ;
+        /*0ff0*/                   LOP3.LUT R21, R21, R20, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 224
+        /*1000*/                   ISETP.NE.U32.AND P1, PT, R22, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 194
+        /*1010*/                   LOP3.LUT R23, R13, R23, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 224
+        /*1020*/                   ISETP.NE.AND.EX P1, PT, R21, RZ, PT, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 194
+        /*1030*/                   ISETP.NE.U32.AND P0, PT, R23, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 225
+        /*1040*/                   SEL R15, RZ, 0x1, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 211
+        /*1050*/                   ISETP.NE.U32.AND P1, PT, R26, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 226
+        /*1060*/                   IADD3 R15, P2, -R15, R22, RZ ;
+        /*1070*/                   IADD3.X R24, R21, -0x1, RZ, P2, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 222
+        /*1080*/                   IADD3 R29, P2, RZ, -R22.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 194
+        /*1090*/              @!P0 LOP3.LUT R23, R12, R25, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 227
+        /*10a0*/                   LOP3.LUT R15, R15, R22, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 222
+        /*10b0*/                   IMAD.X R28, RZ, RZ, ~R21, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 227
+        /*10c0*/                   LOP3.LUT R24, R24, R21, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 235
+        /*10d0*/                   ISETP.NE.U32.AND P3, PT, R15, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 194
+        /*10e0*/                   FLO.U32 R23, R23 ;
+        /*10f0*/                   ISETP.NE.U32.AND P2, PT, R12, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 233
+        /*1100*/                   IADD3 R12, P6, RZ, -R15, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 235
+        /*1110*/                   ISETP.NE.AND.EX P3, PT, R24.reuse, RZ, PT, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 211
+        /*1120*/              @!P1 LOP3.LUT R26, R27, R14, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 233
+        /*1130*/                   IMAD.X R25, RZ, RZ, ~R24, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 236
+        /*1140*/                   SEL R14, RZ, 0x1, !P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 222
+        /*1150*/                   LOP3.LUT R28, R21, R28, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 233
+        /*1160*/                   LOP3.LUT R25, R24, R25, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 211
+        /*1170*/                   FLO.U32 R26, R26 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 237
+        /*1180*/                   IADD3 R14, P3, -R14, R15, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 222
+        /*1190*/                   ISETP.NE.U32.AND P5, PT, R28, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 233
+        /*11a0*/                   ISETP.NE.U32.AND P6, PT, R25, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 237
+        /*11b0*/                   IADD3.X R31, R24, -0x1, RZ, P3, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 238
+        /*11c0*/                   LOP3.LUT R14, R14, R15, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 194
+        /*11d0*/                   ISETP.NE.AND.EX P2, PT, R13, RZ, PT, P2 ;
+        /*11e0*/                   IADD3 R13, -R23, 0x1f, RZ ;
+        /*11f0*/                   IADD3 R30, -R23, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 238
+        /*1200*/                   LOP3.LUT R23, R31, R24, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 194
+        /*1210*/               @P0 IMAD.MOV R30, RZ, RZ, R13 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 246
+        /*1220*/                   ISETP.NE.U32.AND P3, PT, R14, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 222
+        /*1230*/              @!P5 LOP3.LUT R28, R22, R29, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 246
+        /*1240*/                   ISETP.NE.AND.EX P0, PT, R23, RZ, PT, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 210
+        /*1250*/                   ISETP.NE.U32.AND P3, PT, R27, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 222
+        /*1260*/                   FLO.U32 R13, R28 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 247
+        /*1270*/                   SEL R27, RZ, 0x1, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 233
+        /*1280*/              @!P6 LOP3.LUT R25, R15, R12, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 210
+        /*1290*/                   ISETP.NE.AND.EX P0, PT, R20, RZ, PT, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 248
+        /*12a0*/                   IADD3 R27, P3, -R27, R14.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 211
+        /*12b0*/                   IADD3 R29, -R26, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 233
+        /*12c0*/                   FLO.U32 R25, R25 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 248
+        /*12d0*/                   IADD3.X R32, R23, -0x1, RZ, P3, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 249
+        /*12e0*/                   LOP3.LUT R20, R27, R14, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 211
+        /*12f0*/                   IADD3 R26, -R26, 0x3f, RZ ;
+        /*1300*/               @P1 IMAD.MOV R26, RZ, RZ, R29 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 194
+        /*1310*/                   IADD3 R30, -R30, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 221
+        /*1320*/                   ISETP.NE.U32.AND P1, PT, R22, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 249
+        /*1330*/                   LOP3.LUT R22, R32, R23, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 257
+        /*1340*/                   ISETP.NE.U32.AND P3, PT, R20, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 194
+        /*1350*/                   SEL R12, R30, 0x40, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 232
+        /*1360*/                   ISETP.NE.U32.AND P2, PT, R15, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 257
+        /*1370*/                   ISETP.NE.AND.EX P3, PT, R22, RZ, PT, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 232
+        /*1380*/                   ISETP.NE.AND.EX P2, PT, R24, RZ, PT, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 211
+        /*1390*/                   IADD3 R15, -R26, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 222
+        /*13a0*/                   IADD3 R24, -R13, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 258
+        /*13b0*/                   SEL R27, RZ, 0x1, !P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 221
+        /*13c0*/                   ISETP.NE.AND.EX P1, PT, R21, RZ, PT, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 222
+        /*13d0*/                   IADD3 R21, -R13, 0x3f, RZ ;
+        /*13e0*/               @P5 IMAD.MOV R21, RZ, RZ, R24 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 233
+        /*13f0*/                   IADD3 R26, -R25.reuse, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 212
+        /*1400*/                   SEL R15, R12, R15, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 233
+        /*1410*/                   IADD3 R13, -R25, 0x3f, RZ ;
+        /*1420*/               @P6 IMAD.MOV R13, RZ, RZ, R26 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 259
+        /*1430*/                   IADD3 R25, P0, -R27, R20, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 217
+        /*1440*/                   IMAD.SHL.U32 R15, R15, 0x40, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 260
+        /*1450*/                   LOP3.LUT R26, R25, R20.reuse, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 222
+        /*1460*/                   IADD3 R25, -R21, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 259
+        /*1470*/                   IADD3.X R27, R22, -0x1, RZ, P0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 223
+        /*1480*/                   SEL R24, R12, R25, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 255
+        /*1490*/                   IADD3 R33, P1, RZ, -R20, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 260
+        /*14a0*/                   LOP3.LUT R27, R27, R22, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 228
+        /*14b0*/                   IMAD.SHL.U32 R24, R24, 0x1000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 268
+        /*14c0*/                   ISETP.NE.U32.AND P0, PT, R26, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 255
+        /*14d0*/                   IMAD.X R29, RZ, RZ, ~R22, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 244
+        /*14e0*/                   IADD3 R21, P3, RZ, -R14, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 268
+        /*14f0*/                   ISETP.NE.AND.EX P0, PT, R27, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 233
+        /*1500*/                   IADD3 R13, -R13, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 244
+        /*1510*/                   IMAD.X R28, RZ, RZ, ~R23, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 255
+        /*1520*/                   LOP3.LUT R29, R22, R29, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 269
+        /*1530*/                   SEL R31, RZ, 0x1, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 234
+        /*1540*/                   SEL R13, R12, R13, !P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 255
+        /*1550*/                   ISETP.NE.U32.AND P2, PT, R29, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 244
+        /*1560*/                   LOP3.LUT R25, R23, R28, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 239
+        /*1570*/                   IMAD.SHL.U32 R30, R13, 0x40000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 270
+        /*1580*/                   IADD3 R31, P0, -R31, R26.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 244
+        /*1590*/                   ISETP.NE.U32.AND P1, PT, R25, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 270
+        /*15a0*/                   IADD3.X R32, R27, -0x1, RZ, P0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 271
+        /*15b0*/                   LOP3.LUT R28, R31, R26.reuse, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 266
+        /*15c0*/                   IADD3 R31, P3, RZ, -R26, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 271
+        /*15d0*/                   LOP3.LUT R13, R32, R27, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 279
+        /*15e0*/                   ISETP.NE.U32.AND P0, PT, R28, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 266
+        /*15f0*/                   IMAD.X R32, RZ, RZ, ~R27, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 255
+        /*1600*/              @!P2 LOP3.LUT R29, R20, R33, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 219
+        /*1610*/                   LOP3.LUT R15, R12, R15, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 277
+        /*1620*/                   IADD3 R33, P5, RZ, -R28, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 279
+        /*1630*/                   ISETP.NE.AND.EX P0, PT, R13, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 255
+        /*1640*/                   FLO.U32 R29, R29 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 241
+        /*1650*/                   LOP3.LUT R15, R30, R15, R24, 0xfe, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 277
+        /*1660*/                   IMAD.X R30, RZ, RZ, ~R13, P5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 244
+        /*1670*/              @!P1 LOP3.LUT R25, R14, R21, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 280
+        /*1680*/                   SEL R21, RZ, 0x1, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 266
+        /*1690*/                   LOP3.LUT R32, R27, R32, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 281
+        /*16a0*/                   IADD3 R21, P6, -R21, R28, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 244
+        /*16b0*/                   FLO.U32 R25, R25 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 266
+        /*16c0*/                   ISETP.NE.U32.AND P3, PT, R32, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 277
+        /*16d0*/                   LOP3.LUT R30, R13, R30, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 254
+        /*16e0*/                   ISETP.NE.U32.AND P0, PT, R20, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 281
+        /*16f0*/                   IADD3.X R24, R13, -0x1, RZ, P6, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 282
+        /*1700*/                   LOP3.LUT R20, R21, R28, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 277
+        /*1710*/                   ISETP.NE.U32.AND P5, PT, R30, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 282
+        /*1720*/                   LOP3.LUT R21, R24, R13, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 290
+        /*1730*/                   ISETP.NE.U32.AND P6, PT, R20, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 266
+        /*1740*/              @!P3 LOP3.LUT R32, R26, R31, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 290
+        /*1750*/                   ISETP.NE.AND.EX P6, PT, R21, RZ, PT, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 266
+        /*1760*/                   FLO.U32 R31, R32 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 254
+        /*1770*/                   ISETP.NE.AND.EX P0, PT, R22, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 291
+        /*1780*/                   SEL R35, RZ, 0x1, !P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 277
+        /*1790*/              @!P5 LOP3.LUT R30, R28, R33, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 292
+        /*17a0*/                   IADD3 R35, P6, -R35, R20, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 255
+        /*17b0*/                   IADD3 R33, -R29, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 293
+        /*17c0*/                   LOP3.LUT R24, R35, R20, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 277
+        /*17d0*/                   FLO.U32 R30, R30 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 292
+        /*17e0*/                   IADD3.X R22, R21, -0x1, RZ, P6, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 301
+        /*17f0*/                   ISETP.NE.U32.AND P6, PT, R24, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 293
+        /*1800*/                   LOP3.LUT R22, R22, R21, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 255
+        /*1810*/                   IADD3 R29, -R29, 0x3f, RZ ;
+        /*1820*/               @P2 IMAD.MOV R29, RZ, RZ, R33 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 301
+        /*1830*/                   ISETP.NE.AND.EX P2, PT, R22, RZ, PT, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 265
+        /*1840*/                   ISETP.NE.U32.AND P6, PT, R26, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 266
+        /*1850*/                   IADD3 R26, -R31.reuse, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 302
+        /*1860*/                   SEL R33, RZ, 0x1, !P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 266
+        /*1870*/                   IADD3 R31, -R31, 0x3f, RZ ;
+        /*1880*/               @P3 IMAD.MOV R31, RZ, RZ, R26 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 265
+        /*1890*/                   ISETP.NE.AND.EX P2, PT, R27, RZ, PT, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 277
+        /*18a0*/                   IADD3 R26, -R30, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 303
+        /*18b0*/                   IADD3 R27, P6, -R33, R24.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 277
+        /*18c0*/                   IADD3 R30, -R30, 0x3f, RZ ;
+        /*18d0*/               @P5 IMAD.MOV R30, RZ, RZ, R26 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 276
+        /*18e0*/                   ISETP.NE.U32.AND P3, PT, R28, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 303
+        /*18f0*/                   IADD3.X R33, R22, -0x1, RZ, P6, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 304
+        /*1900*/                   LOP3.LUT R27, R27, R24, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 276
+        /*1910*/                   ISETP.NE.AND.EX P3, PT, R13, RZ, PT, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 304
+        /*1920*/                   LOP3.LUT R26, R33, R22, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 312
+        /*1930*/                   ISETP.NE.U32.AND P5, PT, R27, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 266
+        /*1940*/                   IADD3 R31, -R31, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 277
+        /*1950*/                   IADD3 R13, -R30, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 312
+        /*1960*/                   ISETP.NE.AND.EX P5, PT, R26, RZ, PT, P5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 255
+        /*1970*/                   IADD3 R29, -R29, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 267
+        /*1980*/                   SEL R31, R12.reuse, R31, !P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 278
+        /*1990*/                   SEL R28, R12.reuse, R13, !P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 313
+        /*19a0*/                   SEL R32, RZ, 0x1, !P5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 272
+        /*19b0*/                   IMAD.SHL.U32 R30, R31, 0x40, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 256
+        /*19c0*/                   SEL R13, R12, R29, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 283
+        /*19d0*/                   IMAD.SHL.U32 R29, R28, 0x1000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 314
+        /*19e0*/                   IADD3 R32, P2, -R32, R27.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 310
+        /*19f0*/                   IADD3 R28, P0, RZ, -R27, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 285
+        /*1a00*/                   LOP3.LUT R13, R29, R30, R13, 0xfe, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 314
+        /*1a10*/                   IADD3.X R31, R26, -0x1, RZ, P2, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 310
+        /*1a20*/                   IMAD.X R33, RZ, RZ, ~R26, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 315
+        /*1a30*/                   LOP3.LUT R30, R32, R27, RZ, 0xc0, !PT ;
+        /*1a40*/                   LOP3.LUT R31, R31, R26, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 321
+        /*1a50*/                   IADD3 R35, P2, RZ, -R30, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 310
+        /*1a60*/                   LOP3.LUT R33, R26, R33, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 243
+        /*1a70*/                   ISETP.NE.U32.AND P0, PT, R14, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 321
+        /*1a80*/                   IMAD.X R32, RZ, RZ, ~R31, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 323
+        /*1a90*/                   ISETP.NE.U32.AND P2, PT, R30, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 310
+        /*1aa0*/                   ISETP.NE.U32.AND P5, PT, R33, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 323
+        /*1ab0*/                   ISETP.NE.AND.EX P2, PT, R31.reuse, RZ, PT, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 321
+        /*1ac0*/                   LOP3.LUT R32, R31, R32, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 324
+        /*1ad0*/                   SEL R29, RZ, 0x1, !P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 321
+        /*1ae0*/                   ISETP.NE.U32.AND P3, PT, R32, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 325
+        /*1af0*/                   IADD3 R29, P2, -R29, R30, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 243
+        /*1b00*/                   ISETP.NE.AND.EX P0, PT, R23, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 310
+        /*1b10*/              @!P5 LOP3.LUT R33, R27, R28, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 325
+        /*1b20*/                   IADD3.X R28, R31, -0x1, RZ, P2, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 326
+        /*1b30*/                   LOP3.LUT R29, R29, R30, RZ, 0xc0, !PT ;
+        /*1b40*/                   LOP3.LUT R28, R28, R31, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 310
+        /*1b50*/                   FLO.U32 R33, R33 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 332
+        /*1b60*/                   IADD3 R34, P2, RZ, -R29, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 321
+        /*1b70*/              @!P3 LOP3.LUT R32, R30, R35, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 332
+        /*1b80*/                   IMAD.X R35, RZ, RZ, ~R28, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 309
+        /*1b90*/                   ISETP.NE.U32.AND P2, PT, R27, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 321
+        /*1ba0*/                   FLO.U32 R32, R32 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 332
+        /*1bb0*/                   LOP3.LUT R14, R28, R35, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 309
+        /*1bc0*/                   ISETP.NE.AND.EX P2, PT, R26, RZ, PT, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 332
+        /*1bd0*/                   ISETP.NE.U32.AND P6, PT, R14, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 310
+        /*1be0*/                   IADD3 R27, -R33, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 321
+        /*1bf0*/                   IADD3 R26, -R32, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 332
+        /*1c00*/              @!P6 LOP3.LUT R14, R29, R34, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 310
+        /*1c10*/                   IADD3 R34, -R33, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 332
+        /*1c20*/                   FLO.U32 R14, R14 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 310
+        /*1c30*/               @P5 IMAD.MOV R27, RZ, RZ, R34 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 321
+        /*1c40*/                   IADD3 R34, -R32, 0x3f, RZ ;
+        /*1c50*/               @P3 IMAD.MOV R34, RZ, RZ, R26 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 320
+        /*1c60*/                   ISETP.NE.U32.AND P5, PT, R30, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 331
+        /*1c70*/                   ISETP.NE.U32.AND P3, PT, R29, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 310
+        /*1c80*/                   IADD3 R27, -R27, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 320
+        /*1c90*/                   ISETP.NE.AND.EX P5, PT, R31, RZ, PT, P5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 331
+        /*1ca0*/                   ISETP.NE.AND.EX P3, PT, R28, RZ, PT, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 321
+        /*1cb0*/                   IADD3 R31, -R34, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 332
+        /*1cc0*/                   IADD3 R26, -R14.reuse, 0x1f, RZ ;
+        /*1cd0*/                   IADD3 R14, -R14, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 322
+        /*1ce0*/                   SEL R31, R12, R31, !P5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 332
+        /*1cf0*/               @P6 IMAD.MOV R14, RZ, RZ, R26 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 334
+        /*1d00*/                   ISETP.NE.U32.AND P6, PT, R29, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 244
+        /*1d10*/                   IADD3 R32, -R25, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 327
+        /*1d20*/                   IMAD.SHL.U32 R31, R31, 0x40, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 332
+        /*1d30*/                   IADD3 R33, -R14, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 311
+        /*1d40*/                   SEL R14, R12, R27, !P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 334
+        /*1d50*/                   ISETP.NE.AND.EX P2, PT, R28, RZ, PT, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 333
+        /*1d60*/                   SEL R33, R12, R33, !P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 288
+        /*1d70*/                   IADD3 R27, P3, RZ, -R20, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 335
+        /*1d80*/                   SEL R26, RZ, 0x1, !P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 338
+        /*1d90*/                   IMAD.SHL.U32 R33, R33, 0x1000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 288
+        /*1da0*/                   IMAD.X R30, RZ, RZ, ~R21, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 336
+        /*1db0*/                   IADD3 R26, P3, -R26, R29, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 340
+        /*1dc0*/                   LOP3.LUT R14, R33, R31, R14, 0xfe, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 299
+        /*1dd0*/                   IADD3 R31, P2, RZ, -R24, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 337
+        /*1de0*/                   LOP3.LUT R29, R26, R29, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 336
+        /*1df0*/                   IADD3.X R33, R28, -0x1, RZ, P3, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 299
+        /*1e00*/                   IMAD.X R35, RZ, RZ, ~R22, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 288
+        /*1e10*/                   LOP3.LUT R23, R21, R30, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 337
+        /*1e20*/                   LOP3.LUT R28, R33, R28, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 345
+        /*1e30*/                   ISETP.NE.U32.AND P3, PT, R29, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 288
+        /*1e40*/                   ISETP.NE.U32.AND P2, PT, R23, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 345
+        /*1e50*/                   ISETP.NE.AND.EX P3, PT, R28, RZ, PT, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 244
+        /*1e60*/                   IADD3 R26, -R25, 0x3f, RZ ;
+        /*1e70*/               @P1 IMAD.MOV R26, RZ, RZ, R32 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 346
+        /*1e80*/                   SEL R32, RZ, 0x1, !P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 299
+        /*1e90*/                   LOP3.LUT R30, R22, R35, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 343
+        /*1ea0*/                   IADD3 R34, P1, RZ, -R29.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 347
+        /*1eb0*/                   IADD3 R32, P3, -R32, R29, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 288
+        /*1ec0*/              @!P2 LOP3.LUT R23, R20, R27, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 343
+        /*1ed0*/                   IMAD.X R33, RZ, RZ, ~R28, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 299
+        /*1ee0*/                   ISETP.NE.U32.AND P6, PT, R30, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 347
+        /*1ef0*/                   IADD3.X R25, R28, -0x1, RZ, P3, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 348
+        /*1f00*/                   LOP3.LUT R27, R32, R29, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 288
+        /*1f10*/                   FLO.U32 R23, R23 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 348
+        /*1f20*/                   LOP3.LUT R25, R25, R28, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 354
+        /*1f30*/                   IADD3 R32, P1, RZ, -R27, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 343
+        /*1f40*/                   LOP3.LUT R33, R28, R33, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 354
+        /*1f50*/                   IMAD.X R36, RZ, RZ, ~R25, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 343
+        /*1f60*/                   ISETP.NE.U32.AND P3, PT, R33, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 299
+        /*1f70*/              @!P6 LOP3.LUT R30, R24, R31, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 354
+        /*1f80*/                   LOP3.LUT R31, R25, R36, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 287
+        /*1f90*/                   ISETP.NE.U32.AND P1, PT, R20, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 354
+        /*1fa0*/                   ISETP.NE.U32.AND P5, PT, R31, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 299
+        /*1fb0*/                   FLO.U32 R30, R30 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 287
+        /*1fc0*/                   ISETP.NE.AND.EX P1, PT, R21, RZ, PT, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 343
+        /*1fd0*/              @!P3 LOP3.LUT R33, R29, R34, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 288
+        /*1fe0*/                   IADD3 R34, -R23.reuse, 0x1f, RZ ;
+        /*1ff0*/                   IADD3 R23, -R23, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 343
+        /*2000*/                   FLO.U32 R33, R33 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 288
+        /*2010*/               @P2 IMAD.MOV R23, RZ, RZ, R34 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 354
+        /*2020*/              @!P5 LOP3.LUT R31, R27.reuse, R32, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 356
+        /*2030*/                   ISETP.NE.U32.AND P2, PT, R27, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 299
+        /*2040*/                   IADD3 R21, -R30.reuse, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 354
+        /*2050*/                   FLO.U32 R32, R31 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 356
+        /*2060*/                   ISETP.NE.AND.EX P2, PT, R25, RZ, PT, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 299
+        /*2070*/                   IADD3 R20, -R30, 0x3f, RZ ;
+        /*2080*/               @P6 IMAD.MOV R20, RZ, RZ, R21 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 357
+        /*2090*/                   SEL R30, RZ, 0x1, !P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 298
+        /*20a0*/                   ISETP.NE.U32.AND P2, PT, R24, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 358
+        /*20b0*/                   IADD3 R30, P6, -R30, R27, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 343
+        /*20c0*/                   IADD3 R24, -R33, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 298
+        /*20d0*/                   ISETP.NE.AND.EX P2, PT, R22, RZ, PT, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 358
+        /*20e0*/                   IADD3.X R22, R25, -0x1, RZ, P6, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 359
+        /*20f0*/                   LOP3.LUT R30, R30, R27, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 343
+        /*2100*/                   IADD3 R21, -R33, 0x3f, RZ ;
+        /*2110*/               @P3 IMAD.MOV R21, RZ, RZ, R24 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 354
+        /*2120*/                   IADD3 R24, -R32, 0x1f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 359
+        /*2130*/                   LOP3.LUT R31, R22, R25, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 365
+        /*2140*/                   IADD3 R35, P3, RZ, -R30, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 354
+        /*2150*/                   IADD3 R22, -R32, 0x3f, RZ ;
+        /*2160*/               @P5 IMAD.MOV R22, RZ, RZ, R24 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 367
+        /*2170*/                   ISETP.NE.U32.AND P6, PT, R30, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 365
+        /*2180*/                   IMAD.X R24, RZ, RZ, ~R31, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 342
+        /*2190*/                   ISETP.NE.U32.AND P5, PT, R29, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 367
+        /*21a0*/                   ISETP.NE.AND.EX P6, PT, R31, RZ, PT, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 365
+        /*21b0*/                   LOP3.LUT R33, R31, R24, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 368
+        /*21c0*/                   SEL R29, RZ, 0x1, !P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 365
+        /*21d0*/                   ISETP.NE.U32.AND P3, PT, R33, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 369
+        /*21e0*/                   IADD3 R29, P6, -R29, R30, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 342
+        /*21f0*/                   ISETP.NE.AND.EX P5, PT, R28, RZ, PT, P5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 369
+        /*2200*/                   IADD3.X R24, R31, -0x1, RZ, P6, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 370
+        /*2210*/                   LOP3.LUT R29, R29, R30, RZ, 0xc0, !PT ;
+        /*2220*/                   LOP3.LUT R24, R24, R31, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 376
+        /*2230*/                   IADD3 R36, P6, RZ, -R29, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 365
+        /*2240*/              @!P3 LOP3.LUT R33, R30, R35, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 288
+        /*2250*/                   IADD3 R23, -R23, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 376
+        /*2260*/                   IMAD.X R35, RZ, RZ, ~R24, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 365
+        /*2270*/                   FLO.U32 R32, R33 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 343
+        /*2280*/                   IADD3 R21, -R21, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 289
+        /*2290*/                   SEL R23, R12, R23, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 376
+        /*22a0*/                   LOP3.LUT R34, R24, R35, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 344
+        /*22b0*/                   SEL R21, R12, R21, !P5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 376
+        /*22c0*/                   ISETP.NE.U32.AND P6, PT, R34, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 349
+        /*22d0*/                   IMAD.SHL.U32 R21, R21, 0x40000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 365
+        /*22e0*/                   IADD3 R28, -R32.reuse, 0x1f, RZ ;
+        /*22f0*/                   IADD3 R32, -R32, 0x3f, RZ ;
+        /*2300*/               @P3 IMAD.MOV R32, RZ, RZ, R28 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 376
+        /*2310*/              @!P6 LOP3.LUT R34, R29.reuse, R36, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 378
+        /*2320*/                   ISETP.NE.U32.AND P3, PT, R29, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 376
+        /*2330*/                   FLO.U32 R34, R34 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 378
+        /*2340*/                   ISETP.NE.AND.EX P3, PT, R24, RZ, PT, P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 376
+        /*2350*/                   IADD3 R35, -R34.reuse, 0x1f, RZ ;
+        /*2360*/                   IADD3 R28, -R34, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 379
+        /*2370*/                   SEL R34, RZ, 0x1, !P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 376
+        /*2380*/               @P6 IMAD.MOV R28, RZ, RZ, R35 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 353
+        /*2390*/                   ISETP.NE.U32.AND P6, PT, R27, RZ, PT ;
+        /*23a0*/                   ISETP.NE.AND.EX P3, PT, R25, RZ, PT, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 380
+        /*23b0*/                   IADD3 R34, P6, -R34, R29.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 244
+        /*23c0*/                   IADD3 R25, -R26, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 380
+        /*23d0*/                   IADD3.X R27, R24, -0x1, RZ, P6, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 381
+        /*23e0*/                   LOP3.LUT R26, R34, R29, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 245
+        /*23f0*/                   SEL R25, R12, R25, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 364
+        /*2400*/                   ISETP.NE.U32.AND P0, PT, R30, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 381
+        /*2410*/                   LOP3.LUT R30, R27, R24, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 387
+        /*2420*/                   IADD3 R35, P6, RZ, -R26, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 364
+        /*2430*/                   ISETP.NE.AND.EX P0, PT, R31, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 365
+        /*2440*/                   IADD3 R27, -R32, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 387
+        /*2450*/                   IMAD.X R33, RZ, RZ, ~R30, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 389
+        /*2460*/                   ISETP.NE.U32.AND P6, PT, R26, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 366
+        /*2470*/                   SEL R27, R12, R27, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 389
+        /*2480*/                   ISETP.NE.AND.EX P6, PT, R30.reuse, RZ, PT, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 375
+        /*2490*/                   ISETP.NE.U32.AND P0, PT, R29, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 390
+        /*24a0*/                   SEL R31, RZ, 0x1, !P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 387
+        /*24b0*/                   LOP3.LUT R33, R30, R33, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 391
+        /*24c0*/                   IADD3 R31, P6, -R31, R26, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 387
+        /*24d0*/                   ISETP.NE.U32.AND P1, PT, R33, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 391
+        /*24e0*/                   IADD3.X R29, R30, -0x1, RZ, P6, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 392
+        /*24f0*/                   LOP3.LUT R31, R31, R26, RZ, 0xc0, !PT ;
+        /*2500*/                   LOP3.LUT R29, R29, R30, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 398
+        /*2510*/                   IADD3 R36, P6, RZ, -R31, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 375
+        /*2520*/                   ISETP.NE.AND.EX P0, PT, R24, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 398
+        /*2530*/                   IMAD.X R34, RZ, RZ, ~R29, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 387
+        /*2540*/              @!P1 LOP3.LUT R33, R26, R35, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 398
+        /*2550*/                   LOP3.LUT R34, R29, R34, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 387
+        /*2560*/                   FLO.U32 R32, R33 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 398
+        /*2570*/                   ISETP.NE.U32.AND P6, PT, R34, RZ, PT ;
+        /*2580*/              @!P6 LOP3.LUT R34, R31.reuse, R36, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 387
+        /*2590*/                   IADD3 R24, -R32.reuse, 0x1f, RZ ;
+        /*25a0*/                   IADD3 R32, -R32, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 398
+        /*25b0*/                   FLO.U32 R34, R34 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 387
+        /*25c0*/               @P1 IMAD.MOV R32, RZ, RZ, R24 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 400
+        /*25d0*/                   ISETP.NE.U32.AND P1, PT, R31, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 398
+        /*25e0*/                   IADD3 R35, -R34, 0x1f, RZ ;
+        /*25f0*/                   IADD3 R24, -R34, 0x3f, RZ ;
+        /*2600*/               @P6 IMAD.MOV R24, RZ, RZ, R35 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 400
+        /*2610*/                   ISETP.NE.AND.EX P6, PT, R29, RZ, PT, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 386
+        /*2620*/                   ISETP.NE.U32.AND P1, PT, R26, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 401
+        /*2630*/                   SEL R26, RZ, 0x1, !P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 386
+        /*2640*/                   ISETP.NE.AND.EX P1, PT, R30, RZ, PT, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 402
+        /*2650*/                   IADD3 R26, P6, -R26, R31, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 376
+        /*2660*/                   IADD3 R35, -R28, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 402
+        /*2670*/                   IADD3.X R34, R29, -0x1, RZ, P6, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 403
+        /*2680*/                   LOP3.LUT R30, R26, R31, RZ, 0xc0, !PT ;
+        /*2690*/                   LOP3.LUT R33, R34, R29, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 409
+        /*26a0*/                   IADD3 R37, P6, RZ, -R30, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 377
+        /*26b0*/                   SEL R28, R12, R35, !P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 408
+        /*26c0*/                   ISETP.NE.U32.AND P0, PT, R30, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 409
+        /*26d0*/                   IMAD.X R34, RZ, RZ, ~R33, P6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 387
+        /*26e0*/                   IADD3 R35, -R32, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 382
+        /*26f0*/                   IMAD.SHL.U32 R28, R28, 0x40, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 408
+        /*2700*/                   ISETP.NE.AND.EX P0, PT, R33.reuse, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 432
+        /*2710*/                   IMAD.MOV.U32 R32, RZ, RZ, 0x10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 409
+        /*2720*/                   LOP3.LUT R34, R33, R34, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 388
+        /*2730*/                   SEL R35, R12, R35, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 432
+        /*2740*/                   IMAD R17, R17, R32, c[0x2][0x10] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 409
+        /*2750*/                   ISETP.NE.U32.AND P6, PT, R34, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 397
+        /*2760*/                   ISETP.NE.U32.AND P1, PT, R31, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 393
+        /*2770*/                   IMAD.SHL.U32 R35, R35, 0x1000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 354
+        /*2780*/                   IADD3 R31, -R22, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 294
+        /*2790*/                   IMAD.SHL.U32 R22, R23, 0x40000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 397
+        /*27a0*/                   ISETP.NE.AND.EX P1, PT, R29, RZ, PT, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 299
+        /*27b0*/                   IADD3 R29, -R20, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 250
+        /*27c0*/                   IMAD.SHL.U32 R20, R25, 0x1000000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 398
+        /*27d0*/                   IADD3 R33, -R24, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 300
+        /*27e0*/                   SEL R29, R12, R29, !P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 409
+        /*27f0*/              @!P6 LOP3.LUT R34, R30, R37, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 355
+        /*2800*/                   SEL R31, R12.reuse, R31, !P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 305
+        /*2810*/                   IMAD.SHL.U32 R29, R29, 0x1000000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 409
+        /*2820*/                   FLO.U32 R26, R34 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 399
+        /*2830*/                   SEL R33, R12, R33, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 360
+        /*2840*/                   IMAD.SHL.U32 R31, R31, 0x1000000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 395
+        /*2850*/                   LOP3.LUT R27, R35, R28, R27, 0xfe, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 404
+        /*2860*/                   IMAD.SHL.U32 R24, R33, 0x40000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 307
+        /*2870*/                   LOP3.LUT R13, R29, R13, R22, 0xfe, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 362
+        /*2880*/                   LOP3.LUT R14, R31, R14, R21, 0xfe, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 409
+        /*2890*/                   IADD3 R30, -R26.reuse, 0x1f, RZ ;
+        /*28a0*/                   IADD3 R26, -R26, 0x3f, RZ ;
+        /*28b0*/               @P6 IMAD.MOV R26, RZ, RZ, R30 ;
+        /*28c0*/               @P0 IADD3 R12, -R26, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 415
+        /*28d0*/                   IMAD.SHL.U32 R23, R12, 0x1000000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 252
+        /*28e0*/                   LOP3.LUT R12, R15, R20, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 417
+        /*28f0*/                   LOP3.LUT R15, R23, R27, R24, 0xfe, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 432
+        /*2900*/                   STS.128 [R17], R12 ;
+.L_x_14:
+        /*2910*/                   BSYNC B1 ;
+.L_x_13:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 434
+        /*2920*/                   IADD3 R16, R16, 0x100, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 184
+        /*2930*/                   ISETP.GE.U32.AND P0, PT, R16, R11, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 186
+        /*2940*/               @P0 CALL.REL.NOINC `(.L_x_12) ;
+        /*2950*/                   BRA `(.L_x_15) ;
+.L_x_12:
+        /*2960*/                   BSYNC B0 ;
+.L_x_11:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 437
+        /*2970*/                   IMAD.IADD R7, R11, 0x1, R7 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 170
+        /*2980*/               @P4 CALL.REL.NOINC `(.L_x_16) ;
+        /*2990*/                   BRA `(.L_x_17) ;
+.L_x_16:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 439
+        /*29a0*/                   BAR.SYNC.DEFER_BLOCKING 0x0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 452
+        /*29b0*/                   LEA R10, P0, R9, c[0x0][0x168], 0x2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 454
+        /*29c0*/                   IMAD.MOV.U32 R8, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 452
+        /*29d0*/                   LEA.HI.X R11, R9.reuse, c[0x0][0x16c], RZ, 0x2, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 453
+        /*29e0*/                   IADD3 R9, R9, 0x1, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 452
+        /*29f0*/                   LDG.E.CONSTANT R4, [R10.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 454
+        /*2a00*/                   IMAD.WIDE.U32 R8, R9, R8, c[0x0][0x168] ;
+        /*2a10*/                   LDG.E.CONSTANT R6, [R8.64] ;
+        /*2a20*/                   IMAD.MOV.U32 R23, RZ, RZ, 0x1 ;
+        /*2a30*/                   CS2R R16, SRZ ;
+        /*2a40*/                   IMAD.MOV.U32 R7, RZ, RZ, RZ ;
+        /*2a50*/                   CS2R R20, SRZ ;
+        /*2a60*/                   IMAD.MOV.U32 R22, RZ, RZ, RZ ;
+        /*2a70*/                   IMAD.MOV.U32 R25, RZ, RZ, R4 ;
+.L_x_50:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 469
+        /*2a80*/                   ISETP.GE.U32.AND P0, PT, R25, R6, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 454
+        /*2a90*/                   YIELD ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 472
+        /*2aa0*/                   PRMT R12, RZ, 0x7610, R12 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 521
+        /*2ab0*/                   IMAD.MOV.U32 R24, RZ, RZ, -0x1 ;
+        /*2ac0*/                   ISETP.GT.U32.OR P1, PT, R22, 0x3ff, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 472
+        /*2ad0*/               @P1 BRA `(.L_x_18) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*2ae0*/                   S2R R28, SR_TID.X ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 92
+        /*2af0*/                   IMAD.MOV.U32 R9, RZ, RZ, -0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 90
+        /*2b00*/                   IMNMX.U32 R8, R5.reuse, 0x1f, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 89
+        /*2b10*/                   ISETP.GT.U32.AND P0, PT, R5, 0x1f, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 92
+        /*2b20*/                   SHF.L.U32 R8, R9, R8, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 93
+        /*2b30*/                   PRMT R12, RZ, 0x7610, R12 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 92
+        /*2b40*/                   LOP3.LUT R8, RZ, R8, RZ, 0x33, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 93
+        /*2b50*/                   SEL R26, R8, 0xffffffff, !P0 ;
+.L_x_25:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 474
+        /*2b60*/                   IMAD.IADD R27, R28, 0x1, R25 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 477
+        /*2b70*/                   BSSY B0, `(.L_x_19) ;
+        /*2b80*/                   CS2R R32, SRZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 476
+        /*2b90*/                   ISETP.GE.U32.AND P0, PT, R27, R6, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 477
+        /*2ba0*/               @P0 BRA `(.L_x_20) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 478
+        /*2bb0*/                   IMAD.MOV.U32 R8, RZ, RZ, 0x10 ;
+        /*2bc0*/                   IMAD.WIDE.U32 R8, R27, R8, c[0x0][0x160] ;
+.L_x_71:
+        /*2bd0*/                   LDG.E.128.CONSTANT R8, [R8.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 488
+        /*2be0*/                   LOP3.LUT R13, R0, 0x3f, RZ, 0xc0, !PT ;
+        /*2bf0*/                   SHF.R.U32.HI R11, RZ, 0x10, R10.reuse ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 493
+        /*2c00*/                   SHF.R.U32.HI R14, RZ, 0x8, R10.reuse ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 495
+        /*2c10*/                   SHF.R.U32.HI R15, RZ, 0x18, R10.reuse ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 491
+        /*2c20*/                   IMAD R11, R11, R13, R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 501
+        /*2c30*/                   IMAD.MOV.U32 R10, RZ, RZ, 0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 498
+        /*2c40*/                   IMAD R14, R13, R15, R14 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 492
+        /*2c50*/                   LOP3.LUT R11, R11, 0x3f, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 499
+        /*2c60*/                   LOP3.LUT R14, R14, 0x3f, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 501
+        /*2c70*/                   SHF.L.U32 R30, R10.reuse, R11.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 503
+        /*2c80*/                   SHF.L.U32 R13, R10.reuse, R14.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 501
+        /*2c90*/                   SHF.L.U64.HI R15, R10.reuse, R11, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 503
+        /*2ca0*/                   SHF.L.U64.HI R10, R10, R14, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 504
+        /*2cb0*/                   LOP3.LUT R13, R30, R13, RZ, 0xfc, !PT ;
+        /*2cc0*/                   LOP3.LUT R10, R15, R10, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 509
+        /*2cd0*/                   LOP3.LUT P0, RZ, R13.reuse, R8.reuse, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 505
+        /*2ce0*/                   LOP3.LUT R8, R13, R8, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 509
+        /*2cf0*/                   LOP3.LUT P0, RZ, R10.reuse, R9.reuse, RZ, 0xc0, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 505
+        /*2d00*/                   LOP3.LUT R9, R10, R9, RZ, 0xfc, !PT ;
+        /*2d10*/                   ISETP.EQ.OR P0, PT, R11, R14, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 511
+        /*2d20*/                   SEL R33, R8, RZ, !P0 ;
+        /*2d30*/                   SEL R32, R9, RZ, !P0 ;
+.L_x_20:
+        /*2d40*/                   BSYNC B0 ;
+.L_x_19:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 519
+        /*2d50*/                   ISETP.NE.U32.AND P0, PT, R33, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 477
+        /*2d60*/                   IMAD.MOV.U32 R31, RZ, RZ, R16 ;
+        /*2d70*/                   IMAD.MOV.U32 R30, RZ, RZ, R7 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 519
+        /*2d80*/                   ISETP.NE.AND.EX P0, PT, R32, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 521
+        /*2d90*/                   BRA.DIV ~URZ, `(.L_x_21) ;
+.L_x_79:
+        /*2da0*/                   VOTE.ANY R29, PT, P0 ;
+.L_x_61:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 530
+        /*2db0*/                   BRA.DIV ~URZ, `(.L_x_22) ;
+.L_x_80:
+        /*2dc0*/                   VOTE.ANY R10, PT, P0 ;
+.L_x_62:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*2dd0*/                   ISETP.NE.AND P0, PT, R5, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 540
+        /*2de0*/                   WARPSYNC 0xffffffff ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 532
+        /*2df0*/              @!P0 POPC R10, R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 537
+        /*2e00*/              @!P0 IMAD R8, R20, 0x8, R3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 538
+        /*2e10*/              @!P0 IMAD.MOV.U32 R9, RZ, RZ, 0x4 ;
+        /*2e20*/              @!P0 IMAD R9, R8, R9, c[0x2][0x18] ;
+        /*2e30*/              @!P0 STS [R9], R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 540
+        /*2e40*/                   BAR.SYNC.DEFER_BLOCKING 0x0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 542
+        /*2e50*/                   LOP3.LUT P0, RZ, R12, 0xff, RZ, 0xc0, !PT ;
+        /*2e60*/                   IMAD.SHL.U32 R10, R20, 0x8, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 555
+        /*2e70*/                   ISETP.NE.AND P2, PT, R3.reuse, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 559
+        /*2e80*/                   ISETP.GT.U32.AND P1, PT, R3, 0x2, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 555
+        /*2e90*/                   IMAD.SHL.U32 R36, R10, 0x4, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 562
+        /*2ea0*/                   BSSY B0, `(.L_x_23) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 543
+        /*2eb0*/               @P0 IMAD.SHL.U32 R34, R16, 0x4, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 544
+        /*2ec0*/               @P0 IMAD.U32 R8, R7, 0x10000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 543
+        /*2ed0*/               @P0 LDS R9, [R34+0x4580] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 545
+        /*2ee0*/               @P0 LOP3.LUT R35, R9, R8, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 546
+        /*2ef0*/               @P0 STS [R34+0x4580], R35 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 557
+        /*2f00*/                   ISETP.GT.U32.AND P0, PT, R3, 0x1, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 555
+        /*2f10*/                   LDS.128 R8, [R36+0x5000] ;
+        /*2f20*/                   LDS.128 R12, [R36+0x5010] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 557
+        /*2f30*/                   SEL R37, R8, RZ, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 559
+        /*2f40*/                   IADD3 R34, R10.reuse, R9, R8 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 557
+        /*2f50*/                   SEL R8, R9, RZ, P0 ;
+        /*2f60*/                   SEL R10, R10, RZ, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 561
+        /*2f70*/                   ISETP.NE.U32.AND P0, PT, R33, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 559
+        /*2f80*/                   ISETP.GT.U32.AND P1, PT, R3.reuse, 0x3, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 555
+        /*2f90*/                   ISETP.GT.U32.AND P2, PT, R3, 0x4, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 558
+        /*2fa0*/                   IADD3 R10, R10, R8, R37 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 559
+        /*2fb0*/                   IADD3 R8, R12, R11, R34 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 557
+        /*2fc0*/                   SEL R11, R11, RZ, P1 ;
+        /*2fd0*/                   SEL R12, R12, RZ, P2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 561
+        /*2fe0*/                   ISETP.NE.AND.EX P0, PT, R32, RZ, PT, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 559
+        /*2ff0*/                   ISETP.GT.U32.AND P1, PT, R3.reuse, 0x5, PT ;
+        /*3000*/                   ISETP.GT.U32.AND P2, PT, R3, 0x6, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 558
+        /*3010*/                   IADD3 R10, R12, R11, R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 557
+        /*3020*/                   SEL R9, R13, RZ, P1 ;
+        /*3030*/                   SEL R11, R14.reuse, RZ, P2 ;
+        /*3040*/                   ISETP.GT.U32.AND P1, PT, R3, 0x7, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 558
+        /*3050*/                   IADD3 R9, R11, R9, R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 557
+        /*3060*/                   SEL R10, R15, RZ, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 559
+        /*3070*/                   IADD3 R13, R14, R13, R8 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 562
+        /*3080*/                   PRMT R12, RZ, 0x7610, R12 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 558
+        /*3090*/                   IMAD.IADD R9, R9, 0x1, R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 562
+        /*30a0*/              @!P0 BRA `(.L_x_24) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 523
+        /*30b0*/                   LOP3.LUT R29, R29, R26, RZ, 0xc0, !PT ;
+        /*30c0*/                   IMAD.MOV.U32 R12, RZ, RZ, 0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 524
+        /*30d0*/                   POPC R29, R29 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 564
+        /*30e0*/                   IADD3 R16, R9, R29, R22 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 566
+        /*30f0*/                   LOP3.LUT R7, R16, 0x1, RZ, 0xc0, !PT ;
+        /*3100*/                   SHF.R.U32.HI R16, RZ, 0x1, R16 ;
+        /*3110*/                   ISETP.NE.U32.AND P0, PT, R7, 0x1, PT ;
+        /*3120*/                   IMAD.IADD R7, R27, 0x1, -R4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 570
+        /*3130*/               @P0 IMAD.MOV.U32 R9, RZ, RZ, 0x4 ;
+        /*3140*/               @P0 PRMT R12, RZ, 0x7610, R12 ;
+        /*3150*/               @P0 IMAD R8, R16, R9, c[0x2][0x20] ;
+        /*3160*/               @P0 IMAD.MOV.U32 R16, RZ, RZ, R31 ;
+        /*3170*/               @P0 STS [R8], R7 ;
+        /*3180*/               @P0 IMAD.MOV.U32 R7, RZ, RZ, R30 ;
+.L_x_24:
+        /*3190*/                   BSYNC B0 ;
+.L_x_23:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 581
+        /*31a0*/                   IADD3 R25, R25, 0x100, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 579
+        /*31b0*/                   IADD3 R22, R22, R15, R13 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 469
+        /*31c0*/                   ISETP.GE.U32.AND P1, PT, R25.reuse, R6.reuse, PT ;
+        /*31d0*/                   ISETP.LT.U32.AND P2, PT, R22, 0x400, PT ;
+        /*31e0*/                   ISETP.GE.U32.AND P0, PT, R25, R6, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 580
+        /*31f0*/                   LOP3.LUT R20, R20, 0x1, RZ, 0x3c, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 472
+        /*3200*/              @!P1 BRA P2, `(.L_x_25) ;
+.L_x_18:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 583
+        /*3210*/                   WARPSYNC 0xffffffff ;
+        /*3220*/                   BAR.SYNC.DEFER_BLOCKING 0x0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 585
+        /*3230*/                   PRMT R8, R12, 0x9910, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 671
+        /*3240*/                   IMAD.MOV.U32 R14, RZ, RZ, -0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 595
+        /*3250*/                   IADD3 R9, R22, 0x3f, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 585
+        /*3260*/                   ISETP.NE.AND P1, PT, R8, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 596
+        /*3270*/                   SHF.R.U32.HI R9, RZ, 0x6, R9 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 597
+        /*3280*/                   SEL R9, R9, 0x40, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 598
+        /*3290*/                   IMNMX.U32 R12, R9, 0x10, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 600
+        /*32a0*/                   PRMT R9, RZ, 0x7610, R9 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 586
+        /*32b0*/               @P1 IMAD.SHL.U32 R11, R16, 0x4, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 587
+        /*32c0*/               @P1 IMAD.U32 R13, R7, 0x10000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 586
+        /*32d0*/               @P1 LDS R8, [R11+0x4580] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 588
+        /*32e0*/               @P1 LOP3.LUT R8, R8, R13, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 671
+        /*32f0*/                   IMAD.MOV.U32 R13, RZ, RZ, 0x1f ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 589
+        /*3300*/               @P1 STS [R11+0x4580], R8 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 592
+        /*3310*/                   BAR.SYNC.DEFER_BLOCKING 0x0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 599
+        /*3320*/                   ISETP.NE.AND P1, PT, R12, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 600
+        /*3330*/              @!P1 BRA `(.L_x_26) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 603
+        /*3340*/                   IMAD.SHL.U32 R27, R12, 0x40, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 604
+        /*3350*/                   BSSY B0, `(.L_x_27) ;
+        /*3360*/                   IMAD.MOV.U32 R15, RZ, RZ, RZ ;
+        /*3370*/                   IMAD.MOV.U32 R26, RZ, RZ, R3 ;
+        /*3380*/                   IMNMX.U32 R27, R22, R27, PT ;
+.L_x_40:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 611
+        /*3390*/                   IMAD.SHL.U32 R28, R3, 0x20, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 609
+        /*33a0*/                   SHF.R.U32.HI R29, RZ, 0x1, R26 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 604
+        /*33b0*/                   YIELD ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 606
+        /*33c0*/                   IADD3 R15, R15, 0x1, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 619
+        /*33d0*/                   BSSY B1, `(.L_x_28) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 611
+        /*33e0*/                   LOP3.LUT R28, R28, 0x20, RZ, 0xe2, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 619
+        /*33f0*/                   IMAD.MOV.U32 R31, RZ, RZ, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 606
+        /*3400*/                   ISETP.NE.AND P2, PT, R15, 0x4, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 619
+        /*3410*/                   IMAD.MOV.U32 R10, RZ, RZ, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 616
+        /*3420*/                   ISETP.GE.U32.AND P3, PT, R29.reuse, R12, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 613
+        /*3430*/                   IMAD R28, R29, 0x40, R28 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 614
+        /*3440*/                   IMAD.IADD R32, R5, 0x1, R28 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 617
+        /*3450*/                   ISETP.GE.U32.AND P1, PT, R32, R27, PT ;
+        /*3460*/                   ISETP.GE.U32.OR P1, PT, R29, R12, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 619
+        /*3470*/               @P1 BRA `(.L_x_29) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 620
+        /*3480*/                   SHF.R.U32.HI R8, RZ, 0x1, R32 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 621
+        /*3490*/                   IMAD.MOV.U32 R9, RZ, RZ, 0x4 ;
+        /*34a0*/                   IMAD R30, R8, R9, c[0x2][0x20] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 623
+        /*34b0*/                   IMAD.SHL.U32 R8, R32, 0x10, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 621
+        /*34c0*/                   LDS R9, [R30] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 623
+        /*34d0*/                   LOP3.LUT R8, R8, 0x10, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 624
+        /*34e0*/                   SHF.R.U32.HI R8, RZ, R8, R9 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 625
+        /*34f0*/                   LOP3.LUT R9, R8, 0xffff, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 627
+        /*3500*/                   IMAD.MOV.U32 R8, RZ, RZ, 0x10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 626
+        /*3510*/                   IMAD.IADD R9, R4, 0x1, R9 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 627
+        /*3520*/                   IMAD.WIDE.U32 R8, R9, R8, c[0x0][0x160] ;
+.L_x_72:
+        /*3530*/                   LDG.E.128.CONSTANT R8, [R8.64] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 637
+        /*3540*/                   LOP3.LUT R32, R0, 0x3f, RZ, 0xc0, !PT ;
+        /*3550*/                   SHF.R.U32.HI R11, RZ, 0x10, R10.reuse ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 642
+        /*3560*/                   SHF.R.U32.HI R30, RZ, 0x8, R10.reuse ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 644
+        /*3570*/                   SHF.R.U32.HI R31, RZ, 0x18, R10.reuse ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 640
+        /*3580*/                   IMAD R11, R32, R11, R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 647
+        /*3590*/                   IMAD R30, R32, R31, R30 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 641
+        /*35a0*/                   LOP3.LUT R11, R11, 0x3f, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 650
+        /*35b0*/                   IMAD.MOV.U32 R32, RZ, RZ, 0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 648
+        /*35c0*/                   LOP3.LUT R30, R30, 0x3f, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 650
+        /*35d0*/                   SHF.L.U32 R10, R32.reuse, R11.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 652
+        /*35e0*/                   SHF.L.U32 R31, R32.reuse, R30.reuse, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 650
+        /*35f0*/                   SHF.L.U64.HI R33, R32, R11, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 653
+        /*3600*/                   LOP3.LUT R31, R10, R31, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 652
+        /*3610*/                   SHF.L.U64.HI R10, R32, R30, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 658
+        /*3620*/                   LOP3.LUT P1, RZ, R31, R8, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 653
+        /*3630*/                   LOP3.LUT R10, R33, R10, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 654
+        /*3640*/                   LOP3.LUT R8, R31, R8, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 658
+        /*3650*/                   LOP3.LUT P1, RZ, R10.reuse, R9.reuse, RZ, 0xc0, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 654
+        /*3660*/                   LOP3.LUT R9, R10, R9, RZ, 0xfc, !PT ;
+        /*3670*/                   ISETP.EQ.OR P1, PT, R11, R30, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 660
+        /*3680*/                   SEL R31, R8, RZ, !P1 ;
+        /*3690*/                   SEL R10, R9, RZ, !P1 ;
+.L_x_29:
+        /*36a0*/                   BSYNC B1 ;
+.L_x_28:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 671
+        /*36b0*/                   BRA.DIV ~URZ, `(.L_x_30) ;
+.L_x_81:
+        /*36c0*/                   SHFL.BFLY PT, R32, R31, 0x10, 0x1f ;
+.L_x_63:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 672
+        /*36d0*/                   BRA.DIV ~URZ, `(.L_x_31) ;
+.L_x_82:
+        /*36e0*/                   SHFL.BFLY PT, R8, R10, 0x10, 0x1f ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 684
+        /*36f0*/                   IMAD.MOV.U32 R9, RZ, RZ, 0xffff ;
+        /*3700*/                   LOP3.LUT P1, RZ, R5, 0x10, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 680
+        /*3710*/                   SHF.L.W.U32.HI R32, R32, 0x10, R32 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 684
+        /*3720*/                   SEL R11, R9, 0xffff0000, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 696
+        /*3730*/                   SHF.R.U32.HI R30, RZ, 0x3, R5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 688
+        /*3740*/                   LOP3.LUT R31, R11, R31, R32, 0xca, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 708
+        /*3750*/                   IMAD.MOV.U32 R32, RZ, RZ, -0xff0100 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 696
+        /*3760*/                   LOP3.LUT R30, R30, 0x1, RZ, 0xc0, !PT ;
+        /*3770*/                   ISETP.NE.U32.AND P1, PT, R30, 0x1, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 708
+        /*3780*/                   SEL R32, R32, 0xff00ff, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 684
+        /*3790*/                   SHF.L.W.U32.HI R9, R8, 0x10, R8 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 693
+        /*37a0*/                   LOP3.LUT R8, R11, R10, R9, 0xca, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 696
+        /*37b0*/                   IMAD.MOV.U32 R10, RZ, RZ, 0x8 ;
+.L_x_83:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 695
+        /*37c0*/                   SHFL.BFLY PT, R9, R31, 0x8, 0x1f ;
+.L_x_84:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 696
+        /*37d0*/                   SHFL.BFLY PT, R11, R8, 0x8, 0x1f ;
+        /*37e0*/                   SEL R30, R10, 0x18, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 704
+        /*37f0*/                   SHF.R.W.U32 R10, R9, R30.reuse, R9 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 708
+        /*3800*/                   SHF.R.W.U32 R11, R11, R30, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 732
+        /*3810*/                   IMAD.MOV.U32 R30, RZ, RZ, -0xf0f0f10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 712
+        /*3820*/                   LOP3.LUT R31, R10, R32.reuse, R31, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 717
+        /*3830*/                   LOP3.LUT R8, R11, R32, R8, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 720
+        /*3840*/                   SHF.R.U32.HI R11, RZ, 0x2, R5 ;
+.L_x_85:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 719
+        /*3850*/                   SHFL.BFLY PT, R9, R31, 0x4, 0x1f ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 720
+        /*3860*/                   LOP3.LUT R11, R11, 0x1, RZ, 0xc0, !PT ;
+.L_x_86:
+        /*3870*/                   SHFL.BFLY PT, R10, R8, 0x4, 0x1f ;
+        /*3880*/                   ISETP.NE.U32.AND P1, PT, R11, 0x1, PT ;
+        /*3890*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 732
+        /*38a0*/                   SEL R32, R30, 0xf0f0f0f, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 720
+        /*38b0*/                   SEL R11, R11, 0x1c, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 728
+        /*38c0*/                   SHF.R.W.U32 R30, R9, R11.reuse, R9 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 732
+        /*38d0*/                   SHF.R.W.U32 R9, R10, R11, R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 736
+        /*38e0*/                   LOP3.LUT R31, R30, R32.reuse, R31, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 756
+        /*38f0*/                   IMAD.MOV.U32 R30, RZ, RZ, -0x33333334 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 741
+        /*3900*/                   LOP3.LUT R8, R9, R32, R8, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 744
+        /*3910*/                   SHF.R.U32.HI R11, RZ, 0x1, R5 ;
+.L_x_87:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 743
+        /*3920*/                   SHFL.BFLY PT, R9, R31, 0x2, 0x1f ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 744
+        /*3930*/                   LOP3.LUT R11, R11, 0x1, RZ, 0xc0, !PT ;
+.L_x_88:
+        /*3940*/                   SHFL.BFLY PT, R10, R8, 0x2, 0x1f ;
+        /*3950*/                   ISETP.NE.U32.AND P1, PT, R11, 0x1, PT ;
+        /*3960*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 756
+        /*3970*/                   SEL R32, R30, 0x33333333, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 744
+        /*3980*/                   SEL R11, R11, 0x1e, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 752
+        /*3990*/                   SHF.R.W.U32 R30, R9, R11.reuse, R9 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 756
+        /*39a0*/                   SHF.R.W.U32 R9, R10, R11, R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 760
+        /*39b0*/                   LOP3.LUT R31, R30, R32.reuse, R31, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 765
+        /*39c0*/                   LOP3.LUT R10, R9, R32, R8, 0xb8, !PT ;
+.L_x_89:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 767
+        /*39d0*/                   SHFL.BFLY PT, R32, R31, 0x1, 0x1f ;
+.L_x_90:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 768
+        /*39e0*/                   SHFL.BFLY PT, R11, R10, 0x1, 0x1f ;
+.L_x_64:
+        /*39f0*/                   BSSY B1, `(.L_x_32) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 792
+        /*3a00*/               @P3 BRA `(.L_x_33) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 796
+        /*3a10*/                   IMNMX.U32 R8, R27, R28, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 802
+        /*3a20*/                   IMAD.MOV.U32 R9, RZ, RZ, -0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 768
+        /*3a30*/                   LOP3.LUT R30, R5, 0x1, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 780
+        /*3a40*/                   IMAD.MOV.U32 R33, RZ, RZ, -0x55555556 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 797
+        /*3a50*/                   IMAD.IADD R8, R27, 0x1, -R8 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 768
+        /*3a60*/                   ISETP.NE.U32.AND P3, PT, R30, 0x1, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 798
+        /*3a70*/                   IMNMX.U32 R30, R8, 0x20, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 802
+        /*3a80*/                   SHF.L.U32 R9, R9, R8, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 768
+        /*3a90*/                   IMAD.MOV.U32 R8, RZ, RZ, 0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 799
+        /*3aa0*/                   ISETP.GT.U32.AND P1, PT, R30.reuse, 0x1f, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 800
+        /*3ab0*/                   ISETP.GE.U32.AND P4, PT, R30, 0x1f, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 768
+        /*3ac0*/                   SEL R8, R8, 0x1f, !P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 802
+        /*3ad0*/                   LOP3.LUT R30, RZ, R9, RZ, 0x33, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 780
+        /*3ae0*/                   SEL R9, R33, 0x55555555, !P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 776
+        /*3af0*/                   SHF.R.W.U32 R32, R32, R8.reuse, R32 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 802
+        /*3b00*/                   SEL R30, R30, 0x7fffffff, !P4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 784
+        /*3b10*/                   LOP3.LUT R31, R32, R9, R31, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 803
+        /*3b20*/                   SEL R30, R30, 0xffffffff, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 780
+        /*3b30*/                   SHF.R.W.U32 R11, R11, R8, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*3b40*/                   ISETP.NE.AND P1, PT, R5, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 816
+        /*3b50*/                   ISETP.NE.AND P3, PT, R31, R30, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 789
+        /*3b60*/                   LOP3.LUT R11, R11, R9, R10, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 819
+        /*3b70*/                   BRA.DIV ~URZ, `(.L_x_34) ;
+.L_x_91:
+        /*3b80*/                   VOTE.ANY R10, PT, !P3 ;
+.L_x_65:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 796
+        /*3b90*/                   IMNMX.U32 R28, R27.reuse, R28, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 802
+        /*3ba0*/                   IMAD.MOV.U32 R9, RZ, RZ, -0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 830
+        /*3bb0*/                   BSSY B2, `(.L_x_35) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 797
+        /*3bc0*/                   IMAD.IADD R28, R27, 0x1, -R28 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 798
+        /*3bd0*/                   IMNMX.U32 R8, R28, 0x20, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 802
+        /*3be0*/                   SHF.L.U32 R9, R9, R28, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 800
+        /*3bf0*/                   ISETP.GE.U32.AND P4, PT, R8.reuse, 0x1f, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 802
+        /*3c00*/                   LOP3.LUT R9, RZ, R9, RZ, 0x33, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 799
+        /*3c10*/                   ISETP.GT.U32.AND P3, PT, R8, 0x1f, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 802
+        /*3c20*/                   SEL R9, R9, 0x7fffffff, !P4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 803
+        /*3c30*/                   SEL R8, R9, 0xffffffff, !P3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 830
+        /*3c40*/                   ISETP.NE.AND P3, PT, R11, R8, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 821
+        /*3c50*/               @P1 BRA `(.L_x_36) ;
+        /*3c60*/                   IMAD.SHL.U32 R8, R26, 0x4, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 825
+        /*3c70*/                   LOP3.LUT R9, R8, 0xfffffff8, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 826
+        /*3c80*/                   ATOMS.AND RZ, [R9+0x4500], R10 ;
+.L_x_36:
+        /*3c90*/                   BSYNC B2 ;
+.L_x_35:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 833
+        /*3ca0*/                   BRA.DIV ~URZ, `(.L_x_37) ;
+.L_x_92:
+        /*3cb0*/                   VOTE.ANY R10, PT, !P3 ;
+.L_x_66:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 847
+        /*3cc0*/                   IMAD R29, R29, 0x41, R5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 465
+        /*3cd0*/                   LOP3.LUT R8, R3, 0x1, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 852
+        /*3ce0*/                   IMAD.MOV.U32 R30, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 859
+        /*3cf0*/                   BSSY B2, `(.L_x_38) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 852
+        /*3d00*/                   IADD3 R9, R29.reuse, 0x20, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 851
+        /*3d10*/                   IMAD.SHL.U32 R29, R29, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 858
+        /*3d20*/                   IMAD.SHL.U32 R33, R9, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 851
+        /*3d30*/                   LOP3.LUT R9, R29, 0xfffffffe, R8, 0xe2, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 858
+        /*3d40*/                   LOP3.LUT R8, R33, 0xfffffffe, R8, 0xe2, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 852
+        /*3d50*/                   IMAD R28, R9, R30, c[0x2][0x28] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 859
+        /*3d60*/                   IMAD R30, R8, R30, c[0x2][0x28] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 835
+        /*3d70*/               @P1 BRA `(.L_x_39) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 838
+        /*3d80*/                   LOP3.LUT R8, R26, 0x1, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 839
+        /*3d90*/                   IMAD.MOV.U32 R9, RZ, RZ, 0x4 ;
+        /*3da0*/                   IMAD R9, R8, R9, c[0x2][0x8] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 840
+        /*3db0*/                   ATOMS.AND RZ, [R9], R10 ;
+.L_x_39:
+        /*3dc0*/                   BSYNC B2 ;
+.L_x_38:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 852
+        /*3dd0*/                   STS [R28], R31 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 859
+        /*3de0*/                   STS [R30], R11 ;
+.L_x_33:
+        /*3df0*/                   BSYNC B1 ;
+.L_x_32:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 606
+        /*3e00*/                   IADD3 R26, R26, 0x8, RZ ;
+        /*3e10*/               @P2 BRA `(.L_x_40) ;
+        /*3e20*/                   BSYNC B0 ;
+.L_x_27:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*3e30*/                   S2R R10, SR_TID.X ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 862
+        /*3e40*/                   IMAD.IADD R22, R22, 0x1, -R27 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 865
+        /*3e50*/                   IMAD.MOV.U32 R30, RZ, RZ, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 864
+        /*3e60*/                   ISETP.GE.U32.AND P1, PT, R10, R22, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 865
+        /*3e70*/               @P1 BRA `(.L_x_41) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 866
+        /*3e80*/                   IMAD.IADD R8, R27, 0x1, R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 868
+        /*3e90*/                   IMAD.MOV.U32 R24, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 867
+        /*3ea0*/                   SHF.R.U32.HI R9, RZ, 0x1, R8 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 870
+        /*3eb0*/                   IMAD.SHL.U32 R8, R8, 0x10, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 868
+        /*3ec0*/                   IMAD R9, R9, R24, c[0x2][0x20] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 870
+        /*3ed0*/                   LOP3.LUT R8, R8, 0x10, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 868
+        /*3ee0*/                   LDS R9, [R9] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 871
+        /*3ef0*/                   SHF.R.U32.HI R8, RZ, R8, R9 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 872
+        /*3f00*/                   LOP3.LUT R30, R8, 0xffff, RZ, 0xc0, !PT ;
+.L_x_41:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 885
+        /*3f10*/                   WARPSYNC 0xffffffff ;
+        /*3f20*/                   BAR.SYNC.DEFER_BLOCKING 0x0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 887
+        /*3f30*/                   BAR.SYNC.DEFER_BLOCKING 0x0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 894
+        /*3f40*/                   BAR.SYNC.DEFER_BLOCKING 0x0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 134
+        /*3f50*/                   ISETP.NE.AND P2, PT, R10, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 890
+        /*3f60*/                   SEL R12, R12, RZ, !P2 ;
+        /*3f70*/                   SEL R8, R27, RZ, !P2 ;
+        /*3f80*/                   IMAD.IADD R17, R17, 0x1, R12 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 864
+        /*3f90*/                   LOP3.LUT R12, R10, 0x1, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 890
+        /*3fa0*/                   IMAD.IADD R21, R21, 0x1, R8 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 897
+        /*3fb0*/                   BRA.DIV ~URZ, `(.L_x_42) ;
+.L_x_93:
+        /*3fc0*/                   SHFL.BFLY PT, R11, R30, 0x1, 0x1f ;
+.L_x_67:
+        /*3fd0*/                   ISETP.EQ.U32.OR P1, PT, R12, 0x1, P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*3fe0*/                   BSSY B0, `(.L_x_43) ;
+        /*3ff0*/                   LOP3.LUT R8, R10.reuse, 0xffffffe0, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 134
+        /*4000*/                   ISETP.NE.AND P3, PT, R10, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*4010*/                   ISETP.NE.AND P2, PT, R8, 0x20, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 902
+        /*4020*/               @P1 BRA `(.L_x_44) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 897
+        /*4030*/                   IADD3 R9, R10, 0x1, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 906
+        /*4040*/                   IMAD.U32 R11, R11, 0x10000, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 908
+        /*4050*/                   SHF.R.U32.HI R8, RZ, 0x1, R10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 905
+        /*4060*/                   ISETP.GE.U32.AND P1, PT, R9, R22, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 909
+        /*4070*/                   IMAD.MOV.U32 R9, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 907
+        /*4080*/                   SEL R11, R11, RZ, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 909
+        /*4090*/                   IMAD R8, R8, R9, c[0x2][0x20] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 908
+        /*40a0*/                   LOP3.LUT R11, R11, R30, RZ, 0xfc, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 909
+        /*40b0*/                   STS [R8], R11 ;
+.L_x_44:
+        /*40c0*/                   BSYNC B0 ;
+.L_x_43:
+        /*40d0*/                   BSSY B0, `(.L_x_45) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 912
+        /*40e0*/               @P3 BRA `(.L_x_46) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 914
+        /*40f0*/                   ATOMS.EXCH RZ, [RZ], RZ ;
+.L_x_46:
+        /*4100*/                   BSYNC B0 ;
+.L_x_45:
+        /*4110*/                   BSSY B0, `(.L_x_47) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 919
+        /*4120*/               @P2 BRA `(.L_x_48) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*4130*/                   IADD3 R10, R10, -0x20, RZ ;
+        /*4140*/                   IMAD.MOV.U32 R9, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 922
+        /*4150*/                   IMAD.MOV.U32 R11, RZ, RZ, -0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*4160*/                   IMAD R10, R10, R9, c[0x2][0x8] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 922
+        /*4170*/                   ATOMS.EXCH RZ, [R10], R11 ;
+.L_x_48:
+        /*4180*/                   BSYNC B0 ;
+.L_x_47:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 925
+        /*4190*/                   BAR.SYNC.DEFER_BLOCKING 0x0 ;
+        /*41a0*/                   ISETP.EQ.AND P0, PT, R22, RZ, P0 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 929
+        /*41b0*/                   SEL R23, R23, RZ, !P0 ;
+        /*41c0*/                   PRMT R9, R23, 0x7610, R9 ;
+.L_x_26:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 464
+        /*41d0*/                   LOP3.LUT P0, RZ, R9.reuse, 0xff, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 465
+        /*41e0*/                   PRMT R23, R9, 0x7610, R23 ;
+        /*41f0*/              @!P0 CALL.REL.NOINC `(.L_x_49) ;
+        /*4200*/                   BRA `(.L_x_50) ;
+.L_x_49:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 83
+        /*4210*/                   ISETP.GE.U32.AND P0, PT, R2, 0x2, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 936
+        /*4220*/                   IMAD.MOV.U32 R4, RZ, RZ, RZ ;
+        /*4230*/                   IMAD.MOV.U32 R6, RZ, RZ, RZ ;
+        /*4240*/              @!P0 BRA `(.L_x_51) ;
+        /*4250*/                   BSSY B0, `(.L_x_51) ;
+        /*4260*/                   IMAD.MOV.U32 R6, RZ, RZ, RZ ;
+        /*4270*/                   IMAD.MOV.U32 R3, RZ, RZ, 0x1 ;
+.L_x_53:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 937
+        /*4280*/                   BRA.DIV ~URZ, `(.L_x_52) ;
+.L_x_94:
+        /*4290*/                   SHFL.BFLY PT, R11, R6, R3, 0x1f ;
+.L_x_68:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 936
+        /*42a0*/                   IMAD.SHL.U32 R3, R3, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 937
+        /*42b0*/                   IMAD.IADD R6, R11, 0x1, R6 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 936
+        /*42c0*/                   ISETP.GE.U32.AND P0, PT, R3, R2, PT ;
+        /*42d0*/              @!P0 BRA `(.L_x_53) ;
+        /*42e0*/                   BSYNC B0 ;
+.L_x_51:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 83
+        /*42f0*/                   ISETP.GE.U32.AND P0, PT, R2, 0x2, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 944
+        /*4300*/              @!P0 BRA `(.L_x_54) ;
+        /*4310*/                   BSSY B0, `(.L_x_54) ;
+        /*4320*/                   IMAD.MOV.U32 R4, RZ, RZ, RZ ;
+        /*4330*/                   IMAD.MOV.U32 R3, RZ, RZ, 0x1 ;
+.L_x_56:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 945
+        /*4340*/                   BRA.DIV ~URZ, `(.L_x_55) ;
+.L_x_95:
+        /*4350*/                   SHFL.BFLY PT, R11, R4, R3, 0x1f ;
+.L_x_69:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 944
+        /*4360*/                   IMAD.SHL.U32 R3, R3, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 945
+        /*4370*/                   IMAD.IADD R4, R11, 0x1, R4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 944
+        /*4380*/                   ISETP.GE.U32.AND P0, PT, R3, R2, PT ;
+        /*4390*/              @!P0 BRA `(.L_x_56) ;
+        /*43a0*/                   BSYNC B0 ;
+.L_x_54:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 78
+        /*43b0*/                   ISETP.NE.AND P0, PT, R5, RZ, PT ;
+        /*43c0*/                   BSSY B0, `(.L_x_57) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 951
+        /*43d0*/               @P0 BRA `(.L_x_58) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 952
+        /*43e0*/                   ISETP.NE.AND P0, PT, R6, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 959
+        /*43f0*/                   BSSY B1, `(.L_x_59) ;
+        /*4400*/                   ISETP.NE.AND P1, PT, R4, RZ, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 953
+        /*4410*/              @!P0 BRA `(.L_x_60) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 957
+        /*4420*/                   S2R R2, SR_LANEID ;
+.L_x_74:
+        /*4430*/                   REDUX.SUM UR5, R6 ;
+.L_x_75:
+        /*4440*/                   VOTEU.ANY UR4, UPT, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 955
+        /*4450*/                   IMAD.MOV.U32 R3, RZ, RZ, 0x5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 957
+        /*4460*/                   UFLO.U32 UR4, UR4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 956
+        /*4470*/                   IMAD.MOV.U32 R7, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 957
+        /*4480*/                   ISETP.EQ.U32.AND P0, PT, R2, UR4, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 955
+        /*4490*/                   IMAD R2, R0, R3, 0x3 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 957
+        /*44a0*/                   IMAD.U32 R5, RZ, RZ, UR5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 956
+        /*44b0*/                   IMAD.WIDE.U32 R2, R2, R7, c[0x0][0x198] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 957
+        /*44c0*/               @P0 RED.E.ADD.STRONG.GPU [R2.64], R5 ;
+.L_x_60:
+        /*44d0*/                   BSYNC B1 ;
+.L_x_59:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 960
+        /*44e0*/              @!P1 BRA `(.L_x_58) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 964
+        /*44f0*/                   S2R R2, SR_LANEID ;
+.L_x_76:
+        /*4500*/                   REDUX.SUM UR5, R4 ;
+.L_x_77:
+        /*4510*/                   VOTEU.ANY UR4, UPT, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 962
+        /*4520*/                   IMAD.MOV.U32 R3, RZ, RZ, 0x5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 964
+        /*4530*/                   UFLO.U32 UR4, UR4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 963
+        /*4540*/                   IMAD.MOV.U32 R7, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 964
+        /*4550*/                   ISETP.EQ.U32.AND P0, PT, R2, UR4, PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 962
+        /*4560*/                   IMAD R2, R0, R3, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 964
+        /*4570*/                   IMAD.U32 R5, RZ, RZ, UR5 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 963
+        /*4580*/                   IMAD.WIDE.U32 R2, R2, R7, c[0x0][0x198] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 964
+        /*4590*/               @P0 RED.E.ADD.STRONG.GPU [R2.64], R5 ;
+.L_x_58:
+        /*45a0*/                   BSYNC B0 ;
+.L_x_57:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 27
+        /*45b0*/                   S2R R2, SR_TID.X ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 134
+        /*45c0*/                   ISETP.NE.AND P0, PT, R2, RZ, PT ;
+.L_x_113:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 968
+        /*45d0*/               @P0 EXIT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 969
+        /*45e0*/                   IMAD R0, R0, 0x5, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 970
+        /*45f0*/                   IMAD.MOV.U32 R7, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 973
+        /*4600*/                   IADD3 R4, R0.reuse, 0x1, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 970
+        /*4610*/                   IMAD.WIDE.U32 R2, R0.reuse, R7, c[0x0][0x198] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 977
+        /*4620*/                   IADD3 R6, R0, 0x2, RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 974
+        /*4630*/                   IMAD.WIDE.U32 R4, R4, R7.reuse, c[0x0][0x198] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 971
+        /*4640*/                   RED.E.ADD.STRONG.GPU [R2.64], R21 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 978
+        /*4650*/                   IMAD.WIDE.U32 R6, R6, R7, c[0x0][0x198] ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 975
+        /*4660*/                   RED.E.ADD.STRONG.GPU [R4.64], R17 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 979
+        /*4670*/                   RED.E.ADD.STRONG.GPU [R6.64], RZ ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 981
+        /*4680*/                   RED.E.ADD.STRONG.GPU [R18.64+-0x4], RZ ;
+.L_x_114:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 984
+        /*4690*/                   EXIT ;
+.L_x_21:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 521
+        /*46a0*/                   SEL R9, RZ, 0x1, !P0 ;
+        /*46b0*/                   MOV R8, 0x46d0 ;
+.L_x_96:
+        /*46c0*/                   CALL.REL.NOINC `($__internal_1_$__cuda_sm70_votesync_ballot) ;
+        /*46d0*/                   IMAD.MOV.U32 R29, RZ, RZ, R10 ;
+        /*46e0*/                   BRA `(.L_x_61) ;
+.L_x_22:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 530
+        /*46f0*/                   SEL R9, RZ, 0x1, !P0 ;
+        /*4700*/                   MOV R8, 0x4720 ;
+.L_x_97:
+        /*4710*/                   CALL.REL.NOINC `($__internal_1_$__cuda_sm70_votesync_ballot) ;
+        /*4720*/                   BRA `(.L_x_62) ;
+.L_x_30:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 671
+        /*4730*/                   IMAD.MOV.U32 R30, RZ, RZ, R31 ;
+        /*4740*/                   MOV R8, 0x4770 ;
+        /*4750*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x10 ;
+.L_x_98:
+        /*4760*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*4770*/                   IMAD.MOV.U32 R32, RZ, RZ, R11 ;
+        /*4780*/                   BRA `(.L_x_63) ;
+.L_x_31:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 672
+        /*4790*/                   IMAD.MOV.U32 R30, RZ, RZ, R10 ;
+        /*47a0*/                   MOV R8, 0x47d0 ;
+        /*47b0*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x10 ;
+.L_x_99:
+        /*47c0*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 684
+        /*47d0*/                   IMAD.MOV.U32 R30, RZ, RZ, 0xffff ;
+        /*47e0*/                   LOP3.LUT P1, RZ, R5, 0x10, RZ, 0xc0, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 680
+        /*47f0*/                   SHF.L.W.U32.HI R8, R32, 0x10, R32 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 684
+        /*4800*/                   SEL R30, R30, 0xffff0000, !P1 ;
+        /*4810*/                   SHF.L.W.U32.HI R9, R11, 0x10, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 695
+        /*4820*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x8 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 688
+        /*4830*/                   LOP3.LUT R31, R30.reuse, R31, R8, 0xca, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 693
+        /*4840*/                   LOP3.LUT R10, R30, R10, R9, 0xca, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 695
+        /*4850*/                   MOV R8, 0x4880 ;
+        /*4860*/                   IMAD.MOV.U32 R30, RZ, RZ, R31 ;
+.L_x_100:
+        /*4870*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*4880*/                   IMAD.MOV.U32 R32, RZ, RZ, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 696
+        /*4890*/                   MOV R8, 0x48d0 ;
+        /*48a0*/                   IMAD.MOV.U32 R30, RZ, RZ, R10 ;
+        /*48b0*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x8 ;
+.L_x_101:
+        /*48c0*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*48d0*/                   SHF.R.U32.HI R8, RZ, 0x3, R5 ;
+        /*48e0*/                   IMAD.MOV.U32 R9, RZ, RZ, 0x8 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 708
+        /*48f0*/                   IMAD.MOV.U32 R33, RZ, RZ, -0xff0100 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 696
+        /*4900*/                   LOP3.LUT R8, R8, 0x1, RZ, 0xc0, !PT ;
+        /*4910*/                   ISETP.NE.U32.AND P1, PT, R8, 0x1, PT ;
+        /*4920*/                   SEL R8, R9, 0x18, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 708
+        /*4930*/                   SEL R33, R33, 0xff00ff, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 704
+        /*4940*/                   SHF.R.W.U32 R30, R32, R8.reuse, R32 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 708
+        /*4950*/                   SHF.R.W.U32 R9, R11, R8, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 719
+        /*4960*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 712
+        /*4970*/                   LOP3.LUT R31, R30, R33.reuse, R31, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 717
+        /*4980*/                   LOP3.LUT R10, R9, R33, R10, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 719
+        /*4990*/                   MOV R8, 0x49c0 ;
+        /*49a0*/                   IMAD.MOV.U32 R30, RZ, RZ, R31 ;
+.L_x_102:
+        /*49b0*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*49c0*/                   IMAD.MOV.U32 R32, RZ, RZ, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 720
+        /*49d0*/                   MOV R8, 0x4a10 ;
+        /*49e0*/                   IMAD.MOV.U32 R30, RZ, RZ, R10 ;
+        /*49f0*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x4 ;
+.L_x_103:
+        /*4a00*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*4a10*/                   SHF.R.U32.HI R8, RZ, 0x2, R5 ;
+        /*4a20*/                   IMAD.MOV.U32 R9, RZ, RZ, 0x4 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 732
+        /*4a30*/                   IMAD.MOV.U32 R33, RZ, RZ, -0xf0f0f10 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 720
+        /*4a40*/                   LOP3.LUT R8, R8, 0x1, RZ, 0xc0, !PT ;
+        /*4a50*/                   ISETP.NE.U32.AND P1, PT, R8, 0x1, PT ;
+        /*4a60*/                   SEL R8, R9, 0x1c, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 732
+        /*4a70*/                   SEL R33, R33, 0xf0f0f0f, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 728
+        /*4a80*/                   SHF.R.W.U32 R30, R32, R8.reuse, R32 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 732
+        /*4a90*/                   SHF.R.W.U32 R9, R11, R8, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 743
+        /*4aa0*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 736
+        /*4ab0*/                   LOP3.LUT R31, R30, R33.reuse, R31, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 741
+        /*4ac0*/                   LOP3.LUT R10, R9, R33, R10, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 743
+        /*4ad0*/                   MOV R8, 0x4b00 ;
+        /*4ae0*/                   IMAD.MOV.U32 R30, RZ, RZ, R31 ;
+.L_x_104:
+        /*4af0*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*4b00*/                   IMAD.MOV.U32 R32, RZ, RZ, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 744
+        /*4b10*/                   MOV R8, 0x4b50 ;
+        /*4b20*/                   IMAD.MOV.U32 R30, RZ, RZ, R10 ;
+        /*4b30*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x2 ;
+.L_x_105:
+        /*4b40*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*4b50*/                   SHF.R.U32.HI R8, RZ, 0x1, R5 ;
+        /*4b60*/                   IMAD.MOV.U32 R9, RZ, RZ, 0x2 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 756
+        /*4b70*/                   IMAD.MOV.U32 R33, RZ, RZ, -0x33333334 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 744
+        /*4b80*/                   LOP3.LUT R8, R8, 0x1, RZ, 0xc0, !PT ;
+        /*4b90*/                   ISETP.NE.U32.AND P1, PT, R8, 0x1, PT ;
+        /*4ba0*/                   SEL R8, R9, 0x1e, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 756
+        /*4bb0*/                   SEL R33, R33, 0x33333333, !P1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 752
+        /*4bc0*/                   SHF.R.W.U32 R30, R32, R8.reuse, R32 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 756
+        /*4bd0*/                   SHF.R.W.U32 R9, R11, R8, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 767
+        /*4be0*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x1 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 760
+        /*4bf0*/                   LOP3.LUT R31, R30, R33.reuse, R31, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 765
+        /*4c00*/                   LOP3.LUT R10, R9, R33, R10, 0xb8, !PT ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 767
+        /*4c10*/                   MOV R8, 0x4c40 ;
+        /*4c20*/                   IMAD.MOV.U32 R30, RZ, RZ, R31 ;
+.L_x_106:
+        /*4c30*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*4c40*/                   IMAD.MOV.U32 R32, RZ, RZ, R11 ;
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 768
+        /*4c50*/                   MOV R8, 0x4c90 ;
+        /*4c60*/                   IMAD.MOV.U32 R30, RZ, RZ, R10 ;
+        /*4c70*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x1 ;
+.L_x_107:
+        /*4c80*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*4c90*/                   BRA `(.L_x_64) ;
+.L_x_34:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 819
+        /*4ca0*/                   SEL R9, RZ, 0x1, P3 ;
+        /*4cb0*/                   MOV R8, 0x4cd0 ;
+.L_x_108:
+        /*4cc0*/                   CALL.REL.NOINC `($__internal_1_$__cuda_sm70_votesync_ballot) ;
+        /*4cd0*/                   BRA `(.L_x_65) ;
+.L_x_37:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 833
+        /*4ce0*/                   SEL R9, RZ, 0x1, P3 ;
+        /*4cf0*/                   MOV R8, 0x4d10 ;
+.L_x_109:
+        /*4d00*/                   CALL.REL.NOINC `($__internal_1_$__cuda_sm70_votesync_ballot) ;
+        /*4d10*/                   BRA `(.L_x_66) ;
+.L_x_42:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 897
+        /*4d20*/                   IMAD.MOV.U32 R11, RZ, RZ, 0x1 ;
+        /*4d30*/                   MOV R8, 0x4d50 ;
+.L_x_110:
+        /*4d40*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*4d50*/                   BRA `(.L_x_67) ;
+.L_x_52:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 937
+        /*4d60*/                   IMAD.MOV.U32 R30, RZ, RZ, R6 ;
+        /*4d70*/                   MOV R8, 0x4da0 ;
+        /*4d80*/                   IMAD.MOV.U32 R11, RZ, RZ, R3 ;
+.L_x_111:
+        /*4d90*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*4da0*/                   BRA `(.L_x_68) ;
+.L_x_55:
+	//## File "/home/claude/projects/nice/.worktrees/g2-cubecl/nvtools/work/c11/k.cu", line 945
+        /*4db0*/                   IMAD.MOV.U32 R30, RZ, RZ, R4 ;
+        /*4dc0*/                   MOV R8, 0x4df0 ;
+        /*4dd0*/                   IMAD.MOV.U32 R11, RZ, RZ, R3 ;
+.L_x_112:
+        /*4de0*/                   CALL.REL.NOINC `($__internal_0_$__cuda_sm70_shflsync_bfly_p) ;
+        /*4df0*/                   BRA `(.L_x_69) ;
+        .weak           $__internal_0_$__cuda_sm70_shflsync_bfly_p
+        .type           $__internal_0_$__cuda_sm70_shflsync_bfly_p,@function
+        .size           $__internal_0_$__cuda_sm70_shflsync_bfly_p,($__internal_1_$__cuda_sm70_votesync_ballot - $__internal_0_$__cuda_sm70_shflsync_bfly_p)
+$__internal_0_$__cuda_sm70_shflsync_bfly_p:
+        /*4e00*/                   IMAD.MOV.U32 R9, RZ, RZ, 0x0 ;
+        /*4e10*/                   WARPSYNC R14 ;
+        /*4e20*/                   SHFL.BFLY PT, R11, R30, R11, R13 ;
+        /*4e30*/                   RET.REL.NODEC R8 `(g2_kernel) ;
+        .weak           $__internal_1_$__cuda_sm70_votesync_ballot
+        .type           $__internal_1_$__cuda_sm70_votesync_ballot,@function
+        .size           $__internal_1_$__cuda_sm70_votesync_ballot,(.L_x_116 - $__internal_1_$__cuda_sm70_votesync_ballot)
+$__internal_1_$__cuda_sm70_votesync_ballot:
+        /*4e40*/                   ISETP.NE.U32.AND P3, PT, R9, 0x1, PT ;
+        /*4e50*/                   WARPSYNC R24 ;
+        /*4e60*/                   VOTE.ANY R9, PT, !P3 ;
+        /*4e70*/                   LOP3.LUT R10, R9, R24, RZ, 0xc0, !PT ;
+        /*4e80*/                   IMAD.MOV.U32 R9, RZ, RZ, 0x0 ;
+        /*4e90*/                   RET.REL.NODEC R8 `(g2_kernel) ;
+.L_x_70:
+        /*4ea0*/                   BRA `(.L_x_70);
+        /*4eb0*/                   NOP;
+        /*4ec0*/                   NOP;
+        /*4ed0*/                   NOP;
+        /*4ee0*/                   NOP;
+        /*4ef0*/                   NOP;
+        /*4f00*/                   NOP;
+        /*4f10*/                   NOP;
+        /*4f20*/                   NOP;
+        /*4f30*/                   NOP;
+        /*4f40*/                   NOP;
+        /*4f50*/                   NOP;
+        /*4f60*/                   NOP;
+        /*4f70*/                   NOP;
+.L_x_116:

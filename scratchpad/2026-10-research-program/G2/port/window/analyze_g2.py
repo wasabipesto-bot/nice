@@ -37,7 +37,7 @@ for p in sorted(glob.glob(f'{D}/[to]_*_r*.log')):
     name = os.path.basename(p)[:-4]; kind, var, r = name.split('_')
     t = open(p, errors='replace').read()
     ms = dict((m, float(v)) for m, v in re.findall(r'MODE (probes off|skip off|full)\s+median ([\d.]+) ms', t))
-    prep = re.search(r'PREP \(GPU, 4 launches\) median ([\d.]+) ms', t)
+    prep = re.search(r'PREP \(GPU, \d launches\) median ([\d.]+) ms', t)
     e2e = re.search(r'RESULT end-to-end .*?= ([\d.]+) fs', t)
     cok = t.count('EQUAL to the CPU reference'); g = gpu(p[:-4] + '.gpu')
     G[(kind, var, r)] = dict(ms=ms, prep=float(prep.group(1)) if prep else None, e2e=float(e2e.group(1)) if e2e else None)

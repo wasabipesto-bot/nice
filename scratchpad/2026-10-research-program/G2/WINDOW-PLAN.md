@@ -178,3 +178,25 @@ ratio = main base mean / (G2 end-to-end + tops and survivor checks)
 - In the window, add variant **D = `--tdig 1`**, one round. If the card shows the same penalty, the cause is in
   CubeCL's IR, not in NVRTC.
 - Everything else in the plan stands: four rounds of A, median and minimum, one launch, sampler check.
+
+## Changes after the offline tuning (2026-11-18, `G2/TUNE-RESULTS.md`)
+
+- **Build head `4170a781`** from the re-created bundle (same commands; the `--features cubecl-spirv` build is the
+  one to time). Defaults now include the per-digit 3a masks, u16 pending slots (12 waves on GFX1201), the 32-bit
+  transpose and the one-pass GPU prep (`--prep2 1`; `--prep2 0` is the old two-pass prep). The host bails if a parent class has > 65,536 parents (both
+  staged super-units are far below: about 16.5k on average).
+- **Prediction [P]:** central ×6.4 (×4.8–8.1; ×4.4–8.7 with main's ±8 %) by the issue-bound ACO model, against ×4.5
+  before by the same model. Not measured on any GPU.
+- **`go_g2.sh` now** (mini dry run on lavapipe passed, `G2/port/raw/tune/dryrun_mini/`):
+  - adds an exactness run of **D** (`--tdig 1`) on the first super-unit (about 40 s);
+  - runs **D in every round** (rounds 1–4 with A): `--tdig 1` is predicted −0.07 ms on the card, and its CUDA
+    penalty was nvcc's per-lane atomic loads in 3a, which the tuned kernel no longer has;
+  - runs one round of **P**, the pre-tuning build, if `$BIN/g2_pre` exists: build `9ff100e6` the same way
+    (`git -C ~/nice-src worktree add $W/wt0 9ff100e6`, then the g2 build into `$W/bin/g2_pre`; about 2 min). P
+    measures what the tuning was worth on the card. Skip it if the build time is not there.
+  - `run_g2.sh` takes `G2BIN` to run another binary; `analyze_g2.py` now reads the prep time again (its pattern
+    still said "4 launches").
+  - Total: about 4 min more than before, still inside 45.
+- **Reading:** if D beats A on the card, D is the client's form. If P is within a few per cent of A, the issue-bound
+  model was not what limits the card, and the remaining ideas in `TUNE-RESULTS.md` ("What remains", 3) are unlikely
+  to help either.
