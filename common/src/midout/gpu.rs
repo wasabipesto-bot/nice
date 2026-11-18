@@ -1119,8 +1119,8 @@ mod post {
     use cubecl::prelude::*;
 
     /// Records → production's survivor-list entries `(top, r0)`, `r0 = n mod
-    /// 2^30` (the child's r4 and the slice's digit 4): a grid-stride loop
-    /// over the record slots (slab s, row r) of the slabs the kernel used,
+    /// 2^30` (the child's r4 and the slice's digit 4): each plane takes the
+    /// used slabs in a grid-stride loop and its lanes the slab's records,
     /// appended in plane-sized takes. A record names its job (class, unit),
     /// its probe slot and its chunk's first position in the job's child list
     /// (`clst`, written by the main kernel's phase 1). Thread 0 also copies
@@ -1147,23 +1147,22 @@ mod post {
             stat[0usize] = lcnt[0usize];
             stat[1usize] = slabn[0usize];
         }
-        let lim = min(slabn[0usize], nslab_cap) * SLAB;
-        let stride = CUBE_COUNT_X * NT;
-        let mut base = CUBE_POS_X * NT;
-        while base < lim {
-            let i = base + UNIT_POS_X;
-            let s = i / SLAB;
-            let r = i % SLAB;
-            let mut live = false;
+        // one plane per slab at a time, its lanes over the slab's rows: no idle slots past a slab's count
+        let ns = min(slabn[0usize], nslab_cap);
+        let ppc = NT / PLANE_DIM;
+        let pstride = CUBE_COUNT_X * ppc;
+        let mut s = CUBE_POS_X * ppc + UNIT_POS_X / PLANE_DIM;
+        while s < ns {
+          let cnt = slabcnt[s as usize];
+          let mut r0 = 0u32;
+          while r0 < cnt {
+            let r = r0 + UNIT_POS_PLANE;
+            let i = s * SLAB + r;
+            let live = r < cnt;
             let mut wlo = 0u32;
             let mut whi = 0u32;
             let mut ti = 0u32;
             let mut pos = 0u32;
-            if i < lim {
-                if r < slabcnt[s as usize] {
-                    live = true;
-                }
-            }
             if live {
                 let rec = out[i as usize];
                 let ps = rec[0usize] & 0xFFFFu32;
@@ -1223,7 +1222,9 @@ mod post {
                     slot += 1u32;
                 }
             }
-            base += stride;
+            r0 += PLANE_DIM;
+          }
+          s += pstride;
         }
     }
 
@@ -1706,6 +1707,12 @@ pub struct Caps {
     pub survivors: u32,
     /// Classes per launch batch (63: one launch per slice; lavapipe: 4).
     pub classes: u32,
+    /// Nice numbers the device may report before a read (or, with
+    /// `probe`, every survivor the check rebuilds).
+    pub nice: u32,
+    /// Tests: run the check in production's probe mode (it writes every n
+    /// it rebuilds from the list entry and the top record).
+    pub probe: bool,
 }
 
 impl Caps {
@@ -1713,7 +1720,7 @@ impl Caps {
     /// survivors: about twice that.
     #[must_use]
     pub fn b64(classes: u32) -> Self {
-        Caps { parents: 2_100_000, tops: 480_000, survivors: 24_000_000, classes }
+        Caps { parents: 2_100_000, tops: 480_000, survivors: 24_000_000, classes, nice: NICE_CAP, probe: false }
     }
 }
 
@@ -1800,9 +1807,10 @@ pub struct GpuJoin<R: Runtime> {
     /// Device tops: every prefix's mask and validity.
     tm: Handle,
     tv: Handle,
-    /// Timing only (`MIDOUT_STOP`): queue the stages up to this one
-    /// (1 tops, 2 parents, 3 main kernel, 5 expansion, 6 all)
-    /// and skip the accounts. 6 in production.
+    /// Timing and bisection only (`MIDOUT_STOP`): queue the stages up to
+    /// this one (1 tops, 2 parents, 3 main kernel, 5 expansion, 6 all; 11–15:
+    /// the first 1–5 device-top kernels alone) and skip the accounts. 6 in
+    /// production.
     stop: u32,
 }
 
@@ -1868,7 +1876,7 @@ impl<R: Runtime> GpuJoin<R> {
             clst: e(lcap as usize * 4),
             surv: e(scap as usize * 8),
             top_rec: e(nt * TOP_REC_WORDS as usize * 4),
-            nice_out: mk(vec![0u32; NICE_CAP as usize * NICE_STRIDE]),
+            nice_out: mk(vec![0u32; caps.nice as usize * NICE_STRIDE]),
             nice_count: mk(vec![0u32; 1]),
             tm: e(8 << 21),
             tv: e(4 << 21),
@@ -1880,6 +1888,11 @@ impl<R: Runtime> GpuJoin<R> {
     /// The depth-4 roots the device holds (for the host's tops and key).
     pub fn roots(&self) -> &[u32] {
         &self.roots
+    }
+
+    /// Whether stage `k` is queued (`stop`).
+    fn upto(&self, k: u32) -> bool {
+        self.stop < 10 && self.stop >= k
     }
 
     fn mk(&self, v: Vec<u32>) -> Handle {
@@ -1927,59 +1940,69 @@ impl<R: Runtime> GpuJoin<R> {
         let cur = self.client.empty(4032 * 4);
         let full = 1u32 << 21;
         unsafe {
-            dtops::tops1_kernel::launch_unchecked::<R>(
-                c,
-                CubeCount::Static(full / NT, 1, 1),
-                CubeDim::new_1d(NT),
-                a(&self.tm, full as usize),
-                a(&self.tv, full as usize),
-                a(&segc, 4032),
-                a(&tstat, 2),
-                pip as u32,
-            );
-            dtops::tscan_kernel::launch_unchecked::<R>(
-                c,
-                CubeCount::Static(1, 1, 1),
-                CubeDim::new_1d(1024),
-                a(&segc, 4032),
-                a(&tsegh, 4032 * 2),
-                a(&cur, 4032),
-                a(&tstat, 2),
-            );
-            dtops::tops2_kernel::launch_unchecked::<R>(
-                c,
-                CubeCount::Static(full / NT, 1, 1),
-                CubeDim::new_1d(NT),
-                a(&self.tm, full as usize),
-                a(&self.tv, full as usize),
-                a(&cur, 4032),
-                a(&tmh, nt),
-                a(&thdh, nt),
-                nt as u32,
-            );
-            dtops::tdigz2_kernel::launch_unchecked::<R>(
-                c,
-                CubeCount::Static((nt as u32).max(16128).div_ceil(NT), 1, 1),
-                CubeDim::new_1d(NT),
-                a(&tmh, nt),
-                a(&self.g_tdig, nt * 4),
-                a(&self.histh, 16128),
-                a(&self.lcnt, 1),
-                a(&tstat, 2),
-                nt as u32,
-            );
-            dtops::toprec2_kernel::launch_unchecked::<R>(
-                c,
-                CubeCount::Static((nt as u32).div_ceil(NT), 1, 1),
-                CubeDim::new_1d(NT),
-                a(&thdh, nt),
-                a(&self.top_rec, nt * 8),
-                a(&tstat, 2),
-                (pip >> 6) as u32,
-                nt as u32,
-            );
+            if self.stop < 10 || self.stop - 10 >= 1 {
+                dtops::tops1_kernel::launch_unchecked::<R>(
+                    c,
+                    CubeCount::Static(full / NT, 1, 1),
+                    CubeDim::new_1d(NT),
+                    a(&self.tm, full as usize),
+                    a(&self.tv, full as usize),
+                    a(&segc, 4032),
+                    a(&tstat, 2),
+                    pip as u32,
+                );
+            }
+            if self.stop < 10 || self.stop - 10 >= 2 {
+                dtops::tscan_kernel::launch_unchecked::<R>(
+                    c,
+                    CubeCount::Static(1, 1, 1),
+                    CubeDim::new_1d(1024),
+                    a(&segc, 4032),
+                    a(&tsegh, 4032 * 2),
+                    a(&cur, 4032),
+                    a(&tstat, 2),
+                );
+            }
+            if self.stop < 10 || self.stop - 10 >= 3 {
+                dtops::tops2_kernel::launch_unchecked::<R>(
+                    c,
+                    CubeCount::Static(full / NT, 1, 1),
+                    CubeDim::new_1d(NT),
+                    a(&self.tm, full as usize),
+                    a(&self.tv, full as usize),
+                    a(&cur, 4032),
+                    a(&tmh, nt),
+                    a(&thdh, nt),
+                    nt as u32,
+                );
+            }
+            if self.stop < 10 || self.stop - 10 >= 4 {
+                dtops::tdigz2_kernel::launch_unchecked::<R>(
+                    c,
+                    CubeCount::Static((nt as u32).max(16128).div_ceil(NT), 1, 1),
+                    CubeDim::new_1d(NT),
+                    a(&tmh, nt),
+                    a(&self.g_tdig, nt * 4),
+                    a(&self.histh, 16128),
+                    a(&self.lcnt, 1),
+                    a(&tstat, 2),
+                    nt as u32,
+                );
+            }
+            if self.stop < 10 || self.stop - 10 >= 5 {
+                dtops::toprec2_kernel::launch_unchecked::<R>(
+                    c,
+                    CubeCount::Static((nt as u32).div_ceil(NT), 1, 1),
+                    CubeDim::new_1d(NT),
+                    a(&thdh, nt),
+                    a(&self.top_rec, nt * 8),
+                    a(&tstat, 2),
+                    (pip >> 6) as u32,
+                    nt as u32,
+                );
+            }
         }
-        if self.stop >= 2 {
+        if self.upto(2) {
             self.queue_parents(pip, rankh);
         }
         (SliceBufs { tmh, tsegh, thdh }, tstat)
@@ -2141,7 +2164,7 @@ impl<R: Runtime> GpuJoin<R> {
             let stat = self.mk(vec![0u32; 2]);
             let ns = self.nslab_cap as usize;
             unsafe {
-                if self.stop >= 3 {
+                if self.upto(3) {
                 kernels::g2_kernel::launch_unchecked::<R>(
                     c,
                     CubeCount::Static(*nj, 1, 1),
@@ -2172,7 +2195,7 @@ impl<R: Runtime> GpuJoin<R> {
                     1u32,
                 );
                 }
-                if self.stop >= 5 {
+                if self.upto(5) {
                 post::expand_kernel::launch_unchecked::<R>(
                     c,
                     CubeCount::Static(EXPAND_CUBES, 1, 1),
@@ -2194,7 +2217,7 @@ impl<R: Runtime> GpuJoin<R> {
                     ((pip & 63) as u32) << 24,
                 );
                 }
-                if self.stop >= 6 {
+                if self.upto(6) {
                 check_kernel::launch_unchecked::<R>(
                     c,
                     CubeCount::Static(CHECK_CUBES, 1, 1),
@@ -2202,13 +2225,13 @@ impl<R: Runtime> GpuJoin<R> {
                     a(&self.surv, 2 * self.scap as usize),
                     a(&scount, 1),
                     a(&self.top_rec, nt * 8),
-                    a(&self.nice_out, NICE_CAP as usize * NICE_STRIDE),
+                    a(&self.nice_out, self.caps.nice as usize * NICE_STRIDE),
                     a(&self.nice_count, 1),
                     a(&ran, RAN_WORDS),
                     self.scap,
-                    NICE_CAP,
+                    self.caps.nice,
                     self.check,
-                    crate::cubecl_join::CHECK_HITS,
+                    if self.caps.probe { crate::cubecl_join::CHECK_PROBE } else { crate::cubecl_join::CHECK_HITS },
                     self.ballot,
                 );
                 }
@@ -2223,7 +2246,7 @@ impl<R: Runtime> GpuJoin<R> {
     /// and the survivors the kernel counted = the entries listed = checked.
     fn finish_group(&self, cnt: &Handle, tickets: &[Ticket]) -> Result<DevCounts> {
         cubecl::future::block_on(self.client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
-        if self.stop < 6 {
+        if self.stop != 6 {
             return Ok(DevCounts::default());
         }
         let v = self.rd(cnt)?;
@@ -2276,9 +2299,9 @@ impl<R: Runtime> GpuJoin<R> {
     }
 
     /// The nice numbers the check has written so far, ascending.
-    fn nice(&self) -> Result<Vec<u128>> {
+    pub(crate) fn nice(&self) -> Result<Vec<u128>> {
         let n = self.rd(&self.nice_count)?[0] as usize;
-        ensure!(n <= NICE_CAP as usize, "middle-out: nice output overflow {n}");
+        ensure!(n <= self.caps.nice as usize, "middle-out: nice output overflow {n}");
         let w = self.rd(&self.nice_out)?;
         let mut v: Vec<u128> = (0..n)
             .map(|i| {
@@ -2504,6 +2527,35 @@ mod tests {
         }
         assert_eq!(st.tmask.len(), 238_813);
         assert_eq!(st.tested, 1 << 21);
+    }
+
+    /// Production's check, in its probe mode, rebuilds from our list entries
+    /// and top records exactly the n of the survivors (one class of a slice).
+    #[test]
+    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime)"]
+    fn gpu_check_rebuilds_the_survivors() {
+        let ctx = device().expect("a device");
+        let pip = 712_012_851u64;
+        macro_rules! go {
+            ($client:expr) => {{
+                let caps = Caps { classes: 1, nice: 1 << 19, probe: true, ..Caps::b64(1) };
+                let gj = GpuJoin::new($client, caps).unwrap();
+                let st = slice_tops(pip, gj.roots());
+                let (dc, mut got, _) = gj.run_slice_dev(pip, &st.rank, 1).unwrap();
+                got.sort_unstable();
+                let rebuilt = gj.nice().unwrap();
+                println!("class 0 of slice {pip}: {} survivors, the check rebuilt {}", got.len(), rebuilt.len());
+                assert_eq!(dc.checked, got.len() as u64);
+                assert!(rebuilt == got, "the check's n differ from the survivors");
+            }};
+        }
+        match &ctx {
+            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => go!(client.clone()),
+            #[cfg(feature = "cubecl-cuda")]
+            crate::cubecl_backend::CubeclContext::Cuda { client, .. } => go!(client.clone()),
+            #[allow(unreachable_patterns)]
+            _ => panic!("unsupported runtime"),
+        }
     }
 
     fn device() -> Option<crate::cubecl_backend::CubeclContext> {
