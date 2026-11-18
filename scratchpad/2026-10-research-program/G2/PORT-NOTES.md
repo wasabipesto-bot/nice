@@ -174,6 +174,22 @@ Brief: `G2/PORT-BRIEF.md`. Benchmark ported: `G2/BENCH.md` (kernel v10, ×5.13 o
   3. If the card lands below the model: setup in 32-bit halves (or D as default), 32-bit child masks, the prep's
      64-bit multiplies.
 
+- **2026-11-18 13:06–13:57 UTC, the tuned port on a 3080 (Vast 61250912, host cap 240 W, one session;
+  `BENCH.md` §"Tuned port on CUDA (2026-11-18, Vast 61250912, 240 W)", raw `G2/port/raw/cuda_box3/`):**
+  - **Exact at W = 32 [M]**, `4170a781`, CUDA runtime: both super-units whole, GPU prep, `--tdig 0` and `--tdig 1`,
+    and `--prep2 0` once; sets, counts, records, order, segments, top digits, 0 kernel errors. Fill 1024 is the
+    W = 32 default, so that is proven too. W = 64 still runs nowhere.
+  - **Timing [M], six rotated rounds, medians, fs per admissible n:** v10 1.194, P (`9ff100e6`) 1.621, **A 1.336,
+    D 1.322**. Tuned/v10 = **×1.12 (A), ×1.11 (D)** (P ×1.36); tuning gain ×1.21–1.23. Stable across processes.
+  - **Main, same session: 6.619 fs** (m1 6.629, m2 6.609). Ratios with +0.115 fs tops/checks: v10 ×5.06, P ×3.81, **A ×4.56, D ×4.61**.
+  - **Predictions held** (1.25–1.45 fs; ×1.1–1.3 of v10; D not slower — D is now 1.1 % faster), **except the prep**:
+    0.647 ms against the predicted 0.45–0.6 (P 0.711). Remaining gap to v10: full kernel +0.38 ms (D), prep +0.20 ms.
+  - **Build trap:** two worktrees sharing one `CARGO_TARGET_DIR` gave P = T byte for byte (cargo did not rebuild the
+    other worktree's sources). Build each commit in its own target dir and check binaries by md5 / string.
+- **Next, in order:**
+  1. **The window** with `4170a781`, D as the likely default (it is no longer slower on CUDA either).
+  2. The prep (0.65 ms against cub's 0.45): the largest single CUDA-only gap left that is not inside the kernel.
+
 ## Worktree, branch, build
 
 - **Worktree and branch:**

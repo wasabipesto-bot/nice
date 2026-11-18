@@ -5,6 +5,34 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## G2.9 The tuned port on an RTX 3080: exact at 32 lanes; ×1.11 of hand CUDA; ×4.61 against same-session main (2026-11-18 13:06–13:57 UTC, engineer; `G2/BOX3-BRIEF.md`, `G2/BENCH.md` "Tuned port on CUDA (2026-11-18, Vast 61250912, 240 W)", `G2/port/raw/cuda_box3/`; box 61250912, RTX 3080 capped at 240 W by its host, 1.04 h, ≈ $0.13; a first box, 61250182, was capped at 150 W and destroyed after 5 minutes)
+
+- **Exact at W = 32 on hardware** [M]: head 4170a781, CUDA runtime, GPU prep on, `--tdig 0` and `--tdig 1` on both
+  super-units whole, `--prep2 0` once: 5 runs, ALL CHECKS PASSED (sets, counts, records, order, class segments,
+  top digits, 0 kernel errors).
+- **One session, six rotated rounds, 200-launch medians** [M] (ms; end to end in fs per admissible n):
+
+  | | prep | probes off | full | end to end, median of 6 | against main (6.619 fs; + 0.115 for tops and checks) |
+  |---|---|---|---|---|---|
+  | hand CUDA v10 | 0.445 | 0.671 | 4.886 | 1.1938 | ×5.06 |
+  | pre-tuning port (9ff100e6) | 0.711 | 1.881 | 6.532 | 1.6210 | ×3.81 |
+  | tuned A (`--tdig 0`) | 0.647 | 1.721 | 5.322 | 1.3359 | ×4.56 |
+  | tuned D (`--tdig 1`) | 0.647 | 1.695 | 5.261 | 1.3217 | **×4.61** |
+
+- **Main, same box and session** [M]: production client at 7e0113fc against the local stub, the ten b64 fields
+  twice: 6.629 and 6.609 fs. Production hosts blocked and proven before each run.
+- **The tuning is worth ×1.21–1.23 on CUDA; the port is now ×1.11–1.12 of v10** (was ×1.34–1.36). Stable across
+  processes (no bimodality). The 240 W cap costs 7–8 % against yesterday's 300 W box on v10 and P alike.
+- **G2.6's offline predictions:** end to end 1.25–1.45 fs held (1.32–1.34); ×1.1–1.3 of v10 held; `--tdig 1` no
+  longer slower held (the atomic-load mechanism); full kernel 5.0–5.6 ms held; **the preparation missed**
+  (0.647 ms against 0.45–0.6 predicted).
+- **Remaining gap to v10:** full kernel +0.38 ms, preparation +0.20 ms.
+- **Build trap** [M]: a second worktree built into the same target directory returned the first worktree's
+  binary byte for byte (cargo "finished" in 0.15 s); caught by md5 before any timing. Each commit needs its own
+  target directory (demoux's build of the pre-tuning binary used one, and its md5 differs).
+- **Conclusion:** the portable kernel is ×4.6 against main on NVIDIA at base 64, measured, where the
+  hand-written one is ×5.1.
+
 ## G2.8 G2 above base 64: the counts carry to bases 65–70; the price rests on guesses on both sides (2026-11-18 12:58–13:37 UTC, investigator, ivory CPU only; `G2/BASES-BRIEF.md`, `G2/bases/RESULTS.md`, `NOTES.md`, `proto/` (the prototype with u128 masks and 384-bit integers), `price.py`, `today_wide.py`, `indep.py`, `raw/`)
 
 - **Question (the user's, 2026-11-18):** is G2 only useful at base 64, or at the bases after it too?

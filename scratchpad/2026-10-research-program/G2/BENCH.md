@@ -276,3 +276,89 @@ previous box, and hand CUDA v10 is 1.115 fs here.
   - Exact at W = 32 with `--tdig 0` on both super-units.
 - **Against today's same-session main values** (6.35 and 6.396 fs, not re-run on this box): **×3.93–3.96**,
   counting tops and survivor checks.
+
+## Tuned port on CUDA (2026-11-18, Vast 61250912, 240 W)
+
+RTX 3080 capped at **240 W by its host** (power.limit 240 W, max 366 W, not raisable from inside); 16 threads; driver
+610.57.04, CUDA 12.8 (nvcc V12.8.93), rustc 1.100.0, CubeCL 0.10.0. **One session, 13:06–13:57 UTC; every number in
+this section is from it and from no other box.** Raw: `G2/port/raw/cuda_box3/` (`out/` logs and 100 ms `smi_*.csv`,
+`build_*.log`, `scripts/`).
+
+**Builds (all on the box):** v10 = `bench/g2bench.cu` (`nvcc -O3 -arch=sm_86 -std=c++17 -DKVER=10 -DMINB=3`, md5
+`180d7ac6`); P = port `9ff100e6` (`--features cubecl-cuda`, own target dir, md5 `7e099d7d`); T = tuned port
+`4170a781` (md5 `0b71eb26`; A = `--tdig 0`, D = `--tdig 1`, same binary); main = upstream `7e0113fc`
+`nice_client --features gpu,cubecl-cuda` (md5 `1431dbc1`). Code from GitHub + `port/g2-cubecl-local.bundle`.
+- **Build trap, caught before any timing:** the first P build, in the same `CARGO_TARGET_DIR` as T from a second
+  worktree, "finished in 0.15 s" and produced T's binary byte for byte (identical md5). Cargo's fingerprint did not
+  see the other worktree's sources as changed. P was rebuilt in its own target dir and checked by string (T has the
+  "one root pass" prep message, P does not). One aborted start of round 1 (13:13, during v10) is in `out/runs.log`.
+
+**Exactness at W = 32, tuned head `4170a781`, CUDA runtime: EXACT.** Both super-units (712012851, 391856203), whole
+(4,032 jobs, one launch), GPU prep, `--tdig 0` and `--tdig 1`, plus `--prep2 0` once (su1, tdig 0): every unit's
+survivor set equal to the prototype's, counts equal to the CPU reference in all three modes, the prep's records,
+order, class segments and top digits equal to the CPU's, 0 kernel errors (plane, pmax, slab) — `ALL CHECKS PASSED` in
+all 5 runs (`out/x_*.log`). Fill is 1024 (16-chunk rounds) by default at W = 32, so the default runs are the fill-1024
+proof. This is the first time the tuned 32-lane path ran anywhere.
+
+**Timing:** six rotated rounds (orders v10 P A D / P A D v10 / A D v10 P / D v10 P A, then the first two again), card
+idle before each binary, nothing else running, one `nvidia-smi -lms 100` sampler per binary; super-unit 712012851,
+GPU prep on, 200 launches per mode, per-launch medians; `--no-sets` (counts still checked: every timing run passed).
+
+| (ms; fs per admissible n) | r1 | r2 | r3 | r4 | r5 | r6 | **median** |
+|---|---|---|---|---|---|---|---|
+| **v10** prep (cub) | 0.434 | 0.452 | 0.440 | 0.436 | 0.450 | 0.450 | **0.445** |
+| v10 probes off | 0.665 | 0.669 | 0.669 | 0.673 | 0.674 | 0.675 | 0.671 |
+| v10 full kernel | 4.886 | 4.886 | 4.886 | 4.926 | 4.883 | 4.886 | **4.886** |
+| **v10 end to end, fs** | 1.1907 | 1.1946 | 1.1920 | 1.2003 | 1.1936 | 1.1941 | **1.1938** |
+| **P** (`9ff100e6`) prep | 0.711 | 0.711 | 0.711 | 0.712 | 0.711 | 0.711 | **0.711** |
+| P probes off | 1.953 | 1.884 | 1.870 | 1.865 | 1.879 | 1.984 | 1.881 |
+| P full kernel | 6.485 | 6.572 | 6.536 | 6.519 | 6.585 | 6.528 | **6.532** |
+| **P end to end, fs** | 1.6108 | 1.6302 | 1.6219 | 1.6183 | 1.6330 | 1.6202 | **1.6210** |
+| **A** (`4170a781 --tdig 0`) prep | 0.647 | 0.640 | 0.647 | 0.646 | 0.649 | 0.647 | **0.647** |
+| A probes off | 1.748 | 1.671 | 1.770 | 1.732 | 1.710 | 1.702 | 1.721 |
+| A full kernel | 5.371 | 5.350 | 5.320 | 5.298 | 5.283 | 5.323 | **5.322** |
+| **A end to end, fs** | 1.3470 | 1.3407 | 1.3357 | 1.3303 | 1.3276 | 1.3362 | **1.3359** |
+| **D** (`4170a781 --tdig 1`) prep | 0.648 | 0.645 | 0.648 | 0.646 | 0.645 | 0.647 | **0.647** |
+| D probes off | 1.695 | 1.684 | 1.674 | 1.713 | 1.695 | 1.699 | 1.695 |
+| D full kernel | 5.250 | 5.262 | 5.250 | 5.276 | 5.259 | 5.301 | **5.261** |
+| **D end to end, fs** | 1.3199 | 1.3222 | 1.3199 | 1.3256 | 1.3213 | 1.3314 | **1.3217** |
+
+- **Power and clock while busy** (means over the run's busy samples, 6 rounds): v10 132–172 W, 1.66–1.74 GHz; P
+  186–221 W, 1.66–1.74 GHz; A 184–206 W, 1.53–1.63 GHz; D 181–206 W, 1.55–1.65 GHz. Peaks reach the 240 W cap; the
+  active clock-event reason in every busy sample is 0x4 (SW power cap). Max 66 °C. Nothing throttled below the cap.
+- The CubeCL timings were **stable across processes** (A 1.328–1.347, D 1.320–1.331, P 1.611–1.633 fs): no bimodality.
+- Against yesterday's 300 W box: v10 1.194 against 1.115–1.121 (×1.07), P 1.621 against 1.499 (×1.08). The 240 W cap
+  costs both kinds of kernel about the same, so same-session ratios carry.
+
+**Ratios, same box, same session:**
+
+| | end to end (fs) | / v10 | tuning gain over P | against main (mean of m1/m2, 6.619 fs), +0.115 fs tops and survivor checks |
+|---|---|---|---|---|
+| v10 | 1.1938 | ×1.000 | — | **×5.06** |
+| P (pre-tuning) | 1.6210 | ×1.358 | — | **×3.81** |
+| A (tuned, `--tdig 0`) | 1.3359 | **×1.119** | ×1.213 | **×4.56** |
+| D (tuned, `--tdig 1`) | 1.3217 | **×1.107** | ×1.226 | **×4.61** |
+
+(m1 or m2 alone moves each ratio by at most 0.01.)
+
+**Main on this box, same session:** upstream `7e0113fc` production client, `niceonly --gpu`, against the local stub on
+127.0.0.1:8400 only, B64.1's ten base-64 1e17 fields at 0.05–0.95 plus the 1e14 warm-up (`bench/box/queue_b64.json`,
+`run_main.sh`, unchanged). Production hosts mapped to 127.0.0.1 and ::1 before any client ran, proven at 12:59 and again
+before each main run (curl exit 7 for all four hosts, github 200: `proof_hosts_block.txt`, `out/proof_block_before_m*.txt`).
+Method as before: sum of the client's own "Processed" times.
+- **m1 (13:22–13:37): 841.72 s = 6.629 fs** per admissible n (fields 98.2 116.5 1.1 120.0 1.0 128.6 168.5 1.1 18.8 188.1 s;
+  3 empty).
+- **m2 (13:43–13:57): 839.27 s = 6.609 fs** (98.0 116.1 1.1 119.7 1.0 128.4 167.9 1.1 18.8 187.2 s). **Mean 6.619 fs**,
+  m1/m2 within 0.3 %; 238–239 W mean, 1.70 GHz (5 s samples). Main is ×1.035 slower here than on yesterday's 280 W box (6.396).
+
+**Against today's offline predictions (TUNE-RESULTS.md):**
+- **1.25–1.45 fs: held** (A 1.336, D 1.322), at a 240 W cap that costs about 7 % against the 300 W box the prediction
+  was referenced to (v10 1.194 here against 1.12).
+- **×1.1–1.3 of v10: held, at the low end** (A ×1.12, D ×1.11; was ×1.34 yesterday, ×1.36 for P here).
+- **Full kernel 5.0–5.6 ms: held** (5.26–5.32 ms at 240 W). **Prep 0.45–0.6 ms: missed** (0.647 ms; P 0.711): the
+  one-pass prep saved only 0.06 ms on CUDA.
+- **D no longer slower than A: held.** D is 1.1 % faster (full kernel −0.06 ms, probes off −0.03 ms), the sign the
+  ACO model predicted for the card (setup removed). The +2.8 ms `--tdig 1` penalty is gone, consistent with the
+  3a atomics being its mechanism.
+- **The remaining gap to v10** (D − v10 = 0.57 ms per super-unit): full kernel +0.38 ms, prep +0.20 ms (0.647 against
+  cub's 0.445). The probes-off row is not comparable (nvcc drops v10's transpose and setup there, TUNE-RESULTS B1).

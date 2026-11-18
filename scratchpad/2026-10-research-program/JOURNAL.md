@@ -110,6 +110,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   are ×4.7 at worst, ×7.4–8.8 central, resting on guesses on both sides. b65 0.34–0.58 card-years, b68 3.5–5.4,
   b70 about 94. Disk incident on ivory (another session's build): freed 3.5 GB of mine, BX samples to braize.
 
+- **13:58 UTC: the 3080 box run is back (EXPERIMENTS G2.9; box destroyed after 1.04 h; month $18.43
+  invoiced; credit $60.33):** the tuned port is exact at 32 lanes and measures 1.32 fs, ×1.11 of the
+  hand-written kernel (was ×1.34), **×4.61 against main in the same session**. The offline predictions held
+  except the preparation (0.65 ms against 0.45–0.6). The preparation is the weak spot on both cards.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);
