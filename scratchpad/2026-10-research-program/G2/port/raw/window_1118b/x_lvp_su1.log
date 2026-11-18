@@ -1,0 +1,21 @@
+START x_lvp_su1 14:25:35 dev=card md5=8801a739 su=su64_712012851 args=[--gpu-prep --reps 1 --modes 2]
+loaded 238813 tops, pip 712012851, 1042046 parents; key digits [1, 2, 3, 16, 36, 0, 4, 17]; admissible n in the super-unit 4.4679e12 (0.5s)
+jobs: 128 (0-1:0-63)
+CPU ref (128 jobs): Counts { children: 1068620, chunks: 16761, flat: 7948651, kept: 3924983, surv: 376118 } (0.2s)
+VERIFY cpu: 376118 survivors (0 outside a clipped top), every job unit's set EQUAL to the prototype's
+device: llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan, wgpu<spirv>); plane size min 8 max 8; compiler: SPIR-V (cubecl-spirv)
+fill 512 children per round (8 chunks)
+transpose: shuffle_xor stages
+entries per unit per step: 2
+plane ranks: ballot + popcount
+common masks: from the transpose
+bucket sort: rank <= 256 from shared, 4 per step, else bitonic (rsort 2)
+bucket scan: 1008 threads x 16 (scan 1)
+prep: one root pass + list scatter (list 1042046 of 1042046); zeroing on the device (prep3 1)
+PREP (GPU, 5 launches) median 970.984 ms (1 reps) for 1042046 parents from 9298544 roots: 931805.6 ps per parent; largest bucket 573; order, records, class segments and top digits EQUAL to the CPU's
+MODE full       median 1542.443 ms (1 reps) Counts { children: 1068620, chunks: 16761, flat: 7948651, kept: 3924983, surv: 376118 } lane slots 5635755 errors: plane 0 pmax 0 slab 0
+COUNTS full: EQUAL to the CPU reference
+records 349515 in 2048 slabs (1.08 survivors per record)
+VERIFY full: 376118 survivors (0 outside a clipped top), every job unit's set EQUAL to the prototype's
+ALL CHECKS PASSED
+END x_lvp_su1 14:25:39 rc=0

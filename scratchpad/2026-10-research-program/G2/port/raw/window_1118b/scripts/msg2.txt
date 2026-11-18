@@ -1,0 +1,18 @@
+g2 port: --pipe spreads the counts over buffers a u32 holds; hybrid bucket sort by default
+
+- --pipe K: the units' counters go to ceil(K / kb) buffers, kb the most units a u32 counter holds
+  (about 1,000 on super-unit 712012851), each checked against its units x a single unit's counts;
+  the lane-slot counter wraps and is not compared. The device-timestamp span over K units is dropped
+  (it read 0.016 ms per super-unit against 3.4 ms of wall clock on RADV).
+- --pipe-parts: each component queued min(K, kb) times.
+- --rsort 2 is the default (rank sort from shared memory for buckets <= 256, bitonic above).
+
+The previous commit (1f0754e) was meant to carry this description, cut short by a quoting error:
+its changes are --latency, --prep-prof, --prep3 1 (device-side zeroing, default), --rsort 1/2
+(bitonic / hybrid bucket sort), --scan 1 (1,008-thread bucket scan, default), --pipe K,
+--pipe-parts, --warm and --warm-mode.
+
+Exact on the RX 9070 XT (A and D, both super-units: sets, counts, records' order, class
+segments, top digits; pipelined counts) and on lavapipe at W = 8 (GPU prep, 128 jobs).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

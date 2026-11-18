@@ -190,6 +190,34 @@ Brief: `G2/PORT-BRIEF.md`. Benchmark ported: `G2/BENCH.md` (kernel v10, ×5.13 o
   1. **The window** with `4170a781`, D as the likely default (it is no longer slower on CUDA either).
   2. The prep (0.65 ms against cub's 0.45): the largest single CUDA-only gap left that is not inside the kernel.
 
+- **2026-11-18 13:05–13:33 UTC, the window on the RX 9070 XT** (`G2/port/raw/window_1118/`): exact at W = 64 (A, B,
+  D; both super-units). By the formula D ×3.92, off the operating point; prep 1.84 ms for 0.15–0.45 predicted.
+- **2026-11-18 13:36–14:30 UTC, demoux lease (`G2/WINDOW-RESULTS.md`, raw `G2/port/raw/window_1118b/`):** head
+  **`ef54ed59`** (two commits on `4170a781`; bundle `G2/port/g2-cubecl-demoux.bundle`; ivory's worktree
+  fast-forwarded; `G2/port/g2_cubecl.rs` a copy).
+  - **The window's 1.84 ms prep was device work, 1.14 ms of it the per-bucket rank sort** (n² compares in one cube of
+    64; 178M compares). Now `--rsort 2` (default): cube of 256, rank from shared memory for buckets ≤ 256, bitonic
+    above; `--scan 1` (1,008-thread scan); `--prep3 1` (zeroing on the device, no host upload per preparation).
+    **Prep at the operating point 0.42 ms queued** (root pass ≈ 0.19, sort ≈ 0.17); 0.93 ms synced in the
+    pre-registered runs.
+  - **A launch costs ~0.12 ms synchronised, 7–9 µs queued (host), 1 µs on the device.**
+  - **The card is power-limited under G2:** 2.85 GHz at the 304 W cap (main 3.13 GHz at the same cap). The kernel's
+    time does follow the clock (7.0 ms at a stuck 1.56 GHz state against 3.1 ms).
+  - **Ratios, main base 4.707 fs (fields 2 and 6 re-run: +1.2 %):** pre-registered protocol **D ×4.73** (A ×4.53);
+    warm synced D ×4.84; **pipelined (3,000 super-units queued, buffers reused) D ×5.51** (A ×5.28), at 2.85 GHz,
+    304 W. Above the ×4.0 stop line either way. D is the client's form (−0.17 ms against A, before the probes).
+  - **Exact:** card W = 64, A and D, both super-units, new prep; lavapipe W = 8 (prep + 128 jobs) on demoux.
+  - New options: `--latency N`, `--prep-prof`, `--pipe K` + `--pipe-parts`, `--warm S`, `--warm-mode S`.
+  - Commit `1f0754e8`'s message lost its body to a quoting error (not amended); `ef54ed59`'s message carries it.
+- **Next, in order:**
+  1. The proposal's go (×4.0 passed): the client against option A's wire format, with D's form and the pipelined
+     launch pattern (queue super-units, sync rarely, buffers reused).
+  2. Records are DRAM-write-bound (175 MB per super-unit, 0.32 ms): an 8-byte record would save ≈ 0.15 ms
+     (≈ +4 % ratio) but changes what the survivor checks read.
+  3. The root pass (≈ 0.19 ms at the operating point): the next largest prep item.
+  4. A protocol note for any later card window: warm up with queued work; synced bursts sit off point and a phase of
+     short synced launches can leave RADV's governor at ~1.56 GHz.
+
 ## Worktree, branch, build
 
 - **Worktree and branch:**

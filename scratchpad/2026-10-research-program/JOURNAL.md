@@ -115,6 +115,16 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   hand-written kernel (was ×1.34), **×4.61 against main in the same session**. The offline predictions held
   except the preparation (0.65 ms against 0.45–0.6). The preparation is the weak spot on both cards.
 
+- **14:30 UTC: the demoux engineer is back, and my cross-check agrees (EXPERIMENTS G2.10).** The 1.84 ms
+  preparation was a quadratic per-bucket sort in one small cube; fixed on the card (0.42 ms queued). **D: ×4.73
+  by the pre-registered protocol, ×5.51 pipelined**, at 2.85 GHz and the 304 W cap; exact on both units. My own
+  run at 14:31–14:37: 0.9065 / 0.9090 fs, 0.7682 / 0.7709 (second unit) / 0.7712 fs, main field 6 in 101.44 s.
+  The stop line is cleared on the card. N22's walk candidate (decision 7) is not worth lease time now: it only
+  matters if G2 is declined.
+- **14:38 UTC: the engineer was resumed for one more measurement** (hard stop 16:10): a pipelined run over 8–16
+  distinct real super-units with per-unit input upload and per-unit count checks, since the pipelined number so
+  far queues one unit 3,000 times. Lease ends 17:00; cleanup and the user's ping are mine (reminder 16:25).
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

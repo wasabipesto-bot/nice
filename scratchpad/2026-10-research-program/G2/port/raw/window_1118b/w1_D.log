@@ -1,0 +1,27 @@
+START w1_D 13:52:19 dev=card md5=9a828f5e su=su64_712012851 args=[--gpu-prep --no-sets --reps 2000 --xpose 1 --ept 2 --tdig 1 --rsort 2 --warm 6 --warm-mode 3 --prep-prof]
+loaded 238813 tops, pip 712012851, 1042046 parents; key digits [1, 2, 3, 16, 36, 0, 4, 17]; admissible n in the super-unit 4.4679e12 (0.5s)
+jobs: 4032 (all)
+CPU ref (4032 jobs): Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 123163397, surv: 11768560 } (5.8s)
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+device: AMD Radeon RX 9070 XT (RADV GFX1201) (Vulkan, wgpu<spirv>); plane size min 32 max 64; compiler: SPIR-V (cubecl-spirv)
+fill 1024 children per round (16 chunks)
+transpose: shuffle_xor stages
+entries per unit per step: 2
+plane ranks: ballot + popcount
+common masks: from the transpose
+bucket sort: rank <= 256 from shared, 4 per step, else bitonic (rsort 2)
+bucket scan: 1008 threads x 16 (scan 1)
+PREPPROF (prep3 1, 200 reps, µs medians, launch synced alone wall/device): tdig 137.1/17.9 hist 459.7/340.3 scan 289.7/29.3 scatter 194.7/76.1 rsort 427.8/301.1; chain of 5 device 768.0; 200 chains queued, one sync, per chain 787.9
+prep: one root pass + list scatter (list 1042046 of 1042046); zeroing on the device (prep3 1)
+PREP (GPU, 5 launches) median 0.760 ms (2000 reps) for 1042046 parents from 9298544 roots: 729.5 ps per parent; largest bucket 573; order, records, class segments and top digits EQUAL to the CPU's
+BUCKETS 16128: sum n^2 178116304, sum ceil(n/64)*n 3328583; by size <8,<16,<32,<64,<128,<256,<512,>=512: [2333, 2239, 3276, 2694, 3321, 1771, 460, 34]
+MODE probes off median 3.396 ms (2000 reps) Counts { children: 33705647, chunks: 528635, flat: 0, kept: 0, surv: 0 } lane slots 0 errors: plane 0 pmax 0 slab 0
+COUNTS probes off: EQUAL to the CPU reference
+MODE skip off   median 7.437 ms (2000 reps) Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 250486772, surv: 11768560 } lane slots 250486772 errors: plane 0 pmax 0 slab 0
+COUNTS skip off: EQUAL to the CPU reference
+MODE full       median 7.044 ms (2000 reps) Counts { children: 33705647, chunks: 528635, flat: 250486772, kept: 123163397, surv: 11768560 } lane slots 203564717 errors: plane 0 pmax 0 slab 0
+COUNTS full: EQUAL to the CPU reference
+RESULT ps per child 100.76; ps per kept word all-in 29.62; kernel full 1.5767 fs per admissible n (scaled by jobs/4032)
+RESULT end-to-end (GPU prep + full) 7.805 ms = 1.7468 fs per admissible n (tops and survivor checks not included)
+ALL CHECKS PASSED
+END w1_D 13:53:25 rc=0

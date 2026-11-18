@@ -980,6 +980,310 @@ mod prep {
         }
     }
 
+    /// --rsort 1: one cube of 256 per bucket; a bitonic sort of the bucket's
+    /// (r4, index) pairs in shared memory (padded to a power of two with keys above every r4), then a gather of the
+    /// records into r4 order: n log^2 n steps instead of the rank sort's n^2 compares, whose largest buckets
+    /// (34 of 16,128 hold >= 512 parents, 178M compares in all) cost 1.14 ms on the RX 9070 XT. r4s are distinct
+    /// within a bucket, so the order is the CPU's stable order exactly. Buckets over 2,048 fall back to the rank sort
+    /// from global memory.
+    #[cube(launch_unchecked)]
+    pub fn bsort_kernel(off: &Array<u32>, hist: &Array<u32>, tmp: &Array<u32>, rec: &mut Array<u32>) {
+        let mut sk = SharedMemory::<u32>::new(2048usize);
+        let mut si = SharedMemory::<u32>::new(2048usize);
+        let k = CUBE_POS_X;
+        let t = UNIT_POS_X;
+        let b0 = off[k as usize];
+        let n = hist[k as usize];
+        if n <= 2048u32 {
+            let mut p = 2u32;
+            while p < n {
+                p *= 2u32;
+            }
+            let mut i = t;
+            while i < p {
+                let mut key = 0xFFFF_FFFFu32;
+                if i < n {
+                    key = tmp[(4u32 * (b0 + i) + 3u32) as usize];
+                }
+                sk[i as usize] = key;
+                si[i as usize] = i;
+                i += 256u32;
+            }
+            sync_cube();
+            let mut kk = 2u32;
+            while kk <= p {
+                let mut j = kk / 2u32;
+                while j > 0u32 {
+                    let mut i = t;
+                    while i < p {
+                        let l = i ^ j;
+                        if l > i {
+                            let a = sk[i as usize];
+                            let b = sk[l as usize];
+                            let up = (i & kk) == 0u32;
+                            if (a > b) == up {
+                                let ia = si[i as usize];
+                                let ib = si[l as usize];
+                                sk[i as usize] = b;
+                                sk[l as usize] = a;
+                                si[i as usize] = ib;
+                                si[l as usize] = ia;
+                            }
+                        }
+                        i += 256u32;
+                    }
+                    sync_cube();
+                    j /= 2u32;
+                }
+                kk *= 2u32;
+            }
+            let mut i = t;
+            while i < n {
+                let src = 4u32 * (b0 + si[i as usize]);
+                let dst = 4u32 * (b0 + i);
+                rec[dst as usize] = tmp[src as usize];
+                rec[(dst + 1u32) as usize] = tmp[(src + 1u32) as usize];
+                rec[(dst + 2u32) as usize] = tmp[(src + 2u32) as usize];
+                rec[(dst + 3u32) as usize] = tmp[(src + 3u32) as usize];
+                i += 256u32;
+            }
+        } else {
+            let mut i = t;
+            while i < n {
+                let mine = tmp[(4u32 * (b0 + i) + 3u32) as usize];
+                let mut rk = 0u32;
+                for j in 0..n {
+                    rk += select(tmp[(4u32 * (b0 + j) + 3u32) as usize] < mine, 1u32, 0u32);
+                }
+                let dst = 4u32 * (b0 + rk);
+                let src = 4u32 * (b0 + i);
+                rec[dst as usize] = tmp[src as usize];
+                rec[(dst + 1u32) as usize] = tmp[(src + 1u32) as usize];
+                rec[(dst + 2u32) as usize] = tmp[(src + 2u32) as usize];
+                rec[(dst + 3u32) as usize] = mine;
+                i += 256u32;
+            }
+        }
+    }
+
+    /// --rsort 2: one cube of 256 per bucket; buckets of at most RS2 (comptime 256) parents by rank (each thread one
+    /// record, the bucket's r4s read from shared memory four at a time, padded with keys above every r4), larger
+    /// ones by the bitonic sort of `bsort_kernel`'s form.
+    #[cube(launch_unchecked)]
+    pub fn hsort_kernel(off: &Array<u32>, hist: &Array<u32>, tmp: &Array<u32>, rec: &mut Array<u32>) {
+        let mut sk = SharedMemory::<u32>::new(2048usize);
+        let mut si = SharedMemory::<u32>::new(2048usize);
+        let k = CUBE_POS_X;
+        let t = UNIT_POS_X;
+        let b0 = off[k as usize];
+        let n = hist[k as usize];
+        if n <= 256u32 {
+            let n4 = (n + 3u32) & 0xFFFF_FFFCu32;
+            let mut mine = 0xFFFF_FFFFu32;
+            if t < n {
+                mine = tmp[(4u32 * (b0 + t) + 3u32) as usize];
+            }
+            if t < n4 {
+                sk[t as usize] = mine;
+            }
+            sync_cube();
+            if t < n {
+                let mut r0 = 0u32;
+                let mut r1 = 0u32;
+                let mut r2 = 0u32;
+                let mut r3 = 0u32;
+                let mut j = 0u32;
+                while j < n4 {
+                    r0 += select(sk[j as usize] < mine, 1u32, 0u32);
+                    r1 += select(sk[(j + 1u32) as usize] < mine, 1u32, 0u32);
+                    r2 += select(sk[(j + 2u32) as usize] < mine, 1u32, 0u32);
+                    r3 += select(sk[(j + 3u32) as usize] < mine, 1u32, 0u32);
+                    j += 4u32;
+                }
+                let rk = r0 + r1 + r2 + r3;
+                let dst = 4u32 * (b0 + rk);
+                let src = 4u32 * (b0 + t);
+                rec[dst as usize] = tmp[src as usize];
+                rec[(dst + 1u32) as usize] = tmp[(src + 1u32) as usize];
+                rec[(dst + 2u32) as usize] = tmp[(src + 2u32) as usize];
+                rec[(dst + 3u32) as usize] = mine;
+            }
+        } else if n <= 2048u32 {
+            let mut p = 2u32;
+            while p < n {
+                p *= 2u32;
+            }
+            let mut i = t;
+            while i < p {
+                let mut key = 0xFFFF_FFFFu32;
+                if i < n {
+                    key = tmp[(4u32 * (b0 + i) + 3u32) as usize];
+                }
+                sk[i as usize] = key;
+                si[i as usize] = i;
+                i += 256u32;
+            }
+            sync_cube();
+            let mut kk = 2u32;
+            while kk <= p {
+                let mut j = kk / 2u32;
+                while j > 0u32 {
+                    let mut i = t;
+                    while i < p {
+                        let l = i ^ j;
+                        if l > i {
+                            let a = sk[i as usize];
+                            let b = sk[l as usize];
+                            let up = (i & kk) == 0u32;
+                            if (a > b) == up {
+                                let ia = si[i as usize];
+                                let ib = si[l as usize];
+                                sk[i as usize] = b;
+                                sk[l as usize] = a;
+                                si[i as usize] = ib;
+                                si[l as usize] = ia;
+                            }
+                        }
+                        i += 256u32;
+                    }
+                    sync_cube();
+                    j /= 2u32;
+                }
+                kk *= 2u32;
+            }
+            let mut i = t;
+            while i < n {
+                let src = 4u32 * (b0 + si[i as usize]);
+                let dst = 4u32 * (b0 + i);
+                rec[dst as usize] = tmp[src as usize];
+                rec[(dst + 1u32) as usize] = tmp[(src + 1u32) as usize];
+                rec[(dst + 2u32) as usize] = tmp[(src + 2u32) as usize];
+                rec[(dst + 3u32) as usize] = tmp[(src + 3u32) as usize];
+                i += 256u32;
+            }
+        } else {
+            let mut i = t;
+            while i < n {
+                let mine = tmp[(4u32 * (b0 + i) + 3u32) as usize];
+                let mut rk = 0u32;
+                for j in 0..n {
+                    rk += select(tmp[(4u32 * (b0 + j) + 3u32) as usize] < mine, 1u32, 0u32);
+                }
+                let dst = 4u32 * (b0 + rk);
+                let src = 4u32 * (b0 + i);
+                rec[dst as usize] = tmp[src as usize];
+                rec[(dst + 1u32) as usize] = tmp[(src + 1u32) as usize];
+                rec[(dst + 2u32) as usize] = tmp[(src + 2u32) as usize];
+                rec[(dst + 3u32) as usize] = mine;
+                i += 256u32;
+            }
+        }
+    }
+
+    /// --scan 1 (default since 2026-11-18): the scan of `scan_kernel` with 1,008 threads of 16 buckets each (63 x 16
+    /// = 1,008 x 16 = 16,128) instead of 256 of 63: the single cube's serial chain is 4x shorter.
+    #[cube(launch_unchecked)]
+    pub fn scan16_kernel(hist: &Array<u32>, off: &mut Array<u32>, cur: &mut Array<Atomic<u32>>, pseg: &mut Array<u32>) {
+        let mut sums = SharedMemory::<u32>::new(1024usize);
+        let t = UNIT_POS_X;
+        let mut local = 0u32;
+        if t < 1008u32 {
+            for j in 0..16u32 {
+                local += hist[(t * 16u32 + j) as usize];
+            }
+        }
+        sums[t as usize] = local;
+        sync_cube();
+        let mut step = 1u32;
+        while step < 1024u32 {
+            let mut v = sums[t as usize];
+            if t >= step {
+                v += sums[(t - step) as usize];
+            }
+            sync_cube();
+            sums[t as usize] = v;
+            sync_cube();
+            step *= 2u32;
+        }
+        if t < 1008u32 {
+            let mut run = sums[t as usize] - local;
+            for j in 0..16u32 {
+                let k = t * 16u32 + j;
+                off[k as usize] = run;
+                cur[k as usize].store(run);
+                if k % 256u32 == 0u32 {
+                    pseg[(k / 256u32) as usize] = run;
+                }
+                run += hist[k as usize];
+            }
+            if t == 1007u32 {
+                pseg[63usize] = run;
+            }
+        }
+    }
+
+    /// --pipe-parts: zero one word (the slab counter between queued launches of a mode with records).
+    #[cube(launch_unchecked)]
+    pub fn zero1_kernel(a: &mut Array<u32>) {
+        if ABSOLUTE_POS_X == 0u32 {
+            a[0usize] = 0u32;
+        }
+    }
+
+    /// --latency: a trivial kernel (one store), to price a launch and a synchronisation on the runtime.
+    #[cube(launch_unchecked)]
+    pub fn lat1_kernel(a: &mut Array<u32>) {
+        if ABSOLUTE_POS_X == 0u32 {
+            a[0usize] = a[0usize] + 1u32;
+        }
+    }
+
+    /// --latency: the same with 12 storage bindings (the main kernel has 11 arrays), to see what bindings cost.
+    #[cube(launch_unchecked)]
+    pub fn lat12_kernel(
+        a: &mut Array<u32>, b0: &Array<u32>, b1: &Array<u32>, b2: &Array<u32>, b3: &Array<u32>, b4: &Array<u32>,
+        b5: &Array<u32>, b6: &Array<u32>, b7: &Array<u32>, b8: &Array<u32>, b9: &Array<u32>, b10: &Array<u32>,
+    ) {
+        if ABSOLUTE_POS_X == 0u32 {
+            a[0usize] = a[0usize] + b0[0usize] + b1[0usize] + b2[0usize] + b3[0usize] + b4[0usize] + b5[0usize]
+                + b6[0usize] + b7[0usize] + b8[0usize] + b9[0usize] + b10[0usize];
+        }
+    }
+
+    /// --prep3 1 (default since 2026-11-18 on demoux): the top digits plus the zeroing that the host used to do by
+    /// uploading fresh buffers every super-unit (the 16,128 bucket counts, the list count, and for the pipelined
+    /// protocol the slab counter): no host write between super-units. Launched over max(ntops, 16128) threads.
+    #[cube(launch_unchecked)]
+    pub fn tdigz_kernel(tmask: &Array<u64>, tdig: &mut Array<u32>, hist: &mut Array<u32>, lcnt: &mut Array<u32>, slabn: &mut Array<u32>, ntops: u32) {
+        let i = ABSOLUTE_POS_X;
+        if i < 16128u32 {
+            hist[i as usize] = 0u32;
+        }
+        if i == 0u32 {
+            lcnt[0usize] = 0u32;
+            slabn[0usize] = 0u32;
+        }
+        if i < ntops {
+            let mut x = tmask[i as usize];
+            let first = x.trailing_zeros();
+            let mut dw = Array::<u32>::new(4usize);
+            #[unroll]
+            for k in 0..4u32 {
+                dw[k as usize] = 0u32;
+            }
+            #[unroll]
+            for k in 0..20u32 {
+                let v = select(x != 0u64, x.trailing_zeros(), first);
+                x &= x - select(x != 0u64, 1u64, 0u64);
+                dw[comptime!(k / 5) as usize] |= v << comptime!(6 * (k % 5));
+            }
+            #[unroll]
+            for k in 0..4u32 {
+                tdig[(i * 4u32 + k) as usize] = dw[k as usize];
+            }
+        }
+    }
+
     /// Each top's digits once per super-unit: 20 6-bit fields in 4 words, padded with the first digit.
     #[cube(launch_unchecked)]
     pub fn tdig_kernel(tmask: &Array<u64>, tdig: &mut Array<u32>, ntops: u32) {
@@ -1528,6 +1832,98 @@ fn run_gpu<R: Runtime>(
     };
     chk("init");
     let mk = |v: Vec<u32>| client.create(cubecl::bytes::Bytes::from_elems(v));
+    let sync = || cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"));
+    let med = |v: &mut Vec<f64>| -> f64 {
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        v[v.len() / 2]
+    };
+    // --latency N: the fixed cost of a launch and of a synchronisation on this runtime (2026-11-18, demoux): trivial
+    // kernels (one cube of 64, one store), with 1 and with 12 storage bindings; synced after every launch, and N
+    // launches queued with one synchronisation; and the device's own time for one launch (timestamp queries)
+    if let Some(nl) = opt("--latency") {
+        let nl: usize = nl.parse()?;
+        let a = mk(vec![0u32; 16]);
+        let bs: Vec<_> = (0..11).map(|_| mk(vec![1u32; 16])).collect();
+        let l1 = || unsafe {
+            prep::lat1_kernel::launch_unchecked::<R>(&client, CubeCount::Static(1, 1, 1), CubeDim::new_1d(64), ArrayArg::from_raw_parts(a.clone(), 16));
+        };
+        let l12 = || unsafe {
+            let b = |i: usize| ArrayArg::from_raw_parts(bs[i].clone(), 16);
+            prep::lat12_kernel::launch_unchecked::<R>(
+                &client, CubeCount::Static(1, 1, 1), CubeDim::new_1d(64), ArrayArg::from_raw_parts(a.clone(), 16),
+                b(0), b(1), b(2), b(3), b(4), b(5), b(6), b(7), b(8), b(9), b(10),
+            );
+        };
+        // warm: compile both, then 0.5 s of synced launches
+        l1();
+        l12();
+        sync()?;
+        let tw = Instant::now();
+        while tw.elapsed().as_secs_f64() < 0.5 {
+            l1();
+            sync()?;
+        }
+        let mut e = Vec::new();
+        for _ in 0..nl {
+            let t = Instant::now();
+            sync()?;
+            e.push(t.elapsed().as_secs_f64());
+        }
+        let mut s1 = Vec::new();
+        let mut s12 = Vec::new();
+        for _ in 0..nl {
+            let t = Instant::now();
+            l1();
+            sync()?;
+            s1.push(t.elapsed().as_secs_f64());
+            let t = Instant::now();
+            l12();
+            sync()?;
+            s12.push(t.elapsed().as_secs_f64());
+        }
+        let t = Instant::now();
+        for _ in 0..nl {
+            l1();
+        }
+        sync()?;
+        let q1 = t.elapsed().as_secs_f64() / nl as f64;
+        let t = Instant::now();
+        for _ in 0..nl {
+            l12();
+        }
+        sync()?;
+        let q12 = t.elapsed().as_secs_f64() / nl as f64;
+        let mut d1 = Vec::new();
+        let mut d12 = Vec::new();
+        let mut dq = Vec::new();
+        let mut method = String::new();
+        for _ in 0..nl.min(200) {
+            let (_, d) = client.profile(l1, "lat1").map_err(|e| anyhow!("profile: {e:?}"))?;
+            method = format!("{:?}", d.timing_method());
+            d1.push(cubecl::future::block_on(d.resolve()).duration().as_secs_f64());
+            let (_, d) = client.profile(l12, "lat12").map_err(|e| anyhow!("profile: {e:?}"))?;
+            d12.push(cubecl::future::block_on(d.resolve()).duration().as_secs_f64());
+            let (_, d) = client
+                .profile(
+                    || {
+                        for _ in 0..64 {
+                            l12();
+                        }
+                    },
+                    "lat12x64",
+                )
+                .map_err(|e| anyhow!("profile: {e:?}"))?;
+            dq.push(cubecl::future::block_on(d.resolve()).duration().as_secs_f64() / 64.0);
+        }
+        println!(
+            "LATENCY ({nl} each, µs medians) empty sync {:.1}; launch+sync: 1 binding {:.1}, 12 bindings {:.1}; queued (N launches, one sync) per launch: 1 binding {:.2}, 12 bindings {:.2}; device ({method}) one launch: 1 binding {:.2}, 12 bindings {:.2}, 64 queued per launch {:.2}",
+            med(&mut e) * 1e6, med(&mut s1) * 1e6, med(&mut s12) * 1e6, q1 * 1e6, q12 * 1e6,
+            med(&mut d1) * 1e6, med(&mut d12) * 1e6, med(&mut dq) * 1e6
+        );
+        if args.iter().any(|a| a == "--latency-only") {
+            return Ok(());
+        }
+    }
     let mut all_prep_bad = false;
     // parent records (mask lo, mask hi, cacc, r4) and each top's digit words, as the GPU preparation makes them
     let rec_host: Vec<u32> = inp
@@ -1585,13 +1981,134 @@ fn run_gpu<R: Runtime>(
         let off = client.empty(16128 * 4);
         let curh = client.empty(16128 * 4);
         let g_pseg = client.empty(64 * 4);
+        // --prep3 1 (default, 2026-11-18): the first launch also zeroes the bucket counts, the list count and the
+        // pipelined protocol's slab counter, so a super-unit's preparation needs no host write; 0 = the window's
+        // form (fresh zeroed buffers uploaded by the host before every preparation)
+        let prep3: u32 = opt("--prep3").map_or(Ok(1), |s| s.parse())?;
+        // --rsort 2 (default): rank sort from shared memory for buckets <= 256, bitonic above; 1 = bitonic for all; 0 = the
+        // window's rank sort (one cube of 64 per bucket, n^2 compares: 1.14 ms of the 1.84 ms on the RX 9070 XT)
+        let rsort: u32 = opt("--rsort").map_or(Ok(2), |s| s.parse())?;
+        println!("bucket sort: {}", ["rank sort (rsort 0)", "bitonic in shared memory (rsort 1)", "rank <= 256 from shared, 4 per step, else bitonic (rsort 2)"][rsort.min(2) as usize]);
+        let scan16: u32 = opt("--scan").map_or(Ok(1), |s| s.parse())?;
+        println!("bucket scan: {}", if scan16 == 1 { "1008 threads x 16 (scan 1)" } else { "256 threads x 63 (scan 0)" });
+        let slabz = mk(vec![0u32; 1]);
         let mut tv = Vec::new();
         let mut histh = mk(vec![0u32; 16128]);
         let pburst = args.iter().any(|a| a == "--burst");
         let mut pt0: Option<Instant> = None;
+        let cubes = nroots.div_ceil(NT);
+        // launch k of the preparation's five: 0 top digits (+ zeroing with --prep3 1), 1 histogram (+ list), 2 scan,
+        // 3 scatter, 4 rank sort per bucket
+        let launch_prep = |k: usize, histh: &cubecl::server::Handle, lcnt: &cubecl::server::Handle| unsafe {
+            match k {
+                0 => {
+                    if prep3 == 1 {
+                        prep::tdigz_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static((ntops as u32).max(16128).div_ceil(NT), 1, 1), CubeDim::new_1d(NT),
+                            ArrayArg::from_raw_parts(tmask.clone(), ntops), ArrayArg::from_raw_parts(g_tdig.clone(), ntops * 4),
+                            ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(lcnt.clone(), 1),
+                            ArrayArg::from_raw_parts(slabz.clone(), 1), ntops as u32,
+                        );
+                    } else {
+                        prep::tdig_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static((ntops as u32).div_ceil(NT), 1, 1), CubeDim::new_1d(NT),
+                            ArrayArg::from_raw_parts(tmask.clone(), ntops), ArrayArg::from_raw_parts(g_tdig.clone(), ntops * 4),
+                            ntops as u32,
+                        );
+                    }
+                }
+                1 => {
+                    if prep2 == 1 {
+                        prep::hist2_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
+                            ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
+                            ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(g_lst.clone(), npar),
+                            ArrayArg::from_raw_parts(g_lkey.clone(), npar), ArrayArg::from_raw_parts(lcnt.clone(), 1),
+                            nroots, inp.pip as u32, (inp.pip >> 32) as u32, npar as u32, w,
+                        );
+                    } else {
+                        prep::hist_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
+                            ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
+                            ArrayArg::from_raw_parts(histh.clone(), 16128), nroots, inp.pip as u32, (inp.pip >> 32) as u32,
+                        );
+                    }
+                }
+                2 => {
+                    if scan16 == 1 {
+                        prep::scan16_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static(1, 1, 1), CubeDim::new_1d(1024),
+                            ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(off.clone(), 16128),
+                            ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_pseg.clone(), 64),
+                        );
+                    } else {
+                        prep::scan_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static(1, 1, 1), CubeDim::new_1d(256),
+                            ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(off.clone(), 16128),
+                            ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_pseg.clone(), 64),
+                        );
+                    }
+                }
+                3 => {
+                    if prep2 == 1 {
+                        prep::scatter2_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static((npar as u32).div_ceil(NT), 1, 1), CubeDim::new_1d(NT),
+                            ArrayArg::from_raw_parts(g_lst.clone(), npar), ArrayArg::from_raw_parts(g_lkey.clone(), npar),
+                            ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4),
+                            npar as u32,
+                        );
+                    } else {
+                        prep::scatter_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
+                            ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
+                            ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4),
+                            nroots, inp.pip as u32, (inp.pip >> 32) as u32,
+                        );
+                    }
+                }
+                _ => {
+                    if rsort == 2 {
+                        prep::hsort_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static(16128, 1, 1), CubeDim::new_1d(256),
+                            ArrayArg::from_raw_parts(off.clone(), 16128), ArrayArg::from_raw_parts(histh.clone(), 16128),
+                            ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4), ArrayArg::from_raw_parts(g_rec.clone(), npar * 4),
+                        );
+                    } else if rsort == 1 {
+                        prep::bsort_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static(16128, 1, 1), CubeDim::new_1d(256),
+                            ArrayArg::from_raw_parts(off.clone(), 16128), ArrayArg::from_raw_parts(histh.clone(), 16128),
+                            ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4), ArrayArg::from_raw_parts(g_rec.clone(), npar * 4),
+                        );
+                    } else {
+                        prep::rsort_kernel::launch_unchecked::<R>(
+                            &client, CubeCount::Static(16128, 1, 1), CubeDim::new_1d(64),
+                            ArrayArg::from_raw_parts(off.clone(), 16128), ArrayArg::from_raw_parts(histh.clone(), 16128),
+                            ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4), ArrayArg::from_raw_parts(g_rec.clone(), npar * 4),
+                        );
+                    }
+                }
+            }
+        };
+        // --warm S (2026-11-18): S seconds of preparations queued in groups of 16 (untimed) before the timed reps
+        let warm: f64 = opt("--warm").map_or(Ok(0.0), |s| s.parse())?;
+        let tw = Instant::now();
+        while tw.elapsed().as_secs_f64() < warm {
+            for _ in 0..16 {
+                if prep3 == 0 {
+                    histh = mk(vec![0u32; 16128]);
+                    lcnt = mk(vec![0u32; 1]);
+                }
+                for k in 0..5 {
+                    launch_prep(k, &histh, &lcnt);
+                }
+            }
+            sync()?;
+        }
         for prep_rep in 0..reps.max(1) {
-            histh = mk(vec![0u32; 16128]);
-            lcnt = mk(vec![0u32; 1]);
+            if prep3 == 0 {
+                histh = mk(vec![0u32; 16128]);
+                lcnt = mk(vec![0u32; 1]);
+            }
             if !pburst || prep_rep == 0 {
                 cubecl::future::block_on(client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
             }
@@ -1599,55 +2116,8 @@ fn run_gpu<R: Runtime>(
             if pt0.is_none() {
                 pt0 = Some(tl);
             }
-            let cubes = nroots.div_ceil(NT);
-            unsafe {
-                prep::tdig_kernel::launch_unchecked::<R>(
-                    &client, CubeCount::Static((ntops as u32).div_ceil(NT), 1, 1), CubeDim::new_1d(NT),
-                    ArrayArg::from_raw_parts(tmask.clone(), ntops), ArrayArg::from_raw_parts(g_tdig.clone(), ntops * 4),
-                    ntops as u32,
-                );
-                if prep2 == 1 {
-                    prep::hist2_kernel::launch_unchecked::<R>(
-                        &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
-                        ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
-                        ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(g_lst.clone(), npar),
-                        ArrayArg::from_raw_parts(g_lkey.clone(), npar), ArrayArg::from_raw_parts(lcnt.clone(), 1),
-                        nroots, inp.pip as u32, (inp.pip >> 32) as u32, npar as u32, w,
-                    );
-                } else {
-                    prep::hist_kernel::launch_unchecked::<R>(
-                        &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
-                        ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
-                        ArrayArg::from_raw_parts(histh.clone(), 16128), nroots, inp.pip as u32, (inp.pip >> 32) as u32,
-                    );
-                }
-                prep::scan_kernel::launch_unchecked::<R>(
-                    &client, CubeCount::Static(1, 1, 1), CubeDim::new_1d(256),
-                    ArrayArg::from_raw_parts(histh.clone(), 16128), ArrayArg::from_raw_parts(off.clone(), 16128),
-                    ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_pseg.clone(), 64),
-                );
-                if prep2 == 1 {
-                    // (the host knows npar from its own prep here; a client would launch for the list's capacity
-                    // and read the count on the device)
-                    prep::scatter2_kernel::launch_unchecked::<R>(
-                        &client, CubeCount::Static((npar as u32).div_ceil(NT), 1, 1), CubeDim::new_1d(NT),
-                        ArrayArg::from_raw_parts(g_lst.clone(), npar), ArrayArg::from_raw_parts(g_lkey.clone(), npar),
-                        ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4),
-                        npar as u32,
-                    );
-                } else {
-                    prep::scatter_kernel::launch_unchecked::<R>(
-                        &client, CubeCount::Static(cubes, 1, 1), CubeDim::new_1d(NT),
-                        ArrayArg::from_raw_parts(r4h.clone(), nroots as usize), ArrayArg::from_raw_parts(rankh.clone(), 8),
-                        ArrayArg::from_raw_parts(curh.clone(), 16128), ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4),
-                        nroots, inp.pip as u32, (inp.pip >> 32) as u32,
-                    );
-                }
-                prep::rsort_kernel::launch_unchecked::<R>(
-                    &client, CubeCount::Static(16128, 1, 1), CubeDim::new_1d(64),
-                    ArrayArg::from_raw_parts(off.clone(), 16128), ArrayArg::from_raw_parts(histh.clone(), 16128),
-                    ArrayArg::from_raw_parts(g_tmp.clone(), npar * 4), ArrayArg::from_raw_parts(g_rec.clone(), npar * 4),
-                );
+            for k in 0..5 {
+                launch_prep(k, &histh, &lcnt);
             }
             if pburst {
                 if prep_rep + 1 == reps.max(1) {
@@ -1661,6 +2131,249 @@ fn run_gpu<R: Runtime>(
         }
         tv.sort_by(|a, b| a.partial_cmp(b).unwrap());
         prep_secs = tv[tv.len() / 2];
+        // --prep-prof: each of the five launches synced on its own (wall clock), and by the device's timestamps; the
+        // chain of five by the device; and N chains queued with one synchronisation
+        if args.iter().any(|a| a == "--prep-prof") {
+            let n = reps.clamp(1, 200);
+            let fresh = |h: &mut cubecl::server::Handle, l: &mut cubecl::server::Handle| {
+                if prep3 == 0 {
+                    *h = mk(vec![0u32; 16128]);
+                    *l = mk(vec![0u32; 1]);
+                }
+            };
+            let mut wall = vec![Vec::new(); 5];
+            let mut dev = vec![Vec::new(); 5];
+            let mut chain = Vec::new();
+            for _ in 0..n {
+                fresh(&mut histh, &mut lcnt);
+                sync()?;
+                for k in 0..5 {
+                    let t = Instant::now();
+                    launch_prep(k, &histh, &lcnt);
+                    sync()?;
+                    wall[k].push(t.elapsed().as_secs_f64());
+                }
+            }
+            for _ in 0..n {
+                fresh(&mut histh, &mut lcnt);
+                sync()?;
+                for k in 0..5 {
+                    let (_, d) = client.profile(|| launch_prep(k, &histh, &lcnt), "prep").map_err(|e| anyhow!("profile: {e:?}"))?;
+                    dev[k].push(cubecl::future::block_on(d.resolve()).duration().as_secs_f64());
+                }
+                fresh(&mut histh, &mut lcnt);
+                sync()?;
+                let (_, d) = client
+                    .profile(
+                        || {
+                            for k in 0..5 {
+                                launch_prep(k, &histh, &lcnt);
+                            }
+                        },
+                        "chain",
+                    )
+                    .map_err(|e| anyhow!("profile: {e:?}"))?;
+                chain.push(cubecl::future::block_on(d.resolve()).duration().as_secs_f64());
+            }
+            sync()?;
+            let t = Instant::now();
+            for _ in 0..n {
+                fresh(&mut histh, &mut lcnt);
+                for k in 0..5 {
+                    launch_prep(k, &histh, &lcnt);
+                }
+            }
+            sync()?;
+            let q = t.elapsed().as_secs_f64() / n as f64;
+            let pn = ["tdig", "hist", "scan", "scatter", "rsort"];
+            let mut s = String::new();
+            for k in 0..5 {
+                s += &format!(" {} {:.1}/{:.1}", pn[k], med(&mut wall[k]) * 1e6, med(&mut dev[k]) * 1e6);
+            }
+            println!(
+                "PREPPROF (prep3 {prep3}, {n} reps, µs medians, launch synced alone wall/device):{s}; chain of 5 device {:.1}; {n} chains queued, one sync, per chain {:.1}",
+                med(&mut chain) * 1e6,
+                q * 1e6
+            );
+        }
+        // --pipe K: the production-like protocol. K super-units' preparation (5 launches) and main kernel (full mode,
+        // records unless --noout) queued back to back with one synchronisation; every buffer allocated once and
+        // reused (the first launch zeroes the per-super-unit counters, --prep3 1). The counts accumulate in one
+        // buffer and must equal K times those of a single super-unit run the same way, which must equal the CPU
+        // reference. --warm S: S seconds of the same work before (untimed) so the card is at its operating point.
+        // Not included (a client would have them): the host's upload of each super-unit's tops (1.9 MB) and the
+        // consumers of the records (the survivor checks, priced separately by the window's formula).
+        if let Some(kp) = opt("--pipe") {
+            let kp: usize = kp.parse()?;
+            if prep3 != 1 || batches.len() != 1 || jobs.len() != 4032 {
+                bail!("--pipe needs --prep3 1, the whole super-unit and one launch (--batch 4032)");
+            }
+            let warm: f64 = opt("--warm").map_or(Ok(0.0), |s| s.parse())?;
+            let launch_main = |cnt: &cubecl::server::Handle, mode: u32, mnoout: bool| unsafe {
+                macro_rules! go {
+                    ($m:expr, $no:expr) => {
+                        kernels::g2_kernel::launch_unchecked::<R>(
+                            &client,
+                            CubeCount::Static(4032, 1, 1),
+                            CubeDim::new_1d(NT),
+                            ArrayArg::from_raw_parts(g_rec.clone(), inp.par.len()),
+                            ArrayArg::from_raw_parts(g_pseg.clone(), 64),
+                            ArrayArg::from_raw_parts(tmask_k.clone(), inp.ts.len()),
+                            ArrayArg::from_raw_parts(g_tdig.clone(), inp.ts.len() * 4),
+                            ArrayArg::from_raw_parts(tseg.clone(), inp.tseg.len()),
+                            ArrayArg::from_raw_parts(roots.clone(), NROOT),
+                            ArrayArg::from_raw_parts(jobs_h[0].clone(), 2 * 4032),
+                            ArrayArg::from_raw_parts(cnt.clone(), NCNT),
+                            ArrayArg::from_raw_parts(out.clone(), nslab_cap as usize * SLAB as usize),
+                            ArrayArg::from_raw_parts(slabz.clone(), 1),
+                            ArrayArg::from_raw_parts(slabcnt.clone(), nslab_cap as usize),
+                            nslab_cap,
+                            $m,
+                            $no,
+                            w,
+                            fill,
+                            xpose,
+                            ept,
+                            ranks,
+                            cut,
+                            cmask,
+                            tdg,
+                        )
+                    };
+                }
+                match (mode, mnoout) {
+                    (0, _) => go!(0u32, true),
+                    (1, false) => go!(1u32, false),
+                    (1, true) => go!(1u32, true),
+                    (_, false) => go!(2u32, false),
+                    (_, true) => go!(2u32, true),
+                }
+            };
+            let unit = |cnt: &cubecl::server::Handle| {
+                for k in 0..5 {
+                    launch_prep(k, &histh, &lcnt);
+                }
+                launch_main(cnt, 2, noout);
+            };
+            let rd = |h: &cubecl::server::Handle| -> Result<Vec<u64>> {
+                Ok(u32::from_bytes(&client.read_one(h.clone()).map_err(|e| anyhow!("{e:?}"))?).iter().map(|&x| x as u64).collect())
+            };
+            let junk = mk(vec![0u32; NCNT]);
+            let tw = Instant::now();
+            let mut nw = 0usize;
+            while tw.elapsed().as_secs_f64() < warm {
+                for _ in 0..16 {
+                    unit(&junk);
+                }
+                sync()?;
+                nw += 16;
+            }
+            let c1 = mk(vec![0u32; NCNT]);
+            unit(&c1);
+            sync()?;
+            let v1 = rd(&c1)?;
+            let mut s1 = Counts::default();
+            for d in 0..64 {
+                s1.children += v1[d * 5];
+                s1.chunks += v1[d * 5 + 1];
+                s1.flat += v1[d * 5 + 2];
+                s1.kept += v1[d * 5 + 3];
+                s1.surv += v1[d * 5 + 4];
+            }
+            let one_ok = s1 == cref && v1[C_ERR_PLANE] + v1[C_ERR_PMAX] + v1[C_ERR_SLAB] == 0;
+            // (the lane-slot counter wraps and is not compared; the 320 per-unit counters and the error counters are)
+            let cmp_idx: Vec<usize> = (0..C_LSLOTS).chain([C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB]).collect();
+            // the K units' counts go to ceil(K / kb) buffers of at most kb units each, kb the most a u32 counter holds
+            let kb = cmp_idx.iter().map(|&i| if v1[i] == 0 { u64::MAX } else { ((1u64 << 32) - 1) / v1[i] }).min().unwrap().min(kp as u64) as usize;
+            let nb = kp.div_ceil(kb);
+            let pcs: Vec<_> = (0..nb).map(|_| mk(vec![0u32; NCNT])).collect();
+            sync()?;
+            let t = Instant::now();
+            for u in 0..kp {
+                unit(&pcs[u / kb]);
+            }
+            sync()?;
+            let el = t.elapsed().as_secs_f64();
+            let mut k_ok = true;
+            for (j, pc) in pcs.iter().enumerate() {
+                let vk = rd(pc)?;
+                let nu = (kp - j * kb).min(kb) as u64;
+                k_ok &= cmp_idx.iter().all(|&i| vk[i] == v1[i] * nu);
+            }
+            // (a device-timestamp span over the K units read 0.016 ms per super-unit on RADV, against 3.4 ms of wall
+            // clock: CubeCL's profile span over many submissions is not usable here, so it is not reported)
+            let per = el / kp as f64;
+            println!(
+                "PIPE K {kp} super-units queued, one sync, buffers reused (counts in {nb} buffers; {}records; warm-up {nw} units in {:.1} s): wall {:.2} s, {:.3} ms per super-unit = {:.4} fs per admissible n; single unit's counts {} the CPU reference, K units' counts {} K x the single unit's",
+                if noout { "no " } else { "" },
+                tw.elapsed().as_secs_f64(),
+                el,
+                per * 1e3,
+                per / inp.adm * 1e15,
+                if one_ok { "EQUAL to" } else { "DIFFER from" },
+                if k_ok { "EQUAL to" } else { "DIFFER from" }
+            );
+            if !(one_ok && k_ok) {
+                all_prep_bad = true;
+            }
+            // --pipe-parts: the components at the same operating point, each queued K times with one sync (wall
+            // per launch; the counters of each mode checked against K x the CPU reference's for that mode)
+            if args.iter().any(|a| a == "--pipe-parts") {
+                let zero1 = || unsafe {
+                    prep::zero1_kernel::launch_unchecked::<R>(&client, CubeCount::Static(1, 1, 1), CubeDim::new_1d(64), ArrayArg::from_raw_parts(slabz.clone(), 1));
+                };
+                sync()?;
+                let t = Instant::now();
+                for _ in 0..kp {
+                    for k in 0..5 {
+                        launch_prep(k, &histh, &lcnt);
+                    }
+                }
+                sync()?;
+                let tprep = t.elapsed().as_secs_f64() / kp as f64;
+                let mut parts = format!("prep {:.3}", tprep * 1e3);
+                let mut parts_ok = true;
+                // (K capped at the single buffer's limit for skip-off, whose kept = flat; the others like the pipe)
+                let kq = kp.min(kb);
+                for (mode, mno, nm) in [(0u32, true, "probes-off"), (1, false, "skip-off"), (2, true, "full-norec"), (2, false, "full")] {
+                    let pcm = mk(vec![0u32; NCNT]);
+                    sync()?;
+                    let t = Instant::now();
+                    for _ in 0..kq {
+                        if !mno {
+                            zero1();
+                        }
+                        launch_main(&pcm, mode, mno);
+                    }
+                    sync()?;
+                    let tm = t.elapsed().as_secs_f64() / kq as f64;
+                    let v = rd(&pcm)?;
+                    let mut sc = Counts::default();
+                    for d in 0..64 {
+                        sc.children += v[d * 5];
+                        sc.chunks += v[d * 5 + 1];
+                        sc.flat += v[d * 5 + 2];
+                        sc.kept += v[d * 5 + 3];
+                        sc.surv += v[d * 5 + 4];
+                    }
+                    let k = kq as u64;
+                    let want_c = Counts {
+                        children: cref.children * k,
+                        chunks: cref.chunks * k,
+                        flat: if mode == 0 { 0 } else { cref.flat * k },
+                        kept: if mode == 0 { 0 } else if mode == 1 { cref.flat * k } else { cref.kept * k },
+                        surv: if mode == 0 { 0 } else { cref.surv * k },
+                    };
+                    let ok = sc == want_c && v[C_ERR_PLANE] + v[C_ERR_PMAX] + v[C_ERR_SLAB] == 0;
+                    parts_ok &= ok;
+                    parts += &format!(", {nm} {:.3}{}", tm * 1e3, if ok { "" } else { " (COUNTS DIFFER)" });
+                }
+                println!("PIPEPARTS K {kq} each queued, one sync, ms per launch: {parts}; counts {}", if parts_ok { "EQUAL to K x the CPU reference" } else { "DIFFER" });
+                if !parts_ok {
+                    all_prep_bad = true;
+                }
+            }
+        }
         let gr = u32::from_bytes(&client.read_one(g_rec.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
         let gd = u32::from_bytes(&client.read_one(g_tdig.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
         let gp = u32::from_bytes(&client.read_one(g_pseg.clone()).map_err(|e| anyhow!("{e:?}"))?).to_vec();
@@ -1668,7 +2381,7 @@ fn run_gpu<R: Runtime>(
         let total: u64 = gh.iter().map(|&x| x as u64).sum();
         let nl = u32::from_bytes(&client.read_one(lcnt.clone()).map_err(|e| anyhow!("{e:?}"))?)[0];
         let ok = total == npar as u64 && gp == inp.pseg && gr == rec_host && gd == tdig_host && (prep2 == 0 || nl as usize == npar);
-        println!("prep: {}", if prep2 == 1 { format!("one root pass + list scatter (list {nl} of {npar})") } else { "two root passes".into() });
+        println!("prep: {}; {}", if prep2 == 1 { format!("one root pass + list scatter (list {nl} of {npar})") } else { "two root passes".into() }, if prep3 == 1 { "zeroing on the device (prep3 1)" } else { "zeroed buffers uploaded per prep (prep3 0)" });
         println!(
             "PREP (GPU, 5 launches) median {:.3} ms ({} reps) for {npar} parents from {nroots} roots: {:.1} ps per parent; largest bucket {}; order, records, class segments and top digits {}",
             prep_secs * 1e3,
@@ -1677,6 +2390,18 @@ fn run_gpu<R: Runtime>(
             gh.iter().max().unwrap_or(&0),
             if ok { "EQUAL to the CPU's" } else { "DIFFER from the CPU's" }
         );
+        if args.iter().any(|a| a == "--prep-prof") {
+            // the bucket sizes (what the rank sort's cost depends on)
+            let mut cls = [0u64; 8];
+            let (mut s2, mut it64) = (0u64, 0u64);
+            for &x in &gh {
+                let x = x as u64;
+                s2 += x * x;
+                it64 += x.div_ceil(64) * x;
+                cls[(64 - x.leading_zeros() as usize).min(7 + 3).saturating_sub(3).min(7)] += 1;
+            }
+            println!("BUCKETS 16128: sum n^2 {s2}, sum ceil(n/64)*n {it64}; by size <8,<16,<32,<64,<128,<256,<512,>=512: {cls:?}");
+        }
         if !ok {
             all_prep_bad = true;
         }
@@ -1750,55 +2475,70 @@ fn run_gpu<R: Runtime>(
         let burst = args.iter().any(|a| a == "--burst") && no_sets;
         let mut burst_t0: Option<Instant> = None;
         let mut burst_pending = Vec::new();
+        // the launch of one batch in this mode (2026-11-18: a closure, shared by the warm-up and the timed reps)
+        let launch_mode = |bi: usize, cnt: &cubecl::server::Handle, slabn: &cubecl::server::Handle| unsafe {
+            let bj = batches[bi];
+                macro_rules! go {
+                    ($m:expr, $no:expr) => {
+                        kernels::g2_kernel::launch_unchecked::<R>(
+                            &client,
+                            CubeCount::Static(bj.len() as u32, 1, 1),
+                            CubeDim::new_1d(NT),
+                            ArrayArg::from_raw_parts(rec.clone(), inp.par.len()),
+                            ArrayArg::from_raw_parts(pseg.clone(), 64),
+                            ArrayArg::from_raw_parts(tmask_k.clone(), inp.ts.len()),
+                            ArrayArg::from_raw_parts(tdig.clone(), inp.ts.len() * 4),
+                            ArrayArg::from_raw_parts(tseg.clone(), inp.tseg.len()),
+                            ArrayArg::from_raw_parts(roots.clone(), NROOT),
+                            ArrayArg::from_raw_parts(jobs_h[bi].clone(), 2 * bj.len()),
+                            ArrayArg::from_raw_parts(cnt.clone(), NCNT),
+                            ArrayArg::from_raw_parts(out.clone(), nslab_cap as usize * SLAB as usize),
+                            ArrayArg::from_raw_parts(slabn.clone(), 1),
+                            ArrayArg::from_raw_parts(slabcnt.clone(), nslab_cap as usize),
+                            nslab_cap,
+                            $m,
+                            $no,
+                            w,
+                            fill,
+                            xpose,
+                            ept,
+                            ranks,
+                            cut,
+                            cmask,
+                            tdg,
+                        )
+                    };
+                }
+                match (mode, noout) {
+                    (0, _) => go!(0u32, true),
+                    (1, false) => go!(1u32, false),
+                    (1, true) => go!(1u32, true),
+                    (_, false) => go!(2u32, false),
+                    (_, true) => go!(2u32, true),
+                }
+        };
+        // --warm-mode S (2026-11-18): S seconds of this mode's launches before its timed reps (untimed, counts
+        // discarded), so that the reps run at the card's operating point and not on its way up from idle
+        let wm: f64 = opt("--warm-mode").map_or(Ok(0.0), |s| s.parse())?;
+        let tw = Instant::now();
+        while tw.elapsed().as_secs_f64() < wm {
+            for bi in 0..batches.len() {
+                let cnt = mk(vec![0u32; NCNT]);
+                let slabn = mk(vec![0u32; 1]);
+                launch_mode(bi, &cnt, &slabn);
+                sync()?;
+            }
+        }
         for rep in 0..reps.max(1) {
             let last_rep = rep + 1 == reps.max(1);
             let mut tsum = 0f64;
             let mut rep_t0: Option<Instant> = None;
             let mut pending = Vec::new();
-            for (bi, bj) in batches.iter().enumerate() {
+            for bi in 0..batches.len() {
                 let cnt = mk(vec![0u32; NCNT]);
                 let slabn = mk(vec![0u32; 1]);
                 let tl = Instant::now();
-                unsafe {
-                    macro_rules! go {
-                        ($m:expr, $no:expr) => {
-                            kernels::g2_kernel::launch_unchecked::<R>(
-                                &client,
-                                CubeCount::Static(bj.len() as u32, 1, 1),
-                                CubeDim::new_1d(NT),
-                                ArrayArg::from_raw_parts(rec.clone(), inp.par.len()),
-                                ArrayArg::from_raw_parts(pseg.clone(), 64),
-                                ArrayArg::from_raw_parts(tmask_k.clone(), inp.ts.len()),
-                                ArrayArg::from_raw_parts(tdig.clone(), inp.ts.len() * 4),
-                                ArrayArg::from_raw_parts(tseg.clone(), inp.tseg.len()),
-                                ArrayArg::from_raw_parts(roots.clone(), NROOT),
-                                ArrayArg::from_raw_parts(jobs_h[bi].clone(), 2 * bj.len()),
-                                ArrayArg::from_raw_parts(cnt.clone(), NCNT),
-                                ArrayArg::from_raw_parts(out.clone(), nslab_cap as usize * SLAB as usize),
-                                ArrayArg::from_raw_parts(slabn.clone(), 1),
-                                ArrayArg::from_raw_parts(slabcnt.clone(), nslab_cap as usize),
-                                nslab_cap,
-                                $m,
-                                $no,
-                                w,
-                                fill,
-                                xpose,
-                                ept,
-                                ranks,
-                                cut,
-                                cmask,
-                                tdg,
-                            )
-                        };
-                    }
-                    match (mode, noout) {
-                        (0, _) => go!(0u32, true),
-                        (1, false) => go!(1u32, false),
-                        (1, true) => go!(1u32, true),
-                        (_, false) => go!(2u32, false),
-                        (_, true) => go!(2u32, true),
-                    }
-                }
+                launch_mode(bi, &cnt, &slabn);
                 if burst {
                     if burst_t0.is_none() {
                         burst_t0 = Some(tl);

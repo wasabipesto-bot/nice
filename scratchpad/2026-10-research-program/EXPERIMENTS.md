@@ -5,6 +5,51 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## G2.10 The port on the RX 9070 XT after the preparation fix: ×4.7 by the pre-registered protocol, ×5.5 pipelined (2026-11-18 13:36–14:37 UTC, engineer then director, demoux under the user's lease; `G2/DEMOUX-BRIEF.md`, `G2/WINDOW-RESULTS.md`, `G2/port/raw/window_1118b/` (engineer's stretch in `m/`), `G2/port/raw/window_1118c/` (my cross-check); branch `g2-cubecl-local` 4170a781 → ef54ed59, two commits made on demoux, bundle `G2/port/g2-cubecl-demoux.bundle`, ivory's worktree fast-forwarded; timed binary md5 8801a739; main = the window's binary)
+
+- **What the 1.84 ms preparation was** [M, device timestamps per launch]: device work, not launch latency and not
+  a host round trip. 62 % was the per-bucket rank sort (n² compares in one cube of 64 per bucket, 178M compares;
+  34 of 16,128 buckets hold ≥ 512 parents): 1,146 of a 1,658 µs chain. Root pass 342, scatter 75, scan 46, top
+  digits 18 µs.
+- **What a launch costs on CubeCL / wgpu / RADV** [M]: synchronised 0.112–0.125 ms of wall clock; queued 7–9 µs
+  of host time and about 1 µs on the device. CubeCL's device-timestamp span over many submissions is unusable on
+  this stack (read 0.016 ms for 3.4 ms of wall clock): pipelines are timed by wall clock.
+- **The fix** (default now): `--rsort 2` (a cube of 256 per bucket: rank sort from shared memory for ≤ 256
+  parents, bitonic above; sort 1,146 → 301 µs), `--scan 1` (1,008 threads), `--prep3 1` (counters zeroed on the
+  card, no host upload per preparation). **Preparation 0.416–0.427 ms at the operating point** (queued), inside
+  the model's 0.15–0.45 ms; 0.93 ms in the synced protocol (cold card, one sync per rep).
+- **Ratios** [M] (main base mean 4.707 fs from G2.7's ten fields; + 0.085 fs for tops and survivor checks):
+
+  | protocol | variant | G2 fs per admissible n | ratio | clock, power |
+  |---|---|---|---|---|
+  | pre-registered (prep + full, synced per launch, 400 reps) | D | 0.9105 median of 4 (min 0.9082); mine 0.9065, 0.9090 | **×4.73** (mine ×4.74) | 2,773–2,854 MHz, 278–303 W, 7–8 busy samples (still bursts) |
+  | | A | 0.9548 | ×4.53 | 2,481–2,855 MHz |
+  | same with 5 s warm-up, 2,000 reps | D | 0.8866 | ×4.84 | 2,845 MHz, 303 W, 58 samples |
+  | **pipelined** (3,000 super-units' prep + full kernel with records queued, one sync, buffers reused, counts checked) | D | 0.7692 median of 4 (min 0.7675); mine 0.7682, 0.7712, and 0.7709 on the second super-unit | **×5.51** | 2,846–2,852 MHz, 303–304 W, 58–60 samples ≥ 270 W |
+  | | A | 0.8054 | ×5.28 | 2,866–2,872 MHz, 303 W |
+
+- **Main's bracket** [M]: field 2 92.29 / 92.45 s (window 90.83), field 6 100.31 / 102.17 s and mine 101.44
+  (window 100.41), counts identical, 3.11–3.15 GHz at 304 W: +1.2 % slower in the afternoon; with the base scaled
+  to match, D is ×4.78 and ×5.57.
+- **Exact** [M]: A and D on both super-units at 64 lanes after the changes (engineer); D on both again in my
+  run; lavapipe on demoux at 8 lanes; every pipelined run's counts equal K times the CPU reference. Widths 16
+  and 32 not re-run after the preparation change (the main kernel is unchanged).
+- **The operating point under G2 is 2.85 GHz at the 304 W cap** (main reaches 3.13 GHz at the same power): the
+  plan's "≥ 97 % of 3,150 MHz" cannot be met by this kernel; met on power instead. **The kernel's time does
+  follow the clock**: one run stuck at 1,560 MHz and 82 W after a phase of short synced launches and took 7.04 ms
+  for the full kernel instead of 3.1. G2.7's "times barely move with the clock" was too few samples per burst.
+- **Components at the operating point, D, queued** [M]: prep 0.416, probes off 0.930, full without records
+  2.723, full 3.033 ms per super-unit. Records cost 0.31 ms (175 MB of writes per super-unit; an 8-byte record
+  would save about 0.15 ms, not built).
+- **Caveats of the pipelined number:** the same super-unit 3,000 times (inputs may be cache-warm), no host upload
+  of per-unit tops (≈ 1.9 MB, ≈ 0.1 ms, overlappable), records stay on the card. A distinct-unit run is in
+  progress (G2.11).
+- **Process notes:** the engineer's two commits carry a different co-author trailer than briefed and one lost its
+  body to a quoting error (not amended; local branch only). A `--pipe 2000` run aborted on a u32 counter overflow,
+  was fixed and the stretch re-run (`m_aborted/` kept).
+- **Conclusion: on the card that does 86 % of the search the redesign clears its ×4.0 stop line by both
+  protocols: ×4.7 as pre-registered, ×5.5 as a client would run it.**
+
 ## G2.9 The tuned port on an RTX 3080: exact at 32 lanes; ×1.11 of hand CUDA; ×4.61 against same-session main (2026-11-18 13:06–13:57 UTC, engineer; `G2/BOX3-BRIEF.md`, `G2/BENCH.md` "Tuned port on CUDA (2026-11-18, Vast 61250912, 240 W)", `G2/port/raw/cuda_box3/`; box 61250912, RTX 3080 capped at 240 W by its host, 1.04 h, ≈ $0.13; a first box, 61250182, was capped at 150 W and destroyed after 5 minutes)
 
 - **Exact at W = 32 on hardware** [M]: head 4170a781, CUDA runtime, GPU prep on, `--tdig 0` and `--tdig 1` on both
