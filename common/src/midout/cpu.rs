@@ -139,8 +139,8 @@ pub fn top_cert<M: Mask>(base: &Base, a: u128, c: u128, kpos: u32) -> Option<M> 
     top_cert_split(base, a, c, kpos, kpos).map(|x| x.0)
 }
 
-/// [`top_cert`] at `kpos`, and the part of it at positions `>= kmid` (`kmid
-/// >= kpos`): the top's certified digits that lie above the prefilter's.
+/// [`top_cert`] at `kpos`, and the part of it at positions `>= kmid`
+/// (`kmid >= kpos`): the top's certified digits above the prefilter's.
 pub fn top_cert_split<M: Mask>(
     base: &Base,
     a: u128,
