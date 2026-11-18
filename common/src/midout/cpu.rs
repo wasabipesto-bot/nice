@@ -136,11 +136,24 @@ fn mm(a: u128, c: u128, m: u128) -> u128 {
 /// top down; a power whose length changes over the interval gives none).
 /// `None` if one of them repeats.
 pub fn top_cert<M: Mask>(base: &Base, a: u128, c: u128, kpos: u32) -> Option<M> {
+    top_cert_split(base, a, c, kpos, kpos).map(|x| x.0)
+}
+
+/// [`top_cert`] at `kpos`, and the part of it at positions `>= kmid` (`kmid
+/// >= kpos`): the top's certified digits that lie above the prefilter's.
+pub fn top_cert_split<M: Mask>(
+    base: &Base,
+    a: u128,
+    c: u128,
+    kpos: u32,
+    kmid: u32,
+) -> Option<(M, M)> {
     let b = u64::from(base.b);
     let (xa, xc) = (U384::from_u128(a), U384::from_u128(c));
     let (sa, sc) = (xa.mul(&xa), xc.mul(&xc));
     let (ca, cc) = (sa.mul(&xa), sc.mul(&xc));
     let mut mask = M::default();
+    let mut mhi = M::default();
     for (p, q) in [(sa, sc), (ca, cc)] {
         let (dp, dq) = (p.digits(b), q.digits(b));
         if dp.len() != dq.len() {
@@ -157,9 +170,48 @@ pub fn top_cert<M: Mask>(base: &Base, a: u128, c: u128, kpos: u32) -> Option<M> 
                 return None;
             }
             mask |= bit;
+            if j >= kmid as usize {
+                mhi |= bit;
+            }
         }
     }
-    Some(mask)
+    Some((mask, mhi))
+}
+
+/// The middle-digit prefilter of a survivor `n` of shape `k` (production's,
+/// `cpu_join::CpuJoin::prefilter`, at the two positions above the bottom):
+/// the digits at positions `k` and `k + 1` of `n²` and `n³` are distinct,
+/// miss the bottom's digits (positions `0..k`), and miss `mhi`, the top's
+/// certified digits at positions `>= k + 2` (true for every nice n: its
+/// certificate's digits are digits of n² and n³ at other positions). The
+/// bottom's own `2k` digits are distinct for a survivor, so this is: the
+/// `2k + 4` digits at positions `0..k + 2` are distinct and the four new
+/// ones miss `mhi`.
+pub fn prefilter<M: Mask>(base: &Base, k: u32, n: u128, mhi: M) -> bool {
+    let m = base.pw[(k + 2) as usize];
+    assert!(m < (1u128 << 96), "prefilter: b^(k+2) must be below 2^96");
+    let b = u128::from(base.b);
+    if n < base.pw[(k + 2).div_ceil(2) as usize] {
+        // n² may have no digit at position k + 1: no prefilter (small bases only)
+        return true;
+    }
+    let r = n % m;
+    let r2 = mm(r, r, m);
+    let r3 = mm(r2, r, m);
+    let mut seen = M::default();
+    for v in [r2, r3] {
+        let mut x = v;
+        for j in 0..k + 2 {
+            #[allow(clippy::cast_possible_truncation)]
+            let bit = M::bit((x % b) as u32);
+            x /= b;
+            if !(seen & bit).is_zero() || (j >= k && !(mhi & bit).is_zero()) {
+                return false;
+            }
+            seen |= bit;
+        }
+    }
+    true
 }
 
 /// Bottom certificate of `r mod b^k` straight from `r²` and `r³` (tests).
@@ -250,6 +302,8 @@ pub struct Top<M> {
     /// `n div b^k`.
     pub h: u128,
     pub mask: M,
+    /// The certificate's digits at positions `>= k + 2` (the prefilter's).
+    pub mhi: M,
     /// Its interval of n, clipped to the range.
     pub lo: u128,
     pub hi: u128,
@@ -270,10 +324,11 @@ pub fn unit_tops<M: Mask>(base: &Base, sh: Shape, uval: u128, tested: &mut u64) 
             continue;
         }
         *tested += 1;
-        if let Some(mask) = top_cert::<M>(base, a, c, k) {
+        if let Some((mask, mhi)) = top_cert_split::<M>(base, a, c, k, k + 2) {
             out.push(Top {
                 h: lead,
                 mask,
+                mhi,
                 lo: a,
                 hi: c,
             });
@@ -371,6 +426,9 @@ pub struct Counts {
     /// Survivors inside their top's interval: the n of the slice that pass
     /// the shape's predicate ([`q_shape`]).
     pub survivors: u64,
+    /// Survivors that pass the middle-digit prefilter ([`prefilter`]): the n
+    /// the full check examines.
+    pub checked: u64,
     /// Survivor bits outside a clipped top (range ends only).
     pub clipped: u64,
 }
@@ -387,17 +445,18 @@ impl Counts {
         self.kept += o.kept;
         self.words += o.words;
         self.survivors += o.survivors;
+        self.checked += o.checked;
         self.clipped += o.clipped;
     }
 }
 
-/// One slice through the join; calls `sink(d, n)` for every survivor (unit
-/// digit `d`). Single-threaded.
+/// One slice through the join; calls `sink(d, n, pass)` for every survivor
+/// (unit digit `d`; `pass`: it passes the prefilter). Single-threaded.
 pub fn slice_join<M: Mask>(
     base: &Base,
     sh: Shape,
     pip: u128,
-    mut sink: impl FnMut(u32, u128),
+    mut sink: impl FnMut(u32, u128, bool),
 ) -> Counts {
     let b = base.b as usize;
     let m = b - 1;
@@ -516,8 +575,10 @@ pub fn slice_join<M: Mask>(
                         let nn = tp.h * bkk + d as u128 * bk1 + ps[cp[n0 + i]].r;
                         if nn >= tp.lo && nn <= tp.hi {
                             cn.survivors += 1;
+                            let pass = prefilter(base, sh.k, nn, tp.mhi);
+                            cn.checked += u64::from(pass);
                             #[allow(clippy::cast_possible_truncation)]
-                            sink(d as u32, nn);
+                            sink(d as u32, nn, pass);
                         } else {
                             cn.clipped += 1;
                         }
@@ -551,6 +612,19 @@ pub fn q_shape<M: Mask>(base: &Base, sh: Shape, n: u128) -> bool {
     (tm & bm).is_zero()
 }
 
+/// [`q_shape`] and the prefilter, straight from the definitions (brute
+/// force): the n the full check examines.
+pub fn q_checked<M: Mask>(base: &Base, sh: Shape, n: u128) -> bool {
+    if !q_shape::<M>(base, sh, n) {
+        return false;
+    }
+    let p = n / base.pw[sh.f0 as usize];
+    let a = (p * base.pw[sh.f0 as usize]).max(base.start);
+    let c = (p * base.pw[sh.f0 as usize] + base.pw[sh.f0 as usize] - 1).min(base.end - 1);
+    let (_, mhi) = top_cert_split::<M>(base, a, c, sh.k, sh.k + 2).expect("a certified top");
+    prefilter(base, sh.k, n, mhi)
+}
+
 /// What a search of a field returns (CPU reference or device).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct FieldOutcome {
@@ -559,8 +633,8 @@ pub struct FieldOutcome {
     /// n of the field that pass the join's predicate (production's
     /// `survivors`, for this shape).
     pub survivors: u64,
-    /// n the full check examined (production's `checked`: survivors after
-    /// any prefilter; day one has none, so it equals `survivors`).
+    /// n the full check examined (production's `checked`: survivors that
+    /// pass the middle-digit prefilter, [`prefilter`]).
     pub checked: u64,
     /// Slices searched.
     pub slices: u64,
@@ -568,7 +642,7 @@ pub struct FieldOutcome {
 
 /// Search a field `[v_start, v_start + v_size)` of `coord` with the CPU
 /// reference, on `threads` threads (slices in parallel); every survivor
-/// gets the full check.
+/// that passes the prefilter gets the full check.
 ///
 /// # Errors
 /// A field that is not whole quanta, or a shape that cannot search it.
@@ -604,10 +678,12 @@ pub fn search_field<M: Mask>(
                         if i >= pips.len() {
                             break;
                         }
-                        let c = slice_join::<M>(&base, sh, pips[i], |_, n| {
-                            checked += 1;
-                            if unique_digits(n, base.b).1 {
-                                nice.push(n);
+                        let c = slice_join::<M>(&base, sh, pips[i], |_, n, pass| {
+                            if pass {
+                                checked += 1;
+                                if unique_digits(n, base.b).1 {
+                                    nice.push(n);
+                                }
                             }
                         });
                         cn.add(&c);
@@ -684,7 +760,7 @@ mod tests {
                     nice.extend(o.nice);
                     let base_t = Base::new(&coord);
                     for pip in sh.slices_of(&coord, t) {
-                        slice_join::<u64>(&base_t, sh, pip, |_, n| sink.push(n));
+                        slice_join::<u64>(&base_t, sh, pip, |_, n, _| sink.push(n));
                     }
                     for n in sink {
                         assert_eq!(
@@ -703,15 +779,20 @@ mod tests {
                     "b{b} shape {sh:?}: survivors differ from brute force"
                 );
                 assert_eq!(surv, want.len() as u64);
-                assert_eq!(checked, surv);
+                let want_checked = want
+                    .iter()
+                    .filter(|&&n| q_checked::<u64>(&base, sh, n))
+                    .count() as u64;
+                assert_eq!(checked, want_checked, "b{b} shape {sh:?}: checked");
+                assert!(checked <= surv);
                 nice.sort_unstable();
                 assert_eq!(nice, nice_brute, "b{b} shape {sh:?}");
                 let (all, _) =
                     search_field::<u128>(&coord, sh, coord.start, coord.v_end() - coord.start, 3)
                         .unwrap();
                 assert_eq!(
-                    (all.survivors, all.nice.clone()),
-                    (surv, nice_brute.clone()),
+                    (all.survivors, all.checked, all.nice.clone()),
+                    (surv, checked, nice_brute.clone()),
                     "b{b} u128 masks"
                 );
                 if b == 10 {
@@ -759,7 +840,7 @@ mod tests {
         let base = Base::new(&coord);
         let sh = Shape::for_coord(&coord);
         let mut got: Vec<Vec<u128>> = vec![Vec::new(); 64];
-        let cn = slice_join::<u64>(&base, sh, pip, |d, n| got[d as usize].push(n));
+        let cn = slice_join::<u64>(&base, sh, pip, |d, n, _| got[d as usize].push(n));
         let mut off = 0;
         for (d, &c) in counts.iter().enumerate() {
             let mut want: Vec<u128> = raw[off..off + 16 * c]
