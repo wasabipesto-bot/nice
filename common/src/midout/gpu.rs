@@ -218,7 +218,6 @@ mod kernels {
     pub fn g2_kernel(
         par: &Array<Vector<u32, Const<4>>>, // parent records (mask lo, mask hi, cacc, r4), one 16-byte vector each (one LDG.128 on CUDA)
         pseg: &Array<u32>,
-        tmask: &Array<u64>, // the tops' masks (only for --tdig 0: digits made in every cube, as before the fixes)
         tdig: &Array<u32>, // each top's digits, 20 6-bit fields in 4 words (`tdig_kernel`), computed once per super-unit
         tseg: &Array<u32>,
         roots: &Array<u32>,
@@ -3297,7 +3296,7 @@ impl<R: Runtime> GpuJoin<R> {
         let c = &self.client;
         let np = self.caps.parents as usize;
         let nt = nt.max(1);
-        let (tmh, tsegh) = (&sb.tmh, &sb.tsegh);
+        let tsegh = &sb.tsegh;
         let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
         {
             let slabn = self.mk(vec![0u32]);
@@ -3313,7 +3312,6 @@ impl<R: Runtime> GpuJoin<R> {
                         CubeDim::new_1d(NT),
                         a(&self.g_rec, np),
                         a(&self.g_pseg, 64),
-                        a(tmh, nt),
                         a(&self.g_tdig, nt * 4),
                         a(tsegh, 64 * 63 * 2),
                         a(&self.roots_h, NROOT),
