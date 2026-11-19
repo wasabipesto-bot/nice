@@ -952,7 +952,6 @@ mod kernels {
 }
 
 mod prep {
-    use super::kernels::child_mask;
     use super::{A_ERR_PLANE, A_H2_CERT, A_H2_CUBES, A_HSORT, A_SC_CHILD, A_SCAN16, A_SCAT};
     use cubecl::prelude::*;
 
@@ -1099,6 +1098,30 @@ mod prep {
         }
     }
 
+    /// The number of units d (of 64) for which `child_mask(pm, cacc, d) != 0`, pm = lo | hi << 32, in 32-bit
+    /// operations (step 4S: ACO emitted the 64 `child_mask` calls with 64-bit shifts and ORs). A child of unit d is
+    /// valid iff its two new digits e2 = (a2 + b2·d) mod 64 and e3 = (a3 + b3·d) mod 64 differ and both miss pm;
+    /// e2 and e3 advance by b2 and b3 per unit.
+    #[cube]
+    pub fn child_count(lo: u32, hi: u32, cacc: u32) -> u32 {
+        let nlo = !lo;
+        let nhi = !hi;
+        let b2 = (cacc >> 16u32) & 63u32;
+        let b3 = (cacc >> 24u32) & 63u32;
+        let mut e2 = cacc & 63u32;
+        let mut e3 = (cacc >> 8u32) & 63u32;
+        let mut n = 0u32;
+        for _ in 0..64u32 {
+            // bit e of !pm: the free digit test, from the half that holds it
+            let f2 = (select(e2 >= 32u32, nhi, nlo) >> (e2 & 31u32)) & 1u32;
+            let f3 = (select(e3 >= 32u32, nhi, nlo) >> (e3 & 31u32)) & 1u32;
+            n += f2 & f3 & select(e2 != e3, 1u32, 0u32);
+            e2 = (e2 + b2) & 63u32;
+            e3 = (e3 + b3) & 63u32;
+        }
+        n
+    }
+
     /// --multi (2026-11-18): scatter2 with the list's length read on the device (`lcnt`, written by hist2), launched
     /// for the list's capacity, as a client that does not know a super-unit's parent count on the host would.
     #[cube(launch_unchecked)]
@@ -1128,10 +1151,7 @@ mod prep {
             tmp[(4u32 * slot + 1u32) as usize] = v[1usize];
             tmp[(4u32 * slot + 2u32) as usize] = v[2usize];
             tmp[(4u32 * slot + 3u32) as usize] = v[3usize];
-            let pm = u64::cast_from(v[0usize]) | (u64::cast_from(v[1usize]) << 32u64);
-            for dd in 0..64u32 {
-                nch += select(child_mask(pm, v[2usize], dd) != 0u64, 1u32, 0u32);
-            }
+            nch = child_count(v[0usize], v[1usize], v[2usize]);
         }
         let prows = plane_sum(select(live, 1u32, 0u32));
         let pch = plane_sum(nch);
