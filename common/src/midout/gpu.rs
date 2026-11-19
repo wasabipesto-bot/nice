@@ -952,7 +952,6 @@ mod kernels {
 }
 
 mod prep {
-    use super::kernels::child_mask;
     use super::{A_ERR_PLANE, A_H2_CERT, A_H2_CUBES, A_HSORT, A_SC_CHILD, A_SCAN16, A_SCAT};
     use cubecl::prelude::*;
 
@@ -1099,6 +1098,30 @@ mod prep {
         }
     }
 
+    /// The number of units d (of 64) for which `child_mask(pm, cacc, d) != 0`, pm = lo | hi << 32, in 32-bit
+    /// operations (step 4S: ACO emitted the 64 `child_mask` calls with 64-bit shifts and ORs). A child of unit d is
+    /// valid iff its two new digits e2 = (a2 + b2·d) mod 64 and e3 = (a3 + b3·d) mod 64 differ and both miss pm;
+    /// e2 and e3 advance by b2 and b3 per unit.
+    #[cube]
+    pub fn child_count(lo: u32, hi: u32, cacc: u32) -> u32 {
+        let nlo = !lo;
+        let nhi = !hi;
+        let b2 = (cacc >> 16u32) & 63u32;
+        let b3 = (cacc >> 24u32) & 63u32;
+        let mut e2 = cacc & 63u32;
+        let mut e3 = (cacc >> 8u32) & 63u32;
+        let mut n = 0u32;
+        for _ in 0..64u32 {
+            // bit e of !pm: the free digit test, from the half that holds it
+            let f2 = (select(e2 >= 32u32, nhi, nlo) >> (e2 & 31u32)) & 1u32;
+            let f3 = (select(e3 >= 32u32, nhi, nlo) >> (e3 & 31u32)) & 1u32;
+            n += f2 & f3 & select(e2 != e3, 1u32, 0u32);
+            e2 = (e2 + b2) & 63u32;
+            e3 = (e3 + b3) & 63u32;
+        }
+        n
+    }
+
     /// --multi (2026-11-18): scatter2 with the list's length read on the device (`lcnt`, written by hist2), launched
     /// for the list's capacity, as a client that does not know a super-unit's parent count on the host would.
     #[cube(launch_unchecked)]
@@ -1128,10 +1151,7 @@ mod prep {
             tmp[(4u32 * slot + 1u32) as usize] = v[1usize];
             tmp[(4u32 * slot + 2u32) as usize] = v[2usize];
             tmp[(4u32 * slot + 3u32) as usize] = v[3usize];
-            let pm = u64::cast_from(v[0usize]) | (u64::cast_from(v[1usize]) << 32u64);
-            for dd in 0..64u32 {
-                nch += select(child_mask(pm, v[2usize], dd) != 0u64, 1u32, 0u32);
-            }
+            nch = child_count(v[0usize], v[1usize], v[2usize]);
         }
         let prows = plane_sum(select(live, 1u32, 0u32));
         let pch = plane_sum(nch);
@@ -1403,6 +1423,76 @@ mod post {
         (lo | a10 | a11, hi | b10 | b11, a10 | a11, b10 | b11)
     }
 
+    /// Bits 24-47 of a product of two 24-bit values (`x·y < 2^48`): its low and high 32-bit words recombined.
+    #[cube]
+    fn hi24(x: u32, y: u32) -> u32 {
+        ((x * y) >> 24u32) | (u32::mul_hi(x, y) << 8u32)
+    }
+
+    /// The 12 low base-64 digits of a residue mod 2^72 in 24-bit limbs (four digits per limb, none straddles) as a
+    /// one-hot pair (lo, hi) by 64-bit shifts, and digits 10-11 alone as another.
+    #[cube]
+    fn digits12_24(l0: u32, l1: u32, l2: u32) -> (u32, u32, u32, u32) {
+        let mut m = 0u64;
+        #[unroll]
+        for j in 0..4u32 {
+            m |= 1u64 << u64::cast_from((l0 >> comptime!(6 * j)) & 63u32);
+            m |= 1u64 << u64::cast_from((l1 >> comptime!(6 * j)) & 63u32);
+        }
+        m |= 1u64 << u64::cast_from(l2 & 63u32);
+        m |= 1u64 << u64::cast_from((l2 >> 6u32) & 63u32);
+        let mm = (1u64 << u64::cast_from((l2 >> 12u32) & 63u32))
+            | (1u64 << u64::cast_from((l2 >> 18u32) & 63u32));
+        let a = m | mm;
+        (
+            u32::cast_from(a & 0xFFFF_FFFFu64),
+            u32::cast_from(a >> 32u64),
+            u32::cast_from(mm & 0xFFFF_FFFFu64),
+            u32::cast_from(mm >> 32u64),
+        )
+    }
+
+    /// [`pf`] in 24-bit limbs (step 4S, the SPIR-V path): every product is of two values below 2^24, which ACO
+    /// for GFX1201 can issue as full-rate 24-bit multiplies instead of the quarter-rate `v_mul_lo/hi_u32` of the
+    /// 32-bit limbs; no 64-bit adds, no digit straddling two limbs, and each digit's one-hot as one 64-bit shift
+    /// (ACO spent about six 32-bit operations per digit on `oh`'s pair; on CUDA a 64-bit variable shift is two
+    /// funnel shifts and a select, so CUDA keeps `pf`).
+    #[cube]
+    fn pf24(r0: u32, plo: u32, phi: u32, top: u64) -> bool {
+        let mk = 0xFF_FFFFu32;
+        // n mod 2^72 = x0 + x1·2^24 + x2·2^48: r0 is bits 0-29, plo bits 30-61, phi bits 62-93
+        let x0 = r0 & mk;
+        let x1 = (r0 >> 24u32) | ((plo & 0x3_FFFFu32) << 6u32);
+        let x2 = (plo >> 18u32) | ((phi & 0x3FFu32) << 14u32);
+        // n² mod 2^72: column sums stay below 2^32 (at most five 24-bit terms and a carry)
+        let p00 = x0 * x0;
+        let s0 = p00 & mk;
+        let v1 = hi24(x0, x0) + 2u32 * ((x0 * x1) & mk);
+        let s1 = v1 & mk;
+        let v2 = (v1 >> 24u32) + 2u32 * hi24(x0, x1) + ((x1 * x1) & mk) + 2u32 * ((x0 * x2) & mk);
+        let s2 = v2 & mk;
+        // n³ = n²·n mod 2^72
+        let c0 = (s0 * x0) & mk;
+        let u1 = hi24(s0, x0) + ((s0 * x1) & mk) + ((s1 * x0) & mk);
+        let c1 = u1 & mk;
+        let u2 = (u1 >> 24u32)
+            + hi24(s0, x1)
+            + hi24(s1, x0)
+            + ((s0 * x2) & mk)
+            + ((s1 * x1) & mk)
+            + ((s2 * x0) & mk);
+        let c2 = u2 & mk;
+        let (sl, sh, sml, smh) = digits12_24(s0, s1, s2);
+        let (cl, ch, cml, cmh) = digits12_24(c0, c1, c2);
+        let lo = sl | cl;
+        let hi = sh | ch;
+        let mlo = sml | cml;
+        let mhi = smh | cmh;
+        let tlo = u32::cast_from(top & 0xFFFF_FFFFu64);
+        let thi = u32::cast_from(top >> 32u64);
+        lo.count_ones() + hi.count_ones() == 24u32 && ((mlo & tlo) | (mhi & thi)) == 0u32
+    }
+
     /// The middle-digit prefilter of one survivor (`cpu::prefilter` at k
     /// 10): n mod 2^72 from `r0` and its top's P (bits 30-93 of n), in 32-bit
     /// limbs; the digits at positions 0-11 of n² and n³ (mod 2^72) must be
@@ -1444,51 +1534,90 @@ mod post {
         lo.count_ones() + hi.count_ones() == 24u32 && ((mlo & tlo) | (mhi & thi)) == 0u32
     }
 
-    /// The bits of a record (top index, chunk position, word lo, hi) whose
-    /// survivor passes the prefilter; `hd` and `top` its top's h | d << 16 and
-    /// prefilter mask. An all-zero record (past the slab) has none.
+    /// The prefilter in the runtime's form: 24-bit limbs and 64-bit one-hot shifts on the SPIR-V path (`pf24`),
+    /// 32-bit limbs and one-hot pairs on CUDA (`pf`, as measured there).
     #[cube]
-    fn keep_bits(
-        rec: Vector<u32, Const<4>>,
-        hd: u32,
-        top: u64,
+    fn pfx(r0: u32, plo: u32, phi: u32, top: u64, #[comptime] oh64: bool) -> bool {
+        let mut ok = false;
+        if comptime!(oh64) {
+            ok = pf24(r0, plo, phi, top);
+        } else {
+            ok = pf(r0, plo, phi, top);
+        }
+        ok
+    }
+
+    /// The bits of two records (top index, chunk position, word lo, hi) whose
+    /// survivors pass the prefilter, in one loop over the four words (step
+    /// 4S: a plane runs as many rounds as its lane with the most bits, so one
+    /// loop over both records costs the plane max(a + b), not max(a) + max(b),
+    /// and the prefilter is most of a round); `hda`, `hdb` and `topa`, `topb`
+    /// their tops' h | d << 16 and prefilter masks. An all-zero record (past
+    /// the slab) has none. Returns the kept bits (a lo, a hi, b lo, b hi).
+    #[cube]
+    fn keep_bits2(
+        reca: Vector<u32, Const<4>>,
+        recb: Vector<u32, Const<4>>,
+        hda: u32,
+        hdb: u32,
+        topa: u64,
+        topb: u64,
         lst: &Array<u32>,
         r0hi: u32,
         pip_hi: u32,
         nopf: bool,
         pfdrop: bool,
-    ) -> (u32, u32) {
-        let pos = rec[1usize];
-        // P = n div 2^30 = h·2^30 + d·2^24 + digits 5-8 (the top record's words 0-1)
-        let h = hd & 0xFFFFu32;
-        let plo = ((h & 3u32) << 30u32) | ((hd >> 16u32) << 24u32) | pip_hi;
-        let phi = h >> 2u32;
-        let mut klo = 0u32;
-        let mut khi = 0u32;
-        // one loop over both words: the plane runs max(bits) rounds, not that per word
-        let mut x = rec[2usize];
-        let mut y = rec[3usize];
-        while (x | y) != 0u32 {
+        #[comptime] oh64: bool,
+    ) -> (u32, u32, u32, u32) {
+        // P = n div 2^30 = h·2^30 + d·2^24 + digits 5-8 (the top record's words 0-1), per record
+        let ha = hda & 0xFFFFu32;
+        let hb = hdb & 0xFFFFu32;
+        let ploa = ((ha & 3u32) << 30u32) | ((hda >> 16u32) << 24u32) | pip_hi;
+        let plob = ((hb & 3u32) << 30u32) | ((hdb >> 16u32) << 24u32) | pip_hi;
+        let phia = ha >> 2u32;
+        let phib = hb >> 2u32;
+        let mut k0 = 0u32;
+        let mut k1 = 0u32;
+        let mut k2 = 0u32;
+        let mut k3 = 0u32;
+        let mut w0 = reca[2usize];
+        let mut w1 = reca[3usize];
+        let mut w2 = recb[2usize];
+        let mut w3 = recb[3usize];
+        while (w0 | w1 | w2 | w3) != 0u32 {
+            // the lowest set bit of the first nonzero word, in the order a lo, a hi, b lo, b hi
+            let ina = (w0 | w1) != 0u32;
+            let x = select(ina, w0, w2);
+            let y = select(ina, w1, w3);
             let inlo = x != 0u32;
-            let b = select(inlo, x.trailing_zeros(), y.trailing_zeros());
+            let wd = select(inlo, x, y);
+            let b = wd.trailing_zeros();
             let off = select(inlo, b, 32u32 + b);
-            if inlo {
-                x &= x - 1u32;
-            } else {
-                y &= y - 1u32;
-            }
+            let cl = wd & (wd - 1u32);
+            w0 = select(ina && inlo, cl, w0);
+            w1 = select(ina && !inlo, cl, w1);
+            w2 = select(!ina && inlo, cl, w2);
+            w3 = select(!ina && !inlo, cl, w3);
+            let pos = select(ina, reca[1usize], recb[1usize]);
             let r0 = lst[(pos + off) as usize] + r0hi;
+            let top = select(ina, topa, topb);
             if nopf
-                || (pf(r0, plo, phi, top) && !(pfdrop && (r0 >> 10u32).trailing_zeros() >= 10u32))
+                || (pfx(
+                    r0,
+                    select(ina, ploa, plob),
+                    select(ina, phia, phib),
+                    top,
+                    oh64,
+                ) && !(pfdrop && (r0 >> 10u32).trailing_zeros() >= 10u32))
             {
-                if inlo {
-                    klo |= 1u32 << b;
-                } else {
-                    khi |= 1u32 << b;
-                }
+                let bit = 1u32 << b;
+                k0 |= select(ina && inlo, bit, 0u32);
+                k1 |= select(ina && !inlo, bit, 0u32);
+                k2 |= select(!ina && inlo, bit, 0u32);
+                k3 |= select(!ina && !inlo, bit, 0u32);
             }
         }
-        (klo, khi)
+        (k0, k1, k2, k3)
     }
 
     /// Writes the kept bits' entries `(top, r0)` from `slot` on; returns the
@@ -1553,6 +1682,8 @@ mod post {
         pip_hi: u32,
         // (audit) F_NOPF (1): every survivor listed, no prefilter
         fault: u32,
+        // the prefilter in 24-bit limbs with 64-bit one-hot shifts (`pf24`: the SPIR-V path) or as measured on CUDA (`pf`)
+        #[comptime] oh64: bool,
     ) {
         let nopf = (fault & 1u32) != 0u32;
         // (audit) F_PF_DROP (1024): the prefilter wrongly drops survivors whose r0 has bits 10-19 zero
@@ -1597,8 +1728,9 @@ mod post {
                     + reca[3usize].count_ones()
                     + recb[2usize].count_ones()
                     + recb[3usize].count_ones();
-                let (kla, kha) = keep_bits(reca, hda, topa, lst, r0hi, pip_hi, nopf, pfdrop);
-                let (klb, khb) = keep_bits(recb, hdb, topb, lst, r0hi, pip_hi, nopf, pfdrop);
+                let (kla, kha, klb, khb) = keep_bits2(
+                    reca, recb, hda, hdb, topa, topb, lst, r0hi, pip_hi, nopf, pfdrop, oh64,
+                );
                 let nb = kla.count_ones() + kha.count_ones() + klb.count_ones() + khb.count_ones();
                 let excl = plane_exclusive_sum(nb);
                 let tot = plane_sum(nb);
@@ -2422,6 +2554,8 @@ pub struct GpuJoin<R: Runtime> {
     pub w: u32,
     fill: u32,
     ballot: bool,
+    /// The expansion's prefilter in its SPIR-V form (`pf24`: 24-bit limbs, 64-bit one-hot shifts).
+    oh64: bool,
     caps: Caps,
     check: CheckShape,
     roots: Vec<u32>,
@@ -2538,7 +2672,18 @@ impl<R: Runtime> GpuJoin<R> {
     /// # Errors
     /// A device whose plane width the kernel does not take.
     pub fn new(client: ComputeClient<R>, caps: Caps) -> Result<Self> {
-        let w = client.properties().hardware.plane_size_max;
+        Self::with_width(client, caps, None)
+    }
+
+    /// [`GpuJoin::new`] with the kernels compiled for plane width `force_w` instead of the device's (tests only: to
+    /// dump the SPIR-V of another width for an offline compiler; the kernels' plane checks then fail and the results
+    /// are invalid).
+    pub(crate) fn with_width(
+        client: ComputeClient<R>,
+        caps: Caps,
+        force_w: Option<u32>,
+    ) -> Result<Self> {
+        let w = force_w.unwrap_or(client.properties().hardware.plane_size_max);
         ensure!(
             [8u32, 16, 32, 64].contains(&w),
             "middle-out: plane width {w} not supported"
@@ -2590,6 +2735,7 @@ impl<R: Runtime> GpuJoin<R> {
             w,
             fill,
             ballot: ballot_append(w),
+            oh64: R::name(&client).contains("spirv"),
             caps,
             check,
             roots,
@@ -3127,6 +3273,7 @@ impl<R: Runtime> GpuJoin<R> {
                         ((pip & 63) as u32) << 24,
                         (pip >> 6) as u32,
                         self.fault,
+                        self.oh64,
                     );
                 }
                 if self.upto(6) && self.fault & F_SKIP_CHECK == 0 {
@@ -3569,7 +3716,47 @@ pub fn search_field<R: Runtime>(
         "middle-out: a timing stop ({}) is set: this join only times stages",
         gj.stop
     );
-    field_run(gj, coord, v_start, v_size, opt)
+    field_run(gj, coord, v_start, v_size, opt, None)
+}
+
+/// [`search_field`] on the field's first `max_slices` slices only (benches and dry runs on a software device: a
+/// field is 4,096 slices). The outcome and the counts cover those slices; the sampled check draws among them.
+///
+/// # Errors
+/// As [`search_field`].
+pub fn search_field_part<R: Runtime>(
+    gj: &GpuJoin<R>,
+    coord: &Coord,
+    v_start: u128,
+    v_size: u128,
+    opt: GpuOptions,
+    max_slices: usize,
+) -> Result<(FieldOutcome, DevCounts, FieldTiming)> {
+    ensure!(
+        gj.stop == 6,
+        "middle-out: a timing stop ({}) is set: this join only times stages",
+        gj.stop
+    );
+    field_run(gj, coord, v_start, v_size, opt, Some(max_slices))
+}
+
+/// [`time_field`] on the field's first `max_slices` slices only.
+///
+/// # Errors
+/// As [`time_field`].
+pub fn time_field_part<R: Runtime>(
+    gj: &GpuJoin<R>,
+    coord: &Coord,
+    v_start: u128,
+    v_size: u128,
+    opt: GpuOptions,
+    max_slices: usize,
+) -> Result<FieldTiming> {
+    let opt = GpuOptions {
+        cpu_check: false,
+        ..opt
+    };
+    Ok(field_run(gj, coord, v_start, v_size, opt, Some(max_slices))?.2)
 }
 
 /// Time a field with the join's timing stop (benches): the stages up to
@@ -3588,7 +3775,7 @@ pub fn time_field<R: Runtime>(
         cpu_check: false,
         ..opt
     };
-    Ok(field_run(gj, coord, v_start, v_size, opt)?.2)
+    Ok(field_run(gj, coord, v_start, v_size, opt, None)?.2)
 }
 
 fn field_run<R: Runtime>(
@@ -3597,6 +3784,7 @@ fn field_run<R: Runtime>(
     v_start: u128,
     v_size: u128,
     opt: GpuOptions,
+    max_slices: Option<usize>,
 ) -> Result<(FieldOutcome, DevCounts, FieldTiming)> {
     ensure!(coord.b == 64, "middle-out device path: base 64 only");
     let sh = Shape::for_coord(coord);
@@ -3612,9 +3800,12 @@ fn field_run<R: Runtime>(
         opt.group
     );
     let ts = coord.field_digits(v_start, v_size)?;
-    let pips: Vec<u64> = ts
+    let mut pips: Vec<u64> = ts
         .flat_map(|t| sh.slices_of(coord, t).map(|p| p as u64).collect::<Vec<_>>())
         .collect();
+    if let Some(k) = max_slices {
+        pips.truncate(k.max(1));
+    }
     let nice_before = gj.nice()?;
     let t0 = Instant::now();
     // the sampled CPU check: a random slice of the field, on a host thread while the card works
@@ -3903,6 +4094,102 @@ mod tests {
         crate::cubecl_backend::CubeclContext::new_default().ok()
     }
 
+    /// (step 4S) What a plane pays in the expansion: one slice's records as the device wrote them (each batch read
+    /// back after it ran), the histogram of survivor bits per record, and, per take of 2·W records of a slab (lane
+    /// l: records l and l + W, as `expand_kernel`), the prefilter rounds of the two-loop form (max a + max b), of the
+    /// one-loop form (max (a + b)) and of four records per lane (max of 4, per 4·W records), for W 8, 32 and 64 over
+    /// the slabs in the device's order. `MIDOUT_GPU_SLICES` (the first), `MIDOUT_CLASSES` (4).
+    #[test]
+    #[ignore = "needs a GPU (lavapipe will do) and a minute"]
+    fn expansion_bits_profile() {
+        let ctx = device().expect("a device");
+        let pip: u64 = std::env::var("MIDOUT_GPU_SLICES")
+            .ok()
+            .and_then(|s| s.split(',').next().map(|x| x.parse().unwrap()))
+            .unwrap_or(712_012_851);
+        let classes: u32 = std::env::var("MIDOUT_CLASSES")
+            .ok()
+            .map_or(4, |s| s.parse().unwrap());
+        macro_rules! go {
+            ($client:expr) => {{
+                let gj = GpuJoin::new($client, Caps::b64(classes)).unwrap();
+                let st = slice_tops(pip, gj.roots());
+                let rankh = gj.mk(st.rank.to_vec());
+                let cnt = gj.mk(vec![0u32; NCNT]);
+                let dp = gj.queue_dev_prep(pip, &rankh);
+                let nt = gj.caps.tops as usize;
+                let mut hist = [0u64; 65];
+                let mut slabs: Vec<Vec<u32>> = Vec::new();
+                for bi in 0..gj.batches.len() {
+                    let t = gj.queue_batch(pip, nt, &dp.sb, bi, &cnt, &dp.acc);
+                    cubecl::future::block_on(gj.client.sync()).unwrap();
+                    let stat = gj.rd(&t.stat).unwrap();
+                    let ns = (stat[1] as usize).min(gj.nslab_cap as usize);
+                    let sc = gj.rd(&gj.slabcnt).unwrap();
+                    let out = gj.rd(&gj.out).unwrap();
+                    for s in 0..ns {
+                        let v: Vec<u32> = (0..sc[s] as usize)
+                            .map(|r| {
+                                let o = (s * SLAB as usize + r) * 4;
+                                out[o + 2].count_ones() + out[o + 3].count_ones()
+                            })
+                            .collect();
+                        for &x in &v {
+                            hist[x as usize] += 1;
+                        }
+                        slabs.push(v);
+                    }
+                }
+                let recs: u64 = hist.iter().sum();
+                let bits: u64 = hist.iter().enumerate().map(|(k, &n)| k as u64 * n).sum();
+                println!("slice {pip}: device W {} slabs {} records {recs} bits {bits}", gj.w, slabs.len());
+                println!("PROFILE hist {:?}", hist.iter().enumerate().filter(|x| *x.1 > 0).collect::<Vec<_>>());
+                for w in [8usize, 32, 64] {
+                    let (mut takes, mut two, mut one, mut four) = (0u64, 0u64, 0u64, 0u64);
+                    for v in &slabs {
+                        let at = |i: usize| v.get(i).copied().unwrap_or(0);
+                        let mut r0 = 0;
+                        while r0 < v.len() {
+                            takes += 1;
+                            let (mut ma, mut mb, mut mab) = (0, 0, 0);
+                            for l in 0..w {
+                                let (a, b) = (at(r0 + l), at(r0 + l + w));
+                                ma = ma.max(a);
+                                mb = mb.max(b);
+                                mab = mab.max(a + b);
+                            }
+                            two += u64::from(ma + mb);
+                            one += u64::from(mab);
+                            r0 += 2 * w;
+                        }
+                        let mut r0 = 0;
+                        while r0 < v.len() {
+                            let mut m4 = 0;
+                            for l in 0..w {
+                                m4 = m4.max((0..4).map(|k| at(r0 + l + k * w)).sum::<u32>());
+                            }
+                            four += u64::from(m4);
+                            r0 += 4 * w;
+                        }
+                    }
+                    println!(
+                        "PROFILE W {w}: takes of 2W {takes}, rounds per take: two loops {:.3}, one loop {:.3}, four records per lane {:.3} (per 2W records)",
+                        two as f64 / takes as f64,
+                        one as f64 / takes as f64,
+                        four as f64 / takes as f64
+                    );
+                }
+            }};
+        }
+        match &ctx {
+            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => go!(client.clone()),
+            #[cfg(feature = "cubecl-cuda")]
+            crate::cubecl_backend::CubeclContext::Cuda { client, .. } => go!(client.clone()),
+            #[allow(unreachable_patterns)]
+            _ => panic!("unsupported runtime"),
+        }
+    }
+
     /// The device's prefilter survivors of whole base-64 slices (the n its
     /// check takes) equal the CPU reference's, n for n, with the
     /// order-independent counts (survivors and checked among them). `MIDOUT_GPU_SLICES` (comma list of digit-4..8
@@ -3923,9 +4210,23 @@ mod tests {
         let base = Base::new(&coord);
         macro_rules! go {
             ($client:expr) => {{
-                let gj = GpuJoin::new($client, Caps::b64(classes)).unwrap();
+                // MIDOUT_FORCE_W=64: compile for that plane width on any device (lavapipe), run, report and stop:
+                // only the SPIR-V is wanted (`CUBECL_DEBUG_SPIRV`); the results are invalid
+                let force_w: Option<u32> = std::env::var("MIDOUT_FORCE_W").ok().map(|x| x.parse().unwrap());
+                let gj = GpuJoin::with_width($client, Caps::b64(classes), force_w).unwrap();
                 println!("device {} W {}", ctx.device_name(), gj.w);
                 for &pip in &pips {
+                    if force_w.is_some() {
+                        let st = slice_tops(pip, gj.roots());
+                        let nb: usize = std::env::var("MIDOUT_BATCHES").ok().map_or(usize::MAX, |s| s.parse().unwrap());
+                        let r = if std::env::var("MIDOUT_HOST_TOPS").is_ok() {
+                            gj.run_slice(&st).map(|x| x.0)
+                        } else {
+                            gj.run_slice_dev(pip, &st.rank, nb).map(|x| x.0)
+                        };
+                        println!("COMPILE-ONLY W {} slice {pip}: {r:?}", gj.w);
+                        continue;
+                    }
                     let st = slice_tops(pip, gj.roots());
                     // the n the device's check takes: survivors that pass the prefilter
                     let mut want = Vec::new();

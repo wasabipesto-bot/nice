@@ -2488,7 +2488,19 @@ impl<R: Runtime> WideJoin<R> {
     /// # Errors
     /// A plane width or base the kernels do not take.
     pub fn new(client: ComputeClient<R>, caps: WideCaps, coord: &Coord, sh: Shape) -> Result<Self> {
-        let w = client.properties().hardware.plane_size_max;
+        Self::with_width(client, caps, coord, sh, None)
+    }
+
+    /// [`WideJoin::new`] with the kernels compiled for plane width `force_w` instead of the device's (tests only:
+    /// to dump another width's SPIR-V; the results are then invalid).
+    pub(crate) fn with_width(
+        client: ComputeClient<R>,
+        caps: WideCaps,
+        coord: &Coord,
+        sh: Shape,
+        force_w: Option<u32>,
+    ) -> Result<Self> {
+        let w = force_w.unwrap_or(client.properties().hardware.plane_size_max);
         ensure!(
             [8u32, 16, 32, 64].contains(&w),
             "middle-out wide: plane width {w} not supported"
@@ -3735,7 +3747,16 @@ mod tests {
                     if let Ok(x) = std::env::var("MIDOUT_MAXPOP") {
                         caps.maxpop = x.parse().unwrap();
                     }
-                    let mut gj = WideJoin::new($client, caps, &coord, sh).unwrap();
+                    // MIDOUT_FORCE_W=64: compile for that plane width on any device (lavapipe), run, report and stop:
+                    // only the SPIR-V is wanted (`CUBECL_DEBUG_SPIRV`); the results are invalid
+                    let force_w: Option<u32> = std::env::var("MIDOUT_FORCE_W").ok().map(|x| x.parse().unwrap());
+                    let mut gj = WideJoin::with_width($client, caps, &coord, sh, force_w).unwrap();
+                    if force_w.is_some() {
+                        let rank = gj.rank_of(pip).unwrap();
+                        let r = gj.run_slice(pip, &rank).map(|x| x.0);
+                        println!("COMPILE-ONLY W {} base {b} slice {pip}: {r:?}", gj.w);
+                        continue;
+                    }
                     // MIDOUT_NOPF=1: no prefilter, whole survivor sets
                     let nopf = std::env::var("MIDOUT_NOPF").is_ok_and(|x| x == "1");
                     if nopf {

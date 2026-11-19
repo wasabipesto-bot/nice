@@ -4,10 +4,11 @@
 //! no API, no claims, no submissions.
 //!
 //! usage: midout_bench [--cuda] [--fields T0,T1,..] [--group G] [--threads N] [--classes C] [--tops-only K]
-//!                     [--no-cpu-check]
+//!                     [--no-cpu-check] [--slices K]
 //!   --fields: values of digits 6-8 (field t covers v = 2^75 + t·2^57, 2^57 of them)
 //!   --tops-only K: time the host's tops for K slices on N threads and exit
 //!   --no-cpu-check: without the sampled CPU check of one random slice per field (on by default)
+//!   --slices K: only each field's first K slices (dry runs on a software device; times are then per K slices)
 //!   `MIDOUT_STOP` (environment, this bench only): time the stages up to a stop (1 tops, 2 parents, 3 main
 //!   kernel, 5 expansion, 6 all; 11-15 the device-top kernels), no accounts and no result
 #![allow(clippy::cast_precision_loss)]
@@ -16,7 +17,8 @@ use anyhow::{Result, bail};
 use nice_common::cubecl_backend::CubeclContext;
 use nice_common::midout::Coord;
 use nice_common::midout::gpu::{
-    Caps, GpuJoin, GpuOptions, depth4_roots, search_field, slice_tops, time_field,
+    Caps, GpuJoin, GpuOptions, depth4_roots, search_field, search_field_part, slice_tops,
+    time_field, time_field_part,
 };
 use std::time::Instant;
 
@@ -31,6 +33,7 @@ fn main() -> Result<()> {
     let threads: usize = opt("--threads").map_or(Ok(15), |s| s.parse())?;
     let group: usize = opt("--group").map_or(Ok(16), |s| s.parse())?;
     let classes: u32 = opt("--classes").map_or(Ok(63), |s| s.parse())?;
+    let part: Option<usize> = opt("--slices").map(|s| s.parse()).transpose()?;
     let fields: Vec<u128> = opt("--fields")
         .unwrap_or_else(|| "77777".into())
         .split(',')
@@ -100,22 +103,29 @@ fn main() -> Result<()> {
                 gj.set_timing_stop(s);
             }
             let cpu_check = !args.iter().any(|a| a == "--no-cpu-check");
-            println!("device {name}; W {}; group {group}; host threads {threads}; classes per batch {classes}; cpu check {cpu_check}; timing stop {stop:?}", gj.w);
+            println!("device {name}; W {}; group {group}; host threads {threads}; classes per batch {classes}; cpu check {cpu_check}; timing stop {stop:?}; slices per field {part:?}", gj.w);
             let q = coord.quantum();
             let (mut wall, mut adm_all) = (0f64, 0f64);
             for &t in &fields {
                 let vs = coord.start + t * q;
                 let ncount = coord.n_count(vs, q)?;
-                let adm = ncount as f64 * 8.0 / 63.0;
+                // a part of the field: its share of the admissible n (4,096 slices per field)
+                let adm = ncount as f64 * 8.0 / 63.0 * part.map_or(1.0, |k| k.min(4096) as f64 / 4096.0);
                 let go = GpuOptions { group, host_threads: threads, device_tops: !args.iter().any(|a| a == "--host-tops"), cpu_check };
                 if let Some(s) = stop {
-                    let tm = time_field(&gj, &coord, vs, q, go)?;
+                    let tm = match part {
+                        Some(k) => time_field_part(&gj, &coord, vs, q, go, k)?,
+                        None => time_field(&gj, &coord, vs, q, go)?,
+                    };
                     wall += tm.wall;
                     adm_all += adm;
                     println!("FIELD t {t} timing stop {s}: {:.2} s = {:.4} fs per admissible n (no accounts, no result)", tm.wall, tm.wall / adm * 1e15);
                     continue;
                 }
-                let (o, dc, tm) = search_field(&gj, &coord, vs, q, go)?;
+                let (o, dc, tm) = match part {
+                    Some(k) => search_field_part(&gj, &coord, vs, q, go, k)?,
+                    None => search_field(&gj, &coord, vs, q, go)?,
+                };
                 wall += tm.wall;
                 adm_all += adm;
                 println!(

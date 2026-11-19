@@ -10,6 +10,7 @@
 //! `AUDIT_FAULTS` (comma list of fault bit sets) for `audit_faults`.
 
 use super::*;
+#[cfg_attr(not(feature = "cubecl-cuda"), allow(unused_imports))]
 use crate::midout::cpu::{Base, Counts, parents, slice_join};
 use cubecl::prelude::ComputeClient;
 use std::io::Write;
@@ -43,8 +44,10 @@ fn audit_slices() -> Vec<u64> {
 
 /// An order-independent hash of a set of n (count, wrapping sum, xor of a mix).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg(feature = "cubecl-cuda")]
 struct SetHash(u64, u64, u64);
 
+#[cfg(feature = "cubecl-cuda")]
 impl SetHash {
     fn add(&mut self, n: u128) {
         let mut x = (n as u64) ^ ((n >> 64) as u64).rotate_left(17);
@@ -56,6 +59,7 @@ impl SetHash {
 }
 
 /// What the CPU reference says about a slice.
+#[cfg(feature = "cubecl-cuda")]
 struct Ref {
     pip: u64,
     st: SliceTops,
@@ -70,6 +74,7 @@ struct Ref {
     cpu_s: f64,
 }
 
+#[cfg(feature = "cubecl-cuda")]
 fn reference(base: &Base, roots: &[u32], pip: u64) -> Ref {
     let t0 = Instant::now();
     let st = slice_tops(pip, roots);
@@ -124,6 +129,7 @@ fn reference(base: &Base, roots: &[u32], pip: u64) -> Ref {
     }
 }
 
+#[cfg(feature = "cubecl-cuda")]
 fn cuda_client() -> cubecl::prelude::ComputeClient<cubecl::cuda::CudaRuntime> {
     match crate::cubecl_backend::CubeclContext::new_cuda(0).expect("a CUDA device") {
         crate::cubecl_backend::CubeclContext::Cuda { client, .. } => client,
@@ -136,6 +142,7 @@ fn cuda_client() -> cubecl::prelude::ComputeClient<cubecl::cuda::CudaRuntime> {
 /// device tops = host tops; the prefiltered list = the reference's, n for n; with the prefilter off (`F_NOPF`), the
 /// whole survivor set = the reference's (count and an order-independent hash); children, chunks, flat, survivors,
 /// checked equal. One JSON line per slice with the limits' observed values. Fails at the end if any slice differs.
+#[cfg(feature = "cubecl-cuda")]
 #[test]
 #[ignore = "needs CUDA and hours of CPU"]
 fn audit_sweep() {
@@ -368,6 +375,7 @@ fn group<R: Runtime>(gj: &GpuJoin<R>, pips: &[u64]) -> Result<DevCounts> {
 /// Fault injection: each fault set of `AUDIT_FAULTS` on the slices of `AUDIT_SLICES`, as one group through the
 /// production path; prints whether the accounts failed (loud) or passed, and the counts against the run without a
 /// fault (a pass with other counts is a silent fault).
+#[cfg(feature = "cubecl-cuda")]
 #[test]
 #[ignore = "needs CUDA"]
 fn audit_faults() {
@@ -422,6 +430,7 @@ fn audit_faults() {
 /// (step 3A) Finding 1.2: `MIDOUT_STOP` in the environment made `search_field` a no-op that succeeded. Now the
 /// library never reads it (the bench does, and sets the stop with `set_timing_stop`), and `search_field` refuses a
 /// join with a stop set.
+#[cfg(feature = "cubecl-cuda")]
 #[test]
 #[ignore = "needs CUDA"]
 fn audit_stop_env_is_loud() {
@@ -617,6 +626,7 @@ fn audit_coord_slices_partition() {
 /// survivor set (hash, prefilter off) with its own key equal those with foreign keys (other slices', the identity
 /// key 0-7, and a key of the rarest digits); and the production group path (`queue_dev` + `finish_group`, the field's
 /// key, several slices in one group, the 64-slice parent level reused across them) gives the per-slice sums.
+#[cfg(feature = "cubecl-cuda")]
 #[test]
 #[ignore = "needs CUDA"]
 fn audit_key_and_group_independence() {
@@ -690,6 +700,7 @@ fn audit_key_and_group_independence() {
 /// helper process of this test with `AUDIT_HOLD_S`) panics in CubeCL's stream thread, not in the caller; the kernels
 /// that use the missing buffer are dropped. (Step 3A) the production group path must now fail loudly (or the caller
 /// panic); a group that returns `Ok` fails the test.
+#[cfg(feature = "cubecl-cuda")]
 #[test]
 #[ignore = "needs CUDA; fills the card's memory"]
 fn audit_oom_is_loud() {
@@ -741,6 +752,7 @@ fn audit_oom_is_loud() {
 /// The production field path (groups of 16 slices, the field's key, the 64-slice parent level shared by consecutive
 /// slices) against the same slices run one at a time (`run_slice_dev`, the same key): equal sums. The first
 /// `AUDIT_NSL` (128) slices of field `AUDIT_T` (0), i.e. two 64-slice parent groups.
+#[cfg(feature = "cubecl-cuda")]
 #[test]
 #[ignore = "needs CUDA"]
 fn audit_group_vs_single() {
