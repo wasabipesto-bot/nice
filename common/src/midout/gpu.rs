@@ -4094,6 +4094,102 @@ mod tests {
         crate::cubecl_backend::CubeclContext::new_default().ok()
     }
 
+    /// (step 4S) What a plane pays in the expansion: one slice's records as the device wrote them (each batch read
+    /// back after it ran), the histogram of survivor bits per record, and, per take of 2·W records of a slab (lane
+    /// l: records l and l + W, as `expand_kernel`), the prefilter rounds of the two-loop form (max a + max b), of the
+    /// one-loop form (max (a + b)) and of four records per lane (max of 4, per 4·W records), for W 8, 32 and 64 over
+    /// the slabs in the device's order. `MIDOUT_GPU_SLICES` (the first), `MIDOUT_CLASSES` (4).
+    #[test]
+    #[ignore = "needs a GPU (lavapipe will do) and a minute"]
+    fn expansion_bits_profile() {
+        let ctx = device().expect("a device");
+        let pip: u64 = std::env::var("MIDOUT_GPU_SLICES")
+            .ok()
+            .and_then(|s| s.split(',').next().map(|x| x.parse().unwrap()))
+            .unwrap_or(712_012_851);
+        let classes: u32 = std::env::var("MIDOUT_CLASSES")
+            .ok()
+            .map_or(4, |s| s.parse().unwrap());
+        macro_rules! go {
+            ($client:expr) => {{
+                let gj = GpuJoin::new($client, Caps::b64(classes)).unwrap();
+                let st = slice_tops(pip, gj.roots());
+                let rankh = gj.mk(st.rank.to_vec());
+                let cnt = gj.mk(vec![0u32; NCNT]);
+                let dp = gj.queue_dev_prep(pip, &rankh);
+                let nt = gj.caps.tops as usize;
+                let mut hist = [0u64; 65];
+                let mut slabs: Vec<Vec<u32>> = Vec::new();
+                for bi in 0..gj.batches.len() {
+                    let t = gj.queue_batch(pip, nt, &dp.sb, bi, &cnt, &dp.acc);
+                    cubecl::future::block_on(gj.client.sync()).unwrap();
+                    let stat = gj.rd(&t.stat).unwrap();
+                    let ns = (stat[1] as usize).min(gj.nslab_cap as usize);
+                    let sc = gj.rd(&gj.slabcnt).unwrap();
+                    let out = gj.rd(&gj.out).unwrap();
+                    for s in 0..ns {
+                        let v: Vec<u32> = (0..sc[s] as usize)
+                            .map(|r| {
+                                let o = (s * SLAB as usize + r) * 4;
+                                out[o + 2].count_ones() + out[o + 3].count_ones()
+                            })
+                            .collect();
+                        for &x in &v {
+                            hist[x as usize] += 1;
+                        }
+                        slabs.push(v);
+                    }
+                }
+                let recs: u64 = hist.iter().sum();
+                let bits: u64 = hist.iter().enumerate().map(|(k, &n)| k as u64 * n).sum();
+                println!("slice {pip}: device W {} slabs {} records {recs} bits {bits}", gj.w, slabs.len());
+                println!("PROFILE hist {:?}", hist.iter().enumerate().filter(|x| *x.1 > 0).collect::<Vec<_>>());
+                for w in [8usize, 32, 64] {
+                    let (mut takes, mut two, mut one, mut four) = (0u64, 0u64, 0u64, 0u64);
+                    for v in &slabs {
+                        let at = |i: usize| v.get(i).copied().unwrap_or(0);
+                        let mut r0 = 0;
+                        while r0 < v.len() {
+                            takes += 1;
+                            let (mut ma, mut mb, mut mab) = (0, 0, 0);
+                            for l in 0..w {
+                                let (a, b) = (at(r0 + l), at(r0 + l + w));
+                                ma = ma.max(a);
+                                mb = mb.max(b);
+                                mab = mab.max(a + b);
+                            }
+                            two += u64::from(ma + mb);
+                            one += u64::from(mab);
+                            r0 += 2 * w;
+                        }
+                        let mut r0 = 0;
+                        while r0 < v.len() {
+                            let mut m4 = 0;
+                            for l in 0..w {
+                                m4 = m4.max((0..4).map(|k| at(r0 + l + k * w)).sum::<u32>());
+                            }
+                            four += u64::from(m4);
+                            r0 += 4 * w;
+                        }
+                    }
+                    println!(
+                        "PROFILE W {w}: takes of 2W {takes}, rounds per take: two loops {:.3}, one loop {:.3}, four records per lane {:.3} (per 2W records)",
+                        two as f64 / takes as f64,
+                        one as f64 / takes as f64,
+                        four as f64 / takes as f64
+                    );
+                }
+            }};
+        }
+        match &ctx {
+            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => go!(client.clone()),
+            #[cfg(feature = "cubecl-cuda")]
+            crate::cubecl_backend::CubeclContext::Cuda { client, .. } => go!(client.clone()),
+            #[allow(unreachable_patterns)]
+            _ => panic!("unsupported runtime"),
+        }
+    }
+
     /// The device's prefilter survivors of whole base-64 slices (the n its
     /// check takes) equal the CPU reference's, n for n, with the
     /// order-independent counts (survivors and checked among them). `MIDOUT_GPU_SLICES` (comma list of digit-4..8
