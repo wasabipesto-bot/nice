@@ -1,0 +1,34 @@
+cargo fmt --all --check
+cargo clippy -p "*" --all-targets -- -D warnings
+   Compiling nice_common v3.4.9-dev (/root/sfx2/common)
+    Checking nice_client v3.4.9-dev (/root/sfx2/client)
+    Checking nice_jobs v3.4.9-dev (/root/sfx2/jobs)
+    Checking nice-wasm-client v3.4.9-dev (/root/sfx2/wasm-client)
+    Checking nice_api v3.4.9-dev (/root/sfx2/api)
+warning: unused dependency `web-sys`
+  --> wasm-client/Cargo.toml:22:15
+   |
+22 | [dependencies.web-sys]
+   |               ^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `web-sys`
+warning: `nice-wasm-client` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.38s
+# The GPU/spirv code only exists under these features, so lint it too.
+cargo clippy -p "*" --all-targets --features nice_client/gpu,nice_client/cubecl-spirv -- -D warnings
+   Compiling nice_common v3.4.9-dev (/root/sfx2/common)
+    Checking nice-wasm-client v3.4.9-dev (/root/sfx2/wasm-client)
+    Checking nice_jobs v3.4.9-dev (/root/sfx2/jobs)
+    Checking nice_api v3.4.9-dev (/root/sfx2/api)
+    Checking nice_client v3.4.9-dev (/root/sfx2/client)
+warning: unused dependency `web-sys`
+  --> wasm-client/Cargo.toml:22:15
+   |
+22 | [dependencies.web-sys]
+   |               ^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `web-sys`
+warning: `nice-wasm-client` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.68s

@@ -328,3 +328,37 @@ request.** Description draft: `G2/STRIDE-EMPTY-PR-BODY.md`.
 - **Changelog:** one line under Unreleased with a `#NNN` placeholder.
 - **Not included:** `get_base_range_u128(3)` panicking; `insert_new_fields` accepting residue-empty bases; any
   server-side check that would keep such bases out of the nice-only queue.
+
+## 8. After review: `pr/stride-empty-residues` at `82108efb` (20:31–20:45 UTC)
+
+One ordinary commit on `3701a353`, pushed to `fork/pr/stride-empty-residues` (no pull request). It was built and
+tested on the box in `/root/sfx2` (the bundle from ivory plus the same diff; the two files' git hashes on ivory and
+the box are equal). Raw logs are in `build8b/raw/runs/g2/sfx2/`, script `build8b/box/sfx2.sh`.
+
+- **S1, a mistake of mine:** the committed test's base-43 field was id 30000, which the MSD filter rejects whole,
+  not the crashing field 49999 that the commit message names. The field is now its own test,
+  `residue_empty_base_43_field_searches_to_nothing`, on 60991418181959–60992418181959. **Proof:**
+  - Run alone (`--exact`) with the empty-table check removed in the scratch copy, it fails: `panicked at
+    common/src/stride_filter.rs:171:54: index out of bounds: the len is 0 but the index is 0`, rc 101
+    (`b43_without_guard.txt`).
+  - With the check, it passes (`b43_with_guard.txt`).
+- **S2:** the `# Panics` doc of `first_valid_at_or_after` and the changelog line now name bases 4 and 5 (empty
+  at k = 3 by the LSD filter).
+- **Changelog line, shortened:** "Stop the CPU nice-only search crashing at bases whose stride table is empty:
+  those where no number can be nice, such as 43, and bases 4 and 5 (#NNN)."
+- **One-line extras taken:** the bases test's comment no longer says it exercises every window ("the walk runs in
+  those windows the MSD filter does not reject whole"). The PR body now says "on main" for `stride_filter.rs:165`.
+  The test-time and dead-window notes are left alone.
+- **Results at the new state:**
+  - `cargo fmt --check` and `just lint` pass.
+  - Workspace `cargo test --locked --release --no-fail-fast`: nice_common lib 209 pass, 9 ignored; client 24.
+  - `nice_common --features gpu --lib`: 263 pass, 66 ignored.
+  - The new tests: `residue_empty_bases_search_to_nothing` takes 0.81 s release and 7.01 s debug;
+    `residue_empty_base_43_field_searches_to_nothing` takes 0.02 s release and 0.16 s debug.
+- **The PR body** (`G2/STRIDE-EMPTY-PR-BODY.md`, 244 words by `wc -w`):
+  - Bases 4 and 5 are included, and `--gpu` falls back to the CPU walk there.
+  - "Who hits it" is narrowed to fields that take the stride walk. I confirmed this by reading
+    `cpu_join::slices_for` → `overlap_join::join_verdict` and `JoinParams::for_length` (bases 40–64, at least
+    10^13 n).
+  - The real field is 60991418181959–60992418181959.
+  - The database is left to "depends on which bases the server holds".

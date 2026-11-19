@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-19 20:10 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-19 20:45 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
@@ -178,13 +178,15 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 - **Can production hit it today? No.** The database's bases of this kind (15, 19, 23, 27, 35, 39, 43, 47) are
   all fully checked, and none above 50 was ever inserted. It needs a nice-only field of such a base, which only
   appears if one is inserted (the insert script does not refuse them).
-- **Fix ready:** branch `pr/stride-empty-residues` on the fork: one guard, a test, a changelog line (48 lines).
-  The search then reports such a field searched with no numbers, which is the truth. Independent review:
-  see the line below this list.
+- **Fix ready:** branch `pr/stride-empty-residues` on the fork: one guard, two tests, a changelog line (about 60 lines).
+  The search then reports such a field searched with no numbers, which is the truth.
 - **Decide:** may I open it as a small pull request? I read your hold as covering the middle-out series only,
   but you wrote "hold the PRs", so I am not opening anything new without your word.
 - **Recommendation:** yes. **If you do not answer:** it stays a branch.
-- **Review status:** running on the evening of 2026-11-19 (this line is updated when it is back).
+- **Review status (2026-11-19 20:45 UTC):** independently reviewed and the review's two small fixes applied
+  (branch head `82108efb`, two commits). The reviewer's findings: the guard is correct and can only turn a panic
+  into an empty result; no nice number exists at any base it covers (bases 4 and 5 are covered too: checked by
+  brute force); `just lint` and the suites CI runs pass. Description drafted: `G2/STRIDE-EMPTY-PR-BODY.md`.
 
 ## C. Operations
 

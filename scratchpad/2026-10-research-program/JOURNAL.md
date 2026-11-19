@@ -208,6 +208,21 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   (`G2/STRIDE-EMPTY-REVIEW-BRIEF.md`). One thing I saw reading the diff: the test's "real field" is id 30000,
   which the MSD filter rejects whole (it does not panic without the guard); the field that panics is 49999. To
   be fixed with whatever the review finds, in one further commit.
+- **20:35 UTC: the fix's independent review is back (EXPERIMENTS SE.2): ready with fixes**, nothing must-fix in
+  the code; the test's real field (the flaw I had seen) and wording for bases 4 and 5; the author applies them as
+  one more commit by 21:25.
+- **Revised list for the 05:41 cycle of 11-20** (items 4 and 6 of the earlier list were done tonight): (1) read
+  what the user wrote (answers to D1–D16; the hold); (2) PR #271's state; (3) **no new pull request of any kind
+  without the user's word** (the middle-out series is held; the stride fix waits on D16); (4) the wide path:
+  where its expansion spends 3.3 ms, tuning for the RX 9070 XT offline through ACO, bases 68–70 on the merged
+  code; (5) rerun the 27 mutants on `dev/mo-clean` c2152084 (cheap, CPU only); (6) the user's criterion "×5 for
+  all further work": a like-for-like baseline above base 64 (what production's best route costs at base 65 on
+  the same card) so the claim for 65+ is a ratio and not only an absolute; (7) keep `DECISIONS.md` and the
+  design directory at the branch head (`tools/check_refs.py` after every push). Budget: about $7.0 left under
+  the cap.
+- **20:45 UTC, end of the evening's work.** `pr/stride-empty-residues` at 82108efb (review's fixes applied, all
+  CI forms pass on the box); not opened (D16). Box 61490977 destroyed at 20:45 after 2.8 h (about $0.36). No
+  instances running. Agents tonight: 3 Opus (design writer; engineer, resumed twice; reviewer).
 
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 

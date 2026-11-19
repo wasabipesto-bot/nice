@@ -35,6 +35,30 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## SE.2 Independent review of the stride empty-table fix: ready with fixes, nothing must-fix in the code (2026-11-19 20:10–20:35 UTC, independent reviewer; `G2/STRIDE-EMPTY-REVIEW-BRIEF.md`, `G2/STRIDE-EMPTY-REVIEW.md`; branch `pr/stride-empty-residues` 3701a353; box 61490977, own clone)
+
+- **Soundness** [P and M by the reviewer]: the parity argument for b ≡ 3 mod 4 re-derived; the guard fires only on
+  an empty table, so it can only turn a panic into an empty result; for bases 3–128 the only empty tables are 4,
+  5 and the b ≡ 3 mod 4 bases; brute force over whole ranges finds no nice number at 4, 5, 7, 15, 19, 23, 27
+  (control: base 10 gives 69).
+- **Paths** [by reading, and 30 client runs against a local stub, all exit 0]: production lookups go only through
+  `walk_masked`; the lookups in the GPU files are in test modules; every `--gpu-backend` value goes through
+  `begin_niceonly`. **At bases 4 and 5 `--gpu` falls back to the CPU walk (`gpu_route.rs:154–158`) and so
+  panicked on main too** (toy bases).
+- **Findings:** S1, the test's base-43 field is id 30000, which the MSD filter rejects whole (0 ranges kept; no
+  panic without the guard): use 60991418181959–60992418181959 (id 49999), which does panic. S2, wording names
+  only b ≡ 3 mod 4; bases 4 and 5 are covered too. Notes: fields of 1e13 or more at bases with a join never
+  reached the walk; the changelog line is long; six of the 20 test bases never reach the walk.
+- **CI forms in the reviewer's own clone** [M]: `just lint` rc 0; workspace release suite 208 + 24 pass;
+  `nice_common --features gpu --lib` 262 pass. The test takes 7.2–7.8 s in debug, 0.65 s in release.
+- **Applied 20:43 UTC** [M, the author, same box]: `pr/stride-empty-residues` 3701a353 → **82108efb** (one more
+  commit, on the fork): the base-43 field is its own test on 60991418181959–60992418181959 (alone, with the guard
+  removed in a scratch copy: the index-out-of-bounds panic, rc 101; with it: pass); bases 4 and 5 named in the
+  `# Panics` doc and the changelog line; the changelog line shortened. At the head: `just lint` clean; workspace
+  release suite passes (nice_common lib 209, client 24); `nice_common --features gpu --lib` 263 pass; the tests
+  take 0.81 s + 0.02 s in release, 7.0 s + 0.16 s in debug. Description: `G2/STRIDE-EMPTY-PR-BODY.md` (244
+  words). Not opened: DECISIONS D16.
+
 ## SE.1 Production's stride table at bases with no valid residue: a CPU nice-only claim panics; `--validate` does not; no such field exists in production (2026-11-19 19:00–20:10 UTC, engineer on box 61490977, then the director's read-only API check; `G2/CARRYBACK-NOTES.md` §6 and §7, `G2/build8b/raw/runs/g/`, `runs/g2/`; fix branch `pr/stride-empty-residues` 3701a353 on upstream main 974d7194, on the fork, no PR)
 
 - **In the library** [M, upstream main 974d7194]: `StrideTable::new(base, k)` is empty at bases 4, 5, 7 and every
