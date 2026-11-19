@@ -39,6 +39,7 @@ const DEFAULT_PREFETCH_CONCURRENCY: usize = 4;
 const MAX_SUBMITS_IN_FLIGHT: usize = 8;
 
 mod bench;
+#[cfg(feature = "cubecl")]
 mod midout_route;
 mod progress;
 
@@ -1746,7 +1747,15 @@ async fn main() -> Result<()> {
     // The middle-out route (development) runs alone, before any other
     // backend or route is set up.
     if let Some(url) = cli.midout_coordinator.clone() {
+        #[cfg(feature = "cubecl")]
         return midout_route::run(&cli, &url).await;
+        #[cfg(not(feature = "cubecl"))]
+        {
+            error!(
+                "--midout-coordinator {url}: this build carries no CubeCL backend (build with --features cubecl-cuda)"
+            );
+            std::process::exit(1);
+        }
     }
 
     #[allow(unused_mut)]

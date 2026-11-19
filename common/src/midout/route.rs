@@ -24,9 +24,9 @@ const CLASSES_B64: u32 = 63;
 /// The join of one base on one device.
 pub enum FieldJoin<R: Runtime> {
     /// Base 64.
-    Narrow(GpuJoin<R>),
+    Narrow(Box<GpuJoin<R>>),
     /// Bases 65–70.
-    Wide(WideJoin<R>, u32),
+    Wide(Box<WideJoin<R>>, u32),
 }
 
 impl<R: Runtime> FieldJoin<R> {
@@ -37,14 +37,17 @@ impl<R: Runtime> FieldJoin<R> {
     pub fn new(client: ComputeClient<R>, b: u32) -> Result<Self> {
         let coord = Coord::for_base(b)?;
         match b {
-            64 => Ok(Self::Narrow(GpuJoin::new(client, Caps::b64(CLASSES_B64))?)),
+            64 => Ok(Self::Narrow(Box::new(GpuJoin::new(
+                client,
+                Caps::b64(CLASSES_B64),
+            )?))),
             65..=70 => Ok(Self::Wide(
-                WideJoin::new(
+                Box::new(WideJoin::new(
                     client,
                     WideCaps::for_base(b),
                     &coord,
                     Shape::for_coord(&coord),
-                )?,
+                )?),
                 b,
             )),
             _ => bail!("middle-out: no device path for base {b}"),

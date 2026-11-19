@@ -1,7 +1,8 @@
 //! The middle-out route (development, off by default): claim fields of the
 //! middle-out coordinate from a local coordinator, search them with
 //! `nice_common::midout::route`, submit. Reached only through
-//! `--midout-coordinator URL`; nothing else in the client calls it.
+//! `--midout-coordinator URL`; nothing else in the client calls it. Built
+//! only with a `CubeCL` backend (feature `cubecl`).
 //!
 //! Guards (each refuses with a reason and a non-zero exit, and submits
 //! nothing for the field at hand):
@@ -14,7 +15,7 @@
 //! - a field whose accounts fail or whose sampled CPU check differs is not
 //!   submitted (the library returns an error);
 //! - a panic on any thread of the process (the GPU runtime's stream thread
-//!   above all: CubeCL panics there on a failed allocation and the caller
+//!   above all: `CubeCL` panics there on a failed allocation and the caller
 //!   sees nothing) is recorded by a panic hook; after one, nothing more is
 //!   submitted.
 
@@ -52,7 +53,9 @@ fn install_panic_hook() {
 /// The panics recorded so far, or `Ok` if none.
 fn no_panic_so_far() -> Result<()> {
     if PANICKED.load(Ordering::SeqCst) {
-        let v = PANICS.lock().map(|v| v.join("; ")).unwrap_or_default();
+        let v = PANICS
+            .lock()
+            .map_or_else(|_| String::new(), |v| v.join("; "));
         bail!("middle-out: a thread of this process panicked ({v}): nothing more is submitted");
     }
     Ok(())
@@ -154,7 +157,6 @@ pub async fn run(cli: &Cli, url: &str) -> Result<()> {
         .map_err(|e| anyhow!("middle-out: the route's thread ended: {e}"))?
 }
 
-#[cfg(feature = "cubecl")]
 fn run_blocking(cli: &Cli, url: &str) -> Result<()> {
     use nice_common::cubecl_backend::CubeclContext;
     let ctx = match cli.gpu_backend {
@@ -179,12 +181,6 @@ fn run_blocking(cli: &Cli, url: &str) -> Result<()> {
     }
 }
 
-#[cfg(not(feature = "cubecl"))]
-fn run_blocking(_cli: &Cli, _url: &str) -> Result<()> {
-    bail!("middle-out: this build carries no CubeCL backend (build with --features cubecl-cuda)")
-}
-
-#[cfg(feature = "cubecl")]
 fn drive<R: nice_common::midout::route::DeviceRuntime>(
     cli: &Cli,
     url: &str,
