@@ -18,8 +18,8 @@
 //!   submitted (the library returns an error);
 //! - a panic on any thread of the process (the GPU runtime's stream thread
 //!   above all: `CubeCL` panics there on a failed allocation and the caller
-//!   sees nothing) is recorded by a panic hook; after one, nothing more is
-//!   submitted.
+//!   sees nothing) is recorded by a panic hook, installed before the device
+//!   context is made; after one, nothing more is submitted.
 
 use crate::Cli;
 use anyhow::{Context, Result, anyhow, bail, ensure};
@@ -162,6 +162,8 @@ pub async fn run(cli: &Cli, url: &str) -> Result<()> {
 
 fn run_blocking(cli: &Cli, url: &str) -> Result<()> {
     use nice_common::cubecl_backend::CubeclContext;
+    // before the device context: a runtime thread can panic while it is made
+    install_panic_hook();
     let ctx = match cli.gpu_backend {
         #[cfg(feature = "cubecl-cuda")]
         crate::GpuBackend::Auto | crate::GpuBackend::CubeclCuda => {
@@ -173,7 +175,7 @@ fn run_blocking(cli: &Cli, url: &str) -> Result<()> {
         other => bail!("middle-out: backend {other:?} has no middle-out path"),
     };
     let device = ctx.device_name();
-    install_panic_hook();
+    no_panic_so_far()?;
     if is_metal(&device) {
         bail!(
             "middle-out: the join has never been checked on an Apple Metal device ({device}), so this route refuses it"
