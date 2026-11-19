@@ -58,6 +58,26 @@
 //! - **Account** (`acc`, `ACC_WORDS` = 16 words per slice): the `A_*` words below; the same stages as the
 //!   base-64 path's table, without the separate top-record kernel (`A_TREC`) and with the parents' scan and
 //!   sort as `A_HSCAN`, `A_SORT`, so the indices differ from the base-64 path's.
+//!
+//! # Correspondence with the base-64 path
+//!
+//! What the narrow path gains must be ported here by hand; this is the map (base-64 item → wide item). Parent
+//! sharing across digit 8 (`anc8_kernel`) and the host-tops path have no wide counterpart.
+//!
+//! | base 64 ([`super::gpu`]) | wide (this module) |
+//! |---|---|
+//! | `GpuJoin`, `Caps::b64` | `WideJoin`, `WideCaps::for_base` |
+//! | `g2_kernel`, `child_mask` | `wide_kernel`, `child_w` |
+//! | `tops5`, `tops1`, `tscan`, `tops2`, `tdigz2` | `wtops5`, `wtops1`, `wscan`, `wtops2`, `wtdigz` |
+//! | `toprec2` (production's top records) | — (`wcheck_kernel` reads the tops itself) |
+//! | `hist2`, `scan16`, `scatter3`, `hsort` | `whist`, `wscan`, `wscatter`, `wsort` |
+//! | `expand_kernel` with `pf` / `pf24` | `wexpand_kernel` with `pf_w2` (`pf_w`: the earlier form) |
+//! | production's `check_kernel` | `wcheck_kernel` |
+//! | `done_kernel` | `wdone_kernel` |
+//! | `queue_dev_prep`, `queue_batch`, `queue_done`, `queue_dev` | `queue_prep`, `queue_batch`, `queue_done`, `queue_slice` |
+//! | `finish_group`, `check_slice`, `A_*`, `C_*` | `finish_group`, `check_slice`, `A_*`, `C_*` (other indices) |
+//! | `run_slice_dev` | `run_slice` |
+//! | `search_field`, `GpuOptions`, `sample_compare` | `search_field_wide`, `WideOptions`, `wide_sample_compare` |
 
 #![allow(
     clippy::cast_possible_truncation,
