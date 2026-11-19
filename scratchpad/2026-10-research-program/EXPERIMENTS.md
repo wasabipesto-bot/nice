@@ -35,6 +35,36 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.13 The branch cleaned for review: seven must-fix items done; exactness and speed unchanged (step 6C; 2026-11-19 12:15–14:52 UTC, engineer; `G2/BUILD-BRIEF-6C.md`, `G2/CLEAN-NOTES.md`, `G2/build6c/`; branch `dev/mo-clean` 5a048669, 14 commits on the trunk's 66259bb0, on the fork; box 61441981, RTX 3080 at 240 W)
+
+- **M3** (prototype switches out of the narrow main kernel): eight fixed comptime switches, their dead branches and
+  an unused argument removed; the launch passes only the plane width and the fill. Byte identity cannot be shown on
+  CubeCL 0.10 (two runs of one binary give different SPIR-V and IR; two builds give different CUDA declaration order
+  and shared-memory placement [M]); the proof is CubeCL's CUDA source compared after normalising exactly those
+  things: the main kernel differs by three dead selects, one repeated comparison and eight zero or copy
+  assignments, every other kernel is identical; plus parity, fault tests and timing.
+- **M4** a stage table (what each stage proves, what the host compares it with) and the data layouts in both device
+  modules. **M5** every reference to notes, step labels, dates, machines and prototype flags replaced or removed
+  (the grep is empty). **M6** part-field, timing and stop functions behind a feature `midout-bench`; host-tops
+  options crate-private; the route accepts bases 64 and 65 only. **M7** the client flag hidden from `--help`.
+- **M1** three test tiers, documented in the module docs: ordinary CPU tests; eight device tests named
+  `cubecl_midout_*` that CI's lavapipe jobs select; card-only and long tests behind a feature `midout-box-tests`;
+  nothing writes to fixed paths. Found on the way: an ordinary test of the trunk (`audit_coord_slices_partition`)
+  assumed the old coordinate and failed: CI would have gone red; fixed.
+- **M2** the device tier passes on lavapipe through WGSL (naga) as well as SPIR-V: nothing failed. The prefilter
+  form is now an explicit rule (32-bit limbs on CUDA, 24-bit elsewhere), which changes what WGSL, Metal and HIP
+  would run; CI tests both forms. Production's Apple lint over all 27 midout kernels found one of the known
+  miscompile patterns (`u32(pip>>32) % 63` in the preparation): fixed, the lint reports 0. Metal itself not run.
+- **Should items:** seven of nine done (among them the production constants now shared, not copied).
+- **At the head** [M]: `just lint` and the new feature sets clean; production's CI test commands pass; 265 ordinary
+  tests; the device tier on lavapipe in 3.7 min (WGSL) and 3.1 min (SPIR-V) and on CUDA; the card tier on CUDA
+  (two whole slices n for n, both prefilter forms, the fault tests, sharing with faults, base-65 parity and
+  faults). **Timing** [M, eight alternating runs in two blocks]: 1.6269 fs at the head against 1.6242 at the
+  trunk (+0.17 %, inside the 0.4 % drift between blocks); per-stage times equal; every count equal (80 of 80
+  sampled checks).
+- **Not verified:** the cleaned head at 64 lanes on the RX 9070 XT (the lease measured the trunk before the
+  cleanup); Metal.
+
 ## MO.12 The library path on the RX 9070 XT: exact at 64 lanes; ×4.79 against main end to end; the client route run there (2026-11-19 13:55–14:29 UTC, director, demoux under the user's 2-hour lease (35 minutes used); `G2/WINDOW-PLAN-2.md`, `G2/build4s/window_1119/` (go.out, 45 logs and samples, `route/` with the coordinator's records and the client log); builds on demoux from the bundle: trunk 66259bb0 with `--features cubecl-spirv`; Mesa 26.1.6 RADV; production client stopped by the user and never touched)
 
 - **Exact at 64 lanes** [M]: "the device path ran at W 64"; seven narrow slices in three processes (four through

@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-19 14:40 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-19 15:10 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. To answer, reply in the chat with the numbers, for
@@ -15,7 +15,7 @@ once for a far larger span and paired with a bit-sliced kernel.
 
 | | state on 2026-11-19 |
 |---|---|
-| code | branch `dev/middle-out-join` on the fork (`wasabipesto-bot/nice`), 13,300 inserted lines, no PR yet; a cleanup branch `dev/mo-clean` is being made today |
+| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); about 13,000 inserted lines, no PR yet; the first two PRs (no GPU code) are being cut |
 | speed, base 64, RTX 3080, end to end against v3.4.8's join, same session | **×4.09** (1.62 fs against 6.62 fs per candidate) |
 | speed, base 64, RX 9070 XT (demoux), end to end against v3.4.8's join, same session | **×4.79** (0.99 fs against 4.76 fs per candidate), measured 2026-11-19 at 64 lanes; exact on every slice and field tried; the client route also ran there against a local coordinator (12 fields). At that speed base 64 on that card alone is about 55 days instead of about 266 |
 | base 65 (needs masks wider than 64 bits; production has no join there at all) | exact on a GPU; 3.47 fs per candidate, about half an RTX-3080-year for the whole base |
@@ -125,8 +125,9 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
   paths. One *older* test (from #263, mine) fails there: it forces a form of the survivor queue that production
   never selects on a 64-lane card. Production's own form passes in every configuration, and the forced form
   fails loudly, not silently. So: nothing is wrong with the client on demoux; the test is wrong on that card.
-- **Follow-up:** a 12-line, test-only fix (branch `pr/queue-test-plane-width`), already run on the card (both
-  tests pass). I open it as a small PR after an independent review. **If you do not answer:** I open it.
+- **Follow-up: pull request #271** (opened 2026-11-19 15:00 UTC): a 16-line, test-only fix, independently
+  reviewed, run on your card (both tests pass), on the software renderer with both compilers, and through
+  `just lint`. **Recommendation:** merge.
 
 ### D11. A `--gpu` client whose CUDA runtime cannot start
 
@@ -165,7 +166,8 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 
 ## What happens next if you say nothing
 
-1. Today: the cleanup branch (by 17:30 UTC); the small test-fix PR.
-2. Next two days: PRs 1 and 2 (coordinate; CPU reference) cut from the cleaned tree, independently reviewed,
-   opened. The device PRs follow, at most two or three open at once.
+1. Today: the first two pull requests cut from the cleaned tree (coordinate; CPU reference), then an
+   independent review of each.
+2. Tomorrow (2026-11-20): I open those two. The device PRs follow over the next days, at most two or three
+   open at once.
 3. Nothing touches the server, the fleet, or the default client's behaviour.

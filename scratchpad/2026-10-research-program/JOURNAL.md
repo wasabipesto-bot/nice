@@ -109,6 +109,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   select that form on such a device. The PR opens when `just lint` and the lavapipe runs come back from the
   cleanup engineer's box (`SRA/raw/qtest/`); body drafted in `SRA/QTEST-PR-BODY.md`.
 
+- **14:52 UTC: the cleanup is back (EXPERIMENTS MO.13)**: all seven must-fix items, `dev/mo-clean` 5a048669,
+  exactness and speed unchanged on CUDA (+0.17 %, inside drift); the kernels pass through WGSL; one Apple
+  miscompile pattern found by production's lint and fixed; an ordinary test that would have turned CI red found
+  and fixed. Not re-run on the RX 9070 XT after the cleanup.
+- **15:00 UTC: PR #271 opened** (the 12-line test fix; reviewed "merge"; `just lint` and lavapipe with both
+  compilers pass on the box; both tests pass on the RX 9070 XT). It is the only open non-draft PR.
+- **15:05 UTC: step 7P started** (`G2/BUILD-BRIEF-7P.md`, Opus, the same box, hard stop 17:30): the first two
+  pull requests cut from the cleaned tree as fresh commits (the coordinate; the CPU reference), each standing
+  alone, with descriptions; not opened. An independent review follows; I open them tomorrow unless the user's
+  answers to `DECISIONS.md` say otherwise (D1, D2, D8, D9 defaults).
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);

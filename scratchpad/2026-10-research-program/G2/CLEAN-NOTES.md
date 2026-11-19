@@ -7,7 +7,20 @@ lavapipe (LLVM 20.1.2, 256 bits), Rust 1.100.0 (the repo's pin). Box scripts `G2
 `G2/build6c/raw/`. Production hosts mapped to 127.0.0.1 and ::1 at 12:14 UTC before anything ran
 (`raw/proof_hosts_block.txt`).
 
-(written as the work proceeds; section 1 is current)
+
+## 1. Where it stands
+
+**Done by 14:45 UTC.** Branch `dev/mo-clean` (14 commits on `66259bb0`, head **`5a048669`**) on ivory and
+`fork/dev/mo-clean`. All seven must-fix items, each its own commit (M3 in two), and S1, S2, S4 (rustc part), S5,
+S7, S8, S9 and S3's doc part. At the head: `just lint` and the new feature sets clean; production's CI test
+commands pass; tier (a) passes; tier (b) passes on lavapipe through WGSL and SPIR-V and on CUDA; the card tier
+(slice parity both prefilter forms, both fault tests, parent sharing, wide parity) passes; ten fields: head 1.6269,
+trunk 1.6242 fs per admissible n (+0.17 %, inside drift; per-stage times equal), every count equal.
+
+Found on the way: **the trunk's ordinary test `audit_coord_slices_partition` failed** (it assumed the old
+coordinate; CI would have gone red), fixed in M1; **one Apple-miscompile pattern** in `hist2` (flagged by
+production's own WGSL lint), fixed in M2; WGSL needed no fix. M3's proof is a normalised CUDA-source comparison, not
+byte identity (CubeCL's output is not deterministic enough for that; §M3).
 
 ## 2. The must-fix items: what was done and the proof
 
@@ -200,6 +213,26 @@ head itself is verified in full in §4.
 | wide parity, base 65 slice 717171717 | pass (527,041 survivors, 1,701,945 tops) | 102 s |
 | wide fault test, base 65, slices 717171717 and 0 | all six loud | 95 s |
 | client (default features) `--help` | no line mentions midout (139 lines); `--midout-coordinator` still parses and exits 1 in a build without CubeCL, before any network | — |
+
+## 5. The timing: the head against the trunk, ten base-64 fields, one session
+
+Box above, RTX 3080 at its 240 W cap (mean 236–237 W, SM 1,557–1,560 MHz, at most 74 °C), both benches built with
+the repository's release profile (`raw/build_logs/fin/bins.txt`: trunk `66259bb0` md5 `b104f7cd`, head `5a048669`
+md5 `c24a7700`), the build notes' ten fields (t = 13107 … 249036), the bench's defaults (group 16, parents shared,
+sampled CPU check on), runs alternating, nothing else running. Two blocks 13:58–14:44 UTC (`raw/ten_head`,
+`raw/ten2_head`):
+
+| run | trunk | head |
+|---|---|---|
+| block 1 (trunk first) | 1.6212, 1.6216 | 1.6237, 1.6276 |
+| block 2 (head first) | 1.6284, 1.6254 | 1.6276, 1.6285 |
+| **mean of four, fs per admissible n** | **1.6242** | **1.6269 (+0.17 %)** |
+
+Per stage on field 77777 (cumulative timing stops, no accounts, two runs each): parents 3.79/3.78 s trunk,
+3.79/3.80 s head; through the main kernel 26.52/26.58 s against 26.54/26.56 s; through the expansion 30.67/30.72 s
+against 30.63/30.70 s: **the kernels are the same speed**; the +0.17 % of whole fields is inside the drift between
+the two blocks (trunk alone moved 0.4 %) and the morning's 1.62 fs. **Exactness:** survivors, checked and nice
+numbers equal field for field in all eight runs (none nice), and every sampled CPU check equal (80 of 80).
 
 ## 6. What is left (for the series, not for this branch)
 
