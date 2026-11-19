@@ -35,6 +35,25 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.10 The 64-lane pre-flight repeated at the new head; card memory; predicted ×4.87 (2026-11-19 10:50–11:56 UTC, the offline engineer resumed, ivory only; `G2/BUILD-NOTES.md` §14, `G2/build4s/preflight_h5l.md`, `G2/WINDOW-PLAN-2.md` (top section), `G2/build4s/window/`, `G2/build4s/window_dryrun2/`; trunk e09ad7b0 → 66259bb0 (one test-only commit), on the fork)
+
+- **Pre-flight** [M, static]: every kernel of both paths compiled for 64 lanes, validated and run through ACO for
+  GFX1201. The new `anc8_kernel`: 48 VGPRs, 32 waves, 148 VALU cycles, plane check present, the ballot's second
+  word handled at 64 lanes: about 0.002 ms per slice. The wide expansion with the base-b² prefilter: 1,193 → 771
+  cycles in the prefilter loop, 60 → 48 VGPRs, 24 → 32 waves. Everything else within 2 % of the earlier listing.
+  Nothing found that would stop a window; nothing needed fixing.
+- **Card memory per join** [D from buffer sizes; peak estimated at the 1.93× the 3080 showed]: b64 with sharing:
+  2.56 GB of buffers (870 MB the shared lists), peak ≈ 4.9 GB; b65 wide: 4.30 GB, peak ≈ 8.3 GB. Both fit a
+  10 GB and a 16 GB card beside production's 2 GiB budget. Untested: the largest single buffer (the b65 child
+  list, 1.1 GB) has never gone through wgpu / RADV; a refusal would be loud.
+- **Model** [P]: parents 0.48–0.52 → 0.31–0.35 ms per slice; slice 4.01–4.64 ms = 0.97 fs per admissible n:
+  **×4.87 against the card's main, band ×4.54–5.25**; the main kernel binds (74 %).
+- **Window plan** (22 minutes, 24 with PR #270's tests as an optional step 0 from their own binary): exactness
+  on seven slices (four through the shared lists, three unshared under (4, 8, 5)), the wide path alone
+  afterwards, one whole field under the old coordinate with the sampled CPU check; timing on the same field
+  indices under the new coordinate; outcomes T1 ≥ ×4.54, T2 ×4.0–4.54, T3 < ×4.0. Dry run on lavapipe: every
+  step rc 0; PR #270's two tests pass there. Not exercised in the dry run: sharing inside a whole bench field.
+
 ## MO.9 Fields that fix digits 5–7, parents shared across digit 8, the wide prefilter in base b²: ×4.09 on the RTX 3080 (step 5L; 2026-11-19 08:40–10:40 UTC, engineer; `G2/BUILD-BRIEF-5L.md`, `G2/BUILD-NOTES.md` §1 and §13, `G2/BUILD-NOTES-CLIENT.md` §11, `G2/build5l/`; trunk cc0a9e04 → e09ad7b0, seven commits, on the fork; box 61386517, RTX 3080 at 240 W, destroyed 10:45 after 4.99 h)
 
 - **The coordinate (4, 8, 5)** (default at bases 64 and 65 since 4925122a; (4, 9, 6) still supported, and the

@@ -135,3 +135,14 @@ outputs `G2/build4s/window_dryrun/`, the analysis `analysis.txt`):
    stage profile and the sampled check's cost (~16 min); spares: a third round and one b65 field.
 3. Predicted ×4.69 (×4.38–5.04) against main; below ×4.0 stop and report which stage exceeded its band.
 
+
+## Dry run 2 [M] (step 5L's head, ivory lavapipe W 8, 10:52–11:55 UTC, `G2/build4s/window_dryrun2/`)
+
+`dryrun_lvp.sh` with the updated driver and binaries of `66259bb0` (`t_mo`, `mo_bench`, `mo_wide_bench`) plus
+`t_pr270` (`05f18331`): every step rc 0. `p_pr270` 2 passed; `x_g1` 712012851 and `x_g2` 4977728 **through the
+shared depth-8 lists** (1,892,668 and 1,892,685 roots listed), `x_g3` 1061942336 unshared, `x_w` b40, `x_f`,
+`x_496` (field t 77777 under (4, 9, 6), first slice, sampled check equal) — `EXACT narrow=1 wide=1 faults=1
+old-coordinate=1`; rounds, main's bracket at 1e14 (701 s, 737 s), stages, `b_cc`, `b_r3`; `analyze_mo.py` printed
+every table. **Not exercised:** sharing inside a bench field (a one-slice field part uses each digit-4–7 value once,
+so the driver correctly built no lists: `SHARE t 77777: 0 depth-8 lists`; on the card's whole fields expect 64), the
+AMD sampler, `x_g1_w32`, `w_65`.

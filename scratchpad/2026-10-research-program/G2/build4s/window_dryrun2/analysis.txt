@@ -1,0 +1,33 @@
+## Exactness
+- p_pr270: PASS, W ?; 
+- x_496: PASS, W 8; 
+- x_f: PASS, W 8; 
+- x_g1: PASS, W 8; slice 712012851: device tops = host tops (238813)
+- x_g2: PASS, W 8; slice 4977728: device tops = host tops (239640)
+- x_g3: PASS, W 8; slice 1061942336: device tops = host tops (239362)
+- x_w: PASS, W 8; 
+
+## Whole fields (fs per admissible n; warm-up t 4095 dropped)
+- b_r1: 6365.8871 fs (6365.8871-6365.8871) over 1 fields; (0 busy samples of 120)
+- b_r2: 6214.3940 fs (6214.3940-6214.3940) over 1 fields; (0 busy samples of 119)
+- b_r3: 6306.4186 fs (6306.4186-6306.4186) over 1 fields; (0 busy samples of 119)
+- survivors and checked equal field for field across runs: yes
+
+## Main bracket
+- main_f2: 700.70 s (morning of 11-18 90.83 s, x7.7144); (0 busy samples of 2761)
+- main_f6: 736.84 s (morning of 11-18 100.41 s, x7.3383); (0 busy samples of 2791)
+- main base mean: 4.707 x 7.5264 = 35.427 fs
+
+## Ratio: 35.427 / 6306.4186 = x0.01 (median of 3 runs; min-run x0.01); model x4.53-5.24 against 4.707
+
+## Stage profile, field 77777 (ms per slice = s per field / 4,096; cumulative stops)
+- tops (1): 320.000 ms (model 0.12-0.24: ABOVE); (0 busy samples of 4)
+- parents (2-1): 530.000 ms (model 0.31-0.35: ABOVE); (0 busy samples of 8)
+- main kernel (3-2): 26450.000 ms (model 3.09-3.35: ABOVE); (0 busy samples of 115)
+- expansion (5-3): 570.000 ms (model 0.43-0.56: ABOVE); (0 busy samples of 118)
+- check and the rest (6-5): 240.000 ms (model 0.055-0.13: ABOVE); (0 busy samples of 118)
+- slice: 28110.000 ms (model 4.01-4.64)
+
+## Sampled CPU check: slice 262080 equal; field 32.53 s, CPU thread 22.15 s, host waited 0.00 s, rerun 28.249 s
+
+OUTCOME: T3 (< x4.0: the library path loses more on the card than on CUDA: stop and report the stage profile)

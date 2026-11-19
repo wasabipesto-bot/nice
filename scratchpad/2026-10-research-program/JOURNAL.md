@@ -74,6 +74,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **10:50 UTC:** the offline engineer was resumed to re-run the 64-lane pre-flight at the new head, add up card
   memory (the shared lists take 870 MB), update the model and the window plan (hard stop 12:45).
 
+- **11:56 UTC: the pre-flight at the new head is clean (EXPERIMENTS MO.10)**; memory fits 10 GB and 16 GB cards;
+  predicted ×4.87 (×4.54–5.25) on the card; the window plan is current (22–24 minutes). Trunk 66259bb0.
+- **12:05 UTC: a maintainability read and a pull-request plan started** (`G2/PRPLAN-BRIEF.md`, Opus, ivory,
+  read-only, to 15:00): what a reader cannot follow, leftovers, duplication, what CI would exercise; the
+  smallest series of stacked PRs under the user's rules; what to cut; at most seven questions for them.
+  Nothing else runs; no box is rented. The afternoon waits on the window (decision 15).
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);
