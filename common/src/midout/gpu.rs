@@ -1,25 +1,74 @@
 //! The device path of the middle-out join (CubeCL: CUDA, and Vulkan through
 //! SPIR-V or WGSL), base 64, shape (4, 10), `u64` masks.
 //!
-//! Per slice (one value of digits 4–8), all queued on one stream:
+//! # Stages of a slice, and what each one proves
 //!
-//! 1. host: the slice's tops (`tops_b64`, threads of the host in parallel
-//!    with the device), its 8 key digits and segments; uploaded;
-//! 2. preparation (from the G2 port, unchanged): parents of the 9.3M depth-4
-//!    roots under the slice's digits, counting-sorted by (class, key);
-//! 3. the main kernel (the port's kernel v10 in form D, unchanged): 64-pair
-//!    words, one record per nonzero word;
-//! 4. new here: the main kernel also writes each job's certified children
-//!    (their r4, in order) as phase 1 appends them, and its records name
-//!    their top and their chunk's position in the child lists;
-//!    `expand_kernel` turns records into production's survivor-list entries
-//!    `(top, r0)`, `n = P·b^5 + r0`, keeping those that pass production's
-//!    middle-digit prefilter (digits 10-11 of n² and n³);
-//! 5. production's full check, `cubecl_join::check_kernel`, unchanged, with
-//!    `P` and `w6` in production's top-record layout.
+//! A slice is one value `pip` of digits 4–8 of n (30 bits). Its stages are
+//! queued on one stream without a synchronisation; the host reads the
+//! device's counters once per group of slices (`finish_group`) and compares
+//! every account word (`A_*`, below) with what it queued (`check_slice`).
 //!
-//! Slices are queued without a synchronisation; the device's counters are
-//! read once per group of slices.
+//! | stage | kernels | hands the next stage | account (compared with) |
+//! |---|---|---|---|
+//! | tops | `tops5` (once per 64 slices), `tops1`, `tscan`, `tops2`, `tdigz2`, `toprec2` | tops by segment (`tmask`, `thd`, `tmhi`, `tseg`), probe digits (`tdig`), production's top records | `A_T1_EXAM` (= the 64-slice level's count), `A_T1_CERT`, `A_T2_PLACED`, `A_TDIG`, `A_TREC` (each = the tops certified), `A_TSCAN` (= 1) |
+//! | parents | `anc8` (when shared, once per value of digits 4–7), `hist2`, `scan16`, `scatter3`, `hsort` | parent records sorted by (class, key), `pseg` | `A_H2_CUBES` (= its grid), `A_H2_CERT` and `A_SCAT` (= the list length), `A_SCAN16` (= 1), `A_HSORT` (= 16,128), `A_SC_CHILD` (= the main kernel's children) |
+//! | main kernel, per batch of classes | `g2_kernel` | records (slabs), child lists | `A_JOBS` (= instances queued), `A_PROBES` (= 8 × tops), `A_CHILD` (= `A_SC_CHILD`) |
+//! | expansion, per batch | `expand_kernel` | survivor entries `(top, r0)` that pass the middle-digit prefilter | its `stat` words: cubes done (= its grid), slabs walked (= slabs used), bits read (= the main kernel's survivors) |
+//! | full check, per batch | production's `cubecl_join::check_kernel`, unchanged | nice numbers | its `ran` words (production's own: entries checked = the list) |
+//! | done | `done_kernel` | the slice's done word | `A_DONE` (= 1) and the group's `C_SLICES` (= slices queued) |
+//!
+//! Every account word starts at 0 and none may stay 0 for a stage that ran,
+//! so a launch that did not run, a dropped stage or a failed allocation is an
+//! error, not an empty slice. The two conservation laws tie the stages
+//! together: the children the main kernel saw equal the children `scatter3`
+//! listed, and the survivor bits the expansion read equal the bits the main
+//! kernel wrote. What no account can see (a wrong certificate, a wrong child
+//! mask, a false common-mask skip, a too-strict prefilter: work that ran and
+//! computed wrongly) is what the sampled CPU check exists for
+//! ([`GpuOptions::cpu_check`]).
+//!
+//! # Data layouts
+//!
+//! - **Parent record** (`par`, one `Vector<u32, 4>`): `[mask lo, mask hi,
+//!   cacc, r4]`. `mask` is the 64-bit digit mask of the parent's r² and r³
+//!   digits; `r4` its residue mod 64^4 (24 bits); `cacc = c2 | c3 << 8 | a2 <<
+//!   16 | a3 << 24` (6-bit fields): the child of unit `d` adds digits `(c2 +
+//!   a2·d) mod 64` and `(c3 + a3·d) mod 64` (`child_mask`). Records are sorted
+//!   by class `c` and key; `pseg[c] .. pseg[c + 1]` is class `c`.
+//! - **Top**: `thd = h | d << 16` (lead `h` in `[2^15, 2^16)`, unit `d`),
+//!   `tmask` its certified digits, `tmhi` the certificate's digits at
+//!   positions ≥ 12 (the prefilter's); sorted into segments `tseg[(d·63 +
+//!   ct)·2] .. [+1]` by (unit, `h mod 63`). `tdig` holds each top's digits as
+//!   20 6-bit fields, 5 per word in 4 words, padded with its first digit (OR
+//!   is idempotent); at most `MAXPOP` = 17 are read.
+//! - **Production's top record** (`TOP_REC_WORDS` = 8 words per top):
+//!   `P = n div 64^5` in words 0–1 and `w6 = P mod 64^5` in word 6
+//!   (`toprec_kernel`), as `check_kernel` reads them.
+//! - **Job** (`jobs`, two words): `[c, d | poff << 8]`: class `c`, unit `d`
+//!   (8 bits), `poff` the job's first probe (0, or `PMAX` for the second
+//!   instance of a job with more than `PMAX` probes).
+//! - **Probe** (the main kernel's shared `prob_d`, one `Vector<u32, 4>`): the
+//!   top's `tdig` words, with bits 12–31 of word 3 replaced by the top's index
+//!   (digits 15–16 stay in bits 0–11; a top index must fit 20 bits, checked by
+//!   the host).
+//! - **Child list** (`clst`, one word per child: its `r4`): per batch, job
+//!   `(c, d)` writes its certified children in order from position
+//!   `64·(pseg[c] − pseg[c0]) + d·(pseg[c + 1] − pseg[c])`, `c0` the batch's
+//!   first class; a position past the list is an error (`C_ERR_CLST`).
+//! - **Record** (`out`, one `Vector<u32, 4>`): `[top index, child-list
+//!   position of the chunk's first child, word lo, word hi]`: bit `b` of the
+//!   64-bit word is the pair (this top, the chunk's child `b`), a survivor of
+//!   the join. Records go to plane-private slabs of `SLAB` = 256
+//!   (`slabcnt[s]` records in slab `s`, `slabn[0]` slabs used).
+//! - **Survivor entry** (`surv`, two words, production's survivor-list
+//!   layout): `[top index, r0]`, `r0 = n mod 2^30` = the child's `r4` plus
+//!   digit 4 of the slice (`r0hi`), so `n = P·64^5 + r0`.
+//! - **Counters** (`cnt`, `NCNT` words, per group): 64 units × 5 words
+//!   (children, chunks, flat pairs, kept chunks, survivors), then the error
+//!   words `C_ERR_*` and the slice count `C_SLICES`.
+//! - **Account** (`acc`, `ACC_WORDS` words, one buffer per slice): the `A_*`
+//!   words of the table above, `A_ERR_PLANE` (a kernel ran on planes of
+//!   another width) last.
 
 #![allow(
     clippy::cast_possible_truncation,
@@ -153,6 +202,9 @@ const NICE_CAP: u32 = 4096;
 const NICE_STRIDE: usize = 4;
 
 // ------------------------------------------------------------------------------------------------ device
+/// The main kernel (`g2_kernel`) and its plane helpers: per job (class, unit) of a batch, the children of the
+/// class's parents in 64-child chunks against the unit's probes; writes records, child lists and the main kernel's
+/// account words (see the module's data layouts).
 mod kernels {
     use super::{
         A_CHILD, A_JOBS, A_PROBES, C_ERR_CLST, C_ERR_IDX, C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB,
@@ -799,6 +851,11 @@ mod kernels {
     }
 }
 
+/// The parents of a slice: `anc8_kernel` (the roots valid to depth 8, shared across digit 8 of a field), `hist2`
+/// (each root's parent, certified or not, counted by (class, key bucket) and appended to a compact list), `scan16`
+/// (the bucket offsets), `scatter3` (the list into bucket order, with each parent's certified-children count) and
+/// `hsort` (each bucket sorted by r4, the CPU reference's order): `pseg` and the sorted parent records. Also
+/// `tdigz` (the host-tops path only: the top digits, and the zeroing of the slice's counters).
 mod prep {
     use super::{A_ERR_PLANE, A_H2_CERT, A_H2_CUBES, A_HSORT, A_SC_CHILD, A_SCAN16, A_SCAT};
     use cubecl::prelude::*;
@@ -1314,6 +1371,9 @@ mod prep {
 
 /// New for the library path: what turns the main kernel's records into
 /// production's survivor list.
+/// After the main kernel: `expand_kernel` (records to production's survivor entries through the middle-digit
+/// prefilter, `pf` or `pf24`), `done_kernel` (the slice's done word) and `toprec_kernel` (production's top records
+/// from the host's tops, the host-tops path).
 mod post {
     use super::{A_DONE, C_SLICES, NT, SLAB};
     use cubecl::prelude::*;

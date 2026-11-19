@@ -3,7 +3,7 @@
 //! expansion and the wide full check on the device. With `--narrow` (base
 //! 64 only), the same fields also through the 64-bit path
 //! (`midout::gpu::search_field`), alternating, in the same process. Local
-//! only: no API, no claims, no submissions.
+//! only: no API, no claims, no submissions. Needs the feature `midout-bench`.
 //!
 //! usage: midout_wide_bench [--cuda] [--base B] [--fields T0,T1,..] [--group G] [--classes C]
 //!                          [--maxpop P] [--ninst I] [--narrow] [--narrow-only] [--digits K0,K1,Q0] [--pf-digits]

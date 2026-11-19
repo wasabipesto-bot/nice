@@ -35,6 +35,29 @@
 //! `check_kernel` holds digits in one 64-bit mask and refuses bases above
 //! 64. Survivor entries are `(top, r mod b^f0)`; the check rebuilds `n`
 //! from the top's `(h, d)`, the slice's digits and the entry.
+//!
+//! # Data layouts (where they differ from the base-64 path's, see [`super::gpu`])
+//!
+//! - **Parent record** (`Vector<u32, 4>`): `[mask lo (digits 0–31), mask lo (32–63), cacc, rf | mask hi <<
+//!   RF_BITS]`: `rf = r mod b^f0` in the low `RF_BITS` = 25 bits, the mask's digits 64..b above it; `cacc = c2 |
+//!   c3 << 8 | a2 << 16 | a3 << 24` (8-bit fields), the child of unit `d` adding digits `(c2 + a2·d) mod b` and
+//!   `(c3 + a3·d) mod b` (`child_w`).
+//! - **Top digits** (`tdig`, `TDW` = 5 words per top): 7-bit digit fields, 4 per word, padded with the first
+//!   digit.
+//! - **Job** (two words): `[c, d | poff << 8]`, as on the base-64 path; a job runs as `ninst` instances of
+//!   `PMAX` probes, `poff` the instance's first probe.
+//! - **Child list**: job `(c, d)` of a batch writes its certified children's `rf` from position `(pseg[c] −
+//!   pseg[c0])·b + d·(pseg[c + 1] − pseg[c])`.
+//! - **Record** (`Vector<u32, 4>`): `[probe | d << 16 | c << 24, chunk position, word lo, word hi]`: the probe's
+//!   index in the job's probe list (16 bits, `poff` included), the unit and the class (8 bits each), the chunk's
+//!   first child relative to the job's list start (the expansion adds the start from `c` and `d`), and the
+//!   64-pair word as on the base-64 path.
+//! - **Survivor entry** (`surv`, two words): `[top index, rf]`; the check (`wcheck_kernel`) rebuilds `n` from
+//!   the top's `(h, d)`, the slice's digits and `rf`.
+//! - **Counters** (`cnt`, `NCNT` words): units × 5 as on the base-64 path (up to 70 units), then `C_*`.
+//! - **Account** (`acc`, `ACC_WORDS` = 16 words per slice): the `A_*` words below; the same stages as the
+//!   base-64 path's table, without the separate top-record kernel (`A_TREC`) and with the parents' scan and
+//!   sort as `A_HSCAN`, `A_SORT`, so the indices differ from the base-64 path's.
 
 #![allow(
     clippy::cast_possible_truncation,
@@ -148,6 +171,8 @@ const NICE_STRIDE: usize = 4;
 const RF_BITS: u32 = 25;
 
 // ------------------------------------------------------------------------------------------------ device
+/// The wide main kernel (`wide_kernel`) and its helpers (`dbit`: a digit's bit in the two-word mask, `child_w`:
+/// a parent's child at unit `d`).
 mod wk {
     use super::{
         A_CHILD, A_JOBS, A_PROBES, C_ERR_CLASS, C_ERR_CLST, C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB,

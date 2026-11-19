@@ -1,7 +1,8 @@
 //! Whole base-64 fields of the middle-out join through the library path
-//! (`midout::gpu::search_field`): tops on the host, preparation, main kernel,
-//! survivor expansion and production's full check on the device. Local only:
-//! no API, no claims, no submissions.
+//! (`midout::gpu::search_field`): tops, preparation, main kernel, survivor
+//! expansion and production's full check on the device (`--host-tops`: the
+//! tops on the host instead). Local only: no API, no claims, no submissions.
+//! Needs the feature `midout-bench`.
 //!
 //! usage: midout_bench [--cuda] [--fields T0,T1,..] [--group G] [--threads N] [--classes C] [--tops-only K]
 //!                     [--no-cpu-check] [--slices K] [--digits K0,K1,Q0] [--no-share-parents]
