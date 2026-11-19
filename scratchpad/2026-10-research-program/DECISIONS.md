@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-19 14:10 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-19 14:40 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. To answer, reply in the chat with the numbers, for
@@ -17,15 +17,14 @@ once for a far larger span and paired with a bit-sliced kernel.
 |---|---|
 | code | branch `dev/middle-out-join` on the fork (`wasabipesto-bot/nice`), 13,300 inserted lines, no PR yet; a cleanup branch `dev/mo-clean` is being made today |
 | speed, base 64, RTX 3080, end to end against v3.4.8's join, same session | **×4.09** (1.62 fs against 6.62 fs per candidate) |
-| speed, RX 9070 XT | library path not measured yet (the lease of 14:00 UTC today measures it); offline prediction ×4.87 (×4.5–5.3) |
+| speed, base 64, RX 9070 XT (demoux), end to end against v3.4.8's join, same session | **×4.79** (0.99 fs against 4.76 fs per candidate), measured 2026-11-19 at 64 lanes; exact on every slice and field tried; the client route also ran there against a local coordinator (12 fields). At that speed base 64 on that card alone is about 55 days instead of about 266 |
 | base 65 (needs masks wider than 64 bits; production has no join there at all) | exact on a GPU; 3.47 fs per candidate, about half an RTX-3080-year for the whole base |
 | exactness | CPU reference equals brute force on whole bases 10–25; GPU equals the CPU reference on 1,073 real base-64 slices; an independent audit found no loss path on a healthy card |
 | failure handling | every stage proves it ran (what ran = what was queued), two conservation checks, and one random slice per field recomputed on the CPU; a dropped kernel, a failed allocation or a wrong prefilter stops the field instead of reporting it empty |
 | how it runs today | a local coordinator script plus an off-by-default client flag; **no server, schema or API change exists or is proposed yet** |
 | what a field is | all n sharing digits 5–7 (base 64: 262,144 fields of 2^57 n; in the fields table it would still be a range, of a renumbered coordinate) |
 
-What it is not yet: reviewed by you, cleaned for review (in progress), run on your card as a whole path, or
-connected to the real server.
+What it is not yet: reviewed by you, cleaned for review (in progress today), or connected to the real server.
 
 Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumption that was four times too low.
 ×4.09 is the honest end-to-end number on NVIDIA.
@@ -114,17 +113,20 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 
 ## B. Production soundness
 
-### D10. Pull request #270 (open)
+### D10. Pull request #270 (merged by you on 2026-11-19) and one small follow-up
 
-- **What:** after a GPU memory allocation failure, the runtime silently skips later kernel launches; on the
-  nice-only *stride* path the v3.4.8 client then submitted unsearched fields as empty. The *join* path (all of
-  today's base-62 fields) already catches this. #270 adds the same check to the stride path.
+- **What it was:** after a GPU memory allocation failure, the runtime silently skips later kernel launches; on
+  the nice-only *stride* path the v3.4.8 client then submitted unsearched fields as empty. The *join* path (all
+  of today's base-62 fields) already caught this. #270 adds the same check to the stride path.
 - **Effect on past results:** none known. A census of all 984,248 nice-only submissions since v3.4.0 found 451
   that ran the exposed path (one fleet test on 2026-09-03), all on fields already searched on the CPU; the
   hand-written CUDA backend was tested separately and is not exposed (`EXPERIMENTS.md` SRA.3, SRA.4).
-- **Before merging:** two named tests on a Vulkan card. I am running them in today's lease and will add the
-  result to the PR.
-- **Recommendation:** merge once those pass.
+- **On your card (run after the merge, in the lease of 14:00 UTC):** #270's new test passes on all three stride
+  paths. One *older* test (from #263, mine) fails there: it forces a form of the survivor queue that production
+  never selects on a 64-lane card. Production's own form passes in every configuration, and the forced form
+  fails loudly, not silently. So: nothing is wrong with the client on demoux; the test is wrong on that card.
+- **Follow-up:** a 12-line, test-only fix (branch `pr/queue-test-plane-width`), already run on the card (both
+  tests pass). I open it as a small PR after an independent review. **If you do not answer:** I open it.
 
 ### D11. A `--gpu` client whose CUDA runtime cannot start
 
@@ -163,7 +165,7 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 
 ## What happens next if you say nothing
 
-1. Today: the lease's measurement on your card; the cleanup branch; PR #270's two tests.
+1. Today: the cleanup branch (by 17:30 UTC); the small test-fix PR.
 2. Next two days: PRs 1 and 2 (coordinate; CPU reference) cut from the cleaned tree, independently reviewed,
    opened. The device PRs follow, at most two or three open at once.
 3. Nothing touches the server, the fleet, or the default client's behaviour.
