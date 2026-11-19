@@ -1464,51 +1464,71 @@ mod post {
         lo.count_ones() + hi.count_ones() == 24u32 && ((mlo & tlo) | (mhi & thi)) == 0u32
     }
 
-    /// The bits of a record (top index, chunk position, word lo, hi) whose
-    /// survivor passes the prefilter; `hd` and `top` its top's h | d << 16 and
-    /// prefilter mask. An all-zero record (past the slab) has none.
+    /// The bits of two records (top index, chunk position, word lo, hi) whose
+    /// survivors pass the prefilter, in one loop over the four words (step
+    /// 4S: a plane runs as many rounds as its lane with the most bits, so one
+    /// loop over both records costs the plane max(a + b), not max(a) + max(b),
+    /// and the prefilter is most of a round); `hda`, `hdb` and `topa`, `topb`
+    /// their tops' h | d << 16 and prefilter masks. An all-zero record (past
+    /// the slab) has none. Returns the kept bits (a lo, a hi, b lo, b hi).
     #[cube]
-    fn keep_bits(
-        rec: Vector<u32, Const<4>>,
-        hd: u32,
-        top: u64,
+    fn keep_bits2(
+        reca: Vector<u32, Const<4>>,
+        recb: Vector<u32, Const<4>>,
+        hda: u32,
+        hdb: u32,
+        topa: u64,
+        topb: u64,
         lst: &Array<u32>,
         r0hi: u32,
         pip_hi: u32,
         nopf: bool,
         pfdrop: bool,
-    ) -> (u32, u32) {
-        let pos = rec[1usize];
-        // P = n div 2^30 = h·2^30 + d·2^24 + digits 5-8 (the top record's words 0-1)
-        let h = hd & 0xFFFFu32;
-        let plo = ((h & 3u32) << 30u32) | ((hd >> 16u32) << 24u32) | pip_hi;
-        let phi = h >> 2u32;
-        let mut klo = 0u32;
-        let mut khi = 0u32;
-        // one loop over both words: the plane runs max(bits) rounds, not that per word
-        let mut x = rec[2usize];
-        let mut y = rec[3usize];
-        while (x | y) != 0u32 {
+    ) -> (u32, u32, u32, u32) {
+        // P = n div 2^30 = h·2^30 + d·2^24 + digits 5-8 (the top record's words 0-1), per record
+        let ha = hda & 0xFFFFu32;
+        let hb = hdb & 0xFFFFu32;
+        let ploa = ((ha & 3u32) << 30u32) | ((hda >> 16u32) << 24u32) | pip_hi;
+        let plob = ((hb & 3u32) << 30u32) | ((hdb >> 16u32) << 24u32) | pip_hi;
+        let phia = ha >> 2u32;
+        let phib = hb >> 2u32;
+        let mut k0 = 0u32;
+        let mut k1 = 0u32;
+        let mut k2 = 0u32;
+        let mut k3 = 0u32;
+        let mut w0 = reca[2usize];
+        let mut w1 = reca[3usize];
+        let mut w2 = recb[2usize];
+        let mut w3 = recb[3usize];
+        while (w0 | w1 | w2 | w3) != 0u32 {
+            // the lowest set bit of the first nonzero word, in the order a lo, a hi, b lo, b hi
+            let ina = (w0 | w1) != 0u32;
+            let x = select(ina, w0, w2);
+            let y = select(ina, w1, w3);
             let inlo = x != 0u32;
-            let b = select(inlo, x.trailing_zeros(), y.trailing_zeros());
+            let wd = select(inlo, x, y);
+            let b = wd.trailing_zeros();
             let off = select(inlo, b, 32u32 + b);
-            if inlo {
-                x &= x - 1u32;
-            } else {
-                y &= y - 1u32;
-            }
+            let cl = wd & (wd - 1u32);
+            w0 = select(ina && inlo, cl, w0);
+            w1 = select(ina && !inlo, cl, w1);
+            w2 = select(!ina && inlo, cl, w2);
+            w3 = select(!ina && !inlo, cl, w3);
+            let pos = select(ina, reca[1usize], recb[1usize]);
             let r0 = lst[(pos + off) as usize] + r0hi;
+            let top = select(ina, topa, topb);
             if nopf
-                || (pf(r0, plo, phi, top) && !(pfdrop && (r0 >> 10u32).trailing_zeros() >= 10u32))
+                || (pf(r0, select(ina, ploa, plob), select(ina, phia, phib), top)
+                    && !(pfdrop && (r0 >> 10u32).trailing_zeros() >= 10u32))
             {
-                if inlo {
-                    klo |= 1u32 << b;
-                } else {
-                    khi |= 1u32 << b;
-                }
+                let bit = 1u32 << b;
+                k0 |= select(ina && inlo, bit, 0u32);
+                k1 |= select(ina && !inlo, bit, 0u32);
+                k2 |= select(!ina && inlo, bit, 0u32);
+                k3 |= select(!ina && !inlo, bit, 0u32);
             }
         }
-        (klo, khi)
+        (k0, k1, k2, k3)
     }
 
     /// Writes the kept bits' entries `(top, r0)` from `slot` on; returns the
@@ -1617,8 +1637,9 @@ mod post {
                     + reca[3usize].count_ones()
                     + recb[2usize].count_ones()
                     + recb[3usize].count_ones();
-                let (kla, kha) = keep_bits(reca, hda, topa, lst, r0hi, pip_hi, nopf, pfdrop);
-                let (klb, khb) = keep_bits(recb, hdb, topb, lst, r0hi, pip_hi, nopf, pfdrop);
+                let (kla, kha, klb, khb) = keep_bits2(
+                    reca, recb, hda, hdb, topa, topb, lst, r0hi, pip_hi, nopf, pfdrop,
+                );
                 let nb = kla.count_ones() + kha.count_ones() + klb.count_ones() + khb.count_ones();
                 let excl = plane_exclusive_sum(nb);
                 let tot = plane_sum(nb);
