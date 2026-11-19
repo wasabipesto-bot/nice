@@ -214,6 +214,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   switch out of the library, the audit's guards, a sampled CPU slice per field; acceptance = every silent fault
   now loud. Speed work resumes after it. The stride-fix engineer is on the other box until 02:30.
 
+- **01:26 UTC: the stride fix is written (EXPERIMENTS SRA.1)** and turns the three false empties into errors on
+  the card; detailed mode never had the gap. **01:30 UTC: independent review started** on the same box (hard
+  stop 03:15). The PR opens when its must-fix list is empty.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

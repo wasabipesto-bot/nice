@@ -4,8 +4,11 @@ Branch `pr/stride-ran-account` from upstream main 71eb5fcd (same `common/` and `
 worktree `~/projects/nice/.worktrees/stride-ran`, pushed to the fork. Commits: `7cf0c40d` (the fix, its tests,
 CHANGELOG), `3940f8a2` (test-only: the regression test without a `Debug` bound on the result, and `cargo fmt`).
 Production code is identical in both; the client binary measured on the card was built at `7cf0c40d`.
-PR description: `SRA/PR-BODY.md`. Box: Vast 61303619 (RTX 3080 20 GB), one target dir `/root/sra/target` for the
-one worktree `/root/sra/nice`; left running and idle.
+PR description: `SRA/PR-BODY.md`. Box: Vast 61303619 (RTX 3080 20 GB): worktree `/root/sra/nice` with target dir
+`/root/sra/target`, and upstream main at `/root/sra/base` with `/root/sra/t-base` (comparison run only);
+`libpq-dev` and `just` installed there; left running and idle (0 % GPU, no processes) at 01:25 UTC.
+Harness and scripts: `raw/harness/`; box logs: `raw/box/logs/`, runs: `raw/box/runs/` (run.log, hog.log, and
+client.log of the six hog runs) with everything in `raw/box/runs.tgz`.
 
 ## 1. The gap, kernel by kernel and consumer by consumer
 
@@ -76,7 +79,7 @@ check. Not measured under the hog tonight (the brief's three reproductions are a
 | lavapipe, WGSL | `cargo test --release --features cubecl -p nice_common -- --ignored` (CI's command) | pass, 41 |
 | WGSL Apple-division lint | CI's `wgsl_dump_for_lint` + `scripts/wgsl-lint.py` with CI's `--require` list | pass |
 | lavapipe, SPIR-V | `cargo test --release --features cubecl-spirv -p nice_common -- --ignored cubecl_` (CI's command) | pass, 32 |
-| CUDA (RTX 3080) | `cargo test --release --features cubecl-cuda -p nice_common -- --ignored cubecl_cuda_` | every stride and detailed test passes (incl. the new one on all three paths, partly-filled warps, queue faults, parity with the CPU). Two **join** tests failed in the parallel run and one in a `--test-threads=1` run, each on a CubeCL allocation failure (`can't allocate buffer of size: 1314320384` / `5257281536`) after the one test process had filled the card (19,976 MiB parallel; 16.5 GB serial); the join's own `ran` check caught them (`NotRun`, "top cubes run"). The serial failure, `cubecl_cuda_top_fd_matches_the_top_kernel`, passes alone (`phase6/topfd_alone.log`). Upstream main's run for comparison: BASE_PLACEHOLDER |
+| CUDA (RTX 3080) | `cargo test --release --features cubecl-cuda -p nice_common -- --ignored cubecl_cuda_` | every stride and detailed test passes (incl. the new one on all three paths, partly-filled warps, queue faults, parity with the CPU). Two **join** tests failed in the parallel run and one in a `--test-threads=1` run, each on a CubeCL allocation failure (`can't allocate buffer of size: 1314320384` / `5257281536`) after the one test process had filled the card (19,976 MiB parallel; 16.5 GB serial); the join's own `ran` check caught them (`NotRun`, "top cubes run"). The serial failure, `cubecl_cuda_top_fd_matches_the_top_kernel`, passes alone (`phase6/topfd_alone.log`). Upstream main (71eb5fc, its own worktree `/root/sra/base` and target dir `/root/sra/t-base`), same serial command: **the same test fails the same way** (16 passed, 1 failed, `can't allocate buffer of size: 5257281536`, "top cubes run", peak 16,471 MiB; `phase6/base_cuda_serial.log`). So this is pre-existing test-process memory pressure, not this change. |
 | Metal | `cargo check -p nice_common --all-targets --features cubecl-metal` | Rust compiles; the kernel's MSL is generated at run time, so the MSL was not produced or compiled here |
 
 The regression test without the fix (`phase2/nofix_*.log`: the `ran_complete(...)?` line deleted, nothing else):
@@ -142,5 +145,9 @@ field position are the same in both (6).
    dropped); with this fix the client now exits 1 on the first stride field, as the join does at its smallest
    layout. A supervisor that restarts the client will loop if memory stays short; nothing is submitted.
 4. The hand-CUDA backend (`GpuHandle::Cuda`) and the middle-out paths (not on main) were not examined.
-5. The plan cache (`cached_plan`) keeps a base's residue table handle for the process; if its allocation
+5. CUDA device tests share one CubeCL client per test process, and its pools keep what earlier tests
+   allocated: the join's `cubecl_cuda_top_fd_matches_the_top_kernel` fails on a 20 GB card when run after the
+   others (upstream main too; passes alone), and in parallel two more join tests do. A test-isolation fix
+   (one process per heavy test, or dropping the pools) is its own item.
+6. The plan cache (`cached_plan`) keeps a base's residue table handle for the process; if its allocation
    failed, every later field of that base fails (now loudly).

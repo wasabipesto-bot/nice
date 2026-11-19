@@ -31,8 +31,8 @@ No retry, no new flag or environment variable, nothing changes on a healthy devi
 
 - `cubecl_dropped_launches_fail_the_field` (wgpu, runs in the lavapipe jobs with both the WGSL and the SPIR-V compiler) and `cubecl_cuda_dropped_launches_fail_the_field`: a test-only switch makes `launch` count a launch without running it, as the device does when it drops one. On each path of the stride kernel (plain, cube-scoped queue, and the plane-scoped queue where the device runs it), a b50 field split into two launches must fail through the pipeline's own `wait` when both launches are dropped and when only the second is, and must return exactly the host mirror's survivors when none is. With the host's check removed, both tests fail (the field comes back `Ok`).
 - `ran_complete_wants_every_launched_cube`: the check itself, without a device.
-- Every existing stride-path device test now also passes through the account, including the partly-filled-plane tests (cubes of 100, 48 and 36 units, ballot and scan forms) on lavapipe and CUDA.
-- `just lint` passes; the whole suite passes; device tests pass on CUDA (RTX 3080) and on lavapipe with both compilers.
+- Every existing stride-path device test now also passes through the account, including the partly-filled-plane tests (cubes of 100, 48 and 36 units; ballot and scan forms on lavapipe, ballot on CUDA).
+- `just lint` passes; the whole suite passes (`cargo test -p "*"`, and the `gpu`-feature unit tests); the device tests pass on lavapipe with both compilers and, for the stride and detailed paths, on CUDA (RTX 3080). On a 20 GB card one overlap-join device test (`cubecl_cuda_top_fd_matches_the_top_kernel`) fails on a 5 GB allocation when it runs after the others in the same process, on main as well; it passes alone.
 
 On the card, healthy fields are unchanged against v3.4.8 (b62 5e12 by routing and forced-stride b64 1e13, three rounds of three fields each, interleaved): the same results and launch counts per field, and the same time within noise:
 
@@ -53,5 +53,6 @@ Nothing new on a healthy device: one cube barrier and at most one atomic add per
 - Not included: a CUDA context that fails to initialise for lack of memory falls back to wgpu on the CPU rasterizer without an error, which is correct but very slow.
 - Not included: some allocation failures end in a host panic (`CallError` unwrapped, exit 101) rather than an error.
 - Not included: the hand-written CUDA backend was not examined for the same gap.
+- Not included: the CUDA device tests share one client's memory pools per process, so a large join test can run out of memory after the others on a 20 GB card.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

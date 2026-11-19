@@ -5,6 +5,29 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## SRA.1 The stride path proves its cubes ran: the three false-empty reproductions now end in an error (2026-11-18 23:25 – 2026-11-19 01:26 UTC, engineer; `SRA/BRIEF.md`, `SRA/RESULTS.md`, `SRA/PR-BODY.md`, `SRA/raw/`; branch `pr/stride-ran-account` 7cf0c40d, 3940f8a9 on upstream be9cc923, on the fork, no PR yet; box 61303619, RTX 3080 20 GB)
+
+- **Change:** `common/src/cubecl_backend.rs` (+78/−5 outside tests, tests +84), `CHANGELOG.md` (one sentence).
+  Kernel: a helper at the very end of `niceonly_kernel`, after all three of its paths, waits for the cube and
+  unit 0 adds 1 to a fourth word of the field's count buffer (the join's `cube_done` rule). Host: the run sums
+  the cubes it launches; `read_niceonly_hits` fails the field unless the kernel's count matches (mod 2^32)
+  before the queue account and the hits are read: "the device did not run every launch: its kernels finished X
+  of Y cubes". A test-only switch counts a launch without running it. No flag, no retry.
+- **Detailed path** [read + tests]: no gap: every candidate adds 1 to one histogram bin and the host already
+  requires the total to equal the range size; the browser runner has the same check.
+- **On the card** [M]: the three cases that submitted `[]` on v3.4.8 (b64 1e13 forced stride with 400 and
+  520 MiB left; b62 5e12 by production's own routing with 290 MiB left) now exit 1 with "finished 0 of 277,280 /
+  282,373 / 200,319 cubes" and submit nothing. Healthy runs give v3.4.8's results and launch counts; about 5,900
+  base-10 filler fields each found 69.
+- **Timings** [M, three interleaved rounds of three fields, medians]: b62 2.05 → 2.14 s (inside the 0.44 s
+  round-to-round spread); b64 forced stride 7.80 → 7.77 s; device wait per field unchanged.
+- **Tests** [M]: `just lint` passes; whole suite passes; lavapipe with both compilers (41 WGSL, 32 SPIR-V
+  tests); the new regression test passes on CUDA, WGSL and SPIR-V and fails on all three with the host check
+  removed. One join test fails on a 5.26 GB allocation when run after the others in one process on this card,
+  on main as well. Metal: compiles; never generated or run.
+- **Review:** independent reviewer started 01:30 UTC (`SRA/REVIEW-BRIEF.md`, hard stop 03:15); the PR opens after
+  its fixes.
+
 ## MO.4 Independent soundness audit of the trunk: 1,073 slices equal the CPU reference; every host account is satisfied by all zeros (2026-11-18 22:05 – 2026-11-19 01:20 UTC, auditor; `G2/BUILD-BRIEF-3S.md`, `G2/AUDIT-MO.md`, `G2/audit1/` (logs, sweep JSON); branch `dev/mo-audit` dbbbc043, c00c018e on 91ac0761, on the fork; trunk unchanged; box 61286074, RTX 3080, CUDA)
 
 - **Parity sweep** [M]: 1,073 real base-64 slices (1,000 seeded across the base, 49 extremes from a tops scan of
