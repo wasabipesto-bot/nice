@@ -205,6 +205,10 @@ mod kernels {
         // 64·(pseg[c] − pseg[c0]) + d·(class size) + position (written by phase 1)
         clst: &mut Array<u32>,
         c0: u32,
+        // (audit, dev/mo-audit) fault-injection bits, 0 in production: F_PMAX (4) probe window 300 instead of PMAX,
+        // F_DROP_PROBE (8) each job's last probe not run, F_IDX13 (16) the pending parent index read as 13 bits,
+        // F_DROP_REC (32) cube 0 never stores its second record of a step
+        fault: u32,
         #[comptime] mode: u32,
         #[comptime] noout: bool,
         #[comptime] w: u32,
@@ -261,6 +265,7 @@ mod kernels {
         let d = dj & 255u32;
         let poff = dj >> 8u32;
         let cc = (c + d) % M;
+        let pmx = select((fault & 4u32) != 0u32, 300u32, PMAX);
 
         if PLANE_DIM != w || t % w != lane {
             cnt[C_ERR_PLANE].fetch_add(1u32);
@@ -285,7 +290,7 @@ mod kernels {
             }
             s_np[0usize] = n;
             s_nl[0usize].store(0u32);
-            if poff > 0u32 && n > poff + PMAX {
+            if poff > 0u32 && n > poff + pmx {
                 cnt[C_ERR_PMAX].fetch_add(1u32);
             }
         }
@@ -308,7 +313,7 @@ mod kernels {
                 let b1 = tseg[(s + 1u32) as usize];
                 let mut j = t;
                 while j < b1 - b0 {
-                    if base + j >= poff && base + j < poff + PMAX {
+                    if base + j >= poff && base + j < poff + pmx {
                         if comptime!(tdg == 1) {
                             let mut pv = Vector::<u32, Const<4>>::empty();
                             #[unroll]
@@ -347,7 +352,10 @@ mod kernels {
             }
         }
         sync_cube();
-        let nprobe = min(s_np[0usize] - min(s_np[0usize], poff), PMAX);
+        let mut nprobe = min(s_np[0usize] - min(s_np[0usize], poff), pmx);
+        if (fault & 8u32) != 0u32 && nprobe > 0u32 {
+            nprobe -= 1u32;
+        }
 
         let mut my_kept = 0u32;
         let mut my_surv = 0u32;
@@ -464,7 +472,7 @@ mod kernels {
                         if q < nch && mi < ntake {
                             let pi = pb
                                 + ((pq[(mi >> 1u32) as usize] >> ((mi & 1u32) << 4u32))
-                                    & 0xFFFFu32);
+                                    & select((fault & 16u32) != 0u32, 0x1FFFu32, 0xFFFFu32));
                             let pv = par[pi as usize];
                             m = child_mask(
                                 u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64),
@@ -792,7 +800,7 @@ mod kernels {
                                         rv[3usize] = whi[0usize];
                                         out[(sbase + ra) as usize] = rv;
                                     }
-                                    if nzb {
+                                    if nzb && !((fault & 32u32) != 0u32 && CUBE_POS_X == 0u32) {
                                         let mut rv = Vector::<u32, Const<4>>::empty();
                                         rv[0usize] = pk[1usize];
                                         rv[1usize] = lb + cpos;
@@ -845,7 +853,8 @@ mod kernels {
             }
         }
         if !comptime!(noout) {
-            if lane == 0u32 && have_slab && slab_id < nslab_cap {
+            // (audit) F_SLABCNT (2048): cube 0 never writes its last slab's count
+            if lane == 0u32 && have_slab && slab_id < nslab_cap && !((fault & 2048u32) != 0u32 && CUBE_POS_X == 0u32) {
                 slabcnt[slab_id as usize] = slab_used;
             }
         }
@@ -946,6 +955,8 @@ mod prep {
         pip_lo: u32,
         pip_hi: u32,
         cap: u32,
+        // (audit) F_DROP_PARENT (8192): parents of r4 = 0 mod 997 taken as uncertified
+        fault: u32,
         #[comptime] w: u32,
     ) {
         let pip = u64::cast_from(pip_lo) | (u64::cast_from(pip_hi) << 32u64);
@@ -961,7 +972,7 @@ mod prep {
             c = cc;
             key = kk;
         }
-        let flag = m != 0u64;
+        let flag = m != 0u64 && !((fault & 8192u32) != 0u32 && r4 % 997u32 == 0u32);
         let b = plane_ballot(flag);
         let l = UNIT_POS_PLANE;
         let lo = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
@@ -1315,6 +1326,8 @@ mod post {
         lst: &Array<u32>,
         r0hi: u32,
         pip_hi: u32,
+        nopf: bool,
+        pfdrop: bool,
     ) -> (u32, u32) {
         let pos = rec[1usize];
         // P = n div 2^30 = h·2^30 + d·2^24 + digits 5-8 (the top record's words 0-1)
@@ -1335,7 +1348,8 @@ mod post {
             } else {
                 y &= y - 1u32;
             }
-            if pf(lst[(pos + off) as usize] + r0hi, plo, phi, top) {
+            let r0 = lst[(pos + off) as usize] + r0hi;
+            if nopf || (pf(r0, plo, phi, top) && !(pfdrop && ((r0 >> 10u32) & 1023u32) == 0u32)) {
                 if inlo {
                     klo |= 1u32 << b;
                 } else {
@@ -1406,7 +1420,12 @@ mod post {
         scap: u32,
         r0hi: u32,
         pip_hi: u32,
+        // (audit) F_NOPF (1): every survivor listed, no prefilter
+        fault: u32,
     ) {
+        let nopf = (fault & 1u32) != 0u32;
+        // (audit) F_PF_DROP (1024): the prefilter wrongly drops survivors whose r0 has bits 10-19 zero
+        let pfdrop = (fault & 1024u32) != 0u32;
         if ABSOLUTE_POS_X == 0u32 {
             stat[0usize].store(lcnt[0usize]);
             stat[1usize].store(slabn[0usize]);
@@ -1445,8 +1464,8 @@ mod post {
                     + reca[3usize].count_ones()
                     + recb[2usize].count_ones()
                     + recb[3usize].count_ones();
-                let (kla, kha) = keep_bits(reca, hda, topa, lst, r0hi, pip_hi);
-                let (klb, khb) = keep_bits(recb, hdb, topb, lst, r0hi, pip_hi);
+                let (kla, kha) = keep_bits(reca, hda, topa, lst, r0hi, pip_hi, nopf, pfdrop);
+                let (klb, khb) = keep_bits(recb, hdb, topb, lst, r0hi, pip_hi, nopf, pfdrop);
                 let nb = kla.count_ones() + kha.count_ones() + klb.count_ones() + khb.count_ones();
                 let excl = plane_exclusive_sum(nb);
                 let tot = plane_sum(nb);
@@ -1652,8 +1671,11 @@ mod dtops {
         l5: &Array<u32>,
         l5n: &Array<u32>,
         pip: u32,
+        // (audit) F_POP12 (64): the popcount limit checked as 12 instead of MAXPOP
+        fault: u32,
     ) {
         let n5 = l5n[0usize];
+        let plim = select((fault & 64u32) != 0u32, 12u32, MAXPOP);
         let mut i = ABSOLUTE_POS_X;
         while i < n5 {
             let hd = l5[i as usize];
@@ -1686,7 +1708,7 @@ mod dtops {
                 tm[i as usize] = m2;
                 thm[i as usize] = h2;
                 segc[(d * 63u32 + h % 63u32) as usize].fetch_add(1u32);
-                if m2.count_ones() > MAXPOP {
+                if m2.count_ones() > plim {
                     tstat[1usize].fetch_add(1u32);
                 }
             }
@@ -2130,10 +2152,19 @@ pub struct DevCounts {
     pub slices: u64,
     pub tops: u64,
     pub tested: u64,
+    /// (audit) Largest slab count, list length, per-unit flat and survivor counter of a batch or group.
+    pub slabs_max: u64,
+    pub list_max: u64,
+    pub flat_d_max: u64,
+    pub surv_d_max: u64,
 }
 
 impl DevCounts {
     fn add(&mut self, o: &DevCounts) {
+        self.slabs_max = self.slabs_max.max(o.slabs_max);
+        self.list_max = self.list_max.max(o.list_max);
+        self.flat_d_max = self.flat_d_max.max(o.flat_d_max);
+        self.surv_d_max = self.surv_d_max.max(o.surv_d_max);
         self.children += o.children;
         self.chunks += o.chunks;
         self.flat += o.flat;
@@ -2212,9 +2243,53 @@ pub struct GpuJoin<R: Runtime> {
     /// the first 1–5 device-top kernels alone) and skip the accounts. 6 in
     /// production.
     stop: u32,
+    /// (audit, dev/mo-audit) fault-injection bits; 0 in production (only the audit tests set it).
+    pub(crate) fault: u32,
 }
 
+/// (audit) Host-side fault bits (the kernel bits are documented at `g2_kernel`'s `fault`).
+pub(crate) const F_NOPF: u32 = 1;
+pub(crate) const F_SKIP_MAIN: u32 = 2;
+pub(crate) const F_PMAX300: u32 = 4;
+pub(crate) const F_DROP_PROBE: u32 = 8;
+pub(crate) const F_IDX13: u32 = 16;
+pub(crate) const F_DROP_REC: u32 = 32;
+pub(crate) const F_POP12: u32 = 64;
+pub(crate) const F_SLAB_CAP: u32 = 128;
+pub(crate) const F_SCAP: u32 = 256;
+pub(crate) const F_SKIP_CHECK: u32 = 512;
+pub(crate) const F_PF_DROP: u32 = 1024;
+pub(crate) const F_SLABCNT: u32 = 2048;
+pub(crate) const F_SKIP_TOPS: u32 = 4096;
+pub(crate) const F_DROP_PARENT: u32 = 8192;
+
 impl<R: Runtime> GpuJoin<R> {
+    /// (audit) The slab capacity the kernels are told (shrunk by `F_SLAB_CAP`).
+    fn ns_cap(&self) -> u32 {
+        if self.fault & F_SLAB_CAP != 0 { 2000 } else { self.nslab_cap }
+    }
+
+    /// (audit) The list capacity the kernels are told (shrunk by `F_SCAP`).
+    fn s_cap(&self) -> u32 {
+        if self.fault & F_SCAP != 0 { 100_000 } else { self.scap }
+    }
+
+    /// (audit) Set the fault bits; `F_PMAX300` also rebuilds the job table with the second instance at 300.
+    pub(crate) fn set_fault(&mut self, f: u32) {
+        self.fault = f;
+        let pm = if f & F_PMAX300 != 0 { 300 } else { PMAX };
+        let mut nb = Vec::new();
+        for (c0, c1, _, _) in &self.batches {
+            let mut jobs: Vec<u32> = (*c0..*c1)
+                .flat_map(|c| (0..64u32).flat_map(move |d| [c, d]))
+                .collect();
+            let second: Vec<u32> = jobs.chunks(2).flat_map(|x| [x[0], x[1] | pm << 8]).collect();
+            jobs.extend(second);
+            let nj = (jobs.len() / 2) as u32;
+            nb.push((*c0, *c1, self.mk(jobs), nj));
+        }
+        self.batches = nb;
+    }
     /// # Errors
     /// A device whose plane width the kernel does not take.
     pub fn new(client: ComputeClient<R>, caps: Caps) -> Result<Self> {
@@ -2300,6 +2375,7 @@ impl<R: Runtime> GpuJoin<R> {
                 .ok()
                 .and_then(|x| x.parse().ok())
                 .unwrap_or(6),
+            fault: 0,
             client,
         })
     }
@@ -2391,7 +2467,7 @@ impl<R: Runtime> GpuJoin<R> {
         let tmhih = self.client.empty(nt * 8);
         let cur = self.client.empty(4032 * 4);
         unsafe {
-            if self.stop < 10 || self.stop - 10 >= 1 {
+            if (self.stop < 10 || self.stop - 10 >= 1) && self.fault & F_SKIP_TOPS == 0 {
                 dtops::tops1_kernel::launch_unchecked::<R>(
                     c,
                     CubeCount::Static(TOPS_CUBES, 1, 1),
@@ -2404,6 +2480,7 @@ impl<R: Runtime> GpuJoin<R> {
                     a(&self.l5, full as usize),
                     a(&l5n, 1),
                     pip as u32,
+                    self.fault,
                 );
             }
             if self.stop < 10 || self.stop - 10 >= 2 {
@@ -2620,6 +2697,7 @@ impl<R: Runtime> GpuJoin<R> {
                 pip as u32,
                 (pip >> 32) as u32,
                 np as u32,
+                self.fault,
                 self.w,
             );
             prep::scan16_kernel::launch_unchecked::<R>(
@@ -2668,7 +2746,7 @@ impl<R: Runtime> GpuJoin<R> {
             let stat = self.mk(vec![0u32; 3]);
             let ns = self.nslab_cap as usize;
             unsafe {
-                if self.upto(3) {
+                if self.upto(3) && self.fault & F_SKIP_MAIN == 0 {
                     kernels::g2_kernel::launch_unchecked::<R>(
                         c,
                         CubeCount::Static(*nj, 1, 1),
@@ -2684,9 +2762,10 @@ impl<R: Runtime> GpuJoin<R> {
                         a(&self.out, ns * SLAB as usize),
                         a(&slabn, 1),
                         a(&self.slabcnt, ns),
-                        self.nslab_cap,
+                        self.ns_cap(),
                         a(&self.clst, self.lcap as usize),
                         *c0,
+                        self.fault,
                         2u32,
                         false,
                         self.w,
@@ -2714,13 +2793,14 @@ impl<R: Runtime> GpuJoin<R> {
                         a(&self.surv, 2 * self.scap as usize),
                         a(&scount, 1),
                         a(&stat, 3),
-                        self.nslab_cap,
-                        self.scap,
+                        self.ns_cap(),
+                        self.s_cap(),
                         ((pip & 63) as u32) << 24,
                         (pip >> 6) as u32,
+                        self.fault,
                     );
                 }
-                if self.upto(6) {
+                if self.upto(6) && self.fault & F_SKIP_CHECK == 0 {
                     check_kernel::launch_unchecked::<R>(
                         c,
                         CubeCount::Static(CHECK_CUBES, 1, 1),
@@ -2731,7 +2811,7 @@ impl<R: Runtime> GpuJoin<R> {
                         a(&self.nice_out, self.caps.nice as usize * NICE_STRIDE),
                         a(&self.nice_count, 1),
                         a(&ran, RAN_WORDS),
-                        self.scap,
+                        self.s_cap(),
                         self.caps.nice,
                         self.check,
                         if self.caps.probe {
@@ -2776,14 +2856,16 @@ impl<R: Runtime> GpuJoin<R> {
             dc.flat += v[d * 5 + 2] as u64;
             dc.kept += v[d * 5 + 3] as u64;
             dc.survivors += v[d * 5 + 4] as u64;
+            dc.flat_d_max = dc.flat_d_max.max(v[d * 5 + 2] as u64);
+            dc.surv_d_max = dc.surv_d_max.max(v[d * 5 + 4] as u64);
         }
         let mut listed = 0u64;
         for t in tickets {
             let n = self.rd(&t.scount)?[0];
             ensure!(
-                n <= self.scap,
+                n <= self.s_cap(),
                 "middle-out: survivor list overflow {n} > {}",
-                self.scap
+                self.s_cap()
             );
             let ran = self.rd(&t.ran)?;
             let want_sum = (u64::from(n) * u64::from(n.saturating_sub(1)) / 2 % (1 << 32)) as u32;
@@ -2817,12 +2899,14 @@ impl<R: Runtime> GpuJoin<R> {
                 self.caps.parents
             );
             ensure!(
-                st[1] <= self.nslab_cap,
+                st[1] <= self.ns_cap(),
                 "middle-out: {} slabs > cap {}",
                 st[1],
-                self.nslab_cap
+                self.ns_cap()
             );
             listed += u64::from(st[2]);
+            dc.slabs_max = dc.slabs_max.max(u64::from(st[1]));
+            dc.list_max = dc.list_max.max(u64::from(n));
             dc.checked += u64::from(ran[5]);
         }
         ensure!(
@@ -3042,6 +3126,11 @@ pub struct FieldTiming {
     /// Synchronisations and reads at group ends.
     pub sync: f64,
 }
+
+#[cfg(test)]
+#[cfg(test)]
+#[path = "audit.rs"]
+mod audit;
 
 #[cfg(test)]
 mod tests {
