@@ -1,0 +1,154 @@
+//! One entry point for a client route: a field of the middle-out coordinate
+//! of base `b`, searched on the path for that base (base 64: [`super::gpu`],
+//! 64-bit masks; bases 65–70: [`super::gpu_wide`], two-word masks), with
+//! every account checked and, where asked, the sampled CPU check. Returns the
+//! outcome and the route's telemetry (the path, the join's shape, the
+//! counters, the sampled slice, the timings). Nothing here knows the wire.
+
+use super::coord::Coord;
+use super::cpu::{FieldOutcome, Shape};
+use super::gpu::{Caps, FieldTiming, GpuJoin, GpuOptions, search_field};
+use super::gpu_wide::{WideCaps, WideJoin, WideOptions, search_field_wide};
+use anyhow::{Result, bail};
+use cubecl::prelude::*;
+use serde_json::{Value, json};
+
+/// The runtime types a route names (the client does not depend on `cubecl`).
+pub use cubecl::prelude::{ComputeClient as Client, Runtime as DeviceRuntime};
+
+/// Slices per synchronisation (the benches' default).
+const GROUP: usize = 16;
+/// Classes per batch on the base-64 path (the bench's default: all).
+const CLASSES_B64: u32 = 63;
+
+/// The join of one base on one device.
+pub enum FieldJoin<R: Runtime> {
+    /// Base 64.
+    Narrow(GpuJoin<R>),
+    /// Bases 65–70.
+    Wide(WideJoin<R>, u32),
+}
+
+impl<R: Runtime> FieldJoin<R> {
+    /// The join for base `b` (64: the 64-bit path; 65–70: the wide path).
+    ///
+    /// # Errors
+    /// A base without a coordinate or a device path, or a device error.
+    pub fn new(client: ComputeClient<R>, b: u32) -> Result<Self> {
+        let coord = Coord::for_base(b)?;
+        match b {
+            64 => Ok(Self::Narrow(GpuJoin::new(client, Caps::b64(CLASSES_B64))?)),
+            65..=70 => Ok(Self::Wide(
+                WideJoin::new(
+                    client,
+                    WideCaps::for_base(b),
+                    &coord,
+                    Shape::for_coord(&coord),
+                )?,
+                b,
+            )),
+            _ => bail!("middle-out: no device path for base {b}"),
+        }
+    }
+
+    /// The base this join searches.
+    pub fn base(&self) -> u32 {
+        match self {
+            Self::Narrow(_) => 64,
+            Self::Wide(_, b) => *b,
+        }
+    }
+
+    /// Whether the sampled CPU check is on by default for this base: at base
+    /// 64 it costs +0.4 % of a field; above, the CPU slice takes longer than
+    /// the field (BUILD-NOTES §11.4), so it is off unless asked.
+    pub fn cpu_check_default(&self) -> bool {
+        matches!(self, Self::Narrow(_))
+    }
+
+    /// Search the field `[v_start, v_start + v_size)` of this join's base:
+    /// every account checked, the sampled CPU check if `cpu_check`.
+    ///
+    /// # Errors
+    /// A field that is not whole quanta of the base, a failed account, or a
+    /// sampled check that differs.
+    pub fn search(
+        &self,
+        v_start: u128,
+        v_size: u128,
+        cpu_check: bool,
+    ) -> Result<(FieldOutcome, Value)> {
+        let coord = Coord::for_base(self.base())?;
+        let shape = Shape::for_coord(&coord);
+        let (o, counts, tm, path, w) = match self {
+            Self::Narrow(gj) => {
+                let opt = GpuOptions {
+                    group: GROUP,
+                    host_threads: 1,
+                    device_tops: true,
+                    cpu_check,
+                };
+                let (o, dc, tm) = search_field(gj, &coord, v_start, v_size, opt)?;
+                let c = json!({"tops": dc.tops, "children": dc.children, "chunks": dc.chunks,
+                               "flat": dc.flat, "kept": dc.kept, "slices": dc.slices});
+                (o, c, tm, "narrow", gj.w)
+            }
+            Self::Wide(gj, _) => {
+                let opt = WideOptions {
+                    group: GROUP,
+                    cpu_check,
+                };
+                let (o, dc, tm) = search_field_wide(gj, &coord, v_start, v_size, opt)?;
+                let c = json!({"tops": dc.tops, "children": dc.children, "chunks": dc.chunks,
+                               "flat": dc.flat, "kept": dc.kept, "slices": dc.slices});
+                (o, c, tm, "wide", gj.w)
+            }
+        };
+        let tel = json!({
+            "path": path,
+            "shape": [shape.f0, shape.k],
+            "plane_width": w,
+            "group": GROUP,
+            "survivors": o.survivors,
+            "checked": o.checked,
+            "slices": o.slices,
+            "device_counts": counts,
+            "sampled_check": sampled(&tm, cpu_check),
+            "timing": {
+                "wall": tm.wall, "field": tm.field, "sync": tm.sync, "host_wait": tm.host_wait,
+                "cpu_check": tm.cpu_check, "cpu_wait": tm.cpu_wait, "sample_dev": tm.sample_dev,
+            },
+        });
+        Ok((o, tel))
+    }
+
+    /// (test switch, feature `midout-fault`) Inject one of the library's
+    /// fault bits: `accounts` drops the main kernel (the accounts fail),
+    /// `sample` makes the prefilter drop ~1/1024 of the survivors (the
+    /// accounts pass; only the sampled CPU check sees it).
+    ///
+    /// # Errors
+    /// An unknown name.
+    #[cfg(feature = "midout-fault")]
+    pub fn set_test_fault(&mut self, name: &str) -> Result<()> {
+        let (narrow, wide) = match name {
+            "accounts" => (super::gpu::F_SKIP_MAIN, super::gpu_wide::F_SKIP_MAIN),
+            "sample" => (super::gpu::F_PF_DROP, super::gpu_wide::F_PF_DROP),
+            _ => bail!("middle-out: unknown device fault '{name}'"),
+        };
+        match self {
+            Self::Narrow(gj) => gj.set_fault(narrow),
+            Self::Wide(gj, _) => gj.set_fault(wide),
+        }
+        Ok(())
+    }
+}
+
+fn sampled(tm: &FieldTiming, on: bool) -> Value {
+    match (on, tm.sampled) {
+        (false, _) => Value::Null,
+        // the library returns an error for a slice that differs, so a slice here was equal
+        (true, Some(p)) => json!({"slice": p, "equal": true, "cpu_secs": tm.cpu_check}),
+        (true, None) => json!({"slice": null, "equal": null}),
+    }
+}

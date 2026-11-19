@@ -12,6 +12,8 @@
 //! - `gpu` (feature `cubecl`): the device path at base 64.
 //! - `gpu_wide` (feature `cubecl`): the device path with two-word masks,
 //!   bases 65–70 (and any base up to 70 in its tests).
+//! - `route` (feature `cubecl`): one entry point for a client route (the
+//!   path per base, telemetry).
 //! - [`wire`]: the claim and submit additions of the middle-out route, and
 //!   the guard every other route applies to a claim.
 //!
@@ -42,6 +44,8 @@ pub mod gpu;
 #[cfg(feature = "cubecl")]
 pub mod gpu_wide;
 pub mod mask;
+#[cfg(feature = "cubecl")]
+pub mod route;
 pub mod wire;
 
 pub use coord::Coord;
