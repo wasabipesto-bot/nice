@@ -12,8 +12,8 @@
 //! v = start + key·(H·b^k0) + (h − h0)·b^k0 + low
 //! ```
 //!
-//! with `h0 = start div b^k1` and `H = (end − 1) div b^k1 − h0 + 1` (`hn`
-//! in the code), the number of values `h` takes. `v` moves the digits `[k0, k1)` of `n` above
+//! with `h0 = start div b^k1` and `H = (end − 1) div b^k1 − h0 + 1`
+//! ([`Coord::hn`]), the number of values `h` takes. `v` moves the digits `[k0, k1)` of `n` above
 //! all the others and keeps the rest in their order. It is one to one from
 //! the range into `[start, start + H·b^k1)`.
 //!
@@ -74,21 +74,19 @@ use crate::base_range::get_base_range_u128;
 use anyhow::{Result, bail, ensure};
 use std::ops::Range;
 
-/// A base's coordinate (see the module documentation).
+/// A base's coordinate (see the module documentation). Built only by
+/// [`Coord::for_base`] or [`Coord::with_digits`], which check the digit
+/// positions and that `v` fits; its values are read by the methods below.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Coord {
-    pub b: u32,
-    /// The base's range of `n`, `[start, end)`.
-    pub start: u128,
-    pub end: u128,
-    /// The digits `[k0, k1)` that go on top of `v`.
-    pub k0: u32,
-    pub k1: u32,
-    /// A field fixes the digits `[q0, k1)`.
-    pub q0: u32,
-    /// `h0 = start div b^k1` and the number of values of `h`.
-    pub h0: u128,
-    pub hn: u128,
+    b: u32,
+    start: u128,
+    end: u128,
+    k0: u32,
+    k1: u32,
+    q0: u32,
+    h0: u128,
+    hn: u128,
 }
 
 /// The digit positions `(k0, k1, q0)` of base `b`'s coordinate: `(4, 8, 5)`
@@ -102,6 +100,54 @@ pub fn coord_digits(b: u32) -> Option<(u32, u32, u32)> {
 }
 
 impl Coord {
+    /// The base.
+    #[must_use]
+    pub fn b(&self) -> u32 {
+        self.b
+    }
+
+    /// The first `n` of the base's range `[start, end)` (and the first `v`).
+    #[must_use]
+    pub fn start(&self) -> u128 {
+        self.start
+    }
+
+    /// One past the last `n` of the base's range.
+    #[must_use]
+    pub fn end(&self) -> u128 {
+        self.end
+    }
+
+    /// The lowest of the digits `[k0, k1)` that go on top of `v`.
+    #[must_use]
+    pub fn k0(&self) -> u32 {
+        self.k0
+    }
+
+    /// One past the highest of the digits `[k0, k1)` that go on top of `v`.
+    #[must_use]
+    pub fn k1(&self) -> u32 {
+        self.k1
+    }
+
+    /// A field fixes the digits `[q0, k1)`.
+    #[must_use]
+    pub fn q0(&self) -> u32 {
+        self.q0
+    }
+
+    /// `h0 = start div b^k1`.
+    #[must_use]
+    pub fn h0(&self) -> u128 {
+        self.h0
+    }
+
+    /// `H`, the number of values `h = n div b^k1` takes.
+    #[must_use]
+    pub fn hn(&self) -> u128 {
+        self.hn
+    }
+
     /// The coordinate of base `b` ([`coord_digits`]).
     ///
     /// # Errors
