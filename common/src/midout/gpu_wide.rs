@@ -92,9 +92,7 @@
     clippy::missing_errors_doc,
     clippy::must_use_candidate,
     clippy::bool_to_int_with_if,
-    clippy::uninlined_format_args,
-    unused_assignments,
-    unused_mut
+    clippy::uninlined_format_args
 )]
 
 use super::arith::{U384, roots as base_roots};
@@ -173,6 +171,9 @@ const RF_BITS: u32 = 25;
 // ------------------------------------------------------------------------------------------------ device
 /// The wide main kernel (`wide_kernel`) and its helpers (`dbit`: a digit's bit in the two-word mask, `child_w`:
 /// a parent's child at unit `d`).
+// CubeCL's comptime branches assign a variable declared before them (`let mut x = ..; if comptime!(..) { x = .. }
+// else { x = .. }`): rustc sees the declaration's value as never read.
+#[allow(unused_assignments)]
 mod wk {
     use super::{
         A_CHILD, A_JOBS, A_PROBES, C_ERR_CLASS, C_ERR_CLST, C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB,
@@ -842,6 +843,9 @@ mod wk {
 
 /// Preparation, tops, expansion and check for wide masks: everything is
 /// generic in (b, f0, k) and works on base-b digits and base-b² limbs.
+// CubeCL's comptime branches assign a variable declared before them (`let mut x = ..; if comptime!(..) { x = .. }
+// else { x = .. }`): rustc sees the declaration's value as never read.
+#[allow(unused_assignments)]
 mod wp {
     use super::wk::{child_w, dbit};
     use super::{

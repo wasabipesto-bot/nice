@@ -103,9 +103,7 @@
     clippy::missing_errors_doc,
     clippy::must_use_candidate,
     clippy::bool_to_int_with_if,
-    clippy::uninlined_format_args,
-    unused_assignments,
-    unused_mut
+    clippy::uninlined_format_args
 )]
 
 use super::coord::Coord;
@@ -203,6 +201,9 @@ const NICE_STRIDE: usize = 4;
 /// The main kernel (`g2_kernel`) and its plane helpers: per job (class, unit) of a batch, the children of the
 /// class's parents in 64-child chunks against the unit's probes; writes records, child lists and the main kernel's
 /// account words (see the module's data layouts).
+// CubeCL's comptime branches assign a variable declared before them (`let mut x = ..; if comptime!(..) { x = .. }
+// else { x = .. }`): rustc sees the declaration's value as never read.
+#[allow(unused_assignments)]
 mod kernels {
     use super::{
         A_CHILD, A_JOBS, A_PROBES, C_ERR_CLST, C_ERR_IDX, C_ERR_PLANE, C_ERR_PMAX, C_ERR_SLAB,
@@ -853,6 +854,9 @@ mod kernels {
 /// (the bucket offsets), `scatter3` (the list into bucket order, with each parent's certified-children count) and
 /// `hsort` (each bucket sorted by r4, the CPU reference's order): `pseg` and the sorted parent records. Also
 /// `tdigz` (the host-tops path only: the top digits, and the zeroing of the slice's counters).
+// CubeCL's comptime branches assign a variable declared before them (`let mut x = ..; if comptime!(..) { x = .. }
+// else { x = .. }`): rustc sees the declaration's value as never read.
+#[allow(unused_assignments)]
 mod prep {
     use super::{A_ERR_PLANE, A_H2_CERT, A_H2_CUBES, A_HSORT, A_SC_CHILD, A_SCAN16, A_SCAT};
     use cubecl::prelude::*;
@@ -1370,6 +1374,9 @@ mod prep {
 /// After the main kernel: `expand_kernel` (records to production's survivor entries through the middle-digit
 /// prefilter, `pf` or `pf24`), `done_kernel` (the slice's done word) and `toprec_kernel` (production's top records
 /// from the host's tops, the host-tops path).
+// CubeCL's comptime branches assign a variable declared before them (`let mut x = ..; if comptime!(..) { x = .. }
+// else { x = .. }`): rustc sees the declaration's value as never read.
+#[allow(unused_assignments)]
 mod post {
     use super::{A_DONE, C_SLICES, NT, SLAB};
     use cubecl::prelude::*;
