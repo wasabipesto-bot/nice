@@ -1,7 +1,7 @@
 # The middle-out join: design
 
 *A description of what is on the branch and why, for a reader who knows the project and today's overlap join and
-has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean` head `5a048669` (worktree
+has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean` head `c2152084` (worktree
 `~/projects/nice/.worktrees/midout-clean`) and from the measurements recorded beside it. The open decisions are
 not repeated here; they are in `~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md` (section A).*
 
@@ -83,7 +83,7 @@ residues for a nice number; 8 of 63 at base 64.) §8 has the table and the condi
 ## 2. The pipeline for one field, stage by stage
 
 A field at base 64 is 4,096 slices. The library entry point is `midout::gpu::search_field`
-(`common/src/midout/gpu.rs:3920`), which calls `field_run` (`:4039`). The stage table in `gpu.rs:11–18` is the
+(`common/src/midout/gpu.rs:3925`), which calls `field_run` (`:4044`). The stage table in `gpu.rs:11–18` is the
 code's own summary; this section expands it.
 
 **Costs** are ms per slice, measured on field 77777 by *cumulative timing stops* (the bench runs the field's
@@ -114,55 +114,55 @@ kernels up to a stage and nothing after; a stage's cost is the difference betwee
 - **In:** `(Coord, v_start, v_size)`. **Out:** the field's list of 4,096 slice keys, the sampled slice, the 8 key
   digits, the shared parent lists.
 - `field_run` refuses anything but base 64, shape (4, 10), whole quanta, groups of 1–256 slices
-  (`gpu.rs:4048–4060`; 256 because the per-unit counters are 32-bit, `:4055`). `Coord::field_digits`
-  (`coord.rs:214`) turns the v range into the values t of the fixed digits; `Shape::slices_of` (`cpu.rs:77`)
+  (`gpu.rs:4053–4065`; 256 because the per-unit counters are 32-bit, `:4060`). `Coord::field_digits`
+  (`coord.rs:283`) turns the v range into the values t of the fixed digits; `Shape::slices_of` (`cpu.rs:105`)
   lists each t's slices, digit 4 innermost, so 64 consecutive slices share digits 5–8.
 - **The key**: the 8 digits that order the parents (frequent digits in the tops' certificates first) come from
-  the field's first slice, computed on the host by `slice_tops` (`gpu.rs:2367`, `:4099`). Any key is exact; the
+  the field's first slice, computed on the host by `slice_tops` (`gpu.rs:2372`, `:4104`). Any key is exact; the
   key only changes how many chunks the skip removes. [measured: kept fraction on one slice 0.1963 with the field's
   key against 0.1960 with its own]
-- **The shared parent lists** (`build_anc`, `gpu.rs:2856`, kernel `anc8_kernel` `:937`): when the field's slices
+- **The shared parent lists** (`build_anc`, `gpu.rs:2861`, kernel `anc8_kernel` `:942`): when the field's slices
   take at most 64 values of digits 4–7, each more than once (true for every field of the default coordinate),
   64 lists of depth-4 roots are built at once, one per value of digits 4–7. 870 MB of card memory.
-- **The sampled slice**: one slice drawn at random (`RandomState` hashed with `v_start`, `:4077–4091`) is handed
-  to a host thread that runs the CPU reference on it (`cpu_slice`, `:3856`) while the card works.
+- **The sampled slice**: one slice drawn at random (`RandomState` hashed with `v_start`, `:4082–4096`) is handed
+  to a host thread that runs the CPU reference on it (`cpu_slice`, `:3861`) while the card works.
 
-### Stage 1. Tops (device; `dtops` module, `gpu.rs:1823–2197`)
+### Stage 1. Tops (device; `dtops` module, `gpu.rs:1828–2202`)
 
 - **In:** the slice key `pip`. **Out:** the slice's tops sorted into segments by (unit, class), their certified
   digits in two forms, and production's 8-word top records for the check.
 - A *top* here is a lead value h in [2^15, 2^16) and a unit d: 2^21 prefixes per slice, each covering 2^24 n.
   About 238,000 of them certify (11 %) [measured, slice 712012851].
-- `tops5_kernel` (`:1915`) runs **once per 64 slices** (one value of digits 5–8): it certifies the 2^21 coarser
-  prefixes n div 2^30 over their 2^30 n and lists the valid ones (19.4 %). `tops1_kernel` (`:1955`) certifies a
+- `tops5_kernel` (`:1920`) runs **once per 64 slices** (one value of digits 5–8): it certifies the 2^21 coarser
+  prefixes n div 2^30 over their 2^30 n and lists the valid ones (19.4 %). `tops1_kernel` (`:1960`) certifies a
   slice's tops only under those (a finer interval keeps every digit its parent certified: exact by
-  containment [proven]). `tscan` (`:2028`, one cube) scans the segment counts, `tops2` (`:2079`) scatters into
-  segments, `tdigz2` (`:2119`) writes each top's digits as 6-bit fields (`tdig`), `toprec2` (`:2164`) writes
+  containment [proven]). `tscan` (`:2033`, one cube) scans the segment counts, `tops2` (`:2084`) scatters into
+  segments, `tdigz2` (`:2124`) writes each top's digits as 6-bit fields (`tdig`), `toprec2` (`:2169`) writes
   production's top records.
-- The certificate arithmetic is in 32-bit limbs and shifts (`cert_pow`, `:1874`); the host's version
-  (`top_cert_b64`, `:2286`) is tested against the CPU reference on 20,000 prefixes [measured].
-- **MAXPOP 17** (`gpu.rs:142`): no top at base 64 can certify more than 17 digits (only digits 17–25 of n² and
+- The certificate arithmetic is in 32-bit limbs and shifts (`cert_pow`, `:1879`); the host's version
+  (`top_cert_b64`, `:2291`) is tested against the CPU reference on 20,000 prefixes [measured].
+- **MAXPOP 17** (`gpu.rs:147`): no top at base 64 can certify more than 17 digits (only digits 17–25 of n² and
   30–37 of n³ can agree at both ends of a 2^24-wide interval with n ≥ 2^75) [proven, written at the constant];
   every slice seen has a 17-digit top, so there is no margin, and an 18-digit top would be an error of the field,
   not a lost survivor.
 
-### Stage 2. Parents (device; `prep` module, `gpu.rs:869–1387`)
+### Stage 2. Parents (device; `prep` module, `gpu.rs:874–1392`)
 
 - **In:** the 9.30M *depth-4 roots* (values r4 = n mod 2^24 whose digits 0–3 of r², r³ are distinct; uploaded
   once per process) or the slice's shared list. **Out:** the *parent records*, sorted by (class, key), and `pseg`,
   the class boundaries.
 - A *parent* is r = r4 + pip·2^24, the depth-9 bottom; it is valid when digits 0–8 of r² and r³ are 18 distinct
-  digits (`parent()`, `:890`). About 1.04M per slice [measured]. Its record (`par`, one 16-byte vector,
+  digits (`parent()`, `:895`). About 1.04M per slice [measured]. Its record (`par`, one 16-byte vector,
   `gpu.rs:32–37`): the 64-bit mask, `r4` (24 bits), and `cacc` = the two digits and two step sizes from which
   each of its 64 children's digit 9 of r² and r³ follow: `(c2 + a2·d) mod 64`, `(c3 + a3·d) mod 64`.
-- `hist2_kernel` (`:1015`) tests each root (over the shared list: 20.3 % of the roots [measured, field 77777]),
-  `scan16` (`:1291`) scans, `scatter3` (`:1124`) moves the records and **counts the children of every listed
-  parent** (`child_count`, `:1102`; used by the conservation law below), `hsort` (`:1169`, 16,128 buckets = 63
+- `hist2_kernel` (`:1020`) tests each root (over the shared list: 20.3 % of the roots [measured, field 77777]),
+  `scan16` (`:1296`) scans, `scatter3` (`:1129`) moves the records and **counts the children of every listed
+  parent** (`child_count`, `:1107`; used by the conservation law below), `hsort` (`:1174`, 16,128 buckets = 63
   classes × 256 key bytes) sorts each bucket.
 - *Class*: n's residue mod 63 (the digit sum mod b − 1). A child's class is its parent's plus d, so one class
   partition of the parents serves all 64 units [proven].
 
-### Stage 3. The main kernel (device; `g2_kernel`, `gpu.rs:278`)
+### Stage 3. The main kernel (device; `g2_kernel`, `gpu.rs:283`)
 
 - **In:** parent records, `pseg`, the tops' digit words and segments, the 8 roots, the job list. **Out:**
   *records*, and the *child lists* (every certified child's r4, in order).
@@ -170,7 +170,7 @@ kernels up to a stage and nothing after; a stage's cost is the difference betwee
   (probes [0, 576) and [576, 1,152); the second exits at once if there are none). A job's *probes* are the tops of
   unit d whose class pairs with c to one of the 8 roots, so every top is a probe of exactly one job per root
   [proven]; mean 473 probes per job, at most 619 seen [measured].
-- Phases (the body's `phase 1`…`phase 4` comments, listed in the doc at `:267–274`): **1** append the certified
+- Phases (the body's `phase 1`…`phase 4` comments, listed in the doc at `:272–279`): **1** append the certified
   children of 256 parents at a time to pending slots and to the job's child list, until 1,024 children (16 chunks)
   are pending; **2** transpose the round's chunks into per-digit 64-bit words with a shuffle transpose and take
   each chunk's common digits from registers; **3a** per probe, list the chunks the common-mask skip keeps; **3b**
@@ -184,39 +184,39 @@ kernels up to a stage and nothing after; a stage's cost is the difference betwee
   Launched in batches of classes: all 63 at once on CUDA and RADV (`Caps::b64`), 4 on lavapipe (its 128 MiB
   binding limit).
 
-### Stage 4. Expansion and prefilter (device; `expand_kernel`, `gpu.rs:1670`)
+### Stage 4. Expansion and prefilter (device; `expand_kernel`, `gpu.rs:1675`)
 
 - **In:** records, child lists, the tops' `thd` and prefilter masks. **Out:** *survivor entries* `(top index,
   r0)` in production's survivor-list layout, `r0 = n mod 2^30`, only for survivors that pass the prefilter.
 - For each set bit it reads the child's r4, forms n mod 2^72 from r0 and the top, squares and cubes it, and
   tests the *prefilter*: digits 10 and 11 of n² and n³ are four distinct digits missing both the bottom's 20 and
-  the top's certified digits at positions ≥ 12 (`cpu::prefilter`, `cpu.rs:195`, is the definition; the device
+  the top's certified digits at positions ≥ 12 (`cpu::prefilter`, `cpu.rs:232`, is the definition; the device
   mirrors it). 2.87 % pass [measured]. Two records per lane per step, their loads issued together (`keep_bits2`,
-  `gpu.rs:1560`).
+  `gpu.rs:1565`).
 - Two arithmetic forms, the same predicate: `pf` (32-bit limbs; CUDA) and `pf24` (24-bit limbs, which RDNA's
   full-rate 24-bit multiplies take; every other runtime). Chosen by the runtime's type (`PrefilterForm`,
-  `gpu.rs:2462–2482`); both are run by the tests on every compiler CI uses.
+  `gpu.rs:2467–2487`); both are run by the tests on every compiler CI uses.
 
 ### Stage 5. The full check (production's `cubecl_join::check_kernel`, unchanged)
 
 - **In:** the survivor list and the top records. **Out:** nice numbers. About 338,000 entries per slice.
-  Imported, not copied (`gpu.rs:111–113`), with `CheckShape::new(64, 13, 26, 38, 5, 10, 10)`; `n = P·64^5 + r0`
+  Imported, not copied (`gpu.rs:116–118`), with `CheckShape::new(64, 13, 26, 38, 5, 10, 10)`; `n = P·64^5 + r0`
   with `P` from the top record. Shown to rebuild the join's survivors exactly in probe mode [measured, CUDA].
 
 ### Stage 6. Done and the group read (host)
 
-- `done_kernel` (`:1788`) adds 1 to the slice's done word and to the group's slice count. Slices are queued back
-  to back on one stream with no synchronisation; once per group of 16 slices `finish_group` (`:3501`)
+- `done_kernel` (`:1793`) adds 1 to the slice's done word and to the group's slice count. Slices are queued back
+  to back on one stream with no synchronisation; once per group of 16 slices `finish_group` (`:3506`)
   synchronises, reads every small buffer in one call and runs every comparison (§4). Device buffers are allocated
   once and reused (the stream orders the reuse).
 
 ### Stage 7. The sampled CPU check, and the end of the field
 
-- After the last group (`gpu.rs:4187–4232`): every reported nice n must be nice (`arith::unique_digits`, a
+- After the last group (`gpu.rs:4192–4237`): every reported nice n must be nice (`arith::unique_digits`, a
   separate implementation) and inside the field; the slices the device reports done must equal the field's slice
   count; then the sampled slice's counts from the field run must equal the CPU's, and the slice is run again
   alone on the device, unshared, and its prefiltered list must equal the CPU's **n for n** (`sample_compare`,
-  `:3878`). Any difference is an error for the field. The result is `FieldOutcome` (`cpu.rs:635`): nice numbers,
+  `:3883`). Any difference is an error for the field. The result is `FieldOutcome` (`cpu.rs:702`): nice numbers,
   `survivors`, `checked`, slices.
 - `survivors` and `checked` (survivors after the prefilter) are exact properties of (shape, field): equal on the
   CPU and on every device [measured: field 77777's 48,216,914,309 / 1,384,731,444 on CUDA at 32 lanes and on
@@ -236,11 +236,11 @@ with h0 = start div b^k1 and H the number of values h takes. v moves digits [k0,
 keeps the rest in their order: one to one from the range into [start, start + H·b^k1) [proven; tested on random n
 and both ends].
 
-**The default at base 64 is (k0, k1, q0) = (4, 8, 5)** (`coord_digits_known`, `coord.rs:84`): v is n with bits
+**The default at base 64 is (k0, k1, q0) = (4, 8, 5)** (`coord_digits`, `coord.rs:105`; `Coord::is_known`, `:181`, also accepts the older one): v is n with bits
 24–47 (digits 4–7) moved up to bits 51–74, an exact bit permutation of [2^75, 2^76), no padding. A *quantum* is
 H·b^q0 = 2^57 n: all n whose digits 5–7 take one value t. **A field is a whole number of quanta**, i.e. the n whose
 digits 5–7 lie in a range [t0, t1), every other digit free. One quantum is 4,096 slices; 262,144 per base. A field
-is written `(base, v_start, v_size)`; `range_size` on the wire is `n_count` (`coord.rs:238`), which differs from
+is written `(base, v_start, v_size)`; `range_size` on the wire is `n_count` (`coord.rs:307`), which differs from
 v_size only at padded bases. The first coordinate, (4, 9, 6), fixing digits 6–8, is still known and searched.
 
 **What that commits the project to:**
@@ -260,7 +260,7 @@ v_size only at padded bases. The first coordinate, (4, 9, 6), fixing digits 6–
 **What it leaves free** (each a change inside `midout/` only, never a field row):
 
 - the join's shape: any (f0, k) with f0 ≤ 5 and k ≥ 9 can search a (4, 8, 5) field slice by slice
-  (`Shape::fits`, `cpu.rs:62`) [proven]; the CPU reference searches the same small-base fields with two shapes
+  (`Shape::fits`, `cpu.rs:90`) [proven]; the CPU reference searches the same small-base fields with two shapes
   and gets the brute-force answer with each [measured];
 - chunking, key, sort, kernels, plane width, mask width, prefilter, device;
 - work shared between slices inside a field: digits 4 and 8 are free inside a (4, 8, 5) field, so tops share
@@ -286,8 +286,8 @@ launch that binds the missing buffer silently does nothing; `sync()` still retur
 failed allocation, a stop variable left in the environment, a dropped kernel, a dropped probe and a dropped parent
 all produced `Ok` with fewer or zero survivors; all passed the plumbing checks of the time.
 
-**The accounts** (`A_*`, one 20-word buffer per slice; table in `gpu.rs:11–18`, constants `:159–188`, compared in
-`check_slice`, `:3675–3747`, and `finish_group`, `:3501–3668`): every stage writes **positive evidence of its own
+**The accounts** (`A_*`, one 20-word buffer per slice; table in `gpu.rs:11–18`, constants `:164–193`, compared in
+`check_slice`, `:3680–3752`, and `finish_group`, `:3506–3673`): every stage writes **positive evidence of its own
 work**, and the host compares it with a number it queued or a number another stage counted:
 
 | stage | evidence | compared with |
@@ -317,7 +317,7 @@ ran 0 of 4096 cubes"), a dropped shared-list build, a stop variable in the envir
 library), a lost record, a stale slab count, every cap overrun. No failed account is retried: it is an error for
 the field, and the client submits nothing.
 
-**The sampled CPU check** (`GpuOptions::cpu_check`, `gpu.rs:3811`; stage 7) is the only thing that sees a kernel
+**The sampled CPU check** (`GpuOptions::cpu_check`, `gpu.rs:3816`; stage 7) is the only thing that sees a kernel
 that does all its work and computes wrongly: a wrong certificate, a wrong `parent()` mask, a wrong child mask
 (`scatter3` uses the same function, so the law holds), a false common-mask skip, a wrong transpose, a slice run
 with the wrong digits, a prefilter that rejects too much (shown: `F_PF_DROP` passes every account and fails the
@@ -336,8 +336,8 @@ f = 1/1,000 is seen with 63 % probability after 1,000 fields, 0.4 % of the base 
 - the host-tops path (benchmarks only, feature `midout-bench`) has no tops accounts.
 
 Guards on widths (`C_ERR_IDX`: a class of more than 65,536 parents; a top index above 2^20; child-list positions
-past the list, clamped; groups ≤ 256 slices) and the nice numbers' membership are listed in `gpu.rs:149–157` and
-`:4197–4209`. For the long version: `G2/BUILD-NOTES.md` §10 and the soundness audit `G2/AUDIT-MO.md`.
+past the list, clamped; groups ≤ 256 slices) and the nice numbers' membership are listed in `gpu.rs:154–162` and
+`:4202–4214`. For the long version: `G2/BUILD-NOTES.md` §10 and the soundness audit `G2/AUDIT-MO.md`.
 
 ---
 
@@ -515,11 +515,12 @@ said; counts come from an exact CPU prototype on real slices.
   `process_range_niceonly` on whole bases 10–29; its survivors equal brute force on every field of bases 10–25
   in one or two shapes each; its roots equal production's residue filter for bases 3–128 [measured]. A mutation
   test of it (27 mutants) left 3 alive after three independent tests were added: two change only work counts,
-  one edits an exemption no test base reaches [measured, on the first-PR branch; see §9].
+  one edits an exemption no test base reaches [measured on the first cut branch; the same tests are on this
+  branch since 2026-11-19 evening, the mutants were not rerun here].
 - Device against CPU: 1,073 real base-64 slices equal n for n in an independent sweep (on the branch as it was on
   2026-11-18, before the accounts and the 5–7 coordinate) [measured]; since then, 100 of them again, the range's
   first and last slices, and every slice of one field under both coordinates [measured].
-- Three test tiers (`mod.rs:24–46`): ordinary CPU tests in every `cargo test`; eight device tests named
+- Three test tiers (`mod.rs:25–47`): ordinary CPU tests in every `cargo test`; eight device tests named
   `cubecl_midout_*` that CI's lavapipe jobs select (both compilers, WGSL and SPIR-V; 3.1–3.7 minutes each on a
   5-CPU box, not timed on a GitHub runner); card-only and long tests behind the feature `midout-box-tests`, which
   CI never builds.
@@ -561,8 +562,8 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   expansion, the prefilter, the top hierarchy and parent sharing brought it to ×4.09 there. [measured]
 - **"The prefilter adds 2.6 ms to the wide expansion"** was a difference against a different kernel on another
   card; with no prefilter at all the wide expansion takes 3.64 ms against 3.37 ms with it [measured].
-- **The size of the branch** was reported as 6,500–7,000 lines; it is 13,525 insertions in 21 files against
-  `origin/main` (the wide path about 4,600, tests about 2,800) [measured by `git diff --stat`].
+- **The size of the branch** was reported as 6,500–7,000 lines; it was 13,525 insertions in 21 files against
+  `origin/main` at `5a048669` and is 13,939 at `c2152084` (the wide path about 4,600, tests about 2,800) [measured by `git diff --stat`].
 
 ---
 
@@ -570,12 +571,14 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
 
 - **Metal: never run.** The kernels pass production's Apple-miscompile lint (one site found and fixed); the
   paravirtual device on CI hangs above about 1 GiB of footprint and the join allocates several hundred MB with 4
-  classes per batch; CI's 30-minute macOS job would gain about 2.5 minutes per step. `DECISIONS.md` D6 recommends
-  that the client flag refuse Metal until it has been checked on Apple hardware; **the code does not do that
-  today** (`client/src/midout_route.rs:164–186` takes any wgpu device).
+  classes per batch; CI's 30-minute macOS job would gain about 2.5 minutes per step. Since 2026-11-19 evening the
+  client route refuses a Metal device by its name (`is_metal`, `client/src/midout_route.rs:198`, unit-tested on
+  device names) until the join has been checked on Apple hardware; **the refusal itself has not run on a Mac**.
 - **The cleaned branch has not run on the RX 9070 XT.** ×4.79 is the trunk just before the cleanup; on the 3080
   the cleanup is +0.17 % and per-stage times are equal, and the main kernel's generated CUDA differs only by dead
-  code removed [measured]; whether the same holds for RADV's code is not measured. Byte-identical generated code
+  code removed [measured]; whether the same holds for RADV's code is not measured. The four commits after the
+  cleanup (head `c2152084`) change no kernel: the generated CUDA of all 15 narrow and 14 wide kernels is identical
+  to `5a048669`'s, and five warm fields timed 1.7162 against 1.7187 fs on a 3080 in one session [measured]. Byte-identical generated code
   cannot be shown on CubeCL 0.10 (two runs of one binary give different SPIR-V) [measured].
 - **The wide path is untuned on the RX 9070 XT** (its main kernel's shared memory is 3 KB over the 12-wave
   threshold): base 65 is ×3.2 of base 64 there against ×2.17 on the 3080. **What the wide expansion spends ~3.3
@@ -590,47 +593,44 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   on the same machine; several clients, a remote coordinator and long runs are untested. A killed client leaves
   its field claimed unless `--reissue-after` is given. The client claims the next field only after submitting the
   last.
-- **The panic hook is installed after the device context is created**, so a runtime-thread panic during context
-  creation would be seen only by the accounts.
 - **Fault bits are a runtime kernel argument** (`fault: u32`, 0 in production), not compile-time; making them
   compile-time changes every faultable kernel's generated code and needs the same verification again. No test
   switch can reach a release build [measured by reading].
-- **The first two pull requests' review fixes are not on `dev/mo-clean`**: getters on `Coord`, three
-  independent tests, the per-base test split, a fix to the brute-force test (it counted `checked` with the
-  reference's own prefilter, so a wrong prefilter rule passed it), and the coordinate module's docs, which on
-  this branch still give the (4, 9, 6) bit renumbering under "Base 64" (`coord.rs:21–24`) while the default is
-  (4, 8, 5). They are on `pr/midout-field-coordinate` and `pr/midout-cpu-ref` and are to be carried back.
+- **The older field definition is still in the code.** The review fixes of the first two cut branches are on
+  this branch since 2026-11-19 evening (private `Coord` fields with getters, three independent tests, the fixed
+  brute-force test, true docs for the default coordinate). What the branch keeps beyond those cut branches: the
+  older coordinate (4, 9, 6) as "also known" at bases 64 and 65, and the coordinates of bases 65 and 68–70, which
+  the wide path and its tests use. Whether the older one is dropped is `DECISIONS.md` D2.
 - **Smaller:** `run_slice` and `run_slice_dev` are public and return one slice, not a field; lavapipe at 16 lanes
   aborts in lavapipe itself; the 3080's unexplained 0.6 ms in the expansion (§6.7); the shared lists are sized
-  for 3.4M roots each (an overrun is an error; the longest seen is 1.89M); a doc comment in `g2_kernel`'s
-  arguments names `tdig_kernel`, which is now `tdigz2_kernel` (`gpu.rs:281`).
+  for 3.4M roots each (an overrun is an error; the longest seen is 1.89M).
 
 ---
 
 ## 10. Where the code is, and how to run it
 
-**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `5a048669`, 14 commits on the development
+**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `c2152084`, 18 commits on the development
 trunk `66259bb0`; worktree `~/projects/nice/.worktrees/midout-clean`. The development history before the cleanup
 stays on `dev/middle-out-join`. No pull request is open (`DECISIONS.md` D9).
 
 | file | lines | what |
 |---|---|---|
-| `common/src/midout/mod.rs` | 76 | module map; the three test tiers |
-| `common/src/midout/coord.rs` | 521 | the work unit: coordinate, quantum, field ↔ fixed digits, `n_count` |
-| `common/src/midout/cpu.rs` | 902 | the exact CPU reference: shape, certificates, parents, slice join, prefilter, brute-force predicates |
-| `common/src/midout/arith.rs` | 132 | 384-bit arithmetic and nice-ness for the reference (re-implemented on purpose) |
-| `common/src/midout/mask.rs` | 74 | digit masks generic over `u64` / `u128` |
-| `common/src/midout/gpu.rs` | 4,847 | base-64 device path: kernels (`kernels`, `prep`, `post`, `dtops`), driver `GpuJoin`, `search_field`, tests |
-| `common/src/midout/gpu_wide.rs` | 4,588 | two-word-mask device path for bases 65–70 (and small bases in tests), its own check kernel |
+| `common/src/midout/mod.rs` | 62 | module map; the three test tiers |
+| `common/src/midout/coord.rs` | 634 | the work unit: coordinate, quantum, field ↔ fixed digits, `n_count` |
+| `common/src/midout/cpu.rs` | 1,150 | the exact CPU reference: shape, certificates, parents, slice join, prefilter, brute-force predicates |
+| `common/src/midout/arith.rs` | 138 | 384-bit arithmetic and nice-ness for the reference (re-implemented on purpose) |
+| `common/src/midout/mask.rs` | 75 | digit masks generic over `u64` / `u128` |
+| `common/src/midout/gpu.rs` | 4,852 | base-64 device path: kernels (`kernels`, `prep`, `post`, `dtops`), driver `GpuJoin`, `search_field`, tests |
+| `common/src/midout/gpu_wide.rs` | 4,594 | two-word-mask device path for bases 65–70 (and small bases in tests), its own check kernel |
 | `common/src/midout/audit.rs` | 872 | parity sweep and fault injection (tests only) |
-| `common/src/midout/route.rs` | 167 | one entry point per base for a client route, with telemetry |
+| `common/src/midout/route.rs` | 170 | one entry point per base for a client route, with telemetry |
 | `common/src/midout/wire.rs` | 238 | the claim key, the route name, the production-host refusal, the ordinary-route guard |
 | `common/src/cubecl_join.rs` | +2/−2 | two constants (`CHECK_CUBES`, `RAN_WORDS`) made `pub(crate)` so the check's grid and account are shared, not copied |
 | `common/src/client_api_async.rs` | +50/−2 | the ordinary claim refuses a coordinate-space field (and its test) |
 | `common/src/lib.rs`, `Cargo.toml` | +1, +19 | `pub mod midout`; features `midout-bench`, `midout-box-tests`, `midout-fault` |
-| `common/examples/midout_bench.rs`, `midout_wide_bench.rs` | 198, 175 | whole-field timing (feature `midout-bench`) |
+| `common/examples/midout_bench.rs`, `midout_wide_bench.rs` | 203, 180 | whole-field timing (feature `midout-bench`) |
 | `common/examples/midout_fields.rs` | 56 | a work list of fields for the coordinator |
-| `client/src/midout_route.rs` | 415 | the route: claim, search, submit; guards; panic hook |
+| `client/src/midout_route.rs` | 451 | the route: claim, search, submit; guards; Metal refusal; panic hook |
 | `client/src/main.rs`, `client/Cargo.toml` | +25, +3 | the hidden `--midout-coordinator` flag |
 | `scripts/midout_coordinator.py` | 164 | the local coordinator (standard library, 127.0.0.1) |
 
@@ -662,4 +662,5 @@ original design and its cost tables), `REVIEW.md` (the first review of it), `BUI
 field, §3 decisions, §9–§14 the measured steps), `AUDIT-MO.md` (the soundness audit), `fs/REVIEW.md` (the field
 structure), `BUILD-NOTES-CLIENT.md` (coordinator and route), `BUILD-NOTES-WIDE.md` (bases above 64),
 `CLEAN-NOTES.md` (the cleanup), `MAINTAINABILITY.md` and `PR-PLAN.md` (the proposed series of pull requests),
-`PR12-REVIEW.md` (the review of the first two), and `../EXPERIMENTS.md` for every number with its raw data.
+`PR12-REVIEW.md` (the review of the first two), `CARRYBACK-NOTES.md` (that review's fixes brought onto this
+branch, with every test tier re-run), and `../EXPERIMENTS.md` for every number with its raw data.

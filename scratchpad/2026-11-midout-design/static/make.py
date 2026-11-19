@@ -1,4 +1,4 @@
-"""Static overview of the middle-out join (dev/mo-clean 5a048669): python3 make.py, run inside static/."""
+"""Static overview of the middle-out join (dev/mo-clean c2152084): python3 make.py, run inside static/."""
 from html import escape
 W, H = 1500, 1060
 INK, INK2, MUTED = "#0b0b0b", "#52514e", "#8a8983"
@@ -33,7 +33,7 @@ a(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" he
 a(f'<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{MUTED}"/></marker></defs>')
 a(f'<rect width="{W}" height="{H}" fill="{PAGE}"/>')
 text(40, 44, "The middle-out join: one base-64 field, end to end", 22, 700, INK, "start")
-text(40, 68, "A nice-only GPU join whose unit of work is every n sharing five middle digits. Branch dev/mo-clean (5a048669); not merged, no server change.", 13.5, 400, INK2, "start")
+text(40, 68, "A nice-only GPU join whose unit of work is every n sharing five middle digits. Branch dev/mo-clean (c2152084); not merged, no server change.", 13.5, 400, INK2, "start")
 
 # --- digits strip
 x0, y0, cw = 60, 104, 62

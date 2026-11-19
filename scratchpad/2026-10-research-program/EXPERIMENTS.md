@@ -35,6 +35,30 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.16 The review's fixes carried back into `dev/mo-clean`; Metal refusal; panic hook first; kernels and speed unchanged (2026-11-19 18:00–19:36 UTC, engineer; `G2/BUILD-BRIEF-8B.md`, `G2/CARRYBACK-NOTES.md`, `G2/build8b/`; `dev/mo-clean` 5a048669 → c2152084 (bb9b12c0, a82ad9db, 07a7c60e, c2152084; on the fork); box 61490977 on m11295, RTX 3080 at 240 W)
+
+- **What changed** [by reading the diff]: `coord.rs`, `cpu.rs`, `arith.rs`, `mask.rs` are the cut branches' files
+  plus what the rest of the branch needs (the older coordinate (4, 9, 6) as "also known" at 64/65 via `is_known`;
+  coordinates of 65 and 68–70; `Mask::low64`, `Shape::label`, the staged box-only test); `coord_digits_known`
+  is gone (`coord_digits` is the default per base). `Coord` fields private with getters everywhere. Four stale
+  comments fixed. The client route refuses a device whose name says Metal (`is_metal`, unit-tested on names;
+  **not run on a Mac**). The panic hook is installed before the device context.
+- **Verification at c2152084** [M, one session, `G2/CARRYBACK-NOTES.md` §4]: `just lint` and three extra clippy
+  sets clean; production's suite passes (workspace; `--features gpu` 292; client 27); ordinary tests 279 pass
+  (124 s release, 1,142 s debug, of which the middle-out tests are 11 s / 54 s); device tests on lavapipe 8/8
+  through WGSL (182 s) and 8/8 through SPIR-V (188 s); on CUDA: slice parity n for n on two slices (counts equal
+  to 5a048669's), both prefilter limb forms, both fault tests, parent sharing, wide parity at base 65 and the
+  wide fault test, all pass.
+- **Kernels unchanged** [M]: the normalised generated CUDA source of all 15 narrow and 14 wide kernels is
+  identical between 5a048669 and c2152084.
+- **Timing** [M, five warm base-64 fields, alternating field by field, 19:22–19:29 UTC]: 5a048669 1.7187,
+  c2152084 1.7162 fs per admissible n (−0.15 %, inside drift); survivors, checked and nice equal field for field;
+  10 of 10 sampled CPU checks equal. The box read 5.6 % slower than the morning's box for the byte-identical
+  reference binary (same machine id; not investigated): compare heads with each other only.
+- **Not done:** the mutants were not rerun on this branch; nothing on the RX 9070 XT or Metal.
+- **Process deviation:** the subject of bb9b12c0 says "brought up to their reviewed form" (names a review); not
+  amended.
+
 ## MO.15 Review of the first two pull requests, its fixes, and the branches as they will be opened (2026-11-19 16:10–17:30 UTC, independent reviewer, then the author, then the director; `G2/PR12-REVIEW-BRIEF.md`, `G2/PR12-REVIEW.md`, `G2/PR12-NOTES.md` §6, `G2/PR1-BODY.md`, `G2/PR2-BODY.md`, `G2/build7p/raw/` (incl. `mut_after/`); box 61441981, destroyed 17:28 after 5.29 h)
 
 - **Verdicts: both "merge with fixes".** PR 1's code needed nothing (bijection, coverage, overflow margins and every

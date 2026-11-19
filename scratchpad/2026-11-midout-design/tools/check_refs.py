@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Check every file:line reference in the interactive map: the line must contain the named identifier.
-Middle-out refs are read from the dev/mo-clean worktree (head must be 5a048669); refs marked 'main' from
+Middle-out refs are read from the dev/mo-clean worktree (the head the map names in its sub-title); refs marked 'main' from
 `git show origin/main:<path>` (974d7194). Read-only. Usage: python3 tools/check_refs.py interactive/midout-map.html"""
 import re, subprocess, sys, os
 html = open(sys.argv[1]).read()

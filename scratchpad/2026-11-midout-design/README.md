@@ -1,7 +1,7 @@
 # The middle-out join: design document and process maps (2026-11-19)
 
 For the maintainer, before reading the code of the redesigned nice-only GPU join on the fork branch `dev/mo-clean`
-(head `5a048669`, worktree `~/projects/nice/.worktrees/midout-clean`). Nothing here changes any repository.
+(head `c2152084` since 2026-11-19 evening, worktree `~/projects/nice/.worktrees/midout-clean`). Nothing here changes any repository.
 
 ## Contents
 
@@ -16,7 +16,7 @@ For the maintainer, before reading the code of the redesigned nice-only GPU join
   shape = role; gold REUSED badge = production code used unchanged; frequency badges (PROC, FIELD, /64, SLICE,
   BATCH, GROUP); time-share bars (RX 9070 XT; the 3080 in the panel; the overlap lane's shares are derived and
   hatched). Click a shape for why it exists, how it connects, cost, the check that guards it, file:line (into
-  `dev/mo-clean` at `5a048669`, or `origin/main` at `974d7194` for the overlap lane), its wide-path counterpart and
+  `dev/mo-clean` at `c2152084`, or `origin/main` at `974d7194` for the overlap lane), its wide-path counterpart and
   its overlap-join counterpart. Spotlights: by frequency; where each execution check is made and compared (draws
   the account edges); base-64 path against the wide path (teal = has a counterpart, orange dashed = none); what a
   field fixes; what is reused from production.

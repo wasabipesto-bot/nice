@@ -181,6 +181,22 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   21:45), plus the Metal refusal the decisions document promised, the three stale comments, and a
   reproduce-or-refute of the `StrideTable` panic on production main (no fix). When the branch head moves, the
   map's and the design document's file:line references are re-checked against the new head.
+- **19:36 UTC: the carry-back is done (EXPERIMENTS MO.16).** `dev/mo-clean` 5a048669 → **c2152084** (4 commits, on
+  the fork): the cut branches' review fixes, four stale comments, the Metal refusal (untested on a Mac), the
+  panic hook before the device context. Every tier passes at the head; generated CUDA of all 29 kernels identical;
+  five-field timing 1.7162 against 1.7187 fs. The design document's §3, §7, §9, §10, the map (88 refs, 0 bad
+  against the new head; two panels updated) and the static overview were brought to the new head by me and
+  re-rendered; `DECISIONS.md` D6 and the "what happens next" list updated.
+- **A production finding out of the same step, not part of the middle-out work:** `StrideTable` is built empty
+  for every base with no valid residue (4, 5, 7 and every base ≡ 3 mod 4: 15, 19, …, 43, …, 63, 67, …) and its
+  first use panics (`stride_filter.rs:165`, index out of bounds) [M in the library on upstream main 974d7194].
+  I checked the public data API (read-only, 6 primary-key requests): **the validation id range 10,000–50,000 is
+  bases 42 and 43, fields of 1e9 n**, so `nice_client niceonly --validate` would draw a base-43 field about half
+  the time. Not yet shown through the client itself: the same engineer (same box, to 21:35) is running the real
+  client against a local stub serving those rows, on the CPU and the GPU, and drafts a fix branch
+  `pr/stride-empty-residues` only if it reproduces. Not reported to the user as a defect until that is back
+  (rule: reproduce through production's path first). A fix would be its own small PR, with an independent
+  review first; it is not covered by the hold.
 
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 

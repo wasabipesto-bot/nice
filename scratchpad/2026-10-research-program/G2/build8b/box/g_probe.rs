@@ -1,0 +1,114 @@
+
+#[cfg(test)]
+mod empty_table_probe {
+    use super::StrideTable;
+    use crate::base_range::get_base_range_u128;
+    use crate::client_process::process_range_niceonly;
+    use crate::FieldSize;
+
+    fn panic_text(e: &Box<dyn std::any::Any + Send>) -> String {
+        e.downcast_ref::<String>()
+            .cloned()
+            .or_else(|| e.downcast_ref::<&str>().map(|s| (*s).to_string()))
+            .unwrap_or_default()
+    }
+
+    /// Facts, printed: for every base with a range and k = 1..=3 (where the modulus fits), whether the
+    /// table has residues, and for an empty one whether `first_valid_at_or_after` and a nice-only search of
+    /// the base's first 10^6 n panic, with what message.
+    #[test]
+    fn probe_empty_tables() {
+        std::panic::set_hook(Box::new(|_| {}));
+        for base in 3..=128u32 {
+            let r = match std::panic::catch_unwind(|| get_base_range_u128(base)) {
+                Ok(Ok(Some(r))) => r,
+                Ok(_) => continue,
+                Err(e) => {
+                    println!("RANGE base {base}: get_base_range_u128 panics '{}'", panic_text(&e));
+                    continue;
+                }
+            };
+            for k in 1..=3u32 {
+                let fits = base.checked_pow(k).and_then(|bk| bk.checked_mul(base - 1)).is_some();
+                if !fits {
+                    continue;
+                }
+                let t = StrideTable::new(base, k);
+                if !t.valid_residues.is_empty() {
+                    continue;
+                }
+                let a = std::panic::catch_unwind(|| t.first_valid_at_or_after(r.first()));
+                let size = (r.end() - r.first()).min(1_000_000);
+                let range = FieldSize::new(r.first(), r.first() + size);
+                let s = std::panic::catch_unwind(|| process_range_niceonly(&range, base, &t).nice_numbers.len());
+                println!(
+                    "EMPTY base {base} k {k} range [{}, {}) first_valid: {} | niceonly 1e6: {}",
+                    r.first(),
+                    r.end(),
+                    a.map_or_else(|e| format!("PANIC '{}'", panic_text(&e)), |x| format!("{x:?}")),
+                    s.map_or_else(|e| format!("PANIC '{}'", panic_text(&e)), |x| format!("ok, {x} nice"))
+                );
+            }
+        }
+    }
+
+    /// Across each such base's range: 64 windows of 10^7 n evenly spaced; does a nice-only search (k = 3, the
+    /// client's) panic in any, and in how many.
+    #[test]
+    fn probe_windows() {
+        std::panic::set_hook(Box::new(|_| {}));
+        for base in [7u32, 15, 19, 23, 27, 35, 39, 43, 47, 55, 59, 63, 67] {
+            let r = get_base_range_u128(base).unwrap().unwrap();
+            let t = StrideTable::new(base, 3);
+            assert!(t.valid_residues.is_empty());
+            let span = r.end() - r.first();
+            let w = span.min(10_000_000);
+            let (mut panics, mut ok, mut first) = (0, 0, None);
+            for i in 0..64u128 {
+                let s0 = r.first() + (span - w) / 63 * i;
+                let range = FieldSize::new(s0, s0 + w);
+                match std::panic::catch_unwind(|| process_range_niceonly(&range, base, &t).nice_numbers.len()) {
+                    Ok(_) => ok += 1,
+                    Err(e) => {
+                        panics += 1;
+                        first.get_or_insert((s0, panic_text(&e)));
+                    }
+                }
+            }
+            println!("WINDOWS base {base}: {panics} of 64 windows panic, {ok} return; first panic {first:?}");
+        }
+    }
+
+    /// Base 43 (the server's validation fields are drawn from bases 42-43): 32 windows of 10^9 n evenly spaced over
+    /// its range; does a nice-only search (k = 3) panic in any.
+    #[test]
+    fn probe_b43_large_windows() {
+        std::panic::set_hook(Box::new(|_| {}));
+        let base = 43u32;
+        let r = get_base_range_u128(base).unwrap().unwrap();
+        let t = StrideTable::new(base, 3);
+        let span = r.end() - r.first();
+        let w = 1_000_000_000u128;
+        let mut panics = 0;
+        for i in 0..32u128 {
+            let s0 = r.first() + (span - w) / 31 * i;
+            let range = FieldSize::new(s0, s0 + w);
+            if std::panic::catch_unwind(|| process_range_niceonly(&range, base, &t).nice_numbers.len()).is_err() {
+                panics += 1;
+            }
+        }
+        println!("B43 1e9 windows: {panics} of 32 panic");
+    }
+
+    /// A nice-only search of a base whose stride table has no valid residue finds nothing; it must not
+    /// panic. Fails today (bases from the probe above, at the client's k = 3).
+    #[test]
+    fn niceonly_search_of_a_base_without_residues_does_not_panic() {
+        for base in [19u32, 23, 27] {
+            let r = get_base_range_u128(base).unwrap().unwrap();
+            let t = StrideTable::new(base, 3);
+            let range = FieldSize::new(r.first(), r.first() + (r.end() - r.first()).min(1_000_000));
+            assert!(process_range_niceonly(&range, base, &t).nice_numbers.is_empty(), "base {base}");
+        }
+    }
+}

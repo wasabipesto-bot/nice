@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-19 18:00 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-19 19:45 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
@@ -18,7 +18,7 @@ once for a far larger span and paired with a bit-sliced kernel.
 
 | | state on 2026-11-19 |
 |---|---|
-| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); 13,525 inserted lines in 21 files, no PR (held at your word, see D9); the first two PRs (no GPU code) are cut, reviewed and waiting on the fork |
+| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); 13,939 inserted lines in 21 files (head `c2152084` since the evening of 2026-11-19), no PR (held at your word, see D9); the first two PRs (no GPU code) are cut, reviewed and waiting on the fork |
 | speed, base 64, RTX 3080, end to end against v3.4.8's join, same session | **×4.09** (1.62 fs against 6.62 fs per candidate) |
 | speed, base 64, RX 9070 XT (demoux), end to end against v3.4.8's join, same session | **×4.79** (0.99 fs against 4.76 fs per candidate), measured 2026-11-19 at 64 lanes on the branch just before its cleanup (the cleaned branch has not run on that card; on the 3080 the cleanup changed the time by +0.17 %); exact on every slice and field tried; the client route also ran there against a local coordinator (12 fields). The 4.76 fs baseline there is production's join throughput harness (ten fields on 2026-11-18, scaled ×1.012 by two fields re-measured in the same session), not the client's own ten-field run that the 3080 baseline uses. At that speed base 64 on that card alone is about 55 days instead of about 266 |
 | base 65 (needs masks wider than 64 bits; production has no join there at all) | exact on a GPU; 3.47 fs per candidate, about half an RTX-3080-year for the whole base |
@@ -97,8 +97,8 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
   compilers; card-only and long tests behind a cargo feature that no default build enables.
 - **Also decide:** should the new device tests run on the macOS (Metal) job? The join has never run on Metal.
 - **Recommendation:** the three tiers; not on the Metal job for now, and the client flag should refuse to run
-  on Metal until someone has checked it on Apple hardware. (That refusal is **not built**: today the flag
-  accepts any wgpu device. I will add it on the branch.)
+  on Metal until someone has checked it on Apple hardware. (Built on the evening of 2026-11-19: the route refuses a
+  device whose name says Metal. The refusal itself has not been run on a Mac.)
 - **If you do not answer:** as recommended.
 
 ### D7. A benchmark example in the repository?
@@ -187,5 +187,7 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
    independently reviewed (including mutation testing) and fixed: branches `pr/midout-field-coordinate` and
    `pr/midout-cpu-ref` on the fork.
 2. **Nothing is opened from this work until you say so** (your hold of 2026-11-19). Meanwhile I keep working
-   on the branch: the review's changes carried back, base 65 tuned for your card, bases 68–70, optimisation.
+   on the branch. Done on the evening of 2026-11-19: the review's changes carried back into `dev/mo-clean`
+   (head `c2152084`; every test tier re-run; kernels' generated code and speed unchanged). Next: base 65 tuned
+   for your card, bases 68–70, optimisation.
 3. Nothing touches the server, the fleet, or the default client's behaviour.
