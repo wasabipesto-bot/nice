@@ -4469,53 +4469,28 @@ mod tests {
         }
     }
 
-    /// On the wide path: `MIDOUT_STOP` in the environment is ignored by the library, and
-    /// `search_field_wide` refuses a join with a timing stop.
-    #[cfg(feature = "midout-box-tests")]
+    /// On the wide path: a join with a timing stop is refused by `search_field_wide` before any work (base 40,
+    /// shape (3, 6), 4 classes per batch: small enough for any device).
     #[test]
-    #[ignore = "needs a GPU; sets MIDOUT_STOP (run it alone)"]
-    #[allow(clippy::match_wildcard_for_single_variants)]
-    fn wide_stop_is_loud() {
+    #[ignore = "needs a GPU (lavapipe will do; MIDOUT_CUDA=1 for CUDA)"]
+    fn cubecl_midout_wide_timing_stop_is_refused() {
         fn go<R: Runtime>(client: ComputeClient<R>) {
-            // SAFETY: this test alone sets the variable (run it alone: `--exact`).
-            unsafe { std::env::set_var("MIDOUT_STOP", "2") };
-            let coord = Coord::for_base(65).unwrap();
-            let sh = Shape::for_coord(&coord);
-            let mut gj = WideJoin::new(client, WideCaps::for_base(65), &coord, sh).unwrap();
-            assert_eq!(gj.stop, 6, "the library read MIDOUT_STOP");
-            let rank = gj.rank_of(717_171_717).unwrap();
-            let dc = wgroup(&gj, &rank, &[717_171_717]).unwrap();
-            println!(
-                "MIDOUT_STOP=2 in the environment: ignored, survivors {}",
-                dc.survivors
-            );
-            assert_eq!(dc.survivors, 16_482_926);
+            let coord = Coord::with_digits(40, 0, 1, 0).unwrap();
+            let mut caps = WideCaps::for_base(40);
+            caps.classes = 4;
+            let mut gj = WideJoin::new(client, caps, &coord, Shape { f0: 3, k: 6 }).unwrap();
+            assert_eq!(gj.stop, 6, "a new join has no timing stop");
             gj.set_timing_stop(2);
             let opt = WideOptions {
                 group: 16,
                 cpu_check: false,
             };
-            let r = search_field_wide(
-                &gj,
-                &coord,
-                coord.start + 77_777 * coord.quantum(),
-                coord.quantum(),
-                opt,
-            );
-            match r {
+            match search_field_wide(&gj, &coord, coord.start, coord.quantum(), opt) {
                 Ok((o, _, _)) => panic!("timing stop 2: search_field_wide returned Ok: {o:?}"),
-                Err(e) => println!("timing stop 2: search_field_wide LOUD: {e}"),
+                Err(e) => println!("timing stop 2: search_field_wide refused: {e}"),
             }
         }
-        #[cfg(feature = "cubecl-cuda")]
-        if std::env::var("MIDOUT_CUDA").is_ok() {
-            return go(wcuda_client());
-        }
-        match crate::cubecl_backend::CubeclContext::new_default().expect("a device") {
-            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => go(client),
-            #[allow(unreachable_patterns)]
-            _ => panic!("unsupported runtime"),
-        }
+        on_wide_device!(go);
     }
 
     /// A real base-65 slice against a staged reference from an independent

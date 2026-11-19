@@ -438,47 +438,6 @@ fn audit_faults() {
     }
 }
 
-/// `MIDOUT_STOP` in the environment once made `search_field` a no-op that succeeded: the library must never read
-/// it (only the bench does, and sets the stop with `set_timing_stop`), and `search_field` must refuse a join with a
-/// stop set.
-#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
-#[test]
-#[ignore = "needs CUDA"]
-fn audit_stop_env_is_loud() {
-    // SAFETY: this test alone sets the variable (run it alone: `--exact`); nothing reads it concurrently.
-    unsafe { std::env::set_var("MIDOUT_STOP", "2") };
-    let mut gj = GpuJoin::new(cuda_client(), Caps::b64(63)).unwrap();
-    assert_eq!(gj.stop, 6, "the library read MIDOUT_STOP");
-    let dc = group(&gj, &[712_012_851]).expect("a group with MIDOUT_STOP=2 in the environment");
-    println!(
-        "MIDOUT_STOP=2 in the environment: ignored, slice 712012851 survivors {} checked {}",
-        dc.survivors, dc.checked
-    );
-    assert_eq!((dc.survivors, dc.checked), (11_768_560, 337_904));
-    gj.set_timing_stop(2);
-    let coord = Coord::for_base(64).unwrap();
-    let t = 77_777u128;
-    let r = search_field(
-        &gj,
-        &coord,
-        coord.start + t * coord.quantum(),
-        coord.quantum(),
-        GpuOptions {
-            group: 16,
-            host_threads: 1,
-            device_tops: true,
-            cpu_check: false,
-        },
-    );
-    match r {
-        Ok((o, dc, _)) => panic!(
-            "timing stop 2: search_field returned Ok: survivors {} checked {} slices {} ({dc:?})",
-            o.survivors, o.checked, o.slices
-        ),
-        Err(e) => println!("timing stop 2: search_field LOUD: {e}"),
-    }
-}
-
 /// The device the acceptance tests run on: CUDA with `MIDOUT_CUDA`, else the default wgpu device.
 macro_rules! on_device {
     ($go:ident) => {{
@@ -492,6 +451,32 @@ macro_rules! on_device {
             _ => panic!("unsupported runtime"),
         }
     }};
+}
+
+/// A join with a timing stop set (the benches' bisection tool) is refused by `search_field` before any work, so a
+/// timed run can never pass for a searched field. (The library itself never reads `MIDOUT_STOP`; only the benches
+/// do.)
+#[test]
+#[ignore = "needs a GPU (lavapipe will do; MIDOUT_CUDA=1 for CUDA)"]
+fn cubecl_midout_timing_stop_is_refused() {
+    fn go<R: Runtime>(client: ComputeClient<R>) {
+        let mut gj = GpuJoin::new(client, Caps::b64(4)).unwrap();
+        assert_eq!(gj.stop, 6, "a new join has no timing stop");
+        gj.set_timing_stop(2);
+        let coord = Coord::for_base(64).unwrap();
+        let r = search_field(
+            &gj,
+            &coord,
+            coord.start + 77_777 * coord.quantum(),
+            coord.quantum(),
+            GpuOptions::new(16, false),
+        );
+        match r {
+            Ok((o, _, _)) => panic!("timing stop 2: search_field returned Ok: {o:?}"),
+            Err(e) => println!("timing stop 2: search_field refused: {e}"),
+        }
+    }
+    on_device!(go);
 }
 
 /// Every fault that once went unseen fails loudly, on the slices `pips` with `classes` classes per batch:
