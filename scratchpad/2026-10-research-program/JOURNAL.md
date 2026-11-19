@@ -34,6 +34,16 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **Not started, on purpose:** more NVIDIA-timed speed work on the kernel. The 3080 is not where the search
   runs; 4S decides what to tune for the card that is, and a window there decides the rest.
 
+- **06:13 UTC: the field-structure review is back (EXPERIMENTS FS.1).** It could not show the fields wrong. Two
+  proofs that answer the user's concern better than my argument of yesterday did: a field of this kind is a
+  union of whole slices under any shape (so it can be re-cut later without redoing search), and it is a
+  list-level filter for any top/bottom join including today's (about ×1.9 slower there, not impossible). What
+  the choice of fixed digits can cost is bounded at ×1.15–1.30. One improvement: fix digits 5–7, not 6–8.
+  The client-route engineer was told to keep the coordinate a parameter on the wire.
+- ivory is at 4.0 GB free. 7.7 GB is build output in two worktrees of other sessions (`gpu-probe-msg`,
+  `nicemark-repin`: their PRs #266, #267 merged yesterday) and 4.9 GB the uv cache; neither is mine to clear
+  without the user's word (decision 16). 4S stops building under 3.5 GB.
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);

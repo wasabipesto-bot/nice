@@ -35,6 +35,43 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## FS.1 The field structure attacked: not shown wrong; fix digits 5–7 instead of 6–8 (≈ 3 %); fields can be re-cut without redoing search (2026-11-19 05:45–06:13 UTC, independent reviewer, ivory CPU; `G2/FS-BRIEF.md`, `G2/fs/REVIEW.md`, `G2/fs/proto/` (prototype copy with a `levels` command), `G2/fs/code/`, `G2/fs/raw/`)
+
+- **Question (the user's, 2026-11-18):** does the new field structure tie the project to one implementation or
+  block later optimisations ("a hill climb to a local optimum")?
+- **Proven (by the definitions):** (1) any join that splits n into a top part and a bottom part sees every digit
+  of n on one side, so a field defined by fixing digits of n is a list-level filter for today's overlap join and
+  for every middle-out variant; (2) any field whose fixed digits lie in 4–8 is a union of whole slices, so shape,
+  kernel, chunking, pairing and mask width stay free, and **fields can be re-cut later without redoing any
+  search** (only the server's rows change).
+- **What a field can influence at all** [M stage times, D]: tops and parent preparation: 13 % of a slice at b64,
+  23 % at b65; so no grouping of the same work beats another by more than ×1.15 (b64) / ×1.30 (b65); the kernel
+  (71 %) costs the same under every definition.
+- **The one real loss found:** slices that differ only in digit 8 could share their parents' preparation, and
+  fields fixing 6–8 scatter them over 64 fields. **Fields fixing 5–7** (coordinate (4, 8, 5), the same 262,144
+  fields of 2^57 at b64, still a bit permutation) leave digits 4 and 8 free: tops share across digit 4 (built),
+  parents across digit 8. Exact counts: the per-slice root pass falls to 21.9 % (b64) / 22.4 % (b65) of its
+  size against 76.8 % / 77.1 % for the best that 6–8 allows [M]. Price ≈ 3 % net at b64, 3–4 % at b65 [D/G; no
+  card measurement]. Memory 0.48 / 0.59 GB of root indices.
+- **Alternatives priced** [M counts, D costs]: the k = 9 shape has ×1.9–2.0 the pairs and kept words; contiguous
+  n fields break even with today's main only at ≥ 1/18 of the base; leading-range × middle rectangles lose about
+  15 % per halving; keys on low digits, residues or classes rebuild one side per field; coarser fields (fix 7–8)
+  make a b65 field 62 minutes on a 3080 (past the one-hour claim); finer (fix 5–8) means 16.8M fields; hashed
+  slices lose neighbour sharing; a three-way join with the middle enumerated is this structure; one parent
+  order shared by 64 slices costs +4.2–7.0 % kept words [M].
+- **Corrections to the engineers' permits / forbids list** (`BUILD-NOTES.md` §2): parents are shared across
+  digit 8, not digit 4; "forbids k ≤ 9 / f0 ≥ 7" is overstated (+0.15 fs for (4, 9)); today's join *can* search
+  such a field by restricting its tops, at about ×1.9 without its leading-digit prune; changing the coordinate
+  after fields exist costs bookkeeping, not compute.
+- **What would falsify it:** a search method that is not a prefix–suffix join (BX found none: negative evidence,
+  not proof); fields forced down to ≲ 64 slices (for example for CPU clients); a card measurement showing
+  preparation sharing worth much more than derived.
+- **Not done:** no card measurement of the depth-8 sharing; no trunk run with (4, 8, 5); whether a shape that
+  varies across the base pays (unpriced); CPU clients.
+- **Conclusion:** the commitment is weaker than feared: within the top/bottom family it is reversible in compute
+  terms and bounded at ×1.15–1.30 in what it can cost. Adopt 5–7 unless a card measurement says otherwise; the
+  coordinate stays a per-field parameter on the wire (told to the client-route engineer the same hour).
+
 ## MO.6 One trunk: the wide kernels merged and brought level; base 65 is ×2.08 of base 64 (step 3W; 2026-11-19 03:15–04:48 UTC, engineer; `G2/BUILD-BRIEF-3W.md`, `G2/BUILD-NOTES.md` §1 and §11, `G2/build3w/`; trunk `dev/middle-out-join` c0ad3f4a → 4abfab5c (merge 23ce3cf6 of dev/mo-wide, f246d9fd accounts and guards on the wide path, 4abfab5c top hierarchy and prefilter on the wide path; on the fork); box 61286074, RTX 3080 at 240 W, destroyed 04:50 after 12.1 h)
 
 - **State of the head** [M]: fmt and clippy clean (default and GPU features); production's 214 tests pass; the

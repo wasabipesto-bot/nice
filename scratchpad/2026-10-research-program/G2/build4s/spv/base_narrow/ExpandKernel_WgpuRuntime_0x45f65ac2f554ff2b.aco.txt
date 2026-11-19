@@ -1,0 +1,3462 @@
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+PIPEC device=AMD Radeon RX 9070 XT (RADV GFX1201) subgroupSize=64 minSubgroup=32 maxSubgroup=64
+shader: MESA_SHADER_COMPUTE
+source_blake3: {0xc2cc981c, 0xcf2399a0, 0x6e0c556d, 0xc23adda1, 0x1f609eb6, 0x35c98910, 0x54a611a9, 0x5c7f6550}
+workgroup_size: 256, 1, 1
+num_ubos: 1
+num_ssbos: 10
+system_values_read: 0x00000000'00000000'00012100'00000002
+api_subgroup_size: 64
+max_subgroup_size: 64
+min_subgroup_size: 64
+uses_wide_subgroup_intrinsics: true
+bit_sizes_int: 0x61
+separate_shader: true
+flrp_lowered: true
+writes_memory: true
+decl_var ubo INTERP_MODE_NONE readonly block #0 (~0, 0, 10)
+decl_var ssbo INTERP_MODE_NONE restrict readonly block#2 #1 (~0, 0, 0)
+decl_var ssbo INTERP_MODE_NONE restrict readonly block#4 #3 (~0, 0, 1)
+decl_var ssbo INTERP_MODE_NONE restrict readonly block#4 #5 (~0, 0, 2)
+decl_var ssbo INTERP_MODE_NONE restrict readonly block#4 #6 (~0, 0, 3)
+decl_var ssbo INTERP_MODE_NONE restrict readonly block#4 #7 (~0, 0, 4)
+decl_var ssbo INTERP_MODE_NONE restrict readonly block#4 #8 (~0, 0, 5)
+decl_var ssbo INTERP_MODE_NONE restrict readonly block#10 #9 (~0, 0, 6)
+decl_var ssbo INTERP_MODE_NONE restrict writeonly block#4 #11 (~0, 0, 7)
+decl_var ssbo INTERP_MODE_NONE restrict block#4 #12 (~0, 0, 8)
+decl_var ssbo INTERP_MODE_NONE restrict block#4 #13 (~0, 0, 9)
+decl_function expand_kernel () (entrypoint)
+
+impl expand_kernel {
+    block b0:    // preds:
+    32      %0 = @load_scalar_arg_amd (base=1, arg_upper_bound_u32_amd=0)
+    32x3    %1 = @load_workgroup_id
+    32      %2 = @load_vector_arg_amd (base=3, arg_upper_bound_u32_amd=255)
+    32      %3 = load_const (0x00000008)
+    32      %4 = ishl %1.x, %3 (0x8)
+    32      %5 = iadd %4, %2
+    32x3    %6 = @load_num_workgroups
+    64      %7 = load_const (0xffffffffffffffff = -nan = -1 = 18446744073709551615)
+    32      %8 = load_const (0x00000000)
+    32      %9 = @mbcnt_amd (%7 (0xffffffffffffffff), %8 (0x0))
+    32     %10 = load_const (0xffff8000 = -32768 = 4294934528)
+    64     %11 = pack_64_2x32_split %0, %10 (0xffff8000)
+    32x4   %12 = @load_global_amd (%11, %8 (0x0)) (base=160, access=readonly|reorderable|smem-amd, align_mul=4, align_offset=0)
+    32     %13 = load_const (0x00000004)
+    1      %14 = ieq %5, %8 (0x0)
+                 // succs: b1 b2
+    if %14 {
+        block b1:    // preds: b0
+        32x4   %15 = @load_global_amd (%11, %8 (0x0)) (base=64, access=readonly|reorderable|smem-amd, align_mul=4, align_offset=0)
+        32     %16 = @load_ssbo (%15, %8 (0x0)) (access=readonly|reorderable|smem-amd, align_mul=1073741824, align_offset=0, offset_shift=0)
+                     @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=REL, mem_modes=ssbo|global)
+        32x4   %17 = @load_global_amd (%11, %8 (0x0)) (base=144, access=readonly|reorderable|smem-amd, align_mul=4, align_offset=0)
+                     @store_ssbo (%16, %17, %8 (0x0)) (wrmask=x, access=coherent|atomic, align_mul=1073741824, align_offset=0, offset_shift=0)
+        32x4   %18 = @load_global_amd (%11, %8 (0x0)) (base=16, access=readonly|reorderable|smem-amd, align_mul=4, align_offset=0)
+        32     %19 = @load_ssbo (%18, %8 (0x0)) (access=readonly|reorderable|smem-amd, align_mul=1073741824, align_offset=0, offset_shift=0)
+                     @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=REL, mem_modes=ssbo|global)
+                     @store_ssbo (%19, %17, %13 (0x4)) (wrmask=x, access=coherent|atomic, align_mul=1073741824, align_offset=4, offset_shift=0)
+                     // succs: b3
+    } else {
+        block b2:  // preds: b0, succs: b3
+    }
+    block b3:    // preds: b1 b2
+    32x4   %20 = @load_global_amd (%11, %8 (0x0)) (base=16, access=readonly|reorderable|smem-amd, align_mul=4, align_offset=0)
+    32     %21 = @load_ssbo (%20, %8 (0x0)) (access=readonly|reorderable|speculatable|smem-amd, align_mul=1073741824, align_offset=0, offset_shift=0)
+    32x4   %22 = @load_ubo (%12, %8 (0x0)) (access=readonly|speculatable|smem-amd, align_mul=1073741824, align_offset=0, range_base=0, range=16)
+    32     %23 = umin %21, %22.x
+    32     %24 = load_const (0x00000006)
+    32     %25 = ushr %2, %24 (0x6)
+    32     %26 = load_const (0x00000002)
+    32     %27 = ishl %1.x, %26 (0x2)
+    32     %28 = iadd %27, %25
+    32     %29 = load_const (0x00000003)
+    32     %30 = load_const (0x00000010 = 16)
+    32     %31 = load_const (0x0000000c = 12)
+    32     %32 = @load_ubo (%12, %30 (0x10)) (access=readonly|speculatable|smem-amd, align_mul=1073741824, align_offset=16, range_base=16, range=4)
+    32     %33 = load_const (0x00000001)
+    32     %34 = load_const (0x00000400 = 1024)
+    32     %35 = load_const (0x0000000a = 10)
+    32     %36 = ishl %6.x, %26 (0x2)
+    32     %37 = load_const (0x00000040 = 64)
+    1      %38 = bitnz %32, %8 (0x0)
+    1      %39 = bitnz %32, %35 (0xa)
+                 // succs: b4
+    loop {
+        block b4:    // preds: b3 b47
+        32     %40 = phi b3: %28, b47: %906
+        32     %41 = phi b3: %8 (0x0), b47: %907
+        32     %42 = phi b3: %8 (0x0), b47: %48
+        1      %43 = uge %40, %23
+                     // succs: b5 b6
+        if %43 {
+            block b5:// preds: b4
+            break
+            // succs: b48
+        } else {
+            block b6:  // preds: b4, succs: b7
+        }
+        block b7:    // preds: b6
+        32x4   %44 = @load_global_amd (%11, %8 (0x0)) (base=32, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+        32     %45 = ishl %40, %26 (0x2)
+        32     %46 = @load_ssbo (%44, %45) (access=readonly|reorderable, align_mul=4, align_offset=0, offset_shift=0)
+                     // succs: b8
+        loop {
+            block b8:    // preds: b7 b46
+            32     %47 = phi b7: %8 (0x0), b46: %905
+            32     %48 = phi b7: %42, b46: %95
+            1      %49 = uge %47, %46
+                         // succs: b9 b10
+            if %49 {
+                block b9:// preds: b8
+                break
+                // succs: b47
+            } else {
+                block b10:  // preds: b8, succs: b11
+            }
+            block b11:   // preds: b10
+            32     %50 = iadd %47, %9
+            1      %51 = ult %50, %46
+                         // succs: b12 b13
+            if %51 {
+                block b12:   // preds: b11
+                32     %52 = ishl %40, %3 (0x8)
+                32     %53 = iadd %52, %50
+                32x4   %54 = @load_global_amd (%11, %8 (0x0)) (base=0, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+                32     %55 = ishl %53, %13 (0x4)
+                32x4   %56 = @load_ssbo (%54, %55) (access=readonly|reorderable, align_mul=16, align_offset=0, offset_shift=0)
+                32     %57 = mov %56.z
+                32     %58 = mov %56.w
+                32     %59 = mov %56.x
+                32     %60 = mov %56.y
+                             // succs: b14
+            } else {
+                block b13:  // preds: b11, succs: b14
+            }
+            block b14:   // preds: b12 b13
+            32     %61 = phi b12: %59, b13: %8 (0x0)
+            32     %62 = phi b12: %60, b13: %8 (0x0)
+            32     %63 = phi b12: %57, b13: %8 (0x0)
+            32     %64 = phi b12: %58, b13: %8 (0x0)
+            32     %65 = iadd %50, %37 (0x40)
+            1      %66 = ult %65, %46
+                         // succs: b15 b16
+            if %66 {
+                block b15:   // preds: b14
+                32     %67 = ishl %40, %3 (0x8)
+                32     %68 = iadd %50, %67
+                32x4   %69 = @load_global_amd (%11, %8 (0x0)) (base=0, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+                32     %70 = ishl %68, %13 (0x4)
+                32     %71 = iadd %70, %34 (0x400)
+                32x4   %72 = @load_ssbo (%69, %71) (access=readonly|reorderable, align_mul=16, align_offset=0, offset_shift=0)
+                32     %73 = mov %72.z
+                32     %74 = mov %72.w
+                32     %75 = mov %72.x
+                32     %76 = mov %72.y
+                             // succs: b17
+            } else {
+                block b16:  // preds: b14, succs: b17
+            }
+            block b17:   // preds: b15 b16
+            32     %77 = phi b15: %75, b16: %8 (0x0)
+            32     %78 = phi b15: %76, b16: %8 (0x0)
+            32     %79 = phi b15: %73, b16: %8 (0x0)
+            32     %80 = phi b15: %74, b16: %8 (0x0)
+            32x8   %81 = @load_global_amd (%11, %8 (0x0)) (base=80, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+            32x4   %82 = vec4 %81.a, %81.b, %81.c, %81.d
+            32     %83 = ishl %61, %26 (0x2)
+            32     %84 = @load_ssbo (%82, %83) (access=readonly|reorderable, align_mul=4, align_offset=0, offset_shift=0)
+            32     %85 = ishl %61, %29 (0x3)
+            32x4   %86 = vec4 %81.e, %81.f, %81.g, %81.h
+            64     %87 = @load_ssbo (%86, %85) (access=readonly|reorderable, align_mul=8, align_offset=0, offset_shift=0)
+            32     %88 = bit_count %64
+            32     %89 = bit_count %63
+            32     %90 = iadd %89, %88
+            32     %91 = bit_count %79
+            32     %92 = iadd %90, %91
+            32     %93 = bit_count %80
+            32     %94 = iadd %92, %93
+            32     %95 = iadd %48, %94
+            32     %96 = extract_u16 %84, %33 (0x1)
+            32     %97 = insert_u8 %96, %29 (0x3)
+            32     %98 = iand %29 (0x3), %84
+            32     %99 = load_const (0x0000001e = 30)
+            32    %100 = ishl %98, %99 (0x1e)
+            32    %101 = ior %100, %97
+            32    %102 = ior %101, %22.w
+            32    %103 = ushr %84, %26 (0x2)
+            32    %104 = load_const (0x00000018 = 24)
+                         // succs: b18
+            loop {
+                block b18:   // preds: b17 b21
+                32    %105 = phi b17: %8 (0x0), b21: %454
+                32    %106 = phi b17: %64, b21: %127
+                32    %107 = phi b17: %63, b21: %128
+                32    %108 = phi b17: %8 (0x0), b21: %456
+                32    %109 = ior %107, %106
+                1     %110 = ieq %109, %8 (0x0)
+                             // succs: b19 b20
+                if %110 {
+                    block b19:// preds: b18
+                    break
+                    // succs: b22
+                } else {
+                    block b20:  // preds: b18, succs: b21
+                }
+                block b21:   // preds: b20
+                32    %111 = load_const (0x00000020 = 32)
+                32    %112 = find_lsb %107
+                1     %113 = ieq %107, %8 (0x0)
+                32    %114 = bcsel %113, %111 (0x20), %112
+                32    %115 = find_lsb %106
+                1     %116 = ieq %106, %8 (0x0)
+                32    %117 = bcsel %116, %111 (0x20), %115
+                1     %118 = ine %107, %8 (0x0)
+                32    %119 = bcsel %118, %114, %117
+                32    %120 = iadd %111 (0x20), %119
+                32    %121 = bcsel %118, %114, %120
+                32    %122 = load_const (0xffffffff = -1 = 4294967295)
+                32    %123 = iadd %107, %122 (0xffffffff)
+                32    %124 = iand %107, %123
+                32    %125 = iadd %106, %122 (0xffffffff)
+                32    %126 = iand %106, %125
+                32    %127 = bcsel %118, %106, %126
+                32    %128 = bcsel %118, %124, %107
+                32    %129 = iadd %62, %121
+                32x4  %130 = @load_global_amd (%11, %8 (0x0)) (base=48, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+                32    %131 = ishl %129, %26 (0x2)
+                32    %132 = @load_ssbo (%130, %131) (access=readonly|reorderable, align_mul=4, align_offset=0, offset_shift=0)
+                32    %133 = iadd %132, %22.z
+                32    %134 = ishl %102, %99 (0x1e)
+                32    %135 = ior %133, %134
+                32    %136 = ishl %103, %99 (0x1e)
+                32    %137 = ushr %102, %26 (0x2)
+                32    %138 = ior %137, %136
+                32    %139 = imul %135, %138
+                64    %140 = pack_64_2x32_split %139, %8 (0x0)
+                64    %141 = ishl %140, %33 (0x1)
+                32    %142 = umul_high %135, %135
+                64    %143 = pack_64_2x32_split %142, %8 (0x0)
+                64    %144 = iadd %143, %141
+                32    %145 = unpack_64_2x32_split_x %144
+                32    %146 = unpack_64_2x32_split_y %144
+                32    %147 = umul_high %135, %138
+                32    %148 = ishl %147, %33 (0x1)
+                32    %149 = iadd %146, %148
+                32    %150 = imul %138, %138
+                32    %151 = iadd %149, %150
+                32    %152 = ishl %135, %33 (0x1)
+                32    %153 = ubfe %103, %26 (0x2), %3 (0x8)
+                32    %154 = imul %152, %153
+                32    %155 = iadd %151, %154
+                32    %156 = imul %135, %135
+                32    %157 = imul %156, %135
+                32    %158 = umul_high %156, %135
+                32    %159 = imul %156, %138
+                64    %160 = pack_64_2x32_split %159, %8 (0x0)
+                64    %161 = pack_64_2x32_split %158, %8 (0x0)
+                64    %162 = iadd %161, %160
+                32    %163 = imul %145, %135
+                64    %164 = pack_64_2x32_split %163, %8 (0x0)
+                64    %165 = iadd %162, %164
+                32    %166 = unpack_64_2x32_split_x %165
+                32    %167 = unpack_64_2x32_split_y %165
+                32    %168 = umul_high %156, %138
+                32    %169 = iadd %167, %168
+                32    %170 = umul_high %145, %135
+                32    %171 = iadd %169, %170
+                32    %172 = imul %145, %138
+                32    %173 = iadd %171, %172
+                32    %174 = imul %156, %153
+                32    %175 = iadd %173, %174
+                32    %176 = extract_u8 %155, %8 (0x0)
+                32    %177 = imul %176, %135
+                32    %178 = iadd %175, %177
+                32    %179 = load_const (0x00000005)
+                32    %180 = load_const (0x0000003f = 63)
+                32    %181 = iand %156, %180 (0x3f)
+                32    %182 = ushr %181, %179 (0x5)
+                32    %183 = isub %8 (0x0), %182
+                32    %184 = ishl %33 (0x1), %181
+                32    %185 = inot %183
+                32    %186 = iand %184, %185
+                32    %187 = iand %184, %183
+                32    %188 = load_const (0x0000000b = 11)
+                32    %189 = ubfe %156, %188 (0xb), %33 (0x1)
+                32    %190 = isub %8 (0x0), %189
+                32    %191 = ubfe %156, %24 (0x6), %24 (0x6)
+                32    %192 = ishl %33 (0x1), %191
+                32    %193 = inot %190
+                32    %194 = iand %192, %193
+                32    %195 = iand %192, %190
+                32    %196 = ior %186, %194
+                32    %197 = ior %187, %195
+                32    %198 = load_const (0x00000011 = 17)
+                32    %199 = ubfe %156, %198 (0x11), %33 (0x1)
+                32    %200 = isub %8 (0x0), %199
+                32    %201 = ubfe %156, %31 (0xc), %24 (0x6)
+                32    %202 = ishl %33 (0x1), %201
+                32    %203 = inot %200
+                32    %204 = iand %202, %203
+                32    %205 = iand %202, %200
+                32    %206 = ior %196, %204
+                32    %207 = ior %197, %205
+                32    %208 = load_const (0x00000017 = 23)
+                32    %209 = ubfe %156, %208 (0x17), %33 (0x1)
+                32    %210 = isub %8 (0x0), %209
+                32    %211 = load_const (0x00000012 = 18)
+                32    %212 = ubfe %156, %211 (0x12), %24 (0x6)
+                32    %213 = ishl %33 (0x1), %212
+                32    %214 = inot %210
+                32    %215 = iand %213, %214
+                32    %216 = iand %213, %210
+                32    %217 = ior %206, %215
+                32    %218 = ior %207, %216
+                32    %219 = extract_u8 %156, %29 (0x3)
+                32    %220 = iand %219, %180 (0x3f)
+                32    %221 = ushr %220, %179 (0x5)
+                32    %222 = isub %8 (0x0), %221
+                32    %223 = ishl %33 (0x1), %220
+                32    %224 = inot %222
+                32    %225 = iand %223, %224
+                32    %226 = iand %223, %222
+                32    %227 = ior %217, %225
+                32    %228 = ior %218, %226
+                32    %229 = load_const (0x0000000f = 15)
+                32    %230 = iand %145, %229 (0xf)
+                32    %231 = ishl %230, %26 (0x2)
+                32    %232 = ushr %156, %99 (0x1e)
+                32    %233 = ior %232, %231
+                32    %234 = ushr %233, %179 (0x5)
+                32    %235 = isub %8 (0x0), %234
+                32    %236 = ishl %33 (0x1), %233
+                32    %237 = inot %235
+                32    %238 = iand %236, %237
+                32    %239 = iand %236, %235
+                32    %240 = ior %227, %238
+                32    %241 = ior %228, %239
+                32    %242 = load_const (0x00000009)
+                32    %243 = ubfe %145, %242 (0x9), %33 (0x1)
+                32    %244 = isub %8 (0x0), %243
+                32    %245 = ubfe %145, %13 (0x4), %24 (0x6)
+                32    %246 = ishl %33 (0x1), %245
+                32    %247 = inot %244
+                32    %248 = iand %246, %247
+                32    %249 = iand %246, %244
+                32    %250 = ior %240, %248
+                32    %251 = ior %241, %249
+                32    %252 = ubfe %145, %229 (0xf), %33 (0x1)
+                32    %253 = isub %8 (0x0), %252
+                32    %254 = ubfe %145, %35 (0xa), %24 (0x6)
+                32    %255 = ishl %33 (0x1), %254
+                32    %256 = inot %253
+                32    %257 = iand %255, %256
+                32    %258 = iand %255, %253
+                32    %259 = ior %250, %257
+                32    %260 = ior %251, %258
+                32    %261 = extract_u16 %145, %33 (0x1)
+                32    %262 = iand %261, %180 (0x3f)
+                32    %263 = ushr %262, %179 (0x5)
+                32    %264 = isub %8 (0x0), %263
+                32    %265 = ishl %33 (0x1), %262
+                32    %266 = inot %264
+                32    %267 = iand %265, %266
+                32    %268 = iand %265, %264
+                32    %269 = ior %259, %267
+                32    %270 = ior %260, %268
+                32    %271 = load_const (0x0000001b = 27)
+                32    %272 = ubfe %145, %271 (0x1b), %33 (0x1)
+                32    %273 = isub %8 (0x0), %272
+                32    %274 = load_const (0x00000016 = 22)
+                32    %275 = ubfe %145, %274 (0x16), %24 (0x6)
+                32    %276 = ishl %33 (0x1), %275
+                32    %277 = inot %273
+                32    %278 = iand %276, %277
+                32    %279 = iand %276, %273
+                32    %280 = ior %269, %278
+                32    %281 = ior %270, %279
+                32    %282 = iand %29 (0x3), %155
+                32    %283 = ishl %282, %13 (0x4)
+                32    %284 = load_const (0x0000001c = 28)
+                32    %285 = ushr %145, %284 (0x1c)
+                32    %286 = ior %285, %283
+                32    %287 = ushr %286, %179 (0x5)
+                32    %288 = isub %8 (0x0), %287
+                32    %289 = ishl %33 (0x1), %286
+                32    %290 = inot %288
+                32    %291 = iand %289, %290
+                32    %292 = iand %289, %288
+                32    %293 = load_const (0x00000007)
+                32    %294 = ushr %176, %293 (0x7)
+                32    %295 = isub %8 (0x0), %294
+                32    %296 = ushr %176, %26 (0x2)
+                32    %297 = ishl %33 (0x1), %296
+                32    %298 = inot %295
+                32    %299 = iand %297, %298
+                32    %300 = iand %297, %295
+                32    %301 = ior %280, %291
+                32    %302 = ior %301, %299
+                32    %303 = ior %281, %292
+                32    %304 = ior %303, %300
+                32    %305 = ior %291, %299
+                32    %306 = ior %292, %300
+                32    %307 = iand %157, %180 (0x3f)
+                32    %308 = ushr %307, %179 (0x5)
+                32    %309 = isub %8 (0x0), %308
+                32    %310 = ishl %33 (0x1), %307
+                32    %311 = inot %309
+                32    %312 = iand %310, %311
+                32    %313 = iand %310, %309
+                32    %314 = ubfe %157, %188 (0xb), %33 (0x1)
+                32    %315 = isub %8 (0x0), %314
+                32    %316 = ubfe %157, %24 (0x6), %24 (0x6)
+                32    %317 = ishl %33 (0x1), %316
+                32    %318 = inot %315
+                32    %319 = iand %317, %318
+                32    %320 = iand %317, %315
+                32    %321 = ior %312, %319
+                32    %322 = ior %313, %320
+                32    %323 = ubfe %157, %198 (0x11), %33 (0x1)
+                32    %324 = isub %8 (0x0), %323
+                32    %325 = ubfe %157, %31 (0xc), %24 (0x6)
+                32    %326 = ishl %33 (0x1), %325
+                32    %327 = inot %324
+                32    %328 = iand %326, %327
+                32    %329 = iand %326, %324
+                32    %330 = ior %321, %328
+                32    %331 = ior %322, %329
+                32    %332 = ubfe %157, %208 (0x17), %33 (0x1)
+                32    %333 = isub %8 (0x0), %332
+                32    %334 = ubfe %157, %211 (0x12), %24 (0x6)
+                32    %335 = ishl %33 (0x1), %334
+                32    %336 = inot %333
+                32    %337 = iand %335, %336
+                32    %338 = iand %335, %333
+                32    %339 = ior %330, %337
+                32    %340 = ior %331, %338
+                32    %341 = extract_u8 %157, %29 (0x3)
+                32    %342 = iand %341, %180 (0x3f)
+                32    %343 = ushr %342, %179 (0x5)
+                32    %344 = isub %8 (0x0), %343
+                32    %345 = ishl %33 (0x1), %342
+                32    %346 = inot %344
+                32    %347 = iand %345, %346
+                32    %348 = iand %345, %344
+                32    %349 = ior %339, %347
+                32    %350 = ior %340, %348
+                32    %351 = iand %166, %229 (0xf)
+                32    %352 = ishl %351, %26 (0x2)
+                32    %353 = ushr %157, %99 (0x1e)
+                32    %354 = ior %353, %352
+                32    %355 = ushr %354, %179 (0x5)
+                32    %356 = isub %8 (0x0), %355
+                32    %357 = ishl %33 (0x1), %354
+                32    %358 = inot %356
+                32    %359 = iand %357, %358
+                32    %360 = iand %357, %356
+                32    %361 = ior %349, %359
+                32    %362 = ior %350, %360
+                32    %363 = ubfe %166, %242 (0x9), %33 (0x1)
+                32    %364 = isub %8 (0x0), %363
+                32    %365 = ubfe %166, %13 (0x4), %24 (0x6)
+                32    %366 = ishl %33 (0x1), %365
+                32    %367 = inot %364
+                32    %368 = iand %366, %367
+                32    %369 = iand %366, %364
+                32    %370 = ior %361, %368
+                32    %371 = ior %362, %369
+                32    %372 = ubfe %166, %229 (0xf), %33 (0x1)
+                32    %373 = isub %8 (0x0), %372
+                32    %374 = ubfe %166, %35 (0xa), %24 (0x6)
+                32    %375 = ishl %33 (0x1), %374
+                32    %376 = inot %373
+                32    %377 = iand %375, %376
+                32    %378 = iand %375, %373
+                32    %379 = ior %370, %377
+                32    %380 = ior %371, %378
+                32    %381 = extract_u16 %166, %33 (0x1)
+                32    %382 = iand %381, %180 (0x3f)
+                32    %383 = ushr %382, %179 (0x5)
+                32    %384 = isub %8 (0x0), %383
+                32    %385 = ishl %33 (0x1), %382
+                32    %386 = inot %384
+                32    %387 = iand %385, %386
+                32    %388 = iand %385, %384
+                32    %389 = ior %379, %387
+                32    %390 = ior %380, %388
+                32    %391 = ubfe %166, %271 (0x1b), %33 (0x1)
+                32    %392 = isub %8 (0x0), %391
+                32    %393 = ubfe %166, %274 (0x16), %24 (0x6)
+                32    %394 = ishl %33 (0x1), %393
+                32    %395 = inot %392
+                32    %396 = iand %394, %395
+                32    %397 = iand %394, %392
+                32    %398 = ior %389, %396
+                32    %399 = ior %390, %397
+                32    %400 = iand %29 (0x3), %178
+                32    %401 = ishl %400, %13 (0x4)
+                32    %402 = ushr %166, %284 (0x1c)
+                32    %403 = ior %402, %401
+                32    %404 = ushr %403, %179 (0x5)
+                32    %405 = isub %8 (0x0), %404
+                32    %406 = ishl %33 (0x1), %403
+                32    %407 = inot %405
+                32    %408 = iand %406, %407
+                32    %409 = iand %406, %405
+                32    %410 = extract_u8 %178, %8 (0x0)
+                32    %411 = ushr %410, %293 (0x7)
+                32    %412 = isub %8 (0x0), %411
+                32    %413 = ushr %410, %26 (0x2)
+                32    %414 = ishl %33 (0x1), %413
+                32    %415 = inot %412
+                32    %416 = iand %414, %415
+                32    %417 = iand %414, %412
+                32    %418 = ior %398, %408
+                32    %419 = ior %418, %416
+                32    %420 = ior %399, %409
+                32    %421 = ior %420, %417
+                32    %422 = ior %408, %416
+                32    %423 = ior %409, %417
+                32    %424 = ior %302, %419
+                32    %425 = ior %304, %421
+                32    %426 = ior %305, %422
+                32    %427 = ior %306, %423
+                32    %428 = unpack_64_2x32_split_x %87
+                32    %429 = unpack_64_2x32_split_y %87
+                32    %430 = bit_count %425
+                32    %431 = bit_count %424
+                32    %432 = iadd %431, %430
+                32    %433 = iand %426, %428
+                32    %434 = iand %427, %429
+                32    %435 = ior %433, %434
+                1     %436 = ieq %432, %104 (0x18)
+                1     %437 = ieq %435, %8 (0x0)
+                1     %438 = iand %436, %437
+                32    %439 = ushr %133, %35 (0xa)
+                32    %440 = find_lsb %439
+                1     %441 = ieq %439, %8 (0x0)
+                1     %442 = uge %440, %35 (0xa)
+                1     %443 = ior %441, %442
+                1     %444 = iand %39, %443
+                1     %445 = inot %444
+                1     %446 = iand %438, %445
+                1     %447 = ior %38, %446
+                32    %448 = ishl %33 (0x1), %114
+                32    %449 = ior %108, %448
+                32    %450 = ishl %33 (0x1), %117
+                32    %451 = ior %105, %450
+                1     %452 = inot %118
+                1     %453 = iand %447, %452
+                32    %454 = bcsel %453, %451, %105
+                1     %455 = iand %447, %118
+                32    %456 = bcsel %455, %449, %108
+                             // succs: b18
+            }
+            block b22:   // preds: b19
+            32    %457 = ishl %77, %26 (0x2)
+            32    %458 = @load_ssbo (%82, %457) (access=readonly|reorderable, align_mul=4, align_offset=0, offset_shift=0)
+            32    %459 = ishl %77, %29 (0x3)
+            64    %460 = @load_ssbo (%86, %459) (access=readonly|reorderable, align_mul=8, align_offset=0, offset_shift=0)
+            32    %461 = extract_u16 %458, %33 (0x1)
+            32    %462 = insert_u8 %461, %29 (0x3)
+            32    %463 = iand %29 (0x3), %458
+            32    %464 = ishl %463, %99 (0x1e)
+            32    %465 = ior %464, %462
+            32    %466 = ior %465, %22.w
+            32    %467 = ushr %458, %26 (0x2)
+                         // succs: b23
+            loop {
+                block b23:   // preds: b22 b26
+                32    %468 = phi b22: %8 (0x0), b26: %817
+                32    %469 = phi b22: %8 (0x0), b26: %819
+                32    %470 = phi b22: %79, b26: %490
+                32    %471 = phi b22: %80, b26: %491
+                32    %472 = ior %470, %471
+                1     %473 = ieq %472, %8 (0x0)
+                             // succs: b24 b25
+                if %473 {
+                    block b24:// preds: b23
+                    break
+                    // succs: b27
+                } else {
+                    block b25:  // preds: b23, succs: b26
+                }
+                block b26:   // preds: b25
+                32    %474 = load_const (0x00000020 = 32)
+                32    %475 = find_lsb %470
+                1     %476 = ieq %470, %8 (0x0)
+                32    %477 = bcsel %476, %474 (0x20), %475
+                32    %478 = find_lsb %471
+                1     %479 = ieq %471, %8 (0x0)
+                32    %480 = bcsel %479, %474 (0x20), %478
+                1     %481 = ine %470, %8 (0x0)
+                32    %482 = bcsel %481, %477, %480
+                32    %483 = iadd %474 (0x20), %482
+                32    %484 = bcsel %481, %477, %483
+                32    %485 = load_const (0xffffffff = -1 = 4294967295)
+                32    %486 = iadd %470, %485 (0xffffffff)
+                32    %487 = iand %470, %486
+                32    %488 = iadd %471, %485 (0xffffffff)
+                32    %489 = iand %471, %488
+                32    %490 = bcsel %481, %487, %470
+                32    %491 = bcsel %481, %471, %489
+                32    %492 = iadd %78, %484
+                32x4  %493 = @load_global_amd (%11, %8 (0x0)) (base=48, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+                32    %494 = ishl %492, %26 (0x2)
+                32    %495 = @load_ssbo (%493, %494) (access=readonly|reorderable, align_mul=4, align_offset=0, offset_shift=0)
+                32    %496 = iadd %495, %22.z
+                32    %497 = ishl %466, %99 (0x1e)
+                32    %498 = ior %496, %497
+                32    %499 = ishl %467, %99 (0x1e)
+                32    %500 = ushr %466, %26 (0x2)
+                32    %501 = ior %500, %499
+                32    %502 = imul %498, %501
+                64    %503 = pack_64_2x32_split %502, %8 (0x0)
+                64    %504 = ishl %503, %33 (0x1)
+                32    %505 = umul_high %498, %498
+                64    %506 = pack_64_2x32_split %505, %8 (0x0)
+                64    %507 = iadd %506, %504
+                32    %508 = unpack_64_2x32_split_x %507
+                32    %509 = unpack_64_2x32_split_y %507
+                32    %510 = umul_high %498, %501
+                32    %511 = ishl %510, %33 (0x1)
+                32    %512 = iadd %509, %511
+                32    %513 = imul %501, %501
+                32    %514 = iadd %512, %513
+                32    %515 = ishl %498, %33 (0x1)
+                32    %516 = ubfe %467, %26 (0x2), %3 (0x8)
+                32    %517 = imul %515, %516
+                32    %518 = iadd %514, %517
+                32    %519 = imul %498, %498
+                32    %520 = imul %519, %498
+                32    %521 = umul_high %519, %498
+                32    %522 = imul %519, %501
+                64    %523 = pack_64_2x32_split %522, %8 (0x0)
+                64    %524 = pack_64_2x32_split %521, %8 (0x0)
+                64    %525 = iadd %524, %523
+                32    %526 = imul %508, %498
+                64    %527 = pack_64_2x32_split %526, %8 (0x0)
+                64    %528 = iadd %525, %527
+                32    %529 = unpack_64_2x32_split_x %528
+                32    %530 = unpack_64_2x32_split_y %528
+                32    %531 = umul_high %519, %501
+                32    %532 = iadd %530, %531
+                32    %533 = umul_high %508, %498
+                32    %534 = iadd %532, %533
+                32    %535 = imul %508, %501
+                32    %536 = iadd %534, %535
+                32    %537 = imul %519, %516
+                32    %538 = iadd %536, %537
+                32    %539 = extract_u8 %518, %8 (0x0)
+                32    %540 = imul %539, %498
+                32    %541 = iadd %538, %540
+                32    %542 = load_const (0x00000005)
+                32    %543 = load_const (0x0000003f = 63)
+                32    %544 = iand %519, %543 (0x3f)
+                32    %545 = ushr %544, %542 (0x5)
+                32    %546 = isub %8 (0x0), %545
+                32    %547 = ishl %33 (0x1), %544
+                32    %548 = inot %546
+                32    %549 = iand %547, %548
+                32    %550 = iand %547, %546
+                32    %551 = load_const (0x0000000b = 11)
+                32    %552 = ubfe %519, %551 (0xb), %33 (0x1)
+                32    %553 = isub %8 (0x0), %552
+                32    %554 = ubfe %519, %24 (0x6), %24 (0x6)
+                32    %555 = ishl %33 (0x1), %554
+                32    %556 = inot %553
+                32    %557 = iand %555, %556
+                32    %558 = iand %555, %553
+                32    %559 = ior %549, %557
+                32    %560 = ior %550, %558
+                32    %561 = load_const (0x00000011 = 17)
+                32    %562 = ubfe %519, %561 (0x11), %33 (0x1)
+                32    %563 = isub %8 (0x0), %562
+                32    %564 = ubfe %519, %31 (0xc), %24 (0x6)
+                32    %565 = ishl %33 (0x1), %564
+                32    %566 = inot %563
+                32    %567 = iand %565, %566
+                32    %568 = iand %565, %563
+                32    %569 = ior %559, %567
+                32    %570 = ior %560, %568
+                32    %571 = load_const (0x00000017 = 23)
+                32    %572 = ubfe %519, %571 (0x17), %33 (0x1)
+                32    %573 = isub %8 (0x0), %572
+                32    %574 = load_const (0x00000012 = 18)
+                32    %575 = ubfe %519, %574 (0x12), %24 (0x6)
+                32    %576 = ishl %33 (0x1), %575
+                32    %577 = inot %573
+                32    %578 = iand %576, %577
+                32    %579 = iand %576, %573
+                32    %580 = ior %569, %578
+                32    %581 = ior %570, %579
+                32    %582 = extract_u8 %519, %29 (0x3)
+                32    %583 = iand %582, %543 (0x3f)
+                32    %584 = ushr %583, %542 (0x5)
+                32    %585 = isub %8 (0x0), %584
+                32    %586 = ishl %33 (0x1), %583
+                32    %587 = inot %585
+                32    %588 = iand %586, %587
+                32    %589 = iand %586, %585
+                32    %590 = ior %580, %588
+                32    %591 = ior %581, %589
+                32    %592 = load_const (0x0000000f = 15)
+                32    %593 = iand %508, %592 (0xf)
+                32    %594 = ishl %593, %26 (0x2)
+                32    %595 = ushr %519, %99 (0x1e)
+                32    %596 = ior %595, %594
+                32    %597 = ushr %596, %542 (0x5)
+                32    %598 = isub %8 (0x0), %597
+                32    %599 = ishl %33 (0x1), %596
+                32    %600 = inot %598
+                32    %601 = iand %599, %600
+                32    %602 = iand %599, %598
+                32    %603 = ior %590, %601
+                32    %604 = ior %591, %602
+                32    %605 = load_const (0x00000009)
+                32    %606 = ubfe %508, %605 (0x9), %33 (0x1)
+                32    %607 = isub %8 (0x0), %606
+                32    %608 = ubfe %508, %13 (0x4), %24 (0x6)
+                32    %609 = ishl %33 (0x1), %608
+                32    %610 = inot %607
+                32    %611 = iand %609, %610
+                32    %612 = iand %609, %607
+                32    %613 = ior %603, %611
+                32    %614 = ior %604, %612
+                32    %615 = ubfe %508, %592 (0xf), %33 (0x1)
+                32    %616 = isub %8 (0x0), %615
+                32    %617 = ubfe %508, %35 (0xa), %24 (0x6)
+                32    %618 = ishl %33 (0x1), %617
+                32    %619 = inot %616
+                32    %620 = iand %618, %619
+                32    %621 = iand %618, %616
+                32    %622 = ior %613, %620
+                32    %623 = ior %614, %621
+                32    %624 = extract_u16 %508, %33 (0x1)
+                32    %625 = iand %624, %543 (0x3f)
+                32    %626 = ushr %625, %542 (0x5)
+                32    %627 = isub %8 (0x0), %626
+                32    %628 = ishl %33 (0x1), %625
+                32    %629 = inot %627
+                32    %630 = iand %628, %629
+                32    %631 = iand %628, %627
+                32    %632 = ior %622, %630
+                32    %633 = ior %623, %631
+                32    %634 = load_const (0x0000001b = 27)
+                32    %635 = ubfe %508, %634 (0x1b), %33 (0x1)
+                32    %636 = isub %8 (0x0), %635
+                32    %637 = load_const (0x00000016 = 22)
+                32    %638 = ubfe %508, %637 (0x16), %24 (0x6)
+                32    %639 = ishl %33 (0x1), %638
+                32    %640 = inot %636
+                32    %641 = iand %639, %640
+                32    %642 = iand %639, %636
+                32    %643 = ior %632, %641
+                32    %644 = ior %633, %642
+                32    %645 = iand %29 (0x3), %518
+                32    %646 = ishl %645, %13 (0x4)
+                32    %647 = load_const (0x0000001c = 28)
+                32    %648 = ushr %508, %647 (0x1c)
+                32    %649 = ior %648, %646
+                32    %650 = ushr %649, %542 (0x5)
+                32    %651 = isub %8 (0x0), %650
+                32    %652 = ishl %33 (0x1), %649
+                32    %653 = inot %651
+                32    %654 = iand %652, %653
+                32    %655 = iand %652, %651
+                32    %656 = load_const (0x00000007)
+                32    %657 = ushr %539, %656 (0x7)
+                32    %658 = isub %8 (0x0), %657
+                32    %659 = ushr %539, %26 (0x2)
+                32    %660 = ishl %33 (0x1), %659
+                32    %661 = inot %658
+                32    %662 = iand %660, %661
+                32    %663 = iand %660, %658
+                32    %664 = ior %643, %654
+                32    %665 = ior %664, %662
+                32    %666 = ior %644, %655
+                32    %667 = ior %666, %663
+                32    %668 = ior %654, %662
+                32    %669 = ior %655, %663
+                32    %670 = iand %520, %543 (0x3f)
+                32    %671 = ushr %670, %542 (0x5)
+                32    %672 = isub %8 (0x0), %671
+                32    %673 = ishl %33 (0x1), %670
+                32    %674 = inot %672
+                32    %675 = iand %673, %674
+                32    %676 = iand %673, %672
+                32    %677 = ubfe %520, %551 (0xb), %33 (0x1)
+                32    %678 = isub %8 (0x0), %677
+                32    %679 = ubfe %520, %24 (0x6), %24 (0x6)
+                32    %680 = ishl %33 (0x1), %679
+                32    %681 = inot %678
+                32    %682 = iand %680, %681
+                32    %683 = iand %680, %678
+                32    %684 = ior %675, %682
+                32    %685 = ior %676, %683
+                32    %686 = ubfe %520, %561 (0x11), %33 (0x1)
+                32    %687 = isub %8 (0x0), %686
+                32    %688 = ubfe %520, %31 (0xc), %24 (0x6)
+                32    %689 = ishl %33 (0x1), %688
+                32    %690 = inot %687
+                32    %691 = iand %689, %690
+                32    %692 = iand %689, %687
+                32    %693 = ior %684, %691
+                32    %694 = ior %685, %692
+                32    %695 = ubfe %520, %571 (0x17), %33 (0x1)
+                32    %696 = isub %8 (0x0), %695
+                32    %697 = ubfe %520, %574 (0x12), %24 (0x6)
+                32    %698 = ishl %33 (0x1), %697
+                32    %699 = inot %696
+                32    %700 = iand %698, %699
+                32    %701 = iand %698, %696
+                32    %702 = ior %693, %700
+                32    %703 = ior %694, %701
+                32    %704 = extract_u8 %520, %29 (0x3)
+                32    %705 = iand %704, %543 (0x3f)
+                32    %706 = ushr %705, %542 (0x5)
+                32    %707 = isub %8 (0x0), %706
+                32    %708 = ishl %33 (0x1), %705
+                32    %709 = inot %707
+                32    %710 = iand %708, %709
+                32    %711 = iand %708, %707
+                32    %712 = ior %702, %710
+                32    %713 = ior %703, %711
+                32    %714 = iand %529, %592 (0xf)
+                32    %715 = ishl %714, %26 (0x2)
+                32    %716 = ushr %520, %99 (0x1e)
+                32    %717 = ior %716, %715
+                32    %718 = ushr %717, %542 (0x5)
+                32    %719 = isub %8 (0x0), %718
+                32    %720 = ishl %33 (0x1), %717
+                32    %721 = inot %719
+                32    %722 = iand %720, %721
+                32    %723 = iand %720, %719
+                32    %724 = ior %712, %722
+                32    %725 = ior %713, %723
+                32    %726 = ubfe %529, %605 (0x9), %33 (0x1)
+                32    %727 = isub %8 (0x0), %726
+                32    %728 = ubfe %529, %13 (0x4), %24 (0x6)
+                32    %729 = ishl %33 (0x1), %728
+                32    %730 = inot %727
+                32    %731 = iand %729, %730
+                32    %732 = iand %729, %727
+                32    %733 = ior %724, %731
+                32    %734 = ior %725, %732
+                32    %735 = ubfe %529, %592 (0xf), %33 (0x1)
+                32    %736 = isub %8 (0x0), %735
+                32    %737 = ubfe %529, %35 (0xa), %24 (0x6)
+                32    %738 = ishl %33 (0x1), %737
+                32    %739 = inot %736
+                32    %740 = iand %738, %739
+                32    %741 = iand %738, %736
+                32    %742 = ior %733, %740
+                32    %743 = ior %734, %741
+                32    %744 = extract_u16 %529, %33 (0x1)
+                32    %745 = iand %744, %543 (0x3f)
+                32    %746 = ushr %745, %542 (0x5)
+                32    %747 = isub %8 (0x0), %746
+                32    %748 = ishl %33 (0x1), %745
+                32    %749 = inot %747
+                32    %750 = iand %748, %749
+                32    %751 = iand %748, %747
+                32    %752 = ior %742, %750
+                32    %753 = ior %743, %751
+                32    %754 = ubfe %529, %634 (0x1b), %33 (0x1)
+                32    %755 = isub %8 (0x0), %754
+                32    %756 = ubfe %529, %637 (0x16), %24 (0x6)
+                32    %757 = ishl %33 (0x1), %756
+                32    %758 = inot %755
+                32    %759 = iand %757, %758
+                32    %760 = iand %757, %755
+                32    %761 = ior %752, %759
+                32    %762 = ior %753, %760
+                32    %763 = iand %29 (0x3), %541
+                32    %764 = ishl %763, %13 (0x4)
+                32    %765 = ushr %529, %647 (0x1c)
+                32    %766 = ior %765, %764
+                32    %767 = ushr %766, %542 (0x5)
+                32    %768 = isub %8 (0x0), %767
+                32    %769 = ishl %33 (0x1), %766
+                32    %770 = inot %768
+                32    %771 = iand %769, %770
+                32    %772 = iand %769, %768
+                32    %773 = extract_u8 %541, %8 (0x0)
+                32    %774 = ushr %773, %656 (0x7)
+                32    %775 = isub %8 (0x0), %774
+                32    %776 = ushr %773, %26 (0x2)
+                32    %777 = ishl %33 (0x1), %776
+                32    %778 = inot %775
+                32    %779 = iand %777, %778
+                32    %780 = iand %777, %775
+                32    %781 = ior %761, %771
+                32    %782 = ior %781, %779
+                32    %783 = ior %762, %772
+                32    %784 = ior %783, %780
+                32    %785 = ior %771, %779
+                32    %786 = ior %772, %780
+                32    %787 = ior %665, %782
+                32    %788 = ior %667, %784
+                32    %789 = ior %668, %785
+                32    %790 = ior %669, %786
+                32    %791 = unpack_64_2x32_split_x %460
+                32    %792 = unpack_64_2x32_split_y %460
+                32    %793 = bit_count %788
+                32    %794 = bit_count %787
+                32    %795 = iadd %794, %793
+                32    %796 = iand %789, %791
+                32    %797 = iand %790, %792
+                32    %798 = ior %796, %797
+                1     %799 = ieq %795, %104 (0x18)
+                1     %800 = ieq %798, %8 (0x0)
+                1     %801 = iand %799, %800
+                32    %802 = ushr %496, %35 (0xa)
+                32    %803 = find_lsb %802
+                1     %804 = ieq %802, %8 (0x0)
+                1     %805 = uge %803, %35 (0xa)
+                1     %806 = ior %804, %805
+                1     %807 = iand %39, %806
+                1     %808 = inot %807
+                1     %809 = iand %801, %808
+                1     %810 = ior %38, %809
+                32    %811 = ishl %33 (0x1), %477
+                32    %812 = ior %469, %811
+                32    %813 = ishl %33 (0x1), %480
+                32    %814 = ior %468, %813
+                1     %815 = inot %481
+                1     %816 = iand %810, %815
+                32    %817 = bcsel %816, %814, %468
+                1     %818 = iand %810, %481
+                32    %819 = bcsel %818, %812, %469
+                             // succs: b23
+            }
+            block b27:   // preds: b24
+            32    %820 = bit_count %105
+            32    %821 = bit_count %108
+            32    %822 = iadd %821, %820
+            32    %823 = bit_count %469
+            32    %824 = iadd %822, %823
+            32    %825 = bit_count %468
+            32    %826 = iadd %824, %825
+            32    %827 = @exclusive_scan (%826) (reduction_op=iadd)
+            32    %828 = @reduce (%826) (reduction_op=iadd, cluster_size=0)
+            64    %829 = load_const (0x0000000000000001 = 0.000000)
+            1     %830 = @inverse_ballot (%829 (0x1))
+            1     %831 = ine %828, %8 (0x0)
+            1     %832 = iand %830, %831
+                         // succs: b28 b29
+            if %832 {
+                block b28:   // preds: b27
+                             @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=REL, mem_modes=ssbo|global)
+                32x4  %833 = @load_global_amd (%11, %8 (0x0)) (base=128, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+                32    %834 = @ssbo_atomic (%833, %8 (0x0), %828) (access=coherent, atomic_op=iadd, offset_shift=0)
+                             @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=ACQ, mem_modes=ssbo|global)
+                             // succs: b30
+            } else {
+                block b29:  // preds: b27, succs: b30
+            }
+            block b30:   // preds: b28 b29
+            32    %835 = phi b28: %834, b29: %8 (0x0)
+            32    %836 = @reduce (%835) (reduction_op=iadd, cluster_size=0)
+            32    %837 = iadd %836, %827
+                         // succs: b31
+            loop {
+                block b31:   // preds: b30 b37
+                32    %838 = phi b30: %105, b37: %859
+                32    %839 = phi b30: %837, b37: %870
+                32    %840 = phi b30: %108, b37: %860
+                32    %841 = ior %840, %838
+                1     %842 = ieq %841, %8 (0x0)
+                             // succs: b32 b33
+                if %842 {
+                    block b32:// preds: b31
+                    break
+                    // succs: b38
+                } else {
+                    block b33:  // preds: b31, succs: b34
+                }
+                block b34:   // preds: b33
+                32    %843 = load_const (0x00000020 = 32)
+                32    %844 = find_lsb %840
+                1     %845 = ieq %840, %8 (0x0)
+                32    %846 = bcsel %845, %843 (0x20), %844
+                32    %847 = find_lsb %838
+                1     %848 = ieq %838, %8 (0x0)
+                32    %849 = bcsel %848, %843 (0x20), %847
+                1     %850 = ine %840, %8 (0x0)
+                32    %851 = bcsel %850, %846, %849
+                32    %852 = iadd %843 (0x20), %851
+                32    %853 = bcsel %850, %846, %852
+                32    %854 = load_const (0xffffffff = -1 = 4294967295)
+                32    %855 = iadd %840, %854 (0xffffffff)
+                32    %856 = iand %840, %855
+                32    %857 = iadd %838, %854 (0xffffffff)
+                32    %858 = iand %838, %857
+                32    %859 = bcsel %850, %838, %858
+                32    %860 = bcsel %850, %856, %840
+                1     %861 = ult %839, %22.y
+                             // succs: b35 b36
+                if %861 {
+                    block b35:   // preds: b34
+                    32    %862 = iadd %62, %853
+                    32x4  %863 = @load_global_amd (%11, %8 (0x0)) (base=48, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+                    32    %864 = ishl %862, %26 (0x2)
+                    32    %865 = @load_ssbo (%863, %864) (access=readonly|reorderable, align_mul=4, align_offset=0, offset_shift=0)
+                    32    %866 = iadd %865, %22.z
+                    32x4  %867 = @load_global_amd (%11, %8 (0x0)) (base=112, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+                    32x2  %868 = vec2 %61, %866
+                    32    %869 = ishl %839, %29 (0x3)
+                                 @store_ssbo (%868, %867, %869) (wrmask=xy, access=writeonly, align_mul=8, align_offset=0, offset_shift=0)
+                                 // succs: b37
+                } else {
+                    block b36:  // preds: b34, succs: b37
+                }
+                block b37:   // preds: b35 b36
+                32    %870 = iadd %839, %33 (0x1)
+                             // succs: b31
+            }
+            block b38:  // preds: b32, succs: b39
+            loop {
+                block b39:   // preds: b38 b45
+                32    %871 = phi b38: %468, b45: %892
+                32    %872 = phi b38: %469, b45: %893
+                32    %873 = phi b38: %839, b45: %903
+                32    %874 = ior %872, %871
+                1     %875 = ieq %874, %8 (0x0)
+                             // succs: b40 b41
+                if %875 {
+                    block b40:// preds: b39
+                    break
+                    // succs: b46
+                } else {
+                    block b41:  // preds: b39, succs: b42
+                }
+                block b42:   // preds: b41
+                32    %876 = load_const (0x00000020 = 32)
+                32    %877 = find_lsb %872
+                1     %878 = ieq %872, %8 (0x0)
+                32    %879 = bcsel %878, %876 (0x20), %877
+                32    %880 = find_lsb %871
+                1     %881 = ieq %871, %8 (0x0)
+                32    %882 = bcsel %881, %876 (0x20), %880
+                1     %883 = ine %872, %8 (0x0)
+                32    %884 = bcsel %883, %879, %882
+                32    %885 = iadd %876 (0x20), %884
+                32    %886 = bcsel %883, %879, %885
+                32    %887 = load_const (0xffffffff = -1 = 4294967295)
+                32    %888 = iadd %872, %887 (0xffffffff)
+                32    %889 = iand %872, %888
+                32    %890 = iadd %871, %887 (0xffffffff)
+                32    %891 = iand %871, %890
+                32    %892 = bcsel %883, %871, %891
+                32    %893 = bcsel %883, %889, %872
+                1     %894 = ult %873, %22.y
+                             // succs: b43 b44
+                if %894 {
+                    block b43:   // preds: b42
+                    32    %895 = iadd %78, %886
+                    32x4  %896 = @load_global_amd (%11, %8 (0x0)) (base=48, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+                    32    %897 = ishl %895, %26 (0x2)
+                    32    %898 = @load_ssbo (%896, %897) (access=readonly|reorderable, align_mul=4, align_offset=0, offset_shift=0)
+                    32    %899 = iadd %898, %22.z
+                    32x4  %900 = @load_global_amd (%11, %8 (0x0)) (base=112, access=readonly|reorderable|speculatable|smem-amd, align_mul=4, align_offset=0)
+                    32x2  %901 = vec2 %77, %899
+                    32    %902 = ishl %873, %29 (0x3)
+                                 @store_ssbo (%901, %900, %902) (wrmask=xy, access=writeonly, align_mul=8, align_offset=0, offset_shift=0)
+                                 // succs: b45
+                } else {
+                    block b44:  // preds: b42, succs: b45
+                }
+                block b45:   // preds: b43 b44
+                32    %903 = iadd %873, %33 (0x1)
+                             // succs: b39
+            }
+            block b46:   // preds: b40
+            32    %904 = load_const (0x00000080 = 128)
+            32    %905 = iadd %47, %904 (0x80)
+                         // succs: b8
+        }
+        block b47:   // preds: b9
+        32    %906 = iadd %40, %36
+        32    %907 = iadd %41, %33 (0x1)
+                     // succs: b4
+    }
+    block b48:   // preds: b5
+    32    %908 = @reduce (%42) (reduction_op=iadd, cluster_size=0)
+    64    %909 = load_const (0x0000000000000001 = 0.000000)
+    1     %910 = @inverse_ballot (%909 (0x1))
+    1     %911 = ine %908, %8 (0x0)
+    1     %912 = iand %910, %911
+                 // succs: b49 b50
+    if %912 {
+        block b49:   // preds: b48
+                     @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=REL, mem_modes=ssbo|global)
+        32x4  %913 = @load_global_amd (%11, %8 (0x0)) (base=144, access=readonly|reorderable|smem-amd, align_mul=4, align_offset=0)
+        32    %914 = @ssbo_atomic (%913, %3 (0x8), %908) (access=coherent, atomic_op=iadd, offset_shift=0)
+                     @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=ACQ, mem_modes=ssbo|global)
+                     // succs: b51
+    } else {
+        block b50:  // preds: b48, succs: b51
+    }
+    block b51:   // preds: b49 b50
+    1     %915 = ine %41, %8 (0x0)
+    1     %916 = iand %910, %915
+                 // succs: b52 b53
+    if %916 {
+        block b52:   // preds: b51
+                     @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=REL, mem_modes=ssbo|global)
+        32x4  %917 = @load_global_amd (%11, %8 (0x0)) (base=144, access=readonly|reorderable|smem-amd, align_mul=4, align_offset=0)
+        32    %918 = @ssbo_atomic (%917, %30 (0x10), %41) (access=coherent, atomic_op=iadd, offset_shift=0)
+                     @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=ACQ, mem_modes=ssbo|global)
+                     // succs: b54
+    } else {
+        block b53:  // preds: b51, succs: b54
+    }
+    block b54:   // preds: b52 b53
+    1     %919 = ieq %2, %8 (0x0)
+                 // succs: b55 b56
+    if %919 {
+        block b55:   // preds: b54
+                     @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=REL, mem_modes=ssbo|global)
+        32x4  %920 = @load_global_amd (%11, %8 (0x0)) (base=144, access=readonly|reorderable|smem-amd, align_mul=4, align_offset=0)
+        32    %921 = @ssbo_atomic (%920, %31 (0xc), %33 (0x1)) (access=coherent, atomic_op=iadd, offset_shift=0)
+                     @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=ACQ, mem_modes=ssbo|global)
+                     // succs: b57
+    } else {
+        block b56:  // preds: b54, succs: b57
+    }
+    block b57:  // preds: b55 b56, succs: b58
+    block b58:
+}
+
+After RA:
+ACO shader stage: SW (CS), HW (COMPUTE_SHADER)
+BB0
+/* logical preds: / linear preds: / kind: top-level, branch, */
+	 s2: %931:s[0-1],  s1: %932:s[2],  s1: %933:s[3],  s1: %934:s[4],  s1: %935:s[5],  v1: %937:v[0] = p_startpgm
+	p_logical_start
+	 s1: %1312:s[0] = p_parallelcopy %933:s[3]
+	 s2: %12:s[2-3] = p_create_vector %932:s[2], 0xffff8000
+	 s4: %13:s[4-7] = s_load_dwordx4 %12:s[2-3], 0xa0 storage:buffer semantics:private,reorder
+	 v1: %6:v[1] = v_lshl_add_u32 %0:s[117], 8, %937:v[0]
+	 v1: %950:v[2] = v_mbcnt_lo_u32_b32 -1, 0
+	 v1: %10:v[2] = v_mbcnt_hi_u32_b32_e64 -1, %950:v[2]
+	 s2: %15:vcc = v_cmp_eq_i32 0, %6:v[1]
+	p_logical_end
+	 s2: %0:exec = p_parallelcopy %15:vcc
+	p_cbranch_z %0:exec BB2, BB1
+BB1
+/* logical preds: BB0, / linear preds: BB0, / kind: uniform, */
+	p_logical_start
+	 s4: %16:s[8-11] = s_load_dwordx4 %12:s[2-3], 64 storage:buffer semantics:private,reorder
+	 s4: %18:s[12-15] = s_load_dwordx4 %12:s[2-3], 0x90 storage:buffer semantics:private,reorder
+	 s4: %19:s[16-19] = s_load_dwordx4 %12:s[2-3], 16 storage:buffer semantics:private,reorder
+	p_barrier storage:buffer semantics:release scope:device exec_scope:invocation
+	 s1: %17:s[1] = s_buffer_load_dword %16:s[8-11], 0 storage:buffer semantics:private,reorder
+	 v1: %963:v[1] = p_parallelcopy %17:s[1]
+	buffer_store_dword %18:s[12-15],  v1: undef, 0, %963:v[1] device storage:buffer semantics:atomic
+	 s1: %20:s[8] = s_buffer_load_dword %19:s[16-19], 0 storage:buffer semantics:private,reorder
+	p_barrier storage:buffer semantics:release scope:device exec_scope:invocation
+	 v1: %968:v[3] = p_parallelcopy %20:s[8]
+	buffer_store_dword %18:s[12-15],  v1: undef, 0, %968:v[3] offset:4 device storage:buffer semantics:atomic
+	p_logical_end
+	p_branch BB3
+BB2
+/* logical preds: / linear preds: BB0, / kind: uniform, */
+	p_branch BB3
+BB3
+/* logical preds: / linear preds: BB1, BB2, / kind: invert, */
+	 s2: %0:exec,  s1: %1262:scc = s_andn2_b64 -1, %0:exec
+	p_cbranch_z %0:exec BB5, BB4
+BB4
+/* logical preds: BB0, / linear preds: BB3, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB6
+BB5
+/* logical preds: / linear preds: BB3, / kind: uniform, */
+	p_branch BB6
+BB6
+/* logical preds: BB1, BB4, / linear preds: BB4, BB5, / kind: uniform, top-level, loop-preheader, merge, */
+	 s2: %0:exec = p_parallelcopy -1
+	p_logical_start
+	 s4: %21:s[8-11] = s_load_dwordx4 %12:s[2-3], 16 storage:buffer semantics:private,reorder
+	 s1: %22:s[1] = s_buffer_load_dword %21:s[8-11], 0 storage:buffer semantics:private,reorder
+	 s4: %23:s[8-11] = s_buffer_load_dwordx4 %13:s[4-7], 0
+	 s1: %33:s[4] = s_buffer_load_dword %13:s[4-7], 16
+	 v1: %26:v[1] = v_lshrrev_b32 6, %937:v[0]
+	 v1: %29:v[1] = v_lshl_add_u32 %0:s[117], 2, %26:v[1]
+	 s1: %973:s[8],  s1: %974:s[9],  s1: %975:s[10],  s1: %976:s[11] = p_split_vector %23:s[8-11]
+	 s1: %24:s[1],  s1: %977:scc = s_min_u32 %22:s[1], %973:s[8]
+	 s1: %980:scc = s_bitcmp1_b32 %33:s[4], 0
+	 s2: %39:s[6-7] = s_cselect_b64 -1, 0, %980:scc
+	 s1: %981:scc = s_bitcmp1_b32 %33:s[4], 10
+	 s2: %40:s[4-5] = s_cselect_b64 -1, 0, %981:scc
+	p_logical_end
+	 lv1: %1259:v[47] = p_start_linear_vgpr
+	 lv1: %1258:v[46] = p_start_linear_vgpr
+	p_branch BB7
+BB7
+/* logical preds: BB6, BB95, / linear preds: BB6, BB95, / kind: loop-header, branch, */
+	 v1: %43:v[3] = p_phi 0, %912:v[3]
+	 s1: %42:s[8] = p_linear_phi 0, %914:s[8]
+	 v1: %41:v[1] = p_phi %29:v[1], %913:v[1]
+	p_logical_start
+	 s2: %44:vcc = v_cmp_le_u32 %24:s[1], %41:v[1]
+	p_logical_end
+	 s2: %1264:s[12-13],  s1: %1263:scc,  s2: %0:exec = s_and_saveexec_b64 %44:vcc, %0:exec
+	p_cbranch_z %0:exec BB11, BB8
+BB8
+/* logical preds: BB7, / linear preds: BB7, / kind: break, */
+	p_logical_start
+	p_logical_end
+	 s2: %1266:s[12-13],  s1: %1265:scc = s_andn2_b64 %1264:s[12-13], %0:exec
+	p_cbranch_nz %1265:scc BB10, BB9
+BB9
+/* logical preds: / linear preds: BB8, / kind: uniform, */
+	p_branch BB96
+BB10
+/* logical preds: / linear preds: BB8, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB12
+BB11
+/* logical preds: / linear preds: BB7, / kind: uniform, */
+	p_branch BB12
+BB12
+/* logical preds: / linear preds: BB10, BB11, / kind: invert, */
+	 s2: %1267:s[12-13] = p_linear_phi %1266:s[12-13], %1264:s[12-13]
+	 s2: %0:exec,  s1: %1268:scc = s_andn2_b64 %1267:s[12-13], %0:exec
+	p_cbranch_z %0:exec BB14, BB13
+BB13
+/* logical preds: BB7, / linear preds: BB12, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB15
+BB14
+/* logical preds: / linear preds: BB12, / kind: uniform, */
+	p_branch BB15
+BB15
+/* logical preds: BB13, / linear preds: BB13, BB14, / kind: uniform, loop-preheader, merge, */
+	 s2: %0:exec = p_parallelcopy %1267:s[12-13]
+	p_logical_start
+	 s4: %45:s[16-19] = s_load_dwordx4 %12:s[2-3], 32 storage:buffer semantics:private,reorder
+	 v1: %46:v[4] = v_lshlrev_b32 2, %41:v[1]
+	 v1: %47:v[4] = buffer_load_dword %45:s[16-19], %46:v[4], 0 offen storage:buffer semantics:private,reorder
+	p_logical_end
+	p_branch BB16
+BB16
+/* logical preds: BB15, BB94, / linear preds: BB15, BB94, / kind: loop-header, branch, */
+	 v1: %49:v[3] = p_phi %43:v[3], %96:v[3]
+	 s1: %48:s[14] = p_linear_phi 0, %911:s[14]
+	p_logical_start
+	 s2: %50:vcc = v_cmp_ge_u32 %48:s[14], %47:v[4]
+	p_logical_end
+	 s2: %1270:s[16-17],  s1: %1269:scc,  s2: %0:exec = s_and_saveexec_b64 %50:vcc, %0:exec
+	p_cbranch_z %0:exec BB20, BB17
+BB17
+/* logical preds: BB16, / linear preds: BB16, / kind: break, */
+	p_logical_start
+	p_logical_end
+	 s2: %1272:s[16-17],  s1: %1271:scc = s_andn2_b64 %1270:s[16-17], %0:exec
+	p_cbranch_nz %1271:scc BB19, BB18
+BB18
+/* logical preds: / linear preds: BB17, / kind: uniform, */
+	p_branch BB95
+BB19
+/* logical preds: / linear preds: BB17, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB21
+BB20
+/* logical preds: / linear preds: BB16, / kind: uniform, */
+	p_branch BB21
+BB21
+/* logical preds: / linear preds: BB19, BB20, / kind: invert, */
+	 s2: %1273:s[16-17] = p_linear_phi %1272:s[16-17], %1270:s[16-17]
+	 s2: %0:exec,  s1: %1274:scc = s_andn2_b64 %1273:s[16-17], %0:exec
+	p_cbranch_z %0:exec BB23, BB22
+BB22
+/* logical preds: BB16, / linear preds: BB21, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB24
+BB23
+/* logical preds: / linear preds: BB21, / kind: uniform, */
+	p_branch BB24
+BB24
+/* logical preds: BB22, / linear preds: BB22, BB23, / kind: branch, merge, */
+	 s2: %0:exec = p_parallelcopy %1273:s[16-17]
+	p_logical_start
+	 v1: %51:v[5] = v_add_u32 %48:s[14], %10:v[2]
+	 s2: %52:vcc = v_cmp_lt_u32 %51:v[5], %47:v[4]
+	p_logical_end
+	 s2: %0:exec,  s1: %1275:scc = s_and_b64 %52:vcc, %0:exec
+	p_cbranch_z %0:exec BB26, BB25
+BB25
+/* logical preds: BB24, / linear preds: BB24, / kind: uniform, */
+	p_logical_start
+	 s4: %55:s[20-23] = s_load_dwordx4 %12:s[2-3], 0 storage:buffer semantics:private,reorder
+	 v1: %54:v[6] = v_lshl_add_u32 %41:v[1], 8, %51:v[5]
+	 v1: %56:v[6] = v_lshlrev_b32 4, %54:v[6]
+	 v4: %57:v[8-11] = buffer_load_dwordx4 %55:s[20-23], %56:v[6], 0 offen storage:buffer semantics:private,reorder
+	 v1: %990:v[8],  v1: %991:v[9],  v1: %992:v[10],  v1: %993:v[11] = p_split_vector %57:v[8-11]
+	p_logical_end
+	p_branch BB27
+BB26
+/* logical preds: / linear preds: BB24, / kind: uniform, */
+	p_branch BB27
+BB27
+/* logical preds: / linear preds: BB25, BB26, / kind: invert, */
+	 s2: %0:exec,  s1: %1276:scc = s_andn2_b64 %1273:s[16-17], %0:exec
+	p_cbranch_z %0:exec BB29, BB28
+BB28
+/* logical preds: BB24, / linear preds: BB27, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB30
+BB29
+/* logical preds: / linear preds: BB27, / kind: uniform, */
+	p_branch BB30
+BB30
+/* logical preds: BB25, BB28, / linear preds: BB28, BB29, / kind: branch, merge, */
+	 v1: %65:v[11] = p_phi %993:v[11], 0
+	 v1: %64:v[10] = p_phi %992:v[10], 0
+	 v1: %63:v[9] = p_phi %991:v[9], 0
+	 v1: %62:v[8] = p_phi %990:v[8], 0
+	 s2: %0:exec = p_parallelcopy %1273:s[16-17]
+	p_logical_start
+	 v1: %66:v[6] = v_add_u32 64, %51:v[5]
+	 s2: %67:vcc = v_cmp_lt_u32 %66:v[6], %47:v[4]
+	p_logical_end
+	 s2: %0:exec,  s1: %1277:scc = s_and_b64 %67:vcc, %0:exec
+	p_cbranch_z %0:exec BB32, BB31
+BB31
+/* logical preds: BB30, / linear preds: BB30, / kind: uniform, */
+	p_logical_start
+	 s4: %70:s[20-23] = s_load_dwordx4 %12:s[2-3], 0 storage:buffer semantics:private,reorder
+	 v1: %69:v[5] = v_lshl_add_u32 %41:v[1], 8, %51:v[5]
+	 v1: %71:v[5] = v_lshlrev_b32 4, %69:v[5]
+	 v4: %73:v[12-15] = buffer_load_dwordx4 %70:s[20-23], %71:v[5], 0 offset:1024 offen storage:buffer semantics:private,reorder
+	 v1: %998:v[12],  v1: %999:v[13],  v1: %1000:v[14],  v1: %1001:v[15] = p_split_vector %73:v[12-15]
+	p_logical_end
+	p_branch BB33
+BB32
+/* logical preds: / linear preds: BB30, / kind: uniform, */
+	p_branch BB33
+BB33
+/* logical preds: / linear preds: BB31, BB32, / kind: invert, */
+	 s2: %0:exec,  s1: %1278:scc = s_andn2_b64 %1273:s[16-17], %0:exec
+	p_cbranch_z %0:exec BB35, BB34
+BB34
+/* logical preds: BB30, / linear preds: BB33, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB36
+BB35
+/* logical preds: / linear preds: BB33, / kind: uniform, */
+	p_branch BB36
+BB36
+/* logical preds: BB31, BB34, / linear preds: BB34, BB35, / kind: uniform, loop-preheader, merge, */
+	 v1: %81:v[15] = p_phi %1001:v[15], 0
+	 v1: %80:v[14] = p_phi %1000:v[14], 0
+	 v1: %79:v[13] = p_phi %999:v[13], 0
+	 v1: %78:v[12] = p_phi %998:v[12], 0
+	 s2: %0:exec = p_parallelcopy %1273:s[16-17]
+	p_logical_start
+	 s8: %82:s[24-31] = s_load_dwordx8 %12:s[2-3], 0x50 storage:buffer semantics:private,reorder
+	 v1: %84:v[5] = v_lshlrev_b32 2, %62:v[8]
+	 s1: %1002:s[24],  s1: %1003:s[25],  s1: %1004:s[26],  s1: %1005:s[27],  s1: %1006:s[28],  s1: %1007:s[29],  s1: %1008:s[30],  s1: %1009:s[31] = p_split_vector %82:s[24-31]
+	 s4: %83:s[24-27] = p_create_vector %1002:s[24], %1003:s[25], %1004:s[26], %1005:s[27]
+	 v1: %85:v[5] = buffer_load_dword %83:s[24-27], %84:v[5], 0 offen storage:buffer semantics:private,reorder
+	 v1: %86:v[6] = v_lshlrev_b32 3, %62:v[8]
+	 s4: %87:s[28-31] = p_create_vector %1006:s[28], %1007:s[29], %1008:s[30], %1009:s[31]
+	 v2: %88:v[6-7] = buffer_load_dwordx2 %87:s[28-31], %86:v[6], 0 offen storage:buffer semantics:private,reorder
+	 v1: %89:v[16] = v_bcnt_u32_b32 %65:v[11], 0
+	 v1: %91:v[16] = v_bcnt_u32_b32 %64:v[10], %89:v[16]
+	 v1: %93:v[16] = v_bcnt_u32_b32 %80:v[14], %91:v[16]
+	 v1: %95:v[16] = v_bcnt_u32_b32 %81:v[15], %93:v[16]
+	 v1: %96:v[3] = v_add_u32 %49:v[3], %95:v[16]
+	 v1: %97:v[17] = p_extract %85:v[5], 1, 16, 0
+	 v1: %98:v[17] = p_insert %97:v[17], 3, 8
+	 v1: %99:v[18] = v_and_b32 3, %85:v[5]
+	 v1: %102:v[18] = v_lshl_or_b32 (is16bit)%99:v[18], 30, %98:v[17]
+	 v1: %103:v[18] = v_or_b32 %976:s[11], %102:v[18]
+	 v1: %104:v[5] = v_lshrrev_b32 2, %85:v[5]
+	p_logical_end
+	p_branch BB37
+BB37
+/* logical preds: BB36, BB45, / linear preds: BB36, BB45, / kind: loop-header, branch, */
+	 v1: %109:v[16] = p_phi 0, %457:v[16]
+	 v1: %108:v[10] = p_phi %64:v[10], %129:v[10]
+	 v1: %107:v[11] = p_phi %65:v[11], %128:v[11]
+	 v1: %106:v[17] = p_phi 0, %455:v[17]
+	p_logical_start
+	 v1: %110:v[19] = v_or_b32 %108:v[10], %107:v[11]
+	 s2: %111:vcc = v_cmp_eq_i32 0, %110:v[19]
+	p_logical_end
+	 s2: %1280:s[18-19],  s1: %1279:scc,  s2: %0:exec = s_and_saveexec_b64 %111:vcc, %0:exec
+	p_cbranch_z %0:exec BB41, BB38
+BB38
+/* logical preds: BB37, / linear preds: BB37, / kind: break, */
+	p_logical_start
+	p_logical_end
+	 s2: %1282:s[18-19],  s1: %1281:scc = s_andn2_b64 %1280:s[18-19], %0:exec
+	p_cbranch_nz %1281:scc BB40, BB39
+BB39
+/* logical preds: / linear preds: BB38, / kind: uniform, */
+	p_branch BB46
+BB40
+/* logical preds: / linear preds: BB38, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB42
+BB41
+/* logical preds: / linear preds: BB37, / kind: uniform, */
+	p_branch BB42
+BB42
+/* logical preds: / linear preds: BB40, BB41, / kind: invert, */
+	 s2: %1283:s[18-19] = p_linear_phi %1282:s[18-19], %1280:s[18-19]
+	 s2: %0:exec,  s1: %1284:scc = s_andn2_b64 %1283:s[18-19], %0:exec
+	p_cbranch_z %0:exec BB44, BB43
+BB43
+/* logical preds: BB37, / linear preds: BB42, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB45
+BB44
+/* logical preds: / linear preds: BB42, / kind: uniform, */
+	p_branch BB45
+BB45
+/* logical preds: BB43, / linear preds: BB43, BB44, / kind: uniform, continue, merge, */
+	 s2: %0:exec = p_parallelcopy %1283:s[18-19]
+	p_logical_start
+	 s4: %131:s[20-23] = s_load_dwordx4 %12:s[2-3], 48 storage:buffer semantics:private,reorder
+	 v1: %113:v[19] = v_ffbl_b32 %108:v[10]
+	 s2: %114:vcc = v_cmp_eq_i32 0, %108:v[10]
+	 v1: %115:v[19] = v_cndmask_b32 %113:v[19], 32, %114:vcc
+	 v1: %116:v[20] = v_ffbl_b32 %107:v[11]
+	 s2: %117:vcc = v_cmp_eq_i32 0, %107:v[11]
+	 v1: %118:v[20] = v_cndmask_b32 %116:v[20], 32, %117:vcc
+	 s2: %119:vcc = v_cmp_lg_i32 0, %108:v[10]
+	 v1: %120:v[21] = v_cndmask_b32 %118:v[20], %115:v[19], %119:vcc
+	 v1: %121:v[21] = v_add_u32 32, %120:v[21]
+	 v1: %122:v[21] = v_cndmask_b32 %121:v[21], %115:v[19], %119:vcc
+	 v1: %132:v[21] = v_add_lshl_u32 %63:v[9], %122:v[21], 2
+	 v1: %133:v[21] = buffer_load_dword %131:s[20-23], %132:v[21], 0 offen storage:buffer semantics:private,reorder
+	 v1: %124:v[22] = v_add_u32 -1, %108:v[10]
+	 v1: %125:v[22] = v_and_b32 %108:v[10], %124:v[22]
+	 v1: %126:v[23] = v_add_u32 -1, %107:v[11]
+	 v1: %127:v[23] = v_and_b32 %107:v[11], %126:v[23]
+	 v1: %128:v[11] = v_cndmask_b32 %127:v[23], %107:v[11], %119:vcc
+	 v1: %129:v[10] = v_cndmask_b32 %108:v[10], %125:v[22], %119:vcc
+	 v1: %138:v[24] = v_lshrrev_b32 2, %103:v[18]
+	 v1: %139:v[24] = v_lshl_or_b32 %104:v[5], 30, %138:v[24]
+	 v1: %151:v[25] = v_mul_lo_u32 %139:v[24], %139:v[24]
+	 v1: %154:v[26] = v_bfe_u32 %104:v[5], 2, 8
+	 v1: %429:v[22],  v1: %1093:v[23] = p_split_vector %88:v[6-7]
+	 v1: %450:v[19] = v_lshl_or_b32 1, %115:v[19], %109:v[16]
+	 v1: %452:v[20] = v_lshl_or_b32 1, %118:v[20], %106:v[17]
+	 v1: %134:v[21] = v_add_u32 %975:s[10], %133:v[21]
+	 v1: %136:v[27] = v_lshl_or_b32 %103:v[18], 30, %134:v[21]
+	 v1: %140:v[28] = v_mul_lo_u32 %136:v[27], %139:v[24]
+	 v2: %141:v[28-29] = p_create_vector %140:v[28], 0
+	 v2: %142:v[28-29] = v_lshlrev_b64 1, %141:v[28-29]
+	 v1: %143:v[30] = v_mul_hi_u32 %136:v[27], %136:v[27]
+	 v1: %1018:v[28],  v1: %1019:v[29] = p_split_vector %142:v[28-29]
+	 v1: %1020:v[30],  s2: %1021:s[18-19] = v_add_co_u32_e64 %143:v[30], %1018:v[28]
+	 v1: %1022:v[29],  s2: %1023:s[18-19] = v_addc_co_u32 0, %1019:v[29], %1021:s[18-19]
+	 v1: %148:v[31] = v_mul_hi_u32 %136:v[27], %139:v[24]
+	 v1: %150:v[31] = v_lshl_add_u32 %148:v[31], 1, %1022:v[29]
+	 v1: %153:v[32] = v_lshlrev_b32 1, %136:v[27]
+	 v1: %155:v[32] = v_mul_lo_u32 %153:v[32], %154:v[26]
+	 v1: %156:v[32] = v_add3_u32 %155:v[32], %150:v[31], %151:v[25]
+	 v1: %157:v[33] = v_mul_lo_u32 %136:v[27], %136:v[27]
+	 v1: %158:v[34] = v_mul_lo_u32 %157:v[33], %136:v[27]
+	 v1: %159:v[35] = v_mul_hi_u32 %157:v[33], %136:v[27]
+	 v1: %160:v[36] = v_mul_lo_u32 %157:v[33], %139:v[24]
+	 v1: %1031:v[35],  s2: %1032:s[18-19] = v_add_co_u32_e64 %159:v[35], %160:v[36]
+	 v1: %1033:v[37],  s2: %1034:s[18-19] = v_addc_co_u32 0, 0, %1032:s[18-19]
+	 v1: %164:v[38] = v_mul_lo_u32 %1020:v[30], %136:v[27]
+	 v1: %1039:v[35],  s2: %1040:s[18-19] = v_add_co_u32_e64 %1031:v[35], %164:v[38]
+	 v1: %1041:v[37],  s2: %1042:s[18-19] = v_addc_co_u32 0, %1033:v[37], %1040:s[18-19]
+	 v1: %169:v[39] = v_mul_hi_u32 %157:v[33], %139:v[24]
+	 v1: %171:v[40] = v_mul_hi_u32 %1020:v[30], %136:v[27]
+	 v1: %172:v[40] = v_add3_u32 %171:v[40], %1041:v[37], %169:v[39]
+	 v1: %173:v[24] = v_mul_lo_u32 %1020:v[30], %139:v[24]
+	 v1: %175:v[26] = v_mul_lo_u32 %157:v[33], %154:v[26]
+	 v1: %176:v[26] = v_add3_u32 %175:v[26], %172:v[40], %173:v[24]
+	 v1: %177:v[41] = p_extract %156:v[32], 0, 8, 0
+	 v1: %178:v[27] = v_mul_lo_u32 %177:v[41], %136:v[27]
+	 v1: %179:v[26] = v_add_u32 %176:v[26], %178:v[27]
+	 v1: %182:v[42] = v_and_b32 63, %157:v[33]
+	 v1: %183:v[43] = v_lshrrev_b32 5, %182:v[42]
+	 v1: %184:v[43] = v_sub_u32 0, %183:v[43]
+	 v1: %185:v[42] = v_lshlrev_b32 %182:v[42], 1
+	 v1: %187:v[44] = v_bfi_b32 %184:v[43], 0, %185:v[42]
+	 v1: %188:v[42] = v_and_b32 %185:v[42], %184:v[43]
+	 v1: %190:v[45] = v_bfe_u32 %157:v[33], 11, 1
+	 v1: %191:v[45] = v_sub_u32 0, %190:v[45]
+	 v1: %192:v[24] = v_bfe_u32 %157:v[33], 6, 6
+	 v1: %193:v[24] = v_lshlrev_b32 %192:v[24], 1
+	 v1: %195:v[25] = v_bfi_b32 %191:v[45], 0, %193:v[24]
+	 v1: %198:v[24] = v_and_or_b32 %193:v[24], %191:v[45], %188:v[42]
+	 v1: %200:v[27] = v_bfe_u32 %157:v[33], 17, 1
+	 v1: %201:v[27] = v_sub_u32 0, %200:v[27]
+	 v1: %202:v[28] = v_bfe_u32 %157:v[33], 12, 6
+	 v1: %203:v[28] = v_lshlrev_b32 %202:v[28], 1
+	 v1: %205:v[29] = v_bfi_b32 %201:v[27], 0, %203:v[28]
+	 v1: %207:v[29] = v_or3_b32 %205:v[29], %187:v[44], %195:v[25]
+	 v1: %208:v[28] = v_and_or_b32 %203:v[28], %201:v[27], %198:v[24]
+	 v1: %210:v[31] = v_bfe_u32 %157:v[33], 23, 1
+	 v1: %211:v[31] = v_sub_u32 0, %210:v[31]
+	 v1: %213:v[36] = v_bfe_u32 %157:v[33], 18, 6
+	 v1: %214:v[36] = v_lshlrev_b32 %213:v[36], 1
+	 v1: %216:v[37] = v_bfi_b32 %211:v[31], 0, %214:v[36]
+	 v1: %219:v[36] = v_and_or_b32 %214:v[36], %211:v[31], %208:v[28]
+	 v1: %220:v[38] = p_extract %157:v[33], 3, 8, 0
+	 v1: %221:v[38] = v_and_b32 63, %220:v[38]
+	 v1: %222:v[39] = v_lshrrev_b32 5, %221:v[38]
+	 v1: %223:v[39] = v_sub_u32 0, %222:v[39]
+	 v1: %224:v[38] = v_lshlrev_b32 %221:v[38], 1
+	 v1: %226:v[40] = v_bfi_b32 %223:v[39], 0, %224:v[38]
+	 v1: %228:v[40] = v_or3_b32 %226:v[40], %207:v[29], %216:v[37]
+	 v1: %229:v[38] = v_and_or_b32 %224:v[38], %223:v[39], %219:v[36]
+	 v1: %231:v[42] = v_and_b32 15, %1020:v[30]
+	 v1: %233:v[33] = v_lshrrev_b32 30, %157:v[33]
+	 v1: %234:v[42] = v_lshl_or_b32 (is16bit)%231:v[42], 2, %233:v[33]
+	 v1: %235:v[43] = v_lshrrev_b32 5, %234:v[42]
+	 v1: %236:v[43] = v_sub_u32 0, %235:v[43]
+	 v1: %237:v[42] = v_lshlrev_b32 %234:v[42], 1
+	 v1: %239:v[44] = v_bfi_b32 %236:v[43], 0, %237:v[42]
+	 v1: %242:v[42] = v_and_or_b32 %237:v[42], %236:v[43], %229:v[38]
+	 v1: %244:v[45] = v_bfe_u32 %1020:v[30], 9, 1
+	 v1: %245:v[45] = v_sub_u32 0, %244:v[45]
+	 v1: %246:v[24] = v_bfe_u32 %1020:v[30], 4, 6
+	 v1: %247:v[24] = v_lshlrev_b32 %246:v[24], 1
+	 v1: %249:v[25] = v_bfi_b32 %245:v[45], 0, %247:v[24]
+	 v1: %251:v[25] = v_or3_b32 %249:v[25], %228:v[40], %239:v[44]
+	 v1: %252:v[24] = v_and_or_b32 %247:v[24], %245:v[45], %242:v[42]
+	 v1: %253:v[27] = v_bfe_u32 %1020:v[30], 15, 1
+	 v1: %254:v[27] = v_sub_u32 0, %253:v[27]
+	 v1: %255:v[28] = v_bfe_u32 %1020:v[30], 10, 6
+	 v1: %256:v[28] = v_lshlrev_b32 %255:v[28], 1
+	 v1: %258:v[29] = v_bfi_b32 %254:v[27], 0, %256:v[28]
+	 v1: %261:v[28] = v_and_or_b32 %256:v[28], %254:v[27], %252:v[24]
+	 v1: %262:v[31] = p_extract %1020:v[30], 1, 16, 0
+	 v1: %263:v[31] = v_and_b32 63, %262:v[31]
+	 v1: %264:v[33] = v_lshrrev_b32 5, %263:v[31]
+	 v1: %265:v[33] = v_sub_u32 0, %264:v[33]
+	 v1: %266:v[31] = v_lshlrev_b32 %263:v[31], 1
+	 v1: %268:v[36] = v_bfi_b32 %265:v[33], 0, %266:v[31]
+	 v1: %270:v[36] = v_or3_b32 %268:v[36], %251:v[25], %258:v[29]
+	 v1: %271:v[31] = v_and_or_b32 %266:v[31], %265:v[33], %261:v[28]
+	 v1: %273:v[37] = v_bfe_u32 %1020:v[30], 27, 1
+	 v1: %274:v[37] = v_sub_u32 0, %273:v[37]
+	 v1: %276:v[38] = v_bfe_u32 %1020:v[30], 22, 6
+	 v1: %277:v[38] = v_lshlrev_b32 %276:v[38], 1
+	 v1: %279:v[39] = v_bfi_b32 %274:v[37], 0, %277:v[38]
+	 v1: %282:v[38] = v_and_or_b32 %277:v[38], %274:v[37], %271:v[31]
+	 v1: %283:v[32] = v_and_b32 3, %156:v[32]
+	 v1: %286:v[30] = v_lshrrev_b32 28, %1020:v[30]
+	 v1: %287:v[32] = v_lshl_or_b32 (is16bit)%283:v[32], 4, %286:v[30]
+	 v1: %288:v[40] = v_lshrrev_b32 5, %287:v[32]
+	 v1: %289:v[40] = v_sub_u32 0, %288:v[40]
+	 v1: %290:v[32] = v_lshlrev_b32 %287:v[32], 1
+	 v1: %292:v[42] = v_bfi_b32 %289:v[40], 0, %290:v[32]
+	 v1: %293:v[32] = v_and_b32 %290:v[32], %289:v[40]
+	 v1: %295:v[43] = v_lshrrev_b32 7, %177:v[41]
+	 v1: %296:v[43] = v_sub_u32 0, %295:v[43]
+	 v1: %297:v[41] = v_lshrrev_b32 2, %177:v[41]
+	 v1: %298:v[41] = v_lshlrev_b32 %297:v[41], 1
+	 v1: %300:v[44] = v_bfi_b32 %296:v[43], 0, %298:v[41]
+	 v1: %301:v[41] = v_and_b32 %298:v[41], %296:v[43]
+	 v1: %302:v[36] = v_or3_b32 %292:v[42], %270:v[36], %279:v[39]
+	 v1: %303:v[36] = v_or_b32 %302:v[36], %300:v[44]
+	 v1: %305:v[38] = v_or3_b32 %301:v[41], %282:v[38], %293:v[32]
+	 v1: %306:v[42] = v_or_b32 %292:v[42], %300:v[44]
+	 v1: %307:v[32] = v_or_b32 %293:v[32], %301:v[41]
+	 v1: %308:v[45] = v_and_b32 63, %158:v[34]
+	 v1: %309:v[24] = v_lshrrev_b32 5, %308:v[45]
+	 v1: %310:v[24] = v_sub_u32 0, %309:v[24]
+	 v1: %311:v[45] = v_lshlrev_b32 %308:v[45], 1
+	 v1: %313:v[25] = v_bfi_b32 %310:v[24], 0, %311:v[45]
+	 v1: %314:v[45] = v_and_b32 %311:v[45], %310:v[24]
+	 v1: %315:v[27] = v_bfe_u32 %158:v[34], 11, 1
+	 v1: %316:v[27] = v_sub_u32 0, %315:v[27]
+	 v1: %317:v[28] = v_bfe_u32 %158:v[34], 6, 6
+	 v1: %318:v[28] = v_lshlrev_b32 %317:v[28], 1
+	 v1: %320:v[29] = v_bfi_b32 %316:v[27], 0, %318:v[28]
+	 v1: %323:v[28] = v_and_or_b32 %318:v[28], %316:v[27], %314:v[45]
+	 v1: %324:v[30] = v_bfe_u32 %158:v[34], 17, 1
+	 v1: %325:v[30] = v_sub_u32 0, %324:v[30]
+	 v1: %326:v[31] = v_bfe_u32 %158:v[34], 12, 6
+	 v1: %327:v[31] = v_lshlrev_b32 %326:v[31], 1
+	 v1: %329:v[33] = v_bfi_b32 %325:v[30], 0, %327:v[31]
+	 v1: %331:v[33] = v_or3_b32 %329:v[33], %313:v[25], %320:v[29]
+	 v1: %332:v[31] = v_and_or_b32 %327:v[31], %325:v[30], %323:v[28]
+	 v1: %333:v[37] = v_bfe_u32 %158:v[34], 23, 1
+	 v1: %334:v[37] = v_sub_u32 0, %333:v[37]
+	 v1: %335:v[39] = v_bfe_u32 %158:v[34], 18, 6
+	 v1: %336:v[39] = v_lshlrev_b32 %335:v[39], 1
+	 v1: %338:v[40] = v_bfi_b32 %334:v[37], 0, %336:v[39]
+	 v1: %341:v[39] = v_and_or_b32 %336:v[39], %334:v[37], %332:v[31]
+	 v1: %342:v[41] = p_extract %158:v[34], 3, 8, 0
+	 v1: %343:v[41] = v_and_b32 63, %342:v[41]
+	 v1: %344:v[43] = v_lshrrev_b32 5, %343:v[41]
+	 v1: %345:v[43] = v_sub_u32 0, %344:v[43]
+	 v1: %346:v[41] = v_lshlrev_b32 %343:v[41], 1
+	 v1: %348:v[44] = v_bfi_b32 %345:v[43], 0, %346:v[41]
+	 v1: %350:v[44] = v_or3_b32 %348:v[44], %331:v[33], %338:v[40]
+	 v1: %351:v[41] = v_and_or_b32 %346:v[41], %345:v[43], %341:v[39]
+	 v1: %352:v[45] = v_and_b32 15, %1039:v[35]
+	 v1: %354:v[34] = v_lshrrev_b32 30, %158:v[34]
+	 v1: %355:v[45] = v_lshl_or_b32 (is16bit)%352:v[45], 2, %354:v[34]
+	 v1: %356:v[24] = v_lshrrev_b32 5, %355:v[45]
+	 v1: %357:v[24] = v_sub_u32 0, %356:v[24]
+	 v1: %358:v[45] = v_lshlrev_b32 %355:v[45], 1
+	 v1: %360:v[25] = v_bfi_b32 %357:v[24], 0, %358:v[45]
+	 v1: %363:v[45] = v_and_or_b32 %358:v[45], %357:v[24], %351:v[41]
+	 v1: %364:v[27] = v_bfe_u32 %1039:v[35], 9, 1
+	 v1: %365:v[27] = v_sub_u32 0, %364:v[27]
+	 v1: %366:v[28] = v_bfe_u32 %1039:v[35], 4, 6
+	 v1: %367:v[28] = v_lshlrev_b32 %366:v[28], 1
+	 v1: %369:v[29] = v_bfi_b32 %365:v[27], 0, %367:v[28]
+	 v1: %371:v[29] = v_or3_b32 %369:v[29], %350:v[44], %360:v[25]
+	 v1: %372:v[28] = v_and_or_b32 %367:v[28], %365:v[27], %363:v[45]
+	 v1: %373:v[30] = v_bfe_u32 %1039:v[35], 15, 1
+	 v1: %374:v[30] = v_sub_u32 0, %373:v[30]
+	 v1: %375:v[31] = v_bfe_u32 %1039:v[35], 10, 6
+	 v1: %376:v[31] = v_lshlrev_b32 %375:v[31], 1
+	 v1: %378:v[33] = v_bfi_b32 %374:v[30], 0, %376:v[31]
+	 v1: %381:v[31] = v_and_or_b32 %376:v[31], %374:v[30], %372:v[28]
+	 v1: %382:v[34] = p_extract %1039:v[35], 1, 16, 0
+	 v1: %383:v[34] = v_and_b32 63, %382:v[34]
+	 v1: %384:v[37] = v_lshrrev_b32 5, %383:v[34]
+	 v1: %385:v[37] = v_sub_u32 0, %384:v[37]
+	 v1: %386:v[34] = v_lshlrev_b32 %383:v[34], 1
+	 v1: %388:v[39] = v_bfi_b32 %385:v[37], 0, %386:v[34]
+	 v1: %390:v[39] = v_or3_b32 %388:v[39], %371:v[29], %378:v[33]
+	 v1: %391:v[34] = v_and_or_b32 %386:v[34], %385:v[37], %381:v[31]
+	 v1: %392:v[40] = v_bfe_u32 %1039:v[35], 27, 1
+	 v1: %393:v[40] = v_sub_u32 0, %392:v[40]
+	 v1: %394:v[41] = v_bfe_u32 %1039:v[35], 22, 6
+	 v1: %395:v[41] = v_lshlrev_b32 %394:v[41], 1
+	 v1: %397:v[43] = v_bfi_b32 %393:v[40], 0, %395:v[41]
+	 v1: %400:v[41] = v_and_or_b32 %395:v[41], %393:v[40], %391:v[34]
+	 v1: %401:v[44] = v_and_b32 3, %179:v[26]
+	 v1: %403:v[35] = v_lshrrev_b32 28, %1039:v[35]
+	 v1: %404:v[44] = v_lshl_or_b32 (is16bit)%401:v[44], 4, %403:v[35]
+	 v1: %405:v[45] = v_lshrrev_b32 5, %404:v[44]
+	 v1: %406:v[45] = v_sub_u32 0, %405:v[45]
+	 v1: %407:v[44] = v_lshlrev_b32 %404:v[44], 1
+	 v1: %409:v[24] = v_bfi_b32 %406:v[45], 0, %407:v[44]
+	 v1: %410:v[44] = v_and_b32 %407:v[44], %406:v[45]
+	 v1: %411:v[26] = p_extract %179:v[26], 0, 8, 0
+	 v1: %412:v[25] = v_lshrrev_b32 7, %411:v[26]
+	 v1: %413:v[25] = v_sub_u32 0, %412:v[25]
+	 v1: %414:v[26] = v_lshrrev_b32 2, %411:v[26]
+	 v1: %415:v[26] = v_lshlrev_b32 %414:v[26], 1
+	 v1: %417:v[27] = v_bfi_b32 %413:v[25], 0, %415:v[26]
+	 v1: %418:v[26] = v_and_b32 %415:v[26], %413:v[25]
+	 v1: %419:v[39] = v_or3_b32 %409:v[24], %390:v[39], %397:v[43]
+	 v1: %422:v[41] = v_or3_b32 %418:v[26], %400:v[41], %410:v[44]
+	 v1: %425:v[36] = v_or3_b32 %303:v[36], %419:v[39], %417:v[27]
+	 v1: %426:v[38] = v_or_b32 %305:v[38], %422:v[41]
+	 v1: %427:v[42] = v_or3_b32 %306:v[42], %409:v[24], %417:v[27]
+	 v1: %428:v[32] = v_or3_b32 %307:v[32], %410:v[44], %418:v[26]
+	 v1: %431:v[38] = v_bcnt_u32_b32 %426:v[38], 0
+	 v1: %433:v[36] = v_bcnt_u32_b32 %425:v[36], %431:v[38]
+	 v1: %434:v[42] = v_and_b32 %427:v[42], %429:v[22]
+	 v1: %436:v[32] = v_and_or_b32 %428:v[32], %1093:v[23], %434:v[42]
+	 s2: %437:s[18-19] = v_cmp_eq_i32 24, %433:v[36]
+	 s2: %438:s[20-21] = v_cmp_eq_i32 0, %436:v[32]
+	 s2: %439:s[18-19],  s1: %1095:scc = s_and_b64 %437:s[18-19], %438:s[20-21]
+	 v1: %440:v[21] = v_lshrrev_b32 10, %134:v[21]
+	 v1: %441:v[28] = v_ffbl_b32 %440:v[21]
+	 s2: %442:s[20-21] = v_cmp_eq_i32 0, %440:v[21]
+	 s2: %443:s[22-23] = v_cmp_le_u32 10, %441:v[28]
+	 s2: %444:s[20-21],  s1: %1096:scc = s_or_b64 %442:s[20-21], %443:s[22-23]
+	 s2: %446:s[20-21],  s1: %1098:scc = s_nand_b64 %40:s[4-5], %444:s[20-21]
+	 s2: %447:s[18-19],  s1: %1099:scc = s_and_b64 %439:s[18-19], %446:s[20-21]
+	 s2: %448:s[18-19],  s1: %1100:scc = s_or_b64 %39:s[6-7], %447:s[18-19]
+	 s2: %454:s[20-21],  s1: %1104:scc = s_andn2_b64 %448:s[18-19], %119:vcc
+	 v1: %455:v[17] = v_cndmask_b32 %106:v[17], %452:v[20], %454:s[20-21]
+	 s2: %456:vcc,  s1: %1105:scc = s_and_b64 %448:s[18-19], %119:vcc
+	 v1: %457:v[16] = v_cndmask_b32 %109:v[16], %450:v[19], %456:vcc
+	p_logical_end
+	p_branch BB37
+BB46
+/* logical preds: BB38, / linear preds: BB39, / kind: uniform, loop-preheader, loop-exit, */
+	 v1: %459:v[16] = p_phi %109:v[16]
+	 v1: %458:v[17] = p_phi %106:v[17]
+	 s2: %0:exec = p_parallelcopy %1273:s[16-17]
+	p_logical_start
+	 v1: %460:v[5] = v_lshlrev_b32 2, %78:v[12]
+	 v1: %461:v[5] = buffer_load_dword %83:s[24-27], %460:v[5], 0 offen storage:buffer semantics:private,reorder
+	 v1: %462:v[6] = v_lshlrev_b32 3, %78:v[12]
+	 v2: %463:v[6-7] = buffer_load_dwordx2 %87:s[28-31], %462:v[6], 0 offen storage:buffer semantics:private,reorder
+	 v1: %464:v[10] = p_extract %461:v[5], 1, 16, 0
+	 v1: %465:v[10] = p_insert %464:v[10], 3, 8
+	 v1: %466:v[11] = v_and_b32 3, %461:v[5]
+	 v1: %468:v[11] = v_lshl_or_b32 (is16bit)%466:v[11], 30, %465:v[10]
+	 v1: %469:v[11] = v_or_b32 %976:s[11], %468:v[11]
+	 v1: %470:v[5] = v_lshrrev_b32 2, %461:v[5]
+	p_logical_end
+	p_branch BB47
+BB47
+/* logical preds: BB46, BB55, / linear preds: BB46, BB55, / kind: loop-header, branch, */
+	 v1: %474:v[15] = p_phi %81:v[15], %494:v[15]
+	 v1: %473:v[14] = p_phi %80:v[14], %493:v[14]
+	 v1: %472:v[10] = p_phi 0, %822:v[10]
+	 v1: %471:v[18] = p_phi 0, %820:v[18]
+	p_logical_start
+	 v1: %475:v[19] = v_or_b32 %473:v[14], %474:v[15]
+	 s2: %476:vcc = v_cmp_eq_i32 0, %475:v[19]
+	p_logical_end
+	 s2: %1286:s[18-19],  s1: %1285:scc,  s2: %0:exec = s_and_saveexec_b64 %476:vcc, %0:exec
+	p_cbranch_z %0:exec BB51, BB48
+BB48
+/* logical preds: BB47, / linear preds: BB47, / kind: break, */
+	p_logical_start
+	p_logical_end
+	 s2: %1288:s[18-19],  s1: %1287:scc = s_andn2_b64 %1286:s[18-19], %0:exec
+	p_cbranch_nz %1287:scc BB50, BB49
+BB49
+/* logical preds: / linear preds: BB48, / kind: uniform, */
+	p_branch BB56
+BB50
+/* logical preds: / linear preds: BB48, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB52
+BB51
+/* logical preds: / linear preds: BB47, / kind: uniform, */
+	p_branch BB52
+BB52
+/* logical preds: / linear preds: BB50, BB51, / kind: invert, */
+	 s2: %1289:s[18-19] = p_linear_phi %1288:s[18-19], %1286:s[18-19]
+	 s2: %0:exec,  s1: %1290:scc = s_andn2_b64 %1289:s[18-19], %0:exec
+	p_cbranch_z %0:exec BB54, BB53
+BB53
+/* logical preds: BB47, / linear preds: BB52, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB55
+BB54
+/* logical preds: / linear preds: BB52, / kind: uniform, */
+	p_branch BB55
+BB55
+/* logical preds: BB53, / linear preds: BB53, BB54, / kind: uniform, continue, merge, */
+	 s2: %0:exec = p_parallelcopy %1289:s[18-19]
+	p_logical_start
+	 s4: %496:s[20-23] = s_load_dwordx4 %12:s[2-3], 48 storage:buffer semantics:private,reorder
+	 v1: %478:v[19] = v_ffbl_b32 %473:v[14]
+	 s2: %479:vcc = v_cmp_eq_i32 0, %473:v[14]
+	 v1: %480:v[19] = v_cndmask_b32 %478:v[19], 32, %479:vcc
+	 v1: %481:v[20] = v_ffbl_b32 %474:v[15]
+	 s2: %482:vcc = v_cmp_eq_i32 0, %474:v[15]
+	 v1: %483:v[20] = v_cndmask_b32 %481:v[20], 32, %482:vcc
+	 s2: %484:vcc = v_cmp_lg_i32 0, %473:v[14]
+	 v1: %485:v[21] = v_cndmask_b32 %483:v[20], %480:v[19], %484:vcc
+	 v1: %486:v[21] = v_add_u32 32, %485:v[21]
+	 v1: %487:v[21] = v_cndmask_b32 %486:v[21], %480:v[19], %484:vcc
+	 v1: %497:v[21] = v_add_lshl_u32 %79:v[13], %487:v[21], 2
+	 v1: %498:v[21] = buffer_load_dword %496:s[20-23], %497:v[21], 0 offen storage:buffer semantics:private,reorder
+	 v1: %489:v[22] = v_add_u32 -1, %473:v[14]
+	 v1: %490:v[22] = v_and_b32 %473:v[14], %489:v[22]
+	 v1: %491:v[23] = v_add_u32 -1, %474:v[15]
+	 v1: %492:v[23] = v_and_b32 %474:v[15], %491:v[23]
+	 v1: %493:v[14] = v_cndmask_b32 %473:v[14], %490:v[22], %484:vcc
+	 v1: %494:v[15] = v_cndmask_b32 %492:v[23], %474:v[15], %484:vcc
+	 v1: %503:v[24] = v_lshrrev_b32 2, %469:v[11]
+	 v1: %504:v[24] = v_lshl_or_b32 %470:v[5], 30, %503:v[24]
+	 v1: %516:v[25] = v_mul_lo_u32 %504:v[24], %504:v[24]
+	 v1: %519:v[26] = v_bfe_u32 %470:v[5], 2, 8
+	 v1: %794:v[22],  v1: %1189:v[23] = p_split_vector %463:v[6-7]
+	 v1: %815:v[19] = v_lshl_or_b32 1, %480:v[19], %472:v[10]
+	 v1: %817:v[20] = v_lshl_or_b32 1, %483:v[20], %471:v[18]
+	 v1: %499:v[21] = v_add_u32 %975:s[10], %498:v[21]
+	 v1: %501:v[27] = v_lshl_or_b32 %469:v[11], 30, %499:v[21]
+	 v1: %505:v[28] = v_mul_lo_u32 %501:v[27], %504:v[24]
+	 v2: %506:v[28-29] = p_create_vector %505:v[28], 0
+	 v2: %507:v[28-29] = v_lshlrev_b64 1, %506:v[28-29]
+	 v1: %508:v[30] = v_mul_hi_u32 %501:v[27], %501:v[27]
+	 v1: %1114:v[28],  v1: %1115:v[29] = p_split_vector %507:v[28-29]
+	 v1: %1116:v[30],  s2: %1117:s[18-19] = v_add_co_u32_e64 %508:v[30], %1114:v[28]
+	 v1: %1118:v[29],  s2: %1119:s[18-19] = v_addc_co_u32 0, %1115:v[29], %1117:s[18-19]
+	 v1: %513:v[31] = v_mul_hi_u32 %501:v[27], %504:v[24]
+	 v1: %515:v[31] = v_lshl_add_u32 %513:v[31], 1, %1118:v[29]
+	 v1: %518:v[32] = v_lshlrev_b32 1, %501:v[27]
+	 v1: %520:v[32] = v_mul_lo_u32 %518:v[32], %519:v[26]
+	 v1: %521:v[32] = v_add3_u32 %520:v[32], %515:v[31], %516:v[25]
+	 v1: %522:v[33] = v_mul_lo_u32 %501:v[27], %501:v[27]
+	 v1: %523:v[34] = v_mul_lo_u32 %522:v[33], %501:v[27]
+	 v1: %524:v[35] = v_mul_hi_u32 %522:v[33], %501:v[27]
+	 v1: %525:v[36] = v_mul_lo_u32 %522:v[33], %504:v[24]
+	 v1: %1127:v[35],  s2: %1128:s[18-19] = v_add_co_u32_e64 %524:v[35], %525:v[36]
+	 v1: %1129:v[37],  s2: %1130:s[18-19] = v_addc_co_u32 0, 0, %1128:s[18-19]
+	 v1: %529:v[38] = v_mul_lo_u32 %1116:v[30], %501:v[27]
+	 v1: %1135:v[35],  s2: %1136:s[18-19] = v_add_co_u32_e64 %1127:v[35], %529:v[38]
+	 v1: %1137:v[37],  s2: %1138:s[18-19] = v_addc_co_u32 0, %1129:v[37], %1136:s[18-19]
+	 v1: %534:v[39] = v_mul_hi_u32 %522:v[33], %504:v[24]
+	 v1: %536:v[40] = v_mul_hi_u32 %1116:v[30], %501:v[27]
+	 v1: %537:v[40] = v_add3_u32 %536:v[40], %1137:v[37], %534:v[39]
+	 v1: %538:v[24] = v_mul_lo_u32 %1116:v[30], %504:v[24]
+	 v1: %540:v[26] = v_mul_lo_u32 %522:v[33], %519:v[26]
+	 v1: %541:v[26] = v_add3_u32 %540:v[26], %537:v[40], %538:v[24]
+	 v1: %542:v[41] = p_extract %521:v[32], 0, 8, 0
+	 v1: %543:v[27] = v_mul_lo_u32 %542:v[41], %501:v[27]
+	 v1: %544:v[26] = v_add_u32 %541:v[26], %543:v[27]
+	 v1: %547:v[42] = v_and_b32 63, %522:v[33]
+	 v1: %548:v[43] = v_lshrrev_b32 5, %547:v[42]
+	 v1: %549:v[43] = v_sub_u32 0, %548:v[43]
+	 v1: %550:v[42] = v_lshlrev_b32 %547:v[42], 1
+	 v1: %552:v[44] = v_bfi_b32 %549:v[43], 0, %550:v[42]
+	 v1: %553:v[42] = v_and_b32 %550:v[42], %549:v[43]
+	 v1: %555:v[45] = v_bfe_u32 %522:v[33], 11, 1
+	 v1: %556:v[45] = v_sub_u32 0, %555:v[45]
+	 v1: %557:v[24] = v_bfe_u32 %522:v[33], 6, 6
+	 v1: %558:v[24] = v_lshlrev_b32 %557:v[24], 1
+	 v1: %560:v[25] = v_bfi_b32 %556:v[45], 0, %558:v[24]
+	 v1: %563:v[24] = v_and_or_b32 %558:v[24], %556:v[45], %553:v[42]
+	 v1: %565:v[27] = v_bfe_u32 %522:v[33], 17, 1
+	 v1: %566:v[27] = v_sub_u32 0, %565:v[27]
+	 v1: %567:v[28] = v_bfe_u32 %522:v[33], 12, 6
+	 v1: %568:v[28] = v_lshlrev_b32 %567:v[28], 1
+	 v1: %570:v[29] = v_bfi_b32 %566:v[27], 0, %568:v[28]
+	 v1: %572:v[29] = v_or3_b32 %570:v[29], %552:v[44], %560:v[25]
+	 v1: %573:v[28] = v_and_or_b32 %568:v[28], %566:v[27], %563:v[24]
+	 v1: %575:v[31] = v_bfe_u32 %522:v[33], 23, 1
+	 v1: %576:v[31] = v_sub_u32 0, %575:v[31]
+	 v1: %578:v[36] = v_bfe_u32 %522:v[33], 18, 6
+	 v1: %579:v[36] = v_lshlrev_b32 %578:v[36], 1
+	 v1: %581:v[37] = v_bfi_b32 %576:v[31], 0, %579:v[36]
+	 v1: %584:v[36] = v_and_or_b32 %579:v[36], %576:v[31], %573:v[28]
+	 v1: %585:v[38] = p_extract %522:v[33], 3, 8, 0
+	 v1: %586:v[38] = v_and_b32 63, %585:v[38]
+	 v1: %587:v[39] = v_lshrrev_b32 5, %586:v[38]
+	 v1: %588:v[39] = v_sub_u32 0, %587:v[39]
+	 v1: %589:v[38] = v_lshlrev_b32 %586:v[38], 1
+	 v1: %591:v[40] = v_bfi_b32 %588:v[39], 0, %589:v[38]
+	 v1: %593:v[40] = v_or3_b32 %591:v[40], %572:v[29], %581:v[37]
+	 v1: %594:v[38] = v_and_or_b32 %589:v[38], %588:v[39], %584:v[36]
+	 v1: %596:v[42] = v_and_b32 15, %1116:v[30]
+	 v1: %598:v[33] = v_lshrrev_b32 30, %522:v[33]
+	 v1: %599:v[42] = v_lshl_or_b32 (is16bit)%596:v[42], 2, %598:v[33]
+	 v1: %600:v[43] = v_lshrrev_b32 5, %599:v[42]
+	 v1: %601:v[43] = v_sub_u32 0, %600:v[43]
+	 v1: %602:v[42] = v_lshlrev_b32 %599:v[42], 1
+	 v1: %604:v[44] = v_bfi_b32 %601:v[43], 0, %602:v[42]
+	 v1: %607:v[42] = v_and_or_b32 %602:v[42], %601:v[43], %594:v[38]
+	 v1: %609:v[45] = v_bfe_u32 %1116:v[30], 9, 1
+	 v1: %610:v[45] = v_sub_u32 0, %609:v[45]
+	 v1: %611:v[24] = v_bfe_u32 %1116:v[30], 4, 6
+	 v1: %612:v[24] = v_lshlrev_b32 %611:v[24], 1
+	 v1: %614:v[25] = v_bfi_b32 %610:v[45], 0, %612:v[24]
+	 v1: %616:v[25] = v_or3_b32 %614:v[25], %593:v[40], %604:v[44]
+	 v1: %617:v[24] = v_and_or_b32 %612:v[24], %610:v[45], %607:v[42]
+	 v1: %618:v[27] = v_bfe_u32 %1116:v[30], 15, 1
+	 v1: %619:v[27] = v_sub_u32 0, %618:v[27]
+	 v1: %620:v[28] = v_bfe_u32 %1116:v[30], 10, 6
+	 v1: %621:v[28] = v_lshlrev_b32 %620:v[28], 1
+	 v1: %623:v[29] = v_bfi_b32 %619:v[27], 0, %621:v[28]
+	 v1: %626:v[28] = v_and_or_b32 %621:v[28], %619:v[27], %617:v[24]
+	 v1: %627:v[31] = p_extract %1116:v[30], 1, 16, 0
+	 v1: %628:v[31] = v_and_b32 63, %627:v[31]
+	 v1: %629:v[33] = v_lshrrev_b32 5, %628:v[31]
+	 v1: %630:v[33] = v_sub_u32 0, %629:v[33]
+	 v1: %631:v[31] = v_lshlrev_b32 %628:v[31], 1
+	 v1: %633:v[36] = v_bfi_b32 %630:v[33], 0, %631:v[31]
+	 v1: %635:v[36] = v_or3_b32 %633:v[36], %616:v[25], %623:v[29]
+	 v1: %636:v[31] = v_and_or_b32 %631:v[31], %630:v[33], %626:v[28]
+	 v1: %638:v[37] = v_bfe_u32 %1116:v[30], 27, 1
+	 v1: %639:v[37] = v_sub_u32 0, %638:v[37]
+	 v1: %641:v[38] = v_bfe_u32 %1116:v[30], 22, 6
+	 v1: %642:v[38] = v_lshlrev_b32 %641:v[38], 1
+	 v1: %644:v[39] = v_bfi_b32 %639:v[37], 0, %642:v[38]
+	 v1: %647:v[38] = v_and_or_b32 %642:v[38], %639:v[37], %636:v[31]
+	 v1: %648:v[32] = v_and_b32 3, %521:v[32]
+	 v1: %651:v[30] = v_lshrrev_b32 28, %1116:v[30]
+	 v1: %652:v[32] = v_lshl_or_b32 (is16bit)%648:v[32], 4, %651:v[30]
+	 v1: %653:v[40] = v_lshrrev_b32 5, %652:v[32]
+	 v1: %654:v[40] = v_sub_u32 0, %653:v[40]
+	 v1: %655:v[32] = v_lshlrev_b32 %652:v[32], 1
+	 v1: %657:v[42] = v_bfi_b32 %654:v[40], 0, %655:v[32]
+	 v1: %658:v[32] = v_and_b32 %655:v[32], %654:v[40]
+	 v1: %660:v[43] = v_lshrrev_b32 7, %542:v[41]
+	 v1: %661:v[43] = v_sub_u32 0, %660:v[43]
+	 v1: %662:v[41] = v_lshrrev_b32 2, %542:v[41]
+	 v1: %663:v[41] = v_lshlrev_b32 %662:v[41], 1
+	 v1: %665:v[44] = v_bfi_b32 %661:v[43], 0, %663:v[41]
+	 v1: %666:v[41] = v_and_b32 %663:v[41], %661:v[43]
+	 v1: %667:v[36] = v_or3_b32 %657:v[42], %635:v[36], %644:v[39]
+	 v1: %668:v[36] = v_or_b32 %667:v[36], %665:v[44]
+	 v1: %670:v[38] = v_or3_b32 %666:v[41], %647:v[38], %658:v[32]
+	 v1: %671:v[42] = v_or_b32 %657:v[42], %665:v[44]
+	 v1: %672:v[32] = v_or_b32 %658:v[32], %666:v[41]
+	 v1: %673:v[45] = v_and_b32 63, %523:v[34]
+	 v1: %674:v[24] = v_lshrrev_b32 5, %673:v[45]
+	 v1: %675:v[24] = v_sub_u32 0, %674:v[24]
+	 v1: %676:v[45] = v_lshlrev_b32 %673:v[45], 1
+	 v1: %678:v[25] = v_bfi_b32 %675:v[24], 0, %676:v[45]
+	 v1: %679:v[45] = v_and_b32 %676:v[45], %675:v[24]
+	 v1: %680:v[27] = v_bfe_u32 %523:v[34], 11, 1
+	 v1: %681:v[27] = v_sub_u32 0, %680:v[27]
+	 v1: %682:v[28] = v_bfe_u32 %523:v[34], 6, 6
+	 v1: %683:v[28] = v_lshlrev_b32 %682:v[28], 1
+	 v1: %685:v[29] = v_bfi_b32 %681:v[27], 0, %683:v[28]
+	 v1: %688:v[28] = v_and_or_b32 %683:v[28], %681:v[27], %679:v[45]
+	 v1: %689:v[30] = v_bfe_u32 %523:v[34], 17, 1
+	 v1: %690:v[30] = v_sub_u32 0, %689:v[30]
+	 v1: %691:v[31] = v_bfe_u32 %523:v[34], 12, 6
+	 v1: %692:v[31] = v_lshlrev_b32 %691:v[31], 1
+	 v1: %694:v[33] = v_bfi_b32 %690:v[30], 0, %692:v[31]
+	 v1: %696:v[33] = v_or3_b32 %694:v[33], %678:v[25], %685:v[29]
+	 v1: %697:v[31] = v_and_or_b32 %692:v[31], %690:v[30], %688:v[28]
+	 v1: %698:v[37] = v_bfe_u32 %523:v[34], 23, 1
+	 v1: %699:v[37] = v_sub_u32 0, %698:v[37]
+	 v1: %700:v[39] = v_bfe_u32 %523:v[34], 18, 6
+	 v1: %701:v[39] = v_lshlrev_b32 %700:v[39], 1
+	 v1: %703:v[40] = v_bfi_b32 %699:v[37], 0, %701:v[39]
+	 v1: %706:v[39] = v_and_or_b32 %701:v[39], %699:v[37], %697:v[31]
+	 v1: %707:v[41] = p_extract %523:v[34], 3, 8, 0
+	 v1: %708:v[41] = v_and_b32 63, %707:v[41]
+	 v1: %709:v[43] = v_lshrrev_b32 5, %708:v[41]
+	 v1: %710:v[43] = v_sub_u32 0, %709:v[43]
+	 v1: %711:v[41] = v_lshlrev_b32 %708:v[41], 1
+	 v1: %713:v[44] = v_bfi_b32 %710:v[43], 0, %711:v[41]
+	 v1: %715:v[44] = v_or3_b32 %713:v[44], %696:v[33], %703:v[40]
+	 v1: %716:v[41] = v_and_or_b32 %711:v[41], %710:v[43], %706:v[39]
+	 v1: %717:v[45] = v_and_b32 15, %1135:v[35]
+	 v1: %719:v[34] = v_lshrrev_b32 30, %523:v[34]
+	 v1: %720:v[45] = v_lshl_or_b32 (is16bit)%717:v[45], 2, %719:v[34]
+	 v1: %721:v[24] = v_lshrrev_b32 5, %720:v[45]
+	 v1: %722:v[24] = v_sub_u32 0, %721:v[24]
+	 v1: %723:v[45] = v_lshlrev_b32 %720:v[45], 1
+	 v1: %725:v[25] = v_bfi_b32 %722:v[24], 0, %723:v[45]
+	 v1: %728:v[45] = v_and_or_b32 %723:v[45], %722:v[24], %716:v[41]
+	 v1: %729:v[27] = v_bfe_u32 %1135:v[35], 9, 1
+	 v1: %730:v[27] = v_sub_u32 0, %729:v[27]
+	 v1: %731:v[28] = v_bfe_u32 %1135:v[35], 4, 6
+	 v1: %732:v[28] = v_lshlrev_b32 %731:v[28], 1
+	 v1: %734:v[29] = v_bfi_b32 %730:v[27], 0, %732:v[28]
+	 v1: %736:v[29] = v_or3_b32 %734:v[29], %715:v[44], %725:v[25]
+	 v1: %737:v[28] = v_and_or_b32 %732:v[28], %730:v[27], %728:v[45]
+	 v1: %738:v[30] = v_bfe_u32 %1135:v[35], 15, 1
+	 v1: %739:v[30] = v_sub_u32 0, %738:v[30]
+	 v1: %740:v[31] = v_bfe_u32 %1135:v[35], 10, 6
+	 v1: %741:v[31] = v_lshlrev_b32 %740:v[31], 1
+	 v1: %743:v[33] = v_bfi_b32 %739:v[30], 0, %741:v[31]
+	 v1: %746:v[31] = v_and_or_b32 %741:v[31], %739:v[30], %737:v[28]
+	 v1: %747:v[34] = p_extract %1135:v[35], 1, 16, 0
+	 v1: %748:v[34] = v_and_b32 63, %747:v[34]
+	 v1: %749:v[37] = v_lshrrev_b32 5, %748:v[34]
+	 v1: %750:v[37] = v_sub_u32 0, %749:v[37]
+	 v1: %751:v[34] = v_lshlrev_b32 %748:v[34], 1
+	 v1: %753:v[39] = v_bfi_b32 %750:v[37], 0, %751:v[34]
+	 v1: %755:v[39] = v_or3_b32 %753:v[39], %736:v[29], %743:v[33]
+	 v1: %756:v[34] = v_and_or_b32 %751:v[34], %750:v[37], %746:v[31]
+	 v1: %757:v[40] = v_bfe_u32 %1135:v[35], 27, 1
+	 v1: %758:v[40] = v_sub_u32 0, %757:v[40]
+	 v1: %759:v[41] = v_bfe_u32 %1135:v[35], 22, 6
+	 v1: %760:v[41] = v_lshlrev_b32 %759:v[41], 1
+	 v1: %762:v[43] = v_bfi_b32 %758:v[40], 0, %760:v[41]
+	 v1: %765:v[41] = v_and_or_b32 %760:v[41], %758:v[40], %756:v[34]
+	 v1: %766:v[44] = v_and_b32 3, %544:v[26]
+	 v1: %768:v[35] = v_lshrrev_b32 28, %1135:v[35]
+	 v1: %769:v[44] = v_lshl_or_b32 (is16bit)%766:v[44], 4, %768:v[35]
+	 v1: %770:v[45] = v_lshrrev_b32 5, %769:v[44]
+	 v1: %771:v[45] = v_sub_u32 0, %770:v[45]
+	 v1: %772:v[44] = v_lshlrev_b32 %769:v[44], 1
+	 v1: %774:v[24] = v_bfi_b32 %771:v[45], 0, %772:v[44]
+	 v1: %775:v[44] = v_and_b32 %772:v[44], %771:v[45]
+	 v1: %776:v[26] = p_extract %544:v[26], 0, 8, 0
+	 v1: %777:v[25] = v_lshrrev_b32 7, %776:v[26]
+	 v1: %778:v[25] = v_sub_u32 0, %777:v[25]
+	 v1: %779:v[26] = v_lshrrev_b32 2, %776:v[26]
+	 v1: %780:v[26] = v_lshlrev_b32 %779:v[26], 1
+	 v1: %782:v[27] = v_bfi_b32 %778:v[25], 0, %780:v[26]
+	 v1: %783:v[26] = v_and_b32 %780:v[26], %778:v[25]
+	 v1: %784:v[39] = v_or3_b32 %774:v[24], %755:v[39], %762:v[43]
+	 v1: %787:v[41] = v_or3_b32 %783:v[26], %765:v[41], %775:v[44]
+	 v1: %790:v[36] = v_or3_b32 %668:v[36], %784:v[39], %782:v[27]
+	 v1: %791:v[38] = v_or_b32 %670:v[38], %787:v[41]
+	 v1: %792:v[42] = v_or3_b32 %671:v[42], %774:v[24], %782:v[27]
+	 v1: %793:v[32] = v_or3_b32 %672:v[32], %775:v[44], %783:v[26]
+	 v1: %796:v[38] = v_bcnt_u32_b32 %791:v[38], 0
+	 v1: %798:v[36] = v_bcnt_u32_b32 %790:v[36], %796:v[38]
+	 v1: %799:v[42] = v_and_b32 %792:v[42], %794:v[22]
+	 v1: %801:v[32] = v_and_or_b32 %793:v[32], %1189:v[23], %799:v[42]
+	 s2: %802:s[18-19] = v_cmp_eq_i32 24, %798:v[36]
+	 s2: %803:s[20-21] = v_cmp_eq_i32 0, %801:v[32]
+	 s2: %804:s[18-19],  s1: %1191:scc = s_and_b64 %802:s[18-19], %803:s[20-21]
+	 v1: %805:v[21] = v_lshrrev_b32 10, %499:v[21]
+	 v1: %806:v[28] = v_ffbl_b32 %805:v[21]
+	 s2: %807:s[20-21] = v_cmp_eq_i32 0, %805:v[21]
+	 s2: %808:s[22-23] = v_cmp_le_u32 10, %806:v[28]
+	 s2: %809:s[20-21],  s1: %1192:scc = s_or_b64 %807:s[20-21], %808:s[22-23]
+	 s2: %811:s[20-21],  s1: %1194:scc = s_nand_b64 %40:s[4-5], %809:s[20-21]
+	 s2: %812:s[18-19],  s1: %1195:scc = s_and_b64 %804:s[18-19], %811:s[20-21]
+	 s2: %813:s[18-19],  s1: %1196:scc = s_or_b64 %39:s[6-7], %812:s[18-19]
+	 s2: %819:s[20-21],  s1: %1200:scc = s_andn2_b64 %813:s[18-19], %484:vcc
+	 v1: %820:v[18] = v_cndmask_b32 %471:v[18], %817:v[20], %819:s[20-21]
+	 s2: %821:vcc,  s1: %1201:scc = s_and_b64 %813:s[18-19], %484:vcc
+	 v1: %822:v[10] = v_cndmask_b32 %472:v[10], %815:v[19], %821:vcc
+	p_logical_end
+	p_branch BB47
+BB56
+/* logical preds: BB48, / linear preds: BB49, / kind: loop-exit, branch, */
+	 v1: %824:v[10] = p_phi %472:v[10]
+	 v1: %823:v[18] = p_phi %471:v[18]
+	 s2: %0:exec = p_parallelcopy %1273:s[16-17]
+	p_logical_start
+	 v1: %825:v[5] = v_bcnt_u32_b32 %458:v[17], 0
+	 v1: %827:v[5] = v_bcnt_u32_b32 %459:v[16], %825:v[5]
+	 v1: %829:v[5] = v_bcnt_u32_b32 %824:v[10], %827:v[5]
+	 v1: %831:v[5] = v_bcnt_u32_b32 %823:v[18], %829:v[5]
+	 v1: %1202:v[6],  s2: %1203:s[18-19],  s1: %1204:s[15],  s1: %1205:scc = p_inclusive_scan %831:v[5], %1258:v[46], %1259:v[47] op:iadd32 cluster_size:64
+	 v1: %832:v[6] = v_sub_u32 %1202:v[6], %831:v[5]
+	 s1: %833:s[18],  s2: %1206:s[20-21],  s1: %1207:scc = p_reduce %831:v[5], %1258:v[46], %1259:v[47] op:iadd32 cluster_size:64
+	 s2: %834:s[20-21] = p_create_vector 1, 0
+	 s1: %1208:scc = s_cmp_lg_i32 %833:s[18], 0
+	 s2: %836:s[22-23] = s_cselect_b64 -1, 0, %1208:scc
+	 s2: %837:s[20-21],  s1: %1209:scc = s_and_b64 %834:s[20-21], %836:s[22-23]
+	p_logical_end
+	 s2: %0:exec,  s1: %1291:scc = s_and_b64 %837:s[20-21], %0:exec
+	p_cbranch_z %0:exec BB58, BB57
+BB57
+/* logical preds: BB56, / linear preds: BB56, / kind: uniform, */
+	p_logical_start
+	 s4: %838:s[20-23] = s_load_dwordx4 %12:s[2-3], 0x80 storage:buffer semantics:private,reorder
+	p_barrier storage:buffer semantics:release scope:device exec_scope:invocation
+	 v1: %1214:v[5] = p_parallelcopy %833:s[18]
+	 v1: %839:v[5] = buffer_atomic_add %838:s[20-23],  v1: undef, 0, %1214:v[5] atomic_return storage:buffer semantics:volatile,atomic,rmw
+	p_barrier storage:buffer semantics:acquire scope:device exec_scope:invocation
+	p_logical_end
+	p_branch BB59
+BB58
+/* logical preds: / linear preds: BB56, / kind: uniform, */
+	p_branch BB59
+BB59
+/* logical preds: / linear preds: BB57, BB58, / kind: invert, */
+	 s2: %0:exec,  s1: %1292:scc = s_andn2_b64 %1273:s[16-17], %0:exec
+	p_cbranch_z %0:exec BB61, BB60
+BB60
+/* logical preds: BB56, / linear preds: BB59, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB62
+BB61
+/* logical preds: / linear preds: BB59, / kind: uniform, */
+	p_branch BB62
+BB62
+/* logical preds: BB57, BB60, / linear preds: BB60, BB61, / kind: uniform, loop-preheader, merge, */
+	 v1: %840:v[5] = p_phi %839:v[5], 0
+	 s2: %0:exec = p_parallelcopy %1273:s[16-17]
+	p_logical_start
+	 s1: %841:s[15],  s2: %1215:s[18-19],  s1: %1216:scc = p_reduce %840:v[5], %1258:v[46], %1259:v[47] op:iadd32 cluster_size:64
+	 v1: %842:v[6] = v_add_u32 %841:s[15], %832:v[6]
+	p_logical_end
+	p_branch BB63
+BB63
+/* logical preds: BB62, BB77, / linear preds: BB62, BB77, / kind: loop-header, branch, */
+	 v1: %845:v[16] = p_phi %459:v[16], %865:v[16]
+	 v1: %844:v[6] = p_phi %842:v[6], %875:v[6]
+	 v1: %843:v[17] = p_phi %458:v[17], %864:v[17]
+	p_logical_start
+	 v1: %846:v[5] = v_or_b32 %845:v[16], %843:v[17]
+	 s2: %847:vcc = v_cmp_eq_i32 0, %846:v[5]
+	p_logical_end
+	 s2: %1294:s[18-19],  s1: %1293:scc,  s2: %0:exec = s_and_saveexec_b64 %847:vcc, %0:exec
+	p_cbranch_z %0:exec BB67, BB64
+BB64
+/* logical preds: BB63, / linear preds: BB63, / kind: break, */
+	p_logical_start
+	p_logical_end
+	 s2: %1296:s[18-19],  s1: %1295:scc = s_andn2_b64 %1294:s[18-19], %0:exec
+	p_cbranch_nz %1295:scc BB66, BB65
+BB65
+/* logical preds: / linear preds: BB64, / kind: uniform, */
+	p_branch BB78
+BB66
+/* logical preds: / linear preds: BB64, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB68
+BB67
+/* logical preds: / linear preds: BB63, / kind: uniform, */
+	p_branch BB68
+BB68
+/* logical preds: / linear preds: BB66, BB67, / kind: invert, */
+	 s2: %1297:s[18-19] = p_linear_phi %1296:s[18-19], %1294:s[18-19]
+	 s2: %0:exec,  s1: %1298:scc = s_andn2_b64 %1297:s[18-19], %0:exec
+	p_cbranch_z %0:exec BB70, BB69
+BB69
+/* logical preds: BB63, / linear preds: BB68, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB71
+BB70
+/* logical preds: / linear preds: BB68, / kind: uniform, */
+	p_branch BB71
+BB71
+/* logical preds: BB69, / linear preds: BB69, BB70, / kind: branch, merge, */
+	 s2: %0:exec = p_parallelcopy %1297:s[18-19]
+	p_logical_start
+	 v1: %849:v[5] = v_ffbl_b32 %845:v[16]
+	 s2: %850:vcc = v_cmp_eq_i32 0, %845:v[16]
+	 v1: %851:v[5] = v_cndmask_b32 %849:v[5], 32, %850:vcc
+	 v1: %852:v[7] = v_ffbl_b32 %843:v[17]
+	 s2: %853:vcc = v_cmp_eq_i32 0, %843:v[17]
+	 v1: %854:v[7] = v_cndmask_b32 %852:v[7], 32, %853:vcc
+	 s2: %855:vcc = v_cmp_lg_i32 0, %845:v[16]
+	 v1: %856:v[7] = v_cndmask_b32 %854:v[7], %851:v[5], %855:vcc
+	 v1: %857:v[7] = v_add_u32 32, %856:v[7]
+	 v1: %858:v[7] = v_cndmask_b32 %857:v[7], %851:v[5], %855:vcc
+	 v1: %860:v[11] = v_add_u32 -1, %845:v[16]
+	 v1: %861:v[11] = v_and_b32 %845:v[16], %860:v[11]
+	 v1: %862:v[14] = v_add_u32 -1, %843:v[17]
+	 v1: %863:v[14] = v_and_b32 %843:v[17], %862:v[14]
+	 v1: %864:v[17] = v_cndmask_b32 %863:v[14], %843:v[17], %855:vcc
+	 v1: %865:v[16] = v_cndmask_b32 %845:v[16], %861:v[11], %855:vcc
+	 s2: %866:vcc = v_cmp_gt_u32 %974:s[9], %844:v[6]
+	p_logical_end
+	 s2: %0:exec,  s1: %1299:scc = s_and_b64 %866:vcc, %0:exec
+	p_cbranch_z %0:exec BB73, BB72
+BB72
+/* logical preds: BB71, / linear preds: BB71, / kind: uniform, */
+	p_logical_start
+	 s4: %868:s[20-23] = s_load_dwordx4 %12:s[2-3], 48 storage:buffer semantics:private,reorder
+	 s4: %872:s[24-27] = s_load_dwordx4 %12:s[2-3], 0x70 storage:buffer semantics:private,reorder
+	 v1: %869:v[7] = v_add_lshl_u32 %63:v[9], %858:v[7], 2
+	 v1: %870:v[7] = buffer_load_dword %868:s[20-23], %869:v[7], 0 offen storage:buffer semantics:private,reorder
+	 v1: %874:v[5] = v_lshlrev_b32 3, %844:v[6]
+	 v1: %871:v[15] = v_add_u32 %975:s[10], %870:v[7]
+	 v2: %873:v[14-15] = p_create_vector %62:v[8], %871:v[15]
+	buffer_store_dwordx2 %872:s[24-27], %874:v[5], 0, %873:v[14-15] offen storage:buffer
+	p_logical_end
+	p_branch BB74
+BB73
+/* logical preds: / linear preds: BB71, / kind: uniform, */
+	p_branch BB74
+BB74
+/* logical preds: / linear preds: BB72, BB73, / kind: invert, */
+	 s2: %0:exec,  s1: %1300:scc = s_andn2_b64 %1297:s[18-19], %0:exec
+	p_cbranch_z %0:exec BB76, BB75
+BB75
+/* logical preds: BB71, / linear preds: BB74, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB77
+BB76
+/* logical preds: / linear preds: BB74, / kind: uniform, */
+	p_branch BB77
+BB77
+/* logical preds: BB72, BB75, / linear preds: BB75, BB76, / kind: uniform, continue, merge, */
+	 s2: %0:exec = p_parallelcopy %1297:s[18-19]
+	p_logical_start
+	 v1: %875:v[6] = v_add_u32 1, %844:v[6]
+	p_logical_end
+	p_branch BB63
+BB78
+/* logical preds: BB64, / linear preds: BB65, / kind: uniform, loop-preheader, loop-exit, */
+	 v1: %876:v[6] = p_phi %844:v[6]
+	 s2: %0:exec = p_parallelcopy %1273:s[16-17]
+	p_logical_start
+	p_logical_end
+	p_branch BB79
+BB79
+/* logical preds: BB78, BB93, / linear preds: BB78, BB93, / kind: loop-header, branch, */
+	 v1: %879:v[6] = p_phi %876:v[6], %909:v[6]
+	 v1: %878:v[10] = p_phi %824:v[10], %899:v[10]
+	 v1: %877:v[18] = p_phi %823:v[18], %898:v[18]
+	p_logical_start
+	 v1: %880:v[5] = v_or_b32 %878:v[10], %877:v[18]
+	 s2: %881:vcc = v_cmp_eq_i32 0, %880:v[5]
+	p_logical_end
+	 s2: %1302:s[18-19],  s1: %1301:scc,  s2: %0:exec = s_and_saveexec_b64 %881:vcc, %0:exec
+	p_cbranch_z %0:exec BB83, BB80
+BB80
+/* logical preds: BB79, / linear preds: BB79, / kind: break, */
+	p_logical_start
+	p_logical_end
+	 s2: %1304:s[18-19],  s1: %1303:scc = s_andn2_b64 %1302:s[18-19], %0:exec
+	p_cbranch_nz %1303:scc BB82, BB81
+BB81
+/* logical preds: / linear preds: BB80, / kind: uniform, */
+	p_branch BB94
+BB82
+/* logical preds: / linear preds: BB80, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB84
+BB83
+/* logical preds: / linear preds: BB79, / kind: uniform, */
+	p_branch BB84
+BB84
+/* logical preds: / linear preds: BB82, BB83, / kind: invert, */
+	 s2: %1305:s[18-19] = p_linear_phi %1304:s[18-19], %1302:s[18-19]
+	 s2: %0:exec,  s1: %1306:scc = s_andn2_b64 %1305:s[18-19], %0:exec
+	p_cbranch_z %0:exec BB86, BB85
+BB85
+/* logical preds: BB79, / linear preds: BB84, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB87
+BB86
+/* logical preds: / linear preds: BB84, / kind: uniform, */
+	p_branch BB87
+BB87
+/* logical preds: BB85, / linear preds: BB85, BB86, / kind: branch, merge, */
+	 s2: %0:exec = p_parallelcopy %1305:s[18-19]
+	p_logical_start
+	 v1: %883:v[5] = v_ffbl_b32 %878:v[10]
+	 s2: %884:vcc = v_cmp_eq_i32 0, %878:v[10]
+	 v1: %885:v[5] = v_cndmask_b32 %883:v[5], 32, %884:vcc
+	 v1: %886:v[7] = v_ffbl_b32 %877:v[18]
+	 s2: %887:vcc = v_cmp_eq_i32 0, %877:v[18]
+	 v1: %888:v[7] = v_cndmask_b32 %886:v[7], 32, %887:vcc
+	 s2: %889:vcc = v_cmp_lg_i32 0, %878:v[10]
+	 v1: %890:v[7] = v_cndmask_b32 %888:v[7], %885:v[5], %889:vcc
+	 v1: %891:v[7] = v_add_u32 32, %890:v[7]
+	 v1: %892:v[7] = v_cndmask_b32 %891:v[7], %885:v[5], %889:vcc
+	 v1: %894:v[8] = v_add_u32 -1, %878:v[10]
+	 v1: %895:v[8] = v_and_b32 %878:v[10], %894:v[8]
+	 v1: %896:v[9] = v_add_u32 -1, %877:v[18]
+	 v1: %897:v[9] = v_and_b32 %877:v[18], %896:v[9]
+	 v1: %898:v[18] = v_cndmask_b32 %897:v[9], %877:v[18], %889:vcc
+	 v1: %899:v[10] = v_cndmask_b32 %878:v[10], %895:v[8], %889:vcc
+	 s2: %900:vcc = v_cmp_gt_u32 %974:s[9], %879:v[6]
+	p_logical_end
+	 s2: %0:exec,  s1: %1307:scc = s_and_b64 %900:vcc, %0:exec
+	p_cbranch_z %0:exec BB89, BB88
+BB88
+/* logical preds: BB87, / linear preds: BB87, / kind: uniform, */
+	p_logical_start
+	 s4: %902:s[20-23] = s_load_dwordx4 %12:s[2-3], 48 storage:buffer semantics:private,reorder
+	 s4: %906:s[24-27] = s_load_dwordx4 %12:s[2-3], 0x70 storage:buffer semantics:private,reorder
+	 v1: %903:v[7] = v_add_lshl_u32 %79:v[13], %892:v[7], 2
+	 v1: %904:v[7] = buffer_load_dword %902:s[20-23], %903:v[7], 0 offen storage:buffer semantics:private,reorder
+	 v1: %908:v[5] = v_lshlrev_b32 3, %879:v[6]
+	 v1: %905:v[9] = v_add_u32 %975:s[10], %904:v[7]
+	 v2: %907:v[8-9] = p_create_vector %78:v[12], %905:v[9]
+	buffer_store_dwordx2 %906:s[24-27], %908:v[5], 0, %907:v[8-9] offen storage:buffer
+	p_logical_end
+	p_branch BB90
+BB89
+/* logical preds: / linear preds: BB87, / kind: uniform, */
+	p_branch BB90
+BB90
+/* logical preds: / linear preds: BB88, BB89, / kind: invert, */
+	 s2: %0:exec,  s1: %1308:scc = s_andn2_b64 %1305:s[18-19], %0:exec
+	p_cbranch_z %0:exec BB92, BB91
+BB91
+/* logical preds: BB87, / linear preds: BB90, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB93
+BB92
+/* logical preds: / linear preds: BB90, / kind: uniform, */
+	p_branch BB93
+BB93
+/* logical preds: BB88, BB91, / linear preds: BB91, BB92, / kind: uniform, continue, merge, */
+	 s2: %0:exec = p_parallelcopy %1305:s[18-19]
+	p_logical_start
+	 v1: %909:v[6] = v_add_u32 1, %879:v[6]
+	p_logical_end
+	p_branch BB79
+BB94
+/* logical preds: BB80, / linear preds: BB81, / kind: uniform, loop-exit, continue, */
+	 s2: %0:exec = p_parallelcopy %1273:s[16-17]
+	p_logical_start
+	 s1: %911:s[14],  s1: %1237:scc = s_addk_i32 %48:s[14] imm:128
+	p_logical_end
+	p_branch BB16
+BB95
+/* logical preds: BB17, / linear preds: BB18, / kind: uniform, loop-exit, continue, */
+	 v1: %912:v[3] = p_phi %49:v[3]
+	 s2: %0:exec = p_parallelcopy %1267:s[12-13]
+	p_logical_start
+	 v1: %913:v[1] = v_lshl_add_u32 %1312:s[0], 2, %41:v[1]
+	 s1: %914:s[8],  s1: %1238:scc = s_add_u32 %42:s[8], 1
+	p_logical_end
+	p_branch BB7
+BB96
+/* logical preds: BB8, / linear preds: BB9, / kind: top-level, loop-exit, branch, */
+	 v1: %916:v[3] = p_phi %43:v[3]
+	 v1: %915:v[1] = p_phi %42:s[8]
+	 s2: %0:exec = p_parallelcopy -1
+	p_end_linear_vgpr %1258:v[46], %1259:v[47]
+	p_logical_start
+	 lv1: %1260:v[47] = p_start_linear_vgpr
+	 lv1: %1261:v[46] = p_start_linear_vgpr
+	 s1: %917:s[0],  s2: %1239:s[4-5],  s1: %1240:scc = p_reduce %916:v[3], %1260:v[47], %1261:v[46] op:iadd32 cluster_size:64
+	 s2: %918:s[4-5] = p_create_vector 1, 0
+	 s1: %1241:scc = s_cmp_lg_i32 %917:s[0], 0
+	 s2: %920:s[6-7] = s_cselect_b64 -1, 0, %1241:scc
+	 s2: %921:s[6-7],  s1: %1242:scc = s_and_b64 %918:s[4-5], %920:s[6-7]
+	p_logical_end
+	 s2: %0:exec = p_parallelcopy %921:s[6-7]
+	p_cbranch_z %0:exec BB98, BB97
+BB97
+/* logical preds: BB96, / linear preds: BB96, / kind: uniform, */
+	p_logical_start
+	 s4: %922:s[8-11] = s_load_dwordx4 %12:s[2-3], 0x90 storage:buffer semantics:private,reorder
+	p_barrier storage:buffer semantics:release scope:device exec_scope:invocation
+	 v1: %1247:v[2] = p_parallelcopy %917:s[0]
+	buffer_atomic_add %922:s[8-11],  v1: undef, 0, %1247:v[2] offset:8 storage:buffer semantics:volatile,atomic,rmw
+	p_barrier storage:buffer semantics:acquire scope:device exec_scope:invocation
+	p_logical_end
+	p_branch BB99
+BB98
+/* logical preds: / linear preds: BB96, / kind: uniform, */
+	p_branch BB99
+BB99
+/* logical preds: / linear preds: BB97, BB98, / kind: invert, */
+	 s2: %0:exec,  s1: %1309:scc = s_andn2_b64 -1, %0:exec
+	p_cbranch_z %0:exec BB101, BB100
+BB100
+/* logical preds: BB96, / linear preds: BB99, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB102
+BB101
+/* logical preds: / linear preds: BB99, / kind: uniform, */
+	p_branch BB102
+BB102
+/* logical preds: BB97, BB100, / linear preds: BB100, BB101, / kind: top-level, branch, merge, */
+	 s2: %0:exec = p_parallelcopy -1
+	p_logical_start
+	 s2: %924:vcc = v_cmp_lg_i32 0, %915:v[1]
+	 s2: %925:s[0-1],  s1: %1248:scc = s_and_b64 %918:s[4-5], %924:vcc
+	p_logical_end
+	 s2: %0:exec = p_parallelcopy %925:s[0-1]
+	p_cbranch_z %0:exec BB104, BB103
+BB103
+/* logical preds: BB102, / linear preds: BB102, / kind: uniform, */
+	p_logical_start
+	 s4: %926:s[4-7] = s_load_dwordx4 %12:s[2-3], 0x90 storage:buffer semantics:private,reorder
+	p_barrier storage:buffer semantics:release scope:device exec_scope:invocation
+	buffer_atomic_add %926:s[4-7],  v1: undef, 0, %915:v[1] offset:16 storage:buffer semantics:volatile,atomic,rmw
+	p_barrier storage:buffer semantics:acquire scope:device exec_scope:invocation
+	p_logical_end
+	p_branch BB105
+BB104
+/* logical preds: / linear preds: BB102, / kind: uniform, */
+	p_branch BB105
+BB105
+/* logical preds: / linear preds: BB103, BB104, / kind: invert, */
+	 s2: %0:exec,  s1: %1310:scc = s_andn2_b64 -1, %0:exec
+	p_cbranch_z %0:exec BB107, BB106
+BB106
+/* logical preds: BB102, / linear preds: BB105, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB108
+BB107
+/* logical preds: / linear preds: BB105, / kind: uniform, */
+	p_branch BB108
+BB108
+/* logical preds: BB103, BB106, / linear preds: BB106, BB107, / kind: top-level, branch, merge, */
+	 s2: %0:exec = p_parallelcopy -1
+	p_logical_start
+	 s2: %928:vcc = v_cmp_eq_i32 0, %937:v[0]
+	p_logical_end
+	 s2: %0:exec = p_parallelcopy %928:vcc
+	p_cbranch_z %0:exec BB110, BB109
+BB109
+/* logical preds: BB108, / linear preds: BB108, / kind: uniform, */
+	p_logical_start
+	 s4: %929:s[0-3] = s_load_dwordx4 %12:s[2-3], 0x90 storage:buffer semantics:private,reorder
+	p_barrier storage:buffer semantics:release scope:device exec_scope:invocation
+	 v1: %1257:v[0] = p_parallelcopy 1
+	buffer_atomic_add %929:s[0-3],  v1: undef, 0, %1257:v[0] offset:12 storage:buffer semantics:volatile,atomic,rmw
+	p_barrier storage:buffer semantics:acquire scope:device exec_scope:invocation
+	p_logical_end
+	p_branch BB111
+BB110
+/* logical preds: / linear preds: BB108, / kind: uniform, */
+	p_branch BB111
+BB111
+/* logical preds: / linear preds: BB109, BB110, / kind: invert, */
+	 s2: %0:exec,  s1: %1311:scc = s_andn2_b64 -1, %0:exec
+	p_cbranch_z %0:exec BB113, BB112
+BB112
+/* logical preds: BB108, / linear preds: BB111, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB114
+BB113
+/* logical preds: / linear preds: BB111, / kind: uniform, */
+	p_branch BB114
+BB114
+/* logical preds: BB109, BB112, / linear preds: BB112, BB113, / kind: uniform, top-level, merge, */
+	 s2: %0:exec = p_parallelcopy -1
+	p_logical_start
+	p_logical_end
+	s_endpgm
+
+Compute Shader
+disasm:
+Shader disassembly is not supported in the current configuration (LLVM not available), falling back to print_program.
+
+After lowering to hw instructions:
+ACO shader stage: SW (CS), HW (COMPUTE_SHADER)
+BB0
+/* logical preds: / linear preds: / kind: top-level, branch, */
+	 s1: %0:s[0] = s_mov_b32 %933:s[3]
+	 s1: %0:s[3] = s_movk_i32 imm:-32768
+	 s4: %13:s[4-7] = s_load_dwordx4 %12:s[2-3], 0xa0 storage:buffer semantics:private,reorder
+	 v1: %6:v[1] = v_lshl_add_u32 %0:s[117], 8, %937:v[0]
+	 v1: %950:v[2] = v_mbcnt_lo_u32_b32 -1, 0
+	s_delay_alu valu_dep_1
+	 v1: %10:v[2] = v_mbcnt_hi_u32_b32_e64 -1, %950:v[2]
+	 s2: %0:exec = v_cmpx_eq_i32 0, %6:v[1]
+	s_cbranch_execz block:BB6
+BB1
+/* logical preds: BB0, / linear preds: BB0, / kind: uniform, */
+	s_clause imm:2
+	 s4: %16:s[8-11] = s_load_dwordx4 %12:s[2-3], 64 storage:buffer semantics:private,reorder
+	 s4: %18:s[12-15] = s_load_dwordx4 %12:s[2-3], 0x90 storage:buffer semantics:private,reorder
+	 s4: %19:s[16-19] = s_load_dwordx4 %12:s[2-3], 16 storage:buffer semantics:private,reorder
+	s_wait_kmcnt imm:0
+	 s1: %17:s[1] = s_buffer_load_dword %16:s[8-11], 0 storage:buffer semantics:private,reorder
+	s_wait_kmcnt imm:0
+	 v1: %0:v[1] = v_mov_b32 %17:s[1]
+	buffer_store_dword %18:s[12-15],  v1: undef, 0, %963:v[1] device storage:buffer semantics:atomic
+	 s1: %20:s[8] = s_buffer_load_dword %19:s[16-19], 0 storage:buffer semantics:private,reorder
+	s_wait_kmcnt imm:0
+	 v1: %0:v[3] = v_mov_b32 %20:s[8]
+	s_wait_storecnt imm:0
+	buffer_store_dword %18:s[12-15],  v1: undef, 0, %968:v[3] offset:4 device storage:buffer semantics:atomic
+BB6
+/* logical preds: BB1, BB0, / linear preds: BB1, BB0, / kind: uniform, top-level, loop-preheader, merge, */
+	 s4: %21:s[8-11] = s_load_dwordx4 %12:s[2-3], 16 storage:buffer semantics:private,reorder
+	s_wait_kmcnt imm:0
+	 s1: %22:s[1] = s_buffer_load_dword %21:s[8-11], 0 storage:buffer semantics:private,reorder
+	s_clause imm:1
+	 s4: %23:s[8-11] = s_buffer_load_dwordx4 %13:s[4-7], 0
+	 s1: %33:s[4] = s_buffer_load_dword %13:s[4-7], 16
+	 s2: %0:exec = s_mov_b64 -1
+	 v1: %26:v[1] = v_lshrrev_b32 6, %937:v[0]
+	 s2: %0:s[12-13] = s_mov_b64 %0:exec
+	 v1: %0:v[3] = v_mov_b32 0
+	s_delay_alu valu_dep_2 skip_4 salu_cycle_1
+	 v1: %29:v[1] = v_lshl_add_u32 %0:s[117], 2, %26:v[1]
+	s_wait_kmcnt imm:0
+	 s1: %24:s[1],  s1: %977:scc = s_min_u32 %22:s[1], %973:s[8]
+	 s1: %0:s[8] = s_mov_b32 0
+	 s1: %980:scc = s_bitcmp1_b32 %33:s[4], 0
+	 s2: %39:s[6-7] = s_cselect_b64 -1, 0, %980:scc
+	 s1: %981:scc = s_bitcmp1_b32 %33:s[4], 10
+	s_delay_alu salu_cycle_1
+	 s2: %40:s[4-5] = s_cselect_b64 -1, 0, %981:scc
+BB7
+/* logical preds: BB6, BB95, / linear preds: BB6, BB95, / kind: loop-header, branch, */
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %0:exec = v_cmpx_le_u32 %24:s[1], %41:v[1]
+BB8
+/* logical preds: BB7, / linear preds: BB7, / kind: break, */
+	 v1: %0:v[1] = v_mov_b32 %42:s[8]
+	 s2: %1266:s[12-13],  s1: %1265:scc = s_andn2_b64 %1264:s[12-13], %0:exec
+	s_cbranch_scc0 block:BB96
+BB15
+/* logical preds: BB7, / linear preds: BB8, / kind: uniform, loop-preheader, merge, */
+	 s4: %45:s[16-19] = s_load_dwordx4 %12:s[2-3], 32 storage:buffer semantics:private,reorder
+	 s2: %0:exec = s_mov_b64 %1267:s[12-13]
+	 v1: %46:v[4] = v_lshlrev_b32 2, %41:v[1]
+	s_wait_kmcnt imm:0
+	 v1: %47:v[4] = buffer_load_dword %45:s[16-19], %46:v[4], 0 offen storage:buffer semantics:private,reorder
+	 s1: %0:s[14] = s_mov_b32 0
+	 s2: %0:s[16-17] = s_mov_b64 %0:exec
+BB16
+/* logical preds: BB15, BB94, / linear preds: BB15, BB94, / kind: loop-header, branch, */
+	s_wait_loadcnt imm:0
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %0:exec = v_cmpx_ge_u32 %48:s[14], %47:v[4]
+BB17
+/* logical preds: BB16, / linear preds: BB16, / kind: break, */
+	 s2: %1272:s[16-17],  s1: %1271:scc = s_andn2_b64 %1270:s[16-17], %0:exec
+	s_cbranch_scc0 block:BB95
+BB24
+/* logical preds: BB16, / linear preds: BB17, / kind: branch, merge, */
+	 s2: %0:exec = s_mov_b64 %1273:s[16-17]
+	 v1: %51:v[5] = v_add_u32 %48:s[14], %10:v[2]
+	s_delay_alu valu_dep_1
+	 s2: %0:exec = v_cmpx_lt_u32 %51:v[5], %47:v[4]
+	s_cbranch_execz block:BB28
+BB25
+/* logical preds: BB24, / linear preds: BB24, / kind: uniform, */
+	 s4: %55:s[20-23] = s_load_dwordx4 %12:s[2-3], 0 storage:buffer semantics:private,reorder
+	 v1: %54:v[6] = v_lshl_add_u32 %41:v[1], 8, %51:v[5]
+	s_delay_alu valu_dep_1
+	 v1: %56:v[6] = v_lshlrev_b32 4, %54:v[6]
+	s_wait_kmcnt imm:0
+	 v4: %57:v[8-11] = buffer_load_dwordx4 %55:s[20-23], %56:v[6], 0 offen storage:buffer semantics:private,reorder
+BB28
+/* logical preds: BB24, / linear preds: BB25, BB24, / kind: uniform, */
+	 s2: %0:exec,  s1: %1276:scc = s_andn2_b64 %1273:s[16-17], %0:exec
+	s_wait_loadcnt imm:0
+	 v1: %0:v[8] = v_mov_b32 0
+	 v1: %0:v[9] = v_mov_b32 0
+	 v1: %0:v[10] = v_mov_b32 0
+	 v1: %0:v[11] = v_mov_b32 0
+BB30
+/* logical preds: BB25, BB28, / linear preds: BB28, / kind: branch, merge, */
+	 s2: %0:exec = s_mov_b64 %1273:s[16-17]
+	 v1: %66:v[6] = v_add_u32 64, %51:v[5]
+	s_delay_alu valu_dep_1
+	 s2: %0:exec = v_cmpx_lt_u32 %66:v[6], %47:v[4]
+	s_cbranch_execz block:BB34
+BB31
+/* logical preds: BB30, / linear preds: BB30, / kind: uniform, */
+	 s4: %70:s[20-23] = s_load_dwordx4 %12:s[2-3], 0 storage:buffer semantics:private,reorder
+	 v1: %69:v[5] = v_lshl_add_u32 %41:v[1], 8, %51:v[5]
+	s_delay_alu valu_dep_1
+	 v1: %71:v[5] = v_lshlrev_b32 4, %69:v[5]
+	s_wait_kmcnt imm:0
+	 v4: %73:v[12-15] = buffer_load_dwordx4 %70:s[20-23], %71:v[5], 0 offset:1024 offen storage:buffer semantics:private,reorder
+BB34
+/* logical preds: BB30, / linear preds: BB31, BB30, / kind: uniform, */
+	 s2: %0:exec,  s1: %1278:scc = s_andn2_b64 %1273:s[16-17], %0:exec
+	s_wait_loadcnt imm:0
+	 v1: %0:v[12] = v_mov_b32 0
+	 v1: %0:v[13] = v_mov_b32 0
+	 v1: %0:v[14] = v_mov_b32 0
+	 v1: %0:v[15] = v_mov_b32 0
+BB36
+/* logical preds: BB31, BB34, / linear preds: BB34, / kind: uniform, loop-preheader, merge, */
+	 s8: %82:s[24-31] = s_load_dwordx8 %12:s[2-3], 0x50 storage:buffer semantics:private,reorder
+	 s2: %0:exec = s_mov_b64 %1273:s[16-17]
+	 v1: %84:v[5] = v_lshlrev_b32 2, %62:v[8]
+	s_wait_kmcnt imm:0
+	 v1: %85:v[5] = buffer_load_dword %83:s[24-27], %84:v[5], 0 offen storage:buffer semantics:private,reorder
+	 v1: %86:v[6] = v_lshlrev_b32 3, %62:v[8]
+	 v2: %88:v[6-7] = buffer_load_dwordx2 %87:s[28-31], %86:v[6], 0 offen storage:buffer semantics:private,reorder
+	 v1: %89:v[16] = v_bcnt_u32_b32 %65:v[11], 0
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 v1: %91:v[16] = v_bcnt_u32_b32 %64:v[10], %89:v[16]
+	 v1: %93:v[16] = v_bcnt_u32_b32 %80:v[14], %91:v[16]
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 v1: %95:v[16] = v_bcnt_u32_b32 %81:v[15], %93:v[16]
+	 v1: %96:v[3] = v_add_u32 %49:v[3], %95:v[16]
+	 v1: %0:v[16] = v_mov_b32 0
+	s_wait_loadcnt imm:1
+	 v1: %97:v[17] = v_lshrrev_b32 16, %85:v[5]
+	 v1: %99:v[18] = v_and_b32 3, %85:v[5]
+	 v1: %104:v[5] = v_lshrrev_b32 2, %85:v[5]
+	s_delay_alu valu_dep_3 next valu_dep_1
+	 v1: %98:v[17] = v_lshlrev_b32 24, %97:v[17]
+	 v1: %102:v[18] = v_lshl_or_b32 (is16bit)%99:v[18], 30, %98:v[17]
+	 v1: %0:v[17] = v_mov_b32 0
+	s_delay_alu valu_dep_2
+	 v1: %103:v[18] = v_or_b32 %976:s[11], %102:v[18]
+BB37
+/* logical preds: BB36, BB45, / linear preds: BB36, BB45, / kind: loop-header, branch, */
+	 v1: %110:v[19] = v_or_b32 %108:v[10], %107:v[11]
+	 s2: %0:s[18-19] = s_mov_b64 %0:exec
+	s_delay_alu valu_dep_1
+	 s2: %0:exec = v_cmpx_eq_i32 0, %110:v[19]
+BB38
+/* logical preds: BB37, / linear preds: BB37, / kind: break, */
+	 s2: %1282:s[18-19],  s1: %1281:scc = s_andn2_b64 %1280:s[18-19], %0:exec
+	s_cbranch_scc0 block:BB46
+BB45
+/* logical preds: BB37, / linear preds: BB38, / kind: uniform, continue, merge, */
+	 s4: %131:s[20-23] = s_load_dwordx4 %12:s[2-3], 48 storage:buffer semantics:private,reorder
+	 s2: %0:exec = s_mov_b64 %1283:s[18-19]
+	 v1: %113:v[19] = v_ffbl_b32 %108:v[10]
+	 s2: %114:vcc = v_cmp_eq_i32 0, %108:v[10]
+	 v1: %116:v[20] = v_ffbl_b32 %107:v[11]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %115:v[19] = v_cndmask_b32 %113:v[19], 32, %114:vcc
+	 s2: %117:vcc = v_cmp_eq_i32 0, %107:v[11]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %118:v[20] = v_cndmask_b32 %116:v[20], 32, %117:vcc
+	 s2: %119:vcc = v_cmp_lg_i32 0, %108:v[10]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %120:v[21] = v_cndmask_b32 %118:v[20], %115:v[19], %119:vcc
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 v1: %121:v[21] = v_add_u32 32, %120:v[21]
+	 v1: %122:v[21] = v_cndmask_b32 %121:v[21], %115:v[19], %119:vcc
+	s_delay_alu valu_dep_1
+	 v1: %132:v[21] = v_add_lshl_u32 %63:v[9], %122:v[21], 2
+	s_wait_kmcnt imm:0
+	 v1: %133:v[21] = buffer_load_dword %131:s[20-23], %132:v[21], 0 offen storage:buffer semantics:private,reorder
+	 v1: %126:v[23] = v_add_u32 -1, %107:v[11]
+	 v1: %124:v[22] = v_add_u32 -1, %108:v[10]
+	 v1: %138:v[24] = v_lshrrev_b32 2, %103:v[18]
+	 v1: %154:v[26] = v_bfe_u32 %104:v[5], 2, 8
+	 v1: %450:v[19] = v_lshl_or_b32 1, %115:v[19], %109:v[16]
+	 v1: %452:v[20] = v_lshl_or_b32 1, %118:v[20], %106:v[17]
+	 v1: %0:v[29] = v_mov_b32 0
+	 v1: %127:v[23] = v_and_b32 %107:v[11], %126:v[23]
+	 v1: %125:v[22] = v_and_b32 %108:v[10], %124:v[22]
+	 v1: %139:v[24] = v_lshl_or_b32 %104:v[5], 30, %138:v[24]
+	s_delay_alu valu_dep_3 skip_4 valu_dep_1
+	 v1: %128:v[11] = v_cndmask_b32 %127:v[23], %107:v[11], %119:vcc
+	 v1: %129:v[10] = v_cndmask_b32 %108:v[10], %125:v[22], %119:vcc
+	 v1: %151:v[25] = v_mul_lo_u32 %139:v[24], %139:v[24]
+	s_wait_loadcnt imm:0
+	 v1: %134:v[21] = v_add_u32 %975:s[10], %133:v[21]
+	 v1: %136:v[27] = v_lshl_or_b32 %103:v[18], 30, %134:v[21]
+	s_delay_alu valu_dep_1
+	 v1: %157:v[33] = v_mul_lo_u32 %136:v[27], %136:v[27]
+	 v1: %148:v[31] = v_mul_hi_u32 %136:v[27], %139:v[24]
+	 v1: %140:v[28] = v_mul_lo_u32 %136:v[27], %139:v[24]
+	 v1: %153:v[32] = v_lshlrev_b32 1, %136:v[27]
+	 v1: %143:v[30] = v_mul_hi_u32 %136:v[27], %136:v[27]
+	 v1: %158:v[34] = v_mul_lo_u32 %157:v[33], %136:v[27]
+	 v1: %159:v[35] = v_mul_hi_u32 %157:v[33], %136:v[27]
+	 v1: %160:v[36] = v_mul_lo_u32 %157:v[33], %139:v[24]
+	 v1: %169:v[39] = v_mul_hi_u32 %157:v[33], %139:v[24]
+	 v1: %155:v[32] = v_mul_lo_u32 %153:v[32], %154:v[26]
+	 v2: %142:v[28-29] = v_lshlrev_b64 1, %141:v[28-29]
+	 v1: %175:v[26] = v_mul_lo_u32 %157:v[33], %154:v[26]
+	 v1: %1020:v[30],  s2: %1021:s[18-19] = v_add_co_u32_e64 %143:v[30], %1018:v[28]
+	 v1: %182:v[42] = v_and_b32 63, %157:v[33]
+	s_delay_alu valu_dep_2
+	 v1: %173:v[24] = v_mul_lo_u32 %1020:v[30], %139:v[24]
+	 v1: %164:v[38] = v_mul_lo_u32 %1020:v[30], %136:v[27]
+	s_waitcnt_depctr va_sdst(0)
+	 v1: %1022:v[29],  s2: %1023:s[18-19] = v_addc_co_u32 0, %1019:v[29], %1021:s[18-19]
+	 v1: %1031:v[35],  s2: %1032:s[18-19] = v_add_co_u32_e64 %159:v[35], %160:v[36]
+	 v1: %171:v[40] = v_mul_hi_u32 %1020:v[30], %136:v[27]
+	 v1: %183:v[43] = v_lshrrev_b32 5, %182:v[42]
+	 v1: %185:v[42] = v_lshlrev_b32 %182:v[42], 1
+	 v1: %150:v[31] = v_lshl_add_u32 %148:v[31], 1, %1022:v[29]
+	 v1: %190:v[45] = v_bfe_u32 %157:v[33], 11, 1
+	s_waitcnt_depctr va_sdst(0)
+	 v1: %1033:v[37],  s2: %1034:s[18-19] = v_addc_co_u32 0, 0, %1032:s[18-19]
+	 v1: %1039:v[35],  s2: %1040:s[18-19] = v_add_co_u32_e64 %1031:v[35], %164:v[38]
+	 v1: %184:v[43] = v_sub_u32 0, %183:v[43]
+	 v1: %156:v[32] = v_add3_u32 %155:v[32], %150:v[31], %151:v[25]
+	 v1: %191:v[45] = v_sub_u32 0, %190:v[45]
+	 v1: %202:v[28] = v_bfe_u32 %157:v[33], 12, 6
+	s_waitcnt_depctr va_sdst(0)
+	 v1: %1041:v[37],  s2: %1042:s[18-19] = v_addc_co_u32 0, %1033:v[37], %1040:s[18-19]
+	 v1: %187:v[44] = v_bfi_b32 %184:v[43], 0, %185:v[42]
+	 v1: %188:v[42] = v_and_b32 %185:v[42], %184:v[43]
+	 v1: %177:v[41] = v_bfe_u32 %156:v[32], 0, 8
+	 v1: %210:v[31] = v_bfe_u32 %157:v[33], 23, 1
+	 v1: %203:v[28] = v_lshlrev_b32 %202:v[28], 1
+	 v1: %213:v[36] = v_bfe_u32 %157:v[33], 18, 6
+	 v1: %172:v[40] = v_add3_u32 %171:v[40], %1041:v[37], %169:v[39]
+	 v1: %178:v[27] = v_mul_lo_u32 %177:v[41], %136:v[27]
+	 v1: %211:v[31] = v_sub_u32 0, %210:v[31]
+	 v1: %214:v[36] = v_lshlrev_b32 %213:v[36], 1
+	 v1: %220:v[38] = v_lshrrev_b32 24, %157:v[33]
+	 v1: %176:v[26] = v_add3_u32 %175:v[26], %172:v[40], %173:v[24]
+	 v1: %192:v[24] = v_bfe_u32 %157:v[33], 6, 6
+	s_delay_alu valu_dep_4
+	 v1: %216:v[37] = v_bfi_b32 %211:v[31], 0, %214:v[36]
+	 v1: %221:v[38] = v_and_b32 63, %220:v[38]
+	 v1: %179:v[26] = v_add_u32 %176:v[26], %178:v[27]
+	 v1: %200:v[27] = v_bfe_u32 %157:v[33], 17, 1
+	 v1: %193:v[24] = v_lshlrev_b32 %192:v[24], 1
+	 v1: %233:v[33] = v_lshrrev_b32 30, %157:v[33]
+	 v1: %222:v[39] = v_lshrrev_b32 5, %221:v[38]
+	 v1: %224:v[38] = v_lshlrev_b32 %221:v[38], 1
+	 v1: %201:v[27] = v_sub_u32 0, %200:v[27]
+	 v1: %195:v[25] = v_bfi_b32 %191:v[45], 0, %193:v[24]
+	 v1: %198:v[24] = v_and_or_b32 %193:v[24], %191:v[45], %188:v[42]
+	 v1: %231:v[42] = v_and_b32 15, %1020:v[30]
+	 v1: %244:v[45] = v_bfe_u32 %1020:v[30], 9, 1
+	 v1: %223:v[39] = v_sub_u32 0, %222:v[39]
+	 v1: %205:v[29] = v_bfi_b32 %201:v[27], 0, %203:v[28]
+	 v1: %208:v[28] = v_and_or_b32 %203:v[28], %201:v[27], %198:v[24]
+	 v1: %246:v[24] = v_bfe_u32 %1020:v[30], 4, 6
+	 v1: %234:v[42] = v_lshl_or_b32 (is16bit)%231:v[42], 2, %233:v[33]
+	 v1: %245:v[45] = v_sub_u32 0, %244:v[45]
+	 v1: %226:v[40] = v_bfi_b32 %223:v[39], 0, %224:v[38]
+	 v1: %253:v[27] = v_bfe_u32 %1020:v[30], 15, 1
+	 v1: %207:v[29] = v_or3_b32 %205:v[29], %187:v[44], %195:v[25]
+	 v1: %219:v[36] = v_and_or_b32 %214:v[36], %211:v[31], %208:v[28]
+	 v1: %255:v[28] = v_bfe_u32 %1020:v[30], 10, 6
+	 v1: %247:v[24] = v_lshlrev_b32 %246:v[24], 1
+	 v1: %235:v[43] = v_lshrrev_b32 5, %234:v[42]
+	 v1: %237:v[42] = v_lshlrev_b32 %234:v[42], 1
+	 v1: %262:v[31] = v_lshrrev_b32 16, %1020:v[30]
+	 v1: %254:v[27] = v_sub_u32 0, %253:v[27]
+	 v1: %228:v[40] = v_or3_b32 %226:v[40], %207:v[29], %216:v[37]
+	 v1: %229:v[38] = v_and_or_b32 %224:v[38], %223:v[39], %219:v[36]
+	 v1: %256:v[28] = v_lshlrev_b32 %255:v[28], 1
+	 v1: %249:v[25] = v_bfi_b32 %245:v[45], 0, %247:v[24]
+	 v1: %236:v[43] = v_sub_u32 0, %235:v[43]
+	 v1: %273:v[37] = v_bfe_u32 %1020:v[30], 27, 1
+	 v1: %263:v[31] = v_and_b32 63, %262:v[31]
+	 v1: %258:v[29] = v_bfi_b32 %254:v[27], 0, %256:v[28]
+	s_delay_alu valu_dep_4
+	 v1: %239:v[44] = v_bfi_b32 %236:v[43], 0, %237:v[42]
+	 v1: %242:v[42] = v_and_or_b32 %237:v[42], %236:v[43], %229:v[38]
+	 v1: %276:v[38] = v_bfe_u32 %1020:v[30], 22, 6
+	 v1: %283:v[32] = v_and_b32 3, %156:v[32]
+	 v1: %274:v[37] = v_sub_u32 0, %273:v[37]
+	 v1: %264:v[33] = v_lshrrev_b32 5, %263:v[31]
+	 v1: %266:v[31] = v_lshlrev_b32 %263:v[31], 1
+	 v1: %286:v[30] = v_lshrrev_b32 28, %1020:v[30]
+	 v1: %251:v[25] = v_or3_b32 %249:v[25], %228:v[40], %239:v[44]
+	 v1: %252:v[24] = v_and_or_b32 %247:v[24], %245:v[45], %242:v[42]
+	 v1: %277:v[38] = v_lshlrev_b32 %276:v[38], 1
+	 v1: %295:v[43] = v_lshrrev_b32 7, %177:v[41]
+	 v1: %297:v[41] = v_lshrrev_b32 2, %177:v[41]
+	 v1: %265:v[33] = v_sub_u32 0, %264:v[33]
+	 v1: %287:v[32] = v_lshl_or_b32 (is16bit)%283:v[32], 4, %286:v[30]
+	 v1: %261:v[28] = v_and_or_b32 %256:v[28], %254:v[27], %252:v[24]
+	 v1: %279:v[39] = v_bfi_b32 %274:v[37], 0, %277:v[38]
+	 v1: %296:v[43] = v_sub_u32 0, %295:v[43]
+	 v1: %298:v[41] = v_lshlrev_b32 %297:v[41], 1
+	 v1: %268:v[36] = v_bfi_b32 %265:v[33], 0, %266:v[31]
+	 v1: %288:v[40] = v_lshrrev_b32 5, %287:v[32]
+	 v1: %308:v[45] = v_and_b32 63, %158:v[34]
+	 v1: %290:v[32] = v_lshlrev_b32 %287:v[32], 1
+	 v1: %271:v[31] = v_and_or_b32 %266:v[31], %265:v[33], %261:v[28]
+	 v1: %300:v[44] = v_bfi_b32 %296:v[43], 0, %298:v[41]
+	 v1: %301:v[41] = v_and_b32 %298:v[41], %296:v[43]
+	 v1: %270:v[36] = v_or3_b32 %268:v[36], %251:v[25], %258:v[29]
+	 v1: %315:v[27] = v_bfe_u32 %158:v[34], 11, 1
+	 v1: %289:v[40] = v_sub_u32 0, %288:v[40]
+	 v1: %309:v[24] = v_lshrrev_b32 5, %308:v[45]
+	 v1: %311:v[45] = v_lshlrev_b32 %308:v[45], 1
+	 v1: %317:v[28] = v_bfe_u32 %158:v[34], 6, 6
+	 v1: %282:v[38] = v_and_or_b32 %277:v[38], %274:v[37], %271:v[31]
+	 v1: %324:v[30] = v_bfe_u32 %158:v[34], 17, 1
+	 v1: %316:v[27] = v_sub_u32 0, %315:v[27]
+	 v1: %292:v[42] = v_bfi_b32 %289:v[40], 0, %290:v[32]
+	 v1: %326:v[31] = v_bfe_u32 %158:v[34], 12, 6
+	 v1: %293:v[32] = v_and_b32 %290:v[32], %289:v[40]
+	 v1: %310:v[24] = v_sub_u32 0, %309:v[24]
+	 v1: %318:v[28] = v_lshlrev_b32 %317:v[28], 1
+	 v1: %333:v[37] = v_bfe_u32 %158:v[34], 23, 1
+	 v1: %325:v[30] = v_sub_u32 0, %324:v[30]
+	 v1: %302:v[36] = v_or3_b32 %292:v[42], %270:v[36], %279:v[39]
+	 v1: %335:v[39] = v_bfe_u32 %158:v[34], 18, 6
+	 v1: %306:v[42] = v_or_b32 %292:v[42], %300:v[44]
+	 v1: %327:v[31] = v_lshlrev_b32 %326:v[31], 1
+	 v1: %305:v[38] = v_or3_b32 %301:v[41], %282:v[38], %293:v[32]
+	 v1: %307:v[32] = v_or_b32 %293:v[32], %301:v[41]
+	 v1: %313:v[25] = v_bfi_b32 %310:v[24], 0, %311:v[45]
+	 v1: %314:v[45] = v_and_b32 %311:v[45], %310:v[24]
+	 v1: %320:v[29] = v_bfi_b32 %316:v[27], 0, %318:v[28]
+	 v1: %342:v[41] = v_lshrrev_b32 24, %158:v[34]
+	 v1: %334:v[37] = v_sub_u32 0, %333:v[37]
+	 v1: %303:v[36] = v_or_b32 %302:v[36], %300:v[44]
+	 v1: %336:v[39] = v_lshlrev_b32 %335:v[39], 1
+	 v1: %329:v[33] = v_bfi_b32 %325:v[30], 0, %327:v[31]
+	 v1: %354:v[34] = v_lshrrev_b32 30, %158:v[34]
+	 v1: %323:v[28] = v_and_or_b32 %318:v[28], %316:v[27], %314:v[45]
+	 v1: %352:v[45] = v_and_b32 15, %1039:v[35]
+	 v1: %343:v[41] = v_and_b32 63, %342:v[41]
+	 v1: %338:v[40] = v_bfi_b32 %334:v[37], 0, %336:v[39]
+	 v1: %364:v[27] = v_bfe_u32 %1039:v[35], 9, 1
+	 v1: %331:v[33] = v_or3_b32 %329:v[33], %313:v[25], %320:v[29]
+	 v1: %332:v[31] = v_and_or_b32 %327:v[31], %325:v[30], %323:v[28]
+	 v1: %366:v[28] = v_bfe_u32 %1039:v[35], 4, 6
+	 v1: %355:v[45] = v_lshl_or_b32 (is16bit)%352:v[45], 2, %354:v[34]
+	 v1: %344:v[43] = v_lshrrev_b32 5, %343:v[41]
+	 v1: %346:v[41] = v_lshlrev_b32 %343:v[41], 1
+	 v1: %365:v[27] = v_sub_u32 0, %364:v[27]
+	 v1: %373:v[30] = v_bfe_u32 %1039:v[35], 15, 1
+	 v1: %341:v[39] = v_and_or_b32 %336:v[39], %334:v[37], %332:v[31]
+	 v1: %375:v[31] = v_bfe_u32 %1039:v[35], 10, 6
+	 v1: %367:v[28] = v_lshlrev_b32 %366:v[28], 1
+	 v1: %356:v[24] = v_lshrrev_b32 5, %355:v[45]
+	 v1: %358:v[45] = v_lshlrev_b32 %355:v[45], 1
+	 v1: %345:v[43] = v_sub_u32 0, %344:v[43]
+	 v1: %382:v[34] = v_lshrrev_b32 16, %1039:v[35]
+	 v1: %374:v[30] = v_sub_u32 0, %373:v[30]
+	 v1: %376:v[31] = v_lshlrev_b32 %375:v[31], 1
+	 v1: %369:v[29] = v_bfi_b32 %365:v[27], 0, %367:v[28]
+	 v1: %357:v[24] = v_sub_u32 0, %356:v[24]
+	 v1: %348:v[44] = v_bfi_b32 %345:v[43], 0, %346:v[41]
+	 v1: %351:v[41] = v_and_or_b32 %346:v[41], %345:v[43], %341:v[39]
+	 v1: %383:v[34] = v_and_b32 63, %382:v[34]
+	s_delay_alu valu_dep_4
+	 v1: %360:v[25] = v_bfi_b32 %357:v[24], 0, %358:v[45]
+	 v1: %350:v[44] = v_or3_b32 %348:v[44], %331:v[33], %338:v[40]
+	 v1: %392:v[40] = v_bfe_u32 %1039:v[35], 27, 1
+	 v1: %378:v[33] = v_bfi_b32 %374:v[30], 0, %376:v[31]
+	 v1: %363:v[45] = v_and_or_b32 %358:v[45], %357:v[24], %351:v[41]
+	 v1: %394:v[41] = v_bfe_u32 %1039:v[35], 22, 6
+	 v1: %384:v[37] = v_lshrrev_b32 5, %383:v[34]
+	 v1: %386:v[34] = v_lshlrev_b32 %383:v[34], 1
+	 v1: %403:v[35] = v_lshrrev_b32 28, %1039:v[35]
+	 v1: %371:v[29] = v_or3_b32 %369:v[29], %350:v[44], %360:v[25]
+	 v1: %401:v[44] = v_and_b32 3, %179:v[26]
+	 v1: %393:v[40] = v_sub_u32 0, %392:v[40]
+	 v1: %372:v[28] = v_and_or_b32 %367:v[28], %365:v[27], %363:v[45]
+	 v1: %395:v[41] = v_lshlrev_b32 %394:v[41], 1
+	 v1: %385:v[37] = v_sub_u32 0, %384:v[37]
+	 v1: %411:v[26] = v_bfe_u32 %179:v[26], 0, 8
+	 v1: %404:v[44] = v_lshl_or_b32 (is16bit)%401:v[44], 4, %403:v[35]
+	 v1: %381:v[31] = v_and_or_b32 %376:v[31], %374:v[30], %372:v[28]
+	 v1: %397:v[43] = v_bfi_b32 %393:v[40], 0, %395:v[41]
+	 v1: %388:v[39] = v_bfi_b32 %385:v[37], 0, %386:v[34]
+	 v1: %412:v[25] = v_lshrrev_b32 7, %411:v[26]
+	 v1: %414:v[26] = v_lshrrev_b32 2, %411:v[26]
+	 v1: %405:v[45] = v_lshrrev_b32 5, %404:v[44]
+	 v1: %407:v[44] = v_lshlrev_b32 %404:v[44], 1
+	 v1: %391:v[34] = v_and_or_b32 %386:v[34], %385:v[37], %381:v[31]
+	 v1: %390:v[39] = v_or3_b32 %388:v[39], %371:v[29], %378:v[33]
+	 v1: %413:v[25] = v_sub_u32 0, %412:v[25]
+	 v1: %415:v[26] = v_lshlrev_b32 %414:v[26], 1
+	 v1: %406:v[45] = v_sub_u32 0, %405:v[45]
+	 v1: %400:v[41] = v_and_or_b32 %395:v[41], %393:v[40], %391:v[34]
+	s_delay_alu valu_dep_3 skip_4 valu_dep_3
+	 v1: %417:v[27] = v_bfi_b32 %413:v[25], 0, %415:v[26]
+	 v1: %418:v[26] = v_and_b32 %415:v[26], %413:v[25]
+	 v1: %409:v[24] = v_bfi_b32 %406:v[45], 0, %407:v[44]
+	 v1: %410:v[44] = v_and_b32 %407:v[44], %406:v[45]
+	 v1: %440:v[21] = v_lshrrev_b32 10, %134:v[21]
+	 v1: %419:v[39] = v_or3_b32 %409:v[24], %390:v[39], %397:v[43]
+	 v1: %427:v[42] = v_or3_b32 %306:v[42], %409:v[24], %417:v[27]
+	 v1: %422:v[41] = v_or3_b32 %418:v[26], %400:v[41], %410:v[44]
+	 v1: %428:v[32] = v_or3_b32 %307:v[32], %410:v[44], %418:v[26]
+	 v1: %441:v[28] = v_ffbl_b32 %440:v[21]
+	 v1: %425:v[36] = v_or3_b32 %303:v[36], %419:v[39], %417:v[27]
+	 v1: %434:v[42] = v_and_b32 %427:v[42], %429:v[6]
+	 v1: %426:v[38] = v_or_b32 %305:v[38], %422:v[41]
+	s_delay_alu valu_dep_4 next valu_dep_3
+	 s2: %443:s[22-23] = v_cmp_le_u32 10, %441:v[28]
+	 v1: %436:v[32] = v_and_or_b32 %428:v[32], %1093:v[7], %434:v[42]
+	 v1: %431:v[38] = v_bcnt_u32_b32 %426:v[38], 0
+	s_delay_alu valu_dep_2 skip_1 valu_dep_1
+	 s2: %438:s[20-21] = v_cmp_eq_i32 0, %436:v[32]
+	 v1: %433:v[36] = v_bcnt_u32_b32 %425:v[36], %431:v[38]
+	 s2: %437:s[18-19] = v_cmp_eq_i32 24, %433:v[36]
+	 s2: %439:s[18-19],  s1: %1095:scc = s_and_b64 %437:s[18-19], %438:s[20-21]
+	 s2: %442:s[20-21] = v_cmp_eq_i32 0, %440:v[21]
+	 s2: %444:s[20-21],  s1: %1096:scc = s_or_b64 %442:s[20-21], %443:s[22-23]
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %446:s[20-21],  s1: %1098:scc = s_nand_b64 %40:s[4-5], %444:s[20-21]
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %447:s[18-19],  s1: %1099:scc = s_and_b64 %439:s[18-19], %446:s[20-21]
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %448:s[18-19],  s1: %1100:scc = s_or_b64 %39:s[6-7], %447:s[18-19]
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %454:s[20-21],  s1: %1104:scc = s_andn2_b64 %448:s[18-19], %119:vcc
+	 s2: %456:vcc,  s1: %1105:scc = s_and_b64 %448:s[18-19], %119:vcc
+	s_waitcnt_depctr sa_sdst(0)
+	 v1: %455:v[17] = v_cndmask_b32 %106:v[17], %452:v[20], %454:s[20-21]
+	s_waitcnt_depctr sa_sdst(0)
+	 v1: %457:v[16] = v_cndmask_b32 %109:v[16], %450:v[19], %456:vcc
+	s_branch block:BB37
+BB46
+/* logical preds: BB38, / linear preds: BB38, / kind: uniform, loop-preheader, loop-exit, */
+	 s2: %0:exec = s_mov_b64 %1273:s[16-17]
+	 v1: %460:v[5] = v_lshlrev_b32 2, %78:v[12]
+	 v1: %461:v[5] = buffer_load_dword %83:s[24-27], %460:v[5], 0 offen storage:buffer semantics:private,reorder
+	s_wait_loadcnt imm:1
+	 v1: %462:v[6] = v_lshlrev_b32 3, %78:v[12]
+	 v2: %463:v[6-7] = buffer_load_dwordx2 %87:s[28-31], %462:v[6], 0 offen storage:buffer semantics:private,reorder
+	 v1: %0:v[18] = v_mov_b32 0
+	s_wait_loadcnt imm:1
+	 v1: %464:v[10] = v_lshrrev_b32 16, %461:v[5]
+	 v1: %466:v[11] = v_and_b32 3, %461:v[5]
+	 v1: %470:v[5] = v_lshrrev_b32 2, %461:v[5]
+	s_delay_alu valu_dep_3 next valu_dep_1
+	 v1: %465:v[10] = v_lshlrev_b32 24, %464:v[10]
+	 v1: %468:v[11] = v_lshl_or_b32 (is16bit)%466:v[11], 30, %465:v[10]
+	 v1: %0:v[10] = v_mov_b32 0
+	s_delay_alu valu_dep_2
+	 v1: %469:v[11] = v_or_b32 %976:s[11], %468:v[11]
+BB47
+/* logical preds: BB46, BB55, / linear preds: BB46, BB55, / kind: loop-header, branch, */
+	 v1: %475:v[19] = v_or_b32 %473:v[14], %474:v[15]
+	 s2: %0:s[18-19] = s_mov_b64 %0:exec
+	s_delay_alu valu_dep_1
+	 s2: %0:exec = v_cmpx_eq_i32 0, %475:v[19]
+BB48
+/* logical preds: BB47, / linear preds: BB47, / kind: break, */
+	 s2: %1288:s[18-19],  s1: %1287:scc = s_andn2_b64 %1286:s[18-19], %0:exec
+	s_cbranch_scc0 block:BB56
+BB55
+/* logical preds: BB47, / linear preds: BB48, / kind: uniform, continue, merge, */
+	 s4: %496:s[20-23] = s_load_dwordx4 %12:s[2-3], 48 storage:buffer semantics:private,reorder
+	 s2: %0:exec = s_mov_b64 %1289:s[18-19]
+	 v1: %478:v[19] = v_ffbl_b32 %473:v[14]
+	 s2: %479:vcc = v_cmp_eq_i32 0, %473:v[14]
+	 v1: %481:v[20] = v_ffbl_b32 %474:v[15]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %480:v[19] = v_cndmask_b32 %478:v[19], 32, %479:vcc
+	 s2: %482:vcc = v_cmp_eq_i32 0, %474:v[15]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %483:v[20] = v_cndmask_b32 %481:v[20], 32, %482:vcc
+	 s2: %484:vcc = v_cmp_lg_i32 0, %473:v[14]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %485:v[21] = v_cndmask_b32 %483:v[20], %480:v[19], %484:vcc
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 v1: %486:v[21] = v_add_u32 32, %485:v[21]
+	 v1: %487:v[21] = v_cndmask_b32 %486:v[21], %480:v[19], %484:vcc
+	s_delay_alu valu_dep_1
+	 v1: %497:v[21] = v_add_lshl_u32 %79:v[13], %487:v[21], 2
+	s_wait_kmcnt imm:0
+	 v1: %498:v[21] = buffer_load_dword %496:s[20-23], %497:v[21], 0 offen storage:buffer semantics:private,reorder
+	 v1: %491:v[23] = v_add_u32 -1, %474:v[15]
+	 v1: %489:v[22] = v_add_u32 -1, %473:v[14]
+	 v1: %503:v[24] = v_lshrrev_b32 2, %469:v[11]
+	 v1: %519:v[26] = v_bfe_u32 %470:v[5], 2, 8
+	 v1: %815:v[19] = v_lshl_or_b32 1, %480:v[19], %472:v[10]
+	 v1: %817:v[20] = v_lshl_or_b32 1, %483:v[20], %471:v[18]
+	 v1: %0:v[29] = v_mov_b32 0
+	 v1: %492:v[23] = v_and_b32 %474:v[15], %491:v[23]
+	 v1: %490:v[22] = v_and_b32 %473:v[14], %489:v[22]
+	 v1: %504:v[24] = v_lshl_or_b32 %470:v[5], 30, %503:v[24]
+	s_delay_alu valu_dep_3 skip_4 valu_dep_1
+	 v1: %494:v[15] = v_cndmask_b32 %492:v[23], %474:v[15], %484:vcc
+	 v1: %493:v[14] = v_cndmask_b32 %473:v[14], %490:v[22], %484:vcc
+	 v1: %516:v[25] = v_mul_lo_u32 %504:v[24], %504:v[24]
+	s_wait_loadcnt imm:0
+	 v1: %499:v[21] = v_add_u32 %975:s[10], %498:v[21]
+	 v1: %501:v[27] = v_lshl_or_b32 %469:v[11], 30, %499:v[21]
+	s_delay_alu valu_dep_1
+	 v1: %522:v[33] = v_mul_lo_u32 %501:v[27], %501:v[27]
+	 v1: %513:v[31] = v_mul_hi_u32 %501:v[27], %504:v[24]
+	 v1: %505:v[28] = v_mul_lo_u32 %501:v[27], %504:v[24]
+	 v1: %518:v[32] = v_lshlrev_b32 1, %501:v[27]
+	 v1: %508:v[30] = v_mul_hi_u32 %501:v[27], %501:v[27]
+	 v1: %524:v[35] = v_mul_hi_u32 %522:v[33], %501:v[27]
+	 v1: %523:v[34] = v_mul_lo_u32 %522:v[33], %501:v[27]
+	 v1: %525:v[36] = v_mul_lo_u32 %522:v[33], %504:v[24]
+	 v1: %534:v[39] = v_mul_hi_u32 %522:v[33], %504:v[24]
+	 v1: %520:v[32] = v_mul_lo_u32 %518:v[32], %519:v[26]
+	 v2: %507:v[28-29] = v_lshlrev_b64 1, %506:v[28-29]
+	 v1: %540:v[26] = v_mul_lo_u32 %522:v[33], %519:v[26]
+	 v1: %1116:v[30],  s2: %1117:s[18-19] = v_add_co_u32_e64 %508:v[30], %1114:v[28]
+	 v1: %547:v[42] = v_and_b32 63, %522:v[33]
+	s_delay_alu valu_dep_2
+	 v1: %538:v[24] = v_mul_lo_u32 %1116:v[30], %504:v[24]
+	 v1: %529:v[38] = v_mul_lo_u32 %1116:v[30], %501:v[27]
+	s_waitcnt_depctr va_sdst(0)
+	 v1: %1118:v[29],  s2: %1119:s[18-19] = v_addc_co_u32 0, %1115:v[29], %1117:s[18-19]
+	 v1: %1127:v[35],  s2: %1128:s[18-19] = v_add_co_u32_e64 %524:v[35], %525:v[36]
+	 v1: %536:v[40] = v_mul_hi_u32 %1116:v[30], %501:v[27]
+	 v1: %548:v[43] = v_lshrrev_b32 5, %547:v[42]
+	 v1: %550:v[42] = v_lshlrev_b32 %547:v[42], 1
+	 v1: %515:v[31] = v_lshl_add_u32 %513:v[31], 1, %1118:v[29]
+	 v1: %555:v[45] = v_bfe_u32 %522:v[33], 11, 1
+	s_waitcnt_depctr va_sdst(0)
+	 v1: %1129:v[37],  s2: %1130:s[18-19] = v_addc_co_u32 0, 0, %1128:s[18-19]
+	 v1: %1135:v[35],  s2: %1136:s[18-19] = v_add_co_u32_e64 %1127:v[35], %529:v[38]
+	 v1: %549:v[43] = v_sub_u32 0, %548:v[43]
+	 v1: %521:v[32] = v_add3_u32 %520:v[32], %515:v[31], %516:v[25]
+	 v1: %556:v[45] = v_sub_u32 0, %555:v[45]
+	 v1: %567:v[28] = v_bfe_u32 %522:v[33], 12, 6
+	s_waitcnt_depctr va_sdst(0)
+	 v1: %1137:v[37],  s2: %1138:s[18-19] = v_addc_co_u32 0, %1129:v[37], %1136:s[18-19]
+	 v1: %552:v[44] = v_bfi_b32 %549:v[43], 0, %550:v[42]
+	 v1: %553:v[42] = v_and_b32 %550:v[42], %549:v[43]
+	 v1: %542:v[41] = v_bfe_u32 %521:v[32], 0, 8
+	 v1: %575:v[31] = v_bfe_u32 %522:v[33], 23, 1
+	 v1: %568:v[28] = v_lshlrev_b32 %567:v[28], 1
+	 v1: %578:v[36] = v_bfe_u32 %522:v[33], 18, 6
+	 v1: %537:v[40] = v_add3_u32 %536:v[40], %1137:v[37], %534:v[39]
+	 v1: %543:v[27] = v_mul_lo_u32 %542:v[41], %501:v[27]
+	 v1: %576:v[31] = v_sub_u32 0, %575:v[31]
+	 v1: %579:v[36] = v_lshlrev_b32 %578:v[36], 1
+	 v1: %585:v[38] = v_lshrrev_b32 24, %522:v[33]
+	 v1: %541:v[26] = v_add3_u32 %540:v[26], %537:v[40], %538:v[24]
+	 v1: %557:v[24] = v_bfe_u32 %522:v[33], 6, 6
+	s_delay_alu valu_dep_4
+	 v1: %581:v[37] = v_bfi_b32 %576:v[31], 0, %579:v[36]
+	 v1: %586:v[38] = v_and_b32 63, %585:v[38]
+	 v1: %544:v[26] = v_add_u32 %541:v[26], %543:v[27]
+	 v1: %565:v[27] = v_bfe_u32 %522:v[33], 17, 1
+	 v1: %558:v[24] = v_lshlrev_b32 %557:v[24], 1
+	 v1: %598:v[33] = v_lshrrev_b32 30, %522:v[33]
+	 v1: %587:v[39] = v_lshrrev_b32 5, %586:v[38]
+	 v1: %589:v[38] = v_lshlrev_b32 %586:v[38], 1
+	 v1: %566:v[27] = v_sub_u32 0, %565:v[27]
+	 v1: %560:v[25] = v_bfi_b32 %556:v[45], 0, %558:v[24]
+	 v1: %563:v[24] = v_and_or_b32 %558:v[24], %556:v[45], %553:v[42]
+	 v1: %596:v[42] = v_and_b32 15, %1116:v[30]
+	 v1: %609:v[45] = v_bfe_u32 %1116:v[30], 9, 1
+	 v1: %588:v[39] = v_sub_u32 0, %587:v[39]
+	 v1: %570:v[29] = v_bfi_b32 %566:v[27], 0, %568:v[28]
+	 v1: %573:v[28] = v_and_or_b32 %568:v[28], %566:v[27], %563:v[24]
+	 v1: %611:v[24] = v_bfe_u32 %1116:v[30], 4, 6
+	 v1: %599:v[42] = v_lshl_or_b32 (is16bit)%596:v[42], 2, %598:v[33]
+	 v1: %610:v[45] = v_sub_u32 0, %609:v[45]
+	 v1: %591:v[40] = v_bfi_b32 %588:v[39], 0, %589:v[38]
+	 v1: %618:v[27] = v_bfe_u32 %1116:v[30], 15, 1
+	 v1: %572:v[29] = v_or3_b32 %570:v[29], %552:v[44], %560:v[25]
+	 v1: %584:v[36] = v_and_or_b32 %579:v[36], %576:v[31], %573:v[28]
+	 v1: %620:v[28] = v_bfe_u32 %1116:v[30], 10, 6
+	 v1: %612:v[24] = v_lshlrev_b32 %611:v[24], 1
+	 v1: %600:v[43] = v_lshrrev_b32 5, %599:v[42]
+	 v1: %602:v[42] = v_lshlrev_b32 %599:v[42], 1
+	 v1: %627:v[31] = v_lshrrev_b32 16, %1116:v[30]
+	 v1: %619:v[27] = v_sub_u32 0, %618:v[27]
+	 v1: %593:v[40] = v_or3_b32 %591:v[40], %572:v[29], %581:v[37]
+	 v1: %594:v[38] = v_and_or_b32 %589:v[38], %588:v[39], %584:v[36]
+	 v1: %621:v[28] = v_lshlrev_b32 %620:v[28], 1
+	 v1: %614:v[25] = v_bfi_b32 %610:v[45], 0, %612:v[24]
+	 v1: %601:v[43] = v_sub_u32 0, %600:v[43]
+	 v1: %638:v[37] = v_bfe_u32 %1116:v[30], 27, 1
+	 v1: %628:v[31] = v_and_b32 63, %627:v[31]
+	 v1: %623:v[29] = v_bfi_b32 %619:v[27], 0, %621:v[28]
+	s_delay_alu valu_dep_4
+	 v1: %604:v[44] = v_bfi_b32 %601:v[43], 0, %602:v[42]
+	 v1: %607:v[42] = v_and_or_b32 %602:v[42], %601:v[43], %594:v[38]
+	 v1: %641:v[38] = v_bfe_u32 %1116:v[30], 22, 6
+	 v1: %648:v[32] = v_and_b32 3, %521:v[32]
+	 v1: %639:v[37] = v_sub_u32 0, %638:v[37]
+	 v1: %629:v[33] = v_lshrrev_b32 5, %628:v[31]
+	 v1: %631:v[31] = v_lshlrev_b32 %628:v[31], 1
+	 v1: %651:v[30] = v_lshrrev_b32 28, %1116:v[30]
+	 v1: %616:v[25] = v_or3_b32 %614:v[25], %593:v[40], %604:v[44]
+	 v1: %617:v[24] = v_and_or_b32 %612:v[24], %610:v[45], %607:v[42]
+	 v1: %642:v[38] = v_lshlrev_b32 %641:v[38], 1
+	 v1: %660:v[43] = v_lshrrev_b32 7, %542:v[41]
+	 v1: %662:v[41] = v_lshrrev_b32 2, %542:v[41]
+	 v1: %630:v[33] = v_sub_u32 0, %629:v[33]
+	 v1: %652:v[32] = v_lshl_or_b32 (is16bit)%648:v[32], 4, %651:v[30]
+	 v1: %626:v[28] = v_and_or_b32 %621:v[28], %619:v[27], %617:v[24]
+	 v1: %644:v[39] = v_bfi_b32 %639:v[37], 0, %642:v[38]
+	 v1: %661:v[43] = v_sub_u32 0, %660:v[43]
+	 v1: %663:v[41] = v_lshlrev_b32 %662:v[41], 1
+	 v1: %633:v[36] = v_bfi_b32 %630:v[33], 0, %631:v[31]
+	 v1: %653:v[40] = v_lshrrev_b32 5, %652:v[32]
+	 v1: %673:v[45] = v_and_b32 63, %523:v[34]
+	 v1: %655:v[32] = v_lshlrev_b32 %652:v[32], 1
+	 v1: %636:v[31] = v_and_or_b32 %631:v[31], %630:v[33], %626:v[28]
+	 v1: %665:v[44] = v_bfi_b32 %661:v[43], 0, %663:v[41]
+	 v1: %666:v[41] = v_and_b32 %663:v[41], %661:v[43]
+	 v1: %635:v[36] = v_or3_b32 %633:v[36], %616:v[25], %623:v[29]
+	 v1: %680:v[27] = v_bfe_u32 %523:v[34], 11, 1
+	 v1: %654:v[40] = v_sub_u32 0, %653:v[40]
+	 v1: %674:v[24] = v_lshrrev_b32 5, %673:v[45]
+	 v1: %676:v[45] = v_lshlrev_b32 %673:v[45], 1
+	 v1: %682:v[28] = v_bfe_u32 %523:v[34], 6, 6
+	 v1: %647:v[38] = v_and_or_b32 %642:v[38], %639:v[37], %636:v[31]
+	 v1: %689:v[30] = v_bfe_u32 %523:v[34], 17, 1
+	 v1: %681:v[27] = v_sub_u32 0, %680:v[27]
+	 v1: %657:v[42] = v_bfi_b32 %654:v[40], 0, %655:v[32]
+	 v1: %691:v[31] = v_bfe_u32 %523:v[34], 12, 6
+	 v1: %658:v[32] = v_and_b32 %655:v[32], %654:v[40]
+	 v1: %675:v[24] = v_sub_u32 0, %674:v[24]
+	 v1: %683:v[28] = v_lshlrev_b32 %682:v[28], 1
+	 v1: %698:v[37] = v_bfe_u32 %523:v[34], 23, 1
+	 v1: %690:v[30] = v_sub_u32 0, %689:v[30]
+	 v1: %667:v[36] = v_or3_b32 %657:v[42], %635:v[36], %644:v[39]
+	 v1: %700:v[39] = v_bfe_u32 %523:v[34], 18, 6
+	 v1: %671:v[42] = v_or_b32 %657:v[42], %665:v[44]
+	 v1: %692:v[31] = v_lshlrev_b32 %691:v[31], 1
+	 v1: %670:v[38] = v_or3_b32 %666:v[41], %647:v[38], %658:v[32]
+	 v1: %672:v[32] = v_or_b32 %658:v[32], %666:v[41]
+	 v1: %678:v[25] = v_bfi_b32 %675:v[24], 0, %676:v[45]
+	 v1: %679:v[45] = v_and_b32 %676:v[45], %675:v[24]
+	 v1: %685:v[29] = v_bfi_b32 %681:v[27], 0, %683:v[28]
+	 v1: %707:v[41] = v_lshrrev_b32 24, %523:v[34]
+	 v1: %699:v[37] = v_sub_u32 0, %698:v[37]
+	 v1: %668:v[36] = v_or_b32 %667:v[36], %665:v[44]
+	 v1: %701:v[39] = v_lshlrev_b32 %700:v[39], 1
+	 v1: %694:v[33] = v_bfi_b32 %690:v[30], 0, %692:v[31]
+	 v1: %719:v[34] = v_lshrrev_b32 30, %523:v[34]
+	 v1: %688:v[28] = v_and_or_b32 %683:v[28], %681:v[27], %679:v[45]
+	 v1: %717:v[45] = v_and_b32 15, %1135:v[35]
+	 v1: %708:v[41] = v_and_b32 63, %707:v[41]
+	 v1: %703:v[40] = v_bfi_b32 %699:v[37], 0, %701:v[39]
+	 v1: %729:v[27] = v_bfe_u32 %1135:v[35], 9, 1
+	 v1: %696:v[33] = v_or3_b32 %694:v[33], %678:v[25], %685:v[29]
+	 v1: %697:v[31] = v_and_or_b32 %692:v[31], %690:v[30], %688:v[28]
+	 v1: %731:v[28] = v_bfe_u32 %1135:v[35], 4, 6
+	 v1: %720:v[45] = v_lshl_or_b32 (is16bit)%717:v[45], 2, %719:v[34]
+	 v1: %709:v[43] = v_lshrrev_b32 5, %708:v[41]
+	 v1: %711:v[41] = v_lshlrev_b32 %708:v[41], 1
+	 v1: %730:v[27] = v_sub_u32 0, %729:v[27]
+	 v1: %738:v[30] = v_bfe_u32 %1135:v[35], 15, 1
+	 v1: %706:v[39] = v_and_or_b32 %701:v[39], %699:v[37], %697:v[31]
+	 v1: %740:v[31] = v_bfe_u32 %1135:v[35], 10, 6
+	 v1: %732:v[28] = v_lshlrev_b32 %731:v[28], 1
+	 v1: %721:v[24] = v_lshrrev_b32 5, %720:v[45]
+	 v1: %723:v[45] = v_lshlrev_b32 %720:v[45], 1
+	 v1: %710:v[43] = v_sub_u32 0, %709:v[43]
+	 v1: %747:v[34] = v_lshrrev_b32 16, %1135:v[35]
+	 v1: %739:v[30] = v_sub_u32 0, %738:v[30]
+	 v1: %741:v[31] = v_lshlrev_b32 %740:v[31], 1
+	 v1: %734:v[29] = v_bfi_b32 %730:v[27], 0, %732:v[28]
+	 v1: %722:v[24] = v_sub_u32 0, %721:v[24]
+	 v1: %713:v[44] = v_bfi_b32 %710:v[43], 0, %711:v[41]
+	 v1: %716:v[41] = v_and_or_b32 %711:v[41], %710:v[43], %706:v[39]
+	 v1: %748:v[34] = v_and_b32 63, %747:v[34]
+	s_delay_alu valu_dep_4
+	 v1: %725:v[25] = v_bfi_b32 %722:v[24], 0, %723:v[45]
+	 v1: %715:v[44] = v_or3_b32 %713:v[44], %696:v[33], %703:v[40]
+	 v1: %757:v[40] = v_bfe_u32 %1135:v[35], 27, 1
+	 v1: %743:v[33] = v_bfi_b32 %739:v[30], 0, %741:v[31]
+	 v1: %728:v[45] = v_and_or_b32 %723:v[45], %722:v[24], %716:v[41]
+	 v1: %759:v[41] = v_bfe_u32 %1135:v[35], 22, 6
+	 v1: %749:v[37] = v_lshrrev_b32 5, %748:v[34]
+	 v1: %751:v[34] = v_lshlrev_b32 %748:v[34], 1
+	 v1: %768:v[35] = v_lshrrev_b32 28, %1135:v[35]
+	 v1: %736:v[29] = v_or3_b32 %734:v[29], %715:v[44], %725:v[25]
+	 v1: %766:v[44] = v_and_b32 3, %544:v[26]
+	 v1: %758:v[40] = v_sub_u32 0, %757:v[40]
+	 v1: %737:v[28] = v_and_or_b32 %732:v[28], %730:v[27], %728:v[45]
+	 v1: %760:v[41] = v_lshlrev_b32 %759:v[41], 1
+	 v1: %750:v[37] = v_sub_u32 0, %749:v[37]
+	 v1: %776:v[26] = v_bfe_u32 %544:v[26], 0, 8
+	 v1: %769:v[44] = v_lshl_or_b32 (is16bit)%766:v[44], 4, %768:v[35]
+	 v1: %746:v[31] = v_and_or_b32 %741:v[31], %739:v[30], %737:v[28]
+	 v1: %762:v[43] = v_bfi_b32 %758:v[40], 0, %760:v[41]
+	 v1: %753:v[39] = v_bfi_b32 %750:v[37], 0, %751:v[34]
+	 v1: %777:v[25] = v_lshrrev_b32 7, %776:v[26]
+	 v1: %779:v[26] = v_lshrrev_b32 2, %776:v[26]
+	 v1: %770:v[45] = v_lshrrev_b32 5, %769:v[44]
+	 v1: %772:v[44] = v_lshlrev_b32 %769:v[44], 1
+	 v1: %756:v[34] = v_and_or_b32 %751:v[34], %750:v[37], %746:v[31]
+	 v1: %755:v[39] = v_or3_b32 %753:v[39], %736:v[29], %743:v[33]
+	 v1: %778:v[25] = v_sub_u32 0, %777:v[25]
+	 v1: %780:v[26] = v_lshlrev_b32 %779:v[26], 1
+	 v1: %771:v[45] = v_sub_u32 0, %770:v[45]
+	 v1: %765:v[41] = v_and_or_b32 %760:v[41], %758:v[40], %756:v[34]
+	s_delay_alu valu_dep_3 skip_4 valu_dep_3
+	 v1: %782:v[27] = v_bfi_b32 %778:v[25], 0, %780:v[26]
+	 v1: %783:v[26] = v_and_b32 %780:v[26], %778:v[25]
+	 v1: %774:v[24] = v_bfi_b32 %771:v[45], 0, %772:v[44]
+	 v1: %775:v[44] = v_and_b32 %772:v[44], %771:v[45]
+	 v1: %805:v[21] = v_lshrrev_b32 10, %499:v[21]
+	 v1: %784:v[39] = v_or3_b32 %774:v[24], %755:v[39], %762:v[43]
+	 v1: %792:v[42] = v_or3_b32 %671:v[42], %774:v[24], %782:v[27]
+	 v1: %787:v[41] = v_or3_b32 %783:v[26], %765:v[41], %775:v[44]
+	 v1: %793:v[32] = v_or3_b32 %672:v[32], %775:v[44], %783:v[26]
+	 v1: %806:v[28] = v_ffbl_b32 %805:v[21]
+	 v1: %790:v[36] = v_or3_b32 %668:v[36], %784:v[39], %782:v[27]
+	 v1: %799:v[42] = v_and_b32 %792:v[42], %794:v[6]
+	 v1: %791:v[38] = v_or_b32 %670:v[38], %787:v[41]
+	s_delay_alu valu_dep_4 next valu_dep_3
+	 s2: %808:s[22-23] = v_cmp_le_u32 10, %806:v[28]
+	 v1: %801:v[32] = v_and_or_b32 %793:v[32], %1189:v[7], %799:v[42]
+	 v1: %796:v[38] = v_bcnt_u32_b32 %791:v[38], 0
+	s_delay_alu valu_dep_2 skip_1 valu_dep_1
+	 s2: %803:s[20-21] = v_cmp_eq_i32 0, %801:v[32]
+	 v1: %798:v[36] = v_bcnt_u32_b32 %790:v[36], %796:v[38]
+	 s2: %802:s[18-19] = v_cmp_eq_i32 24, %798:v[36]
+	 s2: %804:s[18-19],  s1: %1191:scc = s_and_b64 %802:s[18-19], %803:s[20-21]
+	 s2: %807:s[20-21] = v_cmp_eq_i32 0, %805:v[21]
+	 s2: %809:s[20-21],  s1: %1192:scc = s_or_b64 %807:s[20-21], %808:s[22-23]
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %811:s[20-21],  s1: %1194:scc = s_nand_b64 %40:s[4-5], %809:s[20-21]
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %812:s[18-19],  s1: %1195:scc = s_and_b64 %804:s[18-19], %811:s[20-21]
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %813:s[18-19],  s1: %1196:scc = s_or_b64 %39:s[6-7], %812:s[18-19]
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %819:s[20-21],  s1: %1200:scc = s_andn2_b64 %813:s[18-19], %484:vcc
+	 s2: %821:vcc,  s1: %1201:scc = s_and_b64 %813:s[18-19], %484:vcc
+	s_waitcnt_depctr sa_sdst(0)
+	 v1: %820:v[18] = v_cndmask_b32 %471:v[18], %817:v[20], %819:s[20-21]
+	 v1: %822:v[10] = v_cndmask_b32 %472:v[10], %815:v[19], %821:vcc
+	s_branch block:BB47
+BB56
+/* logical preds: BB48, / linear preds: BB48, / kind: loop-exit, branch, */
+	 s2: %0:exec = s_mov_b64 %1273:s[16-17]
+	 v1: %825:v[5] = v_bcnt_u32_b32 %458:v[17], 0
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 v1: %827:v[5] = v_bcnt_u32_b32 %459:v[16], %825:v[5]
+	 v1: %829:v[5] = v_bcnt_u32_b32 %824:v[10], %827:v[5]
+	s_delay_alu valu_dep_1 skip_2 valu_dep_1
+	 v1: %831:v[5] = v_bcnt_u32_b32 %823:v[18], %829:v[5]
+	 s2: %0:s[18-19],  s1: %0:scc,  s2: %0:exec = s_or_saveexec_b64 -1, %0:exec
+	s_waitcnt_depctr sa_sdst(0)
+	 lv1: %0:v[46] = v_cndmask_b32 0, %0:v[5], %0:s[18-19]
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] row_shr:1 fi
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] row_shr:2 fi
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] row_shr:4 fi
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] row_shr:8 fi
+	 s2: %0:exec = s_bitreplicate_b64_b32 0xff00ff00
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[47] = v_permlanex16_b32 %0:v[46], -1, -1 fi
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[47]
+	 s2: %0:exec = s_bfm_b64 32, 32
+	s_delay_alu valu_dep_1 skip_4 valu_dep_1
+	 s1: %0:s[15] = v_readlane_b32_e64 %0:v[46], 31
+	s_waitcnt_depctr va_sdst(0)
+	 lv1: %0:v[46] = v_add_u32 %0:s[15], %0:v[46]
+	 s2: %0:exec = s_mov_b64 %0:s[18-19]
+	s_wait_loadcnt imm:0
+	 v1: %0:v[6] = v_mov_b32 %0:v[46]
+	s_delay_alu valu_dep_1 skip_3 valu_dep_1
+	 v1: %832:v[6] = v_sub_u32 %1202:v[6], %831:v[5]
+	 s2: %0:s[20-21],  s1: %0:scc,  s2: %0:exec = s_or_saveexec_b64 -1, %0:exec
+	s_waitcnt_depctr sa_sdst(0)
+	 lv1: %0:v[46] = v_cndmask_b32 0, %0:v[5], %0:s[20-21]
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] quad_perm:[1,0,3,2] fi
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] quad_perm:[2,3,0,1] fi
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] row_half_mirror fi
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] row_mirror fi
+	 lv1: %0:v[47] = v_permlanex16_b32 %0:v[46], 0, 0
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[47]
+	 s1: %0:s[18] = v_readlane_b32_e64 %0:v[46], 0
+	s_waitcnt_depctr va_sdst(0)
+	 lv1: %0:v[46] = v_add_u32 %0:s[18], %0:v[46]
+	 s2: %0:exec = s_mov_b64 %0:s[20-21]
+	 s2: %0:s[20-21] = s_mov_b64 1
+	s_delay_alu valu_dep_1 skip_1 salu_cycle_1
+	 s1: %0:s[18] = v_readlane_b32_e64 %0:v[46], 63
+	 s1: %1208:scc = s_cmp_lg_i32 %833:s[18], 0
+	 s2: %836:s[22-23] = s_cselect_b64 -1, 0, %1208:scc
+	s_delay_alu salu_cycle_1
+	 s2: %837:s[20-21],  s1: %1209:scc = s_and_b64 %834:s[20-21], %836:s[22-23]
+	s_waitcnt_depctr sa_sdst(0)
+	 s2: %0:exec,  s1: %1291:scc = s_and_b64 %837:s[20-21], %0:exec
+	s_cbranch_execz block:BB60
+BB57
+/* logical preds: BB56, / linear preds: BB56, / kind: uniform, */
+	 s4: %838:s[20-23] = s_load_dwordx4 %12:s[2-3], 0x80 storage:buffer semantics:private,reorder
+	 v1: %0:v[5] = v_mov_b32 %833:s[18]
+	s_wait_storecnt imm:0
+	s_wait_kmcnt imm:0
+	 v1: %839:v[5] = buffer_atomic_add %838:s[20-23],  v1: undef, 0, %1214:v[5] atomic_return storage:buffer semantics:volatile,atomic,rmw
+BB60
+/* logical preds: BB56, / linear preds: BB57, BB56, / kind: uniform, */
+	 s2: %0:exec,  s1: %1292:scc = s_andn2_b64 %1273:s[16-17], %0:exec
+	s_wait_loadcnt imm:0
+	 v1: %0:v[5] = v_mov_b32 0
+BB62
+/* logical preds: BB57, BB60, / linear preds: BB60, / kind: uniform, loop-preheader, merge, */
+	 s2: %0:exec = s_mov_b64 %1273:s[16-17]
+	s_delay_alu salu_cycle_1 skip_2 valu_dep_1
+	 s2: %0:s[18-19],  s1: %0:scc,  s2: %0:exec = s_or_saveexec_b64 -1, %0:exec
+	s_waitcnt_depctr sa_sdst(0)
+	 lv1: %0:v[46] = v_cndmask_b32 0, %0:v[5], %0:s[18-19]
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] quad_perm:[1,0,3,2] fi
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] quad_perm:[2,3,0,1] fi
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] row_half_mirror fi
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[46] row_mirror fi
+	 lv1: %0:v[47] = v_permlanex16_b32 %0:v[46], 0, 0
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[46] = v_add_u32 %0:v[46], %0:v[47]
+	 s1: %0:s[15] = v_readlane_b32_e64 %0:v[46], 0
+	s_waitcnt_depctr va_sdst(0)
+	 lv1: %0:v[46] = v_add_u32 %0:s[15], %0:v[46]
+	 s2: %0:exec = s_mov_b64 %0:s[18-19]
+	s_delay_alu salu_cycle_1
+	 s2: %0:s[18-19] = s_mov_b64 %0:exec
+	 s1: %0:s[15] = v_readlane_b32_e64 %0:v[46], 63
+	s_waitcnt_depctr va_sdst(0)
+	 v1: %842:v[6] = v_add_u32 %841:s[15], %832:v[6]
+BB63
+/* logical preds: BB62, BB77, / linear preds: BB62, BB77, / kind: loop-header, branch, */
+	 v1: %846:v[5] = v_or_b32 %845:v[16], %843:v[17]
+	s_delay_alu valu_dep_1
+	 s2: %0:exec = v_cmpx_eq_i32 0, %846:v[5]
+BB64
+/* logical preds: BB63, / linear preds: BB63, / kind: break, */
+	 s2: %1296:s[18-19],  s1: %1295:scc = s_andn2_b64 %1294:s[18-19], %0:exec
+	s_cbranch_scc0 block:BB78
+BB71
+/* logical preds: BB63, / linear preds: BB64, / kind: branch, merge, */
+	 s2: %0:exec = s_mov_b64 %1297:s[18-19]
+	 v1: %849:v[5] = v_ffbl_b32 %845:v[16]
+	 s2: %850:vcc = v_cmp_eq_i32 0, %845:v[16]
+	 v1: %852:v[7] = v_ffbl_b32 %843:v[17]
+	 v1: %860:v[11] = v_add_u32 -1, %845:v[16]
+	 v1: %862:v[14] = v_add_u32 -1, %843:v[17]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %851:v[5] = v_cndmask_b32 %849:v[5], 32, %850:vcc
+	 s2: %853:vcc = v_cmp_eq_i32 0, %843:v[17]
+	 v1: %861:v[11] = v_and_b32 %845:v[16], %860:v[11]
+	 v1: %863:v[14] = v_and_b32 %843:v[17], %862:v[14]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %854:v[7] = v_cndmask_b32 %852:v[7], 32, %853:vcc
+	 s2: %855:vcc = v_cmp_lg_i32 0, %845:v[16]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %865:v[16] = v_cndmask_b32 %845:v[16], %861:v[11], %855:vcc
+	 v1: %856:v[7] = v_cndmask_b32 %854:v[7], %851:v[5], %855:vcc
+	 v1: %864:v[17] = v_cndmask_b32 %863:v[14], %843:v[17], %855:vcc
+	s_delay_alu valu_dep_2 next valu_dep_1
+	 v1: %857:v[7] = v_add_u32 32, %856:v[7]
+	 v1: %858:v[7] = v_cndmask_b32 %857:v[7], %851:v[5], %855:vcc
+	 s2: %0:exec = v_cmpx_gt_u32 %974:s[9], %844:v[6]
+	s_cbranch_execz block:BB77
+BB72
+/* logical preds: BB71, / linear preds: BB71, / kind: uniform, */
+	s_clause imm:1
+	 s4: %868:s[20-23] = s_load_dwordx4 %12:s[2-3], 48 storage:buffer semantics:private,reorder
+	 s4: %872:s[24-27] = s_load_dwordx4 %12:s[2-3], 0x70 storage:buffer semantics:private,reorder
+	 v1: %869:v[7] = v_add_lshl_u32 %63:v[9], %858:v[7], 2
+	s_wait_kmcnt imm:0
+	 v1: %870:v[7] = buffer_load_dword %868:s[20-23], %869:v[7], 0 offen storage:buffer semantics:private,reorder
+	 v1: %874:v[5] = v_lshlrev_b32 3, %844:v[6]
+	 v1: %0:v[14] = v_mov_b32 %62:v[8]
+	s_wait_loadcnt imm:0
+	 v1: %871:v[15] = v_add_u32 %975:s[10], %870:v[7]
+	buffer_store_dwordx2 %872:s[24-27], %874:v[5], 0, %873:v[14-15] offen storage:buffer
+BB77
+/* logical preds: BB72, BB71, / linear preds: BB72, BB71, / kind: uniform, continue, merge, */
+	 s2: %0:exec = s_mov_b64 %1297:s[18-19]
+	 v1: %875:v[6] = v_add_u32 1, %844:v[6]
+	s_branch block:BB63
+BB78
+/* logical preds: BB64, / linear preds: BB64, / kind: uniform, loop-preheader, loop-exit, */
+	 s2: %0:exec = s_mov_b64 %1273:s[16-17]
+	s_delay_alu salu_cycle_1
+	 s2: %0:s[18-19] = s_mov_b64 %0:exec
+BB79
+/* logical preds: BB78, BB93, / linear preds: BB78, BB93, / kind: loop-header, branch, */
+	 v1: %880:v[5] = v_or_b32 %878:v[10], %877:v[18]
+	s_delay_alu valu_dep_1
+	 s2: %0:exec = v_cmpx_eq_i32 0, %880:v[5]
+BB80
+/* logical preds: BB79, / linear preds: BB79, / kind: break, */
+	 s2: %1304:s[18-19],  s1: %1303:scc = s_andn2_b64 %1302:s[18-19], %0:exec
+	s_cbranch_scc0 block:BB94
+BB87
+/* logical preds: BB79, / linear preds: BB80, / kind: branch, merge, */
+	 s2: %0:exec = s_mov_b64 %1305:s[18-19]
+	 v1: %883:v[5] = v_ffbl_b32 %878:v[10]
+	 s2: %884:vcc = v_cmp_eq_i32 0, %878:v[10]
+	 v1: %886:v[7] = v_ffbl_b32 %877:v[18]
+	 v1: %894:v[8] = v_add_u32 -1, %878:v[10]
+	 v1: %896:v[9] = v_add_u32 -1, %877:v[18]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %885:v[5] = v_cndmask_b32 %883:v[5], 32, %884:vcc
+	 s2: %887:vcc = v_cmp_eq_i32 0, %877:v[18]
+	 v1: %895:v[8] = v_and_b32 %878:v[10], %894:v[8]
+	 v1: %897:v[9] = v_and_b32 %877:v[18], %896:v[9]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %888:v[7] = v_cndmask_b32 %886:v[7], 32, %887:vcc
+	 s2: %889:vcc = v_cmp_lg_i32 0, %878:v[10]
+	s_waitcnt_depctr va_vcc(0)
+	 v1: %899:v[10] = v_cndmask_b32 %878:v[10], %895:v[8], %889:vcc
+	 v1: %890:v[7] = v_cndmask_b32 %888:v[7], %885:v[5], %889:vcc
+	 v1: %898:v[18] = v_cndmask_b32 %897:v[9], %877:v[18], %889:vcc
+	s_delay_alu valu_dep_2 next valu_dep_1
+	 v1: %891:v[7] = v_add_u32 32, %890:v[7]
+	 v1: %892:v[7] = v_cndmask_b32 %891:v[7], %885:v[5], %889:vcc
+	 s2: %0:exec = v_cmpx_gt_u32 %974:s[9], %879:v[6]
+	s_cbranch_execz block:BB93
+BB88
+/* logical preds: BB87, / linear preds: BB87, / kind: uniform, */
+	s_clause imm:1
+	 s4: %902:s[20-23] = s_load_dwordx4 %12:s[2-3], 48 storage:buffer semantics:private,reorder
+	 s4: %906:s[24-27] = s_load_dwordx4 %12:s[2-3], 0x70 storage:buffer semantics:private,reorder
+	 v1: %903:v[7] = v_add_lshl_u32 %79:v[13], %892:v[7], 2
+	s_wait_kmcnt imm:0
+	 v1: %904:v[7] = buffer_load_dword %902:s[20-23], %903:v[7], 0 offen storage:buffer semantics:private,reorder
+	 v1: %908:v[5] = v_lshlrev_b32 3, %879:v[6]
+	 v1: %0:v[8] = v_mov_b32 %78:v[12]
+	s_wait_loadcnt imm:0
+	 v1: %905:v[9] = v_add_u32 %975:s[10], %904:v[7]
+	buffer_store_dwordx2 %906:s[24-27], %908:v[5], 0, %907:v[8-9] offen storage:buffer
+BB93
+/* logical preds: BB88, BB87, / linear preds: BB88, BB87, / kind: uniform, continue, merge, */
+	 s2: %0:exec = s_mov_b64 %1305:s[18-19]
+	 v1: %909:v[6] = v_add_u32 1, %879:v[6]
+	s_branch block:BB79
+BB94
+/* logical preds: BB80, / linear preds: BB80, / kind: uniform, loop-exit, continue, */
+	 s2: %0:exec = s_mov_b64 %1273:s[16-17]
+	 s1: %911:s[14],  s1: %1237:scc = s_addk_i32 %48:s[14] imm:128
+	s_branch block:BB16
+BB95
+/* logical preds: BB17, / linear preds: BB17, / kind: uniform, loop-exit, continue, */
+	 s2: %0:exec = s_mov_b64 %1267:s[12-13]
+	 s1: %914:s[8],  s1: %1238:scc = s_add_u32 %42:s[8], 1
+	 v1: %913:v[1] = v_lshl_add_u32 %1312:s[0], 2, %41:v[1]
+	s_branch block:BB7
+BB96
+/* logical preds: BB8, / linear preds: BB8, / kind: top-level, loop-exit, branch, */
+	 s2: %0:exec = s_mov_b64 -1
+	s_delay_alu salu_cycle_1 skip_2 valu_dep_1
+	 s2: %0:s[4-5],  s1: %0:scc,  s2: %0:exec = s_or_saveexec_b64 -1, %0:exec
+	 lv1: %0:v[47] = v_cndmask_b32 0, %0:v[3], %0:s[4-5]
+	 s2: %0:s[4-5] = s_mov_b64 1
+	 lv1: %0:v[47] = v_add_u32 %0:v[47], %0:v[47] quad_perm:[1,0,3,2] fi
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[47] = v_add_u32 %0:v[47], %0:v[47] quad_perm:[2,3,0,1] fi
+	 lv1: %0:v[47] = v_add_u32 %0:v[47], %0:v[47] row_half_mirror fi
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[47] = v_add_u32 %0:v[47], %0:v[47] row_mirror fi
+	 lv1: %0:v[46] = v_permlanex16_b32 %0:v[47], 0, 0
+	s_delay_alu valu_dep_1 next valu_dep_1
+	 lv1: %0:v[47] = v_add_u32 %0:v[47], %0:v[46]
+	 s1: %0:s[0] = v_readlane_b32_e64 %0:v[47], 0
+	s_waitcnt_depctr va_sdst(0)
+	 lv1: %0:v[47] = v_add_u32 %0:s[0], %0:v[47]
+	s_delay_alu valu_dep_1 skip_1 salu_cycle_1
+	 s1: %0:s[0] = v_readlane_b32_e64 %0:v[47], 63
+	 s1: %1241:scc = s_cmp_lg_i32 %917:s[0], 0
+	 s2: %920:s[6-7] = s_cselect_b64 -1, 0, %1241:scc
+	s_delay_alu salu_cycle_1
+	 s2: %0:exec,  s1: %1242:scc = s_and_b64 %918:s[4-5], %920:s[6-7]
+	s_cbranch_execz block:BB102
+BB97
+/* logical preds: BB96, / linear preds: BB96, / kind: uniform, */
+	 s4: %922:s[8-11] = s_load_dwordx4 %12:s[2-3], 0x90 storage:buffer semantics:private,reorder
+	 v1: %0:v[2] = v_mov_b32 %917:s[0]
+	s_wait_storecnt imm:0
+	s_wait_kmcnt imm:0
+	buffer_atomic_add %922:s[8-11],  v1: undef, 0, %1247:v[2] offset:8 storage:buffer semantics:volatile,atomic,rmw
+BB102
+/* logical preds: BB97, BB96, / linear preds: BB97, BB96, / kind: top-level, branch, merge, */
+	 s2: %0:exec = s_mov_b64 -1
+	 s2: %924:vcc = v_cmp_lg_i32 0, %915:v[1]
+	 s2: %0:exec,  s1: %1248:scc = s_and_b64 %918:s[4-5], %924:vcc
+	s_cbranch_execz block:BB108
+BB103
+/* logical preds: BB102, / linear preds: BB102, / kind: uniform, */
+	 s4: %926:s[4-7] = s_load_dwordx4 %12:s[2-3], 0x90 storage:buffer semantics:private,reorder
+	s_wait_storecnt imm:0
+	s_wait_kmcnt imm:0
+	buffer_atomic_add %926:s[4-7],  v1: undef, 0, %915:v[1] offset:16 storage:buffer semantics:volatile,atomic,rmw
+BB108
+/* logical preds: BB103, BB102, / linear preds: BB103, BB102, / kind: top-level, branch, merge, */
+	 s2: %0:exec = s_mov_b64 -1
+	 s2: %0:exec = v_cmpx_eq_i32 0, %937:v[0]
+	s_cbranch_execz block:BB114
+BB109
+/* logical preds: BB108, / linear preds: BB108, / kind: uniform, */
+	 s4: %929:s[0-3] = s_load_dwordx4 %12:s[2-3], 0x90 storage:buffer semantics:private,reorder
+	 v1: %0:v[0] = v_mov_b32 1
+	s_wait_storecnt imm:0
+	s_wait_kmcnt imm:0
+	buffer_atomic_add %929:s[0-3],  v1: undef, 0, %1257:v[0] offset:12 storage:buffer semantics:volatile,atomic,rmw
+BB114
+/* logical preds: BB109, BB108, / linear preds: BB109, BB108, / kind: uniform, top-level, merge, */
+	s_endpgm
+
+
+
+Compute Shader:
+*** SHADER STATS ***
+Driver pipeline hash: 18314308372486512342
+SGPRs: 108
+VGPRs: 48
+Spilled SGPRs: 0
+Spilled VGPRs: 0
+Code size: 5424
+LDS size: 0
+Scratch size: 0
+Subgroups per SIMD: 32
+Combined inputs: 0
+Combined outputs: 0
+Hash: 1811075084
+Instructions: 930
+Copies: 57
+Branches: 21
+Latency: 224907
+Inverse Throughput: 82605
+VMEM Clause: 19
+SMEM Clause: 19
+Pre-Sched SGPRs: 33
+Pre-Sched VGPRs: 37
+VALU: 643
+SALU: 79
+VMEM: 19
+SMEM: 24
+VOPD: 0
+********************
+
+
+PIPEC ok /home/claude/projects/nice/.worktrees/g2-cubecl/g2out/s4/base_narrow/ExpandKernel_WgpuRuntime_0x45f65ac2f554ff2b.spv
