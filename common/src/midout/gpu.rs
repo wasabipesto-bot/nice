@@ -4716,6 +4716,12 @@ mod tests {
                     if force_w.is_some() {
                         let st = slice_tops(pip, gj.roots());
                         let nb: usize = std::env::var("MIDOUT_BATCHES").ok().map_or(usize::MAX, |s| s.parse().unwrap());
+                        // with MIDOUT_SHARE8=1 also the shared depth-8 pass (`anc8_kernel`); its plane check fails
+                        // under a forced width, so the slice then runs unshared (hist2 is the same kernel either way)
+                        if std::env::var("MIDOUT_SHARE8").is_ok_and(|x| x == "1") {
+                            let ra = gj.build_anc(&[(pip & 0xFF_FFFF) as u32]);
+                            println!("COMPILE-ONLY W {} slice {pip}: anc8 {ra:?}", gj.w);
+                        }
                         let r = if std::env::var("MIDOUT_HOST_TOPS").is_ok() {
                             gj.run_slice(&st).map(|x| x.0)
                         } else {
