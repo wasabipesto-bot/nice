@@ -6,7 +6,7 @@
 //! only: no API, no claims, no submissions.
 //!
 //! usage: midout_wide_bench [--cuda] [--base B] [--fields T0,T1,..] [--group G] [--classes C]
-//!                          [--maxpop P] [--ninst I] [--narrow] [--narrow-only]
+//!                          [--maxpop P] [--ninst I] [--narrow] [--narrow-only] [--digits K0,K1,Q0]
 //!   --fields: values of the field's fixed digits 6-8 (field t covers v = start + t·quantum)
 #![allow(clippy::cast_precision_loss)]
 
@@ -34,7 +34,22 @@ fn main() -> Result<()> {
         .split(',')
         .map(str::parse)
         .collect::<Result<_, _>>()?;
-    let coord = Coord::for_base(b)?;
+    // --digits K0,K1,Q0: a known coordinate other than the base's default (e.g. 4,9,6 or 4,8,5)
+    let coord = match opt("--digits") {
+        Some(d) => {
+            let d: Vec<u32> = d.split(',').map(str::parse).collect::<Result<_, _>>()?;
+            if d.len() != 3 {
+                bail!("--digits K0,K1,Q0");
+            }
+            let c = Coord::with_digits(b, d[0], d[1], d[2])?;
+            if !c.is_known() {
+                bail!("--digits {d:?}: not a known coordinate of the base");
+            }
+            c
+        }
+        None => Coord::for_base(b)?,
+    };
+    eprintln!("coordinate midout:{},{},{}", coord.k0, coord.k1, coord.q0);
     let sh = Shape::for_coord(&coord);
     let mut caps = WideCaps::for_base(b);
     if let Some(c) = opt("--classes") {

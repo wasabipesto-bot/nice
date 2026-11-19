@@ -9,7 +9,7 @@
 //! - the coordinator's address is explicit and is not the production API
 //!   (`midout::wire::check_coordinator_url`);
 //! - a claim must name a middle-out coordinate this build knows
-//!   (`"coordinate": "midout:K0,K1,Q0"`, the base's `Coord::for_base`), of a
+//!   (`"coordinate": "midout:K0,K1,Q0"`, one of the base's known coordinates, `Coord::is_known`), of a
 //!   base with a device path, whole quanta, with the `range_size` the
 //!   coordinate gives;
 //! - a field whose accounts fail or whose sampled CPU check differs is not
@@ -24,6 +24,7 @@ use anyhow::{Context, Result, anyhow, bail, ensure};
 use log::{error, info, warn};
 use nice_common::client_api_async::{Client, submit_field_to_server_async};
 use nice_common::midout::Coord;
+use nice_common::midout::coord::coord_digits_known;
 use nice_common::midout::wire::{self, CoordClaim};
 use nice_common::{BUILD_SHA, CLIENT_VERSION, DataToServer, NiceNumberSimple};
 use serde_json::{Value, json};
@@ -102,14 +103,17 @@ fn field_of(c: &CoordClaim) -> Result<(Coord, u128, u128)> {
         c.base
     );
     let coord = Coord::with_digits(c.base, k0, k1, q0)?;
-    let known = Coord::for_base(c.base)?;
     ensure!(
-        coord == known,
-        "middle-out: claim {}: coordinate '{}' of base {} is not one this client knows (it searches '{}')",
+        coord.is_known(),
+        "middle-out: claim {}: coordinate '{}' of base {} is not one this client knows (it searches {})",
         c.claim_id,
         c.coordinate,
         c.base,
-        wire::coordinate_id(known.k0, known.k1, known.q0)
+        coord_digits_known(c.base)
+            .iter()
+            .map(|&(a, b, q)| format!("'{}'", wire::coordinate_id(a, b, q)))
+            .collect::<Vec<_>>()
+            .join(", ")
     );
     let v_size = c
         .range_end
@@ -335,15 +339,23 @@ mod tests {
     /// A claim must be a whole-quanta field of a base with a device path, with the coordinate's count.
     #[test]
     fn claims_are_checked_before_work() {
-        let c64 = Coord::for_base(64).unwrap();
+        let c64 = Coord::with_digits(64, 4, 9, 6).unwrap();
         let q = c64.quantum();
         let s = c64.start + 77_777 * q;
         assert!(field_of(&claim(64, s, q, q, "midout:4,9,6")).is_ok());
         assert!(field_of(&claim(64, s, 2 * q, 2 * q, "midout:4,9,6")).is_ok());
+        // both known coordinates of base 64 are accepted (the field-structure review's fixes digits
+        // 5-7: midout:4,8,5), each giving its own coordinate
+        for id in ["midout:4,9,6", "midout:4,8,5"] {
+            let (k0, k1, q0) = wire::parse_coordinate_id(id).unwrap();
+            let c = Coord::with_digits(64, k0, k1, q0).unwrap();
+            let (got, vs, vz) = field_of(&claim(64, s, q, q, id)).unwrap();
+            assert_eq!((got, vs, vz), (c, s, q), "{id}");
+        }
+        assert_eq!(Coord::with_digits(64, 4, 8, 5).unwrap().quantum(), q);
         // a coordinate this client does not know is refused, even one midout::coord can express
-        // (the field-structure review's base-64 proposal fixes digits 5-7: midout:4,8,5)
         for unknown in [
-            "midout:4,8,5",
+            "midout:4,8,6",
             "midout:4,9,7",
             "midout:3,9,6",
             "midout",
@@ -372,12 +384,27 @@ mod tests {
             field_of(&claim(64, c64.v_end(), q, q, "midout:4,9,6")).is_err(),
             "past the end"
         );
-        let c65 = Coord::for_base(65).unwrap();
+        let c65 = Coord::with_digits(65, 4, 9, 6).unwrap();
         let q65 = c65.quantum();
         let s65 = c65.start + 13_731 * q65;
         let n65 = c65.n_count(s65, q65).unwrap();
         assert!(field_of(&claim(65, s65, q65, n65, "midout:4,9,6")).is_ok());
         assert!(field_of(&claim(65, s65, q65, n65 + 1, "midout:4,9,6")).is_err());
+        // base 65 under (4, 8, 5): its own quantum and padded count
+        let c65b = Coord::with_digits(65, 4, 8, 5).unwrap();
+        let q65b = c65b.quantum();
+        let s65b = c65b.start + 13_731 * q65b;
+        let n65b = c65b.n_count(s65b, q65b).unwrap();
+        assert!(field_of(&claim(65, s65b, q65b, n65b, "midout:4,8,5")).is_ok());
+        assert!(field_of(&claim(65, s65b, q65b, n65b + 1, "midout:4,8,5")).is_err());
+        assert!(
+            field_of(&claim(65, s65b, q65b, n65b, "midout:4,9,6")).is_err(),
+            "a (4, 8, 5) field read as (4, 9, 6)"
+        );
+        assert!(
+            field_of(&claim(68, 0, 1, 1, "midout:4,8,5")).is_err(),
+            "(4, 8, 5) is not known at base 68"
+        );
         // base 65 is padded: a field holds fewer n than its v_size
         assert!(n65 <= q65);
         assert!(

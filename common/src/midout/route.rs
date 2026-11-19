@@ -70,7 +70,7 @@ impl<R: Runtime> FieldJoin<R> {
     }
 
     /// Search the field `[v_start, v_start + v_size)` of `coord` (which must
-    /// be this join's base's coordinate):
+    /// be one of this join's base's known coordinates, `Coord::is_known`):
     /// every account checked, the sampled CPU check if `cpu_check`.
     ///
     /// # Errors
@@ -83,9 +83,9 @@ impl<R: Runtime> FieldJoin<R> {
         v_size: u128,
         cpu_check: bool,
     ) -> Result<(FieldOutcome, Value)> {
-        // the device paths are built for the base's coordinate (`Coord::for_base`) only
+        // the device paths search the base's known coordinates (`coord_digits_known`) only
         ensure!(
-            coord.b == self.base() && *coord == Coord::for_base(self.base())?,
+            coord.b == self.base() && coord.is_known(),
             "middle-out: the base-{} join cannot search a field of coordinate (base {}, digits {}, {}, {})",
             self.base(),
             coord.b,

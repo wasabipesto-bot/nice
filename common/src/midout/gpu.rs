@@ -3716,7 +3716,31 @@ pub fn search_field<R: Runtime>(
         "middle-out: a timing stop ({}) is set: this join only times stages",
         gj.stop
     );
-    field_run(gj, coord, v_start, v_size, opt, None)
+    field_run(gj, coord, v_start, v_size, opt, None, None)
+}
+
+/// (tests) [`search_field`] on the slices `sel` of the field's slice list,
+/// returning each group's slices and the device's counts for it (one slice
+/// per group with `opt.group` 1): the field path, slice by slice.
+pub(crate) type GroupCounts = Vec<(Vec<u64>, DevCounts)>;
+
+/// See [`GroupCounts`].
+///
+/// # Errors
+/// As [`search_field`].
+#[cfg(test)]
+pub(crate) fn search_field_groups<R: Runtime>(
+    gj: &GpuJoin<R>,
+    coord: &Coord,
+    v_start: u128,
+    v_size: u128,
+    opt: GpuOptions,
+    sel: std::ops::Range<usize>,
+) -> Result<(FieldOutcome, GroupCounts)> {
+    ensure!(gj.stop == 6, "middle-out: a timing stop is set");
+    let mut rec = Vec::new();
+    let (o, _, _) = field_run(gj, coord, v_start, v_size, opt, Some(sel), Some(&mut rec))?;
+    Ok((o, rec))
 }
 
 /// [`search_field`] on the field's first `max_slices` slices only (benches and dry runs on a software device: a
@@ -3737,7 +3761,15 @@ pub fn search_field_part<R: Runtime>(
         "middle-out: a timing stop ({}) is set: this join only times stages",
         gj.stop
     );
-    field_run(gj, coord, v_start, v_size, opt, Some(max_slices))
+    field_run(
+        gj,
+        coord,
+        v_start,
+        v_size,
+        opt,
+        Some(0..max_slices.max(1)),
+        None,
+    )
 }
 
 /// [`time_field`] on the field's first `max_slices` slices only.
@@ -3756,7 +3788,16 @@ pub fn time_field_part<R: Runtime>(
         cpu_check: false,
         ..opt
     };
-    Ok(field_run(gj, coord, v_start, v_size, opt, Some(max_slices))?.2)
+    Ok(field_run(
+        gj,
+        coord,
+        v_start,
+        v_size,
+        opt,
+        Some(0..max_slices.max(1)),
+        None,
+    )?
+    .2)
 }
 
 /// Time a field with the join's timing stop (benches): the stages up to
@@ -3775,7 +3816,7 @@ pub fn time_field<R: Runtime>(
         cpu_check: false,
         ..opt
     };
-    Ok(field_run(gj, coord, v_start, v_size, opt, None)?.2)
+    Ok(field_run(gj, coord, v_start, v_size, opt, None, None)?.2)
 }
 
 fn field_run<R: Runtime>(
@@ -3784,7 +3825,8 @@ fn field_run<R: Runtime>(
     v_start: u128,
     v_size: u128,
     opt: GpuOptions,
-    max_slices: Option<usize>,
+    sel: Option<std::ops::Range<usize>>,
+    mut rec: Option<&mut GroupCounts>,
 ) -> Result<(FieldOutcome, DevCounts, FieldTiming)> {
     ensure!(coord.b == 64, "middle-out device path: base 64 only");
     let sh = Shape::for_coord(coord);
@@ -3803,8 +3845,14 @@ fn field_run<R: Runtime>(
     let mut pips: Vec<u64> = ts
         .flat_map(|t| sh.slices_of(coord, t).map(|p| p as u64).collect::<Vec<_>>())
         .collect();
-    if let Some(k) = max_slices {
-        pips.truncate(k.max(1));
+    if let Some(r) = sel {
+        let end = r.end.min(pips.len());
+        ensure!(
+            r.start < end,
+            "middle-out: slices {r:?} of a field of {}",
+            pips.len()
+        );
+        pips = pips[r.start..end].to_vec();
     }
     let nice_before = gj.nice()?;
     let t0 = Instant::now();
@@ -3848,6 +3896,9 @@ fn field_run<R: Runtime>(
             let g = gj.finish_group(&cnt, &tk)?;
             sync_s += tsync.elapsed().as_secs_f64();
             total.add(&g);
+            if let Some(r) = rec.as_mut() {
+                r.push((pips[k0..done].to_vec(), g));
+            }
         }
     } else {
         let next = AtomicUsize::new(0);
@@ -4075,6 +4126,119 @@ mod tests {
                 );
                 assert_eq!(dc.checked, got.len() as u64);
                 assert!(rebuilt == got, "the check's n differ from the survivors");
+            }};
+        }
+        match &ctx {
+            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => go!(client.clone()),
+            #[cfg(feature = "cubecl-cuda")]
+            crate::cubecl_backend::CubeclContext::Cuda { client, .. } => go!(client.clone()),
+            #[allow(unreachable_patterns)]
+            _ => panic!("unsupported runtime"),
+        }
+    }
+
+    /// (step 5L) A field of the coordinate `(4, 8, 5)` (digits 5–7 fixed) is searched exactly: run through the
+    /// field path one slice per group, every slice's counts (children, chunks, flat, survivors, checked, tops)
+    /// equal those of the same slice run through the `(4, 9, 6)` fields that hold it (each such field's 64
+    /// slices of the new field's digit 5, as a part of that field); the per-slice counts sum to the field run's
+    /// outcome; with the whole field (`MIDOUT_485_D8=all`, the default), the production path (group 16, the
+    /// sampled CPU check on) gives the same totals. `MIDOUT_485_T` (the new field's digits 5–7, default
+    /// 77777), `MIDOUT_485_D8` (`all` or a list of digit-8 values), `MIDOUT_CLASSES` (63).
+    #[test]
+    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime) and minutes"]
+    fn field_485_equals_496_slice_by_slice() {
+        use std::collections::HashMap;
+        let ctx = device().expect("a device");
+        let tn: u128 = std::env::var("MIDOUT_485_T")
+            .ok()
+            .map_or(77_777, |s| s.parse().unwrap());
+        let d8s: Vec<u128> = match std::env::var("MIDOUT_485_D8").as_deref() {
+            Ok("all") | Err(_) => (0..64).collect(),
+            Ok(l) => l.split(',').map(|x| x.parse().unwrap()).collect(),
+        };
+        let whole = d8s.len() == 64;
+        let classes: u32 = std::env::var("MIDOUT_CLASSES")
+            .ok()
+            .map_or(63, |s| s.parse().unwrap());
+        let cn = Coord::with_digits(64, 4, 8, 5).unwrap();
+        let co = Coord::with_digits(64, 4, 9, 6).unwrap();
+        let q = cn.quantum();
+        assert_eq!(q, co.quantum());
+        let key = |c: &DevCounts| {
+            (
+                c.children,
+                c.chunks,
+                c.flat,
+                c.survivors,
+                c.checked,
+                c.tops,
+                c.slices,
+            )
+        };
+        macro_rules! go {
+            ($client:expr) => {{
+                let gj = GpuJoin::new($client, Caps::b64(classes)).unwrap();
+                let opt1 = GpuOptions { group: 1, host_threads: 1, device_tops: true, cpu_check: false };
+                // the new field, slice by slice (all of it, or the slices of the listed digit-8 values)
+                let mut newc: HashMap<u64, DevCounts> = HashMap::new();
+                let (mut ns, mut nc) = (0u64, 0u64);
+                let sels: Vec<std::ops::Range<usize>> = if whole {
+                    vec![0..4096]
+                } else {
+                    d8s.iter().map(|&d| (d as usize) * 64..(d as usize) * 64 + 64).collect()
+                };
+                let tw = std::time::Instant::now();
+                for sel in sels {
+                    let (o, rec) = search_field_groups(&gj, &cn, cn.start + tn * q, q, opt1, sel).unwrap();
+                    let (mut s1, mut c1) = (0, 0);
+                    for (p, c) in rec {
+                        assert_eq!(p.len(), 1);
+                        assert_eq!((u128::from(p[0]) >> 6) & ((1 << 18) - 1), tn, "slice {} outside the field", p[0]);
+                        s1 += c.survivors;
+                        c1 += c.checked;
+                        assert!(newc.insert(p[0], c).is_none(), "slice {} twice", p[0]);
+                    }
+                    assert_eq!((s1, c1), (o.survivors, o.checked), "per-slice counts sum to the field run's");
+                    ns += o.survivors;
+                    nc += o.checked;
+                }
+                println!("(4, 8, 5) field t {tn}: {} slices, survivors {ns}, checked {nc} ({:.1} s)", newc.len(), tw.elapsed().as_secs_f64());
+                assert_eq!(newc.len(), 64 * d8s.len());
+                // the same slices through the (4, 9, 6) fields that hold them
+                let (d5, hi) = (tn % 64, tn / 64);
+                let mut oldc: HashMap<u64, DevCounts> = HashMap::new();
+                let tw = std::time::Instant::now();
+                for &d8 in &d8s {
+                    let to = hi + 4096 * d8;
+                    let sel = (d5 as usize) * 64..(d5 as usize) * 64 + 64;
+                    let (_, rec) = search_field_groups(&gj, &co, co.start + to * q, q, opt1, sel).unwrap();
+                    for (p, c) in rec {
+                        assert!(oldc.insert(p[0], c).is_none());
+                    }
+                }
+                println!("the same slices in {} (4, 9, 6) fields ({:.1} s)", d8s.len(), tw.elapsed().as_secs_f64());
+                assert_eq!(oldc.len(), newc.len());
+                let mut kept_eq = 0;
+                for (p, c) in &newc {
+                    let o = oldc.get(p).unwrap_or_else(|| panic!("slice {p} not in the (4, 9, 6) runs"));
+                    assert_eq!(key(c), key(o), "slice {p}: (4, 8, 5) {c:?} vs (4, 9, 6) {o:?}");
+                    kept_eq += usize::from(c.kept == o.kept);
+                }
+                let os: u64 = oldc.values().map(|c| c.survivors).sum();
+                let oc: u64 = oldc.values().map(|c| c.checked).sum();
+                assert_eq!((os, oc), (ns, nc));
+                println!("slice by slice: {} slices equal (kept equal on {kept_eq}: kept depends on the field's key)", newc.len());
+                if whole {
+                    let opt = GpuOptions { group: 16, host_threads: 1, device_tops: true, cpu_check: true };
+                    let (o, dc, tm) = search_field(&gj, &cn, cn.start + tn * q, q, opt).unwrap();
+                    println!(
+                        "the production path: survivors {}, checked {}, slices {}, nice {:?}, sampled slice {:?} equal ({:.1} s)",
+                        o.survivors, o.checked, o.slices, o.nice, tm.sampled, tm.wall
+                    );
+                    assert_eq!((o.survivors, o.checked, o.slices), (ns, nc, 4096));
+                    assert_eq!(dc.tops, newc.values().map(|c| c.tops).sum::<u64>());
+                    assert_eq!(dc.children, newc.values().map(|c| c.children).sum::<u64>());
+                }
             }};
         }
         match &ctx {

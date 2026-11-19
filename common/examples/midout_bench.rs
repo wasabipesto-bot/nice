@@ -4,8 +4,9 @@
 //! no API, no claims, no submissions.
 //!
 //! usage: midout_bench [--cuda] [--fields T0,T1,..] [--group G] [--threads N] [--classes C] [--tops-only K]
-//!                     [--no-cpu-check] [--slices K]
-//!   --fields: values of digits 6-8 (field t covers v = 2^75 + t·2^57, 2^57 of them)
+//!                     [--no-cpu-check] [--slices K] [--digits K0,K1,Q0]
+//!   --fields: values of the field's fixed digits (6-8 under 4,9,6; 5-7 under 4,8,5): field t covers v = 2^75 + t·2^57
+//!   --digits: the coordinate (default the base's, `Coord::for_base`)
 //!   --tops-only K: time the host's tops for K slices on N threads and exit
 //!   --no-cpu-check: without the sampled CPU check of one random slice per field (on by default)
 //!   --slices K: only each field's first K slices (dry runs on a software device; times are then per K slices)
@@ -39,7 +40,22 @@ fn main() -> Result<()> {
         .split(',')
         .map(str::parse)
         .collect::<Result<_, _>>()?;
-    let coord = Coord::for_base(64)?;
+    // --digits K0,K1,Q0: a known coordinate other than the base's default (e.g. 4,9,6 or 4,8,5)
+    let coord = match opt("--digits") {
+        Some(d) => {
+            let d: Vec<u32> = d.split(',').map(str::parse).collect::<Result<_, _>>()?;
+            if d.len() != 3 {
+                bail!("--digits K0,K1,Q0");
+            }
+            let c = Coord::with_digits(64, d[0], d[1], d[2])?;
+            if !c.is_known() {
+                bail!("--digits {d:?}: not a known coordinate of the base");
+            }
+            c
+        }
+        None => Coord::for_base(64)?,
+    };
+    eprintln!("coordinate midout:{},{},{}", coord.k0, coord.k1, coord.q0);
     if let Some(k) = opt("--tops-only") {
         let k: u64 = k.parse()?;
         let roots = depth4_roots();

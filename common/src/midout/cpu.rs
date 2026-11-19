@@ -38,14 +38,19 @@ pub struct Shape {
 }
 
 impl Shape {
-    /// The shape the join uses for a coordinate: tops down to the field's
-    /// lowest coordinate digit `k0`, bottoms of `k1 + 1` digits (base 64:
-    /// (4, 10), the measured design).
+    /// The shape the join uses for a coordinate: (4, 10) for the two
+    /// coordinates of bases 64–70, `(4, 9, 6)` and `(4, 8, 5)` (the measured
+    /// design; under `(4, 8, 5)` it is set explicitly, `k1 + 1` would be 9);
+    /// otherwise tops down to the coordinate's lowest digit `k0` and bottoms
+    /// of `k1 + 1` digits (small bases in tests).
     #[must_use]
     pub fn for_coord(c: &Coord) -> Self {
-        Shape {
-            f0: c.k0,
-            k: c.k1 + 1,
+        match (c.k0, c.k1, c.q0) {
+            (4, 8, 5) => Shape { f0: 4, k: 10 },
+            _ => Shape {
+                f0: c.k0,
+                k: c.k1 + 1,
+            },
         }
     }
 
@@ -802,9 +807,45 @@ mod tests {
         }
     }
 
+    /// `(4, 8, 5)`: the (4, 10) shape; a field is 4,096 (b64) / 4,225 (b65)
+    /// distinct slices, exactly those whose digits 5–7 are the field's, every
+    /// n of the field in one of them; digit 4 innermost (the top hierarchy
+    /// groups 64 consecutive slices by digits 5–8).
+    #[test]
+    fn coordinate_485_is_whole_slices() {
+        for (b, per) in [(64u32, 4096usize), (65, 4225)] {
+            let c = Coord::with_digits(b, 4, 8, 5).unwrap();
+            let sh = Shape::for_coord(&c);
+            assert_eq!(sh, Shape { f0: 4, k: 10 });
+            assert!(sh.fits(&c).is_ok());
+            let bb = u128::from(b);
+            let q = c.quantum();
+            for t in [0u128, 1, 77_777, bb.pow(3) - 1] {
+                let pips: Vec<u128> = sh.slices_of(&c, t).collect();
+                assert_eq!(pips.len(), per);
+                let set: std::collections::HashSet<u128> = pips.iter().copied().collect();
+                assert_eq!(set.len(), per);
+                for (i, &p) in pips.iter().enumerate() {
+                    assert!(p < bb.pow(5));
+                    assert_eq!((p / bb) % bb.pow(3), t, "b{b} t {t} pip {p}");
+                    assert_eq!(p % bb, (i % b as usize) as u128, "digit 4 innermost");
+                    assert_eq!(p / bb, pips[i - i % b as usize] / bb);
+                }
+                // every n of the quantum lies in one of its slices (sampled along v)
+                let vs = c.start + t * q;
+                for j in 0..5_000u128 {
+                    let v = vs + (q / 5_000) * j + j * 7_919 % (q / 5_000);
+                    if let Some(n) = c.n_of_v(v) {
+                        assert!(set.contains(&((n / bb.pow(4)) % bb.pow(5))), "b{b} n {n}");
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn shapes_that_do_not_fit_are_refused() {
-        let c = Coord::for_base(64).unwrap();
+        let c = Coord::with_digits(64, 4, 9, 6).unwrap();
         assert!(Shape::for_coord(&c).fits(&c).is_ok());
         assert_eq!(Shape::for_coord(&c), Shape { f0: 4, k: 10 });
         assert!(Shape { f0: 3, k: 11 }.fits(&c).is_ok());

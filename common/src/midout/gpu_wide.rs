@@ -3492,7 +3492,27 @@ pub fn search_field_wide<R: Runtime>(
         "middle-out wide: a timing stop ({}) is set: this join only times stages",
         gj.stop
     );
-    run_field_wide(gj, coord, v_start, v_size, opt)
+    run_field_wide(gj, coord, v_start, v_size, opt, None, None)
+}
+
+/// (tests) [`search_field_wide`] on the slices `sel` of the field's slice list, returning each group's slices
+/// and the device's counts for it (one slice per group with `opt.group` 1): the field path, slice by slice.
+///
+/// # Errors
+/// As [`search_field_wide`].
+#[cfg(test)]
+pub(crate) fn search_field_wide_groups<R: Runtime>(
+    gj: &WideJoin<R>,
+    coord: &Coord,
+    v_start: u128,
+    v_size: u128,
+    opt: WideOptions,
+    sel: std::ops::Range<usize>,
+) -> Result<(FieldOutcome, Vec<(Vec<u64>, WCounts)>)> {
+    ensure!(gj.stop == 6, "middle-out wide: a timing stop is set");
+    let mut rec = Vec::new();
+    let (o, _, _) = run_field_wide(gj, coord, v_start, v_size, opt, Some(sel), Some(&mut rec))?;
+    Ok((o, rec))
 }
 
 /// Time a field with the join's timing stop ([`WideJoin::set_timing_stop`]): the stages up to it, nothing
@@ -3511,7 +3531,7 @@ pub fn time_field_wide<R: Runtime>(
         group,
         cpu_check: false,
     };
-    Ok(run_field_wide(gj, coord, v_start, v_size, opt)?.2)
+    Ok(run_field_wide(gj, coord, v_start, v_size, opt, None, None)?.2)
 }
 
 fn run_field_wide<R: Runtime>(
@@ -3520,6 +3540,8 @@ fn run_field_wide<R: Runtime>(
     v_start: u128,
     v_size: u128,
     opt: WideOptions,
+    sel: Option<std::ops::Range<usize>>,
+    mut rec: Option<&mut Vec<(Vec<u64>, WCounts)>>,
 ) -> Result<(FieldOutcome, WCounts, FieldTiming)> {
     let sh = Shape {
         f0: gj.wb.f0,
@@ -3533,9 +3555,18 @@ fn run_field_wide<R: Runtime>(
     );
     sh.fits(coord)?;
     let ts = coord.field_digits(v_start, v_size)?;
-    let pips: Vec<u64> = ts
+    let mut pips: Vec<u64> = ts
         .flat_map(|t| sh.slices_of(coord, t).map(|p| p as u64).collect::<Vec<_>>())
         .collect();
+    if let Some(r) = sel {
+        let end = r.end.min(pips.len());
+        ensure!(
+            r.start < end,
+            "middle-out wide: slices {r:?} of a field of {}",
+            pips.len()
+        );
+        pips = pips[r.start..end].to_vec();
+    }
     let nice_before = gj.nice()?;
     let t0 = Instant::now();
     let sample = if opt.cpu_check && gj.stop == 6 {
@@ -3574,6 +3605,9 @@ fn run_field_wide<R: Runtime>(
         let g = gj.finish_group(&cnt, &tk, sample.as_ref().map(|_| &mut per_slice))?;
         sync_s += tsync.elapsed().as_secs_f64();
         total.add(&g);
+        if let Some(r) = rec.as_mut() {
+            r.push((pips[k0..done].to_vec(), g));
+        }
     }
     let field = t0.elapsed().as_secs_f64();
     let mut tm = FieldTiming {
@@ -3682,6 +3716,98 @@ mod tests {
                 let n = wb.n_of(pip, wb.nlead + 1, 7);
                 assert_eq!(n % base.pw[f0 as usize], 7);
             }
+        }
+    }
+
+    /// (step 5L) Base 65 under the coordinate `(4, 8, 5)` (padded; digits 5–7 fixed): a field's slices for the
+    /// listed digit-8 values, through the field path one slice per group, each equal (children, chunks, flat,
+    /// survivors, checked, tops) to the same slice run as a part of the `(4, 9, 6)` field that holds it; the
+    /// per-slice counts sum to the field runs'. With `MIDOUT_485_WHOLE=1` also the whole new field through the
+    /// production path (group 16; the sampled CPU check with `MIDOUT_485_CHECK=1`: ~90 s of CPU).
+    /// `MIDOUT_485_T` (default 13731), `MIDOUT_485_D8` (default `0,1,64`).
+    #[test]
+    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime) and minutes"]
+    fn wide_field_485_equals_496_slice_by_slice() {
+        use std::collections::HashMap;
+        let ctx = device().expect("a device");
+        let b = 65u32;
+        let bb = u128::from(b);
+        let tn: u128 = std::env::var("MIDOUT_485_T")
+            .ok()
+            .map_or(13_731, |s| s.parse().unwrap());
+        let d8s: Vec<u128> = std::env::var("MIDOUT_485_D8")
+            .unwrap_or_else(|_| "0,1,64".into())
+            .split(',')
+            .map(|x| x.parse().unwrap())
+            .collect();
+        let cn = Coord::with_digits(b, 4, 8, 5).unwrap();
+        let co = Coord::with_digits(b, 4, 9, 6).unwrap();
+        let sh = Shape::for_coord(&cn);
+        assert_eq!(sh, Shape::for_coord(&co));
+        let (qn, qo) = (cn.quantum(), co.quantum());
+        let key = |c: &WCounts| {
+            (
+                c.children,
+                c.chunks,
+                c.flat,
+                c.survivors,
+                c.checked,
+                c.tops,
+                c.slices,
+            )
+        };
+        macro_rules! go {
+            ($client:expr) => {{
+                let gj = WideJoin::new($client, WideCaps::for_base(b), &cn, sh).unwrap();
+                let opt1 = WideOptions { group: 1, cpu_check: false };
+                let bu = b as usize;
+                let (mut newc, mut oldc): (HashMap<u64, WCounts>, HashMap<u64, WCounts>) = (HashMap::new(), HashMap::new());
+                let (d5, hi) = (tn % bb, tn / bb);
+                for &d8 in &d8s {
+                    let sel = (d8 as usize) * bu..(d8 as usize) * bu + bu;
+                    let (o, rec) = search_field_wide_groups(&gj, &cn, cn.start + tn * qn, qn, opt1, sel).unwrap();
+                    let (mut s1, mut c1) = (0, 0);
+                    for (p, c) in rec {
+                        assert_eq!((u128::from(p[0]) / bb) % bb.pow(3), tn, "slice {} outside the field", p[0]);
+                        assert_eq!(u128::from(p[0]) / bb.pow(4), d8);
+                        s1 += c.survivors;
+                        c1 += c.checked;
+                        assert!(newc.insert(p[0], c).is_none());
+                    }
+                    assert_eq!((s1, c1), (o.survivors, o.checked));
+                    let to = hi + bb * bb * d8;
+                    let sel = (d5 as usize) * bu..(d5 as usize) * bu + bu;
+                    let (_, rec) = search_field_wide_groups(&gj, &co, co.start + to * qo, qo, opt1, sel).unwrap();
+                    for (p, c) in rec {
+                        assert!(oldc.insert(p[0], c).is_none());
+                    }
+                }
+                assert_eq!(newc.len(), bu * d8s.len());
+                assert_eq!(oldc.len(), newc.len());
+                for (p, c) in &newc {
+                    let o = oldc.get(p).unwrap_or_else(|| panic!("slice {p} not in the (4, 9, 6) runs"));
+                    assert_eq!(key(c), key(o), "slice {p}: (4, 8, 5) {c:?} vs (4, 9, 6) {o:?}");
+                }
+                let ns: u64 = newc.values().map(|c| c.survivors).sum();
+                let nc: u64 = newc.values().map(|c| c.checked).sum();
+                println!("b65 (4, 8, 5) field t {tn}, digit 8 in {d8s:?}: {} slices equal to (4, 9, 6)'s, survivors {ns}, checked {nc}", newc.len());
+                if std::env::var("MIDOUT_485_WHOLE").is_ok_and(|x| x == "1") {
+                    let cpu_check = std::env::var("MIDOUT_485_CHECK").is_ok_and(|x| x == "1");
+                    let (o, _, tm) = search_field_wide(&gj, &cn, cn.start + tn * qn, qn, WideOptions { group: 16, cpu_check }).unwrap();
+                    println!(
+                        "b65 (4, 8, 5) whole field t {tn}: survivors {}, checked {}, slices {}, nice {:?}, sampled {:?} ({:.1} s), n {}",
+                        o.survivors, o.checked, o.slices, o.nice, tm.sampled, tm.wall, cn.n_count(cn.start + tn * qn, qn).unwrap()
+                    );
+                    assert_eq!(o.slices, 4225);
+                }
+            }};
+        }
+        match &ctx {
+            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => go!(client.clone()),
+            #[cfg(feature = "cubecl-cuda")]
+            crate::cubecl_backend::CubeclContext::Cuda { client, .. } => go!(client.clone()),
+            #[allow(unreachable_patterns)]
+            _ => panic!("unsupported runtime"),
         }
     }
 
