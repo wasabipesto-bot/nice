@@ -4,9 +4,10 @@
 //! no API, no claims, no submissions.
 //!
 //! usage: midout_bench [--cuda] [--fields T0,T1,..] [--group G] [--threads N] [--classes C] [--tops-only K]
-//!                     [--no-cpu-check] [--slices K] [--digits K0,K1,Q0]
+//!                     [--no-cpu-check] [--slices K] [--digits K0,K1,Q0] [--share-parents]
 //!   --fields: values of the field's fixed digits (6-8 under 4,9,6; 5-7 under 4,8,5): field t covers v = 2^75 + t·2^57
 //!   --digits: the coordinate (default the base's, `Coord::for_base`)
+//!   --share-parents: the parents' root pass shared across digit 8 (`GpuJoin::set_parent_sharing`; (4, 8, 5) fields)
 //!   --tops-only K: time the host's tops for K slices on N threads and exit
 //!   --no-cpu-check: without the sampled CPU check of one random slice per field (on by default)
 //!   --slices K: only each field's first K slices (dry runs on a software device; times are then per K slices)
@@ -119,7 +120,9 @@ fn main() -> Result<()> {
                 gj.set_timing_stop(s);
             }
             let cpu_check = !args.iter().any(|a| a == "--no-cpu-check");
-            println!("device {name}; W {}; group {group}; host threads {threads}; classes per batch {classes}; cpu check {cpu_check}; timing stop {stop:?}; slices per field {part:?}", gj.w);
+            let share = args.iter().any(|a| a == "--share-parents");
+            gj.set_parent_sharing(share);
+            println!("device {name}; W {}; group {group}; host threads {threads}; classes per batch {classes}; cpu check {cpu_check}; timing stop {stop:?}; slices per field {part:?}; parent sharing {share}", gj.w);
             let q = coord.quantum();
             let (mut wall, mut adm_all) = (0f64, 0f64);
             for &t in &fields {
@@ -161,6 +164,10 @@ fn main() -> Result<()> {
                     tm.host_wait,
                     tm.sync
                 );
+                if share {
+                    let (nl, listed) = gj.parent_sharing_last();
+                    println!("SHARE t {t}: {nl} depth-8 lists, {listed} roots listed");
+                }
                 if let Some(p) = tm.sampled {
                     println!(
                         "SAMPLE t {t} slice {p}: equal; field {:.2} s, CPU thread {:.2} s, waited {:.2} s for it, device rerun {:.3} s",

@@ -1012,6 +1012,88 @@ mod prep {
         (mm, cacc, key)
     }
 
+    /// (step 5L) The parents' shared pass across digit 8: the depth-4 roots whose depth-8 ancestor
+    /// r = r4 + pip8·2^24 (pip8 = digits 4–7 of the slices it serves) has 16 distinct digits 0–7 of r² and r³
+    /// (mod 2^48), appended as r4 to `out` (one atomic per plane; order arbitrary). Digits 0–7 of r² and r³
+    /// depend only on r mod 2^48, so every root whose depth-9 parent passes `parent` for some digit 8 is listed:
+    /// `hist2` over this list instead of every root is exact, for each of the 64 slices that share digits 4–7.
+    /// Account `acc8`: [cubes done, roots examined, roots certified (by a ballot, apart from the list's own count
+    /// `cnt[0]`), plane errors].
+    #[cube(launch_unchecked)]
+    pub fn anc8_kernel(
+        r4s: &Array<u32>,
+        out: &mut Array<u32>,
+        cnt: &mut Array<Atomic<u32>>,
+        nroots: u32,
+        pip8: u32,
+        cap: u32,
+        acc8: &mut Array<Atomic<u32>>,
+        #[comptime] w: u32,
+    ) {
+        let sh = SharedMemory::<Atomic<u32>>::new(2usize);
+        if UNIT_POS_X < 2u32 {
+            sh[UNIT_POS_X as usize].store(0u32);
+        }
+        if PLANE_DIM != w || UNIT_POS_X % w != UNIT_POS_PLANE {
+            acc8[3usize].fetch_add(1u32);
+        }
+        sync_cube();
+        let i = ABSOLUTE_POS_X;
+        let live = i < nroots;
+        let mut ok = false;
+        let mut r4 = 0u32;
+        if live {
+            r4 = r4s[i as usize];
+            let mask48 = (1u64 << 48u64) - 1u64;
+            let r = (u64::cast_from(r4) + (u64::cast_from(pip8) << 24u64)) & mask48;
+            let sq = (r * r) & mask48;
+            let cu = (sq * r) & mask48;
+            let slo = u32::cast_from(sq & 0xFFFF_FFFFu64);
+            let shi = u32::cast_from(sq >> 32u64);
+            let clo = u32::cast_from(cu & 0xFFFF_FFFFu64);
+            let chi = u32::cast_from(cu >> 32u64);
+            let mut m = 0u64;
+            #[unroll]
+            for j in 0..8u32 {
+                m |= (1u64 << u64::cast_from(dig2(slo, shi, j)))
+                    | (1u64 << u64::cast_from(dig2(clo, chi, j)));
+            }
+            ok = m.count_ones() == 16u32;
+        }
+        let b = plane_ballot(ok);
+        let l = UNIT_POS_PLANE;
+        let lo = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
+        let mut r = (b[0usize] & lo).count_ones();
+        let mut n = b[0usize].count_ones();
+        if comptime!(w > 32) {
+            let hi = select(l >= 32u32, (1u32 << (l & 31u32)) - 1u32, 0u32);
+            r += (b[1usize] & hi).count_ones();
+            n += b[1usize].count_ones();
+        }
+        let mut base0 = 0u32;
+        if l == 0u32 && n > 0u32 {
+            base0 = cnt[0usize].fetch_add(n);
+        }
+        let base = plane_sum(base0); // only lane 0 holds it
+        if ok {
+            let slot = base + r;
+            if slot < cap {
+                out[slot as usize] = r4;
+            }
+        }
+        let ex = plane_sum(select(live, 1u32, 0u32));
+        if UNIT_POS_PLANE == 0u32 {
+            sh[0usize].fetch_add(ex);
+            sh[1usize].fetch_add(n);
+        }
+        sync_cube();
+        if UNIT_POS_X == 0u32 {
+            acc8[0usize].fetch_add(1u32);
+            acc8[1usize].fetch_add(sh[0usize].load());
+            acc8[2usize].fetch_add(sh[1usize].load());
+        }
+    }
+
     /// --prep2 1 (default): the histogram pass also appends each parent's record and key to a compact list (one
     /// atomic per plane), so the scatter reads 1.04M list entries instead of making the parents of all 9.3M roots
     /// a second time. The list's order is arbitrary; the rank sort restores the CPU's order (ranks by r4).
@@ -2537,6 +2619,8 @@ struct SliceHead {
     host_tops: Option<u32>,
     /// Every launch batch of the slice was queued (the probe and children laws hold only then).
     full: bool,
+    /// The roots `hist2` examined: every depth-4 root, or a shared depth-8 list's length (step 5L).
+    h2n: u32,
 }
 
 /// A slice's device tops and parents, queued: its buffers, top status, account and 64-slice level.
@@ -2545,7 +2629,24 @@ struct DevPrep {
     tstat: Handle,
     acc: Handle,
     l5n: Handle,
+    h2n: u32,
 }
+
+/// (step 5L) The parents' shared depth-8 lists of a field: one per value of digits 4–7 (`keys`), the roots whose
+/// depth-8 ancestor is valid (`anc8_kernel`), with their lengths (read once per field).
+#[derive(Default)]
+struct AncLists {
+    keys: Vec<u32>,
+    lens: Vec<u32>,
+    lists: Vec<Handle>,
+    /// The last build: lists and roots listed (tests, benches).
+    last: (usize, u64),
+}
+
+/// (step 5L) Most shared depth-8 lists held at once (one per value of digit 4 of a `(4, 8, 5)` field), and each
+/// one's capacity in roots (a longer list is an error of the field; ~22 % of the 9.3M roots are listed).
+const ANC_LISTS: usize = 64;
+const ANC_CAP: u32 = 3_400_000;
 
 /// The device side: kernels compiled for one plane width, buffers allocated
 /// once and reused by every slice.
@@ -2603,6 +2704,9 @@ pub struct GpuJoin<R: Runtime> {
     stop: u32,
     /// (audit, dev/mo-audit) fault-injection bits; 0 in production (only the audit tests set it).
     pub(crate) fault: u32,
+    /// (step 5L) Share the parents' root pass across digit 8 inside a field ([`GpuJoin::set_parent_sharing`]).
+    share8: bool,
+    anc: Mutex<AncLists>,
 }
 
 /// (audit) Host-side fault bits (the kernel bits are documented at `g2_kernel`'s `fault`).
@@ -2629,6 +2733,9 @@ pub(crate) const F_SLABCNT: u32 = 2048;
 pub(crate) const F_SKIP_TOPS: u32 = 4096;
 #[allow(dead_code)] // set by the audit's tests only (some by number, `AUDIT_FAULTS`)
 pub(crate) const F_DROP_PARENT: u32 = 8192;
+/// (step 5L) The shared depth-8 pass (`anc8_kernel`) not launched.
+#[allow(dead_code)] // set by the audit's tests only
+pub(crate) const F_SKIP_ANC: u32 = 16384;
 
 impl<R: Runtime> GpuJoin<R> {
     /// (audit) The slab capacity the kernels are told (shrunk by `F_SLAB_CAP`).
@@ -2769,6 +2876,8 @@ impl<R: Runtime> GpuJoin<R> {
             l5: e(4 << 21),
             l5cur: Mutex::new(None),
             watch: Mutex::new((None, None)),
+            share8: false,
+            anc: Mutex::new(AncLists::default()),
             stop: 6,
             fault: 0,
             client,
@@ -2780,6 +2889,107 @@ impl<R: Runtime> GpuJoin<R> {
     /// only be timed ([`time_field`]); [`search_field`] refuses it.
     pub fn set_timing_stop(&mut self, stop: u32) {
         self.stop = stop;
+    }
+
+    /// (step 5L) Share the parents' root pass across digit 8 inside a field: when a field's slices take at most
+    /// 64 values of digits 4–7, each of them several times (a `(4, 8, 5)` field: 64 values, 64 slices each), the
+    /// roots valid to depth 8 are listed once per value (`anc8_kernel`, at the field's start, one
+    /// synchronisation) and each slice's `hist2` runs over its list instead of every root. Exact by containment
+    /// (see `anc8_kernel`); off unless set.
+    pub fn set_parent_sharing(&mut self, on: bool) {
+        self.share8 = on;
+    }
+
+    /// (step 5L) Build the shared depth-8 lists for `keys` (digits 4–7), synchronise, and check their accounts.
+    fn build_anc(&self, keys: &[u32]) -> Result<()> {
+        ensure!(
+            keys.len() <= ANC_LISTS,
+            "middle-out: {} depth-8 lists",
+            keys.len()
+        );
+        let mut st = self.anc.lock().expect("anc");
+        st.keys.clear();
+        st.lens.clear();
+        while st.lists.len() < keys.len() {
+            let h = self.client.empty(ANC_CAP as usize * 4);
+            st.lists.push(h);
+        }
+        let nroots = self.roots.len() as u32;
+        let mut hs = Vec::new();
+        for (j, &k) in keys.iter().enumerate() {
+            let cnt = self.mk(vec![0u32]);
+            let acc8 = self.mk(vec![0u32; 4]);
+            if self.fault & F_SKIP_ANC == 0 {
+                unsafe {
+                    prep::anc8_kernel::launch_unchecked::<R>(
+                        &self.client,
+                        CubeCount::Static(nroots.div_ceil(NT), 1, 1),
+                        CubeDim::new_1d(NT),
+                        ArrayArg::from_raw_parts(self.r4h.clone(), nroots as usize),
+                        ArrayArg::from_raw_parts(st.lists[j].clone(), ANC_CAP as usize),
+                        ArrayArg::from_raw_parts(cnt.clone(), 1),
+                        nroots,
+                        k,
+                        ANC_CAP,
+                        ArrayArg::from_raw_parts(acc8.clone(), 4),
+                        self.w,
+                    );
+                }
+            }
+            hs.push((cnt, acc8));
+        }
+        cubecl::future::block_on(self.client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
+        let mut lens = Vec::new();
+        for (j, (cnt, acc8)) in hs.iter().enumerate() {
+            let n = self.rd(cnt)?[0];
+            let a = self.rd(acc8)?;
+            let k = keys[j];
+            ensure!(
+                a[3] == 0,
+                "middle-out: anc8 (digits 4-7 {k}): plane errors {}",
+                a[3]
+            );
+            ensure!(
+                a[0] == nroots.div_ceil(NT),
+                "middle-out: anc8 (digits 4-7 {k}): cubes done: {}, want {} (account {a:?})",
+                a[0],
+                nroots.div_ceil(NT)
+            );
+            ensure!(
+                a[1] == nroots,
+                "middle-out: anc8 (digits 4-7 {k}): roots examined: {}, want {nroots}",
+                a[1]
+            );
+            ensure!(
+                a[2] == n,
+                "middle-out: anc8 (digits 4-7 {k}): roots certified {} = listed {n}",
+                a[2]
+            );
+            ensure!(
+                n > 0 && n <= ANC_CAP,
+                "middle-out: anc8 (digits 4-7 {k}): {n} roots listed (capacity {ANC_CAP})"
+            );
+            lens.push(n);
+        }
+        st.last = (keys.len(), lens.iter().map(|&x| u64::from(x)).sum());
+        st.keys = keys.to_vec();
+        st.lens = lens;
+        Ok(())
+    }
+
+    /// (step 5L) The last build of shared lists: (lists, roots listed in all).
+    pub fn parent_sharing_last(&self) -> (usize, u64) {
+        self.anc.lock().expect("anc").last
+    }
+
+    /// (step 5L) The shared list for a slice (digits 4–7 of `pip`), if one is built: (handle, length).
+    fn anc_for(&self, pip: u64) -> Option<(Handle, u32)> {
+        let st = self.anc.lock().expect("anc");
+        let k = (pip & 0xFF_FFFF) as u32;
+        st.keys
+            .iter()
+            .position(|&x| x == k)
+            .map(|j| (st.lists[j].clone(), st.lens[j]))
     }
 
     /// The depth-4 roots the device holds (for the host's tops and key).
@@ -2819,6 +3029,7 @@ impl<R: Runtime> GpuJoin<R> {
                     l5n: None,
                     host_tops: Some(st.tmask.len() as u32),
                     full: true,
+                    h2n: self.roots.len() as u32,
                 });
             }
             out.push(t);
@@ -2843,7 +3054,7 @@ impl<R: Runtime> GpuJoin<R> {
     /// Queue a slice with its tops made on the device; `rankh` its 8 key
     /// digits (uploaded once per field).
     fn queue_dev(&self, pip: u64, rankh: &Handle, cnt: &Handle, out: &mut Vec<Ticket>) {
-        let dp = self.queue_dev_prep(pip, rankh);
+        let dp = self.queue_dev_prep(pip, rankh, true);
         let nt = self.caps.tops as usize;
         for bi in 0..self.batches.len() {
             let mut t = self.queue_batch(pip, nt, &dp.sb, bi, cnt, &dp.acc);
@@ -2855,6 +3066,7 @@ impl<R: Runtime> GpuJoin<R> {
                     l5n: Some(dp.l5n.clone()),
                     host_tops: None,
                     full: true,
+                    h2n: dp.h2n,
                 });
             }
             out.push(t);
@@ -2863,7 +3075,7 @@ impl<R: Runtime> GpuJoin<R> {
     }
 
     /// Device tops and parents of a slice; its buffers and top status.
-    fn queue_dev_prep(&self, pip: u64, rankh: &Handle) -> DevPrep {
+    fn queue_dev_prep(&self, pip: u64, rankh: &Handle, shared: bool) -> DevPrep {
         let nt = self.caps.tops as usize;
         let c = &self.client;
         let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
@@ -2979,8 +3191,10 @@ impl<R: Runtime> GpuJoin<R> {
                 );
             }
         }
+        let mut h2n = self.roots.len() as u32;
         if self.upto(2) {
-            self.queue_parents(pip, rankh, &acc);
+            let src = if shared { self.anc_for(pip) } else { None };
+            h2n = self.queue_parents(pip, rankh, &acc, src);
         }
         DevPrep {
             sb: SliceBufs {
@@ -2992,6 +3206,7 @@ impl<R: Runtime> GpuJoin<R> {
             tstat,
             acc,
             l5n,
+            h2n,
         }
     }
 
@@ -3006,6 +3221,18 @@ impl<R: Runtime> GpuJoin<R> {
         rank: &[u32; 8],
         max_batches: usize,
     ) -> Result<(DevCounts, Vec<u128>, Vec<(u32, u64)>)> {
+        self.run_slice_dev_with(pip, rank, max_batches, false)
+    }
+
+    /// [`GpuJoin::run_slice_dev`]; with `shared`, the parents from the shared depth-8 list of the slice's digits
+    /// 4–7 when one is built (step 5L tests: `build_anc` first).
+    pub(crate) fn run_slice_dev_with(
+        &self,
+        pip: u64,
+        rank: &[u32; 8],
+        max_batches: usize,
+        shared: bool,
+    ) -> Result<(DevCounts, Vec<u128>, Vec<(u32, u64)>)> {
         let cnt = self.mk(vec![0u32; NCNT]);
         let rankh = self.mk(rank.to_vec());
         let DevPrep {
@@ -3013,7 +3240,8 @@ impl<R: Runtime> GpuJoin<R> {
             tstat,
             acc,
             l5n,
-        } = self.queue_dev_prep(pip, &rankh);
+            h2n,
+        } = self.queue_dev_prep(pip, &rankh, shared);
         let nt = self.caps.tops as usize;
         let mut tk = Vec::new();
         let mut v = Vec::new();
@@ -3041,6 +3269,7 @@ impl<R: Runtime> GpuJoin<R> {
                     l5n: Some(l5n.clone()),
                     host_tops: None,
                     full: nb == self.batches.len(),
+                    h2n,
                 });
             }
             cubecl::future::block_on(self.client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
@@ -3123,7 +3352,7 @@ impl<R: Runtime> GpuJoin<R> {
             );
         }
         let acc = self.mk(vec![0u32; ACC_WORDS]);
-        self.queue_parents(st.pip, &rankh, &acc);
+        self.queue_parents(st.pip, &rankh, &acc, None);
         Ok((
             SliceBufs {
                 tmh,
@@ -3136,18 +3365,26 @@ impl<R: Runtime> GpuJoin<R> {
     }
 
     /// Queue the slice's parents: the preparation of the G2 port (histogram,
-    /// scan, scatter, per-bucket sort), unchanged.
-    fn queue_parents(&self, pip: u64, rankh: &Handle, acc: &Handle) {
+    /// scan, scatter, per-bucket sort), unchanged; `hist2` over every depth-4
+    /// root, or over a shared depth-8 list `src` (step 5L). Returns the roots
+    /// `hist2` examines.
+    fn queue_parents(
+        &self,
+        pip: u64,
+        rankh: &Handle,
+        acc: &Handle,
+        src: Option<(Handle, u32)>,
+    ) -> u32 {
         let c = &self.client;
         let np = self.caps.parents as usize;
-        let nroots = self.roots.len() as u32;
+        let (r4h, nroots) = src.unwrap_or_else(|| (self.r4h.clone(), self.roots.len() as u32));
         let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
         unsafe {
             prep::hist2_kernel::launch_unchecked::<R>(
                 c,
                 CubeCount::Static(nroots.div_ceil(NT), 1, 1),
                 CubeDim::new_1d(NT),
-                a(&self.r4h, nroots as usize),
+                a(&r4h, nroots as usize),
                 a(rankh, 8),
                 a(&self.histh, 16128),
                 a(&self.g_lst, np),
@@ -3194,6 +3431,7 @@ impl<R: Runtime> GpuJoin<R> {
                 a(acc, ACC_WORDS),
             );
         }
+        nroots
     }
 
     /// Queue one launch batch of a prepared slice.
@@ -3533,11 +3771,10 @@ impl<R: Runtime> GpuJoin<R> {
             fail("tdigz2 rows", u64::from(a[A_TDIG]), u64::from(ntops))?;
             fail("toprec2 rows", u64::from(a[A_TREC]), u64::from(ntops))?;
         }
-        let nroots = self.roots.len() as u32;
         fail(
             "hist2 cubes done",
             u64::from(a[A_H2_CUBES]),
-            u64::from(nroots.div_ceil(NT)),
+            u64::from(h.h2n.div_ceil(NT)),
         )?;
         fail(
             "parents certified (hist2) = listed",
@@ -3603,6 +3840,7 @@ impl<R: Runtime> GpuJoin<R> {
                     l5n: None,
                     host_tops: Some(st.tmask.len() as u32),
                     full: true,
+                    h2n: self.roots.len() as u32,
                 });
             }
             cubecl::future::block_on(self.client.sync()).map_err(|e| anyhow!("sync: {e:?}"))?;
@@ -3881,6 +4119,23 @@ fn field_run<R: Runtime>(
     // the key from the field's first slice on the host (it only orders the parents: any key is exact)
     let rank = slice_tops(pips[0], gj.roots()).rank;
     if opt.device_tops {
+        // (step 5L) the parents' shared depth-8 lists, when the field's slices repeat their digits 4-7
+        gj.anc.lock().expect("anc").keys.clear();
+        if gj.share8 && gj.upto(2) {
+            let mut keys: Vec<u32> = Vec::new();
+            for &p in &pips {
+                let k = (p & 0xFF_FFFF) as u32;
+                if !keys.contains(&k) {
+                    keys.push(k);
+                    if keys.len() > ANC_LISTS {
+                        break;
+                    }
+                }
+            }
+            if keys.len() <= ANC_LISTS && keys.len() < pips.len() {
+                gj.build_anc(&keys)?;
+            }
+        }
         host_wait = t0.elapsed().as_secs_f64();
         let rankh = gj.mk(rank.to_vec());
         let mut done = 0usize;
@@ -3951,6 +4206,7 @@ fn field_run<R: Runtime>(
         res?;
     }
     let field_s = t0.elapsed().as_secs_f64();
+    gj.anc.lock().expect("anc").keys.clear();
     // the field's nice numbers, before the sampled slice runs again
     let nice_all = gj.nice()?;
     let mut nice = nice_all;
@@ -4137,6 +4393,80 @@ mod tests {
         }
     }
 
+    /// (step 5L) The parents' root pass shared across digit 8 (`set_parent_sharing`): the first `MIDOUT_SHARE_SLICES`
+    /// (128) slices of a `(4, 8, 5)` field (64 values of digit 4 × 2 of digit 8: every depth-8 list serves two
+    /// slices), one slice per group, give every slice's counts (kept included: same key) equal with and without
+    /// sharing; with sharing on, each fault is loud (`F_SKIP_ANC` new; `F_SKIP_MAIN`, `F_SKIP_TOPS`,
+    /// `F_DROP_PROBE`, `F_DROP_PARENT` as on the trunk), and a clean run after each gives the clean counts.
+    #[test]
+    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime)"]
+    fn field_parent_sharing_is_exact_and_loud() {
+        let ctx = device().expect("a device");
+        let tn: u128 = std::env::var("MIDOUT_485_T")
+            .ok()
+            .map_or(77_777, |s| s.parse().unwrap());
+        let nsl: usize = std::env::var("MIDOUT_SHARE_SLICES")
+            .ok()
+            .map_or(128, |s| s.parse().unwrap());
+        let classes: u32 = std::env::var("MIDOUT_CLASSES")
+            .ok()
+            .map_or(63, |s| s.parse().unwrap());
+        let cn = Coord::with_digits(64, 4, 8, 5).unwrap();
+        let (q, vs) = (cn.quantum(), cn.start + tn * cn.quantum());
+        macro_rules! go {
+            ($client:expr) => {{
+                let mut gj = GpuJoin::new($client, Caps::b64(classes)).unwrap();
+                let opt1 = GpuOptions { group: 1, host_threads: 1, device_tops: true, cpu_check: false };
+                let opt16 = GpuOptions { group: 16, ..opt1 };
+                let (o0, r0) = search_field_groups(&gj, &cn, vs, q, opt1, 0..nsl).unwrap();
+                gj.set_parent_sharing(true);
+                let (o1, r1) = search_field_groups(&gj, &cn, vs, q, opt1, 0..nsl).unwrap();
+                let (nl, listed) = gj.parent_sharing_last();
+                println!(
+                    "{nsl} slices of (4, 8, 5) field {tn}: {nl} depth-8 lists, {listed} roots listed ({:.1} % of {} per list)",
+                    100.0 * listed as f64 / (nl as f64 * gj.roots().len() as f64),
+                    gj.roots().len()
+                );
+                assert!(nl >= 1 && nl < nsl);
+                assert_eq!(r0.len(), r1.len());
+                for ((p0, c0), (p1, c1)) in r0.iter().zip(&r1) {
+                    assert_eq!(p0, p1);
+                    // every count (the audit's maxima, e.g. slabs, depend on the order of atomics: not compared)
+                    let k = |c: &DevCounts| {
+                        (c.children, c.chunks, c.flat, c.kept, c.survivors, c.checked, c.slices, c.tops, c.tested)
+                    };
+                    assert_eq!(k(c0), k(c1), "slice {p0:?}: shared parents differ: {c0:?} vs {c1:?}");
+                }
+                assert_eq!((o0.survivors, o0.checked, o0.slices), (o1.survivors, o1.checked, o1.slices));
+                println!("equal slice by slice with and without sharing: survivors {}, checked {}", o1.survivors, o1.checked);
+                for (name, f) in [
+                    ("F_SKIP_ANC", F_SKIP_ANC),
+                    ("F_SKIP_MAIN", F_SKIP_MAIN),
+                    ("F_SKIP_TOPS", F_SKIP_TOPS),
+                    ("F_DROP_PROBE", F_DROP_PROBE),
+                    ("F_DROP_PARENT", F_DROP_PARENT),
+                ] {
+                    gj.set_fault(f);
+                    let r = search_field_groups(&gj, &cn, vs, q, opt16, 0..nsl);
+                    gj.set_fault(0);
+                    match r {
+                        Ok((o, _)) => panic!("{name}: silent (survivors {}, checked {})", o.survivors, o.checked),
+                        Err(e) => println!("{name}: loud: {e:#}"),
+                    }
+                    let (oc, _) = search_field_groups(&gj, &cn, vs, q, opt16, 0..nsl).unwrap();
+                    assert_eq!((oc.survivors, oc.checked), (o1.survivors, o1.checked), "{name}: clean rerun");
+                }
+            }};
+        }
+        match &ctx {
+            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => go!(client.clone()),
+            #[cfg(feature = "cubecl-cuda")]
+            crate::cubecl_backend::CubeclContext::Cuda { client, .. } => go!(client.clone()),
+            #[allow(unreachable_patterns)]
+            _ => panic!("unsupported runtime"),
+        }
+    }
+
     /// (step 5L) A field of the coordinate `(4, 8, 5)` (digits 5–7 fixed) is searched exactly: run through the
     /// field path one slice per group, every slice's counts (children, chunks, flat, survivors, checked, tops)
     /// equal those of the same slice run through the `(4, 9, 6)` fields that hold it (each such field's 64
@@ -4280,7 +4610,7 @@ mod tests {
                 let st = slice_tops(pip, gj.roots());
                 let rankh = gj.mk(st.rank.to_vec());
                 let cnt = gj.mk(vec![0u32; NCNT]);
-                let dp = gj.queue_dev_prep(pip, &rankh);
+                let dp = gj.queue_dev_prep(pip, &rankh, false);
                 let nt = gj.caps.tops as usize;
                 let mut hist = [0u64; 65];
                 let mut slabs: Vec<Vec<u32>> = Vec::new();
@@ -4412,7 +4742,14 @@ mod tests {
                     let (dc, mut got) = if std::env::var("MIDOUT_HOST_TOPS").is_ok() {
                         gj.run_slice(&st).unwrap()
                     } else {
-                        let (dc, got, mut tops) = gj.run_slice_dev(pip, &st.rank, nb).unwrap();
+                        // MIDOUT_SHARE8=1 (step 5L): the parents from the shared depth-8 list of the slice's digits 4-7
+                        let share = std::env::var("MIDOUT_SHARE8").is_ok_and(|x| x == "1");
+                        if share {
+                            gj.build_anc(&[(pip & 0xFF_FFFF) as u32]).unwrap();
+                            let (_, n) = gj.anc_for(pip).unwrap();
+                            println!("slice {pip}: shared depth-8 list of {n} roots (of {})", gj.roots().len());
+                        }
+                        let (dc, got, mut tops) = gj.run_slice_dev_with(pip, &st.rank, nb, share).unwrap();
                         let mut htops: Vec<(u32, u64)> = st.thd.iter().copied().zip(st.tmask.iter().copied()).collect();
                         htops.sort_unstable();
                         tops.sort_unstable();
