@@ -3688,7 +3688,47 @@ pub fn search_field<R: Runtime>(
         "middle-out: a timing stop ({}) is set: this join only times stages",
         gj.stop
     );
-    field_run(gj, coord, v_start, v_size, opt)
+    field_run(gj, coord, v_start, v_size, opt, None)
+}
+
+/// [`search_field`] on the field's first `max_slices` slices only (benches and dry runs on a software device: a
+/// field is 4,096 slices). The outcome and the counts cover those slices; the sampled check draws among them.
+///
+/// # Errors
+/// As [`search_field`].
+pub fn search_field_part<R: Runtime>(
+    gj: &GpuJoin<R>,
+    coord: &Coord,
+    v_start: u128,
+    v_size: u128,
+    opt: GpuOptions,
+    max_slices: usize,
+) -> Result<(FieldOutcome, DevCounts, FieldTiming)> {
+    ensure!(
+        gj.stop == 6,
+        "middle-out: a timing stop ({}) is set: this join only times stages",
+        gj.stop
+    );
+    field_run(gj, coord, v_start, v_size, opt, Some(max_slices))
+}
+
+/// [`time_field`] on the field's first `max_slices` slices only.
+///
+/// # Errors
+/// As [`time_field`].
+pub fn time_field_part<R: Runtime>(
+    gj: &GpuJoin<R>,
+    coord: &Coord,
+    v_start: u128,
+    v_size: u128,
+    opt: GpuOptions,
+    max_slices: usize,
+) -> Result<FieldTiming> {
+    let opt = GpuOptions {
+        cpu_check: false,
+        ..opt
+    };
+    Ok(field_run(gj, coord, v_start, v_size, opt, Some(max_slices))?.2)
 }
 
 /// Time a field with the join's timing stop (benches): the stages up to
@@ -3707,7 +3747,7 @@ pub fn time_field<R: Runtime>(
         cpu_check: false,
         ..opt
     };
-    Ok(field_run(gj, coord, v_start, v_size, opt)?.2)
+    Ok(field_run(gj, coord, v_start, v_size, opt, None)?.2)
 }
 
 fn field_run<R: Runtime>(
@@ -3716,6 +3756,7 @@ fn field_run<R: Runtime>(
     v_start: u128,
     v_size: u128,
     opt: GpuOptions,
+    max_slices: Option<usize>,
 ) -> Result<(FieldOutcome, DevCounts, FieldTiming)> {
     ensure!(coord.b == 64, "middle-out device path: base 64 only");
     let sh = Shape::for_coord(coord);
@@ -3731,9 +3772,12 @@ fn field_run<R: Runtime>(
         opt.group
     );
     let ts = coord.field_digits(v_start, v_size)?;
-    let pips: Vec<u64> = ts
+    let mut pips: Vec<u64> = ts
         .flat_map(|t| sh.slices_of(coord, t).map(|p| p as u64).collect::<Vec<_>>())
         .collect();
+    if let Some(k) = max_slices {
+        pips.truncate(k.max(1));
+    }
     let nice_before = gj.nice()?;
     let t0 = Instant::now();
     // the sampled CPU check: a random slice of the field, on a host thread while the card works
