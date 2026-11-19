@@ -13,7 +13,9 @@
 use anyhow::{Result, bail};
 use nice_common::cubecl_backend::CubeclContext;
 use nice_common::midout::gpu::{Caps, GpuJoin, GpuOptions, search_field};
-use nice_common::midout::gpu_wide::{WideCaps, WideJoin, search_field_wide};
+use nice_common::midout::gpu_wide::{
+    WideCaps, WideJoin, WideOptions, search_field_wide, time_field_wide,
+};
 use nice_common::midout::{Coord, Shape};
 
 fn main() -> Result<()> {
@@ -65,7 +67,12 @@ fn main() -> Result<()> {
             let wide = if flag("--narrow-only") {
                 None
             } else {
-                Some(WideJoin::new($client, caps, &coord, sh)?)
+                let mut g = WideJoin::new($client, caps, &coord, sh)?;
+                // timing only: the bench reads MIDOUT_STOP (the library never does) and times the stages up to it
+                if let Some(st) = std::env::var("MIDOUT_STOP").ok().and_then(|x| x.parse().ok()) {
+                    g.set_timing_stop(st);
+                }
+                Some(g)
             };
             let nj = if narrow { Some(GpuJoin::new($client, Caps::b64(63))?) } else { None };
             println!(
@@ -83,8 +90,17 @@ fn main() -> Result<()> {
                 let adm = ncount as f64 * roots / f64::from(b - 1);
                 adm_all += adm;
                 if let Some(gj) = &wide {
-                    let (o, dc, tm) = search_field_wide(gj, &coord, vs, q, group)?;
+                    if gj.stop_set() {
+                        let tm = time_field_wide(gj, &coord, vs, q, group)?;
+                        wall_w += tm.wall;
+                        println!("WIDE b{b} t {t} TIMING STOP: {:.2} s = {:.4} fs per admissible n", tm.wall, tm.wall / adm * 1e15);
+                        continue;
+                    }
+                    let (o, dc, tm) = search_field_wide(gj, &coord, vs, q, WideOptions { group, cpu_check: flag("--cpu-check") })?;
                     wall_w += tm.wall;
+                    if let Some(p) = tm.sampled {
+                        println!("WIDE b{b} t {t} sampled CPU check: slice {p} equal (cpu {:.1} s, host waited {:.1} s, device rerun {:.2} s; field alone {:.2} s)", tm.cpu_check, tm.cpu_wait, tm.sample_dev, tm.field);
+                    }
                     println!(
                         "WIDE b{b} t {t} v [{vs}, +{q}) n {ncount}: {:.2} s = {:.4} fs per admissible n | slices {} survivors {} checked {} nice {:?} | tops {} children {} chunks {} flat {} kept {} | key {:.2} s, sync+reads {:.2} s",
                         tm.wall,
