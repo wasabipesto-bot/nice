@@ -1006,6 +1006,154 @@ mod wp {
         ok || small
     }
 
+    /// (step 5L) `pf_w` in base b² ("super-digits": two digits each, so a column sum of products of super-digits
+    /// stays below 2^32 for b <= 70 and k + 2 <= 2 * 178): r = r_f + F·b^f0 with F's super-digits fixed per record
+    /// (`sf`, from `pf_w2_fixed`) and r_f's from one division by b² per pair of its digits; r² and r³ mod b^(2·ns)
+    /// in ns = ceil((k + 2) / 2) super-digit columns (ns(ns+1)/2 products each, against (k+2)(k+3)/2 per digit in
+    /// `pf_w`), then each super-digit split once into its two digits. The test on the digits 0..k+1 is `pf_w`'s
+    /// (all distinct, those >= k outside the top's mask, `small` passes): the same predicate, so `checked` is
+    /// unchanged. `small` here is the record's part (h < hsmall, slice digits); r_f's part (its digits >= ceil((k +
+    /// 2) / 2) zero) is r_f < b^ceil((k + 2) / 2), tested here.
+    #[cube]
+    pub fn pf_w2(
+        sf: &Array<u32>,
+        rf: u32,
+        mlo: u64,
+        mhi: u32,
+        small_rec: bool,
+        #[comptime] b: u32,
+        #[comptime] f0: u32,
+        #[comptime] k: u32,
+    ) -> bool {
+        let kk = comptime!(k + 2);
+        let ns = comptime!((k + 3) / 2);
+        let bb = comptime!(b * b);
+        let tsm = comptime!((k + 3) / 2);
+        let mut rz = true;
+        if comptime!(tsm < f0) {
+            rz = rf < comptime!(b.pow(tsm));
+        }
+        let mut sd = Array::<u32>::new(comptime!(ns as usize));
+        let mut y = rf;
+        #[unroll]
+        for i in 0..ns {
+            if comptime!(2 * i + 1 < f0) {
+                let q = y / bb;
+                sd[i as usize] = y - q * bb;
+                y = q;
+            } else if comptime!(2 * i + 1 == f0) {
+                // the super-digit across f0: r_f's top digit and the record's digit f0
+                sd[i as usize] = y + b * sf[i as usize];
+            } else {
+                sd[i as usize] = sf[i as usize];
+            }
+        }
+        let mut sq = Array::<u32>::new(comptime!(ns as usize));
+        let mut cu = Array::<u32>::new(comptime!(ns as usize));
+        let mut carry = 0u32;
+        #[unroll]
+        for j in 0..ns {
+            let mut t = carry;
+            #[unroll]
+            for i in 0..ns {
+                if comptime!(i <= j) {
+                    t += sd[i as usize] * sd[comptime!(j - i) as usize];
+                }
+            }
+            carry = t / bb;
+            sq[j as usize] = t - carry * bb;
+        }
+        carry = 0u32;
+        #[unroll]
+        for j in 0..ns {
+            let mut t = carry;
+            #[unroll]
+            for i in 0..ns {
+                if comptime!(i <= j) {
+                    t += sd[i as usize] * sq[comptime!(j - i) as usize];
+                }
+            }
+            carry = t / bb;
+            cu[j as usize] = t - carry * bb;
+        }
+        let mut lo = 0u64;
+        let mut hi = 0u32;
+        let mut ok = true;
+        #[unroll]
+        for j in 0..ns {
+            let s1 = sq[j as usize] / b;
+            let c1 = cu[j as usize] / b;
+            let (a0, ah0) = dbit(sq[j as usize] - s1 * b);
+            let (c0, ch0) = dbit(cu[j as usize] - c1 * b);
+            // digit 2j of r², r³
+            if (lo & a0) != 0u64 || (hi & ah0) != 0u32 {
+                ok = false;
+            }
+            lo |= a0;
+            hi |= ah0;
+            if (lo & c0) != 0u64 || (hi & ch0) != 0u32 {
+                ok = false;
+            }
+            lo |= c0;
+            hi |= ch0;
+            if comptime!(2 * j >= k) {
+                if ((a0 | c0) & mlo) != 0u64 || ((ah0 | ch0) & mhi) != 0u32 {
+                    ok = false;
+                }
+            }
+            // digit 2j + 1, if below k + 2
+            if comptime!(2 * j + 1 < kk) {
+                let (a1, ah1) = dbit(s1);
+                let (c1b, ch1) = dbit(c1);
+                if (lo & a1) != 0u64 || (hi & ah1) != 0u32 {
+                    ok = false;
+                }
+                lo |= a1;
+                hi |= ah1;
+                if (lo & c1b) != 0u64 || (hi & ch1) != 0u32 {
+                    ok = false;
+                }
+                lo |= c1b;
+                hi |= ch1;
+                if comptime!(2 * j + 1 >= k) {
+                    if ((a1 | c1b) & mlo) != 0u64 || ((ah1 | ch1) & mhi) != 0u32 {
+                        ok = false;
+                    }
+                }
+            }
+        }
+        ok || (small_rec && rz)
+    }
+
+    /// (step 5L) A record's fixed super-digits for `pf_w2` from its digits `rd[f0..k+2)` (`rd` of k + 2 digits):
+    /// sf[i] = rd[2i] + b·rd[2i + 1] for 2i >= f0 (rd[k + 2] = 0), rd[f0] for the super-digit across f0 (f0 odd).
+    #[cube]
+    pub fn pf_w2_fixed(
+        rd: &Array<u32>,
+        sf: &mut Array<u32>,
+        #[comptime] b: u32,
+        #[comptime] f0: u32,
+        #[comptime] k: u32,
+    ) {
+        let kk = comptime!(k + 2);
+        let ns = comptime!((k + 3) / 2);
+        #[unroll]
+        for i in 0..ns {
+            if comptime!(2 * i + 1 == f0) {
+                sf[i as usize] = rd[f0 as usize];
+            } else if comptime!(2 * i >= f0) {
+                if comptime!(2 * i + 1 < kk) {
+                    sf[i as usize] =
+                        rd[comptime!(2 * i) as usize] + b * rd[comptime!(2 * i + 1) as usize];
+                } else {
+                    sf[i as usize] = rd[comptime!(2 * i) as usize];
+                }
+            } else {
+                sf[i as usize] = 0u32;
+            }
+        }
+    }
+
     /// The digits of the parent of r_f = r mod b^f0 under the slice (digits [f0, k−1) = pipd): (mask lo, hi, cacc),
     /// mask 0 when a digit 0..k−2 of r² or r³ repeats.
     #[cube]
@@ -1828,6 +1976,8 @@ mod wp {
         #[comptime] nroot: u32,
         #[comptime] f0: u32,
         #[comptime] k: u32,
+        // (step 5L) the prefilter in base b² (`pf_w2`); false: digit by digit (`pf_w`)
+        #[comptime] pf2: bool,
     ) {
         let nopf = (fault & 1u32) != 0u32;
         let pfdrop = (fault & 1024u32) != 0u32;
@@ -1927,6 +2077,10 @@ mod wp {
                     rd[comptime!(k + 1) as usize] = ((h - h0) / b) % b;
                     let hz =
                         h < hsmall && pipz && du * select(comptime!(k > tsm), 1u32, 0u32) == 0u32;
+                    let mut sf = Array::<u32>::new(comptime!(((k + 3) / 2) as usize));
+                    if comptime!(pf2) {
+                        pf_w2_fixed(&rd, &mut sf, b, f0, k);
+                    }
                     for half in 0..2u32 {
                         let mut x = select(half == 0u32, wlo, whi);
                         while x != 0u32 {
@@ -1936,21 +2090,27 @@ mod wp {
                             if (edge_lo && rf < slo) || (edge_hi && rf > ehi) {
                                 nclip += 1u32;
                             } else {
-                                let mut y = rf;
-                                let mut rz = true;
-                                #[unroll]
-                                for j in 0..f0 {
-                                    let q = y / b;
-                                    rd[j as usize] = y - q * b;
-                                    if comptime!(j >= tsm) {
-                                        if y - q * b != 0u32 {
-                                            rz = false;
+                                let mut pfok = false;
+                                if comptime!(pf2) {
+                                    pfok = pf_w2(&sf, rf, mq, mqh, hz, b, f0, k);
+                                } else {
+                                    let mut y = rf;
+                                    let mut rz = true;
+                                    #[unroll]
+                                    for j in 0..f0 {
+                                        let q = y / b;
+                                        rd[j as usize] = y - q * b;
+                                        if comptime!(j >= tsm) {
+                                            if y - q * b != 0u32 {
+                                                rz = false;
+                                            }
                                         }
+                                        y = q;
                                     }
-                                    y = q;
+                                    pfok = pf_w(&rd, mq, mqh, hz && rz, b, k);
                                 }
                                 let pass = nopf
-                                    || (pf_w(&rd, mq, mqh, hz && rz, b, k)
+                                    || (pfok
                                         && !(pfdrop && (rf >> 10u32).trailing_zeros() >= 10u32));
                                 if pass {
                                     if half == 0u32 {
@@ -2482,6 +2642,8 @@ pub struct WideJoin<R: Runtime> {
     pub(crate) stop: u32,
     /// (audit) fault-injection bits; 0 in production (only the tests set them).
     pub(crate) fault: u32,
+    /// (step 5L) The expansion's prefilter in base b² (`pf_w2`; on unless [`WideJoin::set_prefilter_b2`]).
+    pf2: bool,
 }
 
 impl<R: Runtime> WideJoin<R> {
@@ -2616,6 +2778,7 @@ impl<R: Runtime> WideJoin<R> {
             t5state: std::sync::Mutex::new(None),
             stop: 6,
             fault: 0,
+            pf2: true,
             caps,
             wb,
             client,
@@ -2624,6 +2787,12 @@ impl<R: Runtime> WideJoin<R> {
 
     fn upto(&self, k: u32) -> bool {
         self.stop >= k
+    }
+
+    /// (step 5L) The expansion's prefilter in base b² (`pf_w2`, the default) or digit by digit (`pf_w`, the
+    /// trunk's before step 5L; for A/B timing). The same predicate either way.
+    pub fn set_prefilter_b2(&mut self, on: bool) {
+        self.pf2 = on;
     }
 
     /// Timing and bisection only (the bench's `MIDOUT_STOP`): run the stages up to `stop` (1 tops, 2 parents, 3
@@ -2967,6 +3136,7 @@ impl<R: Runtime> WideJoin<R> {
                     wb.roots.len() as u32,
                     wb.f0,
                     wb.k,
+                    self.pf2,
                 );
             }
             if self.upto(6) {
