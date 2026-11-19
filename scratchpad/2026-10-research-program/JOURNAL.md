@@ -4,6 +4,36 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-19 (cycle 10 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances at the start; November research $21.08 invoiced of $30 (fleet $33.79),
+  credit $56.41. No day missed. PRs: **#270 open, mergeable, 24 checks pass, 1 queued (Linux-arm-musl), 2 skipped
+  publish jobs; no comments.** Drafts #255, #242, #194, #160 are the user's or parked. Upstream main 71eb5fcd
+  (#269, a release lockfile check from another session; v3.4.8 published 11-18 17:08 UTC).
+- **The user since the last report (all applied yesterday):** approved building the redesign with conditions
+  (field structure must not box the project in; a day of basics then days of optimising before review; schema
+  last); asked whether the join is affected (no: stride only); asked for the routing and history (checked in
+  the tags); asked for the census (run at 03:15, EXPERIMENTS SRA.3).
+- **Release measured** (`REL348/realized.py`, read-only): the fleet's RTX 3060s went from a median join of
+  403.8 s on v3.4.7 to 112.8 s on v3.4.8, **×3.58 on the same card model** (2,067 → 7,596 M survivors per
+  second); RTX 5060s on v3.4.8 run 77.1 s; demoux is unchanged as expected (49.9 → 51.4 s: it ran main already);
+  the M4 447.9 s. Predicted from the rented 3080: ×3.25.
+- **Plan (kill criteria where they apply):**
+  - **FS, the field structure attacked** (`G2/FS-BRIEF.md`, Opus, ivory, to 10:30): the user's concern treated
+    as a research question: alternative unit structures and future optimisations priced with exact counts
+    against the proposed fields; a recommended field definition. If it finds a structure that beats the proposed
+    one by ×1.5 or an optimisation of that size it blocks, the interface changes before any schema proposal.
+  - **4S, the library path prepared for the RX 9070 XT offline** (`G2/BUILD-BRIEF-4S.md`, Opus, ivory, to 11:30):
+    a 64-lane pre-flight of every kernel through ACO, a model, tuning proven on lavapipe, a window plan. Stop
+    at 08:30 if the 64-lane SPIR-V cannot be produced.
+  - **4F, a client route against a local coordinator** (`G2/BUILD-BRIEF-4F.md`, Opus, box 61386517 on m11295,
+    branch `dev/mo-client`, to 11:30): no server change; guards (refuses production, other routes refuse
+    coordinate fields, nothing submitted after a failed account or a runtime-thread panic).
+  - **HC, the hand-written CUDA backend under an allocation failure** (`SRA/HC-BRIEF.md`, Opus, box 61386568,
+    to 08:15): the 15,046 stride submissions of v3.4.2–v3.4.5 that the census could not clear.
+- **Not started, on purpose:** more NVIDIA-timed speed work on the kernel. The 3080 is not where the search
+  runs; 4S decides what to tune for the card that is, and a window there decides the rest.
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);
