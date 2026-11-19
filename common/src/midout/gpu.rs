@@ -3893,7 +3893,7 @@ pub(crate) type GroupCounts = Vec<(Vec<u64>, DevCounts)>;
 ///
 /// # Errors
 /// As [`search_field`].
-#[cfg(test)]
+#[cfg(all(test, feature = "midout-box-tests"))]
 pub(crate) fn search_field_groups<R: Runtime>(
     gj: &GpuJoin<R>,
     coord: &Coord,
@@ -4289,8 +4289,8 @@ mod tests {
     /// Production's check, in its probe mode, rebuilds from our list entries
     /// and top records exactly the n of the survivors (one class of a slice).
     #[test]
-    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime)"]
-    fn gpu_check_rebuilds_the_survivors() {
+    #[ignore = "needs a GPU (lavapipe will do; MIDOUT_CUDA=1 for CUDA)"]
+    fn cubecl_midout_check_rebuilds_the_survivors() {
         let ctx = device().expect("a device");
         let pip = 712_012_851u64;
         macro_rules! go {
@@ -4329,6 +4329,7 @@ mod tests {
     /// slices), one slice per group, give every slice's counts (kept included: same key) equal with and without
     /// sharing; with sharing on, each fault is loud (`F_SKIP_ANC` new; `F_SKIP_MAIN`, `F_SKIP_TOPS`,
     /// `F_DROP_PROBE`, `F_DROP_PARENT` as without sharing), and a clean run after each gives the clean counts.
+    #[cfg(feature = "midout-box-tests")]
     #[test]
     #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime)"]
     fn field_parent_sharing_is_exact_and_loud() {
@@ -4406,6 +4407,7 @@ mod tests {
     /// outcome; with the whole field (`MIDOUT_485_D8=all`, the default), the production path (group 16, the
     /// sampled CPU check on) gives the same totals. `MIDOUT_485_T` (the new field's digits 5–7, default
     /// 77777), `MIDOUT_485_D8` (`all` or a list of digit-8 values), `MIDOUT_CLASSES` (63).
+    #[cfg(feature = "midout-box-tests")]
     #[test]
     #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime) and minutes"]
     fn field_485_equals_496_slice_by_slice() {
@@ -4525,6 +4527,7 @@ mod tests {
     /// l: records l and l + W, as `expand_kernel`), the prefilter rounds of the two-loop form (max a + max b), of the
     /// one-loop form (max (a + b)) and of four records per lane (max of 4, per 4·W records), for W 8, 32 and 64 over
     /// the slabs in the device's order. `MIDOUT_GPU_SLICES` (the first), `MIDOUT_CLASSES` (4).
+    #[cfg(feature = "midout-box-tests")]
     #[test]
     #[ignore = "needs a GPU (lavapipe will do) and a minute"]
     fn expansion_bits_profile() {
@@ -4616,42 +4619,47 @@ mod tests {
         }
     }
 
-    /// The device's prefilter survivors of whole base-64 slices (the n its
-    /// check takes) equal the CPU reference's, n for n, with the
-    /// order-independent counts (survivors and checked among them). `MIDOUT_GPU_SLICES` (comma list of digit-4..8
-    /// values) picks the slices; `MIDOUT_CLASSES` the batch width.
-    #[test]
-    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime) and minutes of CPU"]
-    fn gpu_slices_equal_cpu() {
+    /// A run of [`slices_equal_cpu`].
+    struct SliceCase {
+        /// The slices (digits 4–8).
+        pips: Vec<u64>,
+        /// Classes per batch (63: one batch; 4 on lavapipe, whose bindings are at most 128 MiB).
+        classes: u32,
+        /// Batches run per slice (`usize::MAX`: the whole slice; fewer: the classes of those batches only).
+        batches: usize,
+        /// The parents from the shared depth-8 list of the slice's digits 4–7 (`anc8_kernel`).
+        share: bool,
+        /// The tops made on the host (the host-tops path) instead of on the device.
+        host_tops: bool,
+        /// Compile for this plane width on any device, run, report and stop: only the generated code is wanted
+        /// (`CUBECL_DEBUG_SPIRV`, `CUBECL_DEBUG_LOG`); the results are invalid.
+        force_w: Option<u32>,
+    }
+
+    /// The device's prefilter survivors of base-64 slices (the n its check takes) equal the CPU reference's, n
+    /// for n, with the order-independent counts (survivors and checked among them) when the slice is whole, and
+    /// the device's tops equal the host's.
+    fn slices_equal_cpu(case: &SliceCase) {
         let ctx = device().expect("a device");
-        let pips: Vec<u64> = std::env::var("MIDOUT_GPU_SLICES")
-            .unwrap_or_else(|_| "712012851".into())
-            .split(',')
-            .map(|s| s.parse().unwrap())
-            .collect();
-        let classes: u32 = std::env::var("MIDOUT_CLASSES")
-            .ok()
-            .map_or(63, |s| s.parse().unwrap());
+        let (pips, classes) = (&case.pips, case.classes);
         let coord = Coord::for_base(64).unwrap();
         let base = Base::new(&coord);
         macro_rules! go {
             ($client:expr) => {{
-                // MIDOUT_FORCE_W=64: compile for that plane width on any device (lavapipe), run, report and stop:
-                // only the SPIR-V is wanted (`CUBECL_DEBUG_SPIRV`); the results are invalid
-                let force_w: Option<u32> = std::env::var("MIDOUT_FORCE_W").ok().map(|x| x.parse().unwrap());
+                let force_w = case.force_w;
                 let gj = GpuJoin::with_width($client, Caps::b64(classes), force_w).unwrap();
                 println!("device {} W {}", ctx.device_name(), gj.w);
-                for &pip in &pips {
+                for &pip in pips {
                     if force_w.is_some() {
                         let st = slice_tops(pip, gj.roots());
-                        let nb: usize = std::env::var("MIDOUT_BATCHES").ok().map_or(usize::MAX, |s| s.parse().unwrap());
+                        let nb: usize = case.batches;
                         // with MIDOUT_SHARE8=1 also the shared depth-8 pass (`anc8_kernel`); its plane check fails
                         // under a forced width, so the slice then runs unshared (hist2 is the same kernel either way)
-                        if std::env::var("MIDOUT_SHARE8").is_ok_and(|x| x == "1") {
+                        if case.share {
                             let ra = gj.build_anc(&[(pip & 0xFF_FFFF) as u32]);
                             println!("COMPILE-ONLY W {} slice {pip}: anc8 {ra:?}", gj.w);
                         }
-                        let r = if std::env::var("MIDOUT_HOST_TOPS").is_ok() {
+                        let r = if case.host_tops {
                             gj.run_slice(&st).map(|x| x.0)
                         } else {
                             gj.run_slice_dev(pip, &st.rank, nb).map(|x| x.0)
@@ -4669,7 +4677,7 @@ mod tests {
                         }
                     });
                     // a part of the slice (MIDOUT_BATCHES): survivors whose bottom's class is in the batches run
-                    let nb: usize = std::env::var("MIDOUT_BATCHES").ok().map_or(usize::MAX, |s| s.parse().unwrap());
+                    let nb: usize = case.batches;
                     let part = nb < gj.batches.len();
                     let c_end = if part { gj.batches[nb - 1].1 } else { 63 };
                     want.retain(|&n| (((n & ((1u128 << 54) - 1)) % 63) as u32) < c_end);
@@ -4677,11 +4685,11 @@ mod tests {
                     if !part {
                         want_surv = cn.survivors;
                     }
-                    let (dc, mut got) = if std::env::var("MIDOUT_HOST_TOPS").is_ok() {
+                    let (dc, mut got) = if case.host_tops {
                         gj.run_slice(&st).unwrap()
                     } else {
                         // MIDOUT_SHARE8=1: the parents from the shared depth-8 list of the slice's digits 4-7
-                        let share = std::env::var("MIDOUT_SHARE8").is_ok_and(|x| x == "1");
+                        let share = case.share;
                         if share {
                             gj.build_anc(&[(pip & 0xFF_FFFF) as u32]).unwrap();
                             let (_, n) = gj.anc_for(pip).unwrap();
@@ -4720,5 +4728,55 @@ mod tests {
             #[allow(unreachable_patterns)]
             _ => panic!("unsupported runtime"),
         }
+    }
+
+    /// Tier (b): one slice, its first batch of 4 classes, against the CPU reference.
+    #[test]
+    #[ignore = "needs a GPU (lavapipe will do; MIDOUT_CUDA=1 for CUDA) and a minute"]
+    fn cubecl_midout_slice_part_equals_cpu() {
+        slices_equal_cpu(&SliceCase {
+            pips: vec![712_012_851],
+            classes: 4,
+            batches: 1,
+            share: false,
+            host_tops: false,
+            force_w: None,
+        });
+    }
+
+    /// Tier (b): the same with the parents from the shared depth-8 list (`anc8_kernel`).
+    #[test]
+    #[ignore = "needs a GPU (lavapipe will do; MIDOUT_CUDA=1 for CUDA) and a minute"]
+    fn cubecl_midout_shared_parents_slice_part_equals_cpu() {
+        slices_equal_cpu(&SliceCase {
+            pips: vec![712_012_851],
+            classes: 4,
+            batches: 1,
+            share: true,
+            host_tops: false,
+            force_w: None,
+        });
+    }
+
+    /// Tier (c): [`slices_equal_cpu`] from the environment: `MIDOUT_GPU_SLICES` (comma list of digit-4..8 values,
+    /// default 712012851), `MIDOUT_CLASSES` (63), `MIDOUT_BATCHES` (all), `MIDOUT_SHARE8=1`, `MIDOUT_HOST_TOPS`,
+    /// `MIDOUT_FORCE_W` (the compile-only path).
+    #[cfg(feature = "midout-box-tests")]
+    #[test]
+    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime) and minutes of CPU"]
+    fn gpu_slices_equal_cpu() {
+        let env = |k: &str| std::env::var(k).ok();
+        slices_equal_cpu(&SliceCase {
+            pips: env("MIDOUT_GPU_SLICES")
+                .unwrap_or_else(|| "712012851".into())
+                .split(',')
+                .map(|s| s.parse().unwrap())
+                .collect(),
+            classes: env("MIDOUT_CLASSES").map_or(63, |s| s.parse().unwrap()),
+            batches: env("MIDOUT_BATCHES").map_or(usize::MAX, |s| s.parse().unwrap()),
+            share: env("MIDOUT_SHARE8").is_some_and(|x| x == "1"),
+            host_tops: env("MIDOUT_HOST_TOPS").is_some(),
+            force_w: env("MIDOUT_FORCE_W").map(|x| x.parse().unwrap()),
+        });
     }
 }

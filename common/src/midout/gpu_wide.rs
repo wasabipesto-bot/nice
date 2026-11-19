@@ -3697,7 +3697,7 @@ pub fn search_field_wide<R: Runtime>(
 ///
 /// # Errors
 /// As [`search_field_wide`].
-#[cfg(test)]
+#[cfg(all(test, feature = "midout-box-tests"))]
 pub(crate) fn search_field_wide_groups<R: Runtime>(
     gj: &WideJoin<R>,
     coord: &Coord,
@@ -3923,6 +3923,7 @@ mod tests {
     /// per-slice counts sum to the field runs'. With `MIDOUT_485_WHOLE=1` also the whole new field through the
     /// production path (group 16; the sampled CPU check with `MIDOUT_485_CHECK=1`: ~90 s of CPU).
     /// `MIDOUT_485_T` (default 13731), `MIDOUT_485_D8` (default `0,1,64`).
+    #[cfg(feature = "midout-box-tests")]
     #[test]
     #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime) and minutes"]
     fn wide_field_485_equals_496_slice_by_slice() {
@@ -4034,30 +4035,16 @@ mod tests {
         (cn, v, pv)
     }
 
-    /// The wide device path against the CPU reference on whole slices: tops
-    /// count, survivor sets n for n, children, chunks, flat, kept (the key is
-    /// the reference's rule), survivors = checked, and the check's distinct
-    /// digits of every survivor = the reference's. `MIDOUT_WIDE_CASES` is a
-    /// comma list of `b:f0:k:pip` (default a b65 slice); `MIDOUT_CLASSES`
-    /// the batch width.
-    #[test]
-    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime) and minutes of CPU"]
-    fn wide_slices_equal_cpu() {
+    /// The wide device path against the CPU reference on whole slices `cases` (`(b, f0, k, pip)`): tops count,
+    /// survivor sets n for n, children, chunks, flat, kept (the key is the reference's rule), survivors = checked,
+    /// and the check's distinct digits of every survivor = the reference's. `classes` the batch width.
+    /// `MIDOUT_NINST`, `MIDOUT_MAXPOP`, `MIDOUT_NOPF=1` and `MIDOUT_FORCE_W` (the compile-only path) change the
+    /// run when set.
+    fn wide_slices_equal(cases: &[(u32, u32, u32, u64)], classes: Option<u32>) {
         let ctx = device().expect("a device");
-        let cases: Vec<(u32, u32, u32, u64)> = std::env::var("MIDOUT_WIDE_CASES")
-            .unwrap_or_else(|_| "65:4:10:717171717".into())
-            .split(',')
-            .map(|s| {
-                let f: Vec<u64> = s.split(':').map(|x| x.parse().unwrap()).collect();
-                (f[0] as u32, f[1] as u32, f[2] as u32, f[3])
-            })
-            .collect();
-        let classes: Option<u32> = std::env::var("MIDOUT_CLASSES")
-            .ok()
-            .map(|s| s.parse().unwrap());
         macro_rules! go {
             ($client:expr) => {{
-                for &(b, f0, k, pip) in &cases {
+                for &(b, f0, k, pip) in cases {
                     let coord = Coord::with_digits(b, 0, 1, 0).unwrap();
                     let sh = Shape { f0, k };
                     let mut caps = WideCaps::for_base(b);
@@ -4158,11 +4145,39 @@ mod tests {
         }
     }
 
+    /// Tier (b): one base-40 slice, shape (3, 6), 4 classes per batch.
+    #[test]
+    #[ignore = "needs a GPU (lavapipe will do; MIDOUT_CUDA=1 for CUDA)"]
+    fn cubecl_midout_wide_b40_slice_equals_cpu() {
+        wide_slices_equal(&[(40, 3, 6, 1234)], Some(4));
+    }
+
+    /// Tier (c): [`wide_slices_equal`] from the environment: `MIDOUT_WIDE_CASES`, a comma list of `b:f0:k:pip`
+    /// (default a base-65 slice), and `MIDOUT_CLASSES`.
+    #[cfg(feature = "midout-box-tests")]
+    #[test]
+    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime) and minutes of CPU"]
+    fn wide_slices_equal_cpu() {
+        let cases: Vec<(u32, u32, u32, u64)> = std::env::var("MIDOUT_WIDE_CASES")
+            .unwrap_or_else(|_| "65:4:10:717171717".into())
+            .split(',')
+            .map(|s| {
+                let f: Vec<u64> = s.split(':').map(|x| x.parse().unwrap()).collect();
+                (f[0] as u32, f[1] as u32, f[2] as u32, f[3])
+            })
+            .collect();
+        let classes = std::env::var("MIDOUT_CLASSES")
+            .ok()
+            .map(|s| s.parse().unwrap());
+        wide_slices_equal(&cases, classes);
+    }
+
     /// Whole small bases through the wide device path against brute force:
     /// every slice of the base on the device; the union of the survivors is
     /// exactly the set of n passing the shape's predicate (no n twice), and
     /// the device's check reports exactly the nice numbers (69 at base 10).
     /// The CPU reference's own brute-force cases, here on the device.
+    #[cfg(feature = "midout-box-tests")]
     #[test]
     #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime)"]
     fn wide_whole_small_bases_vs_brute_force() {
@@ -4266,6 +4281,7 @@ mod tests {
     }
 
     /// `MIDOUT_WIDE_FAULT_CASE`: `b:pip,pip,...` (default base 65, slices 717171717 and 0).
+    #[cfg(feature = "midout-box-tests")]
     fn fault_case() -> (u32, Vec<u64>) {
         let c = std::env::var("MIDOUT_WIDE_FAULT_CASE").unwrap_or_else(|_| "65:717171717,0".into());
         let (b, p) = c.split_once(':').expect("b:pips");
@@ -4275,112 +4291,139 @@ mod tests {
         )
     }
 
-    /// The base-64 path's fault acceptance on the wide path: the faults that apply are loud through the
-    /// accounts of the production group path (`F_SKIP_MAIN`, `F_SKIP_TOPS`, `F_DROP_PROBE`, `F_DROP_PARENT`), a
-    /// clean run passes before and after each with the unfaulted counts, and `F_BAD_PARENT` (a parent computed
-    /// wrongly: every conservation law still holds) is loud through the sampled CPU check. Base 65 by default;
-    /// `MIDOUT_WIDE_FAULT_CASE=64:712012851` forces the wide path at base 64. `MIDOUT_CLASSES` the batch width,
-    /// `AUDIT_AGAIN=0` skips the clean rerun after each fault.
-    #[test]
-    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for CUDA) and a minute or two of CPU"]
+    /// The base-64 path's fault acceptance on the wide path, base `b` shape `sh` on `pips`: the faults that apply
+    /// are loud through the accounts of the production group path (`F_SKIP_MAIN`, `F_SKIP_TOPS`, `F_DROP_PROBE`,
+    /// `F_DROP_PARENT`), a clean run passes before each (and after it, with `again`) with the unfaulted counts, and
+    /// `F_BAD_PARENT` (a parent computed wrongly: every conservation law still holds) is loud through the sampled
+    /// CPU check.
     #[allow(clippy::match_wildcard_for_single_variants)]
-    fn wide_faults_are_loud() {
-        fn go<R: Runtime>(client: ComputeClient<R>) {
-            let (b, pips) = fault_case();
-            let coord = Coord::with_digits(b, 0, 1, 0).unwrap();
-            // MIDOUT_WIDE_FAULT_SHAPE `f0:k` (default 4:10)
-            let sh = std::env::var("MIDOUT_WIDE_FAULT_SHAPE").map_or(Shape { f0: 4, k: 10 }, |x| {
-                let (f, k) = x.split_once(':').expect("f0:k");
-                Shape {
-                    f0: f.parse().unwrap(),
-                    k: k.parse().unwrap(),
-                }
-            });
-            let again = std::env::var("AUDIT_AGAIN").map_or(true, |x| x != "0");
-            let sp = pips[0];
-            let cpu = std::thread::spawn({
-                let c = coord.clone();
-                move || wide_cpu_slice(&c, sh, sp)
-            });
-            let mut caps = WideCaps::for_base(b);
-            if let Ok(c) = std::env::var("MIDOUT_CLASSES") {
-                caps.classes = c.parse::<u32>().unwrap().min(b - 1);
-            }
-            let mut gj = WideJoin::new(client, caps, &coord, sh).unwrap();
-            let rank = gj.rank_of(pips[0]).unwrap();
-            println!(
-                "base {b} W {} classes {} slices {pips:?}",
-                gj.w, caps.classes
-            );
-            let base =
-                wgroup(&gj, &rank, &pips).expect("the run without a fault passes its accounts");
-            println!("fault 0: accounts pass: {base:?}");
-            let mut silent = Vec::new();
-            for (name, f) in [
-                ("F_SKIP_MAIN", F_SKIP_MAIN),
-                ("F_SKIP_TOPS", F_SKIP_TOPS),
-                ("F_DROP_PROBE", F_DROP_PROBE),
-                ("F_DROP_PARENT", F_DROP_PARENT),
-                ("F_BAD_PARENT", F_BAD_PARENT),
-                ("F_PF_DROP", F_PF_DROP),
-            ] {
-                gj.set_fault(f);
-                let r = wgroup(&gj, &rank, &pips);
-                gj.set_fault(0);
-                match r {
-                    Err(e) => println!("{name} ({f}): accounts LOUD: {e}"),
-                    Ok(dc) => {
-                        println!(
-                            "{name} ({f}): accounts pass: survivors {} vs {}",
-                            dc.survivors, base.survivors
-                        );
-                        if f != F_BAD_PARENT && f != F_PF_DROP {
-                            silent.push(name);
-                        }
+    fn wide_faults<R: Runtime>(
+        client: ComputeClient<R>,
+        b: u32,
+        pips: &[u64],
+        sh: Shape,
+        classes: Option<u32>,
+        again: bool,
+    ) {
+        let coord = Coord::with_digits(b, 0, 1, 0).unwrap();
+        let sp = pips[0];
+        let cpu = std::thread::spawn({
+            let c = coord.clone();
+            move || wide_cpu_slice(&c, sh, sp)
+        });
+        let mut caps = WideCaps::for_base(b);
+        if let Some(c) = classes {
+            caps.classes = c.min(b - 1);
+        }
+        let mut gj = WideJoin::new(client, caps, &coord, sh).unwrap();
+        let rank = gj.rank_of(pips[0]).unwrap();
+        println!(
+            "base {b} W {} classes {} slices {pips:?}",
+            gj.w, caps.classes
+        );
+        let base = wgroup(&gj, &rank, pips).expect("the run without a fault passes its accounts");
+        println!("fault 0: accounts pass: {base:?}");
+        let mut silent = Vec::new();
+        for (name, f) in [
+            ("F_SKIP_MAIN", F_SKIP_MAIN),
+            ("F_SKIP_TOPS", F_SKIP_TOPS),
+            ("F_DROP_PROBE", F_DROP_PROBE),
+            ("F_DROP_PARENT", F_DROP_PARENT),
+            ("F_BAD_PARENT", F_BAD_PARENT),
+            ("F_PF_DROP", F_PF_DROP),
+        ] {
+            gj.set_fault(f);
+            let r = wgroup(&gj, &rank, pips);
+            gj.set_fault(0);
+            match r {
+                Err(e) => println!("{name} ({f}): accounts LOUD: {e}"),
+                Ok(dc) => {
+                    println!(
+                        "{name} ({f}): accounts pass: survivors {} vs {}",
+                        dc.survivors, base.survivors
+                    );
+                    if f != F_BAD_PARENT && f != F_PF_DROP {
+                        silent.push(name);
                     }
                 }
-                if again {
-                    let a = wgroup(&gj, &rank, &pips).expect("a clean run after the fault");
-                    assert_eq!(a, base, "clean run after {name}");
-                }
             }
-            let t = Instant::now();
-            let cpu = cpu.join().unwrap();
-            println!(
-                "CPU reference of slice {sp}: survivors {} (waited {:.1} s)",
-                cpu.0,
-                t.elapsed().as_secs_f64()
-            );
-            wide_sample_compare(&gj, sp, &rank, None, &cpu)
-                .expect("the sampled check of a clean run is equal");
-            println!(
-                "sampled check, no fault: slice {sp} equal (survivors {})",
-                cpu.0
-            );
-            for (name, f) in [("F_BAD_PARENT", F_BAD_PARENT), ("F_PF_DROP", F_PF_DROP)] {
-                gj.set_fault(f);
-                let r = wide_sample_compare(&gj, sp, &rank, None, &cpu);
-                gj.set_fault(0);
-                match r {
-                    Err(e) => println!("{name}: sampled check LOUD: {e}"),
-                    Ok(()) => silent.push(name),
-                }
+            if again {
+                let a = wgroup(&gj, &rank, pips).expect("a clean run after the fault");
+                assert_eq!(a, base, "clean run after {name}");
             }
-            assert!(silent.is_empty(), "silent faults: {silent:?}");
         }
-        #[cfg(feature = "cubecl-cuda")]
-        if std::env::var("MIDOUT_CUDA").is_ok() {
-            return go(wcuda_client());
+        let t = Instant::now();
+        let cpu = cpu.join().unwrap();
+        println!(
+            "CPU reference of slice {sp}: survivors {} (waited {:.1} s)",
+            cpu.0,
+            t.elapsed().as_secs_f64()
+        );
+        wide_sample_compare(&gj, sp, &rank, None, &cpu)
+            .expect("the sampled check of a clean run is equal");
+        println!(
+            "sampled check, no fault: slice {sp} equal (survivors {})",
+            cpu.0
+        );
+        for (name, f) in [("F_BAD_PARENT", F_BAD_PARENT), ("F_PF_DROP", F_PF_DROP)] {
+            gj.set_fault(f);
+            let r = wide_sample_compare(&gj, sp, &rank, None, &cpu);
+            gj.set_fault(0);
+            match r {
+                Err(e) => println!("{name}: sampled check LOUD: {e}"),
+                Ok(()) => silent.push(name),
+            }
         }
-        match crate::cubecl_backend::CubeclContext::new_default().expect("a device") {
-            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => go(client),
-            #[allow(unreachable_patterns)]
-            _ => panic!("unsupported runtime"),
-        }
+        assert!(silent.is_empty(), "silent faults: {silent:?}");
     }
 
-    /// AUDIT-MO §1.1 on the wide path: a failed device allocation (`AUDIT_FILL_MB` filled first, in
+    /// The device the wide tests run on: CUDA with `MIDOUT_CUDA`, else the default wgpu device.
+    macro_rules! on_wide_device {
+        ($go:expr) => {{
+            #[cfg(feature = "cubecl-cuda")]
+            if std::env::var("MIDOUT_CUDA").is_ok() {
+                return $go(wcuda_client());
+            }
+            match crate::cubecl_backend::CubeclContext::new_default().expect("a device") {
+                crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => $go(client),
+                #[allow(unreachable_patterns)]
+                _ => panic!("unsupported runtime"),
+            }
+        }};
+    }
+
+    /// Tier (b): [`wide_faults`] at base 40, shape (3, 6), one slice, 4 classes per batch, no rerun.
+    #[test]
+    #[ignore = "needs a GPU (lavapipe will do; MIDOUT_CUDA=1 for CUDA)"]
+    fn cubecl_midout_wide_b40_faults_are_loud() {
+        on_wide_device!(|c| wide_faults(c, 40, &[1234], Shape { f0: 3, k: 6 }, Some(4), false));
+    }
+
+    /// Tier (c): [`wide_faults`] from the environment: `MIDOUT_WIDE_FAULT_CASE` `b:pip,pip,...` (default base 65,
+    /// slices 717171717 and 0; `64:712012851` forces the wide path at base 64), `MIDOUT_WIDE_FAULT_SHAPE` `f0:k`
+    /// (4:10), `MIDOUT_CLASSES` the batch width, `AUDIT_AGAIN=0` skips the clean rerun after each fault.
+    #[cfg(feature = "midout-box-tests")]
+    #[test]
+    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for CUDA) and a minute or two of CPU"]
+    fn wide_faults_are_loud() {
+        let (b, pips) = fault_case();
+        let sh = std::env::var("MIDOUT_WIDE_FAULT_SHAPE").map_or(Shape { f0: 4, k: 10 }, |x| {
+            let (f, k) = x.split_once(':').expect("f0:k");
+            Shape {
+                f0: f.parse().unwrap(),
+                k: k.parse().unwrap(),
+            }
+        });
+        let classes = std::env::var("MIDOUT_CLASSES")
+            .ok()
+            .map(|c| c.parse().unwrap());
+        let again = std::env::var("AUDIT_AGAIN").map_or(true, |x| x != "0");
+        on_wide_device!(|c| wide_faults(c, b, &pips, sh, classes, again));
+    }
+
+    /// On the wide path: a failed device allocation (`AUDIT_FILL_MB` filled first, in
     /// process) must not return a slice as searched. Base 65 slice 717171717 (16,482,926 survivors).
+    #[cfg(feature = "midout-box-tests")]
     #[test]
     #[ignore = "needs CUDA; fills the card's memory"]
     #[cfg(feature = "cubecl-cuda")]
@@ -4424,6 +4467,7 @@ mod tests {
 
     /// On the wide path: `MIDOUT_STOP` in the environment is ignored by the library, and
     /// `search_field_wide` refuses a join with a timing stop.
+    #[cfg(feature = "midout-box-tests")]
     #[test]
     #[ignore = "needs a GPU; sets MIDOUT_STOP (run it alone)"]
     #[allow(clippy::match_wildcard_for_single_variants)]
@@ -4473,6 +4517,7 @@ mod tests {
     /// A real base-65 slice against a staged reference from an independent
     /// implementation of the join (outside this repository): every unit's
     /// survivor set and every unit's top count, from the files in `MIDOUT_SU_DIR`.
+    #[cfg(feature = "midout-box-tests")]
     #[test]
     #[ignore = "needs a GPU and MIDOUT_SU_DIR (a staged slice)"]
     fn wide_slice_vs_staged() {

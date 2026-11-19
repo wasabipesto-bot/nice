@@ -1,20 +1,30 @@
-//! The audit harness of the middle-out join's device path:
-//! a parity sweep of the device against the CPU reference on many real
-//! base-64 slices, and fault injection into the device path to see which
-//! failures the host's accounts catch. Tests only; every test is ignored
-//! (they need a CUDA card and minutes to hours of CPU).
+//! The audit harness of the middle-out join's device path: a parity sweep
+//! of the device against the CPU reference on many real base-64 slices,
+//! and fault injection into the device path to see which failures the
+//! host's accounts catch. Tests only (the tiers: `midout` module docs).
 //!
-//! Environment: `AUDIT_SLICES` (comma list of slices, digits 4-8) or
-//! `AUDIT_SEED` + `AUDIT_N` (seeded uniform slices over the base);
-//! `AUDIT_THREADS` CPU workers (5); `AUDIT_OUT` a JSON-lines file;
+//! - tier (a), ordinary: `audit_coord_slices_partition` (CPU);
+//! - tier (b), device, CI-sized: `cubecl_midout_faults_are_loud`;
+//! - tier (c), feature `midout-box-tests`: everything else (a CUDA card,
+//!   minutes to hours of CPU, or the card's memory filled).
+//!
+//! Environment of the tier-(c) tests: `AUDIT_SLICES` (comma list of
+//! slices, digits 4-8) or `AUDIT_SEED` + `AUDIT_N` (seeded uniform slices
+//! over the base); `AUDIT_THREADS` CPU workers (5); `AUDIT_OUT` the
+//! JSON-lines file the sweep and the tops scan write (required by them);
 //! `AUDIT_FAULTS` (comma list of fault bit sets) for `audit_faults`.
 
 use super::*;
-#[cfg_attr(not(feature = "cubecl-cuda"), allow(unused_imports))]
+#[cfg_attr(
+    not(all(feature = "cubecl-cuda", feature = "midout-box-tests")),
+    allow(unused_imports)
+)]
 use crate::midout::cpu::{Base, Counts, parents, slice_join};
 use cubecl::prelude::ComputeClient;
+#[cfg(feature = "midout-box-tests")]
 use std::io::Write;
 
+#[cfg(feature = "midout-box-tests")]
 fn env_u64(k: &str, d: u64) -> u64 {
     std::env::var(k).ok().map_or(d, |s| s.parse().unwrap())
 }
@@ -28,6 +38,7 @@ fn splitmix(x: &mut u64) -> u64 {
 }
 
 /// The slices of a run: `AUDIT_SLICES`, else `AUDIT_N` seeded by `AUDIT_SEED`.
+#[cfg(feature = "midout-box-tests")]
 fn audit_slices() -> Vec<u64> {
     if let Ok(s) = std::env::var("AUDIT_SLICES") {
         return s
@@ -44,10 +55,10 @@ fn audit_slices() -> Vec<u64> {
 
 /// An order-independent hash of a set of n (count, wrapping sum, xor of a mix).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[cfg(feature = "cubecl-cuda")]
+#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
 struct SetHash(u64, u64, u64);
 
-#[cfg(feature = "cubecl-cuda")]
+#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
 impl SetHash {
     fn add(&mut self, n: u128) {
         let mut x = (n as u64) ^ ((n >> 64) as u64).rotate_left(17);
@@ -59,7 +70,7 @@ impl SetHash {
 }
 
 /// What the CPU reference says about a slice.
-#[cfg(feature = "cubecl-cuda")]
+#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
 struct Ref {
     pip: u64,
     st: SliceTops,
@@ -74,7 +85,7 @@ struct Ref {
     cpu_s: f64,
 }
 
-#[cfg(feature = "cubecl-cuda")]
+#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
 fn reference(base: &Base, roots: &[u32], pip: u64) -> Ref {
     let t0 = Instant::now();
     let st = slice_tops(pip, roots);
@@ -142,13 +153,13 @@ fn cuda_client() -> cubecl::prelude::ComputeClient<cubecl::cuda::CudaRuntime> {
 /// device tops = host tops; the prefiltered list = the reference's, n for n; with the prefilter off (`F_NOPF`), the
 /// whole survivor set = the reference's (count and an order-independent hash); children, chunks, flat, survivors,
 /// checked equal. One JSON line per slice with the limits' observed values. Fails at the end if any slice differs.
-#[cfg(feature = "cubecl-cuda")]
+#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
 #[test]
 #[ignore = "needs CUDA and hours of CPU"]
 fn audit_sweep() {
     let pips = audit_slices();
     let threads = env_u64("AUDIT_THREADS", 5) as usize;
-    let out_path = std::env::var("AUDIT_OUT").unwrap_or_else(|_| "/root/audit/sweep.jsonl".into());
+    let out_path = std::env::var("AUDIT_OUT").expect("AUDIT_OUT: the JSON-lines file to append to");
     let mut out = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -307,13 +318,13 @@ fn audit_sweep() {
 
 /// The host's tops of many slices only (no join): the distribution of the limits that depend on the tops (tops per
 /// slice, popcount, probes per job), to pick the extreme slices for the sweep. One JSON line per slice.
+#[cfg(feature = "midout-box-tests")]
 #[test]
 #[ignore = "minutes of CPU"]
 fn audit_tops_scan() {
     let pips = audit_slices();
     let threads = env_u64("AUDIT_THREADS", 5) as usize;
-    let out_path =
-        std::env::var("AUDIT_OUT").unwrap_or_else(|_| "/root/audit/tops_scan.jsonl".into());
+    let out_path = std::env::var("AUDIT_OUT").expect("AUDIT_OUT: the JSON-lines file to write");
     let next = AtomicUsize::new(0);
     let lines = Mutex::new(Vec::new());
     std::thread::scope(|s| {
@@ -375,7 +386,7 @@ fn group<R: Runtime>(gj: &GpuJoin<R>, pips: &[u64]) -> Result<DevCounts> {
 /// Fault injection: each fault set of `AUDIT_FAULTS` on the slices of `AUDIT_SLICES`, as one group through the
 /// production path; prints whether the accounts failed (loud) or passed, and the counts against the run without a
 /// fault (a pass with other counts is a silent fault).
-#[cfg(feature = "cubecl-cuda")]
+#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
 #[test]
 #[ignore = "needs CUDA"]
 fn audit_faults() {
@@ -430,7 +441,7 @@ fn audit_faults() {
 /// `MIDOUT_STOP` in the environment once made `search_field` a no-op that succeeded: the library must never read
 /// it (only the bench does, and sets the stop with `set_timing_stop`), and `search_field` must refuse a join with a
 /// stop set.
-#[cfg(feature = "cubecl-cuda")]
+#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
 #[test]
 #[ignore = "needs CUDA"]
 fn audit_stop_env_is_loud() {
@@ -483,13 +494,86 @@ macro_rules! on_device {
     }};
 }
 
-/// Every fault that once went unseen fails loudly. `F_SKIP_MAIN`, `F_SKIP_TOPS`,
-/// `F_DROP_PROBE` and `F_DROP_PARENT` through the accounts of the production group path; `F_PF_DROP` (the
-/// prefilter rejecting too much, which no account can see) through the sampled CPU check. A clean run passes before
-/// and after each fault. `AUDIT_SLICES` (default 502136830, 0), `MIDOUT_CLASSES` (63; 4 on lavapipe),
-/// `AUDIT_AGAIN=0` skips the clean rerun after each fault.
+/// Every fault that once went unseen fails loudly, on the slices `pips` with `classes` classes per batch:
+/// `F_SKIP_MAIN`, `F_SKIP_TOPS`, `F_DROP_PROBE` and `F_DROP_PARENT` through the accounts of the production group
+/// path; `F_PF_DROP` (the prefilter rejecting too much, which no account can see) through the sampled CPU check. A
+/// clean run passes before each fault (and after it, with `again`).
+fn faults_are_loud<R: Runtime>(client: ComputeClient<R>, pips: &[u64], classes: u32, again: bool) {
+    let coord = Coord::for_base(64).unwrap();
+    // the sampled slice's CPU reference, in parallel with the device runs
+    let sp = pips[0];
+    let cpu = std::thread::spawn({
+        let c = coord.clone();
+        move || cpu_slice(&c, sp)
+    });
+    let mut gj = GpuJoin::new(client, Caps::b64(classes)).unwrap();
+    println!("W {} classes {classes} slices {pips:?}", gj.w);
+    let base = group(&gj, pips).expect("the run without a fault passes its accounts");
+    println!("fault 0: accounts pass: {base:?}");
+    let mut silent = Vec::new();
+    for (name, f) in [
+        ("F_SKIP_MAIN", F_SKIP_MAIN),
+        ("F_SKIP_TOPS", F_SKIP_TOPS),
+        ("F_DROP_PROBE", F_DROP_PROBE),
+        ("F_DROP_PARENT", F_DROP_PARENT),
+        ("F_PF_DROP", F_PF_DROP),
+    ] {
+        gj.set_fault(f);
+        let r = group(&gj, pips);
+        gj.set_fault(0);
+        match r {
+            Err(e) => println!("{name} ({f}): accounts LOUD: {e}"),
+            Ok(dc) => {
+                println!(
+                    "{name} ({f}): accounts pass: survivors {} vs {}, checked {} vs {}",
+                    dc.survivors, base.survivors, dc.checked, base.checked
+                );
+                if f != F_PF_DROP {
+                    silent.push(name);
+                }
+            }
+        }
+        if again {
+            let a = group(&gj, pips).expect("a clean run after the fault");
+            assert_eq!(
+                (a.survivors, a.checked),
+                (base.survivors, base.checked),
+                "clean run after {name}"
+            );
+        }
+    }
+    let cpu = cpu.join().unwrap();
+    let rank = slice_tops(pips[0], gj.roots()).rank;
+    sample_compare(&gj, sp, &rank, &cpu).expect("the sampled check of a clean run is equal");
+    println!(
+        "sampled check, no fault: slice {sp} equal (survivors {} checked {})",
+        cpu.0, cpu.1
+    );
+    gj.set_fault(F_PF_DROP);
+    let r = sample_compare(&gj, sp, &rank, &cpu);
+    gj.set_fault(0);
+    match r {
+        Err(e) => println!("F_PF_DROP: sampled check LOUD: {e}"),
+        Ok(()) => silent.push("F_PF_DROP (sampled check)"),
+    }
+    assert!(silent.is_empty(), "silent faults: {silent:?}");
+}
+
+/// Tier (b): [`faults_are_loud`] on one slice, 4 classes per batch (lavapipe's binding limit), no rerun.
 #[test]
-#[ignore = "needs a GPU (MIDOUT_CUDA=1 for CUDA) and a minute of CPU"]
+#[ignore = "needs a GPU (lavapipe will do; MIDOUT_CUDA=1 for CUDA) and a few minutes"]
+fn cubecl_midout_faults_are_loud() {
+    fn go<R: Runtime>(client: ComputeClient<R>) {
+        faults_are_loud(client, &[502_136_830], 4, false);
+    }
+    on_device!(go);
+}
+
+/// Tier (c): [`faults_are_loud`] at full size. `AUDIT_SLICES` (default 502136830, 0), `MIDOUT_CLASSES` (63),
+/// `AUDIT_AGAIN=0` skips the clean rerun after each fault.
+#[cfg(feature = "midout-box-tests")]
+#[test]
+#[ignore = "needs a GPU (MIDOUT_CUDA=1 for CUDA) and minutes of CPU"]
 fn accounts_faults_are_loud() {
     fn go<R: Runtime>(client: ComputeClient<R>) {
         let pips: Vec<u64> = std::env::var("AUDIT_SLICES")
@@ -499,96 +583,72 @@ fn accounts_faults_are_loud() {
             .collect();
         let classes = env_u64("MIDOUT_CLASSES", 63) as u32;
         let again = env_u64("AUDIT_AGAIN", 1) == 1;
-        let coord = Coord::for_base(64).unwrap();
-        // the sampled slice's CPU reference, in parallel with the device runs
-        let sp = pips[0];
-        let cpu = std::thread::spawn({
-            let c = coord.clone();
-            move || cpu_slice(&c, sp)
-        });
-        let mut gj = GpuJoin::new(client, Caps::b64(classes)).unwrap();
-        println!("W {} classes {classes} slices {pips:?}", gj.w);
-        let base = group(&gj, &pips).expect("the run without a fault passes its accounts");
-        println!("fault 0: accounts pass: {base:?}");
-        let mut silent = Vec::new();
-        for (name, f) in [
-            ("F_SKIP_MAIN", F_SKIP_MAIN),
-            ("F_SKIP_TOPS", F_SKIP_TOPS),
-            ("F_DROP_PROBE", F_DROP_PROBE),
-            ("F_DROP_PARENT", F_DROP_PARENT),
-            ("F_PF_DROP", F_PF_DROP),
-        ] {
-            gj.set_fault(f);
-            let r = group(&gj, &pips);
-            gj.set_fault(0);
-            match r {
-                Err(e) => println!("{name} ({f}): accounts LOUD: {e}"),
-                Ok(dc) => {
-                    println!(
-                        "{name} ({f}): accounts pass: survivors {} vs {}, checked {} vs {}",
-                        dc.survivors, base.survivors, dc.checked, base.checked
-                    );
-                    if f != F_PF_DROP {
-                        silent.push(name);
-                    }
-                }
-            }
-            if again {
-                let a = group(&gj, &pips).expect("a clean run after the fault");
-                assert_eq!(
-                    (a.survivors, a.checked),
-                    (base.survivors, base.checked),
-                    "clean run after {name}"
-                );
-            }
-        }
-        let cpu = cpu.join().unwrap();
-        let rank = slice_tops(pips[0], gj.roots()).rank;
-        sample_compare(&gj, sp, &rank, &cpu).expect("the sampled check of a clean run is equal");
-        println!(
-            "sampled check, no fault: slice {sp} equal (survivors {} checked {})",
-            cpu.0, cpu.1
-        );
-        gj.set_fault(F_PF_DROP);
-        let r = sample_compare(&gj, sp, &rank, &cpu);
-        gj.set_fault(0);
-        match r {
-            Err(e) => println!("F_PF_DROP: sampled check LOUD: {e}"),
-            Ok(()) => silent.push("F_PF_DROP (sampled check)"),
-        }
-        assert!(silent.is_empty(), "silent faults: {silent:?}");
+        faults_are_loud(client, &pips, classes, again);
     }
     on_device!(go);
 }
 
-/// The coordinate layer, base 64 and the padded base 65: the slices of all fields are a partition of the slice keys
-/// (digits 4-8: each value in exactly one field t and once in it), and every n (the ends of the range, the ends of
-/// the padding, random n) lies in the field its v names and in a slice of that field whose units and leads cover it.
-#[test]
-fn audit_coord_slices_partition() {
-    for b in [64u32, 65] {
-        let c = Coord::for_base(b).unwrap();
+/// The coordinate layer, base 64 and the padded base 65, in every coordinate each knows: the slices of all fields
+/// are a partition of the slice keys (digits 4-8: each value in exactly one field t, the value of its digits
+/// `[q0, k1)`, and once in it), and every n (the ends of the range, the ends of the padding, random n) lies in the
+/// field its v names and in a slice of that field whose units and leads cover it. `fields`: every field (the
+/// partition, about two minutes of CPU) or a sample of that many fields (each field's slices distinct and in it);
+/// `nn` random n.
+fn coord_slices_partition(fields: Option<usize>, nn: usize) {
+    for (b, &(k0, k1, q0)) in [64u32, 65].into_iter().flat_map(|b| {
+        crate::midout::coord::coord_digits_known(b)
+            .iter()
+            .map(move |d| (b, d))
+    }) {
+        let c = Coord::with_digits(b, k0, k1, q0).unwrap();
         let sh = Shape::for_coord(&c);
         let bb = u128::from(b);
+        // the field's value t of the fixed digits [q0, k1) of x, whose digit 0 is n's digit `lo`
+        let fixed = |x: u128, lo: u32| (x / bb.pow(q0 - lo)) % bb.pow(k1 - q0);
         let nkeys = bb.pow(5) as usize;
-        let mut seen = vec![0u64; nkeys.div_ceil(64)];
+        let mut seen = vec![
+            0u64;
+            if fields.is_none() {
+                nkeys.div_ceil(64)
+            } else {
+                0
+            }
+        ];
         let nt = (c.v_end() - c.start) / c.quantum();
         assert_eq!(nt, bb.pow(3));
+        let mut x = 0x5EED_u64;
+        let ts: Vec<u128> = match fields {
+            None => (0..nt).collect(),
+            Some(k) => [0, nt - 1]
+                .into_iter()
+                .chain((0..k).map(|_| u128::from(splitmix(&mut x)) % nt))
+                .collect(),
+        };
         let mut count = 0usize;
-        for t in 0..nt {
+        for &t in &ts {
             for p in sh.slices_of(&c, t) {
-                assert_eq!(p / (bb * bb), t, "b{b} slice {p} not in field {t}");
+                assert_eq!(fixed(p, sh.f0), t, "b{b} {c:?}: slice {p} not in field {t}");
                 let p = p as usize;
                 assert!(p < nkeys);
-                assert_eq!((seen[p / 64] >> (p % 64)) & 1, 0, "b{b} slice {p} twice");
-                seen[p / 64] |= 1 << (p % 64);
+                if fields.is_none() {
+                    assert_eq!((seen[p / 64] >> (p % 64)) & 1, 0, "b{b} slice {p} twice");
+                    seen[p / 64] |= 1 << (p % 64);
+                }
                 count += 1;
             }
+            if fields.is_some() {
+                // within the field: distinct, and a field's share of the keys
+                let mut v: Vec<u128> = sh.slices_of(&c, t).collect();
+                v.sort_unstable();
+                v.dedup();
+                assert_eq!(v.len(), nkeys / nt as usize, "b{b} field {t}");
+            }
         }
-        assert_eq!(count, nkeys, "b{b}: slices of all fields");
-        let mut x = 0x5EED_u64;
+        if fields.is_none() {
+            assert_eq!(count, nkeys, "b{b}: slices of all fields");
+        }
         let mut ns = vec![c.start, c.start + 1, c.end - 1, c.end - 2];
-        for _ in 0..200_000 {
+        for _ in 0..nn {
             let r = u128::from(splitmix(&mut x)) << 64 | u128::from(splitmix(&mut x));
             ns.push(c.start + r % (c.end - c.start));
         }
@@ -602,7 +662,7 @@ fn audit_coord_slices_partition() {
                     .unwrap(),
                 t..t + 1
             );
-            assert_eq!((n / bb.pow(6)) % bb.pow(3), t, "b{b} n {n}: field digits");
+            assert_eq!(fixed(n, 0), t, "b{b} n {n}: field digits");
             let pip = (n / bb.pow(4)) % bb.pow(5);
             assert!(
                 sh.slices_of(&c, t).any(|p| p == pip),
@@ -621,12 +681,26 @@ fn audit_coord_slices_partition() {
     }
 }
 
+/// Tier (a): [`coord_slices_partition`] on 16 fields per coordinate (and both range ends) and 2,000 n.
+#[test]
+fn coord_slices_partition_sampled() {
+    coord_slices_partition(Some(16), 2_000);
+}
+
+/// Tier (c): [`coord_slices_partition`] on every field and 200,000 n (about two minutes of CPU).
+#[cfg(feature = "midout-box-tests")]
+#[test]
+#[ignore = "minutes of CPU"]
+fn audit_coord_slices_partition() {
+    coord_slices_partition(None, 200_000);
+}
+
 /// The production path takes the parents' key from the field's first slice; the sweep runs each slice with its own
 /// key. Any key must give the same survivors: per slice, the device's prefiltered list (n for n) and the whole
 /// survivor set (hash, prefilter off) with its own key equal those with foreign keys (other slices', the identity
 /// key 0-7, and a key of the rarest digits); and the production group path (`queue_dev` + `finish_group`, the field's
 /// key, several slices in one group, the 64-slice parent level reused across them) gives the per-slice sums.
-#[cfg(feature = "cubecl-cuda")]
+#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
 #[test]
 #[ignore = "needs CUDA"]
 fn audit_key_and_group_independence() {
@@ -700,7 +774,7 @@ fn audit_key_and_group_independence() {
 /// helper process of this test with `AUDIT_HOLD_S`) panics in CubeCL's stream thread, not in the caller; the kernels
 /// that use the missing buffer are dropped. the production group path must now fail loudly (or the caller
 /// panic); a group that returns `Ok` fails the test.
-#[cfg(feature = "cubecl-cuda")]
+#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
 #[test]
 #[ignore = "needs CUDA; fills the card's memory"]
 fn audit_oom_is_loud() {
@@ -752,7 +826,7 @@ fn audit_oom_is_loud() {
 /// The production field path (groups of 16 slices, the field's key, the 64-slice parent level shared by consecutive
 /// slices) against the same slices run one at a time (`run_slice_dev`, the same key): equal sums. The first
 /// `AUDIT_NSL` (128) slices of field `AUDIT_T` (0), i.e. two 64-slice parent groups.
-#[cfg(feature = "cubecl-cuda")]
+#[cfg(all(feature = "cubecl-cuda", feature = "midout-box-tests"))]
 #[test]
 #[ignore = "needs CUDA"]
 fn audit_group_vs_single() {

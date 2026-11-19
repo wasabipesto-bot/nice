@@ -863,6 +863,7 @@ mod tests {
     /// `meta.txt` in `MIDOUT_SU_DIR`): every unit's
     /// survivor set, the tops, and the totals. Set `MIDOUT_SU_DIR`; minutes of
     /// CPU on one thread per unit.
+    #[cfg(feature = "midout-box-tests")]
     #[test]
     #[ignore = "needs MIDOUT_SU_DIR (a staged base-64 slice) and minutes of CPU"]
     fn b64_slice_vs_staged() {
