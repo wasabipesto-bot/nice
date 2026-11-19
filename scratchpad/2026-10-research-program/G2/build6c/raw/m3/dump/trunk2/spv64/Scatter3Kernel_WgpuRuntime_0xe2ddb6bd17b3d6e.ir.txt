@@ -1,0 +1,197 @@
+Shared memories: [
+    shared_array(id: 0, offset: 0, length: 2, align: 4, ty: atomic<u32>)
+]
+
+uniform bb0 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(1) = UnitPosX < u32(2) : (u32, u32) -> (bool);
+    binding(1) ? bb2 : bb13; merge: bb13
+}
+
+bb2 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(2) = shared_array(0)[UnitPosX] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(2) = atomic_store(u32(0)) : (u32) -> (atomic<u32>);
+    branch bb13;
+}
+
+bb4 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(7) = input(1)[AbsolutePosX] : (u32, u32, u32, u32) -> (u32);
+    binding(8) = output(3)[binding(7)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(9) = atomic_add(binding(8), u32(1)) : (atomic<u32>, u32) -> (u32);
+    binding(10) = input(0)[AbsolutePosX] : (vector<u32, 4>, u32, u32, u32) -> (vector<u32, 4>);
+    binding(11) = binding(9) << u32(2) : (u32, u32) -> (u32);
+    binding(12) = binding(10)[u32(0)] : (vector<u32, 4>, u32, u32, u32) -> (u32);
+    output(4)[binding(11)] = binding(12)  : (u32, u32) -> (u32); @ uniform
+    binding(14) = binding(11) + u32(1) : (u32, u32) -> (u32);
+    binding(15) = binding(10)[u32(1)] : (vector<u32, 4>, u32, u32, u32) -> (u32);
+    output(4)[binding(14)] = binding(15)  : (u32, u32) -> (u32); @ uniform
+    binding(17) = binding(11) + u32(2) : (u32, u32) -> (u32);
+    binding(18) = binding(10)[u32(2)] : (vector<u32, 4>, u32, u32, u32) -> (u32);
+    output(4)[binding(17)] = binding(18)  : (u32, u32) -> (u32); @ uniform
+    binding(20) = binding(11) + u32(3) : (u32, u32) -> (u32);
+    binding(21) = binding(10)[u32(3)] : (vector<u32, 4>, u32, u32, u32) -> (u32);
+    output(4)[binding(20)] = binding(21)  : (u32, u32) -> (u32); @ uniform
+    binding(25) = !binding(12) : (u32) -> (u32);
+    binding(26) = !binding(15) : (u32) -> (u32);
+    binding(27) = binding(18) >> u32(16) : (u32, u32) -> (u32);
+    binding(28) = binding(27) & u32(63) : (u32, u32) -> (u32);
+    binding(29) = binding(18) >> u32(24) : (u32, u32) -> (u32);
+    binding(30) = binding(29) & u32(63) : (u32, u32) -> (u32);
+    binding(31) = binding(18) & u32(63) : (u32, u32) -> (u32);
+    binding(33) = binding(18) >> u32(8) : (u32, u32) -> (u32);
+    binding(34) = binding(33) & u32(63) : (u32, u32) -> (u32);
+    branch bb6;
+}
+
+uniform bb5 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    local(3).v2 = phi [bb14: u32(0)][bb8: local(36).v2];
+
+
+    binding(56) = binding(6) ? u32(1) : u32(0) : (bool, u32, u32) -> (u32);
+    binding(57) = plane_sum(binding(56)) : (u32) -> (u32); @ uniform
+    binding(58) = plane_sum(local(3).v2) : (u32) -> (u32); @ uniform
+    binding(59) = UnitPosPlane == u32(0) : (u32, u32) -> (bool);
+    binding(59) ? bb9 : bb15; merge: bb15
+}
+
+bb6 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    local(32).v2 = phi [bb7: binding(53)][bb4: binding(31)];
+
+    local(36).v2 = phi [bb7: local(36).v3][bb4: u32(0)];
+
+    local(37).v3 = phi [bb7: local(37).v4][bb4: u32(0)];
+
+    local(35).v2 = phi [bb7: binding(55)][bb4: binding(34)];
+
+
+    binding(73) = local(37).v3 < u32(64) : (u32, u32) -> (bool);
+    loop(cond: binding(73), body: bb7 continue: bb7, break: bb8)
+}
+
+bb7 {
+    Uses: [ContinueTarget]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(38) = local(32).v2 >= u32(32) : (u32, u32) -> (bool);
+    binding(39) = binding(38) ? binding(26) : binding(25) : (bool, u32, u32) -> (u32);
+    binding(40) = local(32).v2 & u32(31) : (u32, u32) -> (u32);
+    binding(41) = binding(39) >> binding(40) : (u32, u32) -> (u32);
+    binding(42) = binding(41) & u32(1) : (u32, u32) -> (u32);
+    binding(43) = local(35).v2 >= u32(32) : (u32, u32) -> (bool);
+    binding(44) = binding(43) ? binding(26) : binding(25) : (bool, u32, u32) -> (u32);
+    binding(45) = local(35).v2 & u32(31) : (u32, u32) -> (u32);
+    binding(46) = binding(44) >> binding(45) : (u32, u32) -> (u32);
+    binding(47) = binding(46) & u32(1) : (u32, u32) -> (u32);
+    binding(48) = binding(42) & binding(47) : (u32, u32) -> (u32);
+    binding(49) = local(32).v2 != local(35).v2 : (u32, u32) -> (bool);
+    binding(50) = binding(49) ? u32(1) : u32(0) : (bool, u32, u32) -> (u32);
+    binding(51) = binding(48) & binding(50) : (u32, u32) -> (u32);
+    local(36).v3 = local(36).v2 + binding(51) : (u32, u32) -> (u32);
+    binding(52) = local(32).v2 + binding(28) : (u32, u32) -> (u32);
+    binding(53) = binding(52) & u32(63) : (u32, u32) -> (u32);
+    binding(54) = local(35).v2 + binding(30) : (u32, u32) -> (u32);
+    binding(55) = binding(54) & u32(63) : (u32, u32) -> (u32);
+    local(37).v4 = local(37).v3 + i32(1) : (u32, i32) -> (u32);
+    branch bb6;
+}
+
+bb8 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb5;
+}
+
+bb9 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(60) = shared_array(0)[u32(0)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(61) = atomic_add(binding(60), binding(57)) : (atomic<u32>, u32) -> (u32);
+    binding(62) = shared_array(0)[u32(1)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(63) = atomic_add(binding(62), binding(58)) : (atomic<u32>, u32) -> (u32);
+    branch bb15;
+}
+
+bb11 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(65) = shared_array(0)[u32(0)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(66) = atomic_load(binding(65)) : (atomic<u32>) -> (u32);
+    binding(67) = output(5)[u32(9)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(68) = atomic_add(binding(67), binding(66)) : (atomic<u32>, u32) -> (u32);
+    binding(69) = shared_array(0)[u32(1)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(70) = atomic_load(binding(69)) : (atomic<u32>) -> (u32);
+    binding(71) = output(5)[u32(10)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(72) = atomic_add(binding(71), binding(70)) : (atomic<u32>, u32) -> (u32);
+    branch bb16;
+}
+
+uniform bb13 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: []
+
+    sync_cube();
+    binding(4) = input(2)[u32(0)] : (u32, u32, u32, u32) -> (u32); @ uniform
+    binding(5) = binding(4).min(scalar<u32>(0)) : (u32, u32) -> (u32); @ uniform
+    binding(6) = AbsolutePosX < binding(5) : (u32, u32) -> (bool);
+    binding(6) ? bb4 : bb14; merge: bb5
+}
+
+bb14 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb5;
+}
+
+uniform bb15 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    sync_cube();
+    binding(64) = UnitPosX == u32(0) : (u32, u32) -> (bool);
+    binding(64) ? bb11 : bb16; merge: bb16
+}
+
+uniform bb16 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    return;
+}
+

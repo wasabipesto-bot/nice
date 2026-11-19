@@ -83,3 +83,8 @@ maintainer's decisions, asked today), and do not restructure for taste: only wha
 
 ## The box
 
+    ssh -p 35082 root@ssh2.vast.ai
+
+Vast instance 61441981: RTX 3080 (10 GB) capped at 240 W by its host, 16 threads visible (a CPU quota of about
+5), 31 GB of memory, 40 GB of disk, a fresh Ubuntu 24.04 image with CUDA 12.8 devel. ivory's ssh key is
+accepted; I logged in at 12:13 UTC. It destroys itself at about 18:05 UTC.

@@ -89,6 +89,18 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   hard stop 17:30): the seven must-fix items, test tiers CI can run, the kernels through WGSL; byte-identity or
   parity plus timing as proof that the cleanup changes nothing.
 
+- **≈ 13:50 UTC, the user:** "You have a lease on demoux for the next 2 hours. For the questions, either make
+  or point me to the document where you describe each design decision, alternatives, recommendations, etc. I
+  check this chat infrequently and only read the last few messages, so in general you'll need to keep in mind I
+  don't have all your context." **Standing consequence: every message to the user must stand alone, and the
+  decisions live in one document, `DECISIONS.md`, kept current.** Also: the user merged PR #270 at about 14:00.
+- **13:55–14:29 UTC, the lease (EXPERIMENTS MO.12, SRA.5), run by me:** the library path is exact at 64 lanes
+  on the card and **×4.79 against main end to end** (model ×4.87); the client route ran there against a local
+  coordinator (12 fields, counts equal the benchmark's and the RTX 3080's); #270's new test passes on the card;
+  a test of #263 fails there because it forces the ballot form on a 64-lane device, where production uses the
+  scan form: fixed on a branch, verified on the card. demoux clean at 14:28, one ntfy, production client still
+  stopped. Lesson repeated: a leftover check over that ssh must not contain the literal names it greps for.
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);

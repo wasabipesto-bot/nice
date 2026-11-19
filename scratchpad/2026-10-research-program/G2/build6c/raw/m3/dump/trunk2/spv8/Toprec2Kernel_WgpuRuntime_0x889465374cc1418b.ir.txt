@@ -1,0 +1,82 @@
+Shared memories: [
+
+]
+
+uniform bb0 {
+    Live variables: []
+
+    Live shared memories: []
+
+    binding(0) = input(2)[u32(0)] : (u32, u32, u32, u32) -> (u32); @ uniform
+    binding(1) = binding(0).min(scalar<u32>(1)) : (u32, u32) -> (u32); @ uniform
+    binding(2) = AbsolutePosX < binding(1) : (u32, u32) -> (bool);
+    binding(3) = binding(2) ? u32(1) : u32(0) : (bool, u32, u32) -> (u32);
+    binding(4) = plane_sum(binding(3)) : (u32) -> (u32); @ uniform
+    binding(5) = UnitPosPlane == u32(0) : (u32, u32) -> (bool);
+    binding(6) = binding(4) > u32(0) : (u32, u32) -> (bool); @ uniform
+    binding(7) = binding(5) && binding(6) : (bool, bool) -> (bool);
+    binding(7) ? bb2 : bb6; merge: bb6
+}
+
+bb2 {
+    Live variables: []
+
+    Live shared memories: []
+
+    binding(8) = output(3)[u32(5)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(9) = atomic_add(binding(8), binding(4)) : (atomic<u32>, u32) -> (u32);
+    branch bb6;
+}
+
+bb4 {
+    Live variables: []
+
+    Live shared memories: []
+
+    binding(10) = input(0)[AbsolutePosX] : (u32, u32, u32, u32) -> (u32);
+    binding(11) = binding(10) & u32(65535) : (u32, u32) -> (u32);
+    binding(12) = input(0)[AbsolutePosX] : (u32, u32, u32, u32) -> (u32);
+    binding(13) = binding(12) >> u32(16) : (u32, u32) -> (u32);
+    binding(14) = binding(13) << u32(24) : (u32, u32) -> (u32);
+    binding(15) = binding(14) | scalar<u32>(0) : (u32, u32) -> (u32);
+    binding(16) = AbsolutePosX << u32(3) : (u32, u32) -> (u32);
+    binding(17) = binding(11) & u32(3) : (u32, u32) -> (u32);
+    binding(18) = binding(17) << u32(30) : (u32, u32) -> (u32);
+    binding(19) = binding(18) | binding(15) : (u32, u32) -> (u32);
+    output(1)[binding(16)] = binding(19)  : (u32, u32) -> (u32); @ uniform
+    binding(20) = binding(16) + u32(1) : (u32, u32) -> (u32);
+    binding(21) = binding(11) >> u32(2) : (u32, u32) -> (u32);
+    output(1)[binding(20)] = binding(21)  : (u32, u32) -> (u32); @ uniform
+    binding(22) = binding(16) + u32(2) : (u32, u32) -> (u32);
+    output(1)[binding(22)] = u32(0)  : (u32, u32) -> (u32); @ uniform
+    binding(23) = binding(16) + u32(3) : (u32, u32) -> (u32);
+    output(1)[binding(23)] = u32(0)  : (u32, u32) -> (u32); @ uniform
+    binding(24) = binding(16) + u32(4) : (u32, u32) -> (u32);
+    output(1)[binding(24)] = u32(0)  : (u32, u32) -> (u32); @ uniform
+    binding(25) = binding(16) + u32(5) : (u32, u32) -> (u32);
+    output(1)[binding(25)] = u32(0)  : (u32, u32) -> (u32); @ uniform
+    binding(26) = binding(16) + u32(6) : (u32, u32) -> (u32);
+    output(1)[binding(26)] = binding(15)  : (u32, u32) -> (u32); @ uniform
+    binding(27) = binding(16) + u32(7) : (u32, u32) -> (u32);
+    output(1)[binding(27)] = u32(0)  : (u32, u32) -> (u32); @ uniform
+    branch bb7;
+}
+
+uniform bb6 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: []
+
+    binding(2) ? bb4 : bb7; merge: bb7
+}
+
+uniform bb7 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: []
+
+    return;
+}
+

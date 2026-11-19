@@ -1,0 +1,18 @@
+
+running 1 test
+test midout::gpu_wide::tests::cubecl_midout_wide_b40_faults_are_loud ... base 40 W 8 classes 4 slices [1234]
+fault 0: accounts pass: WCounts { children: 343633, chunks: 6212, flat: 333230, kept: 313978, survivors: 729611, checked: 33792, slices: 1, tops: 20923 }
+F_SKIP_MAIN (2): accounts LOUD: middle-out wide: 0 of 6240 job instances ran
+F_SKIP_TOPS (4096): accounts LOUD: middle-out wide: slice 1234: wtops1 valid parents examined: 0, want 30128 (account [0, 0, 1, 20923, 0, 141, 15763, 1, 15763, 343633, 9984, 6240, 0, 343633, 1, 0])
+F_DROP_PROBE (8): accounts LOUD: middle-out wide: slice 1234: probes run = nroot x tops: 82132, want 83692 (account [30128, 20923, 1, 20923, 20923, 141, 15763, 1, 15763, 343633, 9984, 6240, 82132, 343633, 1, 0])
+F_DROP_PARENT (8192): accounts LOUD: middle-out wide: slice 1234: parents certified (whist) = listed: 15763, want 15748 (account [30128, 20923, 1, 20923, 20923, 141, 15763, 1, 15748, 343312, 9984, 6240, 83692, 343312, 1, 0])
+F_BAD_PARENT (16384): accounts pass: survivors 728997 vs 729611
+F_PF_DROP (1024): accounts pass: survivors 729611 vs 729611
+CPU reference of slice 1234: survivors 729611 (waited 0.0 s)
+sampled check, no fault: slice 1234 equal (survivors 729611)
+F_BAD_PARENT: sampled check LOUD: middle-out wide: sampled CPU check of slice 1234 differs: device survivors 728997 checked 33768 list 33768, CPU survivors 729611 checked 33792
+F_PF_DROP: sampled check LOUD: middle-out wide: sampled CPU check of slice 1234 differs: device survivors 729611 checked 33261 list 33261, CPU survivors 729611 checked 33792
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 309 filtered out; finished in 4.72s
+

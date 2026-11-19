@@ -35,6 +35,54 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.12 The library path on the RX 9070 XT: exact at 64 lanes; ×4.79 against main end to end; the client route run there (2026-11-19 13:55–14:29 UTC, director, demoux under the user's 2-hour lease (35 minutes used); `G2/WINDOW-PLAN-2.md`, `G2/build4s/window_1119/` (go.out, 45 logs and samples, `route/` with the coordinator's records and the client log); builds on demoux from the bundle: trunk 66259bb0 with `--features cubecl-spirv`; Mesa 26.1.6 RADV; production client stopped by the user and never touched)
+
+- **Exact at 64 lanes** [M]: "the device path ran at W 64"; seven narrow slices in three processes (four through
+  the shared depth-8 lists), device tops = host tops and n-for-n parity against the CPU reference; the wide path at
+  b40 and b65; the fault test; one whole field under the old coordinate with the sampled CPU check: all pass.
+- **Whole base-64 fields, pipelined, five fields per run after a warm-up** [M]: 0.9953, 1.0054, 0.9714 fs per
+  admissible n at 2,82–2,88 GHz and 303 W (about 210 busy samples each); survivors and checked equal field for
+  field across runs.
+- **Main in the same session** [M]: field 2 in 91.60 s and field 6 in 101.92 s (11-18: 90.83, 100.41), at
+  3,12–3,14 GHz and 304 W: base mean 4.707 × 1.0118 = 4.762 fs.
+- **Ratio: ×4.79 (median of three runs; best run ×4.90)**; the offline model had said ×4.87 (band ×4.54–5.25).
+  Outcome T1 of the plan.
+- **Stage profile, field 77777, ms per slice by cumulative stops** [M, the first two off the operating point]:
+  tops 0.759 and parents 0.476 (both measured with the card at about 1.55 GHz and 90 W, since those stages alone
+  do not load it: not comparable with the model's 0.12–0.24 and 0.31–0.35); main kernel 2.607 (model 3.09–3.35);
+  expansion 0.356 (model 0.43–0.56); check and the rest 0.112; whole slice 4.312 ms (model 4.01–4.64).
+- **Sampled CPU check** [M]: slice equal; an 18.45 s field with the CPU thread busy 9.22 s; the host never waited.
+- **Wide path, base 65** [M, two fields including the warm-up]: 3.117 fs per admissible n, about ×3.2 of base 64
+  on this card (×2.17 on the RTX 3080): the wide kernels are untuned for this card (shared memory over the
+  12-wave threshold, MO.7).
+- **The client route on the card** [M]: `nice_client` built with `cubecl-spirv`, a local coordinator on
+  127.0.0.1 with twelve base-64 fields under (4, 8, 5): all twelve claimed, searched and accepted, 17.92–18.61 s
+  each (median 18.16 s = 0.992 fs per admissible n), exit 0. For the seven fields the benchmark also ran, the
+  route's survivors and checked equal the benchmark's; field 77777's (48,216,914,309 and 1,384,731,444) equal
+  the RTX 3080's of MO.9: the counters are device-independent across CUDA at 32 lanes and RADV at 64. I read the
+  route's code before running it there: it checks the address against the production domain and sends every
+  request to the coordinator's address only.
+- **Conclusion:** on the card that does 86 % of the search the middle-out join is exact and ×4.79 faster than
+  v3.4.8's join at base 64, end to end, tops and checks included, and it runs as a client against a local
+  coordinator. Base 64 on that card alone: 4.83e21 admissible n × 0.99 fs ≈ 55 days against ≈ 266 at main's
+  4.76 fs [D].
+
+## SRA.5 PR #270 merged; its tests on the RX 9070 XT; a test of #263 that forces a form production never uses there (2026-11-19 14:01–14:28 UTC, director, same lease; `G2/build4s/window_1119/p_pr270.log`, `p_qtest.log`; fix branch `pr/queue-test-plane-width` fd33d84d on upstream 974d7194, local, not yet reviewed or pushed)
+
+- **The user merged #270 at about 14:00 UTC** (upstream 974d7194) before the tests on a Vulkan card had run.
+- **On the card** [M]: `cubecl_dropped_launches_fail_the_field` (the new test) passes on all three stride paths
+  including the plane-scoped queue: the new count works at 64 lanes. `cubecl_queues_check_every_survivor_on_
+  partly_filled_planes` (from #263, 2026-11-15) **fails**: all 16 runs that force the ballot form fail the queue
+  account loudly ("checked −38 … −10,145 fewer survivors than they queued"), and all 16 scan-form runs are
+  exact (30,449 of 30,449).
+- **Cause** [read]: production picks the ballot form only where a plane fits one ballot word
+  (`ballot_append(plane_size_max) = plane_size_max <= 32`, `cubecl_join.rs:195`); on this card (64 lanes) it
+  takes the scan form. The test (mine, in #263) forces both forms on every wgpu device. A defect of the test,
+  present since 11-15, never seen because the test had only run on lavapipe (8 lanes) and CUDA (32). Production's
+  stride path on the card is the scan form, which passes; the failure mode of the forced ballot is loud.
+- **Fix** (12 lines, test only): run the ballot form only where `ballot_append` allows. With it, on the card:
+  32 runs, 0 wrong; both tests pass. To be reviewed, then opened as a small PR.
+
 ## MO.11 A maintainability read and a pull-request plan for the branch (2026-11-19 11:57–12:07 UTC, independent reviewer, ivory, read-only; `G2/PRPLAN-BRIEF.md`, `G2/MAINTAINABILITY.md`, `G2/PR-PLAN.md`)
 
 - **Size, corrected:** `git diff --shortstat origin/main...HEAD` at 66259bb0 is **13,300 insertions in 20 files, 49
