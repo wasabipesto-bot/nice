@@ -339,7 +339,8 @@ pub struct Cli {
     /// search them on the GPU and submit them there. Off unless given; the
     /// production API is refused. Uses --repeat, --username,
     /// --gpu-backend and --gpu-device; ignores the mode and --api-base.
-    #[arg(long, value_name = "URL")]
+    /// Hidden from --help: a development flag, not a supported option.
+    #[arg(long, value_name = "URL", hide = true)]
     midout_coordinator: Option<String>,
 }
 
