@@ -173,28 +173,9 @@ mod kernels {
         m
     }
 
-    /// Exclusive rank of this lane's flag in its plane: a ballot and population counts (ranks 1), or the plane scan
-    /// (ranks 0; CubeCL lowers it to shuffle loops on CUDA). The ballot's second word only when W = 64.
-    #[cube]
-    fn plane_rank(flag: bool, f: u32, #[comptime] w: u32, #[comptime] ranks: u32) -> u32 {
-        let mut r = 0u32;
-        if comptime!(ranks == 0) {
-            r = plane_exclusive_sum(f);
-        } else {
-            let b = plane_ballot(flag);
-            let l = UNIT_POS_PLANE;
-            let lo = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
-            r = (b[0usize] & lo).count_ones();
-            if comptime!(w > 32) {
-                let hi = select(l >= 32u32, (1u32 << (l & 31u32)) - 1u32, 0u32);
-                r += (b[1usize] & hi).count_ones();
-            }
-        }
-        r
-    }
-
-    /// plane_rank (ranks 1) with the lane's masks below it made once, outside the loop: ACO recomputed them in every
-    /// 3b step. (lo, hi) = (rank_masks().0, rank_masks().1).
+    /// Exclusive rank of this lane's flag in its plane, by a ballot and population counts. `lo` and `hi` are the
+    /// lane's ballot masks below it (bits `[0, lane)` of the ballot's two words), made once by the caller outside
+    /// its loops (ACO recomputed them in every step otherwise). The ballot's second word only when W = 64.
     #[cube]
     fn plane_rank_m(flag: bool, lo: u32, hi: u32, #[comptime] w: u32) -> u32 {
         let b = plane_ballot(flag);
@@ -205,17 +186,13 @@ mod kernels {
         r
     }
 
+    /// Lanes of the plane whose flag is set, by a ballot (its second word only when W = 64).
     #[cube]
-    fn plane_count(flag: bool, f: u32, #[comptime] w: u32, #[comptime] ranks: u32) -> u32 {
-        let mut n = 0u32;
-        if comptime!(ranks == 0) {
-            n = plane_sum(f);
-        } else {
-            let b = plane_ballot(flag);
-            n = b[0usize].count_ones();
-            if comptime!(w > 32) {
-                n += b[1usize].count_ones();
-            }
+    fn plane_count(flag: bool, #[comptime] w: u32) -> u32 {
+        let b = plane_ballot(flag);
+        let mut n = b[0usize].count_ones();
+        if comptime!(w > 32) {
+            n += b[1usize].count_ones();
         }
         n
     }
@@ -234,7 +211,9 @@ mod kernels {
         out
     }
 
-    /// One cube per job (class c, unit d). MODE 0: bottom side only; 1: skip off; 2: full.
+    /// One cube per job (class c, unit d). `w` is the plane width the kernel is compiled for (8, 32 or 64; a plane
+    /// of another width is an error, `C_ERR_PLANE`), `fill` the children appended per round (`FILL`, or 512 below
+    /// 32 lanes).
     #[cube(launch_unchecked)]
     pub fn g2_kernel(
         par: &Array<Vector<u32, Const<4>>>, // parent records (mask lo, mask hi, cacc, r4), one 16-byte vector each (one LDG.128 on CUDA)
@@ -260,16 +239,8 @@ mod kernels {
         // the slice's account (`A_*`) and the child list's length
         acc: &mut Array<Atomic<u32>>,
         lcap: u32,
-        #[comptime] mode: u32,
-        #[comptime] noout: bool,
         #[comptime] w: u32,
         #[comptime] fill: u32,
-        #[comptime] xpose: u32,
-        #[comptime] ept: u32,
-        #[comptime] ranks: u32,
-        #[comptime] cut: u32,
-        #[comptime] cmask: u32,
-        #[comptime] tdg: u32,
     ) {
         let npl = comptime!(NT / w);
         let segs = comptime!(64 / w); // ballot segments per chunk (W <= 64)
@@ -321,17 +292,6 @@ mod kernels {
         if PLANE_DIM != w || t % w != lane {
             cnt[C_ERR_PLANE].fetch_add(1u32);
         }
-        if comptime!(mode == 0) {
-            // lane map of cube 0, for the host's --debug-lanes (mode 0 writes no records)
-            if CUBE_POS_X == 0u32 {
-                let mut lv = Vector::<u32, Const<4>>::empty();
-                lv[0usize] = t;
-                lv[1usize] = lane;
-                lv[2usize] = PLANE_DIM;
-                lv[3usize] = plane_sum(1u32);
-                out[t as usize] = lv;
-            }
-        }
         if t == 0u32 {
             let mut n = 0u32;
             for i in 0..8u32 {
@@ -345,17 +305,14 @@ mod kernels {
                 cnt[C_ERR_PMAX].fetch_add(1u32);
             }
         }
+        // the common masks start all-ones: phase 2 ANDs each plane's ballot into them
         if t < 32u32 {
-            comm[t as usize].store(comptime!(if xpose == 0 || cmask == 0 {
-                0u32
-            } else {
-                u32::MAX
-            }));
+            comm[t as usize].store(u32::MAX);
         }
         sync_cube();
         // probes: the 8 compatible top classes of unit d, each probe's digits as 20 6-bit fields (5 per word),
         // padded with its first digit (OR is idempotent)
-        if comptime!(cut & 4 == 0) {
+        {
             let mut base = 0u32;
             for i in 0..8u32 {
                 let ct = (roots[i as usize] + M - cc) % M;
@@ -365,37 +322,14 @@ mod kernels {
                 let mut j = t;
                 while j < b1 - b0 {
                     if base + j >= poff && base + j < poff + pmx {
-                        if comptime!(tdg == 1) {
-                            let mut pv = Vector::<u32, Const<4>>::empty();
-                            #[unroll]
-                            for k in 0..4u32 {
-                                pv[k as usize] = tdig[((b0 + j) * 4u32 + k) as usize];
-                            }
-                            // (midout) the top's index in word 3's bits 12-31 (digits 15-16 are bits 0-11)
-                            pv[3usize] = (pv[3usize] & 0xFFFu32) | ((b0 + j) << 12u32);
-                            prob_d[(base + j - poff) as usize] = pv;
-                        } else {
-                            let mut x = tmask[(b0 + j) as usize];
-                            let first = x.trailing_zeros();
-                            let mut dw = Array::<u32>::new(4usize);
-                            #[unroll]
-                            for k in 0..4u32 {
-                                dw[k as usize] = 0u32;
-                            }
-                            #[unroll]
-                            for k in 0..20u32 {
-                                let v = select(x != 0u64, x.trailing_zeros(), first);
-                                x &= x - select(x != 0u64, 1u64, 0u64);
-                                dw[comptime!(k / 5) as usize] |= v << comptime!(6 * (k % 5));
-                            }
-                            let mut pv = Vector::<u32, Const<4>>::empty();
-                            #[unroll]
-                            for k in 0..4u32 {
-                                pv[k as usize] = dw[k as usize];
-                            }
-                            pv[3usize] = (pv[3usize] & 0xFFFu32) | ((b0 + j) << 12u32);
-                            prob_d[(base + j - poff) as usize] = pv;
+                        let mut pv = Vector::<u32, Const<4>>::empty();
+                        #[unroll]
+                        for k in 0..4u32 {
+                            pv[k as usize] = tdig[((b0 + j) * 4u32 + k) as usize];
                         }
+                        // the top's index in word 3's bits 12-31 (digits 15-16 are bits 0-11)
+                        pv[3usize] = (pv[3usize] & 0xFFFu32) | ((b0 + j) << 12u32);
+                        prob_d[(base + j - poff) as usize] = pv;
                     }
                     j += NT;
                 }
@@ -461,14 +395,8 @@ mod kernels {
                         d,
                     );
                 }
-                let f = select(m != 0u64, 1u32, 0u32);
-                let mut r = 0u32;
-                if comptime!(ranks == 0) {
-                    r = plane_rank(m != 0u64, f, w, ranks);
-                } else {
-                    r = plane_rank_m(m != 0u64, rlo, rhi, w);
-                }
-                let tot = plane_count(m != 0u64, f, w, ranks);
+                let r = plane_rank_m(m != 0u64, rlo, rhi, w);
+                let tot = plane_count(m != 0u64, w);
                 if lane == 0u32 {
                     wcnt[(parity * npl + pl) as usize] = tot;
                 }
@@ -486,10 +414,8 @@ mod kernels {
                 }
                 if m != 0u64 {
                     let sl16 = npend + off + r;
-                    if comptime!(mode == 2 && !noout) {
-                        // bounded (the job's whole range is checked once, `C_ERR_CLST`)
-                        clst[min(lb + cdone + sl16, lcap - 1u32) as usize] = r4v;
-                    }
+                    // bounded (the job's whole range is checked once, `C_ERR_CLST`)
+                    clst[min(lb + cdone + sl16, lcap - 1u32) as usize] = r4v;
                     if (sl16 & 1u32) == 0u32 {
                         pq[(sl16 >> 1u32) as usize] = idx - pb;
                     } else {
@@ -525,154 +451,122 @@ mod kernels {
                     }
                     sync_cube();
                 }
-                if comptime!(cut & 1 == 0) {
-                    // phase 2: transpose by ballots. Plane task i covers chunk q, segment s (members s*W .. s*W+W-1).
-                    for i in 0..4u32 {
-                        let task = pl + npl * i;
-                        let q = task / segs;
-                        let sg = task % segs;
-                        let mi = q * 64u32 + sg * w + lane;
-                        let mut m = 0u64;
-                        if q < nch && mi < ntake {
-                            let pi = pb
-                                + ((pq[(mi >> 1u32) as usize] >> ((mi & 1u32) << 4u32))
-                                    & select((fault & 16u32) != 0u32, 0x1FFFu32, 0xFFFFu32));
-                            let pv = par[pi as usize];
-                            m = child_mask(
-                                u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64),
-                                pv[2usize],
-                                d,
-                            );
-                        }
-                        if comptime!(xpose == 0) {
-                            for v in 0..64u32 {
-                                let bal = plane_ballot(((m >> u64::cast_from(v)) & 1u64) != 0u64);
-                                if lane == v % w && q < nch {
-                                    let row = (v + 65u32 * q) * 2u32;
-                                    if comptime!(w == 64) {
-                                        sl[row as usize] = bal[0usize];
-                                        sl[(row + 1u32) as usize] = bal[1usize];
-                                    } else if comptime!(w == 32) {
-                                        sl[(row + sg) as usize] = bal[0usize];
-                                    } else {
-                                        let bit = sg * w;
-                                        let seg = bal[0usize] & comptime!((1u32 << w) - 1);
-                                        slt[(row + bit / 32u32) as usize]
-                                            .fetch_or(seg << (bit % 32u32));
-                                    }
-                                }
-                            }
+                // phase 2: transpose by ballots. Plane task i covers chunk q, segment s (members s*W .. s*W+W-1).
+                for i in 0..4u32 {
+                    let task = pl + npl * i;
+                    let q = task / segs;
+                    let sg = task % segs;
+                    let mi = q * 64u32 + sg * w + lane;
+                    let mut m = 0u64;
+                    if q < nch && mi < ntake {
+                        let pi = pb
+                            + ((pq[(mi >> 1u32) as usize] >> ((mi & 1u32) << 4u32))
+                                & select((fault & 16u32) != 0u32, 0x1FFFu32, 0xFFFFu32));
+                        let pv = par[pi as usize];
+                        m = child_mask(
+                            u64::cast_from(pv[0usize]) | (u64::cast_from(pv[1usize]) << 32u64),
+                            pv[2usize],
+                            d,
+                        );
+                    }
+                    // shuffle transpose: the plane's W rows, as 64/W blocks of W x W bits, each transposed in
+                    // log2(W) shuffle_xor stages on the whole u64 (the stage masks are the same per block);
+                    // lane l then holds, in block s, column s*W + l over this plane's rows.
+                    // on the two 32-bit halves (ACO paid a v_lshlrev_b64 and two ORs per stage to rebuild the u64):
+                    // for j < 32 the stage moves bits within each half, and (y >> j) & !mj, (y << j) & mj are a
+                    // 32-bit rotation right by j or by 32 - j, masked: one v_alignbit and one v_bfi per half;
+                    // j = 32 (W = 64) swaps halves between the lane pairs
+                    let mut xl = u32::cast_from(m & 0xFFFF_FFFFu64);
+                    let mut xh = u32::cast_from(m >> 32u64);
+                    #[unroll]
+                    for st in 0..comptime!(w.trailing_zeros()) {
+                        let j = comptime!(w >> (st + 1));
+                        let yl = plane_shuffle_xor(xl, j);
+                        let yh = plane_shuffle_xor(xh, j);
+                        let hit = (lane & j) != 0u32;
+                        if comptime!(j == 32) {
+                            xl = select(hit, yh, xl);
+                            xh = select(hit, xh, yl);
                         } else {
-                            // shuffle transpose: the plane's W rows, as 64/W blocks of W x W bits, each transposed in
-                            // log2(W) shuffle_xor stages on the whole u64 (the stage masks are the same per block);
-                            // lane l then holds, in block s, column s*W + l over this plane's rows.
-                            // on the two 32-bit halves (ACO paid a v_lshlrev_b64 and two ORs per stage to rebuild the u64):
-                            // for j < 32 the stage moves bits within each half, and (y >> j) & !mj, (y << j) & mj are a
-                            // 32-bit rotation right by j or by 32 - j, masked: one v_alignbit and one v_bfi per half;
-                            // j = 32 (W = 64) swaps halves between the lane pairs
-                            let mut xl = u32::cast_from(m & 0xFFFF_FFFFu64);
-                            let mut xh = u32::cast_from(m >> 32u64);
-                            #[unroll]
-                            for st in 0..comptime!(w.trailing_zeros()) {
-                                let j = comptime!(w >> (st + 1));
-                                let yl = plane_shuffle_xor(xl, j);
-                                let yh = plane_shuffle_xor(xh, j);
-                                let hit = (lane & j) != 0u32;
-                                if comptime!(j == 32) {
-                                    xl = select(hit, yh, xl);
-                                    xh = select(hit, xh, yl);
+                            let mj = comptime!(stage_mask(w >> (st + 1)) as u32);
+                            let keep = select(hit, mj, !mj);
+                            let sr = select(hit, j, 32u32 - j);
+                            let rl = (yl >> sr) | (yl << (32u32 - sr));
+                            let rh = (yh >> sr) | (yh << (32u32 - sr));
+                            xl = (xl & keep) | (rl & !keep);
+                            xh = (xh & keep) | (rh & !keep);
+                        }
+                    }
+                    if q < nch {
+                        // common masks from the registers (no pass over the slices): digit v is common to the
+                        // chunk iff, in every plane of it, the column holds all of that plane's valid rows
+                        let nv = min(w, ntake - min(ntake, q * 64u32 + sg * w));
+                        // valid rows as a u64, built from u32 shifts (a variable 64-bit shift crashed lavapipe's
+                        // 512-bit JIT)
+                        let vlo =
+                            select(nv >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(nv, 31u32)) - 1u32);
+                        let vhi = select(
+                            nv >= 64u32,
+                            0xFFFF_FFFFu32,
+                            select(
+                                nv > 32u32,
+                                (1u32 << ((nv - min(nv, 32u32)) & 31u32)) - 1u32,
+                                0u32,
+                            ),
+                        );
+                        #[unroll]
+                        for sb in 0..segs {
+                            // this segment's column piece (W bits), from the half that holds it
+                            let mut hv = xh;
+                            if comptime!(sb * w < 32) {
+                                hv = xl;
+                            }
+                            let mut eq = false;
+                            if comptime!(w == 64) {
+                                eq = xl == vlo && xh == vhi;
+                            } else if comptime!(w == 32) {
+                                eq = hv == vlo;
+                            } else {
+                                eq = ((hv >> comptime!((sb * w) % 32))
+                                    & comptime!((1u32 << w) - 1))
+                                    == vlo;
+                            }
+                            let bal = plane_ballot(eq);
+                            if lane == 0u32 {
+                                if comptime!(w == 64) {
+                                    comm[(2u32 * q) as usize].fetch_and(bal[0usize]);
+                                    comm[(2u32 * q + 1u32) as usize].fetch_and(bal[1usize]);
+                                } else if comptime!(w == 32) {
+                                    comm[(2u32 * q + comptime!(sb)) as usize]
+                                        .fetch_and(bal[0usize]);
                                 } else {
-                                    let mj = comptime!(stage_mask(w >> (st + 1)) as u32);
-                                    let keep = select(hit, mj, !mj);
-                                    let sr = select(hit, j, 32u32 - j);
-                                    let rl = (yl >> sr) | (yl << (32u32 - sr));
-                                    let rh = (yh >> sr) | (yh << (32u32 - sr));
-                                    xl = (xl & keep) | (rl & !keep);
-                                    xh = (xh & keep) | (rh & !keep);
+                                    let wm = comptime!((1u32 << w) - 1);
+                                    let sh = comptime!((sb * w) % 32);
+                                    comm[(2u32 * q + comptime!((sb * w) / 32)) as usize]
+                                        .fetch_and(!(wm << sh) | ((bal[0usize] & wm) << sh));
                                 }
                             }
-                            if comptime!(cmask == 1) {
-                                if q < nch {
-                                    // common masks from the registers (no pass over the slices): digit v is common to the
-                                    // chunk iff, in every plane of it, the column holds all of that plane's valid rows
-                                    let nv = min(w, ntake - min(ntake, q * 64u32 + sg * w));
-                                    // valid rows as a u64, built from u32 shifts (a variable 64-bit shift crashed lavapipe's
-                                    // 512-bit JIT)
-                                    let vlo = select(
-                                        nv >= 32u32,
-                                        0xFFFF_FFFFu32,
-                                        (1u32 << min(nv, 31u32)) - 1u32,
-                                    );
-                                    let vhi = select(
-                                        nv >= 64u32,
-                                        0xFFFF_FFFFu32,
-                                        select(
-                                            nv > 32u32,
-                                            (1u32 << ((nv - min(nv, 32u32)) & 31u32)) - 1u32,
-                                            0u32,
-                                        ),
-                                    );
-                                    #[unroll]
-                                    for sb in 0..segs {
-                                        // this segment's column piece (W bits), from the half that holds it
-                                        let mut hv = xh;
-                                        if comptime!(sb * w < 32) {
-                                            hv = xl;
-                                        }
-                                        let mut eq = false;
-                                        if comptime!(w == 64) {
-                                            eq = xl == vlo && xh == vhi;
-                                        } else if comptime!(w == 32) {
-                                            eq = hv == vlo;
-                                        } else {
-                                            eq = ((hv >> comptime!((sb * w) % 32))
-                                                & comptime!((1u32 << w) - 1))
-                                                == vlo;
-                                        }
-                                        let bal = plane_ballot(eq);
-                                        if lane == 0u32 {
-                                            if comptime!(w == 64) {
-                                                comm[(2u32 * q) as usize].fetch_and(bal[0usize]);
-                                                comm[(2u32 * q + 1u32) as usize]
-                                                    .fetch_and(bal[1usize]);
-                                            } else if comptime!(w == 32) {
-                                                comm[(2u32 * q + comptime!(sb)) as usize]
-                                                    .fetch_and(bal[0usize]);
-                                            } else {
-                                                let wm = comptime!((1u32 << w) - 1);
-                                                let sh = comptime!((sb * w) % 32);
-                                                comm[(2u32 * q + comptime!((sb * w) / 32))
-                                                    as usize]
-                                                    .fetch_and(
-                                                        !(wm << sh) | ((bal[0usize] & wm) << sh),
-                                                    );
-                                            }
-                                        }
-                                    }
-                                }
+                        }
+                    }
+                    if q < nch {
+                        #[unroll]
+                        for sb in 0..segs {
+                            let v = comptime!(sb * w) + lane;
+                            let row = (v + 65u32 * q) * 2u32;
+                            let mut hv = xh;
+                            if comptime!(sb * w < 32) {
+                                hv = xl;
                             }
-                            if q < nch {
-                                #[unroll]
-                                for sb in 0..segs {
-                                    let v = comptime!(sb * w) + lane;
-                                    let row = (v + 65u32 * q) * 2u32;
-                                    let mut hv = xh;
-                                    if comptime!(sb * w < 32) {
-                                        hv = xl;
-                                    }
-                                    if comptime!(w == 64) {
-                                        sl[row as usize] = xl;
-                                        sl[(row + 1u32) as usize] = xh;
-                                    } else if comptime!(w == 32) {
-                                        sl[(row + sg) as usize] = hv;
-                                    } else {
-                                        let bit = sg * w;
-                                        let piece = (hv >> comptime!((sb * w) % 32))
-                                            & comptime!((1u32 << w) - 1);
-                                        slt[(row + bit / 32u32) as usize]
-                                            .fetch_or(piece << (bit % 32u32));
-                                    }
-                                }
+                            if comptime!(w == 64) {
+                                sl[row as usize] = xl;
+                                sl[(row + 1u32) as usize] = xh;
+                            } else if comptime!(w == 32) {
+                                sl[(row + sg) as usize] = hv;
+                            } else {
+                                let bit = sg * w;
+                                let piece =
+                                    (hv >> comptime!((sb * w) % 32)) & comptime!((1u32 << w) - 1);
+                                slt[(row + bit / 32u32) as usize].fetch_or(piece << (bit % 32u32));
                             }
                         }
                     }
@@ -697,37 +591,10 @@ mod kernels {
                     }
                     sync_cube();
                 }
-                if comptime!(cut & 2 == 0 && (xpose == 0 || cmask == 0)) {
-                    // common masks (ballot transpose only): digit v is common to chunk q iff its slice equals the chunk's valid mask
-                    {
-                        let mut j = t;
-                        while j < 1024u32 {
-                            let q = j / 64u32;
-                            let v = j % 64u32;
-                            if q < nch {
-                                let nq = min(64u32, ntake - q * 64u32);
-                                let vlo = select(
-                                    nq >= 32u32,
-                                    0xFFFF_FFFFu32,
-                                    (1u32 << (nq % 32u32)) - 1u32,
-                                );
-                                let vhi = select(
-                                    nq == 64u32,
-                                    0xFFFF_FFFFu32,
-                                    select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32),
-                                );
-                                let row = (v + 65u32 * q) * 2u32;
-                                if sl[row as usize] == vlo && sl[(row + 1u32) as usize] == vhi {
-                                    comm[(2u32 * q + v / 32u32) as usize]
-                                        .fetch_or(1u32 << (v % 32u32));
-                                }
-                            }
-                            j += NT;
-                        }
-                    }
-                }
+                // (this barrier guarded a pass over the slices that the shuffle transpose made unnecessary; kept so
+                // that the generated code stays byte-identical to the audited kernel's)
                 sync_cube();
-                if comptime!(mode == 2) {
+                {
                     // the common masks per digit: cmv[v] bit q = digit v is common to chunk q (one wave, once per
                     // round), so that 3a ORs one word per probe digit instead of testing every chunk's two words
                     if t < 64u32 {
@@ -740,13 +607,13 @@ mod kernels {
                     }
                     sync_cube();
                 }
-                if comptime!(mode != 0) {
+                {
                     // phase 3a: per probe, its 16-bit mask of chunks kept by the common-mask skip -> list
                     let allq = (1u32 << nch) - 1u32; // nch <= 16
                     let mut pp = t;
                     while pp < nprobe {
                         let mut km = allq;
-                        if comptime!(mode == 2) {
+                        {
                             let mut hitm = 0u32;
                             let pv = prob_d[pp as usize];
                             #[unroll]
@@ -790,7 +657,7 @@ mod kernels {
                             pk[h0 as usize] = 0u32;
                         }
                         #[unroll]
-                        for h in 0..ept {
+                        for h in 0..2u32 {
                             // branch-free: an entry past the list reads as 0 (probe 0, no chunk kept), and a lane whose
                             // chunk is not kept computes its word and masks it (a wave skipped only when all 64 lanes
                             // were idle, which is rare; the branches cost more than they saved). e < nlist + 31 <= pq's size.
@@ -815,29 +682,15 @@ mod kernels {
                             whi[h as usize] = !ahi & vhi & kmask;
                         }
                         if t == 0u32 {
-                            my_lslots += min(comptime!(16 * ept), nlist - e0) * nch;
+                            my_lslots += min(32u32, nlist - e0) * nch;
                         }
                         let nza = (wlo[0usize] | whi[0usize]) != 0u32;
                         let nzb = (wlo[1usize] | whi[1usize]) != 0u32;
-                        if comptime!(noout) {
-                            my_surv += wlo[0usize].count_ones()
-                                + whi[0usize].count_ones()
-                                + wlo[1usize].count_ones()
-                                + whi[1usize].count_ones();
-                        } else {
-                            let fa = select(nza, 1u32, 0u32);
-                            let fb = select(nzb, 1u32, 0u32);
-                            let na = plane_count(nza, fa, w, ranks);
-                            let nn = na + plane_count(nzb, fb, w, ranks);
-                            let mut ra = 0u32;
-                            let mut rb = 0u32;
-                            if comptime!(ranks == 0) {
-                                ra = plane_rank(nza, fa, w, ranks);
-                                rb = plane_rank(nzb, fb, w, ranks);
-                            } else {
-                                ra = plane_rank_m(nza, rlo, rhi, w);
-                                rb = plane_rank_m(nzb, rlo, rhi, w);
-                            }
+                        {
+                            let na = plane_count(nza, w);
+                            let nn = na + plane_count(nzb, w);
+                            let ra = plane_rank_m(nza, rlo, rhi, w);
+                            let rb = plane_rank_m(nzb, rlo, rhi, w);
                             if nn > 0u32 {
                                 if slab_used + nn > SLAB {
                                     if lane == 0u32 && have_slab {
@@ -880,7 +733,7 @@ mod kernels {
                                 slab_used += nn;
                             }
                         }
-                        e0 += comptime!(16 * ept);
+                        e0 += 32u32;
                     }
                     if t == 0u32 {
                         my_flat += nprobe * nch;
@@ -902,11 +755,7 @@ mod kernels {
                     s_nl[0usize].store(0u32);
                 }
                 if t >= 32u32 && t < 64u32 {
-                    comm[(t - 32u32) as usize].store(comptime!(if xpose == 0 || cmask == 0 {
-                        0u32
-                    } else {
-                        u32::MAX
-                    }));
+                    comm[(t - 32u32) as usize].store(u32::MAX);
                 }
                 npend = left;
                 cdone += ntake;
@@ -916,8 +765,8 @@ mod kernels {
                 }
             }
         }
-        if !comptime!(noout) {
-            // (audit) F_SLABCNT (2048): cube 0 never writes its last slab's count
+        {
+            // F_SLABCNT (2048): cube 0 never writes its last slab's count
             if lane == 0u32
                 && have_slab
                 && slab_id < nslab_cap
@@ -3479,16 +3328,8 @@ impl<R: Runtime> GpuJoin<R> {
                         self.fault,
                         a(acc, ACC_WORDS),
                         self.lcap,
-                        2u32,
-                        false,
                         self.w,
                         self.fill,
-                        1u32,
-                        2u32,
-                        1u32,
-                        0u32,
-                        1u32,
-                        1u32,
                     );
                 }
                 if self.upto(5) {
