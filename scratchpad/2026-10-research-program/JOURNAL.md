@@ -231,6 +231,23 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   06:40): merge `dev/mo-wide` into the trunk, port the accounts and guards to the wide kernels with their
   fault tests, then the prefilter, top hierarchy and expansion, then base 65 again.
 
+- **≈ 03:30 UTC, the user asked twice about SRA's reach** ("is there an issue with the production join path or
+  just stride?"; "no reason a production field would be run on stride unless forced via environment variable?
+  Or did this defect exist since before the join was introduced?"). Checked in the tags, not from memory:
+  - Routing (`join_verdict_routed`, identical constants at v3.4.6 / v3.4.7 / v3.4.8): stride without any
+    override for bases outside 40–64, fields under 1e13, n past 96 bits, or a field over which the digit length
+    of n, n² or n³ changes. Production's b60 (1e16) and b62 (1e17) fields meet none.
+  - History: `niceonly_kernel` (CubeCL stride) dates from #99 (d4f302f1, 2026-08-19), first released in v3.4.0
+    (08-28), never with a ran-account; the join and its `ensure_ran` arrived together in 9f8c2118, v3.4.6
+    (10-07). **But the default NVIDIA backend for nice-only was the hand-written CUDA one through v3.4.6**
+    (`want == Auto && !detailed` → `try_init_cuda`; v3.4.6 brings CubeCL's CUDA runtime up for the join only).
+    "Auto leads with the CubeCL CUDA runtime in both modes" starts at v3.4.7 (10-31). CubeCL 0.10.0 throughout.
+  - So the demonstrated combination (nice-only, stride, CubeCL CUDA) is the default only from v3.4.7 on and only
+    for stride-routed fields; before that it needed `--gpu-backend cubecl-cuda`. The hand-written backend and
+    wgpu under memory pressure are unexamined. **The census must therefore ask: any nice-only submission from
+    a v3.4.7+ NVIDIA client on a field under 1e13 or a base outside 40–64; and any from v3.4.0–v3.4.6 with the
+    CubeCL CUDA backend selected (telemetry's backend field, if it has one).**
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);
