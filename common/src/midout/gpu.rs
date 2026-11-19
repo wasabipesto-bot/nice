@@ -3840,12 +3840,16 @@ impl GpuOptions {
 fn cpu_slice(coord: &Coord, pip: u64) -> (u64, u64, Vec<u128>) {
     let base = super::cpu::Base::new(coord);
     let mut pass = Vec::new();
-    let cn =
-        super::cpu::slice_join::<u64>(&base, Shape { f0: 4, k: 10 }, u128::from(pip), |_, n, p| {
+    let cn = super::cpu::slice_join::<u64>(
+        &base,
+        Shape::for_coord(coord),
+        u128::from(pip),
+        |_, n, p| {
             if p {
                 pass.push(n);
             }
-        });
+        },
+    );
     pass.sort_unstable();
     (cn.survivors, cn.checked, pass)
 }
