@@ -5,11 +5,11 @@
 //!
 //! A second path, not a width parameter of [`super::gpu`]: base 64 keeps its
 //! 64-bit kernels byte for byte (no tax by construction); what the narrow
-//! path gains must be ported here by hand. Ported so far (step 3W): the
-//! accounts, guards and sampled CPU check of step 3A, the top hierarchy
+//! path gains must be ported here by hand. Ported so far: the
+//! accounts, guards and sampled CPU check, the top hierarchy
 //! (`wtops5`) and the prefilter before the check (in `wexpand_kernel`,
-//! mirroring `cpu::prefilter`). The main kernel here is the base-64 kernel (form D,
-//! the library's options fixed: shuffle transpose, two entries per step,
+//! mirroring `cpu::prefilter`). The main kernel here is the base-64 kernel (`gpu::kernels::g2_kernel`:
+//! shuffle transpose, two entries per step,
 //! ballot ranks, common masks from registers, top digits from a table) with
 //! these widenings:
 //!
@@ -28,8 +28,8 @@
 //! - **the padded coordinate**: the range's ends are clipped per top
 //!   (start's and end's low digits), and `h` runs over the leading values;
 //! - **classes mod b − 1** and **roots** per base (`m`, `nroot` comptime);
-//!   jobs run as `ninst` instances of `PMAX` probes each (day one's second
-//!   instance, generalised: base 68 has 3.5k–6.3k probes per job).
+//!   jobs run as `ninst` instances of `PMAX` probes each (the base-64 path's
+//!   second instance, generalised: base 68 has 3.5k–6.3k probes per job).
 //!
 //! The full check is this file's own (`wcheck_kernel`): production's
 //! `check_kernel` holds digits in one 64-bit mask and refuses bases above
@@ -129,7 +129,7 @@ const C_ERR_CLST: usize = 366;
 /// Slices whose last kernel ran (`wdone_kernel`): the host counts slices from this word.
 const C_SLICES: usize = 367;
 const NCNT: usize = 368;
-/// Per-slice account (`acc`, one buffer per slice; the trunk's step-3A accounts, wide form): what every stage ran,
+/// Per-slice account (`acc`, one buffer per slice; the base-64 path's accounts, wide form): what every stage ran,
 /// compared by the host with what it queued (`WideJoin::check_slice`). Every word starts at 0, and no word may
 /// stay 0 for a slice whose stage ran. `wtops1`: valid parents examined (= `wtops5`'s `l5n[0]`), tops certified
 /// (= `tstat[0]`); `wscan` (tops) ran; `wtops2` tops placed, `wtdigz` rows written (= `tstat[0]`).
@@ -239,8 +239,8 @@ mod wk {
         (olo, ohi)
     }
 
-    /// One cube per job instance (class c, unit d, probes [poff, poff + PMAX)): the base-64 kernel's form D with
-    /// two-word masks, `b | 1` slice rows, 7-bit probe digits and classes mod b − 1 (see the module notes).
+    /// One cube per job instance (class c, unit d, probes [poff, poff + PMAX)): the base-64 kernel with
+    /// two-word masks, `b | 1` slice rows, 7-bit probe digits and classes mod b − 1 (see the module docs).
     #[cube(launch_unchecked)]
     pub fn wide_kernel(
         par: &Array<Vector<u32, Const<4>>>, // (mask lo32, mask hi32, cacc, rf | mask digits 64.. << 25)
@@ -257,7 +257,7 @@ mod wk {
         clst: &mut Array<u32>,
         c0: u32,
         plast: u32,
-        // (audit) fault-injection bits, 0 in production: F_DROP_PROBE (8) each instance's last probe not run
+        // fault-injection bits, 0 in production: F_DROP_PROBE (8) each instance's last probe not run
         fault: u32,
         // the slice's account (`A_*`) and the child list's length
         acc: &mut Array<Atomic<u32>>,
@@ -395,7 +395,7 @@ mod wk {
         let mut parity = 0u32;
         let mut going = nprobe > 0u32 || poff == 0u32;
         let lb = (pb - pseg[c0 as usize]) * b + d * (pe - pb);
-        // (the trunk's step 3A) here, not at the end, so that none of these stays live through the rounds: the
+        // here, not at the end, so that none of these stays live through the rounds: the
         // probes this instance runs (the host's law: nroot x tops over all instances) and the job's child list
         // [lb, lb + (pe - pb)) inside the batch's
         if t == 0u32 {
@@ -962,7 +962,7 @@ mod wp {
         (lo, hi, mlo, mhi, bad)
     }
 
-    /// The middle-digit prefilter (the trunk's piece A, `cpu::prefilter` in wide form) of n whose digits
+    /// The middle-digit prefilter (`cpu::prefilter` in wide form) of n whose digits
     /// `[0, k + 2)` are `rd`: the digits at positions k and k + 1 of n² and n³ are distinct, miss the digits
     /// `[0, k)` of n² and n³, and miss the top's certified digits at positions >= k + 2 (`mlo`, `mhi`). Every
     /// digit of r², r³ mod b^(k+2) is computed and tested (the bottom's 2k are distinct for a survivor). `small`:
@@ -1031,7 +1031,7 @@ mod wp {
         ok || small
     }
 
-    /// (step 5L) `pf_w` in base b² ("super-digits": two digits each, so a column sum of products of super-digits
+    /// `pf_w` in base b² ("super-digits": two digits each, so a column sum of products of super-digits
     /// stays below 2^32 for b <= 70 and k + 2 <= 2 * 178): r = r_f + F·b^f0 with F's super-digits fixed per record
     /// (`sf`, from `pf_w2_fixed`) and r_f's from one division by b² per pair of its digits; r² and r³ mod b^(2·ns)
     /// in ns = ceil((k + 2) / 2) super-digit columns (ns(ns+1)/2 products each, against (k+2)(k+3)/2 per digit in
@@ -1150,7 +1150,7 @@ mod wp {
         ok || (small_rec && rz)
     }
 
-    /// (step 5L) A record's fixed super-digits for `pf_w2` from its digits `rd[f0..k+2)` (`rd` of k + 2 digits):
+    /// A record's fixed super-digits for `pf_w2` from its digits `rd[f0..k+2)` (`rd` of k + 2 digits):
     /// sf[i] = rd[2i] + b·rd[2i + 1] for 2i >= f0 (rd[k + 2] = 0), rd[f0] for the super-digit across f0 (f0 odd).
     #[cube]
     pub fn pf_w2_fixed(
@@ -1266,7 +1266,7 @@ mod wp {
         nroots: u32,
         pipcls: u32,
         cap: u32,
-        // (audit) F_DROP_PARENT (8192): parents of r_f = 0 mod 997 left out of the list after `parent_w`;
+        // F_DROP_PARENT (8192): parents of r_f = 0 mod 997 left out of the list after `parent_w`;
         // F_BAD_PARENT (16384): `parent_w` returns 0 for them (a wrong parent, which only the sampled check sees)
         fault: u32,
         acc: &mut Array<Atomic<u32>>,
@@ -1610,7 +1610,7 @@ mod wp {
         }
     }
 
-    /// The top hierarchy (the trunk's piece C, wide form): once per b consecutive slices (one value of the slice's
+    /// The top hierarchy (the base-64 path's `tops5`, wide form): once per b consecutive slices (one value of the slice's
     /// digits [f0 + 1, k − 1)), thread i = d·nlead + (h − hlo) certifies the parent prefix p5 = (h·b + d)·b^(k−2−f0)
     /// + pip div b over its b^(f0+1) n (clipped to the range) and lists i if valid. A slice's prefix i is tested
     /// only under a valid parent i: a sub-interval's certificate holds its parent's digits, so a parent with a
@@ -1984,7 +1984,7 @@ mod wp {
         // the prefilter: the tops' thread indices and certified digits >= k + 2, the slice's digits, the range's
         // clip (as the check's), the small-n bound (n < b^ceil((k+2)/2) iff h < hsmall and the slice's digits
         // >= ceil((k+2)/2) are zero), the fault bits (F_NOPF 1: no prefilter; F_PF_DROP 1024: the prefilter
-        // wrongly drops n whose r_f has bits 10-19 zero, as the trunk's)
+        // wrongly drops n whose r_f has bits 10-19 zero, as on the base-64 path)
         thd: &Array<u32>,
         ttq: &Array<u64>,
         ttqh: &Array<u32>,
@@ -2001,7 +2001,7 @@ mod wp {
         #[comptime] nroot: u32,
         #[comptime] f0: u32,
         #[comptime] k: u32,
-        // (step 5L) the prefilter in base b² (`pf_w2`); false: digit by digit (`pf_w`)
+        // the prefilter in base b² (`pf_w2`); false: digit by digit (`pf_w`)
         #[comptime] pf2: bool,
     ) {
         let nopf = (fault & 1u32) != 0u32;
@@ -2509,7 +2509,7 @@ impl WideCaps {
             0..=40 => (1 << 20, 1 << 20, 1 << 22, 4, 20),
             41..=64 => (2_100_000, 480_000, 24_000_000, 2, 17),
             65 => (4_000_000, 3_000_000, 40_000_000, 2, 18),
-            // base 68: 89M prefixes and ~143M survivors per slice; 3.5k-6.3k probes per job (bases/RESULTS.md)
+            // base 68: 89M prefixes and ~143M survivors per slice; 3.5k-6.3k probes per job
             _ => (4_000_000, 16_000_000, 200_000_000, 12, 19),
         };
         WideCaps {
@@ -2568,7 +2568,7 @@ struct WSlice {
     l5n: Option<Handle>,
 }
 
-/// What the host knows of a slice when its first launch batch is finished (the trunk's `SliceHead`).
+/// What the host knows of a slice when its first launch batch is finished (the base-64 path's `SliceHead`).
 struct WHead {
     pip: u64,
     acc: Handle,
@@ -2590,7 +2590,7 @@ struct WTicket {
     head: Option<WHead>,
 }
 
-/// (audit) Fault-injection bits, 0 in production; the trunk's numbers where the fault is the same.
+/// Fault-injection bits, 0 in production; the base-64 path's numbers where the fault is the same.
 /// The main kernel not launched.
 #[allow(dead_code)] // the tests only
 pub(crate) const F_SKIP_MAIN: u32 = 2;
@@ -2663,11 +2663,11 @@ pub struct WideJoin<R: Runtime> {
     t5list: Handle,
     t5state: std::sync::Mutex<Option<(u64, Handle)>>,
     /// Timing only ([`WideJoin::set_timing_stop`]): 1 tops, 2 parents, 3 main kernel, 5 expansion, 6 all.
-    /// The library never reads `MIDOUT_STOP` (AUDIT-MO §1.2); [`search_field_wide`] refuses a stop.
+    /// The library never reads `MIDOUT_STOP`; [`search_field_wide`] refuses a stop.
     pub(crate) stop: u32,
-    /// (audit) fault-injection bits; 0 in production (only the tests set them).
+    /// fault-injection bits; 0 in production (only the tests set them).
     pub(crate) fault: u32,
-    /// (step 5L) The expansion's prefilter in base b² (`pf_w2`; on unless [`WideJoin::set_prefilter_b2`]).
+    /// The expansion's prefilter in base b² (`pf_w2`; on unless [`WideJoin::set_prefilter_b2`]).
     pf2: bool,
 }
 
@@ -2814,8 +2814,8 @@ impl<R: Runtime> WideJoin<R> {
         self.stop >= k
     }
 
-    /// (step 5L) The expansion's prefilter in base b² (`pf_w2`, the default) or digit by digit (`pf_w`, the
-    /// trunk's before step 5L; for A/B timing). The same predicate either way.
+    /// The expansion's prefilter in base b² (`pf_w2`, the default) or digit by digit (`pf_w`, the earlier form,
+    /// kept for A/B timing). The same predicate either way.
     pub fn set_prefilter_b2(&mut self, on: bool) {
         self.pf2 = on;
     }
@@ -2834,7 +2834,7 @@ impl<R: Runtime> WideJoin<R> {
         self.stop != 6
     }
 
-    /// (audit) Set the fault bits.
+    /// Set the fault bits.
     #[allow(dead_code)] // the tests only
     pub(crate) fn set_fault(&mut self, f: u32) {
         self.fault = f;
@@ -3663,7 +3663,7 @@ pub(crate) fn wide_sample_compare<R: Runtime>(
 pub struct WideOptions {
     /// Slices per synchronisation (1-256).
     pub group: usize,
-    /// The sampled CPU check (the trunk's): one random slice of the field recomputed by the CPU reference on a
+    /// The sampled CPU check (as on the base-64 path): one random slice of the field recomputed by the CPU reference on a
     /// host thread while the card works; the field run's own survivors for that slice must equal the CPU's, and
     /// the slice run again alone on the device must give the same survivors, n for n. At base 65 the CPU takes
     /// longer than the field (~70 s against ~55 s): the host waits for it.
@@ -3917,7 +3917,7 @@ mod tests {
         }
     }
 
-    /// (step 5L) Base 65 under the coordinate `(4, 8, 5)` (padded; digits 5–7 fixed): a field's slices for the
+    /// Base 65 under the coordinate `(4, 8, 5)` (padded; digits 5–7 fixed): a field's slices for the
     /// listed digit-8 values, through the field path one slice per group, each equal (children, chunks, flat,
     /// survivors, checked, tops) to the same slice run as a part of the `(4, 9, 6)` field that holds it; the
     /// per-slice counts sum to the field runs'. With `MIDOUT_485_WHOLE=1` also the whole new field through the
@@ -4275,7 +4275,7 @@ mod tests {
         )
     }
 
-    /// (step 3W) The trunk's step-3A acceptance on the wide path: the faults that apply are loud through the
+    /// The base-64 path's fault acceptance on the wide path: the faults that apply are loud through the
     /// accounts of the production group path (`F_SKIP_MAIN`, `F_SKIP_TOPS`, `F_DROP_PROBE`, `F_DROP_PARENT`), a
     /// clean run passes before and after each with the unfaulted counts, and `F_BAD_PARENT` (a parent computed
     /// wrongly: every conservation law still holds) is loud through the sampled CPU check. Base 65 by default;
@@ -4379,7 +4379,7 @@ mod tests {
         }
     }
 
-    /// (step 3W) AUDIT-MO §1.1 on the wide path: a failed device allocation (`AUDIT_FILL_MB` filled first, in
+    /// AUDIT-MO §1.1 on the wide path: a failed device allocation (`AUDIT_FILL_MB` filled first, in
     /// process) must not return a slice as searched. Base 65 slice 717171717 (16,482,926 survivors).
     #[test]
     #[ignore = "needs CUDA; fills the card's memory"]
@@ -4422,7 +4422,7 @@ mod tests {
         }
     }
 
-    /// (step 3W) AUDIT-MO §1.2 on the wide path: `MIDOUT_STOP` in the environment is ignored by the library, and
+    /// On the wide path: `MIDOUT_STOP` in the environment is ignored by the library, and
     /// `search_field_wide` refuses a join with a timing stop.
     #[test]
     #[ignore = "needs a GPU; sets MIDOUT_STOP (run it alone)"]
@@ -4470,9 +4470,9 @@ mod tests {
         }
     }
 
-    /// A real base-65 slice against the staged prototype (`g2proto dumpsu 65
-    /// 4 10 PIP DIR`, an independent implementation): every unit's survivor
-    /// set and every unit's top count. `MIDOUT_SU_DIR`.
+    /// A real base-65 slice against a staged reference from an independent
+    /// implementation of the join (outside this repository): every unit's
+    /// survivor set and every unit's top count, from the files in `MIDOUT_SU_DIR`.
     #[test]
     #[ignore = "needs a GPU and MIDOUT_SU_DIR (a staged slice)"]
     fn wide_slice_vs_staged() {

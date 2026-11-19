@@ -2,9 +2,9 @@
 //! (3–128) and the mask word, slow. It is the oracle of the device path and
 //! the audit tool, not a client route.
 //!
-//! Ported from the G2 prototype (`G2/bases/proto/src/{join,su}.rs`; that
-//! code is exact against brute force at bases 10–29 and against an
-//! independent implementation of today's (3, 6) shape at 62, 64, 65–70).
+//! Its tests compare it with brute force on every field of small bases;
+//! it was also compared with an independent implementation of the join at
+//! bases 62–70 while it was written.
 //!
 //! # The join, for one slice
 //!
@@ -21,8 +21,8 @@
 //! whose `n` lies in the top's interval is a *survivor*; every nice `n` is
 //! one. The pairing runs over 64-child chunks of the children sorted by a
 //! key of frequent digits, with the chunk's common mask as a skip (the
-//! prototype's and the device kernel's structure, so the counts of chunks
-//! and kept words mean the same here and there).
+//! device kernel's structure, so the counts of chunks and kept words mean
+//! the same here and there).
 
 use super::arith::{U384, roots, unique_digits};
 use super::coord::{Coord, ndigits};
@@ -398,7 +398,7 @@ pub fn child_mask<M: Mask>(b: u32, p: &Parent<M>, d: u32) -> M {
 }
 
 /// The 8 key digits of a slice: parent frequency × top frequency, largest
-/// first, ties by digit (the prototype's and the benchmark's rule).
+/// first, ties by digit (the device path's rule).
 #[must_use]
 #[allow(clippy::cast_precision_loss)]
 pub fn key_digits(b: u32, fp: &[u64], ft: &[u64]) -> Vec<u32> {
@@ -858,8 +858,9 @@ mod tests {
         }
     }
 
-    /// A real base-64 slice against the staged prototype reference
-    /// (`G2/bench/su64_*`: `tops.bin`, `surv.bin`, `meta.txt`): every unit's
+    /// A real base-64 slice against a staged reference from an independent
+    /// implementation (outside this repository; `tops.bin`, `surv.bin`,
+    /// `meta.txt` in `MIDOUT_SU_DIR`): every unit's
     /// survivor set, the tops, and the totals. Set `MIDOUT_SU_DIR`; minutes of
     /// CPU on one thread per unit.
     #[test]

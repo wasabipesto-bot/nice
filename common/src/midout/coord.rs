@@ -20,12 +20,10 @@
 //!
 //! - **Base 64** (`k0 = 4`, `k1 = 9`): the range is exactly `[2^75, 2^76)`,
 //!   `H = 2^21`, there is no padding, and `v` is `n` with bits 24–53 moved up
-//!   to bits 45–74: the renumbering of `G2/PROPOSAL.md` §2,
-//!   `v = 2^75 + π′·2^45 + (h − 2^15)·2^30 + d9·2^24 + low` (there `h` is
-//!   `n div b^10` and `d9` digit 9; here they are one number `n div b^9`).
-//! - **Other bases** (`G2/bases/RESULTS.md` §5): the same formula with
-//!   padding. It pads at `b^k1` granularity, a little less than §5's
-//!   `b^(k1+1)`, and `v` never needs more bits than `start + H·b^k1`.
+//!   to bits 45–74: `v = 2^75 + π′·2^45 + (n div b^9 − 2^21)·2^24 + (n mod
+//!   b^4)`, `π′` being digits 4–8 of `n`.
+//! - **Other bases**: the same formula with padding. It pads at `b^k1`
+//!   granularity, and `v` never needs more bits than `start + H·b^k1`.
 //!
 //! # What a field fixes
 //!
@@ -41,11 +39,12 @@
 //! `(4, 8, 5)` fixes digits 5–7, one of `(4, 9, 6)` digits 6–8 (quantum
 //! `2^57` either way, 262,144 fields per base); see [`coord_digits_known`].
 //!
-//! `range_size` of a field (what the server sums) is [`Coord::n_count`],
-//! the `n` it holds, not `v_size`; they differ only by padding.
+//! The `n` a field holds is [`Coord::n_count`], not `v_size`; they differ
+//! only by padding. (Were a server ever to sum a field's `range_size`, this
+//! is the number; no server stores this coordinate or its fields.)
 //!
 //! Nothing here knows the join's shape: the join checks for itself that its
-//! shape can search a field of this coordinate (`join` module).
+//! shape can search a field of this coordinate (`cpu::Shape::fits`).
 
 use crate::base_range::get_base_range_u128;
 use anyhow::{Result, bail, ensure};
@@ -70,17 +69,17 @@ pub struct Coord {
 
 /// The coordinates `(k0, k1, q0)` a base's fields may be cut in, the
 /// default first ([`coord_digits`], [`Coord::for_base`]). Only base 64 is
-/// meant for fields today; bases 65 and 68–70 are here for the wide device
+/// meant for fields now; bases 65 and 68–70 are here for the wide device
 /// path's measurements (the padded form; no field of them exists or is
 /// planned).
 ///
-/// - `(4, 8, 5)`, the default at bases 64 and 65 (step 5L): a field fixes
+/// - `(4, 8, 5)`, the default at bases 64 and 65: a field fixes
 ///   digits 5–7, so digits 4 and 8 (the two ends of the (4, 10) join's slice
 ///   key) are free inside it: tops share across digit 4, parents across
-///   digit 8 (`G2/fs/REVIEW.md` §5). Bases 64 and 65 only (the bases its
-///   device path was shown exact on).
-/// - `(4, 9, 6)`: a field fixes digits 6–8 (the first coordinate, steps
-///   1–4; still searched, the default at 68–70).
+///   digit 8. Bases 64 and 65 only (the bases its device path was shown
+///   exact on).
+/// - `(4, 9, 6)`: a field fixes digits 6–8 (the first coordinate; still
+///   searched, the default at 68–70).
 #[must_use]
 pub fn coord_digits_known(b: u32) -> &'static [(u32, u32, u32)] {
     match b {
@@ -283,7 +282,7 @@ pub fn ndigits(mut x: u128, b: u32) -> u32 {
 mod tests {
     use super::*;
 
-    /// Base 64's v is PROPOSAL §2's bit renumbering, on random n and the ends.
+    /// Base 64's v is the bit renumbering of the module docs, on random n and the ends.
     #[test]
     fn b64_is_the_bit_renumbering() {
         let c = Coord::with_digits(64, 4, 9, 6).unwrap();
@@ -445,7 +444,7 @@ mod tests {
             .collect()
     }
 
-    /// Base 64 under `(4, 8, 5)` (`G2/fs/REVIEW.md` §5): an exact bit
+    /// Base 64 under `(4, 8, 5)`: an exact bit
     /// permutation of `[2^75, 2^76)`, n's bits 24–47 (digits 4–7) moved up to
     /// bits 51–74, `H = 2^27`, no padding.
     #[test]

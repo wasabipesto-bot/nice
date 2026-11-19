@@ -223,7 +223,7 @@ mod tests {
         assert!(refuse_coordinate_space(marked_id).is_err());
         let e = refuse_coordinate_space(marked).unwrap_err().to_string();
         assert!(e.contains("coordinate"), "{e}");
-        // any value of the key is refused, not only today's
+        // any value of the key is refused, not only the values known now
         let other = br#"{"claim_id":7,"base":64,"range_start":1,"range_end":2,"range_size":1,"coordinate":2}"#;
         assert!(refuse_coordinate_space(other).is_err());
         // not an object: left to the caller's own parse

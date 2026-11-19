@@ -8,7 +8,7 @@
 //! usage: midout_wide_bench [--cuda] [--base B] [--fields T0,T1,..] [--group G] [--classes C]
 //!                          [--maxpop P] [--ninst I] [--narrow] [--narrow-only] [--digits K0,K1,Q0] [--pf-digits]
 //!   --fields: values of the field's fixed digits (5-7 under the default 4,8,5; 6-8 under 4,9,6): v = start + t·quantum
-//!   --pf-digits: the expansion's prefilter digit by digit (`pf_w`, before step 5L) instead of in base b² (A/B)
+//!   --pf-digits: the expansion's prefilter digit by digit (`pf_w`, the earlier form) instead of in base b² (A/B)
 #![allow(clippy::cast_precision_loss)]
 
 use anyhow::{Result, bail};
@@ -88,7 +88,7 @@ fn main() -> Result<()> {
                 if let Some(st) = std::env::var("MIDOUT_STOP").ok().and_then(|x| x.parse().ok()) {
                     g.set_timing_stop(st);
                 }
-                // --pf-digits: the prefilter digit by digit (the trunk's before step 5L), for A/B timing
+                // --pf-digits: the prefilter digit by digit (the earlier form), for A/B timing
                 g.set_prefilter_b2(!flag("--pf-digits"));
                 println!("prefilter {}", if flag("--pf-digits") { "digits (pf_w)" } else { "base b^2 (pf_w2)" });
                 Some(g)

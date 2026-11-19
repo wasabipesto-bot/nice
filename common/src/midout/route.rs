@@ -65,8 +65,9 @@ impl<R: Runtime> FieldJoin<R> {
     }
 
     /// Whether the sampled CPU check is on by default for this base: at base
-    /// 64 it costs +0.4 % of a field; above, the CPU slice takes longer than
-    /// the field (BUILD-NOTES §11.4), so it is off unless asked.
+    /// 64 it costs +0.4 % of a field (RTX 3080); at base 65 the CPU slice
+    /// takes longer than the field (about 70 s against 55 s), so it is off
+    /// unless asked.
     pub fn cpu_check_default(&self) -> bool {
         matches!(self, Self::Narrow(_))
     }

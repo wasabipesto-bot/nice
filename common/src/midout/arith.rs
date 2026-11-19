@@ -1,8 +1,11 @@
 //! Exact arithmetic for the CPU reference: 384-bit unsigned (6 × u64,
 //! little endian), enough for `n³` at every base up to 70 (70^42 < 2^258)
-//! and for any `n < 2^128` (`n³ < 2^384`). Ported from the G2 prototype
-//! (`G2/bases/proto/src/arith.rs`), which is exact against brute force at
-//! bases 10–28 and against an independent join at 62, 64 and 65–70.
+//! and for any `n < 2^128` (`n³ < 2^384`).
+//!
+//! It deliberately re-implements nice-ness (`unique_digits`) and the residue
+//! roots that production also has (`client_process`, `residue_filter`): an
+//! oracle should not reuse the code it checks. Checked against brute force
+//! at small bases (`cpu`'s tests).
 
 pub const NL: usize = 6;
 

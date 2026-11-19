@@ -1,5 +1,5 @@
-//! The middle-out join (development; working name, `G2` in the research
-//! notes): a nice-only search whose work unit is a range of a per-base
+//! The middle-out join (development; a working name): a nice-only search
+//! whose work unit is a range of a per-base
 //! coordinate instead of a range of n. Additive: no production route reaches
 //! it, and nothing outside this module depends on it.
 //!
@@ -21,8 +21,8 @@
 //! `survivors` and `checked` ([`cpu::FieldOutcome`]); both are properties of
 //! (shape, field), so they are reported with the shape's label.
 
-// Development code (the port's kernels keep their own style; arithmetic
-// names follow the papers' single letters).
+// Development code (the kernels keep their own style; arithmetic names are
+// single letters as in the formulas).
 #![allow(
     clippy::chunks_exact_to_as_chunks,
     clippy::manual_midpoint,

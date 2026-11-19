@@ -1,4 +1,4 @@
-//! (dev/mo-audit) The audit of the middle-out join's device path, 2026-11-18:
+//! The audit harness of the middle-out join's device path:
 //! a parity sweep of the device against the CPU reference on many real
 //! base-64 slices, and fault injection into the device path to see which
 //! failures the host's accounts catch. Tests only; every test is ignored
@@ -427,9 +427,9 @@ fn audit_faults() {
     }
 }
 
-/// (step 3A) Finding 1.2: `MIDOUT_STOP` in the environment made `search_field` a no-op that succeeded. Now the
-/// library never reads it (the bench does, and sets the stop with `set_timing_stop`), and `search_field` refuses a
-/// join with a stop set.
+/// `MIDOUT_STOP` in the environment once made `search_field` a no-op that succeeded: the library must never read
+/// it (only the bench does, and sets the stop with `set_timing_stop`), and `search_field` must refuse a join with a
+/// stop set.
 #[cfg(feature = "cubecl-cuda")]
 #[test]
 #[ignore = "needs CUDA"]
@@ -468,7 +468,7 @@ fn audit_stop_env_is_loud() {
     }
 }
 
-/// The device the acceptance tests run on: CUDA with `MIDOUT_CUDA`, else the default (wgpu: lavapipe on the box).
+/// The device the acceptance tests run on: CUDA with `MIDOUT_CUDA`, else the default wgpu device.
 macro_rules! on_device {
     ($go:ident) => {{
         #[cfg(feature = "cubecl-cuda")]
@@ -483,7 +483,7 @@ macro_rules! on_device {
     }};
 }
 
-/// (step 3A) Acceptance: every fault the audit showed silent (§1.3) now fails loudly. `F_SKIP_MAIN`, `F_SKIP_TOPS`,
+/// Every fault that once went unseen fails loudly. `F_SKIP_MAIN`, `F_SKIP_TOPS`,
 /// `F_DROP_PROBE` and `F_DROP_PARENT` through the accounts of the production group path; `F_PF_DROP` (the
 /// prefilter rejecting too much, which no account can see) through the sampled CPU check. A clean run passes before
 /// and after each fault. `AUDIT_SLICES` (default 502136830, 0), `MIDOUT_CLASSES` (63; 4 on lavapipe),
@@ -698,7 +698,7 @@ fn audit_key_and_group_independence() {
 
 /// Finding 1.1: a device allocation that fails (here: the card's memory filled first, `AUDIT_FILL_MB`, or held by a
 /// helper process of this test with `AUDIT_HOLD_S`) panics in CubeCL's stream thread, not in the caller; the kernels
-/// that use the missing buffer are dropped. (Step 3A) the production group path must now fail loudly (or the caller
+/// that use the missing buffer are dropped. the production group path must now fail loudly (or the caller
 /// panic); a group that returns `Ok` fails the test.
 #[cfg(feature = "cubecl-cuda")]
 #[test]

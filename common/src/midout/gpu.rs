@@ -131,7 +131,7 @@ const FILL: u32 = 1024;
 pub const PMAX: u32 = 576;
 /// Digits of a top mask the kernel reads: a top's popcount must fit.
 ///
-/// 17 is the most a top can certify at base 64 (the audit, AUDIT-MO §3.4):
+/// 17 is the most a top can certify at base 64:
 /// a top's interval is 2^24 n wide with n >= 2^75, so over it n² moves by
 /// at least 2^100 > 64^16 and n³ by at least 3·2^174 > 64^29; only digits
 /// 17–25 of n² (9) and 30–37 of n³ (8) can agree at both ends. Every slice
@@ -270,7 +270,7 @@ mod kernels {
     pub fn g2_kernel(
         par: &Array<Vector<u32, Const<4>>>, // parent records (mask lo, mask hi, cacc, r4), one 16-byte vector each (one LDG.128 on CUDA)
         pseg: &Array<u32>,
-        tdig: &Array<u32>, // each top's digits, 20 6-bit fields in 4 words (`tdig_kernel`), computed once per super-unit
+        tdig: &Array<u32>, // each top's digits, 20 6-bit fields in 4 words (`tdig_kernel`), computed once per slice
         tseg: &Array<u32>,
         roots: &Array<u32>,
         jobs: &Array<u32>,
@@ -279,11 +279,11 @@ mod kernels {
         slabn: &mut Array<Atomic<u32>>,
         slabcnt: &mut Array<u32>,
         nslab_cap: u32,
-        // library path (midout): each job's certified children's r4 in order, at
+        // each job's certified children's r4 in order, at
         // 64·(pseg[c] − pseg[c0]) + d·(class size) + position (written by phase 1)
         clst: &mut Array<u32>,
         c0: u32,
-        // (audit, dev/mo-audit) fault-injection bits, 0 in production: F_PMAX (4) probe window 300 instead of PMAX,
+        // fault-injection bits, 0 in production: F_PMAX (4) probe window 300 instead of PMAX,
         // F_DROP_PROBE (8) each job's last probe not run, F_IDX13 (16) the pending parent index read as 13 bits,
         // F_DROP_REC (32) cube 0 never stores its second record of a step
         fault: u32,
@@ -332,7 +332,7 @@ mod kernels {
         let rlo = select(rl >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(rl, 31u32)) - 1u32);
         let rhi = select(rl >= 32u32, (1u32 << (rl & 31u32)) - 1u32, 0u32);
         let c = jobs[(2u32 * CUBE_POS_X) as usize];
-        // library path (midout): the job word is d | poff << 8, poff the job's first probe (0, or PMAX for the
+        // the job word is d | poff << 8, poff the job's first probe (0, or PMAX for the
         // job's second instance, which runs only if the job has more than PMAX probes)
         let dj = jobs[(2u32 * CUBE_POS_X + 1u32) as usize];
         let d = dj & 255u32;
@@ -410,9 +410,9 @@ mod kernels {
         let mut parity = 0u32;
         // no `loop`/`break`: cubecl-spirv 0.10 emitted a conditional branch without OpSelectionMerge for them
         let mut going = nprobe > 0u32 || poff == 0u32;
-        // the job's child list (midout) and the position of the round's first pending child in it
+        // the job's child list and the position of the round's first pending child in it
         let lb = 64u32 * (pb - pseg[c0 as usize]) + d * (pe - pb);
-        // (midout) here, not at the end, so that none of these values stays live through the rounds (registers):
+        // here, not at the end, so that none of these values stays live through the rounds (registers):
         // the probes this instance runs (the host's law: 8 x tops over all instances), the pending parent index
         // (`pq`, `idx - pb`) within 16 bits, the job's child list [lb, lb + (pe - pb)) inside the batch's
         if t == 0u32 {
@@ -630,8 +630,7 @@ mod kernels {
                     let s16 = ntake + t;
                     keep = (pq[(s16 >> 1u32) as usize] >> ((s16 & 1u32) << 4u32)) & 0xFFFFu32;
                 }
-                // (the port's record held the chunk's first parent here, read from the pending slots)
-                // (midout) the record's chunk q = t % 16 starts at child cdone + 64·q of the job's list
+                // the record's chunk q = t % 16 starts at child cdone + 64·q of the job's list
                 let cpos = cdone + (t % 16u32) * 64u32;
                 sync_cube();
                 if comptime!(w < 32) {
@@ -719,7 +718,7 @@ mod kernels {
                             let mut alo = 0u32;
                             let mut ahi = 0u32;
                             let dws = prob_d[(p16 >> 4u32) as usize];
-                            // (midout) the record names its top, not its probe slot
+                            // the record names its top, not its probe slot
                             pk[h as usize] = dws[3usize] >> 12u32;
                             #[unroll]
                             for k in 0..MAXPOP {
@@ -837,7 +836,7 @@ mod kernels {
             }
         }
         if t == 0u32 && poff == 0u32 {
-            // (midout) a job's second instance repeats its children and chunks: count them once
+            // a job's second instance repeats its children and chunks: count them once
             cnt[(d * 5u32) as usize].fetch_add(my_children);
             cnt[(d * 5u32 + 1u32) as usize].fetch_add(my_chunks);
             acc[A_CHILD].fetch_add(my_children);
@@ -845,7 +844,7 @@ mod kernels {
         if t == 0u32 {
             cnt[(d * 5u32 + 2u32) as usize].fetch_add(my_flat);
             cnt[C_LSLOTS].fetch_add(my_lslots);
-            // (midout) positive evidence: this instance reached its end
+            // positive evidence: this instance reached its end
             acc[A_JOBS].fetch_add(1u32);
         }
     }
@@ -874,7 +873,7 @@ mod prep {
     }
 
     /// The parent of root r4 under π′ (pip): (mask, cacc, key), or mask 0 when a digit 0..8 repeats.
-    /// (2026-11-18: digits from 32-bit halves; the 18 digits are distinct iff the mask has 18 bits, so no per-digit
+    /// (Digits from 32-bit halves; the 18 digits are distinct iff the mask has 18 bits, so no per-digit
     /// tests; r mod 63 = (r4 mod 63 + pip mod 63) mod 63, as 2^24 = 1 mod 63.)
     #[cube]
     fn parent(r4: u32, pip: u64, rank: &Array<u32>) -> (u64, u32, u32) {
@@ -917,7 +916,7 @@ mod prep {
         (mm, cacc, key)
     }
 
-    /// (step 5L) The parents' shared pass across digit 8: the depth-4 roots whose depth-8 ancestor
+    /// The parents' shared pass across digit 8: the depth-4 roots whose depth-8 ancestor
     /// r = r4 + pip8·2^24 (pip8 = digits 4–7 of the slices it serves) has 16 distinct digits 0–7 of r² and r³
     /// (mod 2^48), appended as r4 to `out` (one atomic per plane; order arbitrary). Digits 0–7 of r² and r³
     /// depend only on r mod 2^48, so every root whose depth-9 parent passes `parent` for some digit 8 is listed:
@@ -999,7 +998,7 @@ mod prep {
         }
     }
 
-    /// --prep2 1 (default): the histogram pass also appends each parent's record and key to a compact list (one
+    /// The histogram pass also appends each parent's record and key to a compact list (one
     /// atomic per plane), so the scatter reads 1.04M list entries instead of making the parents of all 9.3M roots
     /// a second time. The list's order is arbitrary; the rank sort restores the CPU's order (ranks by r4).
     #[cube(launch_unchecked)]
@@ -1014,7 +1013,7 @@ mod prep {
         pip_lo: u32,
         pip_hi: u32,
         cap: u32,
-        // (audit) F_DROP_PARENT (8192): parents of r4 = 0 mod 997 taken as uncertified
+        // F_DROP_PARENT (8192): parents of r4 = 0 mod 997 taken as uncertified
         fault: u32,
         acc: &mut Array<Atomic<u32>>,
         #[comptime] w: u32,
@@ -1086,7 +1085,7 @@ mod prep {
     }
 
     /// The number of units d (of 64) for which `child_mask(pm, cacc, d) != 0`, pm = lo | hi << 32, in 32-bit
-    /// operations (step 4S: ACO emitted the 64 `child_mask` calls with 64-bit shifts and ORs). A child of unit d is
+    /// operations (AMD's compiler, ACO, emitted the 64 `child_mask` calls with 64-bit shifts and ORs). A child of unit d is
     /// valid iff its two new digits e2 = (a2 + b2·d) mod 64 and e3 = (a3 + b3·d) mod 64 differ and both miss pm;
     /// e2 and e3 advance by b2 and b3 per unit.
     #[cube]
@@ -1109,8 +1108,8 @@ mod prep {
         n
     }
 
-    /// --multi (2026-11-18): scatter2 with the list's length read on the device (`lcnt`, written by hist2), launched
-    /// for the list's capacity, as a client that does not know a super-unit's parent count on the host would.
+    /// The scatter of the compact list into bucket order, with the list's length read on the device (`lcnt`,
+    /// written by `hist2`) and launched for the list's capacity: the host never needs a slice's parent count.
     #[cube(launch_unchecked)]
     pub fn scatter3_kernel(
         lst: &Array<Vector<u32, Const<4>>>,
@@ -1276,8 +1275,8 @@ mod prep {
         }
     }
 
-    /// --scan 1 (default since 2026-11-18): the scan of `scan_kernel` with 1,008 threads of 16 buckets each (63 x 16
-    /// = 1,008 x 16 = 16,128) instead of 256 of 63: the single cube's serial chain is 4x shorter.
+    /// The buckets' exclusive scan with 1,008 threads of 16 buckets each (63 x 16 = 1,008 x 16 = 16,128 buckets)
+    /// rather than 256 threads of 63: the single cube's serial chain is 4x shorter.
     #[cube(launch_unchecked)]
     pub fn scan16_kernel(
         hist: &Array<u32>,
@@ -1327,9 +1326,9 @@ mod prep {
         }
     }
 
-    /// --prep3 1 (default since 2026-11-18 on demoux): the top digits plus the zeroing that the host used to do by
-    /// uploading fresh buffers every super-unit (the 16,128 bucket counts, the list count, and for the pipelined
-    /// protocol the slab counter): no host write between super-units. Launched over max(ntops, 16128) threads.
+    /// The top digits (host-tops path) plus the zeroing of the slice's counters on the device (the 16,128 bucket
+    /// counts, the list count, the slab counter), so that the host writes nothing between slices. Launched over
+    /// max(ntops, 16128) threads.
     #[cube(launch_unchecked)]
     pub fn tdigz_kernel(
         tmask: &Array<u64>,
@@ -1442,7 +1441,7 @@ mod post {
         )
     }
 
-    /// [`pf`] in 24-bit limbs (step 4S, the SPIR-V path): every product is of two values below 2^24, which ACO
+    /// [`pf`] in 24-bit limbs: every product is of two values below 2^24, which ACO
     /// for GFX1201 can issue as full-rate 24-bit multiplies instead of the quarter-rate `v_mul_lo/hi_u32` of the
     /// 32-bit limbs; no 64-bit adds, no digit straddling two limbs, and each digit's one-hot as one 64-bit shift
     /// (ACO spent about six 32-bit operations per digit on `oh`'s pair; on CUDA a 64-bit variable shift is two
@@ -1538,8 +1537,8 @@ mod post {
     }
 
     /// The bits of two records (top index, chunk position, word lo, hi) whose
-    /// survivors pass the prefilter, in one loop over the four words (step
-    /// 4S: a plane runs as many rounds as its lane with the most bits, so one
+    /// survivors pass the prefilter, in one loop over the four words (a
+    /// plane runs as many rounds as its lane with the most bits, so one
     /// loop over both records costs the plane max(a + b), not max(a) + max(b),
     /// and the prefilter is most of a round); `hda`, `hdb` and `topa`, `topb`
     /// their tops' h | d << 16 and prefilter masks. An all-zero record (past
@@ -1670,13 +1669,13 @@ mod post {
         scap: u32,
         r0hi: u32,
         pip_hi: u32,
-        // (audit) F_NOPF (1): every survivor listed, no prefilter
+        // F_NOPF (1): every survivor listed, no prefilter
         fault: u32,
         // the prefilter in 24-bit limbs with 64-bit one-hot shifts (`pf24`: the SPIR-V path) or as measured on CUDA (`pf`)
         #[comptime] oh64: bool,
     ) {
         let nopf = (fault & 1u32) != 0u32;
-        // (audit) F_PF_DROP (1024): the prefilter wrongly drops survivors whose r0 has bits 10-19 zero
+        // F_PF_DROP (1024): the prefilter wrongly drops survivors whose r0 has bits 10-19 zero
         let pfdrop = (fault & 1024u32) != 0u32;
         if ABSOLUTE_POS_X == 0u32 {
             stat[0usize].store(lcnt[0usize]);
@@ -1949,7 +1948,7 @@ mod dtops {
         l5: &Array<u32>,
         l5n: &Array<u32>,
         pip: u32,
-        // (audit) F_POP12 (64): the popcount limit checked as 12 instead of MAXPOP
+        // F_POP12 (64): the popcount limit checked as 12 instead of MAXPOP
         fault: u32,
         acc: &mut Array<Atomic<u32>>,
     ) {
@@ -2470,7 +2469,7 @@ pub struct DevCounts {
     pub slices: u64,
     pub tops: u64,
     pub tested: u64,
-    /// (audit) Largest slab count, list length, per-unit flat and survivor counter of a batch or group.
+    /// Largest slab count, list length, per-unit flat and survivor counter of a batch or group.
     pub slabs_max: u64,
     pub list_max: u64,
     pub flat_d_max: u64,
@@ -2527,7 +2526,7 @@ struct SliceHead {
     host_tops: Option<u32>,
     /// Every launch batch of the slice was queued (the probe and children laws hold only then).
     full: bool,
-    /// The roots `hist2` examined: every depth-4 root, or a shared depth-8 list's length (step 5L).
+    /// The roots `hist2` examined: every depth-4 root, or a shared depth-8 list's length.
     h2n: u32,
 }
 
@@ -2540,7 +2539,7 @@ struct DevPrep {
     h2n: u32,
 }
 
-/// (step 5L) The parents' shared depth-8 lists of a field: one per value of digits 4–7 (`keys`), the roots whose
+/// The parents' shared depth-8 lists of a field: one per value of digits 4–7 (`keys`), the roots whose
 /// depth-8 ancestor is valid (`anc8_kernel`), with their lengths (read once per field).
 #[derive(Default)]
 struct AncLists {
@@ -2551,7 +2550,7 @@ struct AncLists {
     last: (usize, u64),
 }
 
-/// (step 5L) Most shared depth-8 lists held at once (one per value of digit 4 of a `(4, 8, 5)` field), and each
+/// Most shared depth-8 lists held at once (one per value of digit 4 of a `(4, 8, 5)` field), and each
 /// one's capacity in roots (a longer list is an error of the field; ~22 % of the 9.3M roots are listed).
 const ANC_LISTS: usize = 64;
 const ANC_CAP: u32 = 3_400_000;
@@ -2610,14 +2609,14 @@ pub struct GpuJoin<R: Runtime> {
     /// kernels alone) and skip the accounts. 6 (everything) unless set;
     /// [`search_field`] refuses to run with anything else.
     stop: u32,
-    /// (audit, dev/mo-audit) fault-injection bits; 0 in production (only the audit tests set it).
+    /// fault-injection bits; 0 in production (only the audit tests set it).
     pub(crate) fault: u32,
-    /// (step 5L) Share the parents' root pass across digit 8 inside a field ([`GpuJoin::set_parent_sharing`], on).
+    /// Share the parents' root pass across digit 8 inside a field ([`GpuJoin::set_parent_sharing`], on).
     share8: bool,
     anc: Mutex<AncLists>,
 }
 
-/// (audit) Host-side fault bits (the kernel bits are documented at `g2_kernel`'s `fault`).
+/// Host-side fault bits (the kernel bits are documented at `g2_kernel`'s `fault`).
 #[allow(dead_code)] // set by the audit's tests only (some by number, `AUDIT_FAULTS`)
 pub(crate) const F_NOPF: u32 = 1;
 pub(crate) const F_SKIP_MAIN: u32 = 2;
@@ -2641,12 +2640,12 @@ pub(crate) const F_SLABCNT: u32 = 2048;
 pub(crate) const F_SKIP_TOPS: u32 = 4096;
 #[allow(dead_code)] // set by the audit's tests only (some by number, `AUDIT_FAULTS`)
 pub(crate) const F_DROP_PARENT: u32 = 8192;
-/// (step 5L) The shared depth-8 pass (`anc8_kernel`) not launched.
+/// The shared depth-8 pass (`anc8_kernel`) not launched.
 #[allow(dead_code)] // set by the audit's tests only
 pub(crate) const F_SKIP_ANC: u32 = 16384;
 
 impl<R: Runtime> GpuJoin<R> {
-    /// (audit) The slab capacity the kernels are told (shrunk by `F_SLAB_CAP`).
+    /// The slab capacity the kernels are told (shrunk by `F_SLAB_CAP`).
     fn ns_cap(&self) -> u32 {
         if self.fault & F_SLAB_CAP != 0 {
             2000
@@ -2655,7 +2654,7 @@ impl<R: Runtime> GpuJoin<R> {
         }
     }
 
-    /// (audit) The list capacity the kernels are told (shrunk by `F_SCAP`).
+    /// The list capacity the kernels are told (shrunk by `F_SCAP`).
     fn s_cap(&self) -> u32 {
         if self.fault & F_SCAP != 0 {
             100_000
@@ -2664,7 +2663,7 @@ impl<R: Runtime> GpuJoin<R> {
         }
     }
 
-    /// (audit) Set the fault bits; `F_PMAX300` also rebuilds the job table with the second instance at 300.
+    /// Set the fault bits; `F_PMAX300` also rebuilds the job table with the second instance at 300.
     #[allow(dead_code)] // the audit's tests only
     pub(crate) fn set_fault(&mut self, f: u32) {
         self.fault = f;
@@ -2800,16 +2799,16 @@ impl<R: Runtime> GpuJoin<R> {
         self.stop = stop;
     }
 
-    /// (step 5L) Share the parents' root pass across digit 8 inside a field: when a field's slices take at most
+    /// Share the parents' root pass across digit 8 inside a field: when a field's slices take at most
     /// 64 values of digits 4–7, each of them several times (a `(4, 8, 5)` field: 64 values, 64 slices each), the
     /// roots valid to depth 8 are listed once per value (`anc8_kernel`, at the field's start, one
     /// synchronisation) and each slice's `hist2` runs over its list instead of every root. Exact by containment
-    /// (see `anc8_kernel`). On by default since step 5L (−3.1 % per (4, 8, 5) field on the RTX 3080).
+    /// (see `anc8_kernel`). On by default (−3.1 % per (4, 8, 5) field on an RTX 3080).
     pub fn set_parent_sharing(&mut self, on: bool) {
         self.share8 = on;
     }
 
-    /// (step 5L) Build the shared depth-8 lists for `keys` (digits 4–7), synchronise, and check their accounts.
+    /// Build the shared depth-8 lists for `keys` (digits 4–7), synchronise, and check their accounts.
     fn build_anc(&self, keys: &[u32]) -> Result<()> {
         ensure!(
             keys.len() <= ANC_LISTS,
@@ -2886,12 +2885,12 @@ impl<R: Runtime> GpuJoin<R> {
         Ok(())
     }
 
-    /// (step 5L) The last build of shared lists: (lists, roots listed in all).
+    /// The last build of shared lists: (lists, roots listed in all).
     pub fn parent_sharing_last(&self) -> (usize, u64) {
         self.anc.lock().expect("anc").last
     }
 
-    /// (step 5L) The shared list for a slice (digits 4–7 of `pip`), if one is built: (handle, length).
+    /// The shared list for a slice (digits 4–7 of `pip`), if one is built: (handle, length).
     fn anc_for(&self, pip: u64) -> Option<(Handle, u32)> {
         let st = self.anc.lock().expect("anc");
         let k = (pip & 0xFF_FFFF) as u32;
@@ -3134,7 +3133,7 @@ impl<R: Runtime> GpuJoin<R> {
     }
 
     /// [`GpuJoin::run_slice_dev`]; with `shared`, the parents from the shared depth-8 list of the slice's digits
-    /// 4–7 when one is built (step 5L tests: `build_anc` first).
+    /// 4–7 when one is built (tests: `build_anc` first).
     pub(crate) fn run_slice_dev_with(
         &self,
         pip: u64,
@@ -3273,9 +3272,9 @@ impl<R: Runtime> GpuJoin<R> {
         ))
     }
 
-    /// Queue the slice's parents: the preparation of the G2 port (histogram,
-    /// scan, scatter, per-bucket sort), unchanged; `hist2` over every depth-4
-    /// root, or over a shared depth-8 list `src` (step 5L). Returns the roots
+    /// Queue the slice's parents (histogram, scan, scatter, per-bucket sort;
+    /// the `prep` kernels); `hist2` over every depth-4
+    /// root, or over a shared depth-8 list `src`. Returns the roots
     /// `hist2` examines.
     fn queue_parents(
         &self,
@@ -3627,7 +3626,7 @@ impl<R: Runtime> GpuJoin<R> {
     /// One slice's account `a` (`A_*`; `l5n`, its 64-slice level's) against what the host queued: `jobs`
     /// main-kernel instances, `ntops` tops (the device's own count or the
     /// host's), `lcnt` parents (the expansion's copy of the list length).
-    // (step 5L) reads nothing of the join now (the hist2 grid comes with the head)
+    // reads nothing of the join now (the hist2 grid comes with the head)
     #[allow(clippy::unused_self)]
     fn check_slice(
         &self,
@@ -4051,7 +4050,7 @@ fn field_run<R: Runtime>(
     // the key from the field's first slice on the host (it only orders the parents: any key is exact)
     let rank = slice_tops(pips[0], gj.roots()).rank;
     if opt.device_tops {
-        // (step 5L) the parents' shared depth-8 lists, when the field's slices repeat their digits 4-7
+        // the parents' shared depth-8 lists, when the field's slices repeat their digits 4-7
         gj.anc.lock().expect("anc").keys.clear();
         if gj.share8 && gj.upto(2) {
             let mut keys: Vec<u32> = Vec::new();
@@ -4325,11 +4324,11 @@ mod tests {
         }
     }
 
-    /// (step 5L) The parents' root pass shared across digit 8 (`set_parent_sharing`): the first `MIDOUT_SHARE_SLICES`
+    /// The parents' root pass shared across digit 8 (`set_parent_sharing`): the first `MIDOUT_SHARE_SLICES`
     /// (128) slices of a `(4, 8, 5)` field (64 values of digit 4 × 2 of digit 8: every depth-8 list serves two
     /// slices), one slice per group, give every slice's counts (kept included: same key) equal with and without
     /// sharing; with sharing on, each fault is loud (`F_SKIP_ANC` new; `F_SKIP_MAIN`, `F_SKIP_TOPS`,
-    /// `F_DROP_PROBE`, `F_DROP_PARENT` as on the trunk), and a clean run after each gives the clean counts.
+    /// `F_DROP_PROBE`, `F_DROP_PARENT` as without sharing), and a clean run after each gives the clean counts.
     #[test]
     #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime)"]
     fn field_parent_sharing_is_exact_and_loud() {
@@ -4400,7 +4399,7 @@ mod tests {
         }
     }
 
-    /// (step 5L) A field of the coordinate `(4, 8, 5)` (digits 5–7 fixed) is searched exactly: run through the
+    /// A field of the coordinate `(4, 8, 5)` (digits 5–7 fixed) is searched exactly: run through the
     /// field path one slice per group, every slice's counts (children, chunks, flat, survivors, checked, tops)
     /// equal those of the same slice run through the `(4, 9, 6)` fields that hold it (each such field's 64
     /// slices of the new field's digit 5, as a part of that field); the per-slice counts sum to the field run's
@@ -4521,7 +4520,7 @@ mod tests {
         crate::cubecl_backend::CubeclContext::new_default().ok()
     }
 
-    /// (step 4S) What a plane pays in the expansion: one slice's records as the device wrote them (each batch read
+    /// What a plane pays in the expansion: one slice's records as the device wrote them (each batch read
     /// back after it ran), the histogram of survivor bits per record, and, per take of 2·W records of a slab (lane
     /// l: records l and l + W, as `expand_kernel`), the prefilter rounds of the two-loop form (max a + max b), of the
     /// one-loop form (max (a + b)) and of four records per lane (max of 4, per 4·W records), for W 8, 32 and 64 over
@@ -4681,7 +4680,7 @@ mod tests {
                     let (dc, mut got) = if std::env::var("MIDOUT_HOST_TOPS").is_ok() {
                         gj.run_slice(&st).unwrap()
                     } else {
-                        // MIDOUT_SHARE8=1 (step 5L): the parents from the shared depth-8 list of the slice's digits 4-7
+                        // MIDOUT_SHARE8=1: the parents from the shared depth-8 list of the slice's digits 4-7
                         let share = std::env::var("MIDOUT_SHARE8").is_ok_and(|x| x == "1");
                         if share {
                             gj.build_anc(&[(pip & 0xFF_FFFF) as u32]).unwrap();
