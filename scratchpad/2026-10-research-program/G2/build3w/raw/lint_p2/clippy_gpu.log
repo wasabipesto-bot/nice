@@ -1,0 +1,43 @@
+    Checking nice_common v3.4.9-dev (/root/midout/common)
+error: unnecessary `>= y + 1` or `x - 1 >=`
+    --> common/src/midout/gpu_wide.rs:1928:50
+     |
+1928 |                         && du * select(comptime!(k - 1 >= tsm), 1u32, 0u32) == 0u32;
+     |                                                  ^^^^^^^^^^^^ help: change it to: `k > tsm`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#int_plus_one
+     = note: `-D clippy::int-plus-one` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::int_plus_one)]`
+
+error: bit mask could be simplified with a call to `trailing_zeros`
+    --> common/src/midout/gpu_wide.rs:1953:56
+     |
+1953 | ...                   && !(pfdrop && ((rf >> 10u32) & 1023u32) == 0u32));
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `(rf >> 10u32).trailing_zeros() >= 10`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#verbose_bit_mask
+     = note: `-D clippy::verbose-bit-mask` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::verbose_bit_mask)]`
+
+error: could not compile `nice_common` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: wildcard matches only a single variant and will also match any future added variants
+    --> common/src/midout/gpu_wide.rs:4031:13
+     |
+4031 |             _ => panic!("unsupported runtime"),
+     |             ^ help: try: `crate::cubecl_backend::CubeclContext::Cuda { .. }`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#match_wildcard_for_single_variants
+     = note: `-D clippy::match-wildcard-for-single-variants` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::match_wildcard_for_single_variants)]`
+
+error: wildcard matches only a single variant and will also match any future added variants
+    --> common/src/midout/gpu_wide.rs:4121:13
+     |
+4121 |             _ => panic!("unsupported runtime"),
+     |             ^ help: try: `crate::cubecl_backend::CubeclContext::Cuda { .. }`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#match_wildcard_for_single_variants
+
+error: could not compile `nice_common` (lib test) due to 4 previous errors
+rc=101

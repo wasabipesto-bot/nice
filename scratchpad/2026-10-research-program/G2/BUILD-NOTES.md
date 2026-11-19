@@ -1,4 +1,4 @@
-# The middle-out join, build day 1 (2026-11-18, 16:43–22:30 UTC), step 2A (19:05–23:45 UTC) and step 3A (2026-11-19, 01:25–05:15 UTC)
+# The middle-out join, build day 1 (2026-11-18, 16:43–22:30 UTC), step 2A (19:05–23:45 UTC), step 3A (2026-11-19, 01:25–05:15 UTC) and step 3W (03:07–06:00 UTC)
 
 Briefs: `G2/BUILD-BRIEF-1.md` (day one), `G2/BUILD-BRIEF-2A.md` (step 2A: pieces B, A, C of §7), `G2/BUILD-BRIEF-3A.md`
 (step 3A: accounts that prove the work ran, from the audit `G2/AUDIT-MO.md`). Branch
@@ -6,47 +6,36 @@ Briefs: `G2/BUILD-BRIEF-1.md` (day one), `G2/BUILD-BRIEF-2A.md` (step 2A: pieces
 fork only. Box: Vast 61286074, RTX 3080 at the host's 240 W cap, i9-9900 with a **5.12-CPU cgroup quota** (16 threads
 visible), CUDA 12.8 image, Mesa 25.2.8 lavapipe. Box scripts and raw logs: day one `G2/build1/box/`, `G2/build1/raw/`;
 step 2A `G2/build2a/box/`, `G2/build2a/raw/`; step 3A `G2/build3a/`. Step 2A's account is §9; step 3A's is §10
-(the accounts, the fault switches before and after, the cost, its tests in §10.7); section 1 is updated for it.
+(the accounts, the fault switches before and after, the cost, its tests in §10.7); step 3W's (`G2/BUILD-BRIEF-3W.md`: the merge of the wide branch, its accounts and speed work, the base-65 number) is §11, raw logs `G2/build3w/`; section 1 is current for it.
 
 ## 1. Where it stands (kept current)
 
-**2026-11-19 ~03:30 UTC, end of step 3A.** Branch head **`c0ad3f4a`** on ivory and on `fork/dev/middle-out-join`
-(step 3A: the merge of `dev/mo-audit` `7a9fd414`, then `197c1e94`, `a7d3099a`, `46c99784`, `c0ad3f4a`). Still nothing
-outside `common/src/midout/`, `common/examples/midout_bench.rs`, one line of `lib.rs` and the example entry in
-`common/Cargo.toml`; no route reaches it; no server, schema or API change.
+**2026-11-19 ~05:00 UTC, end of step 3W: one trunk.** Branch head **`4abfab5c`** on ivory and on
+`fork/dev/middle-out-join`. `dev/mo-wide` is merged (`23ce3cf6`); there is no other live branch of the join. Still
+nothing outside `common/src/midout/`, the examples `midout_bench.rs` and `midout_wide_bench.rs`, one line of `lib.rs`
+and the two example entries in `common/Cargo.toml`; no route reaches it; no server, schema or API change.
 
-- **Step 3A: a launch that did nothing is no longer a success** (§10). Every stage of a slice returns positive
-  evidence that it ran (cubes or job instances that reached their end, tops placed, rows written, a done word per
-  slice) and two conservation laws hold per slice (probes run = 8 × tops; children the main kernel saw = children
-  counted from the parent list); the host compares each with what it queued. Every fault the audit showed silent is
-  now loud on CUDA and on lavapipe W 8 (SPIR-V); both reproductions (a failed device allocation, `MIDOUT_STOP` in the
-  environment) now fail loudly; `MIDOUT_STOP` is no longer read by the library. A sampled CPU check (one random
-  slice per field, on a host thread) is the only check that sees a kernel computing wrongly; it costs nothing on the
-  card's clock but one core for 27 s per field. **Cost: 1.6505 → 1.6911 fs (+2.5 %) without the sampled check, 1.6980
-  fs (+2.9 %) with it, same session; ×3.91 / ×3.90 against main's 6.615 fs** (×4.01 before).
-- *Step 2A's state, still true:*
-- **Runs end to end and exactly on the RTX 3080 (CUDA):** whole base-64 fields of the new kind, `(64, 2^75 + t·2^57,
-  2^57)`, through `midout::gpu::search_field`: tops (now hierarchical), parents, main kernel, record expansion with
-  production's middle-digit prefilter, and production's full check of the 2.9 % that pass, on the card, one
-  synchronisation per 16 slices, every account verified. **1.647 fs per admissible n over the same 10 fields as day
-  one, against main 6.615 fs in the same session: ×4.02** (§6, §9; at `03091f72` 1.661 fs, ×3.98). Day one:
-  1.752 fs, ×3.78. **The target ×4.4 is not reached** (§9.4 says why and where the rest is).
-- **What step 2A changed** (§9): records name their top (B: no probe walk in the expansion); the prefilter before the
-  check, mirrored in the CPU reference, so `checked` has production's meaning (A); tops certified only under a valid
-  parent of 64 slices (C); then the prefilter's arithmetic in 32-bit limbs and two records per lane in the expansion.
-  Per slice on field 77777, same session (at `03091f72`, before the last commit): the work around the kernel 2.00 →
-  1.59 ms, the slice 8.05 → 7.72 ms.
-- **Exact:** the CPU reference equals brute force on whole bases 10–25, now including `checked` (survivors that pass
-  the prefilter, against the prefilter computed from the definitions); the device equals the CPU reference on 5 b64
-  slices on CUDA (tops, the prefiltered lists n for n, survivors, checked and every order-independent count) and on 2
-  whole slices on lavapipe W 8 through SPIR-V; production's check rebuilds our lists exactly (probe mode); the 10
-  fields' survivor counts equal day one's field for field.
-- **Does not run yet:** lavapipe W 16 (lavapipe 25.2.8's 512-bit JIT aborts, "stack smashing", in our device-top
-  kernel and in the port's preparation kernels); W 64 / the RX 9070 XT (not attempted: no AMD card); masks above 64
-  bits on the device (CPU reference only); any client route.
-- **The rest of the gap to the example's ×4.6** is now mostly the expansion with its prefilter (1.10 ms per slice,
-  a pass over 10.9M records that is neither bandwidth- nor atomic-bound by the experiments of §9.3, most likely
-  load latency) and the parents' preparation (0.67 ms), next to a main kernel of 5.4 ms.
+- **Two device paths, one library.** Base 64: `midout::gpu` (64-bit masks; `search_field`). Bases 65–70 (and any base
+  3–70 in tests, base 64 forced): `midout::gpu_wide` (two-word masks; `search_field_wide`). A client route would pick
+  the path per base. Both return `FieldOutcome` with the same counters (`survivors`, `checked` = after production's
+  middle-digit prefilter).
+- **Both paths prove their work ran** (§10 for the narrow path, §11.2 for the wide): per-slice accounts, the two
+  conservation laws, a done word per slice, guards, `MIDOUT_STOP` out of the library, the sampled CPU check. On the
+  wide path every applicable fault (dropped main kernel, dropped tops, dropped probe, dropped parent, failed device
+  allocation, `MIDOUT_STOP` in the environment) is loud by test at base 65, at base 64 forced wide and on lavapipe
+  W 8; a wrong parent and a too-strict prefilter pass the accounts and are caught by the sampled check, as on the trunk.
+- **The wide path has the trunk's speed work** (§11.3): the top hierarchy and the prefilter before the check, exact
+  against brute force (bases 10–25), the CPU reference (b30–b65 slices incl. both range ends; b64 forced) and the
+  narrow path's counts at b64.
+- **The numbers** (this box, 240 W cap, same session, §11.4): base 64 narrow **1.710 fs** per admissible n; base 65
+  wide **3.561 fs = ×2.08** of base 64 (last night ×2.04 on an uncapped card before the accounts; the accounts cost
+  the wide path ~+9 %, the speed port gave back −7.8 %); 0.49 card-years for base 65. Base 64 against main: ×3.91
+  without the sampled check (§10.6). The sampled check is affordable at b64 (+0.4 %) but **not at b65** (its CPU slice
+  takes 93 s against a 56 s field); it is off by default on the wide path.
+- **Not run / not proven**: base 68 since the merge (does not fit this 10 GB card; its exactness is last night's two
+  slices on the wide branch, `BUILD-NOTES-WIDE.md`), bases 69–70, the staged-prototype test at b65 (staged slice lost
+  with the wide branch's box), lavapipe W 16, W 64 / the RX 9070 XT, any client route.
+- *Step 3A's account of the narrow path (§10) and step 2A's (§9) are unchanged and still true.*
 
 ## 2. The interface: what a field is, and what it permits and forbids
 
@@ -596,3 +585,149 @@ count of `m ≠ 0`; the defect it is meant to model, a wrong `parent()`, is stil
 rerunning the same slice, exactly the right 238,813), so "tops 0" in its table was `tscan`'s count, not what the later
 kernels used: stale buffers can look exactly right, and only counts that each kernel makes of its own work, compared
 with each other (examined = listed, certified = counted, placed = counted), tell a dropped launch from a run.
+
+## 11. Step 3W: one trunk, and the wide kernels brought level (2026-11-19, 03:07–06:00 UTC)
+
+Brief: `G2/BUILD-BRIEF-3W.md` (rules of `BUILD-BRIEF-1.md`). Same box (Vast 61286074, RTX 3080 at its host's 240 W cap,
+5.12-CPU quota), production hosts mapped to 127.0.0.1 and ::1 before every run (`build3w/raw/*/hosts_block.txt`).
+Commits on `dev/middle-out-join`: **`23ce3cf6`** (merge of `dev/mo-wide` `a8a76315`), **`f246d9fd`** (accounts, guards,
+sampled check on the wide path), **`4abfab5c`** (top hierarchy and prefilter on the wide path; two clippy findings of
+`f246d9fd`'s tests). Scripts `build3w/box/` (`build.sh`, `chain.sh` for the merge, `chain_port.sh` / `chain_port2.sh`
+for the two ports, `measure.sh`, `final.sh`, `lint.sh`); raw logs `build3w/raw/`: `merge/`, `port1/` (= `f246d9fd`'s
+tree), `port2/` (= `4abfab5c`'s tree before its last fixes), `port2d/` (the head's tree), `m1/` (the number),
+`lint_s2/`, `lint_p2/`, `lint_head/`. The box's trees: `/root/midout` (checkouts of the bundles, lint), `/root/mp`
+(the ports; its own target directory `/root/t/mp`); test binaries were copied before each chain so a rebuild could
+not swap them.
+
+### 11.1 The merge (`23ce3cf6`)
+
+Files did not conflict (`gpu_wide.rs`, its bench, one line each in `mod.rs`, `coord.rs`, `Cargo.toml`). Three edits the
+trunk's later work required, in the merge commit: the CPU reference's sink takes the prefilter flag (wide tests ignore
+it: no prefilter on that path yet, `checked = survivors` there), `FieldTiming`'s new fields, `GpuOptions::cpu_check` in
+the wide bench's narrow runs. Verified at the merge (`raw/merge/`): the trunk's `accounts_faults_are_loud`,
+`gpu_slices_equal_cpu` (712012851, 2^30 − 1), `audit_stop_env_is_loud`, `audit_oom_is_loud` (9,216 MiB) on CUDA;
+`wide_whole_small_bases_vs_brute_force` (17 shapes, CUDA); `wide_slices_equal_cpu` b30/b40/b50, b64 forced wide
+712012851, b65 717171717 and 532260419 (CUDA); lavapipe W 8: trunk parity 712012851, wide b40 1234 and b65 717171717;
+fmt clean, clippy `-D warnings` clean default and `cubecl-cuda,cubecl-spirv`, production suite 214 passed / 0 failed /
+10 ignored. The wide branch's staged-prototype test (`wide_slice_vs_staged`) was not run: its staged slice was on the
+wide branch's box, which is gone (the CPU reference test covers the same slice).
+
+### 11.2 Accounts and guards on the wide path (`f246d9fd`)
+
+The trunk's step-3A design, wide form (`gpu_wide.rs`: `A_*`, `WideJoin::check_slice`, `finish_group`):
+
+| stage | evidence (per slice `acc`, or the batch's `est`) | compared with |
+|---|---|---|
+| `wtops5` (since `4abfab5c`) | cubes done, valid parents listed (`l5n`) | its grid; = `wtops1`'s examined |
+| `wtops1` | prefixes examined (valid parents since `4abfab5c`), tops certified | `ntest` (then `l5n[0]`); `tstat[0]` |
+| `wscan` ×2 | ran (`A_TSCAN`, `A_HSCAN`) | 1 each |
+| `wtops2`, `wtdigz` | tops placed, digit rows | `tstat[0]` |
+| `whist` | cubes done; parents certified by a ballot apart from the list; plane check | ⌈nrf/256⌉; `lcnt`; 0 |
+| `wscatter` | rows; **children of the listed parents over all b units** (`child_w`) | `lcnt`; the main kernel's children |
+| `wsort` | cubes done | the buckets (m·256) |
+| main kernel | job instances done; probes run (once per instance before the rounds); children (instance 0) | queued; **nroot × tops**; the scatter's count |
+| expansion | cubes done, slabs walked; since `4abfab5c` survivor bits read, clipped bits | 4,096, `min(slabn, cap)`; the kernel's survivors |
+| done kernel | `A_DONE`, `C_SLICES` | 1; slices queued |
+
+Guards: per job, the child-list range against the batch's list (`C_ERR_CLST`, store clamped); class index limit at
+65,536 (was 65,535); groups 1–256; reported nice n must lie in the field. `MIDOUT_STOP` is no longer read by the library
+(`set_timing_stop`; `search_field_wide` refuses a stop; `time_field_wide` takes it; the bench reads the variable).
+`WideOptions::cpu_check`: the sampled CPU check (one random slice through `cpu::slice_join::<u128>` on a host thread; the
+field run's own survivors for that slice, then a device rerun, n for n). **MAXPOP**: the wide path makes a top above
+`maxpop` an error of the field (`tstat[1]`), so a margin of 0 cannot lose survivors; a bound like the trunk's
+(§3.4 of the audit) was not proven per base (a loose count gives ≤ 20 at b65, `maxpop` is 18; never exceeded).
+
+**The fault table** (tests `wide_faults_are_loud` at base 65 {717171717, 0}, base 64 forced wide {712012851, 0}, and
+lavapipe W 8 SPIR-V at base 40 slice 1234; each fault followed by a clean run that must equal the unfaulted counts;
+`wide_oom_is_loud`, `wide_stop_is_loud`). Raw: `port1/`, `port2/`, `port2d/`.
+
+| fault | b65 (CUDA) | b64 forced wide (CUDA) | b40 lavapipe W 8 |
+|---|---|---|---|
+| `F_SKIP_MAIN` | loud: "0 of 16640 job instances ran" | loud | loud |
+| `F_SKIP_TOPS` (`wtops1` dropped) | loud: "wtops1 valid parents examined: 0, want 2838017" (stale tops placed: 1,693,682) | loud | loud |
+| `F_DROP_PROBE` | loud: "probes run = nroot x tops: 1697785, want 1701945" | loud | loud |
+| `F_DROP_PARENT` | loud: "parents certified (whist) = listed: 1268336, want 1267042" | loud | loud |
+| `F_BAD_PARENT` (new: `parent_w` wrong for 1 in 997; every law holds) | accounts pass (as designed); **sampled check loud** | same | same |
+| `F_PF_DROP` (since `4abfab5c`) | accounts pass; **sampled check loud** (526,566 vs 527,041 checked) | same (after moving the predicate to bits 10–19: r_f ≡ 0 mod 1024 never survives at b64, so the first form dropped nothing) | same |
+| allocation failure (8,192 MiB filled, in process) | `WideJoin::new` Ok, stream thread panics, **group loud**: "0 of 8320 job instances ran" | — | — |
+| `MIDOUT_STOP=2` in the environment | ignored (survivors 16,482,926); `set_timing_stop(2)` → `search_field_wide` refuses | — | — |
+
+### 11.3 The speed work on the wide path (`4abfab5c`), exact first
+
+- **Top hierarchy** (piece C): `wtops5` once per b consecutive slices (one value of the slice's digits above its
+  lowest) certifies each parent prefix over b^(f0+1) n and lists the valid ones; `wtops1`/`wtops2` grid-stride over the
+  list. At b65 slice 717171717: 2,838,017 valid parents of 13,410,995 prefixes (21 %); at b64 405,811 of 2,097,152.
+  `WideBase::new` now needs a slice digit (f0 + 1 < k).
+- **Prefilter before the check** (piece A): `cert_split_w` gives each top its certified digits at positions ≥ k + 2;
+  the expansion forms n mod b^(k+2) digit by digit (`pf_w`, the test of `cpu::prefilter`, small-n rule included) and
+  lists only passing n; it also counts a clipped top's n outside the range itself (never listed). `checked` now has
+  production's meaning on the wide path: 3.2 % at b65 (527,041 of 16,482,926 on 717171717), 2.87 % at b64.
+- **Cheaper expansion** (piece B): not ported: the wide record already carries its probe slot and, at b65 (one root),
+  the walk to the top is one segment. Two records per lane: not tried.
+- **Exactness** (`port2/`, again on the head's tree in `port2d/`): whole small bases 10–25 in 17 shapes against brute
+  force, survivors = `q_shape`, the listed n = `q_checked` exactly, nice = {69 at base 10} by the device's check;
+  slices vs the CPU reference n for n and every count (checked included): b30 100, b40 1234, b50 77777, **b64 forced
+  712012851** (checked 337,904 = the narrow path's), **b65 717171717, 532260419 (start's clipped top), 1160290624 (the
+  last slice)**; with the prefilter off (`MIDOUT_NOPF=1`) whole survivor sets at b40, b64, b65; lavapipe W 8 b40 1234
+  and b65 717171717; the trunk's fault test unchanged.
+
+### 11.4 The number (measured, this box, 240 W cap, one session 04:17–04:39 UTC, `raw/m1/`)
+
+Same fields as last night (b64 t = 13107, 131072, 249036, 65536, 196608; b65 t = 13731, 77777, 137312, 200000, 260893;
+t = 4095 first in each process as warm-up, excluded). Sampled check off unless said. Card while busy: 239 W mean,
+1,607 MHz mean, at most 72 °C.
+
+| run | fs per admissible n (warm mean, range) |
+|---|---|
+| b64 narrow (trunk head), before and after the b65 runs | 1.7137 and 1.7063 → **1.710** (1.671–1.742) |
+| **b65 wide at the head `4abfab5c`** | **3.561** (3.550–3.565): **×2.08 of b64** |
+| b65 wide at `f246d9fd` (accounts, no speed port) | 3.861 (3.849–3.867): ×2.26 |
+| b65 head with the sampled CPU check | 5.93 (the CPU slice takes 93 s against a 56 s field: the host waits ~36 s) |
+
+Last night (another card, 320 W, before the trunk's work): 3.484 fs, ×2.04. So: the accounts cost the wide path about
++8–10 % at b65 (×2.04 → ×2.26, partly the cap: not separated), the speed port gave back −7.8 % (3.861 → 3.561), and
+the multiple stands at **×2.08**. Card-time for all of base 65 at the head on this capped 3080: 3.561e-15 × 4.371e21 =
+1.56e7 s = **0.49 card-years**. **The sampled CPU check is not affordable at b65 as built** (single-threaded u128
+reference slower than the field); `cpu_check` stays off by default on the wide path.
+
+Per stage at the head (cumulative `MIDOUT_STOP`, b65 field 77777, one cold process each, `raw/port2d/stop65_*.log`):
+| stage (cumulative stop) | b65 ms per slice at the head | last night (wide branch, 320 W, first code) |
+|---|---|---|
+| tops (1), incl. ~1.5 s one-time per process (~0.35 ms/slice) | 1.80 | ≈ 2.6 |
+| parents (2 − 1) | 1.42 | 1.03 |
+| main kernel (3 − 2) | 6.72 | 6.37 |
+| expansion (5 − 3), **now with the prefilter** | **3.71** | 1.13 |
+| check (6 − 5) | 0.17 | ≈ 2.0 |
+| slice (one cold field: 58.44 s / 4,225) | 13.83 | ≈ 13.1 |
+
+So the hierarchy saved about 1 ms of tops and the prefilter about 1.8 ms of check, but **the prefilter's digit-by-digit
+arithmetic costs the expansion ~2.6 ms** (16.5M survivors per slice, ~300 dependent operations each, two `% b` per
+digit): that, not the idea, is why the port gave only −7.8 %. Parents +0.4 ms is most likely the accounts'
+children count in `wscatter` (65 `child_w` with two `% b` per parent).
+
+### 11.5 What is left for the wide path
+
+1. **The prefilter's arithmetic** (the next piece, ~2.5 ms of 13.3 per slice): r = rf + F·b^f0 with F fixed per
+   record, so r², r³ mod b^(k+2) need only rf², rf·F and F's powers per record; or the trunk's 32-bit limb form.
+   Estimated b65 at ~10.8 ms per slice, ≈ 2.9 fs, ×1.7 of b64 (estimate, not measured).
+2. **The accounts' cost at b65** (parents +0.4 ms): `wscatter`'s children count with `% b`; a table of
+   `(c + a·d) mod b` or counting children from the main kernel's side only.
+3. The sampled CPU check at b65: a multi-threaded or u64-limb CPU slice (or sample one slice every k fields).
+4. The trunk's step-2A follow-ups not ported: two records per lane in the expansion, 32-bit limb prefilter arithmetic
+   (ours is digit by digit, ~2·(k+2)²/2 multiply-adds per survivor).
+5. Not run: `wide_slice_vs_staged` (staged slice lost with the wide branch's box), base 68 (does not fit this card),
+   bases 69–70, lavapipe at b65 faults, W 16/W 64.
+6. A 2D tops grid (Vulkan at b68+), a 64-bit slice value (b70's (4, 11)), unchanged from `BUILD-NOTES-WIDE.md` §7.
+
+### 11.6 Tests at the head (`4abfab5c`)
+
+| test | result |
+|---|---|
+| fmt; clippy `-D warnings`, `nice_common`, all targets, default and `cubecl-cuda,cubecl-spirv` | clean on the box's checkout of `4abfab5c` (`raw/lint_head/`; `lint_s2/` and `lint_p2/` are the runs that found the 4 findings fixed in `4abfab5c`) |
+| production suite `cargo test --release -p nice_common --lib` | 214 passed, 0 failed, 10 ignored (as on main) |
+| `wide_faults_are_loud` b65, b64 forced, lavapipe b40; `wide_slices_equal_cpu` b30, b40, b65 717171717 | pass on the head's tree (`raw/port2d/`) |
+| the rest of §11.2–11.3 (brute force, all slices, `MIDOUT_NOPF`, OOM, stop, the trunk's `accounts_faults_are_loud`, lavapipe b65) | pass on `port2/`, whose tree differs from the head only by the F_PF_DROP predicate (fault path), `k - 1 >= tsm` written `k > tsm`, two test attributes and two doc comments |
+
+The b65 number of §11.4 was measured with `port2/`'s bench binary (same production code path as the head; the
+differences above are not reachable without a fault bit). Nothing of this step's ran on another machine; the box was
+left with no process of this step running.

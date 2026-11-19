@@ -1,5 +1,9 @@
 # The middle-out join, step 2E: masks wider than 64 bits (2026-11-18, 18:55–00:30 UTC)
 
+> **Merged (2026-11-19, step 3W).** `dev/mo-wide` (`a8a76315`) is merged into `dev/middle-out-join` at `23ce3cf6`;
+> this branch is closed. The wide path's current state, its accounts, its speed work and its number are in
+> `BUILD-NOTES.md` §1 and §11. What follows is the branch's record as of 2026-11-18, unchanged.
+
 Brief: `G2/BUILD-BRIEF-2E.md` (rules of `BUILD-BRIEF-1.md`). Branch **`dev/mo-wide`** from `7ba982c7`, worktree
 `~/projects/nice/.worktrees/midout-wide`, pushed to the fork only. Box: Vast 61303619, RTX 3080 20 GB, power limit
 320 W (uncapped), 64 threads with a 7.68-CPU cgroup quota, 251 GB, CUDA 12.8 image, Mesa 25.2.8 lavapipe (LLVM

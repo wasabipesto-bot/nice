@@ -255,6 +255,18 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   arithmetic). Since v3.4.6 every GPU submission took the join. Open for the cycle: the hand-written CUDA
   backend under an allocation failure (15,046 stride submissions, one rented hour), and wgpu on a real card.
 
+- **04:48 UTC: step 3W is back (EXPERIMENTS MO.6).** One trunk at 4abfab5c: the wide kernels merged, with the
+  accounts, guards, top hierarchy and prefilter; exact against brute force and the CPU reference; base 65 costs
+  ×2.08 of base 64 per admissible n (3.561 against 1.710 fs at 240 W), 0.49 card-years. Last box destroyed at
+  04:50; month $21.08 invoiced of $30; credit $56.48. The daily cycle fires at 05:41.
+- **State for that cycle:** trunk `dev/middle-out-join` 4abfab5c (fork), ×3.90 at base 64 on an RTX 3080 with
+  execution proven per stage; PR #270 open (CI to check; two tests wanted on a Vulkan card); census done (no
+  production effect). Open pieces, in my order: the hand-written CUDA backend under an allocation failure (one
+  rented hour); a 64-lane parity run and the whole-path number on the RX 9070 XT (needs the user's card);
+  the client route against a local coordinator, with an abort on a runtime-thread panic; the main kernel
+  (71 % of a slice) and the expansion; the wide prefilter's arithmetic; the field-structure note and its
+  adversarial review; decisions 13 (Vast cap: $8.92 left this month, the build burns about $2.5 a day) and 14.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

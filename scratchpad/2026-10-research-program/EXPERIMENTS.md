@@ -35,6 +35,32 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.6 One trunk: the wide kernels merged and brought level; base 65 is ×2.08 of base 64 (step 3W; 2026-11-19 03:15–04:48 UTC, engineer; `G2/BUILD-BRIEF-3W.md`, `G2/BUILD-NOTES.md` §1 and §11, `G2/build3w/`; trunk `dev/middle-out-join` c0ad3f4a → 4abfab5c (merge 23ce3cf6 of dev/mo-wide, f246d9fd accounts and guards on the wide path, 4abfab5c top hierarchy and prefilter on the wide path; on the fork); box 61286074, RTX 3080 at 240 W, destroyed 04:50 after 12.1 h)
+
+- **State of the head** [M]: fmt and clippy clean (default and GPU features); production's 214 tests pass; the
+  trunk's fault and parity tests and the wide exactness tests pass. No side branch was needed.
+- **Exact** [M]: against brute force on whole bases 10–25 in 17 shapes (survivors, listed n = checked; the
+  device's check finds 69 at base 10); against the CPU reference n for n with every count at b30, b40, b50, b64
+  forced wide, and b65 slices 717171717, 532260419 (the range start's clipped top) and 1160290624 (the last
+  slice); whole survivor sets with the prefilter off; lavapipe at 8 lanes through SPIR-V at b40 and b65.
+- **Wide faults now loud, by test** (b65, b64 forced wide, lavapipe b40) [M]: through the accounts: dropped main
+  kernel, dropped tops, dropped probe, dropped parent, a failed device allocation (8,192 MiB filled), a stop
+  variable in the environment (ignored); through the sampled CPU check only, as designed: a wrong parent (a new
+  switch) and an over-strict prefilter.
+- **The number** [M, one session, warm fields, sampled check off, 240 W]: base 64 narrow 1.710 fs per admissible
+  n; base 65 wide 3.561 fs: **×2.08 of base 64** (MO.3: ×2.04 on an uncapped card before the accounts);
+  0.49 card-years for all of base 65 on this card.
+- **Where the wide path stands against the trunk's narrow one:** the accounts cost it about +9 % (×2.26 before
+  the speed port); the top hierarchy saves about 1 ms per slice and the prefilter about 1.8 ms of check, but the
+  prefilter's digit-by-digit wide arithmetic adds about 2.6 ms to the expansion (3.71 of a 13.8 ms slice), so
+  the port won back only 7.8 %. The sampled CPU check does not fit at b65 (a CPU slice takes 93 s against a
+  56 s field): off by default there.
+- **Not done:** the cheaper expansion on the wide path (little to gain with one root); the staged-prototype
+  test (its slice went with the wide branch's box); bases 68–70 (b68 does not fit a 10 GB card).
+- **Next for the wide path** [E]: the prefilter's arithmetic reusing each record's fixed high part or 32-bit
+  limbs: about 2.9 fs at b65, roughly ×1.7 of b64; then the children's `% b` tests; a multithreaded CPU
+  reference so the sampled check fits.
+
 ## SRA.3 Census: which production submissions ran the exposed path (2026-11-19 03:15–03:40 UTC, director, ivory, read-only API; `SRA/census/` (`probe.py`, `census.py`, `census.log`, `state.json`, `rows.jsonl`, `followup.py`, `analyze.py`, `msd_check.py` and their outputs))
 
 - **Method:** every nice-only submission since 2026-08-28 (the day v3.4.0, the first release with CubeCL's stride
