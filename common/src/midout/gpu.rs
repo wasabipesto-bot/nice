@@ -283,7 +283,7 @@ mod kernels {
     pub fn g2_kernel(
         par: &Array<Vector<u32, Const<4>>>, // parent records (mask lo, mask hi, cacc, r4), one 16-byte vector each (one LDG.128 on CUDA)
         pseg: &Array<u32>,
-        tdig: &Array<u32>, // each top's digits, 20 6-bit fields in 4 words (`tdig_kernel`), computed once per slice
+        tdig: &Array<u32>, // each top's digits, 20 6-bit fields in 4 words (`tdigz2_kernel`; `tdigz_kernel` on the host-tops path), once per slice
         tseg: &Array<u32>,
         roots: &Array<u32>,
         jobs: &Array<u32>,

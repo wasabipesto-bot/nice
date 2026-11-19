@@ -19,7 +19,8 @@
 //!
 //! A search of a field returns its nice numbers and two exact counters,
 //! `survivors` and `checked` ([`cpu::FieldOutcome`]); both are properties of
-//! (shape, field), so they are reported with the shape's label.
+//! (shape, field), so the route reports them with the shape (`"shape": [f0,
+//! k]` in its telemetry).
 //!
 //! # Tests: three tiers
 //!

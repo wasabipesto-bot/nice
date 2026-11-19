@@ -3695,7 +3695,8 @@ pub struct WideOptions {
     /// The sampled CPU check (as on the base-64 path): one random slice of the field recomputed by the CPU reference on a
     /// host thread while the card works; the field run's own survivors for that slice must equal the CPU's, and
     /// the slice run again alone on the device must give the same survivors, n for n. At base 65 the CPU takes
-    /// longer than the field (~70 s against ~55 s): the host waits for it.
+    /// longer than the field (70–93 s measured, against a field of 55–56 s on an RTX 3080): the host waits for
+    /// it.
     pub cpu_check: bool,
 }
 
