@@ -2538,7 +2538,18 @@ impl<R: Runtime> GpuJoin<R> {
     /// # Errors
     /// A device whose plane width the kernel does not take.
     pub fn new(client: ComputeClient<R>, caps: Caps) -> Result<Self> {
-        let w = client.properties().hardware.plane_size_max;
+        Self::with_width(client, caps, None)
+    }
+
+    /// [`GpuJoin::new`] with the kernels compiled for plane width `force_w` instead of the device's (tests only: to
+    /// dump the SPIR-V of another width for an offline compiler; the kernels' plane checks then fail and the results
+    /// are invalid).
+    pub(crate) fn with_width(
+        client: ComputeClient<R>,
+        caps: Caps,
+        force_w: Option<u32>,
+    ) -> Result<Self> {
+        let w = force_w.unwrap_or(client.properties().hardware.plane_size_max);
         ensure!(
             [8u32, 16, 32, 64].contains(&w),
             "middle-out: plane width {w} not supported"
@@ -3923,9 +3934,23 @@ mod tests {
         let base = Base::new(&coord);
         macro_rules! go {
             ($client:expr) => {{
-                let gj = GpuJoin::new($client, Caps::b64(classes)).unwrap();
+                // MIDOUT_FORCE_W=64: compile for that plane width on any device (lavapipe), run, report and stop:
+                // only the SPIR-V is wanted (`CUBECL_DEBUG_SPIRV`); the results are invalid
+                let force_w: Option<u32> = std::env::var("MIDOUT_FORCE_W").ok().map(|x| x.parse().unwrap());
+                let gj = GpuJoin::with_width($client, Caps::b64(classes), force_w).unwrap();
                 println!("device {} W {}", ctx.device_name(), gj.w);
                 for &pip in &pips {
+                    if force_w.is_some() {
+                        let st = slice_tops(pip, gj.roots());
+                        let nb: usize = std::env::var("MIDOUT_BATCHES").ok().map_or(usize::MAX, |s| s.parse().unwrap());
+                        let r = if std::env::var("MIDOUT_HOST_TOPS").is_ok() {
+                            gj.run_slice(&st).map(|x| x.0)
+                        } else {
+                            gj.run_slice_dev(pip, &st.rank, nb).map(|x| x.0)
+                        };
+                        println!("COMPILE-ONLY W {} slice {pip}: {r:?}", gj.w);
+                        continue;
+                    }
                     let st = slice_tops(pip, gj.roots());
                     // the n the device's check takes: survivors that pass the prefilter
                     let mut want = Vec::new();
