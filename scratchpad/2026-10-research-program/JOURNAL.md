@@ -126,6 +126,20 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   independent review of both started** on the same box (to 17:40). I open them tomorrow morning if the review
   leaves nothing to fix and the user has not said otherwise.
 
+- **16:48 UTC: the review of PRs 1 and 2 is back** (`G2/PR12-REVIEW.md`): both "merge with fixes". PR 1's code is
+  fine; the CPU reference agrees with production's search on whole bases 10–29 and two real base-64 slices
+  re-check true. Mutation testing: 9 of 27 mutants survived the author's tests, one of them (the top
+  certificate's upper part taking the wrong position) silently dropping nice numbers; three cheap independent
+  tests kill the six that matter. The author is applying the fixes (to 17:50).
+- **A claim of mine corrected.** FS.1's "fields can be re-cut later without redoing any search" was passed on to
+  the user this morning as proven. The reviewer of PR 1 is right that it is false as stated: a re-cut field is
+  not a union of finished fields, so it only holds between bases or with slice-level records on the server.
+  What stays true: the join's internals are free under any such field, and the cost of the choice is bounded.
+  `DECISIONS.md` D2 now says so; the user gets it in plain words in the next message.
+- **A production defect noted by the same reviewer, outside these PRs:** `StrideTable` panics at
+  `stride_filter.rs:165` for bases 15, 19, 23 and 27 (it indexes an empty residue list). Those bases have no
+  residue class and no fields, so nothing in production reaches it; to verify and offer as a small fix.
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);

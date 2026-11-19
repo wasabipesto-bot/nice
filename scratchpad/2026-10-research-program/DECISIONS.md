@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-19 15:10 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-19 16:55 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. To answer, reply in the chat with the numbers, for
@@ -46,8 +46,13 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 ### D2. Which definition of a field?
 
 - **Background:** a field must fix some middle digits of n. An independent review (`G2/fs/REVIEW.md`, half a
-  page at the top) proved that any choice within digits 4–8 can be re-cut later without redoing any search,
-  and that today's overlap join could still search such fields (about ×1.9 slower). It recommended fixing
+  page at the top) showed that the join's internals (its shape, kernels, slice size) stay free under any choice
+  within digits 4–8, that the choice can cost at most ×1.15 (base 64) to ×1.30 (base 65), and that today's
+  overlap join could still search such fields (about ×1.9 slower). **A correction (2026-11-19):** I told you
+  such fields "can be re-cut later without redoing any search". That holds only between bases, or if the
+  server tracked single slices: a field cut along other digits is not a union of finished fields, so re-cutting
+  a partly searched base would leave partly searched fields. Treat the definition as fixed for a base once its
+  first field is handed out; it remains a free choice per base. It recommended fixing
   digits **5–7** rather than 6–8; that is built and measured (3.1 % faster, exact slice by slice against the
   old definition).
 - **Options:** a. only 5–7 in the PRs (the old definition stays on the archive branch); b. keep both.
