@@ -761,9 +761,41 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
+    /// The prefilter of a survivor `n` straight from its definition, on the
+    /// full digits of `n²` and `n³` rather than the reference's residues mod
+    /// `b^(k + 2)`: the digits at positions `0..k + 2` of both are distinct,
+    /// and the four at positions `k` and `k + 1` miss the top's certified
+    /// digits at positions `>= k + 2`. The same exemption for an `n²` that
+    /// may be too short ([`prefilter`]).
+    fn prefilter_direct(base: &Base, sh: Shape, n: u128) -> bool {
+        let k = sh.k as usize;
+        if n < base.pw[(k + 2).div_ceil(2)] {
+            return true;
+        }
+        let p = n / base.pw[sh.f0 as usize];
+        let a = (p * base.pw[sh.f0 as usize]).max(base.start);
+        let c = (p * base.pw[sh.f0 as usize] + base.pw[sh.f0 as usize] - 1).min(base.end - 1);
+        let (_, mhi) = top_cert_split::<u64>(base, a, c, sh.k, sh.k + 2).expect("a certified top");
+        let x = U384::from_u128(n);
+        let sq = x.mul(&x);
+        let cu = sq.mul(&x);
+        let mut seen = 0u64;
+        for d in [sq.digits(u64::from(base.b)), cu.digits(u64::from(base.b))] {
+            for j in 0..k + 2 {
+                let bit = 1u64 << d.get(j).copied().unwrap_or(0);
+                if seen & bit != 0 || (j >= k && mhi & bit != 0) {
+                    return false;
+                }
+                seen |= bit;
+            }
+        }
+        true
+    }
+
     /// Whole small bases, every field of the coordinate, against brute force:
     /// the survivors are exactly the n passing the shape's predicate, no n
-    /// twice, and every nice number found. Covers every b mod 5 class with a
+    /// twice, `checked` is the number of them passing the prefilter, and
+    /// every nice number is found. Covers every b mod 5 class with a
     /// range (0, 2, 3, 4), odd bases, and two shapes on the same fields.
     #[test]
     fn whole_small_bases_vs_brute_force() {
@@ -827,9 +859,16 @@ mod tests {
                     "b{b} shape {sh:?}: survivors differ from brute force"
                 );
                 assert_eq!(surv, want.len() as u64);
+                // checked: q_checked, and the same from the full digits of n²
+                // and n³ (prefilter_direct), so that the prefilter's own
+                // arithmetic is checked too
                 let want_checked = want
                     .iter()
-                    .filter(|&&n| q_checked::<u64>(&base, sh, n))
+                    .filter(|&&n| {
+                        let q = q_checked::<u64>(&base, sh, n);
+                        assert_eq!(q, prefilter_direct(&base, sh, n), "b{b} n {n}");
+                        q
+                    })
                     .count() as u64;
                 assert_eq!(checked, want_checked, "b{b} shape {sh:?}: checked");
                 assert!(checked <= surv);
