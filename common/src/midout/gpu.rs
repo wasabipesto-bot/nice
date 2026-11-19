@@ -81,6 +81,13 @@ const FILL: u32 = 1024;
 /// Probe table rows (the kernel's shared memory): a job's probes must fit.
 pub const PMAX: u32 = 576;
 /// Digits of a top mask the kernel reads: a top's popcount must fit.
+///
+/// 17 is the most a top can certify at base 64 (the audit, AUDIT-MO §3.4):
+/// a top's interval is 2^24 n wide with n >= 2^75, so over it n² moves by
+/// at least 2^100 > 64^16 and n³ by at least 3·2^174 > 64^29; only digits
+/// 17–25 of n² (9) and 30–37 of n³ (8) can agree at both ends. Every slice
+/// seen has a 17-digit top, so the margin is 0 and none is needed. This
+/// does not hold for other bases (the wide path must redo it).
 pub const MAXPOP: u32 = 17;
 /// Records per plane-private output slab.
 const SLAB: u32 = 256;
@@ -3598,6 +3605,12 @@ fn field_run<R: Runtime>(
         "middle-out device path: shape (4, 10) only"
     );
     sh.fits(coord)?;
+    // the per-unit counters are u32 per group: about 900 slices of the largest observed flat count wrap them
+    ensure!(
+        (1..=256).contains(&opt.group),
+        "middle-out: group of {} slices (1-256)",
+        opt.group
+    );
     let ts = coord.field_digits(v_start, v_size)?;
     let pips: Vec<u64> = ts
         .flat_map(|t| sh.slices_of(coord, t).map(|p| p as u64).collect::<Vec<_>>())
