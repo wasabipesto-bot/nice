@@ -206,6 +206,14 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   to the wide kernels; (4) the accounts the audit asks for; (5) the client route against a local coordinator;
   (6) a request for 45 minutes on demoux for the library path.
 
+- **01:20 UTC: the audit is back (EXPERIMENTS MO.4).** 1,073 slices equal the CPU reference; and every account
+  on the trunk passes on all zeros: a failed allocation, a debug variable in the environment, a dropped kernel,
+  a dropped probe or parent all return a short or empty field as a success. The audit paid for itself.
+- **01:25 UTC: step 3A started on the same box** (`G2/BUILD-BRIEF-3A.md`, hard stop 05:15; the box dies at
+  06:40): merge the audit branch, execution accounts per stage, probe and children conservation, the debug
+  switch out of the library, the audit's guards, a sampled CPU slice per field; acceptance = every silent fault
+  now loud. Speed work resumes after it. The stride-fix engineer is on the other box until 02:30.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

@@ -5,6 +5,37 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## MO.4 Independent soundness audit of the trunk: 1,073 slices equal the CPU reference; every host account is satisfied by all zeros (2026-11-18 22:05 – 2026-11-19 01:20 UTC, auditor; `G2/BUILD-BRIEF-3S.md`, `G2/AUDIT-MO.md`, `G2/audit1/` (logs, sweep JSON); branch `dev/mo-audit` dbbbc043, c00c018e on 91ac0761, on the fork; trunk unchanged; box 61286074, RTX 3080, CUDA)
+
+- **Parity sweep** [M]: 1,073 real base-64 slices (1,000 seeded across the base, 49 extremes from a tops scan of
+  16,384 slices, 24 from the base's first and last fields): tops, prefiltered lists n for n (361.7M entries),
+  whole survivor sets with the prefilter off (12.59G survivors) and every count equal to the CPU reference. The
+  first and last fields also ran whole with every account passing; the group path equals single slices; slice 0
+  genuinely has no survivors.
+- **Class 1, a candidate or count lost silently** [M, reproduced]: (1.1) a failed device allocation on CUDA:
+  tops 0 and survivors 0, or tops run but the main kernel does not (a 2.59 GB pool page refused) and children,
+  survivors and checked are 0; `Ok`, all accounts pass, `nice()` gives `Ok([])`; (1.2) `MIDOUT_STOP` left in the
+  environment: `search_field` returns `Ok` in 5 s with survivors 0; (1.3) by fault injection, each passing the
+  accounts with lower counts: main kernel dropped, tops kernel dropped, one probe per job dropped (−0.21 % of
+  survivors), 1 parent in 997 dropped, a prefilter that rejects 1 in 1,024 too many.
+- **Why:** the accounts are conservation laws on the records → list → check plumbing; every counter starts at
+  zero and all zeros satisfy every one of them. Nothing asks for positive evidence that a stage ran
+  (`AUDIT-MO.md` §4.1 lists the evidence each stage should return).
+- **Class 2, lost but loud** [M]: probes past 2·PMAX, popcount past MAXPOP, a lost record, a stale slab count,
+  the slab and list caps, a dropped check.
+- **Class 3, robustness:** the 16-bit pending parent index is unchecked (largest class seen 17,060: ×3.8
+  margin); the top index rides in 20 bits, safe only by the tops cap; the child-list write has no per-batch
+  bound; MAXPOP 17 has no margin but 17 is a proven maximum at base 64 only; the slice count compares a host
+  counter with itself; reported nice numbers are not checked to lie in the field.
+- **Class 4, test gaps:** 64 lanes has never run on the library path; SPIR-V has two slices on lavapipe; the
+  base-64 oracle is the CPU reference, not brute force.
+- **Clean:** the coordinate layer (a new test shows the slices of all fields at base 64 and padded base 65
+  partition the slice keys; 200k n per base including both range ends land in the right field, slice and
+  lead); neither known SPIR-V defect shape occurs in the kernels.
+- **Conclusion:** correct kernels on a healthy card lose nothing in 1,073 slices, and a kernel that does not
+  run is invisible. Step 3A (started 01:25 UTC, `G2/BUILD-BRIEF-3A.md`) adds execution accounts, conservation
+  laws and a sampled CPU check, with the audit's fault switches as acceptance tests.
+
 ## SRA.0 Production's v3.4.8 client can submit an unsearched field as empty after a CUDA allocation failure, on the stride route only (2026-11-18 22:52–23:30 UTC, engineer; `G2/build2e/ALLOC-FAILURE.md`, `G2/build2e/raw/alloc/` (memory-hog program `hog.cu`, harness `arun.sh`, one directory per run); box 61303619, RTX 3080 20 GB; client 8c267de5 = tag v3.4.8, features `gpu,cubecl-cuda`, local stub only, production hosts blocked and proven)
 
 - **Setup:** a CUDA program holds all but N MiB of the card before the client starts or a few seconds in.

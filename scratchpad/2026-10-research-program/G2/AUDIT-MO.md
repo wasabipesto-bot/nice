@@ -8,7 +8,7 @@ and switches in `gpu.rs` that only the audit tests set). Raw logs: `G2/audit1/`.
 
 ## Verdict
 
-**The device equals the CPU reference on every slice tried (__SWEEPN__ slices, 0 differences), and no path was found by
+**The device equals the CPU reference on every slice tried (1,073 slices, 0 differences), and no path was found by
 which correct kernels on a healthy card lose a candidate. But the host's accounts only check the plumbing after the main
 kernel: anything that stops the main kernel, the tops or the parents from running, or makes them compute less,
 returns a field with fewer (or zero) survivors as a success. That is reproduced, not suspected: a device allocation
@@ -115,7 +115,7 @@ parity tests. (Prefilter note: `checked` would change, but nothing compares it w
 
 1. **The pending parent index is 16 bits, unchecked** (`pq` slots, 422 `idx - pb`, 426, 465–467 `& 0xFFFF`): a class
    of more than 65,535 parents would alias parent indices (the even slot's write also spills into its odd
-   neighbour). Observed max class 17,026 (margin 3.8×), so not reachable at base 64; nothing would say so
+   neighbour). Observed max class 17,060 (margin 3.8×), so not reachable at base 64; nothing would say so
    if a later shape or base changed it (the 13-bit injection was loud only because the garbage overflowed the slabs).
    Fix: an error counter when `pe − pb > 65,535` (one compare per cube).
 2. **The top index rides in 20 bits** of the probe word (319, 340, 733): safe only because `Caps::tops` (480,000) <
@@ -124,7 +124,7 @@ parity tests. (Prefilter note: `checked` would change, but nothing compares it w
    slack): with batches of 4 classes (lavapipe) a batch whose classes hold more than its share writes past `clst`
    before the parents account (checked only for the whole slice) can say so. Not reachable on CUDA (one batch).
    Fix: per-batch parent count against the share, or size `clst` by the parents cap.
-4. **MAXPOP 17 has margin 0 and needs no more:** every one of 16,384 + __SWEEPN__ slices has a 17-digit top, and 17 is
+4. **MAXPOP 17 has margin 0 and needs no more:** every one of 16,384 + 1,073 slices has a 17-digit top, and 17 is
    the maximum at base 64: over a top's interval (2^24 n, n ≥ 2^75) n² moves by ≥ 2^100 > 64^16 and n³ by ≥ 3·2^174 >
    64^29, so only digits 17–25 of n² (9) and 30–37 of n³ (8) can be certified. Write this proof next to the
    constant; it does not hold for other bases (the wide path must redo it).
@@ -187,8 +187,8 @@ reference's survivors that pass, **n for n**; with the prefilter switched off (`
 **whole survivor set** = the reference's (count and an order-independent 3-word hash of every n); children, chunks,
 flat, survivors, checked equal; `kept` too where the keys agree. One JSON line per slice with the limits' values.
 
-- **Slices:** __SWEEPDESC__
-- **Result:** __SWEEPRESULT__
+- **Slices:** **1,073 distinct slices**: 1,000 seeded uniformly over the base (seeds 20261118 ×300, 20261119 ×300, 20261120 ×400; splitmix64, `AUDIT_SEED`), the 49 extremes of a 16,384-slice tops scan (most and fewest tops, most probes per job incl. 612, the smallest jobs, the largest segments), and 24 slices of the base's first and last fields (each field's first 3, digit-4 boundaries 63/64, 4031, last 2, and 4–5 random). Slices 0 and 2^30 − 1 included. Lists: `audit1/sweep_slices.txt`; per slice: `audit1/sweep{1,2,3}.jsonl`; summary `audit1/sweep_stats.txt`.
+- **Result:** **all 1,073 equal**: device tops = host tops, prefiltered lists equal n for n (361,682,740 entries), whole survivor sets equal by count and hash (12,594,195,924 survivors), children/chunks/flat/survivors/checked equal; `kept` equal on the 559 slices where the host's sampled key equals the reference's. The no-prefilter comparison was non-vacuous on every slice (device list length = the reference's survivors). 24 slices had a job past PMAX (max 619, slice 2) and all were equal through the second instance. Slice 0 has 0 survivors, 0 checked and 504 jobs with no probe (on both sides).
 - **Also:** the base's first and last fields whole on the device (`fields_ends.log`, `midout_bench`, group 16):
   every account passed, survivors 47,417,055,193 and 48,000,609,298, checked 1,361,908,290 and 1,378,233,015, 33.9 s
   and 30.5 s. Key independence (`audit_key_and_group_independence`, `keys2.log`): 10 slices × 5 foreign keys
@@ -208,7 +208,7 @@ flat, survivors, checked equal; `kept` too where the keys agree. One JSON line p
 | probes per job, both instances | 1,152 | 619 | 1.86× | loud (`C_ERR_PMAX`, shown) |
 | top popcount, `MAXPOP` (84) | 17 | 17 on every slice | 0, and none needed: 17 is the proven maximum at base 64 (§3.4) | loud (shown with 12); the kernel would over-report, not lose |
 | parents per slice, `Caps::parents` | 2,100,000 | 1,046,138 | 2.0× | loud (2814; `hist2` drops past the cap, 982) |
-| parents per class, u16 pending index (422, 467) | 65,535 | 17,026 | 3.8× | **unchecked**: silent aliasing (§3.1) |
+| parents per class, u16 pending index (422, 467) | 65,535 | 17,060 | 3.8× | **unchecked**: silent aliasing (§3.1) |
 | parents per sort bucket (`hsort` paths) | 256 / 2,048 | 1,070 | — | correct on every path (the > 2,048 path is O(n²), slow only) |
 | child-list entries per batch, `lcap` (2259) | 142.8M | ~67M (64 × parents) | 2.1× | **unchecked write** (419); only the slice's parents cap is checked (§3.3) |
 | slabs per batch, `nslab_cap` | 164,185 | 64,502 | 2.5× | loud (`C_ERR_SLAB`, 2820; shown) |

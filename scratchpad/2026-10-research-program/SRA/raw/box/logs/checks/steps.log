@@ -1,0 +1,19 @@
+2026-11-18T23:38:00Z start just_lint: just lint
+2026-11-18T23:38:00Z end just_lint rc=1
+2026-11-18T23:38:00Z start clippy_cuda: cargo clippy -p nice_common --all-targets --features cubecl-cuda,cubecl-spirv -- -D warnings
+2026-11-18T23:38:44Z end clippy_cuda rc=101
+2026-11-18T23:38:44Z start suite: cargo test --locked --release --no-fail-fast
+2026-11-18T23:42:57Z end suite rc=0
+2026-11-18T23:42:57Z start lvp_wgsl: cargo test --release --features cubecl -p nice_common -- --ignored --nocapture
+2026-11-18T23:44:48Z start just_lint: just lint
+2026-11-18T23:45:57Z end just_lint rc=0
+2026-11-18T23:45:57Z start clippy_cuda: cargo clippy -p nice_common --all-targets --features cubecl-cuda,cubecl-spirv -- -D warnings
+2026-11-18T23:46:01Z end clippy_cuda rc=0
+2026-11-18T23:46:01Z start suite: cargo test --locked --release --no-fail-fast
+2026-11-18T23:49:20Z end suite rc=0
+2026-11-18T23:49:20Z start lvp_wgsl: cargo test --release --features cubecl -p nice_common -- --ignored --nocapture
+2026-11-19T00:02:22Z end lvp_wgsl rc=0
+2026-11-19T00:02:22Z start wgsl_lint: sh -c cargo test --release --features cubecl -p nice_common --lib -- --ignored --exact cubecl_backend::tests::wgsl_dump_for_lint --nocapture && python3 scripts/wgsl-lint.py "$CUBECL_DEBUG_LOG" --require DetailedKernelU32@80 --require DetailedFdKernelU32@40 --require DetailedFdKernelU32@50 --require DetailedFdKernel@23 --require DetailedFdKernel@40 --require DetailedFdKernel@50 --require DetailedFdKernel@62 --require DetailedKernel@80 --require NiceonlyKernel@40 --require BucketKernel@57 --require JoinKernel@57 --require TopKernel@57
+2026-11-19T00:02:33Z end wgsl_lint rc=0
+2026-11-19T00:02:33Z start lvp_spirv: cargo test --release --features cubecl-spirv -p nice_common -- --ignored --nocapture cubecl_
+2026-11-19T00:22:46Z end lvp_spirv rc=0
