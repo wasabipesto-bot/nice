@@ -31,6 +31,7 @@ pub mod gpu_route;
 pub mod join_check;
 pub mod join_plan;
 pub mod lsd_filter;
+pub mod midout;
 pub mod msd_prefix_filter;
 pub mod number_stats;
 pub mod overlap_join;
