@@ -1,0 +1,40 @@
+[2026-11-19T06:31:13Z INFO  nice_client] Nice Client v3.4.9-dev started in Nice-only mode, using GPU device 0.
+[2026-11-19T06:31:14Z DEBUG nice_common::client_process_cuda] GPU init: NVRTC smoke test passed in 0.18s
+[2026-11-19T06:31:14Z INFO  nice_client] GPU initialized: CUDA device 0, batch size 50000000
+[2026-11-19T06:31:14Z INFO  nice_client]   GPU: NVIDIA GeForce RTX 3080
+[2026-11-19T06:31:14Z INFO  nice_client]   overlap join: CubeCL CUDA runtime ready for large fields
+[2026-11-19T06:31:14Z DEBUG nice_common::stride_filter] stride walk phase 1: Scalar
+[2026-11-19T06:31:14Z INFO  nice_client] Acquired claim:  206213638, Base 54
+[2026-11-19T06:31:14Z WARN  nice_common::overlap_join] NICE_JOIN_ROUTE=stride: nice-only fields take the stride path where they can
+[2026-11-19T06:31:14Z DEBUG nice_common::gpu_route] b54 [2941996280153679229, 2942006280153679229): stride pipeline, forced by NICE_JOIN_ROUTE=stride
+[2026-11-19T06:31:14Z INFO  nice_client] Acquired claim:  206214594, Base 54
+[2026-11-19T06:31:14Z DEBUG nice_common::gpu_route] b54 [2951556280153679229, 2951566280153679229): stride pipeline, forced by NICE_JOIN_ROUTE=stride
+[2026-11-19T06:31:14Z DEBUG nice_common::client_process_cuda] modular prefilter disabled for base 54
+[2026-11-19T06:31:14Z DEBUG nice_common::client_process_cuda] GPU niceonly plan for base 54: M=8345592, R=202478, built in 0.40s
+[2026-11-19T06:31:14Z DEBUG nice_common::client_process_cuda] GPU niceonly field 0: base 54, M=8345592, R=202478
+[2026-11-19T06:31:14Z DEBUG nice_common::client_process_cuda] GPU niceonly field 1: base 54, M=8345592, R=202478
+[2026-11-19T06:31:15Z DEBUG nice_common::client_process_cuda] GPU niceonly field device span 1.300s
+[2026-11-19T06:31:15Z DEBUG nice_common::gpu_niceonly] GPU niceonly b54: floor 250000 msd 1.692s -> 8662230 ranges (2.810e12 numbers), gpu 0.000s, total 1.302s, 130 launches, waited cpu 0.530s device 0.715s, device busy 1.139s
+[2026-11-19T06:31:15Z DEBUG nice_common::client_process_cuda] GPU niceonly pipeline: 8662230 ranges in 130 launches, found 0
+[2026-11-19T06:31:15Z INFO  nice_client] ✓ Processed 1.00e13 numbers in 1.70s (5.88e12 numbers/sec)
+[2026-11-19T06:31:15Z INFO  nice_client] Acquired claim:  910401, Base 62
+[2026-11-19T06:31:15Z DEBUG nice_common::gpu_route] b62 [7997740455941656861841, 7997740460941656861841): stride pipeline, forced by NICE_JOIN_ROUTE=stride
+[2026-11-19T06:31:15Z DEBUG nice_common::client_process_cuda] modular prefilter disabled for base 62
+[2026-11-19T06:31:16Z DEBUG nice_common::client_process_cuda] GPU niceonly plan for base 62: M=14538008, R=353342, built in 0.45s
+[2026-11-19T06:31:16Z DEBUG nice_common::client_process_cuda] GPU niceonly field 2: base 62, M=14538008, R=353342
+[2026-11-19T06:31:17Z DEBUG nice_common::client_process_cuda] GPU niceonly field device span 1.438s
+[2026-11-19T06:31:17Z DEBUG nice_common::gpu_niceonly] GPU niceonly b54: floor 250000 msd 1.892s -> 7922518 ranges (2.615e12 numbers), gpu 1.300s, total 3.191s, 119 launches, waited cpu 0.705s device 0.696s, device busy 1.060s
+[2026-11-19T06:31:17Z DEBUG nice_common::client_process_cuda] GPU niceonly pipeline: 7922518 ranges in 119 launches, found 0
+[2026-11-19T06:31:17Z INFO  nice_client] ✓ Processed 1.00e13 numbers in 1.89s (5.29e12 numbers/sec)
+[2026-11-19T06:31:17Z INFO  nice_client] Acquired claim:  910201, Base 64
+[2026-11-19T06:31:17Z DEBUG nice_common::gpu_route] b64 [39667831862957161709568, 39667831863957161709568): stride pipeline, forced by NICE_JOIN_ROUTE=stride
+[2026-11-19T06:31:17Z DEBUG nice_common::client_process_cuda] modular prefilter disabled for base 64
+[2026-11-19T06:31:18Z ERROR nice_client] GPU processing error: DriverError(CUDA_ERROR_OUT_OF_MEMORY, "out of memory")
+    
+    Stack backtrace:
+       0: <anyhow::Error as core::convert::From<cudarc::driver::result::DriverError>>::from
+       1: std::sys::backtrace::__rust_begin_short_backtrace::<<nice_common::gpu_niceonly::NiceonlyPipeline<nice_common::client_process_cuda::CudaPendingField>>::start_with<nice_common::client_process_cuda::CudaNiceonlySink>::{closure#1}, ()>
+       2: <std::thread::lifecycle::spawn_unchecked<<nice_common::gpu_niceonly::NiceonlyPipeline<nice_common::client_process_cuda::CudaPendingField>>::start_with<nice_common::client_process_cuda::CudaNiceonlySink>::{closure#1}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+       3: <std::sys::thread::unix::Thread>::new::thread_start
+       4: <unknown>
+       5: clone

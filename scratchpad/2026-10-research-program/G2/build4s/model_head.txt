@@ -1,0 +1,13 @@
+model_4s --tag=head: expansion inner 197 vcyc x 3.70 iterations per take + 80 + 43; scatter3 956 vcyc; PREDICTED
+stage                                        lo ms   hi ms     mid
+tops (6 kernels)                             0.121   0.239   0.180
+parents (hist2, scan16, scatter3, hsort)     0.476   0.518   0.497
+main kernel                                  3.085   3.345   3.215
+expansion + prefilter                        0.436   0.567   0.502
+check (production)                           0.035   0.083   0.059
+done, uploads, sync                          0.020   0.050   0.035
+slice                                        4.174   4.802   4.488
+  lo: 0.934 fs per admissible n -> x5.04 against main (4.707 fs); with main +-1.2 % drift x4.98-5.10
+  mid: 1.004 fs per admissible n -> x4.69 against main (4.707 fs); with main +-1.2 % drift x4.63-4.74
+  hi: 1.075 fs per admissible n -> x4.38 against main (4.707 fs); with main +-1.2 % drift x4.33-4.43
+  E[max] bits per lane per take: 2 records in one loop 3.70, two loops 4.58, 4 records 6.32 (per 256 records)

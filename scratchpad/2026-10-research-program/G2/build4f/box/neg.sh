@@ -54,4 +54,7 @@ json.dump([a],open(sys.argv[2],"w")); json.dump([b],open(sys.argv[2]+".2","w"))
 PY
 W=$R/wbad.json case_route misaligned 8478 "" nice_mo
 W=$R/wbad.json.2 case_route badsize 8479 "" nice_mo
+# 8. a claim in a coordinate this client does not know (the field-structure review's base-64 digits 5-7: midout:4,8,5)
+$B/midout_fields --base 64 --t 1000 --digits 4,8,5 > $R/w485.json
+W=$R/w485.json case_route unknowncoord 8481 "" nice_mo
 echo NEG-DONE >> $S

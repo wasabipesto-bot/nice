@@ -44,6 +44,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   `nicemark-repin`: their PRs #266, #267 merged yesterday) and 4.9 GB the uv cache; neither is mine to clear
   without the user's word (decision 16). 4S stops building under 3.5 GB.
 
+- **07:20 UTC: the hand-written CUDA backend is cleared (EXPERIMENTS SRA.4).** Every device call's error
+  propagates and 88 squeezed runs produced no false empty; box 61386568 destroyed. With the census, the stride
+  defect has no known effect on any production result.
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);

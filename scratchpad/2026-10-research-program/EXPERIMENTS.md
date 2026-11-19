@@ -35,6 +35,30 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## SRA.4 The hand-written CUDA backend under an allocation failure: no false empty found (2026-11-19 05:47–07:20 UTC, engineer; `SRA/HC-BRIEF.md`, `SRA/HC-RESULTS.md`, `SRA/raw/hc/`; box 61386568, RTX 3080 20 GB at 220 W, driver 580.126.09, destroyed after the run; clients v3.4.5 (auto backend) and upstream main 71eb5fc (`--gpu-backend cuda`, `NICE_JOIN_ROUTE=stride`), local stub only, production hosts blocked and proven)
+
+- **Code** [read, v3.4.5 and main]: every device call ends in `?` (context creation, NVRTC and module load,
+  residue upload, per-field buffers, descriptor uploads, `cuLaunchKernel`, event syncs, readbacks); errors from
+  `begin_field` and `launch` go to the dispatcher's `first_error`, the next field's end takes it and the field
+  fails; `wait` synchronises the end event, which also returns faults from inside a kernel; any `Err` exits 1.
+  An all-zero result cannot be told from a kernel that did not run (the count starts at 0), so the protection
+  is that CUDA reports each failure and the client propagates it.
+- **Card** [M, 88 runs]: the four base-54 1e13 fields of the census with the most work left, and a base-10
+  control containing 69; memory squeezed before start at many sizes, a few seconds in, between fields, and by a
+  greedy hog that takes whatever the client frees. **No false empty:** base-54 results equal the healthy runs;
+  all of about 228,000 control fields returned `[69]`. Allocations can only fail at three points (the process
+  keeps about 256 MiB in cudarc's pool from its first allocation): context creation; the first nice-only
+  allocation (255 MiB free fails, 256 works); on main, a later plan upload for a new base. Each was reached and
+  each ended in exit 1 with nothing false submitted.
+- **Not covered:** allocation failures inside a field once the pool exists (could not be provoked); failures
+  that are not allocations (launch errors, kernel faults, Xid, resets: the code propagates them; not producible
+  without code changes); one card and driver.
+- **Also:** when v3.4.5's auto selection cannot create the CUDA context it moves on at info level to CubeCL on
+  wgpu; such runs would be labelled `cubecl`, so the census's 15,046 `cuda` rows did run this backend.
+- **Conclusion:** the 15,046 stride submissions on the hand-written backend are not exposed to the failure that
+  PR #270 fixes. With SRA.3, the defect has no known effect on any production result. Still unmeasured: the
+  wgpu runtime under memory pressure on a real card (by the code, the failed launch surfaces at the next sync).
+
 ## FS.1 The field structure attacked: not shown wrong; fix digits 5–7 instead of 6–8 (≈ 3 %); fields can be re-cut without redoing search (2026-11-19 05:45–06:13 UTC, independent reviewer, ivory CPU; `G2/FS-BRIEF.md`, `G2/fs/REVIEW.md`, `G2/fs/proto/` (prototype copy with a `levels` command), `G2/fs/code/`, `G2/fs/raw/`)
 
 - **Question (the user's, 2026-11-18):** does the new field structure tie the project to one implementation or

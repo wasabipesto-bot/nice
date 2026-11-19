@@ -1,0 +1,12 @@
+GET /claim/niceonly (plain): "this coordinator serves only middle-out fields: GET /claim/niceonly?coordinate=midout" 404
+claim 1: {"claim_id": 1000, "base": 64, "range_start": 37780373014837920268288, "range_end": 37780517130025996124160, "range_size": 144115188075855872, "coordinate": "midout"}
+claim 2: {"claim_id": 1001, "base": 64, "range_start": 37781814166718678827008, "range_end": 37781958281906754682880, "range_size": 144115188075855872, "coordinate": "midout"}
+after restart, claim 3: {"claim_id": 1002, "base": 64, "range_start": 37783255318599437385728, "range_end": 37783399433787513241600, "range_size": 144115188075855872, "coordinate": "midout"}
+claim 4 (none left): 204
+submit claim 1000 route overlap: "rejected: telemetry pipeline.route is 'overlap', not 'midout'" 422
+submit claim 1000 no telemetry: "rejected: telemetry pipeline.route is None, not 'midout'" 422
+submit claim 1000 route midout: "recorded" 200
+submit claim 1000 again: "rejected: field already submitted (claim 1000)" 409
+submit unknown claim 5: "rejected: unknown claim" 404
+restart with --reissue-after 0: claim: {"claim_id": 1003, "base": 64, "range_start": 37781814166718678827008, "range_end": 37781958281906754682880, "range_size": 144115188075855872, "coordinate": "midout"}
+status: {"fields": 3, "claimed": 3, "done": 1}
