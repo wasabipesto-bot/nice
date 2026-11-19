@@ -4,8 +4,11 @@
 //! for number and count for count; it is not a client route.
 //!
 //! Its tests compare it with brute force on every field of eleven small
-//! bases: the survivors, the numbers the full check examines, and the nice
-//! numbers.
+//! bases (nine of them with survivors): the survivors, the numbers the full
+//! check examines, and the nice numbers. Separate tests check the pieces
+//! the reference and its brute-force predicate share: the top certificate
+//! against its definition, the roots against production's residue filter,
+//! and the prefilter at base 64 against full digits.
 //!
 //! # The join, for one slice
 //!
@@ -889,8 +892,10 @@ mod tests {
 
     // Whole small bases: every b mod 5 class with a range (0, 2, 3, 4), odd
     // and even bases, and two shapes on the same fields where it is cheap.
-    // (b, coordinate (k0, k1, q0), shapes (f0, k)). Base 12 has no survivors
-    // in its shape; the prefilter is exempt over the whole of bases 10–14.
+    // (b, coordinate (k0, k1, q0), shapes (f0, k)). Bases 12 and 19 have no
+    // survivors in their shapes (nor base 13 in (0, 3)), so they test only
+    // that nothing is found; the prefilter is exempt over the whole of bases
+    // 10–14.
     #[test]
     fn whole_base_10_vs_brute_force() {
         check_whole_base(10, (0, 1, 0), &[(0, 2)]);
