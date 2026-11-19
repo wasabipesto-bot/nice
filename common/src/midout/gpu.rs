@@ -265,6 +265,15 @@ mod kernels {
     /// One cube per job (class c, unit d). `w` is the plane width the kernel is compiled for (8, 32 or 64; a plane
     /// of another width is an error, `C_ERR_PLANE`), `fill` the children appended per round (`FILL`, or 512 below
     /// 32 lanes).
+    ///
+    /// Its phases (the comments `phase 1` … `phase 4` in the body): the probes (the 8 top classes compatible with
+    /// unit `d`, their digit words into shared memory, once); then rounds until the class's parents are used up:
+    /// **1** append the certified children of 256 parents at a time, in order, to the pending slots and the job's
+    /// child list, until `fill` children (16 chunks of 64 at 32 lanes and above) are pending; **2** transpose the round's chunks into per-digit slices (a
+    /// shuffle transpose per plane) and take each chunk's common digits from the registers; **3a** per probe, the
+    /// chunks the common-mask skip keeps, into a list; **3b** per (probe, chunk) of the list, the 64-pair word
+    /// (pairs whose masks are disjoint), one record per nonzero word into the plane's slab; **4** carry the
+    /// pending rest to the front. At the end, the counters and the account words.
     #[cube(launch_unchecked)]
     pub fn g2_kernel(
         par: &Array<Vector<u32, Const<4>>>, // parent records (mask lo, mask hi, cacc, r4), one 16-byte vector each (one LDG.128 on CUDA)
