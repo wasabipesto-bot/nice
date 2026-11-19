@@ -39,6 +39,7 @@ const DEFAULT_PREFETCH_CONCURRENCY: usize = 4;
 const MAX_SUBMITS_IN_FLIGHT: usize = 8;
 
 mod bench;
+mod midout_route;
 mod progress;
 
 #[cfg(all(feature = "cuda", feature = "cubecl-cuda"))]
@@ -331,6 +332,14 @@ pub struct Cli {
     /// Set the log level (overrides `RUST_LOG` environment variable)
     #[arg(short, long, value_enum, env = "NICE_LOG_LEVEL")]
     log_level: Option<LogLevel>,
+
+    /// Development only (the middle-out join): claim fields of the
+    /// middle-out coordinate from the local coordinator at this address,
+    /// search them on the GPU and submit them there. Off unless given; the
+    /// production API is refused. Uses --repeat, --username,
+    /// --gpu-backend and --gpu-device; ignores the mode and --api-base.
+    #[arg(long, value_name = "URL")]
+    midout_coordinator: Option<String>,
 }
 
 /// Which backends this build carries, for error messages.
@@ -1732,6 +1741,12 @@ async fn main() -> Result<()> {
     if cli.validate && cli.mode == SearchMode::Niceonly {
         error!("Configuration not supported: Validation && Niceonly");
         std::process::exit(1);
+    }
+
+    // The middle-out route (development) runs alone, before any other
+    // backend or route is set up.
+    if let Some(url) = cli.midout_coordinator.clone() {
+        return midout_route::run(&cli, &url).await;
     }
 
     #[allow(unused_mut)]
