@@ -130,7 +130,7 @@ const ENTRIES_PER_THREAD: u32 = 2;
 /// through a counter, one entry per lane at a time (fewer registers, and
 /// faster on a 3080, than 4 or 8), so a cube that starts after the list is
 /// exhausted exits at once, and no part of the list waits for a last wave.
-const CHECK_CUBES: u32 = 2048;
+pub(crate) const CHECK_CUBES: u32 = 2048;
 /// [`check_kernel`]'s modes: write the nice numbers; every n (tests); four
 /// words per list entry, with the gate bypassed or applied (tests, see the
 /// kernel).
@@ -167,7 +167,7 @@ const STAGES: usize = STAGES_U32 as usize;
 /// reads (`JoinDevice::ensure_appended`).
 const TOP_ACCOUNT: u32 = STAGES_U32 + 3;
 /// The words of `ran`.
-const RAN_WORDS: usize = STAGES + 5;
+pub(crate) const RAN_WORDS: usize = STAGES + 5;
 const _: () = assert!(TOP_ACCOUNT as usize + 2 == RAN_WORDS);
 /// Added to [`top_fd_kernel`]'s test bits (tests): every plane's lane 0
 /// appends its top with an atomic of its own and sits out the plane's

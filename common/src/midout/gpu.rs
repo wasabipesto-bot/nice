@@ -110,7 +110,11 @@
 
 use super::coord::Coord;
 use super::cpu::{FieldOutcome, Shape, key_digits};
-use crate::cubecl_join::{TOP_REC_WORDS, ballot_append, check_kernel};
+// production's full check, its grid and its `ran` words (4 stage counters, the work counter, entries checked, their
+// index sum, the top account), shared rather than copied so that a change there cannot desynchronise this path
+use crate::cubecl_join::{
+    CHECK_CUBES, JOIN_WG as CHECK_WG, RAN_WORDS, TOP_REC_WORDS, ballot_append, check_kernel,
+};
 use crate::join_check::{CheckShape, GATE_DIGITS};
 use anyhow::{Result, anyhow, bail, ensure};
 use cubecl::prelude::*;
@@ -186,12 +190,6 @@ const A_ERR_PLANE: usize = 16;
 const ACC_WORDS: usize = 20;
 /// The expansion's `stat` words: list length (parents), slabs, survivor bits read, cubes done, slabs walked.
 const STAT_WORDS: usize = 5;
-/// `check_kernel`'s `ran` words (production's `RAN_WORDS`: 4 stage counters,
-/// the work counter, entries checked, their index sum, the top account).
-const RAN_WORDS: usize = 9;
-/// Its grid (production's `CHECK_CUBES`, `JOIN_WG`).
-const CHECK_CUBES: u32 = 2048;
-const CHECK_WG: u32 = 256;
 /// Grid of the record expansion (a grid-stride loop over the used slabs).
 const EXPAND_CUBES: u32 = 4096;
 /// Grid of the per-slice top kernels (a grid-stride loop over the valid parents).
