@@ -143,13 +143,25 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **17:30 UTC: the review's fixes are in (EXPERIMENTS MO.15)** and the two branches exist as they will be opened:
   `pr/midout-field-coordinate` c6d9164a and `pr/midout-cpu-ref` da7f25c3, one commit each with exactly the
   reviewed trees. Last box destroyed 17:28; month $22.54 invoiced of $30; credit $54.27.
-- **For the 05:41 cycle of 11-20, in this order:** (1) read what the user wrote; (2) PR #271's state; (3) shorten
-  `G2/PR1-BODY.md` and `G2/PR2-BODY.md` (PR 1 to about 400 words, PR 2 to about 600), open PR 1 from
-  `pr/midout-field-coordinate`, then PR 2 from `pr/midout-cpu-ref` with PR 1's number, unless the user's answers
-  to `DECISIONS.md` (D1, D2, D8, D9) say otherwise; (4) carry the review's changes back to `dev/mo-clean` and
-  re-run its tiers; (5) cut PR 3 (device tops) and PR 4 (one slice with its accounts) from it; (6) verify the
-  `StrideTable` panic at bases 15, 19, 23, 27 and offer a fix; (7) base 65's wide kernels for the RX 9070 XT
-  (3.1 fs there against 0.99 at base 64) if a deep slot is free. Budget: $7.46 left under the cap.
+- **SUPERSEDED at 17:40 UTC by the user's hold (next entry): no pull request is to be opened from the middle-out
+  branches until the user says so.** The plan that stood before, for the record: shorten the two descriptions and
+  open PRs 1 and 2 on 11-20; carry the review's changes back; cut PRs 3 and 4.
+- **≈ 17:40 UTC, the user:** "Hold the PRs for now, I want to take some time to dig in to your design and the
+  decisions doc. You can keep working on the branch adding support and optimizations but don't open PRs from it
+  until I say."
+  - **Rule from now, until the user lifts it: no `gh pr create` for anything cut from the middle-out work**
+    (`pr/midout-field-coordinate`, `pr/midout-cpu-ref`, anything from `dev/mo-clean` or `dev/middle-out-join`).
+    The branches stay on the fork, unopened. PR #271 (a test fix on production, already open) and other defect
+    fixes that are not part of the middle-out work are not covered by the hold; the usual rules apply to them.
+  - Work continues on the branch: support (bases 68–70, the wide path on the RX 9070 XT, Metal reading, several
+    clients on one coordinator) and optimisation, with the review's changes carried back first.
+  - The user is about to read the design: they get one design document and a process map in the format they
+    liked for PR #178, started tonight (`../2026-11-midout-design/`).
+- **For the 05:41 cycle of 11-20, in this order:** (1) read what the user wrote; (2) PR #271's state; (3) NO
+  middle-out PRs; (4) carry the review's changes back to `dev/mo-clean` and re-run its tiers; (5) the wide
+  kernels for the RX 9070 XT (base 65 is 3.1 fs there against 0.99 at base 64) and bases 68–70 on the merged
+  code; (6) verify the `StrideTable` panic at bases 15, 19, 23, 27 and offer a fix (its own small PR, not covered
+  by the hold); (7) keep `DECISIONS.md` and the design document current. Budget: $7.46 left under the cap.
 
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 

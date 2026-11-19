@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-19 17:35 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-19 17:45 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. To answer, reply in the chat with the numbers, for
@@ -111,10 +111,14 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 
 ### D9. When to open the pull requests
 
-- **Options:** a. open each as soon as it is cleaned and independently reviewed (PRs 1 and 2 are CPU-only and
-  could open within two days); b. hold everything until the whole first series is ready, for one sitting.
-- **Recommendation: a**, never more than two or three waiting on you at once.
-- **If you do not answer:** a.
+- **Your answer (2026-11-19):** hold. No pull request is opened from the middle-out work until you say so; work
+  on the branch continues.
+- **What is ready when you do say so:** the first two (no GPU code), cut, independently reviewed including
+  mutation testing, and fixed: `pr/midout-field-coordinate` (the field coordinate, about 570 lines) and
+  `pr/midout-cpu-ref` (the exact CPU reference, about 1,300 lines), both on the fork, one commit each. Their
+  drafted descriptions: `G2/PR1-BODY.md`, `G2/PR2-BODY.md` (to be shortened before opening).
+- **To read the design:** `../2026-11-midout-design/DESIGN.md` and the process map beside it (being written
+  on the evening of 2026-11-19; this line is updated when they exist).
 
 ## B. Production soundness
 
@@ -174,6 +178,6 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 1. Done on 2026-11-19: the first two pull requests (coordinate; CPU reference) cut from the cleaned tree,
    independently reviewed (including mutation testing) and fixed: branches `pr/midout-field-coordinate` and
    `pr/midout-cpu-ref` on the fork.
-2. Tomorrow (2026-11-20): I open those two. The device PRs follow over the next days, at most two or three
-   open at once.
+2. **Nothing is opened from this work until you say so** (your hold of 2026-11-19). Meanwhile I keep working
+   on the branch: the review's changes carried back, base 65 tuned for your card, bases 68–70, optimisation.
 3. Nothing touches the server, the fleet, or the default client's behaviour.
