@@ -411,8 +411,12 @@ Brief: `G2/BUILD-BRIEF-3A.md`; specification: the audit `G2/AUDIT-MO.md` (§1.1,
 rules. Commits: `7a9fd414` (merge of `dev/mo-audit`: the auditor's sweep, tops scan, fault switches and tests),
 `197c1e94` (accounts, `MIDOUT_STOP` out of the library, guards, sampled CPU check), `a7d3099a` (the acceptance tests),
 `46c99784` (account checks moved off the main kernel's live range, one read per group, the sampled slice's own field
-counts), `c0ad3f4a` (MAXPOP's proof, group cap). Raw logs: `G2/build3a/` (`final/` is the head's verification chain,
-`run1/` the first measurement whose main-kernel cost led to `46c99784`, `ab/` the A/B runs; scripts alongside).
+counts), `c0ad3f4a` (MAXPOP's proof, group cap). Raw logs: `G2/build3a/`: `final/` the verification chain at
+`46c99784` (`box/chain.sh`), its lint and suite at `c0ad3f4a` (`final/lint/`, `box/lint.sh`) and the per-stage A/B at
+`c0ad3f4a` (`final/stops.log`, `box/stops.sh`); `early/` the first acceptance runs at `197c1e94`'s tree; `run1/` the
+first measurement, whose main-kernel cost led to `46c99784` (stopped part-way); `ab/` the A/B pairs in between.
+Code moved to the box as bundles of the commits; between commits, uncommitted trees went over as `git diff` patches
+(each later committed on ivory and fast-forwarded on the box from a bundle).
 
 ### 10.1 Accounts: what every stage returns and what the host compares it with
 
@@ -433,7 +437,7 @@ slice, the account and the whole account vector.
 | `tdigz2`, `toprec2` | rows written (`A_TDIG`, `A_TREC`) | `tstat[0]` |
 | `hist2` | cubes done (`A_H2_CUBES`); parents certified, counted by a ballot of `m ≠ 0` apart from the list's own count (`A_H2_CERT`, per cube in shared memory) | the grid, ⌈depth-4 roots / 256⌉ = 36,323; `lcnt` (the list length the expansion copies into `stat[0]`) |
 | `scan16` | ran (`A_SCAN16`) | 1 |
-| `scatter3` | rows moved (`A_SCAT`); **children of the listed parents** (`A_SC_CHILD`: for each parent, the 64 values of digit 4 whose child mask is valid, by the main kernel's own `child_mask`) | `lcnt`; the main kernel's children (below) |
+| `scatter3` | rows moved (`A_SCAT`); **children of the listed parents** (`A_SC_CHILD`: for each parent, the units d (of 64) whose child mask is valid, by the main kernel's own `child_mask`) | `lcnt`; the main kernel's children (below) |
 | `hsort` | cubes done (`A_HSORT`) | 16,128 |
 | main kernel (`g2_kernel`) | **job instances that reached their end** (`A_JOBS`, the wide branch's `C_JOBS` per slice); probes it runs (`A_PROBES`, added once per instance before the rounds); children seen (`A_CHILD`, the existing per-job count) | the instances queued for the slice (2·classes·64 per batch, summed over the batches queued); **8 × tops** (every top is a probe of exactly one job per root, over the job's two instances); **`A_SC_CHILD`** (the last two only when every batch of the slice was queued) |
 | expansion (`expand_kernel`, per batch) | cubes done (`stat[3]`), slabs walked once per plane (`stat[4]`) | 4,096; `min(slabn, slab cap)` |
@@ -462,8 +466,8 @@ batch: slice 712012851 (`final/lvp_faults.log`).
 |---|---|---|---|
 | `F_SKIP_MAIN` (2), main kernel dropped | **silent** (survivors 0) | loud: "main-kernel job instances done: 0, want 8064" | loud (same account) |
 | `F_SKIP_TOPS` (4096), `tops1` dropped | **silent** (tops 0, survivors 0) | loud: "tops1 valid parents examined: 0, want 405593" (and `tops2` placed 219,137 stale tops from the previous slice: the account would have failed there too) | loud (same; `tops2` placed 238,813 stale tops, the same slice's from the clean run, which would have looked right) |
-| `F_DROP_PROBE` (8), each job's last probe not run | **silent** (−0.21 % survivors) | loud: "probes run = 8 x tops: 1906740, want 1910856" | loud (1906472 vs 1910504) |
-| `F_DROP_PARENT` (8192), 1 parent in 997 uncertified | **silent** (−0.20 % survivors) | loud: "parents certified (hist2) = listed: 1040898, want 1039848" | loud (1042046 vs 1040986) |
+| `F_DROP_PROBE` (8), each job's last probe not run | **silent** (−50,412 survivors, −0.21 %) | loud: "probes run = 8 x tops: 1906740, want 1910856" | loud (1906472 vs 1910504) |
+| `F_DROP_PARENT` (8192), 1 parent in 997 uncertified | **silent** (−23,963 survivors, −68,072 children) | loud: "parents certified (hist2) = listed: 1040898, want 1039848" | loud (1042046 vs 1040986) |
 | `F_PF_DROP` (1024), prefilter rejects ~1/1024 of survivors | **silent** (checked −672) | accounts still pass (no account can see it); **the sampled CPU check fails**: "device … checked 337845 …, CPU … checked 338191" | accounts pass; sampled check loud (337578 vs 337904) |
 | `F_DROP_REC`, `F_SLABCNT`, `F_SKIP_CHECK`, `F_PMAX300`, `F_POP12`, `F_SLAB_CAP`, `F_SCAP` | loud | loud (accounts unchanged) | — |
 | `F_IDX13` | loud by accident | loud by accident (the 16-bit guard checks the class size, not the read) | — |

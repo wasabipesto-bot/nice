@@ -223,6 +223,14 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   Open on it: CI, and two named tests on a real Vulkan card (ten minutes on demoux, the user's to grant or run).
   It is the only open non-draft PR, so it is the top-3 list.
 
+- **03:06 UTC: step 3A is back (EXPERIMENTS MO.5).** Every silent fault is loud; the accounts cost 2.5 % and
+  the sampled CPU slice another 0.4 %: ×3.90 against main on the 3080. An engineer reported that the harness
+  refused its kill of two sleeping wait loops an earlier agent left on the rented box; I did not kill them
+  either (the box is destroyed at the end of its use).
+- **03:15 UTC: step 3W started on the same box** (`G2/BUILD-BRIEF-3W.md`, hard stop 06:00, the box dies at
+  06:40): merge `dev/mo-wide` into the trunk, port the accounts and guards to the wide kernels with their
+  fault tests, then the prefilter, top hierarchy and expansion, then base 65 again.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

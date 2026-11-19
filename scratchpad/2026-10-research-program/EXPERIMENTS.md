@@ -5,6 +5,36 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## MO.5 Accounts that prove the work ran (step 3A): every fault the audit showed silent is now loud; cost +2.5 % (2026-11-19 01:25–03:06 UTC, engineer; `G2/BUILD-BRIEF-3A.md`, `G2/BUILD-NOTES.md` §1 and §10, `G2/build3a/`; trunk `dev/middle-out-join` 91ac0761 → c0ad3f4a (merge of dev/mo-audit 7a9fd414, then 197c1e94, a7d3099a, 46c99784, c0ad3f4a; on the fork); box 61286074, RTX 3080 at 240 W)
+
+- **Now loud** [M, test `accounts_faults_are_loud`, on CUDA (two slice sets) and lavapipe at 8 lanes through
+  SPIR-V]: dropped main kernel ("main-kernel job instances done: 0, want 8064"); dropped tops ("tops1 valid
+  parents examined: 0, want 405593"); a dropped probe ("probes run = 8 x tops: 1906740, want 1910856"); a
+  dropped parent ("parents certified (hist2) = listed"); an over-strict prefilter through the sampled CPU check
+  (checked 337,845 against 338,191). Everything that was loud before still is.
+- **The two reproductions** [M]: a failed device allocation (in-process with 9,216 MiB filled, and a helper
+  process holding 7,680 MiB): both slices now fail with "expansion ran 0 of 4096 cubes"; `MIDOUT_STOP` in the
+  environment: ignored by the library (the slice gives its full 11,768,560 survivors), and a timing stop set
+  through the bench-only call makes `search_field` refuse.
+- **Still visible only to the sampled check:** a kernel that does all its work but computes wrongly (a wrong
+  certificate, `parent()` mask, child mask, common-mask skip, segment table, or prefilter). Visible to nothing:
+  a defect the CPU reference shares; the 64-lane paths (never run on the library path).
+- **Cost** [M, one session]: ten fields 1.6505 fs before (the evening's 1.647 repeated) → 1.6911 fs with the
+  accounts (+2.5 %, ×3.91 against main's 6.615) and 1.6980 fs with the sampled CPU check as well (+2.9 %,
+  ×3.90); survivors and checked equal field for field. Per slice 7.714 → 7.891 ms. The sampled check uses one
+  host core for about 27 of a field's 30.6 s and never made the host wait. A first version cost 0.55 ms per
+  slice (checks at the kernel's end); once per job before the rounds fixed it.
+- **Guards in:** 16-bit class index, 20-bit top index, bounded child list, plane check in the preparation,
+  slice count from the device, nice numbers checked to lie in the field, groups capped at 256, MAXPOP's proof
+  written at the constant.
+- **Left from the audit:** a panic hook that aborts after a runtime-thread panic (belongs to the client route);
+  reading back large buffers at start (the accounts catch that failure at the first group); the 64-lane parity
+  run; lavapipe at 16 lanes; tops accounts on the host-tops path; the wide kernels.
+- **Other checks** [M]: a 100-slice subset of the sweep equal; parity on 5 slices, host-tops path, a part
+  slice, probe mode, lavapipe on 2 slices; production's 214 tests; fmt and clippy clean.
+- **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
+  recomputed on the CPU.
+
 ## SRA.2 Review of the stride fix, its fixes, and PR #270 (2026-11-19 01:30–03:10 UTC, independent reviewer then the author; `SRA/REVIEW-BRIEF.md`, `SRA/REVIEW.md`, `SRA/raw/review/`, `SRA/RESULTS.md` "After review", `SRA/PR-BODY.md`; branch `pr/stride-ran-account` 0f3a4542 + changelog link 05f18331; https://github.com/wasabipesto/nice/pull/270; box 61303619, destroyed 03:10 after 8.2 h)
 
 - **Verdict: merge with fixes; no defect found in the code.** The reviewer ran everything on its own clones:
