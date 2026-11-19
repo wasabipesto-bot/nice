@@ -12,8 +12,8 @@
 //! v = start + key·(H·b^k0) + (h − h0)·b^k0 + low
 //! ```
 //!
-//! with `h0 = start div b^k1` and `H = (end − 1) div b^k1 − h0 + 1`, the
-//! number of values `h` takes. `v` moves the digits `[k0, k1)` of `n` above
+//! with `h0 = start div b^k1` and `H = (end − 1) div b^k1 − h0 + 1` (`hn`
+//! in the code), the number of values `h` takes. `v` moves the digits `[k0, k1)` of `n` above
 //! all the others and keeps the rest in their order. It is one to one from
 //! the range into `[start, start + H·b^k1)`.
 //!
@@ -54,7 +54,7 @@
 //!
 //! # Slices
 //!
-//! The search works on *slices*: at base 64, the `2^46` numbers that share
+//! The search works on *slices*: at base 64, the `2^45` numbers that share
 //! one value of digits 4–8. A field fixes digits 5–7 only, so every slice
 //! lies in exactly one field and a field of one quantum is exactly 4,096
 //! whole slices (every value of digit 4 times every value of digit 8). Any
@@ -62,9 +62,10 @@
 //! digit of `n` on one side or the other, so it can restrict itself to a
 //! field by its fixed digits alone; and a search by slices is free in its
 //! shape, its order and its grouping of slices inside a field. Leaving
-//! digits 4 and 8 free lets neighbouring slices of a field share work:
-//! slices that differ only in digit 4 share their tops, and slices that
-//! differ only in digit 8 share part of their bottoms' preparation.
+//! digits 4 and 8 free lets neighbouring slices of a field share
+//! preparation: slices that differ only in digit 4 have the same digits
+//! above it (the tops' side), and slices that differ only in digit 8 the
+//! same digits below it (the bottoms' side).
 //!
 //! No server stores this coordinate or its fields; nothing here proposes a
 //! field row, a claim format or an API.
@@ -236,7 +237,7 @@ impl Coord {
         Ok(t0..t0 + v_size / q)
     }
 
-    /// How many `n` of the range a field holds (its `range_size`).
+    /// How many `n` of the range a field holds (`v_size` less the padding).
     ///
     /// # Errors
     /// As [`Coord::field_digits`].
