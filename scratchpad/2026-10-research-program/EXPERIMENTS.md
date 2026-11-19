@@ -35,6 +35,25 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.14 The first two pull requests cut from the cleaned tree (step 7P; 2026-11-19 15:05–16:00 UTC, engineer; `G2/BUILD-BRIEF-7P.md`, `G2/PR12-NOTES.md`, `G2/PR1-BODY.md`, `G2/PR2-BODY.md`, `G2/build7p/`; branches on the fork, not opened: `pr/midout-coordinate` cf27bc89 (on upstream 974d7194), `pr/midout-cpu-reference` 06d55495 (stacked); box 61441981)
+
+- **PR 1, the field coordinate** (520 lines: `midout/coord.rs` 502 of which 213 are tests, `mod.rs` 17, one `pub mod`
+  line): six CPU tests, 0.18 s in release. Only the coordinate that fixes digits 5–7.
+- **PR 2, the CPU reference** (1,157 lines: `cpu.rs` 941 of which 183 tests, `arith.rs` 138, `mask.rs` 65): the ten
+  midout tests take 13.3 s in release (CI's form) and 66–67 s in debug (`just test`), mostly base 25.
+- **Both heads** [M, on the box]: `just lint`'s three commands clean; CI's workspace test command passes (nice_common
+  lib 213 and 217); the `gpu` feature's lib tests pass (267 and 271). No features, dependencies, ignored tests,
+  dead-code allowances or changelog line.
+- **A test gap in the cleaned tree, found and fixed** [M]: the brute-force test counted `checked` with the
+  reference's own prefilter, so a wrong prefilter rule passed it (shown: a prefilter that ignores the top's
+  digits passes on the pre-fix head). A direct recomputation from the full digits of n² and n³ now fails that
+  fault. Two other one-line faults fail before and after.
+- **Changes against the cleaned tree to carry back** (`PR12-NOTES.md` §2): the coordinate module's docs still gave
+  the old definition's formula (rewritten); `coord_digits_known` → `coord_digits`; ten module-wide lint allowances
+  replaced by two narrow ones; the box-only staged test, `Shape::label` and `Mask::low64` left out.
+- **Review:** an independent reviewer started 16:10 UTC (`G2/PR12-REVIEW-BRIEF.md`, the same box, to 17:40): the
+  diffs read cold, the reference against production's CPU search and by mutation, the descriptions.
+
 ## MO.13 The branch cleaned for review: seven must-fix items done; exactness and speed unchanged (step 6C; 2026-11-19 12:15–14:52 UTC, engineer; `G2/BUILD-BRIEF-6C.md`, `G2/CLEAN-NOTES.md`, `G2/build6c/`; branch `dev/mo-clean` 5a048669, 14 commits on the trunk's 66259bb0, on the fork; box 61441981, RTX 3080 at 240 W)
 
 - **M3** (prototype switches out of the narrow main kernel): eight fixed comptime switches, their dead branches and

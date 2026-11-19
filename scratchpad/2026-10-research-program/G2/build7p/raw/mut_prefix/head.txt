@@ -1,0 +1,15 @@
+294abe9 Merge branch 'pr/midout-coordinate' into pr/midout-cpu-reference
+diff --git a/common/src/midout/cpu.rs b/common/src/midout/cpu.rs
+index 3b4c5aa..06baa02 100644
+--- a/common/src/midout/cpu.rs
++++ b/common/src/midout/cpu.rs
+@@ -233,7 +233,7 @@ pub fn prefilter<M: Mask>(base: &Base, k: u32, n: u128, mhi: M) -> bool {
+             #[allow(clippy::cast_possible_truncation)]
+             let bit = M::bit((x % b) as u32);
+             x /= b;
+-            if !(seen & bit).is_zero() || (j >= k && !(mhi & bit).is_zero()) {
++            if !(seen & bit).is_zero() {
+                 return false;
+             }
+             seen |= bit;
+rc=0

@@ -120,6 +120,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   alone, with descriptions; not opened. An independent review follows; I open them tomorrow unless the user's
   answers to `DECISIONS.md` say otherwise (D1, D2, D8, D9 defaults).
 
+- **16:00 UTC: the first two PR branches are cut (EXPERIMENTS MO.14)**: the coordinate (520 lines) and the CPU
+  reference (1,157 lines), each standing alone with lint and suite clean. The cut found a real gap: the
+  brute-force test checked the prefilter against itself; fixed with a direct recomputation. **16:10 UTC: an
+  independent review of both started** on the same box (to 17:40). I open them tomorrow morning if the review
+  leaves nothing to fix and the user has not said otherwise.
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);
