@@ -35,6 +35,37 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.7 The library path prepared offline for the RX 9070 XT: clean at 64 lanes as far as can be told; predicted ×4.69 (step 4S; 2026-11-19 05:50–07:55 UTC, engineer, ivory only; `G2/BUILD-BRIEF-4S.md`, `G2/BUILD-NOTES.md` §12, `G2/WINDOW-PLAN-2.md`, `G2/build4s/` (SPIR-V and ACO listings, `preflight_*.md`, `model_4s.py`, exactness logs, the window driver and its dry run, a bundle); trunk 4abfab5c → 9b790647, seven commits, on the fork)
+
+- **Pre-flight at 64 lanes** [M, static]: every library kernel compiled for plane width 64 without a device
+  (`MIDOUT_FORCE_W=64` through a test-only `with_width`), run through `spirv-val` and through ACO for GFX1201
+  (Mesa 26.0.8 RADV on drm-shim): 14 narrow kernels including production's check, 12 of 13 wide kernels at b65.
+  No spills, no scratch, all wave64 except the 32-thread done kernels; the main kernel has the tuned prototype's
+  shape (120 VGPRs, 21,504 B shared memory, 12 waves). `spirv-val` passes with two features RADV has, except
+  for a duplicate ArrayStride decoration CubeCL emits in `scatter3` / `wscatter`, which lavapipe and RADV's
+  front end accept. Code reading found no plane-width or lane-0 assumption that 8 or 32 lanes would have hidden.
+  The wide kernel's ballot rows have never run at 64 anywhere. The one risk only the card can settle: RADV
+  choosing wave32 (the plane checks and accounts would catch it).
+- **Model** [P]: slice 4.17–4.80 ms, 1.00 fs per admissible n, **×4.69 against the card's main (4.707 fs), band
+  ×4.38–5.04**; the main kernel binds (3.09–3.35 ms, 72 %), then preparation 0.48–0.52, expansion 0.43–0.56,
+  tops 0.12–0.24, check 0.04–0.08. The same model gave ×4.32 before this step's changes.
+- **Changes**, each exact first on lavapipe at 8 lanes (two-slice parity n for n and the fault test) [M counts]:
+  `scatter3`'s children count in 32-bit operations (1,317 → 956 VALU cycles); the expansion's prefilter in one
+  loop over both records of a take (4.55 → 3.68 rounds per take); on the SPIR-V path one-hot digits by 64-bit
+  shifts and the prefilter in 24-bit limbs (290 → 197 cycles per round); CUDA keeps its measured form. Also a
+  defect fixed: a `cubecl-spirv`-only test build did not compile. New `search_field_part` / `time_field_part`
+  and `--slices K` for dry runs; `search_field` and `FieldOutcome` unchanged.
+- **Checks at the head** [M]: lavapipe parity on six narrow slices, the fault test, wide parity at b40 and b65
+  and the wide fault test; production's 214 tests; fmt and clippy clean. **None of the changes has run on
+  CUDA** (the client-route engineer runs the device tests and the ten-field timing at the merged head today).
+  Release builds on ivory needed LTO off (fat LTO was OOM-killed on 7 GB).
+- **Window plan** (`WINDOW-PLAN-2.md`; driver dry-run end to end on lavapipe): build beforehand; exactness at 64
+  lanes first (six b64 slices, the wide path at b65, the fault test; about 4 minutes; any failure stops it);
+  two rounds of five whole b64 fields around main's bracket fields 2 and 6 in one session, the stage profile
+  and the sampled check's cost; about 20 of 45 minutes; stop line ×4.0.
+- **Not done** (about 1 % each or needing the card first): four records per lane in the expansion; tops in
+  32-bit limbs; u16 child lists; the wide kernel's shared memory (3 KB over the 12-wave threshold).
+
 ## SRA.4 The hand-written CUDA backend under an allocation failure: no false empty found (2026-11-19 05:47–07:20 UTC, engineer; `SRA/HC-BRIEF.md`, `SRA/HC-RESULTS.md`, `SRA/raw/hc/`; box 61386568, RTX 3080 20 GB at 220 W, driver 580.126.09, destroyed after the run; clients v3.4.5 (auto backend) and upstream main 71eb5fc (`--gpu-backend cuda`, `NICE_JOIN_ROUTE=stride`), local stub only, production hosts blocked and proven)
 
 - **Code** [read, v3.4.5 and main]: every device call ends in `?` (context creation, NVRTC and module load,

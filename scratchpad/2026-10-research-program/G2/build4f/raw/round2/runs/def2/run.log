@@ -1,0 +1,15 @@
+nice_trunk a (niceonly --gpu): rc=0
+nice_trunk b (niceonly --gpu): rc=0
+nice_trunk c (niceonly --threads 4): rc=0
+nice_trunk d (detailed --threads 4): rc=1
+nice_trunk e (detailed --gpu): rc=1
+nice_mo a (niceonly --gpu): rc=0
+nice_mo b (niceonly --gpu): rc=0
+nice_mo c (niceonly --threads 4): rc=0
+nice_mo d (detailed --threads 4): rc=1
+nice_mo e (detailed --gpu): rc=1
+COMPARE a EQUAL {'claim': 910201, 'nice': [], 'dist': None, 'route': 'stride', 'surv': None, 'checked': None, 'valid': 0} 
+COMPARE b EQUAL {'claim': 910301, 'nice': [], 'dist': None, 'route': 'join', 'surv': 609926573, 'checked': 37752816, 'valid': 37752816} 
+COMPARE c EQUAL {'claim': 1, 'nice': [{'number': 69, 'num_uniques': 10}], 'dist': None, 'route': 'stride', 'surv': None, 'checked': None, 'valid': None} 
+COMPARE d DIFFER None 
+COMPARE e DIFFER None 

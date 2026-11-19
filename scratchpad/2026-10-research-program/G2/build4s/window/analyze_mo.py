@@ -10,9 +10,9 @@ OUT = sys.argv[1]
 BASE = float(sys.argv[2]) if len(sys.argv) > 2 else 4.707
 MORNING = {'main_f2': 90.83, 'main_f6': 100.41}
 # the step-4S model's bands per slice (ms, G2/build4s/model_4s.py --tag=head), cumulative stops
-MODEL = {'tops (1)': (0.12, 0.24), 'parents (2-1)': (0.47, 0.52), 'main kernel (3-2)': (3.18, 3.35),
-         'expansion (5-3)': (0.53, 0.69), 'check and the rest (6-5)': (0.06, 0.13)}
-MODEL_SLICE = (4.36, 4.93)
+MODEL = {'tops (1)': (0.12, 0.24), 'parents (2-1)': (0.48, 0.52), 'main kernel (3-2)': (3.09, 3.35),
+         'expansion (5-3)': (0.43, 0.56), 'check and the rest (6-5)': (0.055, 0.13)}
+MODEL_SLICE = (4.17, 4.80)
 
 def log(n):
     p = os.path.join(OUT, n + '.log')
@@ -79,14 +79,16 @@ if g2:
 print('\n## Stage profile, field 77777 (ms per slice = s per field / 4,096; cumulative stops)')
 cum = {}
 for s_ in (1, 2, 3, 5, 6):
+    t = log(f's_{s_}') or ''
+    k = re.search(r'slices per field Some\((\d+)\)', t)
+    nsl = int(k.group(1)) if k else 4096   # a dry run's --slices K
     f = [x for x in (fields(f's_{s_}') or []) if x[0] == 77777]
     if not f:
-        t = log(f's_{s_}') or ''
         m = re.search(r'FIELD t 77777 timing stop \d+: ([0-9.]+) s', t)
         if m:
-            cum[s_] = float(m.group(1)) / 4096 * 1e3
+            cum[s_] = float(m.group(1)) / nsl * 1e3
     else:
-        cum[s_] = f[0][1] / 4096 * 1e3
+        cum[s_] = f[0][1] / nsl * 1e3
 prev = {2: 1, 3: 2, 5: 3, 6: 5}
 names = {1: 'tops (1)', 2: 'parents (2-1)', 3: 'main kernel (3-2)', 5: 'expansion (5-3)', 6: 'check and the rest (6-5)'}
 for s_ in (1, 2, 3, 5, 6):
@@ -108,6 +110,6 @@ if t:
 
 if g2:
     r = base / g2
-    print('\nOUTCOME: ' + ('T1 (>= x4.0: the library path keeps the prototype\'s promise on the card)' if r >= 4.0 else
-                          'T2 (x3.5-4.0: read the stage profile for the stage above its band)' if r >= 3.5 else
-                          'T3 (< x3.5: stop and report; the stage profile names what binds)'))
+    print('\nOUTCOME: ' + ('T1 (>= x4.38, the model\'s band or above)' if r >= 4.38 else
+                          'T2 (x4.0-4.38: below the band, above the 3080\'s x3.9: the stage above its band names the next piece)' if r >= 4.0 else
+                          'T3 (< x4.0: the library path loses more on the card than on CUDA: stop and report the stage profile)'))

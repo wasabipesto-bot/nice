@@ -48,6 +48,14 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   propagates and 88 squeezed runs produced no false empty; box 61386568 destroyed. With the census, the stride
   defect has no known effect on any production result.
 
+- **07:55 UTC: step 4S is back (EXPERIMENTS MO.7).** Every library kernel compiles and validates at 64 lanes
+  for the card, with no hidden plane-width assumption found; predicted ×4.69 (×4.38–5.04) against the card's
+  main; three kernel changes proven on lavapipe only; the window driver dry-run. Trunk 9b790647. The
+  client-route engineer was asked to run the trunk's device tests and the ten-field timing on CUDA at its
+  merged head, since none of 4S's changes has run there.
+- **The window is ready** (`G2/WINDOW-PLAN-2.md`): about 20 of 45 minutes, exactness at 64 lanes first, plus
+  PR #270's two tests. It needs the user's word (decision 15, asked this morning).
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);

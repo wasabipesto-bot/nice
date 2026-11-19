@@ -1,4 +1,4 @@
-# The middle-out join, build day 1 (2026-11-18, 16:43–22:30 UTC), step 2A (19:05–23:45 UTC), step 3A (2026-11-19, 01:25–05:15 UTC) and step 3W (03:07–06:00 UTC)
+# The middle-out join, build day 1 (2026-11-18, 16:43–22:30 UTC), step 2A (19:05–23:45 UTC), step 3A (2026-11-19, 01:25–05:15 UTC), step 3W (03:07–06:00 UTC) and step 4S (05:45–11:30 UTC, ivory only)
 
 Briefs: `G2/BUILD-BRIEF-1.md` (day one), `G2/BUILD-BRIEF-2A.md` (step 2A: pieces B, A, C of §7), `G2/BUILD-BRIEF-3A.md`
 (step 3A: accounts that prove the work ran, from the audit `G2/AUDIT-MO.md`). Branch
@@ -6,9 +6,34 @@ Briefs: `G2/BUILD-BRIEF-1.md` (day one), `G2/BUILD-BRIEF-2A.md` (step 2A: pieces
 fork only. Box: Vast 61286074, RTX 3080 at the host's 240 W cap, i9-9900 with a **5.12-CPU cgroup quota** (16 threads
 visible), CUDA 12.8 image, Mesa 25.2.8 lavapipe. Box scripts and raw logs: day one `G2/build1/box/`, `G2/build1/raw/`;
 step 2A `G2/build2a/box/`, `G2/build2a/raw/`; step 3A `G2/build3a/`. Step 2A's account is §9; step 3A's is §10
-(the accounts, the fault switches before and after, the cost, its tests in §10.7); step 3W's (`G2/BUILD-BRIEF-3W.md`: the merge of the wide branch, its accounts and speed work, the base-65 number) is §11, raw logs `G2/build3w/`; section 1 is current for it.
+(the accounts, the fault switches before and after, the cost, its tests in §10.7); step 3W's (`G2/BUILD-BRIEF-3W.md`: the merge of the wide branch, its accounts and speed work, the base-65 number) is §11, raw logs `G2/build3w/`; step 4S's (`G2/BUILD-BRIEF-4S.md`: the library path at 64 lanes for the RX 9070 XT, offline) is §12, raw listings `G2/build4s/`, its window plan `G2/WINDOW-PLAN-2.md`; section 1 is current for it.
 
 ## 1. Where it stands (kept current)
+
+**Interface note for `dev/mo-client` (step 4S): `search_field`'s signature, `FieldOutcome`, `GpuOptions`, `Caps` and
+`GpuJoin::new` are unchanged.** Added beside them: `search_field_part` / `time_field_part` (a field's first K slices;
+benches and dry runs) and crate-internal `GpuJoin::with_width` / `WideJoin::with_width` (tests). Nothing to adapt.
+
+**2026-11-19 ~08:00 UTC, end of step 4S (ivory only; nothing ran on a card).** Head **`9b790647`** on ivory and
+`fork/dev/middle-out-join` (seven commits since `4abfab5c`, §12):
+
+- **The library path compiles at 64 lanes for the RX 9070 XT** [M, offline]: every kernel of both device paths (14
+  narrow incl. production's check, 12 of the 13 wide; the 13th, `wdone`, is two atomic adds) dumped as W 64 SPIR-V (`MIDOUT_FORCE_W=64` on lavapipe), validated,
+  and compiled by ACO (Mesa 26.0.8 RADV, GFX1201, drm-shim): no spills, no scratch, all wave64 but the two
+  one-thread kernels; the main kernel is the tuned prototype's shape (120 VGPRs, 21,504 B LDS, 12 waves). The code
+  reading found no plane-width or lane-0 assumption that 8 and 32 lanes would have hidden (§12.2). **As far as can
+  be told offline, the library path can run at 64 lanes.** Not proven until it runs there (WINDOW-PLAN-2 step 1).
+- **Predicted on the card [P]: 1.00 fs per admissible n, ×4.69 against main (×4.38–5.04)**; the main kernel binds
+  (3.1–3.35 of 4.2–4.8 ms per slice), then preparation, expansion, tops. Before this step's tuning the same model gave
+  ×4.32 (×4.02–4.66) (§12.3).
+- **Tuned for the card, each exact first on lavapipe W 8** (§12.4): scatter3's children count in 32-bit operations;
+  the expansion's prefilter in one loop over both records of a take; on the SPIR-V path the prefilter in 24-bit limbs
+  with 64-bit one-hot digits (CUDA keeps its measured form). The expansion's prefilter loop 290 → 197 VALU cycles per
+  wave-iteration and 4.6 → 3.7 iterations per take.
+- **Also:** a `--features cubecl-spirv`-only test build now compiles (it did not: the audit's CUDA items); the bench
+  takes `--slices K`; the window driver for the library path (`G2/build4s/window/`) dry-ran on lavapipe.
+- *Steps 3W, 3A and 2A's accounts below (§9–§11) are unchanged and still true. §1's text from step 3W follows.*
+
 
 **2026-11-19 ~05:00 UTC, end of step 3W: one trunk.** Branch head **`4abfab5c`** on ivory and on
 `fork/dev/middle-out-join`. `dev/mo-wide` is merged (`23ce3cf6`); there is no other live branch of the join. Still
@@ -731,3 +756,195 @@ children count in `wscatter` (65 `child_w` with two `% b` per parent).
 The b65 number of §11.4 was measured with `port2/`'s bench binary (same production code path as the head; the
 differences above are not reachable without a fault bit). Nothing of this step's ran on another machine; the box was
 left with no process of this step running.
+
+## 12. Step 4S: the library path made ready for the RX 9070 XT, offline (2026-11-19, 05:45–11:30 UTC, ivory only)
+
+Brief: `G2/BUILD-BRIEF-4S.md` (rules of `BUILD-BRIEF-1.md`). Nothing here ran on a card: **[M]** = measured on
+ivory (ACO instruction counts, Mesa 26.0.8 RADV for GFX1201 on the amdgpu drm-shim in container `g2mesa`;
+spirv-val; exactness on lavapipe 26.0.8, container `lvp26`, W 8, SPIR-V); **[P]** = predicted, every time on the
+card. Commits on `dev/middle-out-join` after `4abfab5c`: `448f313c` (width override, SPIR-V-only test build),
+`2e1301d4` (scatter3), `1a5e8262` (one prefilter loop), `026e9edc` (64-bit one-hot digits), `89125d2b` (partial
+fields, `--slices`), `e34e4df7` (24-bit limbs), `9b790647` (`expansion_bits_profile`, a diagnostic test). Raw: `G2/build4s/` — `spv/<tag>_{narrow,wide,hosttops}/` (each
+kernel's `.spv`, `.spvasm`, CubeCL IR, spirv-val verdict `.val`, ACO listing `.aco.txt`), `preflight_<tag>.md`
+(the tables), `ex/<tag>/` (exactness logs), `model_4s.py` + `model_{base,head}.txt`, `box/` (scripts),
+`window/` (the window driver), `raw/` (builds, suite, dry run).
+
+### 12.1 How the 64-lane SPIR-V is made without the card (tools, `G2/build4s/box/`)
+
+- **`GpuJoin::with_width` / `WideJoin::with_width`** (crate-internal; `new` calls them with `None`) compile every
+  kernel for a forced plane width; the parity tests take `MIDOUT_FORCE_W`, run the device part once, print
+  `COMPILE-ONLY … Err(…plane N…)` (the kernels' plane checks fire, as they must on 8-lane planes) and skip the CPU
+  part. `dump.sh TAG BIN narrow|wide|hosttops` runs that on lavapipe W 8 with `CUBECL_DEBUG_SPIRV`, then spirv-val
+  (Vulkan 1.3) and `aco/aco.sh` (`pipec` through RADV's real front end and ACO). Every module of the device-tops
+  path appears (14), the wide path at b65 (12; that run was killed, rc 137, while a build ran beside it on this 7 GB machine, after the last batch and before `wdone`),
+  and the host-tops path's two extra kernels.
+- The port's other route, `LP_NATIVE_VECTOR_WIDTH=2048` (lavapipe reports 64 lanes itself), **crashed lavapipe**
+  ("stack smashing detected" in its 2048-bit JIT, running the preparation): not usable for the library.
+- `preflight.py` turns a dump into the table below (`aco/loops.py`'s classes: valu, q = quarter-rate multiplies,
+  v64 = 64-bit VALU, vcyc = valu + 4q + 2·v64 per wave-iteration). `ex.sh TAG BIN` is the exactness set of every
+  change (§12.6). `model_4s.py` is the model of §12.3.
+- **Builds on ivory** (7 GB, 4 cores): the release profile's fat LTO was OOM-killed linking `tracel-rspirv`, so every
+  build here used `CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16` (host code only: CubeCL
+  builds the kernels at run time from the same IR, so the SPIR-V is the same); `-j 2`, `nice -n 19`, one target
+  directory `midout/target` (2.0 GB). The window builds with the repository's profile on demoux.
+- **A defect found on the way (`448f313c`):** `cargo test --features cubecl-spirv` (without `cubecl-cuda`) did not
+  compile (the audit's CUDA client); every earlier build had both features. Fixed by gating the audit's CUDA-only
+  tests and helpers.
+
+### 12.2 The pre-flight at the head (W 64, GFX1201) [M]
+
+Narrow path (`build4s/preflight_c4.md`); waves per SIMD in ACO's unit (wave32 slots: 12 = six wave64).
+
+| kernel | wave | VGPRs | LDS B | waves/SIMD | instr | loop of interest: vcyc per wave-iteration (valu / q / v64) | spirv-val |
+|---|---|---|---|---|---|---|---|
+| `g2_kernel` (main) | 64 | 120 | 21,504 | 12 | 2,131 | phase 1 62 (52/0/5); 3b 171 (171/0/0), 39 LDS; whole 815 — the tuned prototype's 58 and 169 plus the child-list store and the top index | ok |
+| `hist2` | 64 | 48 | 1,024 | 32 | 364 | whole 251 (141/14/27) | ok* |
+| `scan16` | 64 | 24 | 4,096 | 32 | 529 | one cube of 1,024, 21 barriers | ok |
+| `scatter3` | 64 | 48 | 1,024 | 32 | 1,368 | whole 956 (956/0/0); was 1,317 (803/0/257) | dup. decoration† |
+| `hsort` | 64 | 12 | 16,384 | 16 | 220 | rank loop 9 | ok |
+| `tops5` (per 64 slices) | 64 | 48 | 0 | 32 | 1,997 | whole 1,476 (808/88/158) | ok |
+| `tops1` | 64 | 48 | 0 | 32 | 2,277 | grid-stride loop 1,657 (979/90/159) | ok* |
+| `tscan` | 64 | 12 | 4,096 | 32 | 245 | one cube of 1,024 | ok |
+| `tops2`, `toprec2` | 64 | 48, 12 | 0 | 32 | 99, 52 | 26, 16 | ok |
+| `tdigz2` | 64 | 48 | 0 | 32 | 661 | whole 457 (417/0/20) | ok |
+| `expand_kernel` | 64 | 48 | 0 | 32 | 584 | prefilter loop 197 (149/0/24); was 290 (228/15/1); per take 325 | ok |
+| `check_kernel` (production) | 64 | 48 | 0 | 32 | 1,037 | 1,118 (474/116/90) | ok |
+| `done_kernel` | 32 | 24 | 0 | 16 | 14 | — | ok |
+
+Wide path at b65 (`build4s/preflight_base.md`, unchanged by this step): `wide_kernel` **192 VGPRs, 24,576 B LDS,
+8 waves** (the narrow kernel's 12 need ≤ 21,504 B: the wide one is 3,072 B over, of which the 18-digit probes' fifth
+word `prob_e` is 2,304 B and the 67-row slices 256 B; ACO then raises VGPRs to the 8-wave budget); `wexpand` 60
+VGPRs, 24 waves, its prefilter loop **1,193 vcyc** (527/142/49: digit by digit with `% b`, §11.5 item 1); `wtops1`
+72 VGPRs, 20 waves, 3,047 vcyc; `wcheck` 1,817; the rest 12–48 VGPRs, 16–32 waves. No spills, no scratch anywhere.
+
+**spirv-val** (`--target-env vulkan1.3`): every module needs `--uniform-buffer-standard-layout` (CubeCL's info block
+has 4-byte array strides: core Vulkan 1.2, RADV has it); `hist2`, `tops1`, `whist`, `wtops1` and `wcheck` need
+`--allow-vulkan-32-bit-bitwise` (64-bit `OpBitCount`, legal with VK_KHR_maintenance9; the prototype's `hist` used it
+on this card exactly); with both, all pass except **`scatter3` and `wscatter`: "decorated with ArrayStride multiple
+times"** (†: cubecl-spirv emits the same `ArrayStride 4` twice when the shared counter array's type `uint[2]` equals a
+member type of the info block). RADV's front end (pipec → `spirv_to_nir` → ACO) and lavapipe accept it, and the 3080
+never saw SPIR-V; it is cosmetic for RADV but worth an upstream note (not filed).
+
+**Code reading for plane-width and lane-0 assumptions** (every kernel of `gpu.rs` and `gpu_wide.rs`):
+
+- Comptime `w` with a run-time check: `g2_kernel`, `wide_kernel`, `hist2`, `whist`, `wtops5` (`PLANE_DIM == w` and
+  `UNIT_POS % w == UNIT_POS_PLANE`, counted into `C_ERR_PLANE` / `A_ERR_PLANE`, fatal for the field). Their W 64
+  branches: the ballot's second word in ranks and counts (`bm[1]`, `rhi`), the transpose's j = 32 stage and
+  two-word stores, the common masks' two `fetch_and` — **all identical to the prototype's, which ran exact at 64
+  lanes on this card** (WINDOW-RESULTS). New since: the wide kernel's ballot rows for digits 64..b at W 64
+  (`gpu_wide.rs` ~578: `sl[row] = bal[0]`, `sl[row+1] = bal[1]`, `eq` on both words) — read and correct, never run
+  at 64 lanes anywhere (WINDOW-PLAN-2 step 1 runs it, b65).
+- Run-time `PLANE_DIM` only: `expand_kernel`/`wexpand` (planes per cube, the plane's slab stride, takes of 2·W
+  records), `scatter3`, `tops1/2`, `tdigz2`, `toprec2`, `wscatter`, `wtops1/2`, `wtdigz` (plane sums with a lane-0
+  add). Correct for any width; a partly filled plane or one without lane 0 under-counts its account and fails the
+  field (§10.1), which is the check a wave32 run of these would need. No kernel assumes 32 lanes (no `u32` ballot
+  without its second word, no `& 31` lane masks, no shuffle offsets ≥ 32 except the transpose's j = 32 under `w == 64`).
+- One-thread kernels with 32 threads (`done_kernel`, `wdone`): no plane operation; RADV makes them wave32.
+- 1,024-thread cubes (`scan16`, `tscan`, `wscan`): 16 waves at W 64, barriers only; fine.
+- Host side: slab capacities use the join's `w` (`jobs × NT/w` plane-private slabs: fewer, fuller slabs at 64);
+  `ballot_append(w)` for production's check; the expansion's grid (4,096 cubes) and slab walk do not depend on W.
+- What 8 and 32 lanes would not have shown, and nothing offline can: **RADV choosing wave32** for a kernel whose
+  plane operations want 64 (pipec, with RADV's default pipeline flags, compiled every plane-op kernel as wave64, as
+  the prototype ran). If the card does otherwise, the five comptime-`w` kernels say so (plane errors) and the others'
+  accounts fail; WINDOW-PLAN-2's E1 branch then runs the W 32 path (`MIDOUT_FORCE_W=32`).
+
+**Verdict:** as far as can be told offline, the library path runs at 64 lanes: it compiles and validates for
+GFX1201 at W 64 with the prototype kernel's resources, and the only W 64-specific code not yet run on this card is
+the wide kernel's ballot rows, which the window's step 1 covers.
+
+### 12.3 The model of a slice on the card [P] (`build4s/model_4s.py`, `model_{base,head}.txt`)
+
+Method of `TUNE-RESULTS.md`: per stage, ACO's VALU cycles per wave-iteration × the slice's dynamic counts, wave64 in
+two passes on 128 SIMD32 at the card's operating point under G2 (2.85 GHz at the 304 W cap, measured), divided by an
+efficiency (0.77 = the prototype kernel's measured 3.04 ms against its 2.34 ms issue bound) — and anchored on what
+the card measured for the prototype (kernel 3.035 ms, preparation 0.425 ms, pipelined) and on the 3080's measured
+stage times for this path (§10.6) scaled by the two cards' integer issue rates (card / 3080 = 1.72). Each stage is a
+band [low, high]; slice 712012851's counts (10.93M records, 11.77M survivors, 1.04M parents, 406k valid parents).
+
+| stage (per slice) | before (`4abfab5c`) | head (`e34e4df7`) | basis |
+|---|---|---|---|
+| tops (6 kernels; `tops5` per 64 slices) | 0.12–0.24 | 0.12–0.24 | issue (tops1 6,341 wave-iterations × 1,657) + one-cube scan + launches / the 3080's 0.413 ÷ 1.72 |
+| parents (`hist2`, `scan16`, `scatter3`, `hsort`) | 0.51–0.55 | 0.48–0.52 | the prototype's measured preparation, hist2 +10 %, scatter3's children count by issue |
+| main kernel | 3.09–3.35 | 3.09–3.35 | prototype measured 3.035 + child lists (135 MB of writes: 0.03 if hidden under the kernel's ~45 GB/s, 0.25 at 550 GB/s) + accounts |
+| expansion + prefilter | 0.74–0.96 | **0.43–0.56** | issue per take × 93k takes (E[max] survivor bits over 64 lanes, measured histogram: 4.55 → 3.68 per take) / 1.0–0.77; floor 0.27 (175 MB of records) |
+| check (production) | 0.04–0.08 | 0.04–0.08 | issue (5,280 waves × 1,118) / the 3080's 0.144 ÷ 1.72 |
+| done, small uploads, group sync | 0.02–0.05 | 0.02–0.05 | 7 tiny creates per slice; 0.12 ms sync per 16 slices |
+| **slice** | **4.51–5.23 (mid 4.87)** | **4.17–4.80 (mid 4.49)** | |
+| fs per admissible n | 1.01–1.17 (1.09) | **0.93–1.08 (1.00)** | 4.4679e12 admissible n per slice |
+| **ratio against main (4.707 fs)** | ×4.02–4.66 (×4.32) | **×4.38–5.04 (×4.69)** | main's ±1.2 % afternoon drift adds ±0.06 |
+
+- **What binds: the main kernel**, 72 % of the slice — the prototype's kernel, already tuned and measured; the
+  library's additions to it are the child-list stores (+4 VALU cycles per phase-1 step, 135 MB per slice) and the
+  accounts. Then preparation (11 %), expansion (11 %), tops (4 %).
+- Against the measured prototype on this card (0.774 fs resident, ×5.48): the library path is predicted 30 % slower
+  (×4.69), the 3080's library path was 15 % slower than the 3080's prototype measure (×3.91 vs ×4.61). The
+  difference is the stages around the kernel, which are a larger share where the kernel is fast.
+- The survivor bits per record are **measured** (`expansion_bits_profile`, lavapipe, the device's own 10,929,765
+  records of slice 712012851, `raw/profile/`): 1 bit 92.83 %, 2 6.69 %, 3 0.44 %, 4 0.03 %, 5–6 0.002 %; the model
+  draws from this histogram (E[max] over 64 lanes per full take of 128 records: 4.55 rounds with two loops, 3.68
+  with one). Over the slabs as lavapipe's 8-lane planes laid them out (many partial takes), grouped as W 64 takes:
+  3.36 and 2.89 rounds per take, 2.41 with four records per lane; the model's full-take figure is the pessimistic
+  side. Assumptions left for the window: that the child-list writes hide; that 7
+  small `client.create` per slice cost microseconds (one 1.94 MB create per unit cost 0.27 ms on 11-18); that the
+  device tops' one-cube scan behaves like the prototype's `scan16`.
+
+### 12.4 Tuning for the card, each exact first [M counts; P times]
+
+| # | change | commit | ACO before → after (W 64) | predicted card | exact (lavapipe W 8, `ex/<tag>/`) |
+|---|---|---|---|---|---|
+| 1 | `scatter3`'s children count (`A_SC_CHILD`) by `child_count`: the two new digits tested against `!pm`'s 32-bit halves, stepped by b2, b3 per unit (was 64 `child_mask` calls with 64-bit shifts and ORs) | `2e1301d4` | whole 1,317 → 956 vcyc, v64 257 → 0 | parents −0.03 ms | `c1`: parity 2 slices (scatter3's count = the main kernel's children, 33,705,647 and 33,728,715), faults |
+| 2 | the expansion's prefilter in **one loop over both records** of a take (`keep_bits2`): a plane pays max(a + b) rounds, not max(a) + max(b) | `1a5e8262` | loop 290 → 306 vcyc, iterations per take 4.58 → 3.70 (model) | expansion −0.10 ms | `c2`: parity, faults |
+| 3 | the prefilter's one-hot digits by one 64-bit shift each (SPIR-V only; `GpuJoin::oh64` from the runtime's name, comptime in the kernel) | `026e9edc` | loop 306 → 240 | expansion −0.13 ms | `c3`: parity, faults |
+| 4 | the SPIR-V prefilter in **24-bit limbs** (`pf24`): every product of two values < 2^24, issued as `v_mul_u32_u24` / `v_mul_hi_u32_u24` (full rate) instead of 15 quarter-rate `v_mul_lo/hi_u32`; no 64-bit carries; no digit across two limbs; supersedes 3's `digits12_64` | `e34e4df7` | loop 240 → **197**, q 15 → 0 | expansion −0.08 ms | `c4`: parity (23.6M survivors through `pf24`, lists n for n), faults |
+
+The exactness set of every change (`box/ex.sh`, before its commit): `gpu_slices_equal_cpu` on slices 712012851 and
+318575442 (device tops = host tops, prefiltered lists n for n, children/chunks/flat/kept/survivors/checked = the
+CPU reference; 4 classes per batch; ~110 s) and `accounts_faults_are_loud` on 712012851 (F_SKIP_MAIN, F_SKIP_TOPS,
+F_DROP_PROBE, F_DROP_PARENT loud by account; F_PF_DROP passes the accounts and is caught by the sampled CPU check;
+clean reruns equal; ~190 s). CUDA keeps the measured forms of 3 and 4 (`pf`); change 2 applies to both.
+
+**Not done, with reasons (candidates if the window disagrees with the model):**
+
+- **Four records per lane in the expansion**: 2.41 rounds per 128 records against 2.89 (measured grouping, §12.3;
+  6.30 against 7.36 per 256 by the full-take model), but the 4-way selects add ~15 vcyc to a 197-vcyc round: about
+  −10 % of the expansion (−0.04 ms, 1 % of the slice). Not built.
+- **`tops1` / `tops5` in 32-bit limbs**: 159 64-bit VALU per iteration (112 `v_lshrrev_b64` from the u64 accumulators'
+  `>> 32`, 47 `v_lshlrev_b64`) and 90 quarter-rate; a rewrite might cut a third of 1,657 vcyc, −0.02–0.05 ms per
+  slice. The tops are 4 % of the slice.
+- **u16 child lists** (the main kernel stores the parent's offset in its class, 2 B, instead of the child's r4, 4 B;
+  the record carries the class in its 12 spare bits; the expansion reads r4 from the parent record): −67 MB of writes
+  per slice, + one cached gather per survivor bit. Worth up to 0.1 ms only if the window shows the child-list writes
+  do not hide (main kernel stage above 3.35 ms). Touches the record format and both paths: not without that evidence.
+- **The wide kernel's LDS** (24,576 B, 8 waves): 12 waves need ≤ 21,504 B; a probe window of 448 for 18-digit tops
+  would fit (prob_d 7,168 + prob_e 1,792) but changes the instances per job at b65+. Bases 65–70 are not this card's
+  work today.
+- The wide prefilter (1,193 vcyc, digit by digit with `% b`): §11.5 item 1, unchanged.
+- **lavapipe W 16** for the library (piece I): not attempted; the 512-bit JIT crashed on variable 64-bit shifts
+  before, and changes 3–4 add some.
+
+### 12.5 What the window should look at first if the ratio misses (WINDOW-PLAN-2 "outcomes")
+
+Main kernel stage above 3.35 ms → the child-list writes (u16 lists above). Expansion above 0.56 ms → the bits-per-
+record assumption or latency (the 3080's unexplained 0.6 ms, piece K). Tops above 0.24 ms → the fixed costs of 6
+launches and 3 creates per slice, or `tscan`. Parents above 0.52 → `hsort`/`hist2` (the prototype's, measured 0.425
+in total on this card).
+
+### 12.6 Tests at the head (`9b790647`; `e34e4df7` for the library code, `9b790647` adds an ignored test)
+
+| test | result |
+|---|---|
+| lavapipe W 8: `gpu_slices_equal_cpu` 712012851, 318575442; `accounts_faults_are_loud` 712012851 | pass (`ex/c4/`) |
+| lavapipe W 8: `gpu_slices_equal_cpu` 806726610 (the 141-probe job), 502136830; and in the dry run 0, 2^30 − 1 (at `e34e4df7`) | pass (`ex/head_more/`, `window_dryrun/`) |
+| lavapipe W 8: `wide_slices_equal_cpu` b40 1234 and **b65 717171717**; `wide_faults_are_loud` b40 1234 (every fault loud, F_BAD_PARENT and F_PF_DROP by the sampled check) | pass (`ex/head_wide/`) |
+| fmt; clippy `-D warnings`, `nice_common`, all targets, default and `cubecl-cuda,cubecl-spirv` | clean at `9b790647` (`raw/clippy_*2.log`; `e34e4df7` also clean, `raw/clippy_{default,gpu}.log`) |
+| W 64 compile of every kernel (narrow, wide b65, host tops), spirv-val, ACO GFX1201 | as §12.2 (`spv/c4_narrow`; wide and host tops at `base_*`, code unchanged since) |
+| production suite `cargo test --release -p nice_common --lib` (default features; LTO off, §12.1) | 214 passed, 0 failed, 10 ignored (as on main) (`raw/suite_default.log`) |
+| the window driver dry run (lavapipe, binaries of `e34e4df7`): exactness (3 slices, wide b40, faults), three whole-field rounds (one slice each), main's bracket at 1e14, the stage profile, the sampled check | ran end to end, every step rc 0, 06:48–07:50 UTC (`window_dryrun/`, WINDOW-PLAN-2 "Dry run") |
+
+### 12.7 The window (`G2/WINDOW-PLAN-2.md`, driver `G2/build4s/window/go_mo.sh`)
+
+At most 45 minutes, about 20 planned: exactness at W 64 first (six base-64 slices against the CPU reference computed
+on demoux, the wide path at b65, the fault test; any failure stops the window), then two rounds of five whole base-64
+fields by the pipelined protocol around main's bracket fields 2 and 6 in the same session, the stage profile by
+cumulative stops, the sampled check's cost, and spares (a third round, one b65 field). `analyze_mo.py` gives the ratio
+against main (4.707 fs × the bracket's drift) and each stage against §12.3's band.

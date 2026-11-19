@@ -29,7 +29,8 @@ else  # PAR=0 (the dry run on a 4-core machine): one after another
 fi
 NS=$(grep -c 'busy=' $OUT/x_g1.gpu 2>/dev/null); echo "SAMPLER: $NS samples with busy= in x_g1.gpu; last: $(tail -1 $OUT/x_g1.gpu)"
 [ "$DEV" = card ] && [ "${NS:-0}" -eq 0 ] && echo "SAMPLER EMPTY on the card: timing runs will carry no clock; fix smp.sh's sysfs paths if there is time"
-grep -h ' W [0-9]*' $OUT/x_g1.log | head -1
+WD=$(grep -h -o ' W [0-9]*' $OUT/x_g1.log | head -1 | tr -dc 0-9); echo "PLANE WIDTH: the device path ran at W ${WD:-?}"
+[ "$DEV" = card ] && [ "${WD:-0}" != 64 ] && echo "NOT W 64: the device reports plane width ${WD:-?}; everything below tests that width, not 64 (report it)"
 XG=1; for x in x_g1 x_g2 x_g3; do pass $x || XG=0; done; pass x_w && XW=1 || XW=0
 if [ $XG = 0 ]; then
   echo "NARROW NOT EXACT AT W 64: $(grep -h -m2 'panicked\|errors' $OUT/x_g*.log | cut -c1-200)"

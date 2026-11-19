@@ -24,14 +24,21 @@ R3080 = ISSUE_CARD / ISSUE_3080      # ~1.72
 def t_issue(waveiters, vcyc):
     return waveiters * vcyc * PASS / (SIMD * F) * 1e3   # ms
 
-# --- per-record survivor bits (assumption: 1 + geometric extra, mean = 11,768,560 / 10,929,765 words = 1.0767,
-# slice 712012851, CPU reference). E[max over the 64 lanes of a plane] by simulation.
-P_EXTRA = 1 - 1 / 1.0767
+# --- per-record survivor bits: MEASURED histogram of slice 712012851's 10,929,765 records (lavapipe, the device's
+# own records read back: build4s/raw/profile/p712012851.log); E[max over the 64 lanes of a plane] by simulation of
+# full takes (iid; the device's partial takes at slab ends cost less, so this is the pessimistic side).
+HIST = {1: 10146381, 2: 731610, 3: 48350, 4: 3220, 5: 195, 6: 9}
+_CUM = []
+_acc = 0
+for _k, _n in sorted(HIST.items()):
+    _acc += _n
+    _CUM.append((_acc, _k))
 def rec_bits(rng):
-    k = 1
-    while rng.random() < P_EXTRA:
-        k += 1
-    return k
+    x = rng.random() * _acc
+    for c, k in _CUM:
+        if x < c:
+            return k
+    return _CUM[-1][1]
 def emax(per_lane, lanes=64, n=20000, seed=7):
     rng = random.Random(seed)
     s = 0

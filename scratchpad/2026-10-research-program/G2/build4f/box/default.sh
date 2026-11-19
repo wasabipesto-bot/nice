@@ -8,7 +8,7 @@ for bin in nice_trunk nice_mo; do
   for c in "a q64small.json niceonly --gpu" "b qs1.json niceonly --gpu" "c qempty.json niceonly --threads 4" "d qempty.json detailed --threads 4" "e qempty.json detailed --gpu"; do
     set -- $c; tag=$1; q=$2; shift 2
     OUT=$R/${bin}_$tag.jsonl; : > $OUT
-    python3 /root/mo/stub_api.py $P /root/mo/$q $OUT 2> $R/${bin}_${tag}_stub.log & SP=$!; sleep 1
+    python3 /root/mo/stub_api2.py $P /root/mo/$q $OUT 2> $R/${bin}_${tag}_stub.log & SP=$!; sleep 1
     $B/$bin "$@" --api-base http://127.0.0.1:$P --telemetry --no-progress --username mo-default-local > $R/${bin}_$tag.log 2>&1; echo "$bin $tag ($*): rc=$?" >> $R/run.log
     kill $SP; P=$((P+1)); sleep 0.5
   done

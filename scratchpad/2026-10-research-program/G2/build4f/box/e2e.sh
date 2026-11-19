@@ -3,7 +3,7 @@
 set -u
 B=/root/mo/bin; R=/root/mo/runs/$1; mkdir -p $R; source /root/mo/guard.sh $R
 PORT=8471
-$B/midout_fields --base 64 --spread 24 > $R/w64.json && $B/midout_fields --base 65 --t 13731,77777 > $R/w65.json || exit 1
+$B/midout_fields --base 64 --spread ${N64:-24} > $R/w64.json && $B/midout_fields --base 65 --t ${T65:-13731,77777} > $R/w65.json || exit 1
 python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1]))+json.load(open(sys.argv[2])), indent=0))' $R/w64.json $R/w65.json > $R/work.json
 md5sum $B/nice_mo > $R/bin.txt
 python3 /root/mc/scripts/midout_coordinator.py --worklist $R/work.json --state $R/state --port $PORT 2> $R/coord.log & CP=$!
