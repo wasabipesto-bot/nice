@@ -467,7 +467,7 @@ fn cubecl_midout_timing_stop_is_refused() {
         let r = search_field(
             &gj,
             &coord,
-            coord.start + 77_777 * coord.quantum(),
+            coord.start() + 77_777 * coord.quantum(),
             coord.quantum(),
             GpuOptions::new(16, false),
         );
@@ -580,12 +580,12 @@ fn accounts_faults_are_loud() {
 /// partition, about two minutes of CPU) or a sample of that many fields (each field's slices distinct and in it);
 /// `nn` random n.
 fn coord_slices_partition(fields: Option<usize>, nn: usize) {
-    for (b, &(k0, k1, q0)) in [64u32, 65].into_iter().flat_map(|b| {
-        crate::midout::coord::coord_digits_known(b)
-            .iter()
-            .map(move |d| (b, d))
-    }) {
+    for (b, (k0, k1, q0)) in [64u32, 65]
+        .into_iter()
+        .flat_map(|b| [(4, 8, 5), (4, 9, 6)].map(|d| (b, d)))
+    {
         let c = Coord::with_digits(b, k0, k1, q0).unwrap();
+        assert!(c.is_known(), "b{b} ({k0}, {k1}, {q0})");
         let sh = Shape::for_coord(&c);
         let bb = u128::from(b);
         // the field's value t of the fixed digits [q0, k1) of x, whose digit 0 is n's digit `lo`
@@ -599,7 +599,7 @@ fn coord_slices_partition(fields: Option<usize>, nn: usize) {
                 0
             }
         ];
-        let nt = (c.v_end() - c.start) / c.quantum();
+        let nt = (c.v_end() - c.start()) / c.quantum();
         assert_eq!(nt, bb.pow(3));
         let mut x = 0x5EED_u64;
         let ts: Vec<u128> = match fields {
@@ -632,18 +632,18 @@ fn coord_slices_partition(fields: Option<usize>, nn: usize) {
         if fields.is_none() {
             assert_eq!(count, nkeys, "b{b}: slices of all fields");
         }
-        let mut ns = vec![c.start, c.start + 1, c.end - 1, c.end - 2];
+        let mut ns = vec![c.start(), c.start() + 1, c.end() - 1, c.end() - 2];
         for _ in 0..nn {
             let r = u128::from(splitmix(&mut x)) << 64 | u128::from(splitmix(&mut x));
-            ns.push(c.start + r % (c.end - c.start));
+            ns.push(c.start() + r % (c.end() - c.start()));
         }
-        let (lead_lo, lead_hi) = (c.start / bb.pow(10), (c.end - 1) / bb.pow(10));
+        let (lead_lo, lead_hi) = (c.start() / bb.pow(10), (c.end() - 1) / bb.pow(10));
         for n in ns {
             let v = c.v_of_n(n);
             assert_eq!(c.n_of_v(v), Some(n));
-            let t = (v - c.start) / c.quantum();
+            let t = (v - c.start()) / c.quantum();
             assert_eq!(
-                c.field_digits(c.start + t * c.quantum(), c.quantum())
+                c.field_digits(c.start() + t * c.quantum(), c.quantum())
                     .unwrap(),
                 t..t + 1
             );

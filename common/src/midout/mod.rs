@@ -45,21 +45,6 @@
 //!   example `MIDOUT_CUDA=1 cargo test --release -p nice_common --features
 //!   cubecl-cuda,midout-box-tests --lib -- --ignored gpu_slices_equal_cpu`.
 
-// Development code (the kernels keep their own style; arithmetic names are
-// single letters as in the formulas).
-#![allow(
-    clippy::chunks_exact_to_as_chunks,
-    clippy::manual_midpoint,
-    clippy::manual_range_contains,
-    clippy::manual_rotate,
-    clippy::many_single_char_names,
-    clippy::missing_panics_doc,
-    clippy::must_use_candidate,
-    clippy::needless_for_each,
-    clippy::too_many_lines,
-    clippy::type_complexity
-)]
-
 pub mod arith;
 pub mod coord;
 pub mod cpu;

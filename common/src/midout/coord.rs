@@ -1,5 +1,6 @@
-//! The work unit of the middle-out join: a field is a range of a per-base
-//! coordinate `v`, and this module is the whole of what a field means.
+//! The work unit of the middle-out join: a *field*, a range of a per-base
+//! coordinate `v`. This module is the whole of what a field means; it knows
+//! nothing of how a field is searched.
 //!
 //! # The coordinate
 //!
@@ -11,91 +12,157 @@
 //! v = start + key·(H·b^k0) + (h − h0)·b^k0 + low
 //! ```
 //!
-//! with `h0 = start div b^k1` and `H = (end − 1) div b^k1 − h0 + 1`, the
-//! number of values `h` takes. `v` moves the digits `[k0, k1)` of `n` above
+//! with `h0 = start div b^k1` and `H = (end − 1) div b^k1 − h0 + 1`
+//! ([`Coord::hn`]), the number of values `h` takes. `v` moves the digits `[k0, k1)` of `n` above
 //! all the others and keeps the rest in their order. It is one to one from
-//! the range into `[start, start + H·b^k1)`; the `v` that no `n` of the
-//! range maps to (`h` of the first or last value whose `n` falls outside the
-//! range) are the *padding*, and [`Coord::n_of_v`] returns `None` for them.
+//! the range into `[start, start + H·b^k1)`.
 //!
-//! - **Base 64** (`k0 = 4`, `k1 = 9`): the range is exactly `[2^75, 2^76)`,
-//!   `H = 2^21`, there is no padding, and `v` is `n` with bits 24–53 moved up
-//!   to bits 45–74: `v = 2^75 + π′·2^45 + (n div b^9 − 2^21)·2^24 + (n mod
-//!   b^4)`, `π′` being digits 4–8 of `n`.
-//! - **Other bases**: the same formula with padding. It pads at `b^k1`
-//!   granularity, and `v` never needs more bits than `start + H·b^k1`.
+//! **Base 64**'s coordinate ([`Coord::for_base`], the default) is
+//! `(k0, k1, q0) = (4, 8, 5)`. Its range is exactly `[2^75, 2^76)`, so
+//! `H = 2^27`, `h0 = 2^27`, and `v` is a permutation of the bits of `n`:
+//! digits 4–7 (bits 24–47) move up to bits 51–74, the rest keep their
+//! order:
+//!
+//! ```text
+//! v = 2^75 + key·2^51 + (h − 2^27)·2^24 + low,
+//!     h = n >> 48, key = (n >> 24) mod 2^24, low = n mod 2^24
+//! ```
+//!
+//! Also known ([`Coord::is_known`]) at bases 64 and 65: the first
+//! coordinate, `(4, 9, 6)`, whose fields fix digits 6–8. At base 64 its `v`
+//! moves bits 24–53 (digits 4–8) up to bits 45–74, `H = 2^21`:
+//! `v = 2^75 + π′·2^45 + (n div b^9 − 2^21)·2^24 + (n mod b^4)`, `π′` being
+//! digits 4–8 of `n`. The device paths still search it.
+//!
+//! **Other bases**: the same formula. When the range does not start and
+//! end on multiples of `b^k1`, some `v` of the first and last values of `h`
+//! have no `n` in the range; they are *padding*, and [`Coord::n_of_v`]
+//! returns `None` for them. Bases 65 (`(4, 8, 5)` by default) and 68–70
+//! (`(4, 9, 6)`) have padded coordinates for the wide device path's
+//! measurements; no field of them exists or is planned. The tests use small
+//! bases, where every `n` can be visited, to check the formula in that
+//! general form, and base 65 as a large base that pads.
 //!
 //! # What a field fixes
 //!
 //! A field is `(base, v_start, v_size)`. It must be a whole number of
-//! *quanta*: `v_start − start` and `v_size` multiples of [`Coord::quantum`]
-//! `= H·b^q0`. One quantum is exactly the set of `n` of the range whose
-//! digits `[q0, k1)` take one value `t`, every other digit free; a field is
-//! the set of `n` whose digits `[q0, k1)` lie in a range of values
-//! `[t0, t1)` ([`Coord::field_digits`]). That set is all a search of the
-//! field may rely on: the order of `v` inside a quantum, and the digits
-//! `[k0, q0)`, are not part of the contract, so a search may split a field
-//! however it likes. At base 64 a field of the default coordinate
-//! `(4, 8, 5)` fixes digits 5–7, one of `(4, 9, 6)` digits 6–8 (quantum
-//! `2^57` either way, 262,144 fields per base); see [`coord_digits_known`].
+//! *quanta*: `v_start − start` and `v_size` multiples of
+//! [`Coord::quantum`] `= H·b^q0`. One quantum is exactly the set of `n` of
+//! the range whose digits `[q0, k1)` take one value `t`, every other digit
+//! free; a field is the set of `n` whose digits `[q0, k1)` lie in a range of
+//! values `[t0, t1)` ([`Coord::field_digits`]). That set is all a search of
+//! the field may rely on: the order of `v` inside a quantum, and the digits
+//! `[k0, q0)`, are not part of the contract.
 //!
-//! The `n` a field holds is [`Coord::n_count`], not `v_size`; they differ
-//! only by padding. (Were a server ever to sum a field's `range_size`, this
-//! is the number; no server stores this coordinate or its fields.)
+//! At base 64 a field of one quantum is all `n` with one value of digits
+//! 5–7: `2^57` numbers, and the base has `64^3 = 262,144` such fields.
 //!
-//! Nothing here knows the join's shape: the join checks for itself that its
-//! shape can search a field of this coordinate (`cpu::Shape::fits`).
+//! The number of `n` in a field is [`Coord::n_count`], not `v_size`; they
+//! differ only by padding (never at base 64).
+//!
+//! # Slices
+//!
+//! The search works on *slices*: at base 64, the `2^45` numbers that share
+//! one value of digits 4–8. A field fixes digits 5–7 only, so every slice
+//! lies in exactly one field and a field of one quantum is exactly 4,096
+//! whole slices (every value of digit 4 times every value of digit 8). Any
+//! search that splits `n` into a top part and a bottom part sees every
+//! digit of `n` on one side or the other, so it can restrict itself to a
+//! field by its fixed digits alone; and a search by slices is free in its
+//! shape, its order and its grouping of slices inside a field. Leaving
+//! digits 4 and 8 free lets neighbouring slices of a field share
+//! preparation: slices that differ only in digit 4 have the same digits
+//! above it (the tops' side), and slices that differ only in digit 8 the
+//! same digits below it (the bottoms' side).
+//!
+//! No server stores this coordinate or its fields; nothing here proposes a
+//! field row, a claim format or an API.
 
 use crate::base_range::get_base_range_u128;
 use anyhow::{Result, bail, ensure};
 use std::ops::Range;
 
-/// A base's coordinate (see the module documentation).
+/// A base's coordinate (see the module documentation). Built only by
+/// [`Coord::for_base`] or [`Coord::with_digits`], which check the digit
+/// positions and that `v` fits; its values are read by the methods below.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Coord {
-    pub b: u32,
-    /// The base's range of `n`, `[start, end)`.
-    pub start: u128,
-    pub end: u128,
-    /// The digits `[k0, k1)` that go on top of `v`.
-    pub k0: u32,
-    pub k1: u32,
-    /// A field fixes the digits `[q0, k1)`.
-    pub q0: u32,
-    /// `h0 = start div b^k1` and the number of values of `h`.
-    pub h0: u128,
-    pub hn: u128,
+    b: u32,
+    start: u128,
+    end: u128,
+    k0: u32,
+    k1: u32,
+    q0: u32,
+    h0: u128,
+    hn: u128,
 }
 
-/// The coordinates `(k0, k1, q0)` a base's fields may be cut in, the
-/// default first ([`coord_digits`], [`Coord::for_base`]). Only base 64 is
-/// meant for fields now; bases 65 and 68–70 are here for the wide device
-/// path's measurements (the padded form; no field of them exists or is
-/// planned).
-///
-/// - `(4, 8, 5)`, the default at bases 64 and 65: a field fixes
-///   digits 5–7, so digits 4 and 8 (the two ends of the (4, 10) join's slice
-///   key) are free inside it: tops share across digit 4, parents across
-///   digit 8. Bases 64 and 65 only (the bases its device path was shown
-///   exact on).
-/// - `(4, 9, 6)`: a field fixes digits 6–8 (the first coordinate; still
-///   searched, the default at 68–70).
+/// The digit positions `(k0, k1, q0)` of base `b`'s default coordinate:
+/// `(4, 8, 5)` at bases 64 and 65 (a field fixes digits 5–7), `(4, 9, 6)`
+/// at bases 68–70 (the wide device path's measurements), none at any other
+/// base. [`Coord::is_known`] also accepts the older `(4, 9, 6)` at 64 and 65.
 #[must_use]
-pub fn coord_digits_known(b: u32) -> &'static [(u32, u32, u32)] {
+pub fn coord_digits(b: u32) -> Option<(u32, u32, u32)> {
     match b {
-        64 | 65 => &[(4, 8, 5), (4, 9, 6)],
-        68..=70 => &[(4, 9, 6)],
-        _ => &[],
+        64 | 65 => Some((4, 8, 5)),
+        68..=70 => Some(OLDER),
+        _ => None,
     }
 }
 
-/// The default coordinate of base `b` (the first of [`coord_digits_known`]).
-#[must_use]
-pub fn coord_digits(b: u32) -> Option<(u32, u32, u32)> {
-    coord_digits_known(b).first().copied()
-}
+/// The first coordinate, `(4, 9, 6)` (a field fixes digits 6–8): the
+/// default at bases 68–70 and also known at bases 64 and 65.
+const OLDER: (u32, u32, u32) = (4, 9, 6);
 
 impl Coord {
+    /// The base.
+    #[must_use]
+    pub fn b(&self) -> u32 {
+        self.b
+    }
+
+    /// The first `n` of the base's range `[start, end)` (and the first `v`).
+    #[must_use]
+    pub fn start(&self) -> u128 {
+        self.start
+    }
+
+    /// One past the last `n` of the base's range.
+    #[must_use]
+    pub fn end(&self) -> u128 {
+        self.end
+    }
+
+    /// The lowest of the digits `[k0, k1)` that go on top of `v`.
+    #[must_use]
+    pub fn k0(&self) -> u32 {
+        self.k0
+    }
+
+    /// One past the highest of the digits `[k0, k1)` that go on top of `v`.
+    #[must_use]
+    pub fn k1(&self) -> u32 {
+        self.k1
+    }
+
+    /// A field fixes the digits `[q0, k1)`.
+    #[must_use]
+    pub fn q0(&self) -> u32 {
+        self.q0
+    }
+
+    /// `h0 = start div b^k1`.
+    #[must_use]
+    pub fn h0(&self) -> u128 {
+        self.h0
+    }
+
+    /// `H`, the number of values `h = n div b^k1` takes.
+    #[must_use]
+    pub fn hn(&self) -> u128 {
+        self.hn
+    }
+
     /// The coordinate of base `b` ([`coord_digits`]).
     ///
     /// # Errors
@@ -107,16 +174,18 @@ impl Coord {
         Self::with_digits(b, k0, k1, q0)
     }
 
-    /// Whether this is one of its base's known coordinates
-    /// ([`coord_digits_known`]): the ones a device path searches.
+    /// Whether this is a coordinate a device path searches: its base's
+    /// default ([`coord_digits`]), or the older `(4, 9, 6)` at bases 64 and
+    /// 65.
     #[must_use]
     pub fn is_known(&self) -> bool {
-        coord_digits_known(self.b).contains(&(self.k0, self.k1, self.q0))
+        let d = (self.k0, self.k1, self.q0);
+        coord_digits(self.b) == Some(d) || (matches!(self.b, 64 | 65) && d == OLDER)
     }
 
-    /// A coordinate with explicit digit positions (tests, tools, and a claim
-    /// that names its coordinate; [`Coord::is_known`] says whether a device
-    /// path searches it).
+    /// A coordinate with explicit digit positions, for any base with a
+    /// `u128` range (the tests check the formula on small bases with it;
+    /// [`Coord::is_known`] says whether a device path searches it).
     ///
     /// # Errors
     /// A base without a `u128` range, or positions that are not
@@ -231,7 +300,7 @@ impl Coord {
         Ok(t0..t0 + v_size / q)
     }
 
-    /// How many `n` of the range a field holds (its `range_size`).
+    /// How many `n` of the range a field holds (`v_size` less the padding).
     ///
     /// # Errors
     /// As [`Coord::field_digits`].
@@ -260,8 +329,11 @@ impl Coord {
     }
 }
 
-/// `b^e` (panics on overflow: every caller's exponent is a digit position
-/// of an `n` below 2^128).
+/// `b^e`.
+///
+/// # Panics
+/// On overflow (every caller's exponent is a digit position of an `n` below
+/// 2^128, so `b^e` fits).
 #[must_use]
 pub fn pow(b: u32, e: u32) -> u128 {
     u128::from(b).checked_pow(e).expect("b^e overflows u128")
@@ -282,59 +354,111 @@ pub fn ndigits(mut x: u128, b: u32) -> u32 {
 mod tests {
     use super::*;
 
-    /// Base 64's v is the bit renumbering of the module docs, on random n and the ends.
-    #[test]
-    fn b64_is_the_bit_renumbering() {
-        let c = Coord::with_digits(64, 4, 9, 6).unwrap();
-        assert_eq!((c.start, c.end, c.hn), (1 << 75, 1 << 76, 1 << 21));
-        assert_eq!(c.v_end(), 1 << 76);
-        assert_eq!(c.quantum(), 1 << 57);
-        let mut x = 0x9E37_79B9_7F4A_7C15_u64;
-        let mut ns = vec![1u128 << 75, (1u128 << 76) - 1];
-        for _ in 0..10_000 {
+    /// `count` pseudo-random n in `[lo, hi)` (xorshift, fixed seed).
+    fn rand_n(lo: u128, hi: u128, count: usize) -> Vec<u128> {
+        let mut x = 0x2545_F491_4F6C_DD1D_u64;
+        let mut next = || {
             x ^= x << 13;
             x ^= x >> 7;
             x ^= x << 17;
-            let y = u128::from(x) << 64 | u128::from(x.rotate_left(29));
-            ns.push((1 << 75) | (y & ((1 << 75) - 1)));
-        }
-        for n in ns {
-            let h = n >> 60;
-            let d9 = (n >> 54) & 63;
-            let pi = (n >> 24) & ((1 << 30) - 1);
-            let low = n & ((1 << 24) - 1);
-            let want = (1u128 << 75) + (pi << 45) + ((h - (1 << 15)) << 30) + (d9 << 24) + low;
-            assert_eq!(c.v_of_n(n), want);
-            assert_eq!(c.n_of_v(want), Some(n));
-        }
+            x
+        };
+        (0..count)
+            .map(|_| {
+                let y = u128::from(next()) << 64 | u128::from(next());
+                lo + y % (hi - lo)
+            })
+            .collect()
     }
 
-    /// A b64 field of one quantum is exactly the n with digits 6–8 fixed.
+    /// Base 64's coordinate is the base's, and `v` is the bit permutation of
+    /// the module documentation (n's bits 24–47 moved up to bits 51–74), on
+    /// random n and both ends of the range.
     #[test]
-    fn b64_quantum_fixes_digits_6_to_8() {
-        let c = Coord::with_digits(64, 4, 9, 6).unwrap();
+    fn b64_is_a_bit_permutation() {
+        let c = Coord::for_base(64).unwrap();
+        assert_eq!((c.k0, c.k1, c.q0), (4, 8, 5));
+        assert!(c.is_known());
+        assert_eq!(
+            (c.start, c.end, c.hn, c.h0),
+            (1 << 75, 1 << 76, 1 << 27, 1 << 27)
+        );
+        assert_eq!(c.v_end(), 1 << 76);
+        let mut ns = vec![1u128 << 75, (1u128 << 76) - 1];
+        ns.extend(rand_n(1 << 75, 1 << 76, 20_000));
+        let mut vs = std::collections::HashSet::new();
+        for n in ns {
+            let h = n >> 48;
+            let key = (n >> 24) & ((1 << 24) - 1);
+            let low = n & ((1 << 24) - 1);
+            let want = (1u128 << 75) + (key << 51) + ((h - (1 << 27)) << 24) + low;
+            assert_eq!(c.v_of_n(n), want);
+            assert_eq!(c.n_of_v(want), Some(n));
+            vs.insert(want);
+        }
+        assert!(vs.len() > 19_000);
+    }
+
+    /// A base-64 field of one quantum is exactly the n with one value of
+    /// digits 5–7; every n lands in the field of its digits 5–7; fields that
+    /// are not whole quanta are refused; 262,144 fields of 2^57.
+    #[test]
+    fn b64_quantum_fixes_digits_5_to_7() {
+        let c = Coord::for_base(64).unwrap();
         let q = c.quantum();
+        assert_eq!(q, 1 << 57);
+        assert_eq!((c.v_end() - c.start) / q, 1 << 18);
         for t in [0u128, 1, 4095, 77_777, (1 << 18) - 1] {
             let vs = c.start + t * q;
             assert_eq!(c.field_digits(vs, q).unwrap(), t..t + 1);
             assert_eq!(c.n_count(vs, q).unwrap(), q);
-            // first, last and a middle v of the quantum all have digits 6-8 = t
-            for v in [vs, vs + q - 1, vs + q / 3] {
+            for v in [vs, vs + q - 1, vs + q / 3, vs + q / 7 * 5] {
                 let n = c.n_of_v(v).unwrap();
-                assert_eq!((n >> 36) & ((1 << 18) - 1), t);
+                assert_eq!((n >> 30) & ((1 << 18) - 1), t);
             }
+        }
+        for n in rand_n(1 << 75, 1 << 76, 20_000) {
+            let t = (n >> 30) & ((1 << 18) - 1);
+            assert_eq!((c.v_of_n(n) - c.start) / q, t);
         }
         assert!(c.field_digits(c.start + 1, q).is_err());
         assert!(c.field_digits(c.start, q / 2).is_err());
+        assert!(c.field_digits(c.start, 0).is_err());
         assert!(c.field_digits(c.v_end() - q, 2 * q).is_err());
-        assert_eq!(
-            c.field_digits(c.start, c.v_end() - c.start).unwrap(),
-            0..1 << 18
-        );
+        let all = c.v_end() - c.start;
+        assert_eq!(c.field_digits(c.start, all).unwrap(), 0..1 << 18);
+        assert_eq!(c.n_count(c.start, all).unwrap(), c.end - c.start);
+        assert_eq!(c.n_count(c.start + 5 * q, 3 * q).unwrap(), 3 * q);
     }
 
-    /// Exhaustive bijection and field counts on small padded bases, every b
-    /// mod 5 class with a range.
+    /// A base-64 field of one quantum is exactly 4,096 whole slices (one
+    /// value of digits 4–8 each): every n of a slice, whatever its other
+    /// digits, lands in the same field, the one of the slice's digits 5–7.
+    #[test]
+    fn b64_field_is_4096_whole_slices() {
+        let c = Coord::for_base(64).unwrap();
+        let q = c.quantum();
+        let free = rand_n(0, 1 << 76, 64);
+        for t in [0u128, 1, 4095, 77_777, (1 << 18) - 1] {
+            let mut slices = std::collections::HashSet::new();
+            for d8 in 0..64u128 {
+                for d4 in 0..64u128 {
+                    let pip = d8 << 24 | t << 6 | d4; // digits 4-8 of n
+                    assert!(slices.insert(pip));
+                    // n = (digits 9-12) | pip | (digits 0-3), the free parts
+                    // random; bit 75 set keeps n in the range
+                    let x = free[usize::try_from((d4 + d8) % 64).unwrap()];
+                    let hi = (1 << 21) | ((x >> 54) & ((1 << 21) - 1));
+                    let n = hi << 54 | pip << 24 | (x & ((1 << 24) - 1));
+                    assert_eq!((c.v_of_n(n) - c.start) / q, t, "slice {pip}");
+                }
+            }
+            assert_eq!(slices.len(), 4096);
+        }
+    }
+
+    /// Exhaustive bijection and field counts on small bases, padded and
+    /// not, every b mod 5 class with a range.
     #[test]
     fn small_bases_bijection_and_counts() {
         for (b, k0, k1, q0) in [
@@ -349,6 +473,7 @@ mod tests {
             (24, 1, 4, 2),
         ] {
             let c = Coord::with_digits(b, k0, k1, q0).unwrap();
+            assert!(!c.is_known());
             let mut seen = vec![false; usize::try_from(c.v_end() - c.start).unwrap()];
             for n in c.start..c.end {
                 let v = c.v_of_n(n);
@@ -380,18 +505,19 @@ mod tests {
         }
     }
 
-    /// Base 65's padded coordinates: v fits, padding is tiny, counts add up,
-    /// each quantum's n have its fixed digits, both coordinates.
+    /// A large base that pads (65), in both coordinates it knows: `v` fits,
+    /// the padding is tiny but not zero, the counts add up to the range, and
+    /// each quantum's n have its fixed digits.
     #[test]
     fn b65_padded() {
-        for (k0, k1, q0, ppb) in [(4, 9, 6, 3000), (4, 8, 5, 2)] {
+        for (k0, k1, q0, ppb) in [(4, 8, 5, 2), (4, 9, 6, 3000)] {
             let c = Coord::with_digits(65, k0, k1, q0).unwrap();
             assert!(c.is_known());
-            let w = c.end - c.start;
-            let pad = c.v_end() - c.start - w;
+            let span = c.end - c.start;
+            let pad = c.v_end() - c.start - span;
             assert!(
-                pad * 1_000_000_000 < w * ppb,
-                "({k0}, {k1}, {q0}): padding {pad} of {w}"
+                pad > 0 && pad * 1_000_000_000 < span * ppb,
+                "({k0}, {k1}, {q0}): padding {pad} of {span}"
             );
             let q = c.quantum();
             assert_eq!(q, c.hn * 65u128.pow(q0));
@@ -401,8 +527,8 @@ mod tests {
             for t in 0..nq {
                 tot += c.n_count(c.start + t * q, q).unwrap();
             }
-            assert_eq!(tot, w);
-            let mut ns = vec![c.start, c.end - 1, c.start + w / 3];
+            assert_eq!(tot, span);
+            let mut ns = vec![c.start, c.end - 1, c.start + span / 3];
             ns.extend(rand_n(c.start, c.end, 20_000));
             for n in ns {
                 let v = c.v_of_n(n);
@@ -414,7 +540,7 @@ mod tests {
                     "({k0}, {k1}, {q0}) n {n}"
                 );
             }
-            // the first and last quantum: their first and last v that are n
+            // the first and last quantum, where the padding is: their v that are n
             for t in [0, nq - 1] {
                 let vs = c.start + t * q;
                 let n_in = (vs..vs + q)
@@ -427,95 +553,82 @@ mod tests {
         }
     }
 
-    /// `count` pseudo-random n in `[lo, hi)` (xorshift, fixed seed).
-    fn rand_n(lo: u128, hi: u128, count: usize) -> Vec<u128> {
-        let mut x = 0x2545_F491_4F6C_DD1D_u64;
-        let mut next = || {
-            x ^= x << 13;
-            x ^= x >> 7;
-            x ^= x << 17;
-            x
-        };
-        (0..count)
-            .map(|_| {
-                let y = u128::from(next()) << 64 | u128::from(next());
-                lo + y % (hi - lo)
-            })
-            .collect()
-    }
-
-    /// Base 64 under `(4, 8, 5)`: an exact bit
-    /// permutation of `[2^75, 2^76)`, n's bits 24–47 (digits 4–7) moved up to
-    /// bits 51–74, `H = 2^27`, no padding.
+    /// Base 64's older coordinate `(4, 9, 6)` is the bit renumbering of the
+    /// module documentation (bits 24–53 moved up to bits 45–74), on random n
+    /// and both ends of the range.
     #[test]
-    fn b64_485_is_a_bit_permutation() {
-        let c = Coord::with_digits(64, 4, 8, 5).unwrap();
+    fn b64_older_is_the_bit_renumbering() {
+        let c = Coord::with_digits(64, 4, 9, 6).unwrap();
         assert!(c.is_known());
-        assert_eq!(
-            (c.start, c.end, c.hn, c.h0),
-            (1 << 75, 1 << 76, 1 << 27, 1 << 27)
-        );
+        assert_eq!((c.start, c.end, c.hn), (1 << 75, 1 << 76, 1 << 21));
         assert_eq!(c.v_end(), 1 << 76);
+        assert_eq!(c.quantum(), 1 << 57);
         let mut ns = vec![1u128 << 75, (1u128 << 76) - 1];
-        ns.extend(rand_n(1 << 75, 1 << 76, 20_000));
-        let mut vs = std::collections::HashSet::new();
+        ns.extend(rand_n(1 << 75, 1 << 76, 10_000));
         for n in ns {
-            let h = n >> 48;
-            let key = (n >> 24) & ((1 << 24) - 1);
+            let h = n >> 60;
+            let d9 = (n >> 54) & 63;
+            let pi = (n >> 24) & ((1 << 30) - 1);
             let low = n & ((1 << 24) - 1);
-            let want = (1u128 << 75) + (key << 51) + ((h - (1 << 27)) << 24) + low;
+            let want = (1u128 << 75) + (pi << 45) + ((h - (1 << 15)) << 30) + (d9 << 24) + low;
             assert_eq!(c.v_of_n(n), want);
             assert_eq!(c.n_of_v(want), Some(n));
-            vs.insert(want);
         }
-        assert!(vs.len() > 19_000);
     }
 
-    /// A b64 `(4, 8, 5)` field of one quantum is exactly the n with digits
-    /// 5–7 fixed; misaligned fields are refused; 262,144 fields of 2^57.
+    /// A base-64 field of one quantum of the older coordinate is exactly the
+    /// n with one value of digits 6–8.
     #[test]
-    fn b64_485_quantum_fixes_digits_5_to_7() {
-        let c = Coord::with_digits(64, 4, 8, 5).unwrap();
+    fn b64_older_quantum_fixes_digits_6_to_8() {
+        let c = Coord::with_digits(64, 4, 9, 6).unwrap();
         let q = c.quantum();
-        assert_eq!(q, 1 << 57);
-        assert_eq!((c.v_end() - c.start) / q, 1 << 18);
         for t in [0u128, 1, 4095, 77_777, (1 << 18) - 1] {
             let vs = c.start + t * q;
             assert_eq!(c.field_digits(vs, q).unwrap(), t..t + 1);
             assert_eq!(c.n_count(vs, q).unwrap(), q);
-            for v in [vs, vs + q - 1, vs + q / 3, vs + q / 7 * 5] {
+            for v in [vs, vs + q - 1, vs + q / 3] {
                 let n = c.n_of_v(v).unwrap();
-                assert_eq!((n >> 30) & ((1 << 18) - 1), t);
+                assert_eq!((n >> 36) & ((1 << 18) - 1), t);
             }
-        }
-        // every n of the base lands in the field of its digits 5-7
-        for n in rand_n(1 << 75, 1 << 76, 20_000) {
-            let t = (n >> 30) & ((1 << 18) - 1);
-            assert_eq!((c.v_of_n(n) - c.start) / q, t);
         }
         assert!(c.field_digits(c.start + 1, q).is_err());
         assert!(c.field_digits(c.start, q / 2).is_err());
         assert!(c.field_digits(c.v_end() - q, 2 * q).is_err());
+        assert_eq!(
+            c.field_digits(c.start, c.v_end() - c.start).unwrap(),
+            0..1 << 18
+        );
     }
 
-    /// The known coordinates: (4, 9, 6) and (4, 8, 5) at bases 64 and 65,
-    /// (4, 9, 6) at 68-70, none elsewhere; the default is the first: (4, 8, 5) at 64 and 65.
+    /// The coordinates: the default `(4, 8, 5)` at bases 64 and 65,
+    /// `(4, 9, 6)` at 68–70, none elsewhere; the older `(4, 9, 6)` also
+    /// known at 64 and 65 and nothing else; digit positions that do not
+    /// satisfy `k0 <= q0 < k1 <= digits of n` are refused.
     #[test]
     fn known_coordinates() {
         for b in [64, 65] {
-            assert_eq!(coord_digits_known(b), &[(4, 8, 5), (4, 9, 6)]);
             assert_eq!(coord_digits(b), Some((4, 8, 5)));
             assert!(Coord::with_digits(b, 4, 8, 5).unwrap().is_known());
             assert!(Coord::with_digits(b, 4, 9, 6).unwrap().is_known());
             assert!(!Coord::with_digits(b, 4, 9, 7).unwrap().is_known());
             assert!(!Coord::with_digits(b, 3, 9, 6).unwrap().is_known());
         }
-        assert!(!Coord::with_digits(68, 4, 8, 5).unwrap().is_known());
+        for b in [68, 69, 70] {
+            assert_eq!(coord_digits(b), Some((4, 9, 6)));
+            assert!(!Coord::with_digits(b, 4, 8, 5).unwrap().is_known());
+        }
         for b in [64, 65, 68, 69, 70] {
             let c = Coord::for_base(b).unwrap();
             assert!(c.is_known());
             assert_eq!(Some((c.k0, c.k1, c.q0)), coord_digits(b));
         }
-        assert!(coord_digits(62).is_none());
+        for b in [10, 40, 62, 63, 66, 67, 71] {
+            assert!(coord_digits(b).is_none());
+            assert!(Coord::for_base(b).is_err());
+        }
+        assert!(Coord::with_digits(64, 5, 8, 4).is_err());
+        assert!(Coord::with_digits(64, 4, 8, 8).is_err());
+        assert!(Coord::with_digits(64, 4, 14, 5).is_err());
+        assert!(Coord::with_digits(2, 0, 1, 0).is_err());
     }
 }

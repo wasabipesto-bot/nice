@@ -50,7 +50,12 @@ fn main() -> Result<()> {
         }
         None => Coord::for_base(b)?,
     };
-    eprintln!("coordinate midout:{},{},{}", coord.k0, coord.k1, coord.q0);
+    eprintln!(
+        "coordinate midout:{},{},{}",
+        coord.k0(),
+        coord.k1(),
+        coord.q0()
+    );
     let sh = Shape::for_coord(&coord);
     let mut caps = WideCaps::for_base(b);
     if let Some(c) = opt("--classes") {
@@ -104,7 +109,7 @@ fn main() -> Result<()> {
             let q = coord.quantum();
             let (mut wall_w, mut wall_n, mut adm_all) = (0f64, 0f64, 0f64);
             for &t in &fields {
-                let vs = coord.start + t * q;
+                let vs = coord.start() + t * q;
                 let ncount = coord.n_count(vs, q)?;
                 let adm = ncount as f64 * roots / f64::from(b - 1);
                 adm_all += adm;

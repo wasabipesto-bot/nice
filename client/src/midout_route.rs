@@ -24,7 +24,7 @@ use anyhow::{Context, Result, anyhow, bail, ensure};
 use log::{error, info, warn};
 use nice_common::client_api_async::{Client, submit_field_to_server_async};
 use nice_common::midout::Coord;
-use nice_common::midout::coord::coord_digits_known;
+use nice_common::midout::coord::coord_digits;
 use nice_common::midout::wire::{self, CoordClaim};
 use nice_common::{BUILD_SHA, CLIENT_VERSION, DataToServer, NiceNumberSimple};
 use serde_json::{Value, json};
@@ -105,15 +105,12 @@ fn field_of(c: &CoordClaim) -> Result<(Coord, u128, u128)> {
     let coord = Coord::with_digits(c.base, k0, k1, q0)?;
     ensure!(
         coord.is_known(),
-        "middle-out: claim {}: coordinate '{}' of base {} is not one this client knows (it searches {})",
+        "middle-out: claim {}: coordinate '{}' of base {} is not one this client knows (the base's is '{}', and '{}' at bases 64 and 65)",
         c.claim_id,
         c.coordinate,
         c.base,
-        coord_digits_known(c.base)
-            .iter()
-            .map(|&(a, b, q)| format!("'{}'", wire::coordinate_id(a, b, q)))
-            .collect::<Vec<_>>()
-            .join(", ")
+        coord_digits(c.base).map_or_else(String::new, |(a, b, q)| wire::coordinate_id(a, b, q)),
+        wire::coordinate_id(4, 9, 6)
     );
     let v_size = c
         .range_end
@@ -212,7 +209,7 @@ fn drive<R: nice_common::midout::route::DeviceRuntime>(
         };
         let (coord, v_start, v_size) = field_of(&c)?;
         let q = coord.quantum();
-        let t0 = (v_start - coord.start) / q;
+        let t0 = (v_start - coord.start()) / q;
         info!(
             "middle-out: claim {} base {} fields t [{t0}, {}) v [{v_start}, +{v_size})",
             c.claim_id,
@@ -341,7 +338,7 @@ mod tests {
     fn claims_are_checked_before_work() {
         let c64 = Coord::with_digits(64, 4, 9, 6).unwrap();
         let q = c64.quantum();
-        let s = c64.start + 77_777 * q;
+        let s = c64.start() + 77_777 * q;
         assert!(field_of(&claim(64, s, q, q, "midout:4,9,6")).is_ok());
         assert!(field_of(&claim(64, s, 2 * q, 2 * q, "midout:4,9,6")).is_ok());
         // both known coordinates of base 64 are accepted (the field-structure review's fixes digits
@@ -386,14 +383,14 @@ mod tests {
         );
         let c65 = Coord::with_digits(65, 4, 9, 6).unwrap();
         let q65 = c65.quantum();
-        let s65 = c65.start + 13_731 * q65;
+        let s65 = c65.start() + 13_731 * q65;
         let n65 = c65.n_count(s65, q65).unwrap();
         assert!(field_of(&claim(65, s65, q65, n65, "midout:4,9,6")).is_ok());
         assert!(field_of(&claim(65, s65, q65, n65 + 1, "midout:4,9,6")).is_err());
         // base 65 under (4, 8, 5): its own quantum and padded count
         let c65b = Coord::with_digits(65, 4, 8, 5).unwrap();
         let q65b = c65b.quantum();
-        let s65b = c65b.start + 13_731 * q65b;
+        let s65b = c65b.start() + 13_731 * q65b;
         let n65b = c65b.n_count(s65b, q65b).unwrap();
         assert!(field_of(&claim(65, s65b, q65b, n65b, "midout:4,8,5")).is_ok());
         assert!(field_of(&claim(65, s65b, q65b, n65b + 1, "midout:4,8,5")).is_err());

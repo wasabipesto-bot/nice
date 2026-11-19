@@ -112,7 +112,12 @@
     clippy::missing_errors_doc,
     clippy::must_use_candidate,
     clippy::bool_to_int_with_if,
-    clippy::uninlined_format_args
+    clippy::uninlined_format_args,
+    // kernel code (`#[cube]`) spells these out, so that the generated
+    // device code stays the code whose exactness was measured
+    clippy::manual_midpoint,
+    clippy::manual_range_contains,
+    clippy::manual_rotate,
 )]
 
 use super::arith::{U384, roots as base_roots};
@@ -2378,13 +2383,13 @@ impl WideBase {
     /// # Errors
     /// A base or shape outside what the layouts hold.
     pub fn new(coord: &Coord, sh: Shape) -> Result<Self> {
-        let b = coord.b;
+        let b = coord.b();
         let (f0, k) = (sh.f0, sh.k);
         ensure!(
             (3..=MAXB).contains(&b),
             "middle-out wide: base {b} outside 3-{MAXB}"
         );
-        let (start, end) = (coord.start, coord.end);
+        let (start, end) = (coord.start(), coord.end());
         let l = ndigits(end - 1, b);
         ensure!(
             k >= 2 && f0 + 1 < k && k <= l,
@@ -3769,7 +3774,7 @@ fn run_field_wide<R: Runtime>(
         f0: gj.wb.f0,
         k: gj.wb.k,
     };
-    ensure!(coord.b == gj.wb.b, "middle-out wide: base mismatch");
+    ensure!(coord.b() == gj.wb.b, "middle-out wide: base mismatch");
     ensure!(
         (1..=256).contains(&opt.group),
         "middle-out wide: group of {} slices (1-256)",
@@ -3868,11 +3873,11 @@ fn run_field_wide<R: Runtime>(
     }
     for &n in &nice {
         ensure!(
-            super::arith::unique_digits(n, coord.b).1,
+            super::arith::unique_digits(n, coord.b()).1,
             "middle-out wide: device reported {n}, not nice"
         );
         ensure!(
-            n >= coord.start && n < coord.end,
+            n >= coord.start() && n < coord.end(),
             "middle-out wide: device reported {n}, outside the range"
         );
         let v = coord.v_of_n(n);
@@ -3988,7 +3993,7 @@ mod tests {
                 let (d5, hi) = (tn % bb, tn / bb);
                 for &d8 in &d8s {
                     let sel = (d8 as usize) * bu..(d8 as usize) * bu + bu;
-                    let (o, rec) = search_field_wide_groups(&gj, &cn, cn.start + tn * qn, qn, opt1, sel).unwrap();
+                    let (o, rec) = search_field_wide_groups(&gj, &cn, cn.start() + tn * qn, qn, opt1, sel).unwrap();
                     let (mut s1, mut c1) = (0, 0);
                     for (p, c) in rec {
                         assert_eq!((u128::from(p[0]) / bb) % bb.pow(3), tn, "slice {} outside the field", p[0]);
@@ -4000,7 +4005,7 @@ mod tests {
                     assert_eq!((s1, c1), (o.survivors, o.checked));
                     let to = hi + bb * bb * d8;
                     let sel = (d5 as usize) * bu..(d5 as usize) * bu + bu;
-                    let (_, rec) = search_field_wide_groups(&gj, &co, co.start + to * qo, qo, opt1, sel).unwrap();
+                    let (_, rec) = search_field_wide_groups(&gj, &co, co.start() + to * qo, qo, opt1, sel).unwrap();
                     for (p, c) in rec {
                         assert!(oldc.insert(p[0], c).is_none());
                     }
@@ -4016,10 +4021,10 @@ mod tests {
                 println!("b65 (4, 8, 5) field t {tn}, digit 8 in {d8s:?}: {} slices equal to (4, 9, 6)'s, survivors {ns}, checked {nc}", newc.len());
                 if std::env::var("MIDOUT_485_WHOLE").is_ok_and(|x| x == "1") {
                     let cpu_check = std::env::var("MIDOUT_485_CHECK").is_ok_and(|x| x == "1");
-                    let (o, _, tm) = search_field_wide(&gj, &cn, cn.start + tn * qn, qn, WideOptions { group: 16, cpu_check }).unwrap();
+                    let (o, _, tm) = search_field_wide(&gj, &cn, cn.start() + tn * qn, qn, WideOptions { group: 16, cpu_check }).unwrap();
                     println!(
                         "b65 (4, 8, 5) whole field t {tn}: survivors {}, checked {}, slices {}, nice {:?}, sampled {:?} ({:.1} s), n {}",
-                        o.survivors, o.checked, o.slices, o.nice, tm.sampled, tm.wall, cn.n_count(cn.start + tn * qn, qn).unwrap()
+                        o.survivors, o.checked, o.slices, o.nice, tm.sampled, tm.wall, cn.n_count(cn.start() + tn * qn, qn).unwrap()
                     );
                     assert_eq!(o.slices, 4225);
                 }
@@ -4233,7 +4238,7 @@ mod tests {
                     let coord = Coord::with_digits(b, 0, 1, 0).unwrap();
                     let base = Base::new(&coord);
                     let nice_brute: Vec<u128> =
-                        (coord.start..coord.end).filter(|&n| unique_digits(n, b).1).collect();
+                        (coord.start()..coord.end()).filter(|&n| unique_digits(n, b).1).collect();
                     for &(f0, k) in shapes {
                         let sh = Shape { f0, k };
                         let mut caps = WideCaps::for_base(b);
@@ -4260,9 +4265,9 @@ mod tests {
                             }
                         }
                         let want: HashSet<u128> =
-                            (coord.start..coord.end).filter(|&n| q_checked::<u128>(&base, sh, n)).collect();
+                            (coord.start()..coord.end()).filter(|&n| q_checked::<u128>(&base, sh, n)).collect();
                         let nsurv =
-                            (coord.start..coord.end).filter(|&n| q_shape::<u128>(&base, sh, n)).count() as u64;
+                            (coord.start()..coord.end()).filter(|&n| q_shape::<u128>(&base, sh, n)).count() as u64;
                         assert_eq!(got, want, "b{b} shape {sh:?}: checked n differ from brute force");
                         assert_eq!(surv, nsurv, "b{b} shape {sh:?}: survivors");
                         assert_eq!(gj.nice().unwrap(), nice_brute, "b{b} shape {sh:?}: nice");
@@ -4505,7 +4510,7 @@ mod tests {
                 group: 16,
                 cpu_check: false,
             };
-            match search_field_wide(&gj, &coord, coord.start, coord.quantum(), opt) {
+            match search_field_wide(&gj, &coord, coord.start(), coord.quantum(), opt) {
                 Ok((o, _, _)) => panic!("timing stop 2: search_field_wide returned Ok: {o:?}"),
                 Err(e) => println!("timing stop 2: search_field_wide refused: {e}"),
             }

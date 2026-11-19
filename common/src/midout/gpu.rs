@@ -103,7 +103,12 @@
     clippy::missing_errors_doc,
     clippy::must_use_candidate,
     clippy::bool_to_int_with_if,
-    clippy::uninlined_format_args
+    clippy::uninlined_format_args,
+    // kernel code (`#[cube]`) spells these out, so that the generated
+    // device code stays the code whose exactness was measured
+    clippy::manual_midpoint,
+    clippy::manual_range_contains,
+    clippy::manual_rotate,
 )]
 
 use super::coord::Coord;
@@ -4045,7 +4050,7 @@ fn field_run<R: Runtime>(
     sel: Option<std::ops::Range<usize>>,
     mut rec: Option<&mut GroupCounts>,
 ) -> Result<(FieldOutcome, DevCounts, FieldTiming)> {
-    ensure!(coord.b == 64, "middle-out device path: base 64 only");
+    ensure!(coord.b() == 64, "middle-out device path: base 64 only");
     let sh = Shape::for_coord(coord);
     ensure!(
         sh == (Shape { f0: 4, k: 10 }),
@@ -4201,8 +4206,8 @@ fn field_run<R: Runtime>(
             "middle-out: device reported {n}, not nice"
         );
         ensure!(
-            n >= coord.start
-                && n < coord.end
+            n >= coord.start()
+                && n < coord.end()
                 && (v_start..v_start + v_size).contains(&coord.v_of_n(n)),
             "middle-out: device reported {n}, not in the field"
         );
@@ -4392,7 +4397,7 @@ mod tests {
             .ok()
             .map_or(63, |s| s.parse().unwrap());
         let cn = Coord::with_digits(64, 4, 8, 5).unwrap();
-        let (q, vs) = (cn.quantum(), cn.start + tn * cn.quantum());
+        let (q, vs) = (cn.quantum(), cn.start() + tn * cn.quantum());
         macro_rules! go {
             ($client:expr) => {{
                 let mut gj = GpuJoin::new($client, Caps::b64(classes)).unwrap();
@@ -4501,7 +4506,7 @@ mod tests {
                 };
                 let tw = std::time::Instant::now();
                 for sel in sels {
-                    let (o, rec) = search_field_groups(&gj, &cn, cn.start + tn * q, q, opt1, sel).unwrap();
+                    let (o, rec) = search_field_groups(&gj, &cn, cn.start() + tn * q, q, opt1, sel).unwrap();
                     let (mut s1, mut c1) = (0, 0);
                     for (p, c) in rec {
                         assert_eq!(p.len(), 1);
@@ -4523,7 +4528,7 @@ mod tests {
                 for &d8 in &d8s {
                     let to = hi + 4096 * d8;
                     let sel = (d5 as usize) * 64..(d5 as usize) * 64 + 64;
-                    let (_, rec) = search_field_groups(&gj, &co, co.start + to * q, q, opt1, sel).unwrap();
+                    let (_, rec) = search_field_groups(&gj, &co, co.start() + to * q, q, opt1, sel).unwrap();
                     for (p, c) in rec {
                         assert!(oldc.insert(p[0], c).is_none());
                     }
@@ -4542,7 +4547,7 @@ mod tests {
                 println!("slice by slice: {} slices equal (kept equal on {kept_eq}: kept depends on the field's key)", newc.len());
                 if whole {
                     let opt = GpuOptions { group: 16, host_threads: 1, device_tops: true, cpu_check: true };
-                    let (o, dc, tm) = search_field(&gj, &cn, cn.start + tn * q, q, opt).unwrap();
+                    let (o, dc, tm) = search_field(&gj, &cn, cn.start() + tn * q, q, opt).unwrap();
                     println!(
                         "the production path: survivors {}, checked {}, slices {}, nice {:?}, sampled slice {:?} equal ({:.1} s)",
                         o.survivors, o.checked, o.slices, o.nice, tm.sampled, tm.wall

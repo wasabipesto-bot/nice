@@ -57,7 +57,12 @@ fn main() -> Result<()> {
         }
         None => Coord::for_base(64)?,
     };
-    eprintln!("coordinate midout:{},{},{}", coord.k0, coord.k1, coord.q0);
+    eprintln!(
+        "coordinate midout:{},{},{}",
+        coord.k0(),
+        coord.k1(),
+        coord.q0()
+    );
     if let Some(k) = opt("--tops-only") {
         let k: u64 = k.parse()?;
         let roots = depth4_roots();
@@ -127,7 +132,7 @@ fn main() -> Result<()> {
             let q = coord.quantum();
             let (mut wall, mut adm_all) = (0f64, 0f64);
             for &t in &fields {
-                let vs = coord.start + t * q;
+                let vs = coord.start() + t * q;
                 let ncount = coord.n_count(vs, q)?;
                 // a part of the field: its share of the admissible n (4,096 slices per field)
                 let adm = ncount as f64 * 8.0 / 63.0 * part.map_or(1.0, |k| k.min(4096) as f64 / 4096.0);

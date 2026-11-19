@@ -31,9 +31,9 @@ fn main() -> Result<()> {
         }
         None => Coord::for_base(b)?,
     };
-    let id = nice_common::midout::wire::coordinate_id(coord.k0, coord.k1, coord.q0);
+    let id = nice_common::midout::wire::coordinate_id(coord.k0(), coord.k1(), coord.q0());
     let q = coord.quantum();
-    let total = (coord.v_end() - coord.start) / q;
+    let total = (coord.v_end() - coord.start()) / q;
     let ts: Vec<u128> = if let Some(t) = opt("--t") {
         t.split(',').map(str::parse).collect::<Result<_, _>>()?
     } else if let Some(n) = opt("--spread") {
@@ -44,7 +44,7 @@ fn main() -> Result<()> {
     };
     let mut out = Vec::new();
     for t in ts {
-        let (s, size) = (coord.start + t * q, quanta * q);
+        let (s, size) = (coord.start() + t * q, quanta * q);
         let n = coord.n_count(s, size)?;
         out.push(format!(
             "{{\"base\":{b},\"coordinate\":\"{id}\",\"range_start\":{s},\"range_end\":{},\"range_size\":{n}}}",

@@ -24,7 +24,10 @@ impl U384 {
         U384(a)
     }
 
-    /// The product; panics if it does not fit 384 bits.
+    /// The product.
+    ///
+    /// # Panics
+    /// If it does not fit 384 bits.
     #[must_use]
     pub fn mul(&self, o: &U384) -> U384 {
         let mut r = [0u64; NL];
@@ -109,6 +112,9 @@ pub fn unique_digits(n: u128, b: u32) -> (u32, bool) {
 
 /// Residues `r mod (b − 1)` with `r² + r³ ≡ b(b − 1)/2 (mod b − 1)`: the
 /// classes a nice number can be in.
+///
+/// # Panics
+/// Never (every residue is below `b`).
 #[must_use]
 pub fn roots(b: u32) -> Vec<u32> {
     let m = u64::from(b - 1);

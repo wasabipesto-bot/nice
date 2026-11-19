@@ -57,6 +57,7 @@ impl<R: Runtime> FieldJoin<R> {
     }
 
     /// The base this join searches.
+    #[must_use]
     pub fn base(&self) -> u32 {
         match self {
             Self::Narrow(_) => 64,
@@ -68,6 +69,7 @@ impl<R: Runtime> FieldJoin<R> {
     /// 64 it costs +0.4 % of a field (RTX 3080); at base 65 the CPU slice
     /// takes longer than the field (about 70 s against 55 s), so it is off
     /// unless asked.
+    #[must_use]
     pub fn cpu_check_default(&self) -> bool {
         matches!(self, Self::Narrow(_))
     }
@@ -86,15 +88,15 @@ impl<R: Runtime> FieldJoin<R> {
         v_size: u128,
         cpu_check: bool,
     ) -> Result<(FieldOutcome, Value)> {
-        // the device paths search the base's known coordinates (`coord_digits_known`) only
+        // the device paths search the base's known coordinates (`Coord::is_known`) only
         ensure!(
-            coord.b == self.base() && coord.is_known(),
+            coord.b() == self.base() && coord.is_known(),
             "middle-out: the base-{} join cannot search a field of coordinate (base {}, digits {}, {}, {})",
             self.base(),
-            coord.b,
-            coord.k0,
-            coord.k1,
-            coord.q0
+            coord.b(),
+            coord.k0(),
+            coord.k1(),
+            coord.q0()
         );
         let coord = coord.clone();
         let shape = Shape::for_coord(&coord);

@@ -1,7 +1,8 @@
 //! Digit masks: one bit per digit of the base. The CPU reference is generic
-//! over the word, so bases above 64 take `u128` through the same code; the
-//! base-64 device path is `u64`; the wide device path (`gpu_wide`) has its
-//! own kernels with two-word masks.
+//! over the word: `u64` up to base 64, `u128` above it, through the same
+//! code (its tests run both words on the same bases). The base-64 device
+//! path takes the low word ([`Mask::low64`]); the wide device path
+//! (`gpu_wide`) has its own kernels with two-word masks.
 
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not};
 
