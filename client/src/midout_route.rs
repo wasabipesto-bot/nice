@@ -8,6 +8,8 @@
 //! nothing for the field at hand):
 //! - the coordinator's address is explicit and is not the production API
 //!   (`midout::wire::check_coordinator_url`);
+//! - an Apple Metal device is refused: the join has never been checked on
+//!   one;
 //! - a claim must name a middle-out coordinate this build knows
 //!   (`"coordinate": "midout:K0,K1,Q0"`, one of the base's known coordinates, `Coord::is_known`), of a
 //!   base with a device path, whole quanta, with the `range_size` the
@@ -172,6 +174,11 @@ fn run_blocking(cli: &Cli, url: &str) -> Result<()> {
     };
     let device = ctx.device_name();
     install_panic_hook();
+    if is_metal(&device) {
+        bail!(
+            "middle-out: the join has never been checked on an Apple Metal device ({device}), so this route refuses it"
+        );
+    }
     info!("middle-out route: coordinator {url}, device {device}");
     match &ctx {
         CubeclContext::Wgpu { client, .. } => drive(cli, url, &device, client),
@@ -180,6 +187,14 @@ fn run_blocking(cli: &Cli, url: &str) -> Result<()> {
         #[allow(unreachable_patterns)]
         _ => bail!("middle-out: unsupported runtime"),
     }
+}
+
+/// Whether a device, by the name `CubeclContext::device_name` gives it, is
+/// an Apple Metal device: a wgpu adapter on the Metal graphics API (the name
+/// ends in `(Metal, <compiler>)`), or `CubeCL`'s own Metal compiler
+/// (`wgpu<msl>`). The middle-out kernels have never run on one.
+fn is_metal(device: &str) -> bool {
+    device.contains("(Metal, ") || device.contains("wgpu<msl>")
 }
 
 fn drive<R: nice_common::midout::route::DeviceRuntime>(
@@ -319,6 +334,28 @@ mod tests {
         ] {
             let e = run(&cli(), u).await.expect_err("must refuse");
             assert!(e.to_string().contains("middle-out"), "{e}");
+        }
+    }
+
+    /// Apple Metal devices are told apart by the names the client's device
+    /// contexts give them; Vulkan, DX12, CUDA and HIP devices are not refused.
+    #[test]
+    fn metal_devices_are_refused() {
+        for metal in [
+            "Apple M4 (Metal, wgpu<wgsl>)",
+            "Apple Paravirtual device (Metal, wgpu<wgsl>)",
+            "Apple M1 Max (Metal, wgpu<msl>)",
+        ] {
+            assert!(is_metal(metal), "{metal}");
+        }
+        for other in [
+            "AMD Radeon RX 9070 XT (RADV GFX1201) (Vulkan, wgpu<spirv>)",
+            "llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>)",
+            "NVIDIA GeForce RTX 3080 (Dx12, wgpu<wgsl>)",
+            "NVIDIA GeForce RTX 3080",
+            "AMD Radeon RX 7900 XTX",
+        ] {
+            assert!(!is_metal(other), "{other}");
         }
     }
 
