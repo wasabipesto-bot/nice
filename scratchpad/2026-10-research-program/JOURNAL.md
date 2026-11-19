@@ -101,6 +101,14 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   scan form: fixed on a branch, verified on the card. demoux clean at 14:28, one ntfy, production client still
   stopped. Lesson repeated: a leftover check over that ssh must not contain the literal names it greps for.
 
+- **14:50 UTC: the test fix is reviewed ("merge")** (`SRA/QTEST-REVIEW.md`): the diagnosis holds (every ballot
+  reads word 0 only; the override is test-only); no other wgpu test is exposed; two optional fixes applied
+  (wording, a line when the form is left out), head 7e640149 on the fork. One caveat from the review that
+  corrects what I told the user: in the forced ballot form the cube-scoped queue could also lose candidates
+  without failing its account, so "fails loudly" is what was observed, not a guarantee; production cannot
+  select that form on such a device. The PR opens when `just lint` and the lavapipe runs come back from the
+  cleanup engineer's box (`SRA/raw/qtest/`); body drafted in `SRA/QTEST-PR-BODY.md`.
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);
