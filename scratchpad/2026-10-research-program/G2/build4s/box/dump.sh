@@ -12,7 +12,7 @@ ACO=/home/claude/projects/nice/.worktrees/g2-cubecl/aco
 TAG=$1; BIN=$2; WHAT=${3:-narrow}; LPW=${LPW:-256}
 OUT=/home/claude/projects/nice/.worktrees/g2-cubecl/g2out/s4/${TAG}_$WHAT; rm -rf $OUT; mkdir -p $OUT  # g2mesa mounts only that worktree
 case $WHAT in
-  narrow)   T=midout::gpu::tests::gpu_slices_equal_cpu; E="-e MIDOUT_GPU_SLICES=712012851 -e MIDOUT_CLASSES=1 -e MIDOUT_BATCHES=1";;
+  narrow)   T=midout::gpu::tests::gpu_slices_equal_cpu; E="-e MIDOUT_GPU_SLICES=712012851 -e MIDOUT_CLASSES=1 -e MIDOUT_BATCHES=1 -e MIDOUT_SHARE8=${SHARE8:-0}";;
   hosttops) T=midout::gpu::tests::gpu_slices_equal_cpu; E="-e MIDOUT_GPU_SLICES=712012851 -e MIDOUT_CLASSES=1 -e MIDOUT_BATCHES=1 -e MIDOUT_HOST_TOPS=1";;
   wide)     T=midout::gpu_wide::tests::wide_slices_equal_cpu; E="-e MIDOUT_WIDE_CASES=65:4:10:717171717 -e MIDOUT_CLASSES=1";;
 esac

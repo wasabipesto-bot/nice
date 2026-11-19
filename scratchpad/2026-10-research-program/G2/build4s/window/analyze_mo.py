@@ -10,9 +10,9 @@ OUT = sys.argv[1]
 BASE = float(sys.argv[2]) if len(sys.argv) > 2 else 4.707
 MORNING = {'main_f2': 90.83, 'main_f6': 100.41}
 # the step-4S model's bands per slice (ms, G2/build4s/model_4s.py --tag=head), cumulative stops
-MODEL = {'tops (1)': (0.12, 0.24), 'parents (2-1)': (0.48, 0.52), 'main kernel (3-2)': (3.09, 3.35),
+MODEL = {'tops (1)': (0.12, 0.24), 'parents (2-1)': (0.31, 0.35), 'main kernel (3-2)': (3.09, 3.35),
          'expansion (5-3)': (0.43, 0.56), 'check and the rest (6-5)': (0.055, 0.13)}
-MODEL_SLICE = (4.17, 4.80)
+MODEL_SLICE = (4.01, 4.64)   # model_4s.py --tag=h5l (parents shared across digit 8)
 
 def log(n):
     p = os.path.join(OUT, n + '.log')
@@ -31,9 +31,10 @@ def clock(n):
     return f'{sc:.0f} MHz, {pw:.0f} W ({len(busy)} busy samples)'
 
 print('## Exactness')
-for n in sorted(os.path.basename(p)[:-4] for p in glob.glob(os.path.join(OUT, 'x_*.log'))):
+for n in sorted(os.path.basename(p)[:-4] for p in glob.glob(os.path.join(OUT, '[xp]_*.log'))):
     t = log(n)
-    ok = 'test result: ok. 1 passed' in t
+    ok = (re.search(r'test result: ok\. \d+ passed; 0 failed', t) is not None) or (
+        n == 'x_496' and re.search(r'^SAMPLE .*equal', t, re.M) is not None and ' rc=0' in t)
     w = re.search(r' W (\d+)', t)
     print(f"- {n}: {'PASS' if ok else 'FAIL'}, W {w.group(1) if w else '?'}; {'; '.join(sorted(set(re.findall(r'(slice \d+: device tops = host tops \(\d+\)|COMPILE-ONLY[^\n]*)', t))))[:300]}")
 
@@ -110,6 +111,6 @@ if t:
 
 if g2:
     r = base / g2
-    print('\nOUTCOME: ' + ('T1 (>= x4.38, the model\'s band or above)' if r >= 4.38 else
-                          'T2 (x4.0-4.38: below the band, above the 3080\'s x3.9: the stage above its band names the next piece)' if r >= 4.0 else
+    print('\nOUTCOME: ' + ('T1 (>= x4.54, the model\'s band or above)' if r >= 4.54 else
+                          'T2 (x4.0-4.54: below the band, above the 3080\'s x3.9: the stage above its band names the next piece)' if r >= 4.0 else
                           'T3 (< x4.0: the library path loses more on the card than on CUDA: stop and report the stage profile)'))

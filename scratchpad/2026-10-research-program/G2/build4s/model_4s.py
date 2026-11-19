@@ -64,6 +64,7 @@ EXP = {
     'c4':   (197, emax(2), 325 - 197 - 2 * 24, 2 * 0.9 * 24),
 }
 EXP['head'] = EXP['c4']
+EXP['h5l'] = EXP['c4']
 EXP.update({k: v for k, v in [(a.split('=')[0][2:], tuple(float(x) for x in a.split('=')[1].split(','))) for a in sys.argv if a.startswith('--exp_')]})
 inner, iters, outer, puts = EXP.get(tag, EXP['c2'])
 
@@ -78,8 +79,14 @@ stages['tops (6 kernels)'] = (lo, max(lo, 0.413 / R3080))
 # parents: the prototype's preparation measured on the card at its operating point, 0.425 ms = tdig 0.010 + hist
 # 0.19 + scan 0.016 + scatter 0.042 + sort 0.166; here hist2 +10 % (229 -> 251 vcyc) and scatter3's children count
 sc = t_issue(1.0425e6 / 64, SCATTER3)
-lo = 0.19 * 251 / 229 + 0.016 + max(0.042, sc) + 0.166
-hi = 0.19 * 251 / 229 + 0.016 + 0.042 + sc + 0.166
+H2 = 0.19 * 251 / 229
+# (step 5L, --tag=h5l) parents shared across digit 8: hist2 runs over the slice's depth-8 list, 20.3 % of the roots
+# (measured, field 77777), and anc8 (148 vcyc per wave, 9.30M roots) runs once per 64 slices; the 3080 measured the
+# parents stage 0.728 -> 0.525 ms per slice
+if tag == 'h5l':
+    H2 = H2 * 0.203 + t_issue(9.2985e6 / 64, 148) / 64
+lo = H2 + 0.016 + max(0.042, sc) + 0.166
+hi = H2 + 0.016 + 0.042 + sc + 0.166
 stages['parents (hist2, scan16, scatter3, hsort)'] = (lo, hi)
 # main kernel: the prototype's full kernel with records, measured 3.035 ms (D, pipelined, operating point), + the
 # child lists the library writes in phase 1 (33.7M x 4 B = 135 MB: issue +4 VALU cycles per phase-1 step, 0.02 ms,

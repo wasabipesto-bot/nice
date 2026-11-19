@@ -11,6 +11,35 @@ client would see. Until now the library path has run only on an RTX 3080 (CUDA, 
 - **Context [M]:** the same library path on the 3080 is ×3.91 against that card's main; the prototype kernel on
   this card measured ×5.48 (inputs resident) and ×5.14 (uploads per unit).
 
+> **Changes for step 5L's head (2026-11-19, 12:00 UTC; BUILD-NOTES §13–§14). This section overrides the text below
+> where they differ.**
+>
+> - **Build `66259bb0`** (step 5L's `e09ad7b0` + one test-only commit), same commands. The default coordinate of b64
+>   and b65 is now **(4, 8, 5)**: a field fixes digits 5–7 (t = those digits, any t < 2^18), 4,096 slices with digit 4
+>   innermost; parents are shared across digit 8 by default (64 depth-8 lists per field, 870 MB).
+> - **Prediction [P]:** slice 4.01–4.64 ms, **0.97 fs, ×4.87 (×4.54–5.25)**; the main kernel binds (74 %). Memory:
+>   b64 ~4.9 GB, b65 ~8.3 GB at peak (sums 2.56 / 4.30 GB × the 3080's measured 1.93); fits the card.
+> - **Step 0 (optional, ~2 min + its build):** PR #270's two tests, `cubecl_dropped_launches_fail_the_field` and
+>   `cubecl_queues_check_every_survivor_on_partly_filled_planes`, from their own binary: upstream branch
+>   `pr/stride-ran-account` at `05f18331`, `cargo test --release --features cubecl-spirv -p nice_common --lib --no-run`
+>   in a second worktree with its own target directory, the unittests binary copied to `$W/bin/t_pr270`. The driver
+>   runs it first if that file exists (`p_pr270`); a failure is reported, never a stop. (On lavapipe W 8: 2 passed,
+>   7 s, `build4s/raw/pr270/lvp.log`.)
+> - **Step 1 now:** seven slices in three processes, then the wide path alone (memory: three narrow processes ~3.3 GB
+>   each, b65 up to ~8.3 GB): `x_g1` 712012851, 318575442 and `x_g2` 0, 2^30 − 1 **with the shared depth-8 lists**
+>   (`MIDOUT_SHARE8=1`: `anc8` at 64 lanes, then `hist2` over the list, n for n against the CPU reference); `x_g3`
+>   unshared: 806726610 (the 141-probe job) and three slices of timing field 77777 under (4, 8, 5) (digit 4 = 0, digit
+>   8 = 0, 63, 13: 4977728, 1061942336, 223081536); `x_w` b40 and b65; `x_f` the fault test; then **`x_496`: one whole
+>   field t 77777 under the old coordinate (4, 9, 6)** (`midout_bench --digits 4,9,6`, sampled CPU check on: every
+>   account plus one random slice n for n; ~25 s), outcome E3 if it fails (the (4, 8, 5) steps continue). About 6 min.
+> - **Steps 2–8 unchanged in form;** the field numbers t are the same values but now name (4, 8, 5) fields (§13.3
+>   timed the same t under (4, 8, 5) on the 3080: 1.619 fs, ×4.09 there). Each bench run prints `SHARE t …: 64
+>   depth-8 lists` (sharing on). Main's bracket fields are main's own, unchanged.
+> - **Outcomes:** T1 ≥ ×4.54 (the new band's floor), T2 ×4.0–4.54, T3 < ×4.0; parents stage band 0.31–0.35 ms; a
+>   parents stage near 0.48–0.52 means the lists were not used (check the `SHARE` line).
+> - Total about 22 min (+2 with step 0), inside 45.
+> - Dry run of the updated driver on lavapipe: see "Dry run 2" at the end.
+
 ## Before the window (on demoux, production client still running: building needs no GPU)
 
 Workspace `$W` (the lease's directory), Rust 1.100.0 at `$HOME/.cargo/bin`.

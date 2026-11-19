@@ -27,6 +27,8 @@ of n than field `t` of the other (same v range at base 64, different n): never c
 - *Steps 4S, 3W, 3A and 2A's accounts below are unchanged and still true except where §13 says otherwise (the default
   coordinate; `hist2`'s cube account now compares with the grid it was given).*
 
+**Step 4S follow-up (§14, 2026-11-19 ~12:00 UTC):** step 5L's head pre-flighted at 64 lanes (new `anc8_kernel`, `wexpand` with `pf_w2`): nothing blocks, nothing costly; memory b64 ~4.9 GB / b65 ~8.3 GB peak (fits 10 and 16 GB); predicted ×4.87 (×4.54–5.25); window plan and driver updated (`66259bb0`, test code only).
+
 **Interface note for `dev/mo-client` (step 4S): `search_field`'s signature, `FieldOutcome`, `GpuOptions`, `Caps` and
 `GpuJoin::new` are unchanged.** Added beside them: `search_field_part` / `time_field_part` (a field's first K slices;
 benches and dry runs) and crate-internal `GpuJoin::with_width` / `WideJoin::with_width` (tests). Nothing to adapt.
@@ -1170,3 +1172,54 @@ GPU tests at `7e682f05` (`final/`; `e09ad7b0` after it only adds a clippy attrib
 - lavapipe W 8 ran the shared parents on one slice through `gpu_slices_equal_cpu`, not a whole shared field (64+
   slices are hours there); the field path's sharing logic is host code, run on CUDA.
 - REVIEW §2's corrections to §2's permits/forbids list are not merged into §2 (pointer added).
+
+## 14. Step 4S follow-up: the 64-lane pre-flight of step 5L's head (2026-11-19, 10:44–12:45 UTC, ivory only)
+
+Asked by the coordinator after step 5L (§13) moved the trunk to `e09ad7b0`. Same rules and labels as §12 ([M] ivory,
+[P] the card). One commit, `66259bb0` (test code only: the compile-only width path also queues `anc8_kernel` when
+`MIDOUT_SHARE8=1`); fmt and clippy (`cubecl-cuda,cubecl-spirv`, all targets) clean. Listings `G2/build4s/spv/h5l_*`,
+table `G2/build4s/preflight_h5l.md`, model `model_h5l.txt`.
+
+**Pre-flight [M] (W 64, GFX1201, ACO 26.0.8).** The diff `9b790647..e09ad7b0` adds one device kernel and changes one:
+
+| kernel | VGPRs | LDS | waves/SIMD | vcyc (valu / q / v64) | spirv-val | reading |
+|---|---|---|---|---|---|---|
+| `prep::anc8_kernel` (new; 64 per (4, 8, 5) field, 9.30M roots each) | 48 | 1,024 | 32 | 148 (88 / 7 / 16) | ok (64-bit popcount, as `hist2`) | comptime `w` with the plane check (`acc8[3]`, fatal); the ballot's second word under `w > 32`; lane-0 sums; one-atomic-per-plane append. Correct at 64. |
+| `hist2` | unchanged (48, 1,024, 32, 251) | | | | | same kernel, run over the shared list (its grid from the list's length) |
+| `wexpand` (`pf_w2`, `pf_w2_fixed`) | 48 (was 60) | 0 | 32 (was 24) | prefilter loop 771 (445 / 57 / 49), was 1,193; per record 1,733, was 2,573 | ok | per-lane arithmetic only; its `Array`s are promoted to registers (scratch 0) |
+
+Every other kernel's counts equal §12.2's within 2 % (`tops1` 2,313 against 2,277 instructions, its loop 1,677 against 1,679 vcyc; `preflight_h5l.md`); the wide path at b65
+compiled all 13 modules this time (`wdone` included). **Nothing would stop the library path at 64 lanes, and nothing
+new is costly on the card**: `anc8` is ~0.002 ms per slice (once per 64 slices), and the wide prefilter got cheaper
+on ACO too (−35 % per round). Fixed: nothing (nothing was wrong).
+
+**Card memory [P] (buffers each join allocates, MB; per slice in flight × 16 for a group of 16):**
+
+| | b64 (4, 8, 5), sharing on, W 64 | b64 at W 32 (the 3080) | b65 wide, W 64 | b65 at W 32 |
+|---|---|---|---|---|
+| records `out` | 540 | 673 | 817 | 953 |
+| child lists `clst` | 571 | 571 | 1,105 | 1,105 |
+| survivor list `surv` | 204 | 204 | 340 | 340 |
+| preparation `g_*` | 109 | 109 | 208 | 208 |
+| tops level, roots, digits, top records | 110 | 110 | 489 | 489 |
+| per-slice tops in flight (×16) | 154 | 154 | 1,344 | 1,344 |
+| shared depth-8 lists (64 × 3.4M) | **870** | 870 | — (the wide path does not share) | — |
+| **sum** | **2,560** | **2,690** | **4,300** | **4,440** |
+
+The 3080 *measured* a 5.2 GB peak for the b64 ten-field runs with sharing on (§13.3), 1.93× the sum (CubeCL's pool
+pages, the CUDA context, the sampled check's unshared rerun); b65 runs on that 10 GB card (§11.4, §13.4). So, by the
+same factor: **b64 about 4.9 GB, b65 about 8.3 GB at peak; both fit a 10 GB 3080 (b65 with ~1.7 GB to spare) and the
+16 GB RX 9070 XT with room for production's 2 GiB join budget beside either.** The largest single binding is the b65
+child list (1.1 GB; b64: 571 MB): bindings that large have not run through wgpu/RADV before (the prototype's largest
+was 254 MB); a refusal would be loud (allocation failure → the accounts, §10.2). In the window's exactness step the
+three narrow test processes run together (~3.3 GB each with slack) and the b65 one alone after them.
+
+**Model [P] (`model_4s.py --tag=h5l`):** the parents stage now runs `hist2` over the shared list (20.3 % of the
+roots, measured) plus `anc8` once per 64 slices: 0.48–0.52 → **0.31–0.35 ms** per slice (the 3080 measured
+0.728 → 0.525; the model's −0.17 ms on the card against the 3080's −0.20 ÷ 1.72 = −0.12). Slice **4.01–4.64 ms (mid
+4.32) = 0.97 fs per admissible n, ×4.87 against main (×4.54–5.25)**; the main kernel binds (74 %), then expansion
+(12 %), preparation (8 %), tops (4 %). The coordinate change itself is not in the model (−0.8 % on the 3080, inside
+its drift).
+
+**Window plan:** `WINDOW-PLAN-2.md` and `G2/build4s/window/` updated for `66259bb0` (§ "Changes for step 5L's head" there);
+dry run again on lavapipe: `G2/build4s/window_dryrun2/`.
