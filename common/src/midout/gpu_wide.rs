@@ -4,9 +4,11 @@
 //! Vulkan (SPIR-V).
 //!
 //! A second path, not a width parameter of [`super::gpu`]: base 64 keeps its
-//! 64-bit kernels byte for byte (no tax by construction), and the trunk's
-//! changes to the expansion, prefilter and tops of `gpu.rs` merge without
-//! touching this file. The main kernel here is the base-64 kernel (form D,
+//! 64-bit kernels byte for byte (no tax by construction); what the narrow
+//! path gains must be ported here by hand. Ported so far (step 3W): the
+//! accounts, guards and sampled CPU check of step 3A, the top hierarchy
+//! (`wtops5`) and the prefilter before the check (in `wexpand_kernel`,
+//! mirroring `cpu::prefilter`). The main kernel here is the base-64 kernel (form D,
 //! the library's options fixed: shuffle transpose, two entries per step,
 //! ballot ranks, common masks from registers, top digits from a table) with
 //! these widenings:
@@ -106,7 +108,7 @@ const C_SLICES: usize = 367;
 const NCNT: usize = 368;
 /// Per-slice account (`acc`, one buffer per slice; the trunk's step-3A accounts, wide form): what every stage ran,
 /// compared by the host with what it queued (`WideJoin::check_slice`). Every word starts at 0, and no word may
-/// stay 0 for a slice whose stage ran. `wtops1`: prefixes examined (= the host's `ntest`), tops certified
+/// stay 0 for a slice whose stage ran. `wtops1`: valid parents examined (= `wtops5`'s `l5n[0]`), tops certified
 /// (= `tstat[0]`); `wscan` (tops) ran; `wtops2` tops placed, `wtdigz` rows written (= `tstat[0]`).
 const A_T1_EXAM: usize = 0;
 const A_T1_CERT: usize = 1;
@@ -133,7 +135,7 @@ const A_DONE: usize = 14;
 const A_ERR_PLANE: usize = 15;
 const ACC_WORDS: usize = 16;
 /// The expansion's own account (`est`): cubes done, slabs walked (once per plane).
-const EST_WORDS: usize = 2;
+const EST_WORDS: usize = 4;
 /// The check's grid.
 const CHECK_CUBES: u32 = 2048;
 const CHECK_WG: u32 = 256;
@@ -885,8 +887,29 @@ mod wp {
         #[comptime] s: u32,
         #[comptime] k: u32,
     ) -> (u64, u32, bool) {
+        let (lo, hi, _ml, _mh, bad) = cert_split_w(x, y, lo_in, hi_in, 0u64, 0u32, b, s, k, k);
+        (lo, hi, bad)
+    }
+
+    /// [`cert_w`], and the part of the certificate at positions >= `kmid` (the prefilter's `mhi`, added to
+    /// `mlo_in`, `mhi_in`): (lo, hi, mhi lo, mhi hi, repeated).
+    #[cube]
+    fn cert_split_w(
+        x: &Array<u32>,
+        y: &Array<u32>,
+        lo_in: u64,
+        hi_in: u32,
+        mlo_in: u64,
+        mhi_in: u32,
+        #[comptime] b: u32,
+        #[comptime] s: u32,
+        #[comptime] k: u32,
+        #[comptime] kmid: u32,
+    ) -> (u64, u32, u64, u32, bool) {
         let mut lo = lo_in;
         let mut hi = hi_in;
+        let mut mlo = mlo_in;
+        let mut mhi = mhi_in;
         let mut live = true;
         let mut bad = false;
         #[unroll]
@@ -904,10 +927,83 @@ mod wp {
                     }
                     lo |= bl;
                     hi |= bh;
+                    if comptime!(s - 1 - tt >= kmid) {
+                        mlo |= bl;
+                        mhi |= bh;
+                    }
                 }
             }
         }
-        (lo, hi, bad)
+        (lo, hi, mlo, mhi, bad)
+    }
+
+    /// The middle-digit prefilter (the trunk's piece A, `cpu::prefilter` in wide form) of n whose digits
+    /// `[0, k + 2)` are `rd`: the digits at positions k and k + 1 of n² and n³ are distinct, miss the digits
+    /// `[0, k)` of n² and n³, and miss the top's certified digits at positions >= k + 2 (`mlo`, `mhi`). Every
+    /// digit of r², r³ mod b^(k+2) is computed and tested (the bottom's 2k are distinct for a survivor). `small`:
+    /// n < b^ceil((k+2)/2) (n² may have no digit at k + 1: no prefilter, small bases only).
+    #[cube]
+    pub fn pf_w(
+        rd: &Array<u32>,
+        mlo: u64,
+        mhi: u32,
+        small: bool,
+        #[comptime] b: u32,
+        #[comptime] k: u32,
+    ) -> bool {
+        let kk = comptime!(k + 2);
+        let mut sq = Array::<u32>::new(comptime!(kk as usize));
+        let mut cu = Array::<u32>::new(comptime!(kk as usize));
+        let mut carry = 0u32;
+        #[unroll]
+        for j in 0..kk {
+            let mut s = carry;
+            #[unroll]
+            for i in 0..kk {
+                if comptime!(i <= j) {
+                    s += rd[i as usize] * rd[comptime!(j - i) as usize];
+                }
+            }
+            carry = s / b;
+            sq[j as usize] = s - carry * b;
+        }
+        carry = 0u32;
+        #[unroll]
+        for j in 0..kk {
+            let mut s = carry;
+            #[unroll]
+            for i in 0..kk {
+                if comptime!(i <= j) {
+                    s += rd[i as usize] * sq[comptime!(j - i) as usize];
+                }
+            }
+            carry = s / b;
+            cu[j as usize] = s - carry * b;
+        }
+        let mut lo = 0u64;
+        let mut hi = 0u32;
+        let mut ok = true;
+        #[unroll]
+        for j in 0..kk {
+            let (a, ah) = dbit(sq[j as usize]);
+            let (c, ch) = dbit(cu[j as usize]);
+            if (lo & a) != 0u64 || (hi & ah) != 0u32 {
+                ok = false;
+            }
+            lo |= a;
+            hi |= ah;
+            if (lo & c) != 0u64 || (hi & ch) != 0u32 {
+                ok = false;
+            }
+            lo |= c;
+            hi |= ch;
+            if comptime!(j >= k) {
+                if ((a | c) & mlo) != 0u64 || ((ah | ch) & mhi) != 0u32 {
+                    ok = false;
+                }
+            }
+        }
+        ok || small
     }
 
     /// The digits of the parent of r_f = r mod b^f0 under the slice (digits [f0, k−1) = pipd): (mask lo, hi, cacc),
@@ -1341,6 +1437,118 @@ mod wp {
         }
     }
 
+    /// The top hierarchy (the trunk's piece C, wide form): once per b consecutive slices (one value of the slice's
+    /// digits [f0 + 1, k − 1)), thread i = d·nlead + (h − hlo) certifies the parent prefix p5 = (h·b + d)·b^(k−2−f0)
+    /// + pip div b over its b^(f0+1) n (clipped to the range) and lists i if valid. A slice's prefix i is tested
+    /// only under a valid parent i: a sub-interval's certificate holds its parent's digits, so a parent with a
+    /// repeated digit has no valid child (exact by containment). `l5n`: [0] parents listed, [1] cubes done.
+    #[cube(launch_unchecked)]
+    pub fn wtops5_kernel(
+        list: &mut Array<u32>,
+        l5n: &mut Array<Atomic<u32>>,
+        pipd: &Array<u32>,
+        ends: &Array<u32>,
+        ntest: u32,
+        nlead: u32,
+        hlo: u32,
+        plo_lo: u32,
+        plo_hi: u32,
+        phi_lo: u32,
+        phi_hi: u32,
+        #[comptime] w: u32,
+        #[comptime] b: u32,
+        #[comptime] f0: u32,
+        #[comptime] k: u32,
+        #[comptime] l: u32,
+        #[comptime] s2: u32,
+        #[comptime] s3: u32,
+    ) {
+        let bb = comptime!(b * b);
+        let na = comptime!((l + 1) / 2);
+        let i = ABSOLUTE_POS_X;
+        let mut ok = false;
+        if i < ntest {
+            let d = i / nlead;
+            let h = hlo + i % nlead;
+            let bw = comptime!(b as u64);
+            let mut p = u64::cast_from(h * b + d);
+            #[unroll]
+            for j in 0..comptime!(k - 2 - f0) {
+                p = p * bw + u64::cast_from(pipd[comptime!(k - 2 - f0 - j) as usize]);
+            }
+            // the range's parent prefixes: start div b^(f0+1) .. (end - 1) div b^(f0+1)
+            let plo = u64::cast_from(plo_lo) | (u64::cast_from(plo_hi) << 32u64);
+            let phi = u64::cast_from(phi_lo) | (u64::cast_from(phi_hi) << 32u64);
+            if p >= plo && p <= phi {
+                let mut ad = Array::<u32>::new(comptime!(l as usize));
+                let mut cd = Array::<u32>::new(comptime!(l as usize));
+                #[unroll]
+                for j in 0..comptime!(f0 + 1) {
+                    ad[j as usize] = select(p == plo, ends[j as usize], 0u32);
+                    cd[j as usize] =
+                        select(p == phi, ends[comptime!(l + j) as usize], comptime!(b - 1));
+                }
+                #[unroll]
+                for j in 0..comptime!(k - 2 - f0) {
+                    let v = pipd[comptime!(j + 1) as usize];
+                    ad[comptime!(f0 + 1 + j) as usize] = v;
+                    cd[comptime!(f0 + 1 + j) as usize] = v;
+                }
+                ad[comptime!(k - 1) as usize] = d;
+                cd[comptime!(k - 1) as usize] = d;
+                let mut hh = h;
+                #[unroll]
+                for j in 0..comptime!(l - k) {
+                    let q = hh / b;
+                    let v = hh - q * b;
+                    ad[comptime!(k + j) as usize] = v;
+                    cd[comptime!(k + j) as usize] = v;
+                    hh = q;
+                }
+                let mut an = Array::<u32>::new(comptime!(na as usize));
+                let mut cn = Array::<u32>::new(comptime!(na as usize));
+                limbs(&ad, &mut an, l, b);
+                limbs(&cd, &mut cn, l, b);
+                let mut a2 = Array::<u32>::new(comptime!((2 * na) as usize));
+                let mut c2 = Array::<u32>::new(comptime!((2 * na) as usize));
+                mul_l(&an, &an, &mut a2, na, na, bb);
+                mul_l(&cn, &cn, &mut c2, na, na, bb);
+                let mut a3 = Array::<u32>::new(comptime!((3 * na) as usize));
+                let mut c3 = Array::<u32>::new(comptime!((3 * na) as usize));
+                mul_l(&a2, &an, &mut a3, comptime!(2 * na), na, bb);
+                mul_l(&c2, &cn, &mut c3, comptime!(2 * na), na, bb);
+                let (l1, h1, bad1) = cert_w(&a2, &c2, 0u64, 0u32, b, s2, k);
+                let (_l2, _h2, bad2) = cert_w(&a3, &c3, l1, h1, b, s3, k);
+                ok = !bad1 && !bad2;
+            }
+        }
+        let bl = plane_ballot(ok);
+        let lane = UNIT_POS_PLANE;
+        let lm = select(
+            lane >= 32u32,
+            0xFFFF_FFFFu32,
+            (1u32 << min(lane, 31u32)) - 1u32,
+        );
+        let mut r = (bl[0usize] & lm).count_ones();
+        let mut n = bl[0usize].count_ones();
+        if comptime!(w > 32) {
+            let hm = select(lane >= 32u32, (1u32 << (lane & 31u32)) - 1u32, 0u32);
+            r += (bl[1usize] & hm).count_ones();
+            n += bl[1usize].count_ones();
+        }
+        let mut base0 = 0u32;
+        if lane == 0u32 && n > 0u32 {
+            base0 = l5n[0usize].fetch_add(n);
+        }
+        let base = plane_sum(base0);
+        if ok {
+            list[(base + r) as usize] = i;
+        }
+        if UNIT_POS_X == 0u32 {
+            l5n[1usize].fetch_add(1u32);
+        }
+    }
+
     /// Tops: thread i = d·nlead + (h − hlo) tests the prefix p = (h·b + d)·b^(k−1−f0) + pip (if in the range's
     /// prefixes [plo, phi]; the range's ends clip the first and last); certificate of n² and n³ at positions ≥ k;
     /// a count per segment d·m + h mod m.
@@ -1348,12 +1556,18 @@ mod wp {
     pub fn wtops1_kernel(
         tm: &mut Array<u64>,
         th: &mut Array<u32>,
+        // the certificate's digits at positions >= k + 2 (the prefilter's), per prefix
+        tq: &mut Array<u64>,
+        tqh: &mut Array<u32>,
         tv: &mut Array<u32>,
         segc: &mut Array<Atomic<u32>>,
         tstat: &mut Array<Atomic<u32>>,
         pipd: &Array<u32>,
         ends: &Array<u32>,
         acc: &mut Array<Atomic<u32>>,
+        // the valid parents' prefix indices (`wtops5`) and their count (`l5n[0]`): grid-stride over them
+        list: &Array<u32>,
+        l5n: &Array<u32>,
         ntest: u32,
         nlead: u32,
         hlo: u32,
@@ -1372,9 +1586,14 @@ mod wp {
         let m = comptime!(b - 1);
         let bb = comptime!(b * b);
         let na = comptime!((l + 1) / 2);
-        let i = ABSOLUTE_POS_X;
-        let mut okc = false;
-        if i < ntest {
+        let nl = min(l5n[0usize], ntest);
+        let mut jj = ABSOLUTE_POS_X;
+        let mut exam = 0u32;
+        let mut cert = 0u32;
+        while jj < nl {
+            let i = list[jj as usize];
+            jj += CUBE_COUNT_X * NT;
+            exam += 1u32;
             let d = i / nlead;
             let h = hlo + i % nlead;
             let bw = comptime!(b as u64);
@@ -1388,6 +1607,8 @@ mod wp {
             let mut ok = false;
             let mut lo = 0u64;
             let mut hi = 0u32;
+            let mut mq = 0u64;
+            let mut mqh = 0u32;
             if p >= plo && p <= phi {
                 let mut ad = Array::<u32>::new(comptime!(l as usize));
                 let mut cd = Array::<u32>::new(comptime!(l as usize));
@@ -1426,26 +1647,32 @@ mod wp {
                 let mut c3 = Array::<u32>::new(comptime!((3 * na) as usize));
                 mul_l(&a2, &an, &mut a3, comptime!(2 * na), na, bb);
                 mul_l(&c2, &cn, &mut c3, comptime!(2 * na), na, bb);
-                let (l1, h1, bad1) = cert_w(&a2, &c2, 0u64, 0u32, b, s2, k);
-                let (l2, h2, bad2) = cert_w(&a3, &c3, l1, h1, b, s3, k);
+                let (l1, h1, q1, qh1, bad1) =
+                    cert_split_w(&a2, &c2, 0u64, 0u32, 0u64, 0u32, b, s2, k, comptime!(k + 2));
+                let (l2, h2, q2, qh2, bad2) =
+                    cert_split_w(&a3, &c3, l1, h1, q1, qh1, b, s3, k, comptime!(k + 2));
                 ok = !bad1 && !bad2;
                 lo = l2;
                 hi = h2;
+                mq = q2;
+                mqh = qh2;
             }
             tm[i as usize] = lo;
             th[i as usize] = hi;
+            tq[i as usize] = mq;
+            tqh[i as usize] = mqh;
             tv[i as usize] = select(ok, 1u32, 0u32);
-            okc = ok;
             if ok {
+                cert += 1u32;
                 segc[(d * m + h % m) as usize].fetch_add(1u32);
                 if lo.count_ones() + hi.count_ones() > maxpop {
                     tstat[1usize].fetch_add(1u32);
                 }
             }
         }
-        // prefixes examined, tops certified (plane sums, lane 0 adds: a partly filled plane under-counts)
-        let ex = plane_sum(select(i < ntest, 1u32, 0u32));
-        let ce = plane_sum(select(okc, 1u32, 0u32));
+        // valid parents examined, tops certified (plane sums, lane 0 adds: a partly filled plane under-counts)
+        let ex = plane_sum(exam);
+        let ce = plane_sum(cert);
         if UNIT_POS_PLANE == 0u32 {
             acc[A_T1_EXAM].fetch_add(ex);
             acc[A_T1_CERT].fetch_add(ce);
@@ -1462,7 +1689,13 @@ mod wp {
         tmask: &mut Array<u64>,
         tmh: &mut Array<u32>,
         thd: &mut Array<u32>,
+        tq: &Array<u64>,
+        tqh: &Array<u32>,
+        ttq: &mut Array<u64>,
+        ttqh: &mut Array<u32>,
         acc: &mut Array<Atomic<u32>>,
+        list: &Array<u32>,
+        l5n: &Array<u32>,
         ntest: u32,
         nlead: u32,
         hlo: u32,
@@ -1470,11 +1703,14 @@ mod wp {
         #[comptime] b: u32,
     ) {
         let m = comptime!(b - 1);
-        let i = ABSOLUTE_POS_X;
-        let mut placed = false;
-        if i < ntest {
+        let nl = min(l5n[0usize], ntest);
+        let mut jj = ABSOLUTE_POS_X;
+        let mut placed = 0u32;
+        while jj < nl {
+            let i = list[jj as usize];
+            jj += CUBE_COUNT_X * NT;
             if tv[i as usize] == 1u32 {
-                placed = true;
+                placed += 1u32;
                 let d = i / nlead;
                 let h = hlo + i % nlead;
                 let slot = cur[(d * m + h % m) as usize].fetch_add(1u32);
@@ -1482,10 +1718,12 @@ mod wp {
                     tmask[slot as usize] = tm[i as usize];
                     tmh[slot as usize] = th[i as usize];
                     thd[slot as usize] = i;
+                    ttq[slot as usize] = tq[i as usize];
+                    ttqh[slot as usize] = tqh[i as usize];
                 }
             }
         }
-        let pp = plane_sum(select(placed, 1u32, 0u32));
+        let pp = plane_sum(placed);
         if UNIT_POS_PLANE == 0u32 {
             acc[A_T2_PLACED].fetch_add(pp);
         }
@@ -1567,14 +1805,50 @@ mod wp {
         surv: &mut Array<u32>,
         scount: &mut Array<Atomic<u32>>,
         stat: &mut Array<u32>,
-        // the expansion's account: cubes done, slabs walked
+        // the expansion's account: cubes done, slabs walked, survivor bits read, bits of a clipped top outside the
+        // range (not survivors; never listed)
         est: &mut Array<Atomic<u32>>,
+        // the prefilter: the tops' thread indices and certified digits >= k + 2, the slice's digits, the range's
+        // clip (as the check's), the small-n bound (n < b^ceil((k+2)/2) iff h < hsmall and the slice's digits
+        // >= ceil((k+2)/2) are zero), the fault bits (F_NOPF 1: no prefilter; F_PF_DROP 1024: the prefilter
+        // wrongly drops n whose r_f has bits 10-19 zero, as the trunk's)
+        thd: &Array<u32>,
+        ttq: &Array<u64>,
+        ttqh: &Array<u32>,
+        pipd: &Array<u32>,
+        clip: &Array<u32>,
+        nlead: u32,
+        hlo: u32,
+        hsmall: u32,
+        fault: u32,
         nslab_cap: u32,
         scap: u32,
         c0: u32,
         #[comptime] b: u32,
         #[comptime] nroot: u32,
+        #[comptime] f0: u32,
+        #[comptime] k: u32,
     ) {
+        let nopf = (fault & 1u32) != 0u32;
+        let pfdrop = (fault & 1024u32) != 0u32;
+        let bw = comptime!(b as u64);
+        let plo = u64::cast_from(clip[0usize]) | (u64::cast_from(clip[1usize]) << 32u64);
+        let phi = u64::cast_from(clip[2usize]) | (u64::cast_from(clip[3usize]) << 32u64);
+        let slo = clip[4usize];
+        let ehi = clip[5usize];
+        // n < b^ceil((k+2)/2) needs every slice digit at positions >= ceil((k+2)/2) zero
+        let tsm = comptime!((k + 3) / 2);
+        let mut pipz = true;
+        #[unroll]
+        for j in 0..comptime!(k - 1 - f0) {
+            if comptime!(f0 + j >= tsm) {
+                if pipd[j as usize] != 0u32 {
+                    pipz = false;
+                }
+            }
+        }
+        let mut nread = 0u32;
+        let mut nclip = 0u32;
         let m = comptime!(b - 1);
         if ABSOLUTE_POS_X == 0u32 {
             stat[0usize] = lcnt[0usize];
@@ -1625,6 +1899,72 @@ mod wp {
                     let pe = pseg[(c + 1u32) as usize];
                     pos = (pb - pseg[c0 as usize]) * b + du * (pe - pb) + rec[1usize];
                 }
+                // the entries of the record that are survivors inside the range and pass the prefilter
+                nread += wlo.count_ones() + whi.count_ones();
+                let mut plo_b = 0u32;
+                let mut phi_b = 0u32;
+                if live {
+                    let ix = thd[ti as usize];
+                    let du = ix / nlead;
+                    let h = hlo + ix % nlead;
+                    let mq = ttq[ti as usize];
+                    let mqh = ttqh[ti as usize];
+                    let mut pp = u64::cast_from(h * b + du);
+                    #[unroll]
+                    for j in 0..comptime!(k - 1 - f0) {
+                        pp = pp * bw + u64::cast_from(pipd[comptime!(k - 2 - f0 - j) as usize]);
+                    }
+                    let edge_lo = pp == plo;
+                    let edge_hi = pp == phi;
+                    let mut rd = Array::<u32>::new(comptime!((k + 2) as usize));
+                    #[unroll]
+                    for j in 0..comptime!(k - 1 - f0) {
+                        rd[comptime!(f0 + j) as usize] = pipd[j as usize];
+                    }
+                    rd[comptime!(k - 1) as usize] = du;
+                    let h0 = h % b;
+                    rd[comptime!(k) as usize] = h0;
+                    rd[comptime!(k + 1) as usize] = ((h - h0) / b) % b;
+                    let hz =
+                        h < hsmall && pipz && du * select(comptime!(k > tsm), 1u32, 0u32) == 0u32;
+                    for half in 0..2u32 {
+                        let mut x = select(half == 0u32, wlo, whi);
+                        while x != 0u32 {
+                            let bt = x.trailing_zeros();
+                            x &= x - 1u32;
+                            let rf = lst[(pos + bt + 32u32 * half) as usize];
+                            if (edge_lo && rf < slo) || (edge_hi && rf > ehi) {
+                                nclip += 1u32;
+                            } else {
+                                let mut y = rf;
+                                let mut rz = true;
+                                #[unroll]
+                                for j in 0..f0 {
+                                    let q = y / b;
+                                    rd[j as usize] = y - q * b;
+                                    if comptime!(j >= tsm) {
+                                        if y - q * b != 0u32 {
+                                            rz = false;
+                                        }
+                                    }
+                                    y = q;
+                                }
+                                let pass = nopf
+                                    || (pf_w(&rd, mq, mqh, hz && rz, b, k)
+                                        && !(pfdrop && (rf >> 10u32).trailing_zeros() >= 10u32));
+                                if pass {
+                                    if half == 0u32 {
+                                        plo_b |= 1u32 << bt;
+                                    } else {
+                                        phi_b |= 1u32 << bt;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                wlo = plo_b;
+                whi = phi_b;
                 let nb = wlo.count_ones() + whi.count_ones();
                 let excl = plane_exclusive_sum(nb);
                 let tot = plane_sum(nb);
@@ -1661,6 +2001,12 @@ mod wp {
         }
         if UNIT_POS_PLANE == 0u32 && walked > 0u32 {
             est[1usize].fetch_add(walked);
+        }
+        let pr = plane_sum(nread);
+        let pc = plane_sum(nclip);
+        if UNIT_POS_PLANE == 0u32 {
+            est[2usize].fetch_add(pr);
+            est[3usize].fetch_add(pc);
         }
         if UNIT_POS_X == 0u32 {
             est[0usize].fetch_add(1u32);
@@ -1812,7 +2158,10 @@ pub struct WideBase {
     /// The range's prefixes n div b^f0: [plo, phi].
     pub plo: u64,
     pub phi: u64,
-    /// The low f0 digits of start, then of end − 1 (then zeros to l each).
+    /// The top hierarchy's parent prefixes n div b^(f0+1): [plo5, phi5].
+    pub plo5: u64,
+    pub phi5: u64,
+    /// The low f0 + 1 digits of start, then of end − 1 (then zeros to l each).
     pub ends: Vec<u32>,
 }
 
@@ -1829,8 +2178,8 @@ impl WideBase {
         let (start, end) = (coord.start, coord.end);
         let l = ndigits(end - 1, b);
         ensure!(
-            k >= 2 && f0 < k && k <= l,
-            "middle-out wide: shape (f0 {f0}, k {k}) for {l}-digit n"
+            k >= 2 && f0 + 1 < k && k <= l,
+            "middle-out wide: shape (f0 {f0}, k {k}) for {l}-digit n (the top hierarchy needs a slice digit)"
         );
         let bu = u128::from(b);
         ensure!(
@@ -1874,7 +2223,7 @@ impl WideBase {
         let (plo, phi) = (start / bf, e1 / bf);
         ensure!(phi < 1 << 64, "middle-out wide: prefixes reach 2^64");
         let mut ends = vec![0u32; 2 * l as usize];
-        for j in 0..f0 {
+        for j in 0..=f0 {
             ends[j as usize] = ((start / bu.pow(j)) % bu) as u32;
             ends[(l + j) as usize] = ((e1 / bu.pow(j)) % bu) as u32;
         }
@@ -1892,6 +2241,8 @@ impl WideBase {
             nlead: nlead as u32,
             plo: plo as u64,
             phi: phi as u64,
+            plo5: (start / (bf * bu)) as u64,
+            phi5: (e1 / (bf * bu)) as u64,
             ends,
         })
     }
@@ -2022,15 +2373,21 @@ struct WSlice {
     tmhh: Handle,
     tsegh: Handle,
     thdh: Handle,
+    /// Per top: the prefilter's `mhi` (lo, hi).
+    ttq: Handle,
+    ttqh: Handle,
     tstat: Handle,
     /// The slice's account (`A_*`).
     acc: Handle,
+    /// Its top-hierarchy group's `l5n` (parents listed, cubes done).
+    l5n: Option<Handle>,
 }
 
 /// What the host knows of a slice when its first launch batch is finished (the trunk's `SliceHead`).
 struct WHead {
     pip: u64,
     acc: Handle,
+    l5n: Option<Handle>,
     /// Every launch batch of the slice was queued (the probe and children laws apply).
     full: bool,
 }
@@ -2052,6 +2409,12 @@ struct WTicket {
 /// The main kernel not launched.
 #[allow(dead_code)] // the tests only
 pub(crate) const F_SKIP_MAIN: u32 = 2;
+/// No prefilter: every survivor listed and checked (the tests' whole survivor sets).
+#[allow(dead_code)] // the tests only
+pub(crate) const F_NOPF: u32 = 1;
+/// The prefilter wrongly drops survivors whose r_f has bits 10-19 zero (only the sampled check sees it).
+#[allow(dead_code)] // the tests only
+pub(crate) const F_PF_DROP: u32 = 1024;
 /// Each main-kernel instance's last probe not run.
 #[allow(dead_code)] // the tests only
 pub(crate) const F_DROP_PROBE: u32 = 8;
@@ -2107,6 +2470,13 @@ pub struct WideJoin<R: Runtime> {
     tm: Handle,
     th: Handle,
     tv: Handle,
+    /// Per prefix: the certificate's digits >= k + 2 (the prefilter's `mhi`, lo and hi).
+    tq: Handle,
+    tqh: Handle,
+    /// The top hierarchy's list of valid parent prefixes (shared by b consecutive slices), and which slice group
+    /// (pip div b) it holds with that group's `l5n` (count, cubes done).
+    t5list: Handle,
+    t5state: std::sync::Mutex<Option<(u64, Handle)>>,
     /// Timing only ([`WideJoin::set_timing_stop`]): 1 tops, 2 parents, 3 main kernel, 5 expansion, 6 all.
     /// The library never reads `MIDOUT_STOP` (AUDIT-MO §1.2); [`search_field_wide`] refuses a stop.
     pub(crate) stop: u32,
@@ -2228,6 +2598,10 @@ impl<R: Runtime> WideJoin<R> {
             tm: e(ntest * 8),
             th: e(ntest * 4),
             tv: e(ntest * 4),
+            tq: e(ntest * 8),
+            tqh: e(ntest * 4),
+            t5list: e(ntest * 4),
+            t5state: std::sync::Mutex::new(None),
             stop: 6,
             fault: 0,
             caps,
@@ -2294,25 +2668,65 @@ impl<R: Runtime> WideJoin<R> {
         let tmh = self.client.empty(nt * 8);
         let tmhh = self.client.empty(nt * 4);
         let thdh = self.client.empty(nt * 4);
+        let ttq = self.client.empty(nt * 8);
+        let ttqh = self.client.empty(nt * 4);
         let cur = self.client.empty(nseg * 4);
         let dummy = self.client.empty(4);
         let ntest = wb.ntest();
         let (b, f0, k, l) = (wb.b, wb.f0, wb.k, wb.l);
+        let grp = pip / u64::from(b);
+        let mut l5n = None;
         unsafe {
             if self.upto(1) {
-                if self.fault & F_SKIP_TOPS == 0 {
-                    wp::wtops1_kernel::launch_unchecked::<R>(
+                let mut st = self.t5state.lock().expect("t5state");
+                if st.as_ref().map(|x| x.0) != Some(grp) {
+                    let h = self.mk(vec![0u32; 2]);
+                    wp::wtops5_kernel::launch_unchecked::<R>(
                         c,
                         CubeCount::Static(ntest.div_ceil(NT), 1, 1),
                         CubeDim::new_1d(NT),
+                        a(&self.t5list, ntest as usize),
+                        a(&h, 2),
+                        a(&pipd, npd),
+                        a(&self.ends_h, 2 * l as usize),
+                        ntest,
+                        wb.nlead,
+                        wb.hlo,
+                        wb.plo5 as u32,
+                        (wb.plo5 >> 32) as u32,
+                        wb.phi5 as u32,
+                        (wb.phi5 >> 32) as u32,
+                        self.w,
+                        b,
+                        f0,
+                        k,
+                        l,
+                        wb.s2,
+                        wb.s3,
+                    );
+                    *st = Some((grp, h));
+                }
+                l5n = st.as_ref().map(|x| x.1.clone());
+                let l5h = l5n.clone().expect("l5n");
+                drop(st);
+                let tgrid = ntest.div_ceil(NT * 4).max(1);
+                if self.fault & F_SKIP_TOPS == 0 {
+                    wp::wtops1_kernel::launch_unchecked::<R>(
+                        c,
+                        CubeCount::Static(tgrid, 1, 1),
+                        CubeDim::new_1d(NT),
                         a(&self.tm, ntest as usize),
                         a(&self.th, ntest as usize),
+                        a(&self.tq, ntest as usize),
+                        a(&self.tqh, ntest as usize),
                         a(&self.tv, ntest as usize),
                         a(&segc, nseg),
                         a(&tstat, 2),
                         a(&pipd, npd),
                         a(&self.ends_h, 2 * l as usize),
                         a(&acc, ACC_WORDS),
+                        a(&self.t5list, ntest as usize),
+                        a(&l5h, 2),
                         ntest,
                         wb.nlead,
                         wb.hlo,
@@ -2346,7 +2760,7 @@ impl<R: Runtime> WideJoin<R> {
                 );
                 wp::wtops2_kernel::launch_unchecked::<R>(
                     c,
-                    CubeCount::Static(ntest.div_ceil(NT), 1, 1),
+                    CubeCount::Static(tgrid, 1, 1),
                     CubeDim::new_1d(NT),
                     a(&self.tm, ntest as usize),
                     a(&self.th, ntest as usize),
@@ -2355,7 +2769,13 @@ impl<R: Runtime> WideJoin<R> {
                     a(&tmh, nt),
                     a(&tmhh, nt),
                     a(&thdh, nt),
+                    a(&self.tq, ntest as usize),
+                    a(&self.tqh, ntest as usize),
+                    a(&ttq, nt),
+                    a(&ttqh, nt),
                     a(&acc, ACC_WORDS),
+                    a(&self.t5list, ntest as usize),
+                    a(&l5h, 2),
                     ntest,
                     wb.nlead,
                     wb.hlo,
@@ -2448,8 +2868,11 @@ impl<R: Runtime> WideJoin<R> {
             tmhh,
             tsegh,
             thdh,
+            ttq,
+            ttqh,
             tstat,
             acc,
+            l5n,
         }
     }
 
@@ -2516,11 +2939,22 @@ impl<R: Runtime> WideJoin<R> {
                     a(&scount, 1),
                     a(&stat, 2),
                     a(&est, EST_WORDS),
+                    a(&ws.thdh, nt),
+                    a(&ws.ttq, nt),
+                    a(&ws.ttqh, nt),
+                    a(&ws.pipd, npd),
+                    a(&self.clip_h, 6),
+                    wb.nlead,
+                    wb.hlo,
+                    1u32,
+                    self.fault,
                     self.nslab_cap,
                     self.scap,
                     *c0,
                     wb.b,
                     wb.roots.len() as u32,
+                    wb.f0,
+                    wb.k,
                 );
             }
             if self.upto(6) {
@@ -2594,6 +3028,7 @@ impl<R: Runtime> WideJoin<R> {
                 t.head = Some(WHead {
                     pip,
                     acc: ws.acc.clone(),
+                    l5n: ws.l5n.clone(),
                     full: true,
                 });
             }
@@ -2701,14 +3136,15 @@ impl<R: Runtime> WideJoin<R> {
                 es[1],
                 st[1]
             );
-            listed += u64::from(n);
-            clipped += u64::from(ran[2]);
+            // survivor bits the expansion read (before the prefilter), and those of a clipped top outside the range
+            listed += u64::from(es[2]);
+            clipped += u64::from(es[3]) + u64::from(ran[2]);
             dc.checked += u64::from(ran[0] - ran[2]);
-            per.push((st[0], ntops, u64::from(n - ran[2])));
+            per.push((st[0], ntops, u64::from(es[2] - es[3] - ran[2])));
         }
         ensure!(
             listed == dc.survivors,
-            "middle-out wide: {listed} survivors listed, the kernel counted {}",
+            "middle-out wide: {listed} survivor bits read by the expansion, the kernel counted {}",
             dc.survivors
         );
         // survivor bits of a clipped top outside the range are not survivors (the reference's `clipped`)
@@ -2730,7 +3166,14 @@ impl<R: Runtime> WideJoin<R> {
                 anyhow!("middle-out wide: slice {} without a top count", head.pip)
             })?;
             let a = self.rd(&head.acc)?;
-            self.check_slice(head, &a, jobs, ntops, per[i].0)?;
+            let l5 = match &head.l5n {
+                Some(h) => self.rd(h)?,
+                None => bail!(
+                    "middle-out wide: slice {} without its top-hierarchy count",
+                    head.pip
+                ),
+            };
+            self.check_slice(head, &a, &l5, jobs, ntops, per[i].0)?;
             if let Some(ps) = per_slice.as_deref_mut() {
                 ps.push((head.pip, per[i..j].iter().map(|x| x.2).sum()));
             }
@@ -2750,7 +3193,15 @@ impl<R: Runtime> WideJoin<R> {
     /// One slice's account `a` (`A_*`) against what the host queued: `jobs` main-kernel instances, `ntops` tops
     /// (`tstat[0]`, the scan's sum of the segment counts), `lcnt` parents (the expansion's copy of the list
     /// length).
-    fn check_slice(&self, h: &WHead, a: &[u32], jobs: u64, ntops: u32, lcnt: u32) -> Result<()> {
+    fn check_slice(
+        &self,
+        h: &WHead,
+        a: &[u32],
+        l5n: &[u32],
+        jobs: u64,
+        ntops: u32,
+        lcnt: u32,
+    ) -> Result<()> {
         let pip = h.pip;
         let fail = |what: &str, got: u64, want: u64| -> Result<()> {
             ensure!(
@@ -2763,9 +3214,14 @@ impl<R: Runtime> WideJoin<R> {
         fail("plane errors", u64::from(a[A_ERR_PLANE]), 0)?;
         fail("slice done", u64::from(a[A_DONE]), 1)?;
         fail(
-            "wtops1 prefixes examined",
+            "wtops5 cubes done",
+            u64::from(l5n[1]),
+            u64::from(self.wb.ntest().div_ceil(NT)),
+        )?;
+        fail(
+            "wtops1 valid parents examined",
             u64::from(a[A_T1_EXAM]),
-            u64::from(self.wb.ntest()),
+            u64::from(l5n[0]),
         )?;
         fail("wtops1 tops certified", u64::from(a[A_T1_CERT]), ntops)?;
         fail("wscan (tops) ran", u64::from(a[A_TSCAN]), 1)?;
@@ -2887,6 +3343,7 @@ impl<R: Runtime> WideJoin<R> {
                 t.head = Some(WHead {
                     pip,
                     acc: ws.acc.clone(),
+                    l5n: ws.l5n.clone(),
                     full: true,
                 });
             }
@@ -2943,11 +3400,16 @@ impl<R: Runtime> WideJoin<R> {
     }
 }
 
-/// The sampled check's CPU half: slice `pip` through the CPU reference (`u128` masks), its survivors sorted.
+/// The sampled check's CPU half: slice `pip` through the CPU reference (`u128` masks): its survivors, and those
+/// that pass the prefilter, sorted.
 pub(crate) fn wide_cpu_slice(coord: &Coord, sh: Shape, pip: u64) -> (u64, Vec<u128>) {
     let base = Base::new(coord);
     let mut v = Vec::new();
-    let cn = super::cpu::slice_join::<u128>(&base, sh, u128::from(pip), |_, n, _| v.push(n));
+    let cn = super::cpu::slice_join::<u128>(&base, sh, u128::from(pip), |_, n, pass| {
+        if pass {
+            v.push(n);
+        }
+    });
     v.sort_unstable();
     (cn.survivors, v)
 }
@@ -2975,10 +3437,11 @@ pub(crate) fn wide_sample_compare<R: Runtime>(
     let mut gn: Vec<u128> = got.into_iter().map(|x| x.0).collect();
     gn.sort_unstable();
     ensure!(
-        dc.survivors == cpu.0 && gn == cpu.1,
-        "middle-out wide: sampled CPU check of slice {pip} differs: device survivors {} list {}, CPU survivors {} \
-         list {}",
+        dc.survivors == cpu.0 && dc.checked == cpu.1.len() as u64 && gn == cpu.1,
+        "middle-out wide: sampled CPU check of slice {pip} differs: device survivors {} checked {} list {}, CPU \
+         survivors {} checked {}",
         dc.survivors,
+        dc.checked,
         gn.len(),
         cpu.0,
         cpu.1.len()
@@ -3220,12 +3683,19 @@ mod tests {
 
     /// One slice through the CPU reference (u128 masks) on `threads` threads
     /// (units split), survivors with their units.
-    fn cpu_slice(coord: &Coord, sh: Shape, pip: u128) -> (Counts, Vec<u128>) {
+    fn cpu_slice(coord: &Coord, sh: Shape, pip: u128) -> (Counts, Vec<u128>, Vec<u128>) {
         let base = Base::new(coord);
         let mut v = Vec::new();
-        let cn = slice_join::<u128>(&base, sh, pip, |_, n, _| v.push(n));
+        let mut pv = Vec::new();
+        let cn = slice_join::<u128>(&base, sh, pip, |_, n, pass| {
+            v.push(n);
+            if pass {
+                pv.push(n);
+            }
+        });
         v.sort_unstable();
-        (cn, v)
+        pv.sort_unstable();
+        (cn, v, pv)
     }
 
     /// The wide device path against the CPU reference on whole slices: tops
@@ -3265,18 +3735,25 @@ mod tests {
                     if let Ok(x) = std::env::var("MIDOUT_MAXPOP") {
                         caps.maxpop = x.parse().unwrap();
                     }
-                    let gj = WideJoin::new($client, caps, &coord, sh).unwrap();
+                    let mut gj = WideJoin::new($client, caps, &coord, sh).unwrap();
+                    // MIDOUT_NOPF=1: no prefilter, whole survivor sets
+                    let nopf = std::env::var("MIDOUT_NOPF").is_ok_and(|x| x == "1");
+                    if nopf {
+                        gj.set_fault(F_NOPF);
+                    }
                     println!(
-                        "device {} W {} base {b} shape ({f0}, {k}) slice {pip}",
+                        "device {} W {} base {b} shape ({f0}, {k}) slice {pip} prefilter {}",
                         ctx.device_name(),
-                        gj.w
+                        gj.w,
+                        !nopf
                     );
                     let t0 = Instant::now();
                     let rank = gj.rank_of(pip).unwrap();
                     let (dc, mut got, tops) = gj.run_slice(pip, &rank).unwrap();
                     let tdev = t0.elapsed().as_secs_f64();
                     let t1 = Instant::now();
-                    let (cn, want) = cpu_slice(&coord, sh, u128::from(pip));
+                    let (cn, all, pass) = cpu_slice(&coord, sh, u128::from(pip));
+                    let want = if nopf { all } else { pass };
                     println!("slice {pip}: device {dc:?} ({tdev:.1} s)");
                     println!(
                         "slice {pip}: cpu    {cn:?} ({:.1} s)",
@@ -3286,8 +3763,8 @@ mod tests {
                     assert_eq!(gj.wb.tested(pip), cn.tops_tested, "tops tested");
                     got.sort_unstable();
                     let gn: Vec<u128> = got.iter().map(|x| x.0).collect();
-                    assert_eq!(gn.len(), want.len(), "survivor count");
-                    assert!(gn == want, "survivor sets differ");
+                    assert_eq!(gn.len(), want.len(), "listed count");
+                    assert!(gn == want, "listed sets differ");
                     assert_eq!(
                         (
                             dc.children,
@@ -3303,7 +3780,7 @@ mod tests {
                             cn.flat,
                             cn.kept,
                             cn.survivors,
-                            cn.survivors
+                            if nopf { cn.survivors } else { cn.checked }
                         )
                     );
                     let mut bad = 0;
@@ -3344,7 +3821,7 @@ mod tests {
     #[test]
     #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime)"]
     fn wide_whole_small_bases_vs_brute_force() {
-        use crate::midout::cpu::q_shape;
+        use crate::midout::cpu::{q_checked, q_shape};
         use std::collections::HashSet;
         let ctx = device().expect("a device");
         let classes: Option<u32> = std::env::var("MIDOUT_CLASSES")
@@ -3391,7 +3868,7 @@ mod tests {
                         for pip in 0..npip {
                             let rank = gj.rank_of(pip).unwrap();
                             let (dc, v, _) = gj.run_slice(pip, &rank).unwrap();
-                            assert_eq!(dc.survivors, v.len() as u64);
+                            assert_eq!(dc.checked, v.len() as u64);
                             surv += dc.survivors;
                             for (n, u) in v {
                                 assert!(got.insert(n), "b{b} {sh:?}: n {n} twice");
@@ -3399,12 +3876,14 @@ mod tests {
                             }
                         }
                         let want: HashSet<u128> =
-                            (coord.start..coord.end).filter(|&n| q_shape::<u128>(&base, sh, n)).collect();
-                        assert_eq!(got, want, "b{b} shape {sh:?}: survivors differ from brute force");
-                        assert_eq!(surv, want.len() as u64);
+                            (coord.start..coord.end).filter(|&n| q_checked::<u128>(&base, sh, n)).collect();
+                        let nsurv =
+                            (coord.start..coord.end).filter(|&n| q_shape::<u128>(&base, sh, n)).count() as u64;
+                        assert_eq!(got, want, "b{b} shape {sh:?}: checked n differ from brute force");
+                        assert_eq!(surv, nsurv, "b{b} shape {sh:?}: survivors");
                         assert_eq!(gj.nice().unwrap(), nice_brute, "b{b} shape {sh:?}: nice");
                         println!(
-                            "b{b} shape ({f0}, {k}): {npip} slices, {} survivors = brute force, nice {:?}: PASS",
+                            "b{b} shape ({f0}, {k}): {npip} slices, {nsurv} survivors, {} checked = brute force, nice {:?}: PASS",
                             want.len(),
                             nice_brute
                         );
@@ -3459,6 +3938,7 @@ mod tests {
     /// `AUDIT_AGAIN=0` skips the clean rerun after each fault.
     #[test]
     #[ignore = "needs a GPU (MIDOUT_CUDA=1 for CUDA) and a minute or two of CPU"]
+    #[allow(clippy::match_wildcard_for_single_variants)]
     fn wide_faults_are_loud() {
         fn go<R: Runtime>(client: ComputeClient<R>) {
             let (b, pips) = fault_case();
@@ -3497,6 +3977,7 @@ mod tests {
                 ("F_DROP_PROBE", F_DROP_PROBE),
                 ("F_DROP_PARENT", F_DROP_PARENT),
                 ("F_BAD_PARENT", F_BAD_PARENT),
+                ("F_PF_DROP", F_PF_DROP),
             ] {
                 gj.set_fault(f);
                 let r = wgroup(&gj, &rank, &pips);
@@ -3508,7 +3989,7 @@ mod tests {
                             "{name} ({f}): accounts pass: survivors {} vs {}",
                             dc.survivors, base.survivors
                         );
-                        if f != F_BAD_PARENT {
+                        if f != F_BAD_PARENT && f != F_PF_DROP {
                             silent.push(name);
                         }
                     }
@@ -3531,12 +4012,14 @@ mod tests {
                 "sampled check, no fault: slice {sp} equal (survivors {})",
                 cpu.0
             );
-            gj.set_fault(F_BAD_PARENT);
-            let r = wide_sample_compare(&gj, sp, &rank, None, &cpu);
-            gj.set_fault(0);
-            match r {
-                Err(e) => println!("F_BAD_PARENT: sampled check LOUD: {e}"),
-                Ok(()) => silent.push("F_BAD_PARENT (sampled check)"),
+            for (name, f) in [("F_BAD_PARENT", F_BAD_PARENT), ("F_PF_DROP", F_PF_DROP)] {
+                gj.set_fault(f);
+                let r = wide_sample_compare(&gj, sp, &rank, None, &cpu);
+                gj.set_fault(0);
+                match r {
+                    Err(e) => println!("{name}: sampled check LOUD: {e}"),
+                    Ok(()) => silent.push(name),
+                }
             }
             assert!(silent.is_empty(), "silent faults: {silent:?}");
         }
@@ -3598,6 +4081,7 @@ mod tests {
     /// `search_field_wide` refuses a join with a timing stop.
     #[test]
     #[ignore = "needs a GPU; sets MIDOUT_STOP (run it alone)"]
+    #[allow(clippy::match_wildcard_for_single_variants)]
     fn wide_stop_is_loud() {
         fn go<R: Runtime>(client: ComputeClient<R>) {
             // SAFETY: this test alone sets the variable (run it alone: `--exact`).
@@ -3670,7 +4154,8 @@ mod tests {
             ($client:expr) => {{
                 let mut caps = WideCaps::for_base(b);
                 caps.probe = true;
-                let gj = WideJoin::new($client, caps, &coord, Shape { f0, k }).unwrap();
+                let mut gj = WideJoin::new($client, caps, &coord, Shape { f0, k }).unwrap();
+                gj.set_fault(F_NOPF);
                 let rank = gj.rank_of(pip).unwrap();
                 let (dc, got, tops) = gj.run_slice(pip, &rank).unwrap();
                 println!("staged b{b} slice {pip}: device {dc:?}");
