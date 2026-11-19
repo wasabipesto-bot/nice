@@ -10,6 +10,8 @@
 //! - [`cpu`]: the join's exact CPU reference (any base 3–128, generic masks),
 //!   the oracle for the device path and for audits.
 //! - `gpu` (feature `cubecl`): the device path at base 64.
+//! - `gpu_wide` (feature `cubecl`): the device path with two-word masks,
+//!   bases 65–70 (and any base up to 70 in its tests).
 //!
 //! A search of a field returns its nice numbers and two exact counters,
 //! `survivors` and `checked` ([`cpu::FieldOutcome`]); both are properties of
@@ -35,6 +37,8 @@ pub mod coord;
 pub mod cpu;
 #[cfg(feature = "cubecl")]
 pub mod gpu;
+#[cfg(feature = "cubecl")]
+pub mod gpu_wide;
 pub mod mask;
 
 pub use coord::Coord;

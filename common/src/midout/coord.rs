@@ -68,12 +68,12 @@ pub struct Coord {
 }
 
 /// The coordinates fields may be cut in. Only base 64 is defined today;
-/// base 65 is here to show the padded form fits the same interface (no
-/// field of it exists or is planned).
+/// bases 65 and 68–70 are here for the wide device path's measurements
+/// (the padded form; no field of them exists or is planned).
 #[must_use]
 pub fn coord_digits(b: u32) -> Option<(u32, u32, u32)> {
     match b {
-        64 | 65 => Some((4, 9, 6)),
+        64 | 65 | 68 | 69 | 70 => Some((4, 9, 6)),
         _ => None,
     }
 }
