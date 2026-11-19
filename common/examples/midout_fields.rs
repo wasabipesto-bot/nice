@@ -6,7 +6,7 @@
 //!
 //! usage: midout_fields --base B (--t T0,T1,.. | --spread N) [--quanta Q] [--digits K0,K1,Q0]
 //!   --digits: another coordinate than the base's (`Coord::with_digits`; tests of a client's refusal)
-//!   --t: the fields' first quantum (the value of digits 6-8 at base 64);
+//!   --t: the fields' first quantum (the value of the fixed digits: 5-7 at base 64 by default, 6-8 under 4,9,6);
 //!   --spread N: N fields spread evenly over the base; --quanta: quanta per field (1)
 use anyhow::{Result, bail};
 use nice_common::midout::Coord;

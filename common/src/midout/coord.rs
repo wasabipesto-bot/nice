@@ -37,9 +37,9 @@
 //! `[t0, t1)` ([`Coord::field_digits`]). That set is all a search of the
 //! field may rely on: the order of `v` inside a quantum, and the digits
 //! `[k0, q0)`, are not part of the contract, so a search may split a field
-//! however it likes. At base 64 a field of the coordinate `(4, 9, 6)` fixes
-//! digits 6–8, one of `(4, 8, 5)` digits 5–7 (quantum `2^57` either way,
-//! 262,144 fields per base); see [`coord_digits_known`].
+//! however it likes. At base 64 a field of the default coordinate
+//! `(4, 8, 5)` fixes digits 5–7, one of `(4, 9, 6)` digits 6–8 (quantum
+//! `2^57` either way, 262,144 fields per base); see [`coord_digits_known`].
 //!
 //! `range_size` of a field (what the server sums) is [`Coord::n_count`],
 //! the `n` it holds, not `v_size`; they differ only by padding.
@@ -74,15 +74,17 @@ pub struct Coord {
 /// path's measurements (the padded form; no field of them exists or is
 /// planned).
 ///
-/// - `(4, 9, 6)`: a field fixes digits 6–8 (the first coordinate, step 1).
-/// - `(4, 8, 5)`: a field fixes digits 5–7, so digits 4 and 8 (the two ends
-///   of the (4, 10) join's slice key) are free inside it: tops share across
-///   digit 4, parents across digit 8 (`G2/fs/REVIEW.md` §5). Bases 64 and 65
-///   only (the bases its device path was shown exact on).
+/// - `(4, 8, 5)`, the default at bases 64 and 65 (step 5L): a field fixes
+///   digits 5–7, so digits 4 and 8 (the two ends of the (4, 10) join's slice
+///   key) are free inside it: tops share across digit 4, parents across
+///   digit 8 (`G2/fs/REVIEW.md` §5). Bases 64 and 65 only (the bases its
+///   device path was shown exact on).
+/// - `(4, 9, 6)`: a field fixes digits 6–8 (the first coordinate, steps
+///   1–4; still searched, the default at 68–70).
 #[must_use]
 pub fn coord_digits_known(b: u32) -> &'static [(u32, u32, u32)] {
     match b {
-        64 | 65 => &[(4, 9, 6), (4, 8, 5)],
+        64 | 65 => &[(4, 8, 5), (4, 9, 6)],
         68..=70 => &[(4, 9, 6)],
         _ => &[],
     }
@@ -498,11 +500,12 @@ mod tests {
     }
 
     /// The known coordinates: (4, 9, 6) and (4, 8, 5) at bases 64 and 65,
-    /// (4, 9, 6) at 68-70, none elsewhere; the default is the first.
+    /// (4, 9, 6) at 68-70, none elsewhere; the default is the first: (4, 8, 5) at 64 and 65.
     #[test]
     fn known_coordinates() {
         for b in [64, 65] {
-            assert_eq!(coord_digits_known(b), &[(4, 9, 6), (4, 8, 5)]);
+            assert_eq!(coord_digits_known(b), &[(4, 8, 5), (4, 9, 6)]);
+            assert_eq!(coord_digits(b), Some((4, 8, 5)));
             assert!(Coord::with_digits(b, 4, 8, 5).unwrap().is_known());
             assert!(Coord::with_digits(b, 4, 9, 6).unwrap().is_known());
             assert!(!Coord::with_digits(b, 4, 9, 7).unwrap().is_known());

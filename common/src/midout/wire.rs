@@ -8,8 +8,8 @@
 //!   `"coordinate": "midout:K0,K1,Q0"` ([`COORDINATE_KEY`], [`coordinate_id`]):
 //!   the coordinate named explicitly by its digit positions (`midout::coord`:
 //!   digits `[K0, K1)` go on top of v, a field fixes digits `[Q0, K1)`;
-//!   base 64 today is `midout:4,9,6`). A client builds its `Coord` from it
-//!   and refuses an id it does not know.
+//!   base 64's default is `midout:4,8,5`, and `midout:4,9,6` is also known).
+//!   A client builds its `Coord` from it and refuses an id it does not know.
 //!   `range_start`/`range_end` are `v_start`/`v_start + v_size` in the base's
 //!   coordinate (`midout::coord`), and `range_size` is the field's count of
 //!   `n` (`Coord::n_count`, what the server sums). `204 No Content`: no

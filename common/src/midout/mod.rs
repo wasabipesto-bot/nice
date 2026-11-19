@@ -4,7 +4,7 @@
 //! it, and nothing outside this module depends on it.
 //!
 //! - [`coord`]: the work unit. A field is `(base, v_start, v_size)`; it fixes
-//!   a few central digits of n (6–8 at base 64) and nothing else. This is the
+//!   a few central digits of n (5–7 at base 64) and nothing else. This is the
 //!   only part that would ever touch the server, and it knows nothing of the
 //!   join.
 //! - [`cpu`]: the join's exact CPU reference (any base 3–128, generic masks),

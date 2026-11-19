@@ -7,7 +7,7 @@
 //!
 //! usage: midout_wide_bench [--cuda] [--base B] [--fields T0,T1,..] [--group G] [--classes C]
 //!                          [--maxpop P] [--ninst I] [--narrow] [--narrow-only] [--digits K0,K1,Q0]
-//!   --fields: values of the field's fixed digits 6-8 (field t covers v = start + t·quantum)
+//!   --fields: values of the field's fixed digits (5-7 under the default 4,8,5; 6-8 under 4,9,6): v = start + t·quantum
 #![allow(clippy::cast_precision_loss)]
 
 use anyhow::{Result, bail};
