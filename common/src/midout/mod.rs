@@ -8,10 +8,20 @@
 //! field fixes fewer of those digits (5–7 at base 64), so every field is a
 //! whole number of slices and the search may cut it any way it likes.
 //!
-//! This module holds, so far, only [`coord`]: what a field is, the maps
-//! between `n` and `v`, and how fields cover a base's range. Nothing uses
-//! it yet: no client route, no server, no stored data.
+//! - [`coord`]: what a field is, the maps between `n` and `v`, and how
+//!   fields cover a base's range.
+//! - [`cpu`]: the join's exact CPU reference for a field, with
+//!   [`arith`] (384-bit arithmetic for `n²` and `n³`, nice-ness) and
+//!   [`mask`] (digit masks of one or two words). Its tests compare it with
+//!   brute force on whole small bases.
+//!
+//! Nothing uses this module yet: no client route, no server, no stored
+//! data.
 
+pub mod arith;
 pub mod coord;
+pub mod cpu;
+pub mod mask;
 
 pub use coord::Coord;
+pub use cpu::{FieldOutcome, Shape};
