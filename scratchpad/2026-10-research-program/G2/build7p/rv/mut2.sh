@@ -1,0 +1,47 @@
+#!/bin/bash
+# reviewer mutation run in /root/rv/c3 (scratch clone of 06d55495)
+source /root/.cargo/env
+cd /root/rv/c4
+export CARGO_TARGET_DIR=/root/rv/tq
+C=common/src/midout/cpu.rs
+A=common/src/midout/arith.rs
+run() { # id file sed : reviewer tests only, for mutants that survived the author's tests
+  local id=$1 f=$2 expr=$3
+  case " $SURV " in *" $id "*) ;; *) return;; esac
+  git checkout -q -- common/src/midout/cpu.rs common/src/midout/arith.rs common/src/midout/coord.rs
+  sed -i "$expr" "$f"
+  local out; out=$(timeout 900 cargo test -q --release -p nice_common --lib midout::review 2>&1)
+  local rc=$?
+  echo "MUT2 $id rc=$rc | $(echo "$out" | grep -E "FAILED|panicked at|left == right|b[0-9]+" | head -4 | tr '\n' ' ')"
+}
+date -u
+run M01_top_one_fewer_digit $C '187s/while j > kpos as usize {/while j > kpos as usize + 1 {/'
+run M02_top_one_more_digit $C '187s/while j > kpos as usize {/while j + 1 > kpos as usize {/'
+run M03_mhi_drop_k2 $C '197s/if j >= kmid as usize {/if j > kmid as usize {/'
+run M04_mhi_add_k1 $C '197s/if j >= kmid as usize {/if j + 1 >= kmid as usize {/'
+run M05_bottoms_no_e2e3 $C '319s/if e2 == e3 {/if false \&\& e2 == e3 {/'
+run M06_child_no_e2e3 $C '423s/if e2 == e3 || /if /'
+run M07_pref_mhi_from_k1 $C '236s/(j >= k \&\&/(j > k \&\&/'
+run M08_pref_one_digit $C '232s/for j in 0..k + 2 {/for j in 0..k + 1 {/'
+run M09_pref_exempt_floor $C '222s/(k + 2).div_ceil(2) as usize/((k + 2) \/ 2) as usize/'
+run M10a_roots_extra_class $A 's/== target)/== target || r == 1)/'
+run M10b_roots_extra_small $A 's/== target)/== target || (r == 1 \\&\\& m < 63))/'
+run M11_class_pairing $C '562s/(rt as usize + m - cc) % m/(rt as usize + m - cc + 1) % m/'
+run M12_top_hi_past_end $C '355s/.min(base.end - 1);/.min(base.end);/'
+run M13_top_lo_unclipped $C '354s/.max(base.start);/;/'
+run M14_survivor_hi_excl $C '615s/nn <= tp.hi/nn < tp.hi/'
+run M15_qshape_hi_past_end $C '645s/.min(base.end - 1);/.min(base.end);/'
+run M16_drop_last_lead $C '352s/lead_lo..=lead_hi/lead_lo..lead_hi/'
+run M17_chunk_key_order $C '533s/(255 - key(p.mask))/key(p.mask)/'
+run M18_mm_large_branch $C '149s/\[64u32, 32, 0\]/[64u32, 32, 1]/'
+run M19_nice_off_by_one $A 's/(u, u == b \&\& tot == b)/(u, u + 1 >= b \&\& tot == b)/'
+run M20_pref_no_dup_check $C '236s/if !(seen \& bit).is_zero() || /if /'
+run M21_both_exempt_floor $C '222s/(k + 2).div_ceil(2) as usize/((k + 2) \/ 2) as usize/;772s/(k + 2).div_ceil(2)/(k + 2) \/ 2/'
+run M22_both_top_fewer $C '187s/while j > kpos as usize {/while j > kpos as usize + 2 {/'
+run M23_bot_forced_digit $C '303s/% b;/+ 1) % b;/;303s/(forced/((forced/'
+run M24_pref_skip_r3 $C '230s/for v in \[r2, r3\]/for v in [r2]/'
+run M25_lead_lo_plus1 $C '349s/let lead_lo = base.start \/ pw\[k as usize\];/let lead_lo = base.start \/ pw[k as usize] + 1;/'
+run M26_kept_skip_off $C '598s/if !(common \& tp.mask).is_zero() {/if false {/'
+git checkout -q -- common/src/midout
+date -u
+echo MUTDONE

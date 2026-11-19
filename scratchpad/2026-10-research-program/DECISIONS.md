@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-19 16:55 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-19 17:35 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. To answer, reply in the chat with the numbers, for
@@ -171,8 +171,9 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 
 ## What happens next if you say nothing
 
-1. Today: the first two pull requests cut from the cleaned tree (coordinate; CPU reference), then an
-   independent review of each.
+1. Done on 2026-11-19: the first two pull requests (coordinate; CPU reference) cut from the cleaned tree,
+   independently reviewed (including mutation testing) and fixed: branches `pr/midout-field-coordinate` and
+   `pr/midout-cpu-ref` on the fork.
 2. Tomorrow (2026-11-20): I open those two. The device PRs follow over the next days, at most two or three
    open at once.
 3. Nothing touches the server, the fleet, or the default client's behaviour.

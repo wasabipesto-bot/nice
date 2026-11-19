@@ -35,6 +35,37 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.15 Review of the first two pull requests, its fixes, and the branches as they will be opened (2026-11-19 16:10–17:30 UTC, independent reviewer, then the author, then the director; `G2/PR12-REVIEW-BRIEF.md`, `G2/PR12-REVIEW.md`, `G2/PR12-NOTES.md` §6, `G2/PR1-BODY.md`, `G2/PR2-BODY.md`, `G2/build7p/raw/` (incl. `mut_after/`); box 61441981, destroyed 17:28 after 5.29 h)
+
+- **Verdicts: both "merge with fixes".** PR 1's code needed nothing (bijection, coverage, overflow margins and every
+  figure checked by algebra and by the reviewer's own runs); its description had one false sentence (re-cutting
+  fields "without searching anything again": a re-cut field is not a union of finished fields) and two overstated
+  ones. PR 2's reference is correct as far as tested: its nice numbers equal production's `process_range_niceonly`
+  on whole bases 10–29 (base 10 gives [69]); `roots` equals `get_residue_filter` for bases 3–128; the base-64
+  prefilter equals full digits on 200k random n; all 11.8M + 11.7M survivors of two real base-64 slices re-check
+  true [M, the reviewer's runs].
+- **Mutation testing** [M]: 27 mutants; 9 survived the author's tests, among them one that silently drops nice
+  numbers (the top certificate's upper part taking position k + 1; only base 10 has a nice number and its
+  prefilter is exempt). After three independent tests were added (the top certificate against its definition
+  including f0 = 0 shapes; `roots` against production's residue filter; the base-64 prefilter against full
+  digits on 100,000 random n): 3 survive, two that change only work counts and one that edits an exemption no
+  test base reaches.
+- **Other fixes applied:** `Coord`'s values private behind getters; the whole-base test split per base and the
+  join run once per base (the midout tests now take 11.3 s in release and 55.2 s in debug, under libtest's
+  60-second warning); the `Counts` fields documented and marked untested; descriptions corrected.
+- **At the reviewed heads** [M]: `just lint` clean; CI's workspace test command passes (nice_common lib 213 and
+  230 passed); `nice_common --features gpu --lib` passes (267 and 284).
+- **Branches to open** (made by me with `git commit-tree`, one commit each, trees identical to the reviewed heads
+  a695951e and 47222239, so every result above carries over; the development history had an intermediate merge
+  that did not compile): **`pr/midout-field-coordinate` c6d9164a** (566 insertions) on upstream 974d7194 and
+  **`pr/midout-cpu-ref` da7f25c3** (+1,312 / −3) on top of it; both on the fork; not opened.
+- **To do before opening:** shorten the two descriptions (871 and 1,393 words: too long for this maintainer),
+  fill PR 1's number into PR 2's.
+- **To carry back to `dev/mo-clean`:** the getters across the device, route, wire and client code; the new
+  tests; the per-base split; the `Counts` docs (`PR12-NOTES.md` §6).
+- **Noted, outside these PRs** [reviewer, not verified by me]: production's `StrideTable` panics at
+  `stride_filter.rs:165` for bases 15, 19, 23 and 27 (an empty residue list).
+
 ## MO.14 The first two pull requests cut from the cleaned tree (step 7P; 2026-11-19 15:05–16:00 UTC, engineer; `G2/BUILD-BRIEF-7P.md`, `G2/PR12-NOTES.md`, `G2/PR1-BODY.md`, `G2/PR2-BODY.md`, `G2/build7p/`; branches on the fork, not opened: `pr/midout-coordinate` cf27bc89 (on upstream 974d7194), `pr/midout-cpu-reference` 06d55495 (stacked); box 61441981)
 
 - **PR 1, the field coordinate** (520 lines: `midout/coord.rs` 502 of which 213 are tests, `mod.rs` 17, one `pub mod`

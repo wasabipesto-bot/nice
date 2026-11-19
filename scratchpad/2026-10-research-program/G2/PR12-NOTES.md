@@ -92,3 +92,67 @@ trailer; every other commit has it. Nothing was amended, rebased or forced.
 
 No pull request opened (as briefed). No GPU, Metal or lavapipe run (no device code here). Tier timings on a 4-core
 GitHub runner not measured.
+
+## 6. After review (`G2/PR12-REVIEW.md`, 16:49–17:45 UTC, same box)
+
+### What changed
+
+| branch | new commits | what |
+|---|---|---|
+| `pr/midout-coordinate` → `a695951e` | `a695951e` | `Coord`'s eight values private, read by getters (`b()`, `start()`, `end()`, `k0()`, `k1()`, `q0()`, `h0()`, `hn()`); a `Coord` exists only through `for_base` / `with_digits` and their checks. Doc wrap fixed (`[`Coord::hn`]`). |
+| `pr/midout-cpu-reference` → `47222239` | merge `d359b2a…` (PR 1's getters, with trailer), `4581367b`, `47222239` | `cpu.rs` adapted to the getters (25 lines). Three independent tests: `top_certificate_equals_its_definition` (the reviewer's brute definition over every n of an interval, 7 base/shape pairs incl. f0 = 0), `roots_equal_production_residue_filter` (bases 3–128), `prefilter_at_base_64_equals_full_digits` (100,000 random n and mhi; shares `prefilter_digits` with the per-survivor check). The 17-case test split into `whole_base_<b>_vs_brute_force` (11 tests, a shared helper), the join run once instead of twice, plus the first field through `search_field::<u64>`. `Counts` fields documented, "no test checks them yet". Counter wording "the same kind of count as production's…, not comparable". Coverage stated: nine bases with survivors (12 and 19 have none; 13 none in (0, 3)), prefilter exempt over 10–14, only nice number 69. |
+
+Note: the merge commit `d359b2a` does not compile on its own (PR 2's `cpu.rs` still read the public fields); the next
+commit `4581367b` fixes it. Branch heads compile; a bisect would hit it.
+
+Descriptions: PR 1 drops the re-cut claim, "work shrinking in proportion" and the 6–8/3 % paragraph (now one
+sentence on why 5–7), says the slicing inside a field is free and a field's definition is a per-base choice, fixes
+"so does" and "with random other digits", mentions the private `Coord`. PR 2: the shared-pieces paragraph corrected
+(top certificate, roots, nice-ness, clipping, exemption; which are now independently tested), prefilter "the same
+rule as production's, computed independently", counters reworded, test list and times rewritten, mutant results.
+`#NNN` kept for PR 1's number. Both re-read for the maintainer's rules: no program, notes, path, agent, assistant,
+model or host name; only the standard closing line.
+
+### Test times (box, ~5 CPUs)
+
+| | release (`cargo test --release -p nice_common --lib midout`) | debug (`just test`'s form) |
+|---|---|---|
+| PR 1 head | 6 tests, 0.18 s | 0.59 s |
+| PR 2 before review | 10 tests, 13.4 s | 67 s, one test over libtest's 60 s warning |
+| PR 2 head | 23 tests, 10.9 s | 54 s, no warning (base 25 runs beside the others) |
+
+### The review's 27 mutants, before and after (`raw/mut_after/`, script `box/mut2.py`; line numbers remapped by text)
+
+| mutants | review (06d55495), author's tests | head `47222239` | killed by |
+|---|---|---|---|
+| M01, M03, M04, M22 (top certificate) | survive | **killed** | `top_certificate_equals_its_definition` (M02 also by `whole_base_10`) |
+| M10b (extra root below base 64) | survives | **killed** | `roots_equal_production_residue_filter` |
+| M18 (`mm` large branch) | survives | **killed** | `prefilter_at_base_64_equals_full_digits` |
+| M02, M05–M09, M10a, M11–M16, M19, M20, M23–M25 | killed | killed | whole-base tests, and the base-64 prefilter test for M07, M08, M20, M24 |
+| M17 (chunk key order), M26 (common-mask skip off) | survive | survive | none: they change only `Counts` work fields, which no test checks yet (documented) |
+| M21 (exemption changed in both `prefilter` and the test's full-digit check) | survives | survives | none: the condition is the same text on both sides, and `n²` stays long enough at these bases. A third, independent statement of the exemption would be circular; accepted, and named in the description. |
+
+Totals: before 9 survivors of 27, after 3, the 3 the review expected.
+
+### Lint and suite at the heads (`raw/p1_lint_r`, `raw/p1_suite_r`, `raw/p2_lint_r`, `raw/p2_suite_r`)
+
+- PR 1 `a695951e`: `just lint`'s three commands rc 0; workspace `cargo test --locked --release --no-fail-fast` rc 0
+  (nice_common lib 213 pass, 9 ignored; client 24); `nice_common --features gpu --lib` 267 pass.
+- PR 2 `47222239`: lint rc 0 / 0 / 0; workspace rc 0 (nice_common lib 230 pass, 9 ignored; client 24);
+  `--features gpu --lib` 284 pass; midout 23 tests 11.3 s release, 55.2 s debug.
+- Both pushed to the fork (`pr/midout-coordinate` a695951e, `pr/midout-cpu-reference` 47222239); bundle
+  `build7p/pr12.bundle` rebuilt.
+
+### Carry back to `dev/mo-clean`
+
+1. `Coord`'s fields are private: every `c.b`, `c.start`, `c.k1`, … in `gpu.rs`, `gpu_wide.rs`, `audit.rs`, `route.rs`,
+   `wire.rs`, the examples and the client become getter calls (the PR 2 change was mechanical: a regex over
+   `(c|coord).(field)` plus a compile).
+2. The three independent tests and `prefilter_digits` / `prefilter_direct` (`cpu.rs` tests); the per-base split of
+   the whole-base test and its single join pass.
+3. `Counts` field docs; the counter wording ("same kind of count, not comparable") in `cpu.rs` and `FieldOutcome`.
+4. Earlier list (§2): `coord_digits` instead of `coord_digits_known`, the `(4, 8, 5)` docs, `Mask::low64` and
+   `Shape::label` (re-added by the PRs that need them), the per-file lint allowances.
+5. Not acted on (review notes, optional): `Base::new` saturating `pw`, `key_digits`' `f64` order, unused `Base::l`
+   and `Mask::count_ones`, the doc wrap of PR 1's "Slices" section. Production's stride table panics at bases
+   with no valid residues (b19, b23, b27; reviewer's finding, out of scope, not filed).

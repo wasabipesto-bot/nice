@@ -1,0 +1,31 @@
+
+running 23 tests
+midout::arith::tests::known_nice_and_roots --- FAILED
+.... 5/23
+midout::cpu::tests::roots_equal_production_residue_filter --- FAILED
+.................
+failures:
+
+---- midout::arith::tests::known_nice_and_roots stdout ----
+
+thread 'midout::arith::tests::known_nice_and_roots' (162409) panicked at common/src/midout/arith.rs:136:9:
+assertion `left == right` failed
+  left: [0, 1, 6, 21, 27, 35, 42, 48, 62]
+ right: [0, 6, 21, 27, 35, 42, 48, 62]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- midout::cpu::tests::roots_equal_production_residue_filter stdout ----
+
+thread 'midout::cpu::tests::roots_equal_production_residue_filter' (162418) panicked at common/src/midout/cpu.rs:1009:13:
+assertion `left == right` failed: b3
+  left: [1]
+ right: []
+
+
+failures:
+    midout::arith::tests::known_nice_and_roots
+    midout::cpu::tests::roots_equal_production_residue_filter
+
+test result: FAILED. 21 passed; 2 failed; 0 ignored; 0 measured; 216 filtered out; finished in 11.98s
+
+error: test failed, to rerun pass `-p nice_common --lib`

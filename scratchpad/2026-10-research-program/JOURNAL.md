@@ -140,6 +140,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   `stride_filter.rs:165` for bases 15, 19, 23 and 27 (it indexes an empty residue list). Those bases have no
   residue class and no fields, so nothing in production reaches it; to verify and offer as a small fix.
 
+- **17:30 UTC: the review's fixes are in (EXPERIMENTS MO.15)** and the two branches exist as they will be opened:
+  `pr/midout-field-coordinate` c6d9164a and `pr/midout-cpu-ref` da7f25c3, one commit each with exactly the
+  reviewed trees. Last box destroyed 17:28; month $22.54 invoiced of $30; credit $54.27.
+- **For the 05:41 cycle of 11-20, in this order:** (1) read what the user wrote; (2) PR #271's state; (3) shorten
+  `G2/PR1-BODY.md` and `G2/PR2-BODY.md` (PR 1 to about 400 words, PR 2 to about 600), open PR 1 from
+  `pr/midout-field-coordinate`, then PR 2 from `pr/midout-cpu-ref` with PR 1's number, unless the user's answers
+  to `DECISIONS.md` (D1, D2, D8, D9) say otherwise; (4) carry the review's changes back to `dev/mo-clean` and
+  re-run its tiers; (5) cut PR 3 (device tops) and PR 4 (one slice with its accounts) from it; (6) verify the
+  `StrideTable` panic at bases 15, 19, 23, 27 and offer a fix; (7) base 65's wide kernels for the RX 9070 XT
+  (3.1 fs there against 0.99 at base 64) if a deep slot is free. Budget: $7.46 left under the cap.
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);
