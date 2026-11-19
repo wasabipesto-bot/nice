@@ -67,6 +67,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   audit tests; wide path; client route and coordinator); an independent read for maintainability; the server's
   side as a proposal only.
 
+- **10:43 UTC: step 5L is back (EXPERIMENTS MO.9).** The review's field definition is in and default (digits
+  5–7), proven slice by slice against the old one; parent sharing across digit 8 measured at −3.1 %, as the
+  review derived: **×4.09 on the 3080**. The wide prefilter rewrite gained 2 % and showed last night's
+  attribution of 2.6 ms to it was wrong. Trunk e09ad7b0; last box destroyed 10:45; month $21.86 invoiced.
+- **10:50 UTC:** the offline engineer was resumed to re-run the 64-lane pre-flight at the new head, add up card
+  memory (the shared lists take 870 MB), update the model and the window plan (hard stop 12:45).
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);

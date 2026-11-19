@@ -72,6 +72,18 @@ field, claim time, receive time, whole body); `GET /status` gives counts.
 That is one query parameter, one claim key and one telemetry value. No type of production's changes (`DataToClient`
 is built by the API, so a new field there would have been a server change; the route parses its own `CoordClaim`).
 
+**Step 5L (2026-11-19, `G2/BUILD-NOTES.md` §13): the client takes both coordinates of base 64 and 65, and
+`midout:4,8,5` is the default.** A claim's id must name one of its base's *known* coordinates
+(`midout::coord::coord_digits_known`: bases 64 and 65 `midout:4,8,5` (default) and `midout:4,9,6`; bases 68–70
+`midout:4,9,6`); `field_of` builds the `Coord` from the id and checks `Coord::is_known` (it no longer compares with
+`Coord::for_base`), and `FieldJoin::search` does the same, so one client searches fields of either coordinate, each
+by its own quanta and `range_size`. `midout_fields` cuts (4, 8, 5) fields by default (`--t` = digits 5–7 at base 64)
+and (4, 9, 6) fields with `--digits 4,9,6`. The unit test `claims_are_checked_before_work` now accepts
+`midout:4,8,5` at 64 and 65 (with its own quantum and padded count at 65), refuses a (4, 8, 5) field presented as
+`midout:4,9,6` at 65 (wrong `range_size`), and refuses `midout:4,8,5` at 68; `midout:4,8,6`, `midout:4,9,7`,
+`midout:3,9,6` stay unknown. End to end on the box: §11 below. The coordinator needed no change (it passes each
+field's id through). The text that follows is step 4F's and describes the state before this.
+
 **The coordinate is named explicitly** (changed mid-step after the field-structure review, `G2/fs/REVIEW.md` §1):
 the id `midout:K0,K1,Q0` gives the coordinate's digit positions (digits `[K0, K1)` go on top of v, a field fixes
 digits `[Q0, K1)`); base 64 today is `midout:4,9,6` (fields fix digits 6–8). The client parses the id, builds its
@@ -263,3 +275,20 @@ instances on the same host model, so part of it may be the session). **Every fie
 count are identical to yesterday's run before these commits** (all ten, both runs; `raw/trunk/y.txt`, `a.txt`,
 `b.txt`), and all ten sampled slices equal the CPU reference. The client route's merged run (§5, 6 b64 fields and
 b65 t 77777) is a third check: equal to the library and, for b65 t 77777, to the pre-merge counts.
+
+## 11. Step 5L: the route with both coordinates (2026-11-19, `G2/build5l/raw/p1b/e2e/`, `final/e2e/`)
+
+Box Vast 61386517 (the same), production hosts blocked and checked (`hosts_proof.txt`). One coordinator, four fields
+in one work list: b64 `midout:4,8,5` t 77777 and t 5461, b65 `midout:4,8,5` t 13731 (`range_size`
+1,011,440,671,053,109,375, its padded count), b64 `midout:4,9,6` t 77777 (cut with `midout_fields --digits 4,9,6`);
+one client `niceonly --midout-coordinator … --repeat`: **4/4 claimed, searched and accepted** (rc 0, 08:56–08:58 UTC).
+Counts: (4, 8, 5) t 77777 survivors 48,216,914,309, checked 1,384,731,444 (= the library's test of the same field);
+(4, 9, 6) t 77777 48,199,033,671 / 1,384,147,294 (= every earlier run of that field); b65 (4, 8, 5) t 13731
+69,600,528,738 / 2,222,514,230 (= the library's production-path test); every b64 sampled CPU check equal. The client
+binary was built at `4925122a`'s tree, so parent sharing (default on from `7e682f05`) was not in it; the head's
+binary ran one (4, 8, 5) field through the route again in `final/e2e/` (§13.5 of BUILD-NOTES).
+
+Telemetry: `pipeline.coordinate` carries the id the claim named (`midout:4,8,5` or `midout:4,9,6`); `join.shape` is
+[4, 10] for both. For the server list of §8: item 2's "a re-cut is a new id" now has its first instance: fields of
+`midout:4,8,5` and `midout:4,9,6` are different sets of n for the same `range_start` at base 64, so a field row must
+carry its id.

@@ -35,6 +35,33 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.9 Fields that fix digits 5–7, parents shared across digit 8, the wide prefilter in base b²: ×4.09 on the RTX 3080 (step 5L; 2026-11-19 08:40–10:40 UTC, engineer; `G2/BUILD-BRIEF-5L.md`, `G2/BUILD-NOTES.md` §1 and §13, `G2/BUILD-NOTES-CLIENT.md` §11, `G2/build5l/`; trunk cc0a9e04 → e09ad7b0, seven commits, on the fork; box 61386517, RTX 3080 at 240 W, destroyed 10:45 after 4.99 h)
+
+- **The coordinate (4, 8, 5)** (default at bases 64 and 65 since 4925122a; (4, 9, 6) still supported, and the
+  default at 68–70): a base-64 field fixes digits 5–7 of n, still a bit permutation, still 262,144 fields of 2^57,
+  4,096 slices of the (4, 10) join each; digits 4 and 8 free inside a field. **Exact** [M]: all 4,096 slices of
+  (4, 8, 5) field 77777 equal the same slices run inside the 64 (4, 9, 6) fields that hold them (48,216,914,309
+  survivors, 1,384,731,444 checked in total); at base 65, 195 slices of field 13731 likewise and the whole field
+  through the production path; coordinate tests (bit permutation, padded form, whole slices); three slices
+  against the CPU reference number for number; the client route claimed and submitted four fields in both
+  coordinates, counts equal to the library's.
+- **Parent preparation shared across digit 8** (on by default since 7e682f05): 64 depth-8 lists per field,
+  covering 20.3 % of the roots (FS.1 counted 21.9 %); each slice's parent pass runs over its list; 870 MB of card
+  memory. Every count equal with and without it; the new fault switch `F_SKIP_ANC` is loud and the old ones stay
+  loud; checked number for number against the CPU reference on CUDA (4 slices) and on lavapipe at 8 lanes.
+  **Worth** [M, 240 W, one session]: parents 0.728 → 0.525 ms per slice, slice 7.766 → 7.568 ms; ten fields
+  1.6706 → 1.6189 fs per admissible n (−3.1 %; FS.1 derived ≈ 3 %): **×4.09 against main's 6.615**.
+- **The wide prefilter in base b²** [M]: exact by brute force (17 shapes) and on b30–b65 slices on CUDA and
+  lavapipe; saves only 0.31 of the 3.61 ms base-65 expansion (3.565 → 3.498 fs). A run with no prefilter at all
+  gives 3.64 ms: **MO.6's "the prefilter adds 2.6 ms to the wide expansion" was wrong**; the cost is elsewhere in
+  that kernel and wants a probe build before more code.
+- **Base 65 against base 64 at the head** [M, one session]: 3.468 / 1.600 fs = ×2.17 (MO.6: ×2.08 against a
+  slower base 64): 0.48 card-years for base 65 on this capped card.
+- **Head state** [M]: GPU tests, fmt, four clippy sets, production's suite (221 passed), client tests (24, 26).
+- **Not built:** parent sharing on the wide path (estimated −0.4 ms per b65 slice); (4, 8, 5) at bases 68–70; a
+  whole shared field on lavapipe (one slice ran there). **Not yet through the 64-lane pre-flight** (the offline
+  engineer is re-running it at this head).
+
 ## MO.8 A client route against a local coordinator: 26 fields end to end, every guard tested; the trunk exact on CUDA at ×3.94 (step 4F; 2026-11-19 05:50–08:28 UTC, engineer; `G2/BUILD-BRIEF-4F.md`, `G2/BUILD-NOTES-CLIENT.md`, `G2/build4f/`; branch `dev/mo-client` cc0a9e04 (six commits on 4abfab5c and a merge of the trunk's 9b790647), fast-forwarded into the trunk by me at 08:30 and pushed; box 61386517, RTX 3080 at 240 W)
 
 - **What runs** [M]: a local coordinator (`scripts/midout_coordinator.py`, standard library, 127.0.0.1, state in

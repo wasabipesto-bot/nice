@@ -1,0 +1,26 @@
+
+running 1 test
+device llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>) W 8 base 40 shape (3, 6) slice 1234 prefilter true
+slice 1234: device WCounts { children: 343633, chunks: 6212, flat: 333230, kept: 313978, survivors: 729611, checked: 33792, slices: 1, tops: 20923 } (2.5 s)
+slice 1234: cpu    Counts { tops_tested: 45287, tops: 20923, parents: 15763, children: 343633, chunks: 6212, pairs: 18438350, flat: 333230, kept: 313978, words: 253093, survivors: 729611, checked: 33792, clipped: 0 } (0.3 s)
+slice 1234: PASS (33792 survivors, 20923 tops, 0 nice)
+device llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<spirv>) W 8 base 65 shape (4, 10) slice 717171717 prefilter true
+
+thread 'DSD-4-0' (36519) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-wgpu-0.10.0/src/compute/server.rs:270:43:
+called `Result::unwrap()` on an `Err` value: can't allocate buffer of size: 148418560
+No backtrace available
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'midout::gpu_wide::tests::wide_slices_equal_cpu' (36484) panicked at common/src/midout/gpu_wide.rs:4117:74:
+called `Result::unwrap()` on an `Err` value: sync: ServerUnhealthy { errors: [Io(couldn't find resource for that handle: Memory page 0 doesn't exist
+No backtrace available), Io(couldn't find resource for that handle: Memory page 0 doesn't exist
+No backtrace available)], backtrace: No backtrace available }
+test midout::gpu_wide::tests::wide_slices_equal_cpu ... FAILED
+
+failures:
+
+failures:
+    midout::gpu_wide::tests::wide_slices_equal_cpu
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 342 filtered out; finished in 8.80s
+

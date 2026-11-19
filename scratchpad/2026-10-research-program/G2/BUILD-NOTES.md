@@ -1,4 +1,4 @@
-# The middle-out join, build day 1 (2026-11-18, 16:43–22:30 UTC), step 2A (19:05–23:45 UTC), step 3A (2026-11-19, 01:25–05:15 UTC), step 3W (03:07–06:00 UTC) and step 4S (05:45–11:30 UTC, ivory only)
+# The middle-out join, build day 1 (2026-11-18, 16:43–22:30 UTC), step 2A (19:05–23:45 UTC), step 3A (2026-11-19, 01:25–05:15 UTC), step 3W (03:07–06:00 UTC), step 4S (05:45–11:30 UTC, ivory only) and step 5L (08:30–12:10 UTC)
 
 Briefs: `G2/BUILD-BRIEF-1.md` (day one), `G2/BUILD-BRIEF-2A.md` (step 2A: pieces B, A, C of §7), `G2/BUILD-BRIEF-3A.md`
 (step 3A: accounts that prove the work ran, from the audit `G2/AUDIT-MO.md`). Branch
@@ -6,9 +6,26 @@ Briefs: `G2/BUILD-BRIEF-1.md` (day one), `G2/BUILD-BRIEF-2A.md` (step 2A: pieces
 fork only. Box: Vast 61286074, RTX 3080 at the host's 240 W cap, i9-9900 with a **5.12-CPU cgroup quota** (16 threads
 visible), CUDA 12.8 image, Mesa 25.2.8 lavapipe. Box scripts and raw logs: day one `G2/build1/box/`, `G2/build1/raw/`;
 step 2A `G2/build2a/box/`, `G2/build2a/raw/`; step 3A `G2/build3a/`. Step 2A's account is §9; step 3A's is §10
-(the accounts, the fault switches before and after, the cost, its tests in §10.7); step 3W's (`G2/BUILD-BRIEF-3W.md`: the merge of the wide branch, its accounts and speed work, the base-65 number) is §11, raw logs `G2/build3w/`; step 4S's (`G2/BUILD-BRIEF-4S.md`: the library path at 64 lanes for the RX 9070 XT, offline) is §12, raw listings `G2/build4s/`, its window plan `G2/WINDOW-PLAN-2.md`; section 1 is current for it.
+(the accounts, the fault switches before and after, the cost, its tests in §10.7); step 3W's (`G2/BUILD-BRIEF-3W.md`: the merge of the wide branch, its accounts and speed work, the base-65 number) is §11, raw logs `G2/build3w/`; step 4S's (`G2/BUILD-BRIEF-4S.md`: the library path at 64 lanes for the RX 9070 XT, offline) is §12, raw listings `G2/build4s/`, its window plan `G2/WINDOW-PLAN-2.md`; step 5L's (`G2/BUILD-BRIEF-5L.md`: fields fixing digits 5–7, parents shared across digit 8, the wide prefilter) is §13, raw logs `G2/build5l/`; section 1 is current for it.
 
 ## 1. Where it stands (kept current)
+
+**DEFAULT COORDINATE CHANGED (step 5L, 2026-11-19): a base-64 field now fixes digits 5–7 (`midout:4,8,5`), not 6–8.**
+`Coord::for_base(64)` and `(65)`, `midout_fields` and the benches give (4, 8, 5); `(4, 9, 6)` stays known and
+searched (a claim in either is accepted); bases 68–70 keep (4, 9, 6). A field `t` of one coordinate is a different set
+of n than field `t` of the other (same v range at base 64, different n): never compare their counts field for field.
+
+**2026-11-19 ~10:45 UTC, end of step 5L (§13).** Head **`e09ad7b0`** on ivory and `fork/dev/middle-out-join`:
+
+- **(4, 8, 5) is exact end to end** (§13.2): every slice of a (4, 8, 5) field equals the same slice inside the (4, 9, 6)
+  fields that hold it (all 4,096 of b64 field 77777; 195 of b65 field 13731), the production path gives the summed
+  counts with its sampled check equal, the route and coordinator searched (4, 8, 5) and (4, 9, 6) fields in one run.
+- **Parents shared across digit 8** (§13.3), on by default: per-slice parents 0.728 → 0.525 ms; ten fields **1.6189 fs
+  per admissible n, ×4.09 against main** (1.6706 unshared, trunk before this step 1.6834), every count equal.
+- **The wide prefilter in base b²** (§13.4): exact; b65 expansion 3.61 → 3.30 ms, b65 3.565 → 3.498 fs (−1.9 %); the
+  wide expansion's ~3.4 ms per slice is not the prefilter (without any prefilter it is 3.64 ms). **Base 65 = ×2.17 of base 64** at the head (3.468 / 1.600 fs, one session): b65 gained 2.6 %, b64 more (sharing, and the trunk's step-4S work); last night ×2.08 against a slower b64 (1.710).
+- *Steps 4S, 3W, 3A and 2A's accounts below are unchanged and still true except where §13 says otherwise (the default
+  coordinate; `hist2`'s cube account now compares with the grid it was given).*
 
 **Interface note for `dev/mo-client` (step 4S): `search_field`'s signature, `FieldOutcome`, `GpuOptions`, `Caps` and
 `GpuJoin::new` are unchanged.** Added beside them: `search_field_part` / `time_field_part` (a field's first K slices;
@@ -63,6 +80,9 @@ and the two example entries in `common/Cargo.toml`; no route reaches it; no serv
 - *Step 3A's account of the narrow path (§10) and step 2A's (§9) are unchanged and still true.*
 
 ## 2. The interface: what a field is, and what it permits and forbids
+
+*Since step 5L the default base-64 coordinate is `(4, 8, 5)` (fields fix digits 5–7; §13.1). This section describes the
+form and the first coordinate `(4, 9, 6)`, which stays supported; `G2/fs/REVIEW.md` §2 corrects its permits/forbids list.*
 
 **A field is `(base, v_start, v_size)`** in a per-base coordinate `v` (`common/src/midout/coord.rs`, the only piece
 that would ever reach the server; it knows nothing of the join):
@@ -948,3 +968,205 @@ on demoux, the wide path at b65, the fault test; any failure stops the window), 
 fields by the pipelined protocol around main's bracket fields 2 and 6 in the same session, the stage profile by
 cumulative stops, the sampled check's cost, and spares (a third round, one b65 field). `analyze_mo.py` gives the ratio
 against main (4.707 fs × the bracket's drift) and each stage against §12.3's band.
+
+## 13. Step 5L: fields that fix digits 5–7, parents shared across digit 8, the wide prefilter (2026-11-19, 08:30–12:10 UTC)
+
+Brief: `G2/BUILD-BRIEF-5L.md` (rules of `BUILD-BRIEF-1.md`); specification of piece 1: `G2/fs/REVIEW.md`. Box: Vast
+61386517, RTX 3080 10 GB at its host's 240 W cap, 16 threads visible with a ~5-CPU quota, CUDA 12.8, Mesa 25.2.8
+lavapipe; production hosts mapped to 127.0.0.1 and ::1 and checked before every run (`hosts_proof.txt` in each log
+directory). Commits on `dev/middle-out-join` after `cc0a9e04`: **`69222166`** ((4, 8, 5) beside (4, 9, 6)),
+**`4925122a`** ((4, 8, 5) the default), **`3db9d8b6`** (parent sharing, switch), **`dee67573`** (wide prefilter in
+base b²), **`7e682f05`** (parent sharing on by default), **`e09ad7b0`** (a clippy attribute). Scripts `G2/build5l/box/`; raw logs
+`G2/build5l/raw/`: `p1a/` (piece 1's exactness, tree = `69222166`), `p1b/` (the default switch: CPU and client tests,
+the route end to end, b65 through the production path), `p23a/`, `p23b/` (pieces 2 and 3: exactness), `m2/` (piece 2's
+numbers), `m3/` (piece 3's numbers), `final/` (the head's tests), `lint2/` (fmt and clippy at the head), `m4/` (b65 as a multiple of b64 at the head), `xnopf/` (a diagnostic split of the wide expansion). Box trees: `/root/m5` (target `/root/t/m5`) for piece 1,
+`/root/m5w` (target `/root/t/m5w`) for pieces 2–3 and the head; diffs moved as patches, commits as bundles
+(`G2/build5l/bundles/`). Code was edited and committed on ivory only; nothing was built on ivory.
+
+### 13.1 What a field is now, and why
+
+**A base-64 field fixes digits 5–7 of n** (coordinate `(k0, k1, q0) = (4, 8, 5)`, id `midout:4,8,5`): v moves digits
+4–7 (n's bits 24–47) to bits 51–74, an exact bit permutation of [2^75, 2^76) (`H = 2^27`, no padding); a quantum is
+2^57 n (262,144 fields per base, unchanged), and a field is 4,096 slices of the (4, 10) join: 64 values of digit 4 ×
+64 of digit 8, digit 4 innermost. Base 65 the same in padded form (`H = 871,713,216`, quantum `H·65^5 ≈ 1.0114e18`,
+65³ quanta, 4,225 slices; padding under 1 ppb). Why (REVIEW §1, §5): every field fixing digits inside 4–8 is a union of
+whole slices, so the join's shape stays free either way; fixing 5–7 leaves both ends of the slice key free inside a
+field, so tops keep sharing across digit 4 (built) **and parents can share across digit 8** (§13.3), at no server
+cost. `(4, 9, 6)` stays known and searched (`coord_digits_known`), and stays the default at 68–70 (not run on a card
+under (4, 8, 5)). `Shape::for_coord` returns (4, 10) explicitly for (4, 8, 5).
+
+### 13.2 Exactness of the new coordinate (piece 1)
+
+| test | what | result |
+|---|---|---|
+| `coord::b64_485_is_a_bit_permutation` | v of 20,002 n = the bit formula; back | pass |
+| `coord::b64_485_quantum_fixes_digits_5_to_7` | quantum 2^57, 2^18 quanta, digits 5–7 constant, 20,000 random n in the field of their digits, misaligned refused | pass |
+| `coord::b65_padded` (both coordinates) | 65³ quanta sum to the range, padding < 3 ppm / < 2 ppb, 20,003 n round trip and land in their quantum, quantum ends | pass |
+| `coord::known_coordinates` | 64, 65: (4, 8, 5) default and (4, 9, 6); 68–70 (4, 9, 6) only | pass |
+| `cpu::coordinate_485_is_whole_slices` | b64 4,096 / b65 4,225 distinct slices per field, exactly those with its digits 5–7, digit 4 innermost, 5,000 n per quantum each in one of its slices | pass |
+| `cpu::whole_small_bases_vs_brute_force` | unchanged (its base-17/18 (1, 4) shapes are already the "digit k − 2 free" case) | pass |
+| `gpu::field_485_equals_496_slice_by_slice`, CUDA | field t 77777: its 4,096 slices one per group, each (children, chunks, flat, survivors, checked, tops) **equal to the same slice run inside the 64 (4, 9, 6) fields that hold it**; per-slice sums = field; then the production path (group 16, sampled CPU check) gives the same totals: survivors 48,216,914,309, checked 1,384,731,444, no nice n | pass (`p1a/`; again at the head with sharing on, `final/`) |
+| `gpu_wide::wide_field_485_equals_496_slice_by_slice`, CUDA | b65 field t 13731, digit 8 = 0, 1, 64: 195 slices equal to (4, 9, 6)'s; and the whole field through the production path with the sampled CPU check: survivors 69,600,528,738, checked 2,222,514,230, 4,225 slices, sampled slice equal | pass (`p1a/`, `p1b/`) |
+| `gpu::gpu_slices_equal_cpu`, CUDA | three slices of the (4, 8, 5) field (digit 8 = 0, 63, 13): device = CPU reference n for n | pass |
+| client `claims_are_checked_before_work`; `midout::wire` | `midout:4,8,5` accepted at 64 and 65 (own quantum, padded count), refused at 68, a (4, 8, 5) b65 field named `midout:4,9,6` refused | pass |
+| the route end to end (`p1b/e2e/`) | local coordinator, 4 fields: b64 (4, 8, 5) t 77777 and 5461, b65 (4, 8, 5) t 13731, b64 (4, 9, 6) t 77777; one client `--repeat` | 4/4 accepted; t 77777 under (4, 8, 5) = the library's counts above; under (4, 9, 6) = yesterday's (checked 1,384,147,294); b65 = the test's |
+
+kept differs between coordinates on 2,496 of 4,096 slices: it depends on the field's key (from its first slice),
+nothing else does. The coordinator needed no change.
+
+### 13.3 Parents shared across digit 8 (piece 2; `3db9d8b6`, on by default since `7e682f05`)
+
+**What:** a slice's parents are the depth-9 bottoms r = r4 + pip·2^24 (pip = digits 4–8) whose digits 0–8 of r², r³
+are distinct; `hist2` tested all 9.30M depth-4 roots per slice. Digits 0–7 of r² and r³ depend only on r mod 2^48,
+i.e. on digits 4–7 of the slice, which the 64 slices of a (4, 8, 5) field that differ in digit 8 share. New kernel
+`prep::anc8_kernel` lists, once per value of digits 4–7, the roots whose depth-8 ancestor is valid (16 distinct digits);
+each slice's `hist2` then runs over that list. **Exact by containment** (a root with a valid parent for some digit 8 is
+listed); the per-slice pass is otherwise unchanged (it still tests all 9 digits; the list order is arbitrary as
+before, the rank sort restores the CPU's order). The review's G2_ANCKEY idea of a shared parent *order* was not built
+(its own measurement: +4–7 % kept).
+
+**Driver:** `GpuJoin::set_parent_sharing` (default on). At a field's start, if its slices take at most 64 values of
+digits 4–7, each more than once, the 64 lists are built (64 × `anc8` over 9.30M roots, one synchronisation; 64 buffers
+of 3.4M roots = 870 MB, allocated on first use; the card peaked at 5.2 GB in the ten-field runs) and their account is
+checked at once: cubes done = grid, roots examined = 9,298,544, roots certified (ballot count) = listed, listed ≤
+capacity. A (4, 9, 6) field has 4,096 values (no sharing; unchanged path). The sampled CPU check's device rerun of its
+slice is deliberately **unshared** (all roots), so it checks the shared path against an independent one too.
+
+**Counts** (exact, device): 1,892,668 roots listed for slice 712012851's digits 4–7 (20.4 % of 9,298,544), 1,839,448
+for 2^30 − 1; field 77777: 64 lists, 121,087,480 roots, **20.3 %** (review: 21.9 %, its 3-slice mean).
+
+**Accounts and faults** (`field_parent_sharing_is_exact_and_loud`, CUDA, 128 slices of field 77777 = 64 lists × 2
+slices; `p23b/tests/share_faults_cuda.log`, again in `final/`): every slice's counts (children, chunks, flat, kept,
+survivors, checked, tops, tested) equal with and without sharing (survivors 1,507,255,587, checked 43,284,600; `hist2`
+ran 7,394 cubes instead of 36,323: the lists were used); with sharing on: `F_SKIP_ANC` (new) loud at the list build
+("anc8 cubes done: 0, want 36323"), `F_SKIP_MAIN` loud ("job instances done: 0, want 8064"), `F_SKIP_TOPS` loud,
+**`F_DROP_PROBE` loud ("probes run = 8 x tops: 1913088, want 1917120")**, **`F_DROP_PARENT` loud ("parents certified
+(hist2) = listed: 1042363, want 1041295")**, and **the children counted two ways still agree** in every clean run
+(scatter3's count = the main kernel's, checked per slice); a clean rerun after each fault gives the clean counts. A
+root wrongly left out of a list would pass every account (as a wrong `parent()` does, §10.5): only the sampled CPU check
+sees it, and its rerun is unshared. Also `gpu_slices_equal_cpu` with `MIDOUT_SHARE8=1` (the slice's list built, then
+the slice through it): CUDA slices 712012851, 318575442, 4977728, 2^30 − 1, and **lavapipe W 8 through SPIR-V** slice
+712012851 (4 classes per batch): device = CPU reference n for n (`p23a/tests/`).
+
+**What it is worth** (measured, Vast 61386517, RTX 3080 at 240 W, one session 09:20–09:42 UTC, `m2/`; card 238 W mean,
+1,560 MHz mean SM clock, at most 71 °C):
+
+Per slice, (4, 8, 5) field 77777, cumulative stops, seconds per field / 4,096:
+
+| stage | sharing off | sharing on | change |
+|---|---|---|---|
+| tops (1) | 0.391 ms | 0.393 | 0 |
+| parents (2 − 1), incl. the 64 list builds | 0.728 | **0.525** | **−0.203 (−28 %)** |
+| main kernel (3 − 2) | 5.520 | 5.542 | +0.02 (noise) |
+| expansion + check (6 − 3) | 1.128 | 1.108 | −0.02 (noise) |
+| **slice** (whole field, no sampled check: 31.81 / 31.00 s) | **7.766** | **7.568** | **−0.198 (−2.5 %)** |
+
+The ten fields of §10.6 (t = 13107 … 249036), group 16, sampled CPU check on (the bench's default):
+
+| run | binary | fs per admissible n | against main (6.615) |
+|---|---|---|---|
+| trunk before step 5L, (4, 9, 6) fields | `mo_bench_merged` (`cc0a9e04`'s library) | 1.6796 | ×3.94 |
+| (4, 8, 5) fields, sharing off | `p23b` | 1.6706 | ×3.96 |
+| **(4, 8, 5) fields, sharing on** | `p23b --share-parents` | **1.6189** | **×4.09** |
+| trunk again, at the end | `mo_bench_merged` | 1.6871 | ×3.92 |
+
+Field for field the same survivors and checked with and without sharing (all ten), and every sampled slice equal to
+the CPU reference in all four runs. **Sharing pays: −3.1 % against the same fields unshared, −3.8 % against the trunk
+before this step** (mean of its two runs, 1.6834; the coordinate change alone is −0.8 %, inside the trunk's own 0.4 %
+drift). The review derived ≈ 3 % (b64); measured 3.1 %. So it is on by default (`7e682f05`).
+
+### 13.4 The wide prefilter's arithmetic (piece 3; `dee67573`)
+
+**What:** `pf_w` formed r² and r³ mod b^(k+2) digit by digit, (k+2)(k+3)/2 products and a division by b per column,
+twice per survivor (156 products at k = 10). `pf_w2` works in base b² (two digits per "super-digit"; a column sum stays
+below 2^32 for b ≤ 70): r_f's super-digits from one division by b² per pair of its digits, the record's fixed part
+(digits f0..k+1: the slice's, the unit's, the top's h) as super-digits once per record (`pf_w2_fixed`), 21 + 21
+products at k = 10, then each super-digit split once into its two digits; the test on the digits is `pf_w`'s (all
+distinct, those ≥ k outside the top's mask, the small-n rule with r_f's part as r_f < b^ceil((k+2)/2)). Same predicate,
+so `checked` is unchanged. The narrow path's binary limbs do not carry over (digits of b65 need divisions whatever the
+representation); "reuse the record's fixed part" alone is worth little (1.08 survivors per record), so the fixed part
+is reused *and* the column count cut by 3.7×. `WideJoin::set_prefilter_b2(false)` / bench `--pf-digits` keeps the
+old form for A/B.
+
+**Exact:** `wide_whole_small_bases_vs_brute_force` (17 shapes, bases 10–25, odd f0 and odd k + 2 included: survivors,
+listed n = `q_checked` exactly, nice = {69}), `wide_slices_equal_cpu` b30 100 (2, 5), b40 1234 (3, 6: f0 odd, the
+super-digit across f0), b50 77777, **b64 forced wide 712012851** (checked 337,904 = the narrow path's), **b65
+717171717, 532260419 (start's clipped top), 1160290624 (the last slice)** on CUDA; b40 1234 and **b65 717171717 on
+lavapipe W 8 through SPIR-V** (checked 527,041 as before; the first b65 attempt hit lavapipe's allocator while a build
+ran beside it, rerun alone with 2 classes per batch: pass); `wide_faults_are_loud` b65 (every fault loud, F_PF_DROP by
+the sampled check); field for field identical survivors and checked in the A/B below (`p23a/`, `p23b/`, `m3/`).
+
+**Measured** (same box, one session 09:42–10:03 UTC, `m3/`; card 239 W mean, 1,601 MHz, at most 73 °C; t 4095 first
+as warm-up, excluded; sampled check off):
+
+| run | fs per admissible n (warm mean of 5) |
+|---|---|
+| b64 narrow (`p23b`, sharing off), before | 1.6556 |
+| **b65 wide, `pf_w2`** | **3.4978** (3.483–3.507) |
+| b65 wide, `pf_w` (digit by digit, the trunk's) | 3.5647 (3.554–3.574) |
+| b64 narrow, after | 1.6530 |
+
+Per slice at b65 (field 77777, cumulative stops 3 and 5): expansion **3.61 → 3.30 ms** (−0.31 ms). **The prefilter's
+arithmetic was not most of the wide expansion's cost**: −1.9 % of a b65 field, not the −2.6 ms §11.4 attributed to it
+(that figure was the difference against last night's expansion, which had no prefilter and no accounts: a different
+kernel, on another card). What else the wide expansion spends ~3.3 ms on (narrow: 1.1 ms) is not known: candidates
+are the per-record segment walk to the top (`for kk in 0..nroot`, `% m` per record), the per-survivor r_f divisions and
+`dbit`s, and latency. **Split afterwards** (`xnopf/`, 10:38–10:41 UTC, a diagnostic build not committed: `set_fault`
+made public and read by the wide bench, its diff in `xnopf/diag.patch`; field 77777, stops 3 and 5): expansion with
+`pf_w2` 14.22 s per field = **3.37 ms per slice**; with no prefilter at all (`F_NOPF`, every survivor listed)
+15.37 s = **3.64 ms**. So the prefilter in base b² now costs less than the list writes it saves: **the wide
+expansion's ~3.4 ms is not the prefilter at all** but the rest of the kernel (the record's walk to its top over the
+segments, the gathers, the per-record arithmetic with `% b` and `% m`, or latency). That is the next piece for b65,
+measured before any code (the narrow path's step-2A probe build, §9.3, is the method).
+
+**Base 65 as a multiple of base 64 at the head** (same box, one session 10:21–10:33 UTC, `m4/`, binaries of `7e682f05`:
+b64 with parent sharing (the default), b65 with `pf_w2` (the default); card 239 W mean, 1,589 MHz, at most 71 °C; t 4095
+warm-up excluded; sampled check off; counts field for field identical to `m3/`'s runs of the same fields):
+
+| run | fs per admissible n (warm mean of 5) |
+|---|---|
+| b64, before | 1.6005 (1.594–1.605) |
+| **b65** | **3.4679** (3.464–3.470) |
+| b64, after | 1.6003 (1.596–1.605) |
+
+**×2.167** (3.4679 / 1.6004). In `m3/` (no sharing): ×2.114 with `pf_w2`, ×2.155 with `pf_w`. Last night's ×2.08
+(§11.4) was against b64 1.710; b64 is now 6.4 % cheaper (sharing −3 %, the rest the trunk's step-4S tuning and the
+session) while b65 is 2.6 % cheaper (3.561 → 3.468), so the multiple rose. Base 65 on this capped 3080: 3.468e-15 ×
+4.371e21 = 1.52e7 s = **0.48 card-years**. Parent sharing at b65 (not built) would take about 0.4 ms of its 1.42 ms
+parents per slice if it saves the same share as at b64 (−28 % of parents; REVIEW's b65 list fraction is 22.4 %,
+b64's measured 20.3 %) [estimate].
+
+### 13.5 Tests at the head
+
+GPU tests at `7e682f05` (`final/`; `e09ad7b0` after it only adds a clippy attribute), CUDA, this box; lint at `e09ad7b0`
+(`lint2/`):
+
+| test | result |
+|---|---|
+| `gpu::tests::field_parent_sharing_is_exact_and_loud` | pass (§13.3) |
+| `gpu::tests::field_485_equals_496_slice_by_slice` (sharing on by default now: the production-path run at its end shares) | pass: 4,096 slices equal, survivors 48,216,914,309, checked 1,384,731,444, sampled slice equal |
+| `gpu::audit::accounts_faults_are_loud` (slices {502136830, 0}) | pass (every fault loud) |
+| `gpu::tests::gpu_slices_equal_cpu` 712012851, 4977728 | pass |
+| `gpu::audit::audit_stop_env_is_loud`, `audit_oom_is_loud` (9,216 MiB) | pass |
+| the route, one (4, 8, 5) field t 77777 with the head's client (sharing on) | accepted; survivors 48,216,914,309, checked 1,384,731,444 |
+| CPU: `midout::coord`, `midout::cpu::tests`, `midout::wire` (at `4925122a`) | 13 passed (1 ignored: the staged-slice test) |
+| production suite `cargo test --release -p nice_common --lib` (default features) | **221 passed, 0 failed, 10 ignored** (217 at `cc0a9e04` + 4 new CPU tests) |
+| `cargo test --release -p nice_client`, default and `cubecl-cuda` | 24 and 26 passed, 0 failed |
+| `cargo fmt --all --check`; clippy `-D warnings`, all targets: `nice_common`+`nice_client` default; `nice_common` `cubecl-cuda,cubecl-spirv`; `nice_client/gpu,nice_client/cubecl-spirv`; `nice_client/cubecl-cuda,nice_client/midout-fault` | clean (`lint2/`) |
+| pieces 2–3 exactness (`p23a/`, `p23b/`): wide brute force (17 shapes), wide slices b30–b65 (CUDA), lavapipe W 8 (shared parents b64; wide b40, b65), `wide_faults_are_loud` b65 | pass, on the trees of `3db9d8b6` / `dee67573` (identical code but for formatting) |
+
+### 13.6 Not done, parked, open
+
+- **Nothing parked on a side branch**: all three pieces are on the trunk.
+- Piece 3 fell short of its aim: the wide expansion is still ~3.3 ms per b65 slice (narrow 1.1), and the split in
+  §13.4 shows it is not the prefilter; the next step is a probe build of the wide expansion (records only / + top walk /
+  + gathers) before writing more code.
+- Parent sharing is narrow-path only (base 64); the wide path (b65: 1.42 ms of parents per slice, §11.4) would gain
+  the same way (`whist` over a per-(digits 4–7) list), not built.
+- (4, 8, 5) at bases 68–70: not made known (no card here fits b68); the rule of REVIEW §5 says (4, 8, 5) for 68–69 and
+  (4, 9, 5) for 70.
+- The shared lists' memory (870 MB) is sized for the 3080; a list longer than 3.4M roots is an error of the field
+  (never seen: the longest was 1.89M).
+- lavapipe W 8 ran the shared parents on one slice through `gpu_slices_equal_cpu`, not a whole shared field (64+
+  slices are hours there); the field path's sharing logic is host code, run on CUDA.
+- REVIEW §2's corrections to §2's permits/forbids list are not merged into §2 (pointer added).

@@ -1,0 +1,25 @@
+diff --git a/common/examples/midout_wide_bench.rs b/common/examples/midout_wide_bench.rs
+index 8557034..ac0863b 100644
+--- a/common/examples/midout_wide_bench.rs
++++ b/common/examples/midout_wide_bench.rs
+@@ -90,6 +90,7 @@ fn main() -> Result<()> {
+                 }
+                 // --pf-digits: the prefilter digit by digit (the trunk's before step 5L), for A/B timing
+                 g.set_prefilter_b2(!flag("--pf-digits"));
++                if let Ok(f) = std::env::var("XWIDE_FAULT") { g.set_fault(f.parse().unwrap()); }
+                 println!("prefilter {}", if flag("--pf-digits") { "digits (pf_w)" } else { "base b^2 (pf_w2)" });
+                 Some(g)
+             };
+diff --git a/common/src/midout/gpu_wide.rs b/common/src/midout/gpu_wide.rs
+index 1844679..5ac776b 100644
+--- a/common/src/midout/gpu_wide.rs
++++ b/common/src/midout/gpu_wide.rs
+@@ -2809,7 +2809,7 @@ impl<R: Runtime> WideJoin<R> {
+ 
+     /// (audit) Set the fault bits.
+     #[allow(dead_code)] // the tests only
+-    pub(crate) fn set_fault(&mut self, f: u32) {
++    pub fn set_fault(&mut self, f: u32) {
+         self.fault = f;
+     }
+ 
