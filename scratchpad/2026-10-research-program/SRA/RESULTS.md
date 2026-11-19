@@ -151,3 +151,29 @@ field position are the same in both (6).
    (one process per heavy test, or dropping the pools) is its own item.
 6. The plan cache (`cached_plan`) keeps a base's residue table handle for the process; if its allocation
    failed, every later field of that base fails (now loudly).
+
+## After review (2026-11-19, 02:19–03:05 UTC)
+
+Review (`REVIEW.md`): merge with fixes, no code defect. Applied:
+
+- **S1 (code, one test-only commit `0f3a4542`, pushed to the fork):** `dropped_launches` now cuts the b50 window
+  into ranges of 97 with `lane_shift_override = Some(0)` and launches them in two halves of 9 cubes each; it
+  asserts the host counted 18 cubes, and that the errors read "finished 0 of 18 cubes" (both dropped) and
+  "finished 9 of 18 cubes" (second dropped). Logs `raw/box/logs/phase7/`.
+  - Clean: CUDA (3 paths), lavapipe WGSL and SPIR-V (plain + cube-scoped): 30449 of 30449 survivors, 18 cubes.
+  - Mutant A (host check deleted): fails on CUDA, WGSL, SPIR-V ("a dropped launch must fail the field").
+  - Mutant B (count once per launch, `ABSOLUTE_POS_X == 0`): now fails on all three ("finished 2 of 18 cubes"
+    on a clean field). Both mutants were scratch only; the tree was restored and is clean.
+  - `just lint` pass; clippy with `cubecl-cuda,cubecl-spirv` pass; suite (CI form) pass (24 + 207); `gpu --lib`
+    pass (261); lavapipe WGSL `--ignored` pass (41); lavapipe SPIR-V `cubecl_` pass (32); CUDA
+    `cubecl_backend::tests::cubecl_cuda_` (serial) pass (7). No client binary was run after review
+    (production code unchanged since `7cf0c40d`).
+- **M1 (description):** the healthy-wgpu claim is gone. It now says the plane-scoped path with the count ran on
+  CUDA only, not on a real Vulkan GPU; why lavapipe cannot stand in (its plane-scoped path loses survivors on
+  main already); the consequence if wrong (stride fields on such clients would error instead of submitting);
+  and the exact `cubecl-spirv` command for the two tests a Vulkan owner should run before merging.
+- **M2 (description):** Metal: not run on Apple hardware; this PR's macOS CI job runs the new test and every
+  stride device test through Metal, the only Metal evidence.
+- **S2 (description):** "identical results; launch counts vary run to run in both builds".
+- Also: N1's wrap wording ("a field launches far fewer cubes than 2^32") and the "return them unchanged: zeros"
+  wording; the description was cut by about a third (repetition removed, numbers kept).

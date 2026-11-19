@@ -5,6 +5,26 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## SRA.2 Review of the stride fix, its fixes, and PR #270 (2026-11-19 01:30–03:10 UTC, independent reviewer then the author; `SRA/REVIEW-BRIEF.md`, `SRA/REVIEW.md`, `SRA/raw/review/`, `SRA/RESULTS.md` "After review", `SRA/PR-BODY.md`; branch `pr/stride-ran-account` 0f3a4542 + changelog link 05f18331; https://github.com/wasabipesto/nice/pull/270; box 61303619, destroyed 03:10 after 8.2 h)
+
+- **Verdict: merge with fixes; no defect found in the code.** The reviewer ran everything on its own clones:
+  `just lint`, clippy with cubecl-cuda, the suite in CI's form (231) and `-p "*"` (278), the gpu unit tests
+  (261), the Metal `cargo check`, CUDA stride and detailed device tests, lavapipe WGSL (41) and SPIR-V (32), the
+  WGSL lint; and with the host check removed the new test fails on CUDA, WGSL and SPIR-V. Read and confirmed:
+  every reader and writer of the 4-word count buffer, the single reader every consumer goes through, barrier
+  legality on all three kernel paths, the detailed path's histogram check, the test switch only in test builds.
+- **Must-fix (description):** (M1) the plane-scoped queue path, which Vulkan GPUs take by default with SPIR-V,
+  has run with the new count on CUDA only; lavapipe cannot stand in (its plane path already mis-runs on main:
+  72 of 30,449 survivors accepted as Ok, which the new count turns into "0 of 2 cubes"); the description now
+  says so, names the two tests to run on a Vulkan card before merging and the consequence if it were wrong
+  (stride fields would stop with an error, not be lost). (M2) Metal: only the PR's macOS CI job.
+- **Should-fix, applied:** (S1) the regression test launched one cube per launch and could not tell per-cube
+  from per-launch counting; it now launches two halves of 9 cubes, asserts 18, and fails for a kernel that
+  counts once per launch ("finished 2 of 18"); (S2) "same launch counts per field" removed (they vary run to
+  run in both builds; results identical). Description cut by a third.
+- **PR #270 opened 03:08 UTC** by me, body from `SRA/PR-BODY.md` (checked for forbidden references), changelog
+  line linked in a follow-up commit. Not yet verified: CI on the PR; the two tests on a real Vulkan card.
+
 ## SRA.1 The stride path proves its cubes ran: the three false-empty reproductions now end in an error (2026-11-18 23:25 – 2026-11-19 01:26 UTC, engineer; `SRA/BRIEF.md`, `SRA/RESULTS.md`, `SRA/PR-BODY.md`, `SRA/raw/`; branch `pr/stride-ran-account` 7cf0c40d, 3940f8a9 on upstream be9cc923, on the fork, no PR yet; box 61303619, RTX 3080 20 GB)
 
 - **Change:** `common/src/cubecl_backend.rs` (+78/−5 outside tests, tests +84), `CHANGELOG.md` (one sentence).

@@ -1,0 +1,20 @@
+--- a/common/src/cubecl_backend.rs
++++ b/common/src/cubecl_backend.rs
+-    sync_cube();
++    /// Reviewer's probe (scratch only): the plane-scoped queue with the new
++    /// count, forced on a software rasterizer, so its SPIR-V module is built
++    /// and run; prints what the host accepts.
++    #[test]
++    #[ignore = "reviewer scratch"]
++    fn rev_plane_scoped_forced() {
++        let ctx = CubeclContext::new_default().expect("CubeCL init");
++        #[allow(irrefutable_let_patterns)]
++        let CubeclContext::Wgpu { client, .. } = &ctx else {
++            unreachable!("wgpu");
++        };
++        let (base, mask, start, len, want) = queue_cases().swap_remove(0);
++        let half = len / 2;
++        for ballot in [true, false] {
++            for (dim, shift) in [(None, None), (Some(100u32), Some(0u32))] {
++                let mut run = CubeclNiceonlyRun::new(client, base, start, false).expect("run");
++                run.probe = true;

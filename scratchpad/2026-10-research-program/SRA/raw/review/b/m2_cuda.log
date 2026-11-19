@@ -1,0 +1,184 @@
+   Compiling nice_common v3.4.9-dev (/root/rev/b/common)
+    Finished `release` profile [optimized] target(s) in 2m 50s
+     Running unittests src/lib.rs (/root/rev/tb/release/build/nice_common/c29ae11497f8b508/out/nice_common-c29ae11497f8b508)
+
+running 23 tests
+test cubecl_backend::tests::cubecl_cross_filter_survivors_match_the_host_mirror ... ok
+test cubecl_backend::tests::cubecl_cuda_dropped_launches_fail_the_field ... compact=false plane=false skip_from=None: 30449 of 30449 survivors
+compact=false plane=false skip_from=Some(0): stride walk b50: the device did not run every launch: its kernels finished 0 of 2 cubes
+compact=false plane=false skip_from=Some(1): stride walk b50: the device did not run every launch: its kernels finished 1 of 2 cubes
+compact=true plane=false skip_from=None: 30449 of 30449 survivors
+compact=true plane=false skip_from=Some(0): stride walk b50: the device did not run every launch: its kernels finished 0 of 2 cubes
+compact=true plane=false skip_from=Some(1): stride walk b50: the device did not run every launch: its kernels finished 1 of 2 cubes
+compact=true plane=true skip_from=None: 30449 of 30449 survivors
+compact=true plane=true skip_from=Some(0): stride walk b50: the device did not run every launch: its kernels finished 0 of 2 cubes
+compact=true plane=true skip_from=Some(1): stride walk b50: the device did not run every launch: its kernels finished 1 of 2 cubes
+ok
+test cubecl_backend::tests::cubecl_cuda_matches_cpu_detailed ... base 10: 1000000 candidates match the CPU exactly (CUDA runtime)
+base 40: 2000000 candidates match the CPU exactly (CUDA runtime)
+base 62: 200000 candidates match the CPU exactly (CUDA runtime)
+base 80: 100000 candidates match the CPU exactly (CUDA runtime)
+ok
+test cubecl_backend::tests::cubecl_cuda_matches_cpu_niceonly ... base 10: [47, 100) agrees, 1 nice (CUDA runtime)
+base 12: [144, 330) agrees, 0 nice (CUDA runtime)
+
+thread 'cubecl_backend::tests::cubecl_cuda_matches_cpu_niceonly' (335071) panicked at common/src/cubecl_backend.rs:4223:60:
+cubecl-cuda run: stride walk b25: the device did not run every launch: its kernels finished 1 of 3 cubes
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test cubecl_backend::tests::cubecl_cuda_queue_faults_fail_the_field ... plane=true bits=1: stride walk b50: the survivor queues checked 41 fewer survivors than they queued
+plane=true bits=2: stride walk b50: the survivors the queues checked differ from those they queued (low words differ by 439835 mod 2^32)
+plane=false bits=1: stride walk b50: the survivor queues checked 6 fewer survivors than they queued
+plane=false bits=2: stride walk b50: the survivors the queues checked differ from those they queued (low words differ by 248052 mod 2^32)
+ok
+test cubecl_backend::tests::cubecl_cuda_queues_check_every_survivor_on_partly_filled_warps ... b50 plane=true ballot=true cube=256 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=256 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=100 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=100 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=48 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=48 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=36 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=true ballot=true cube=36 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=256 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=256 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=100 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=100 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=48 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=48 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=36 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=36 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=256 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=256 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=100 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=100 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=48 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=48 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=36 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=true ballot=true cube=36 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=256 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=256 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=100 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=100 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=48 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=48 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=36 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=36 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+32 runs, 0 wrong
+ok
+test cubecl_backend::tests::cubecl_cuda_reads_back_every_near_miss ... bases 10-28 in full: 73 near-misses match the CPU exactly (CUDA runtime)
+ok
+test cubecl_backend::tests::cubecl_cuda_reports_the_real_device_name ... cubecl-cuda device 0 reports as "NVIDIA GeForce RTX 3080"
+ok
+test cubecl_backend::tests::cubecl_detailed_survives_more_batches_than_the_task_cap ... skipping on software rasterizer: llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>)
+ok
+test cubecl_backend::tests::cubecl_dropped_launches_fail_the_field ... compact=false plane=false skip_from=None: 30449 of 30449 survivors
+compact=false plane=false skip_from=Some(0): stride walk b50: the device did not run every launch: its kernels finished 0 of 2 cubes
+compact=false plane=false skip_from=Some(1): stride walk b50: the device did not run every launch: its kernels finished 1 of 2 cubes
+compact=true plane=false skip_from=None: 30449 of 30449 survivors
+compact=true plane=false skip_from=Some(0): stride walk b50: the device did not run every launch: its kernels finished 0 of 2 cubes
+compact=true plane=false skip_from=Some(1): stride walk b50: the device did not run every launch: its kernels finished 1 of 2 cubes
+ok
+test cubecl_backend::tests::cubecl_finds_69_in_base_10 ... ok
+test cubecl_backend::tests::cubecl_matches_cpu_detailed ... base 10: 1000000 candidates match the CPU exactly
+base 40: 2000000 candidates match the CPU exactly
+base 62: 200000 candidates match the CPU exactly
+base 80: 100000 candidates match the CPU exactly
+ok
+test cubecl_backend::tests::cubecl_matches_cpu_niceonly ... base 10: [47, 100) agrees, 1 nice
+base 12: [144, 330) agrees, 0 nice
+
+thread 'cubecl_backend::tests::cubecl_matches_cpu_niceonly' (335127) panicked at common/src/cubecl_backend.rs:3863:60:
+cubecl run: stride walk b25: the device did not run every launch: its kernels finished 1 of 3 cubes
+FAILED
+test cubecl_backend::tests::cubecl_niceonly_finds_69_in_base_10 ... ok
+test cubecl_backend::tests::cubecl_prefilter_survivors_match_the_host_mirror ... base 30: 396 of 159058 candidates survive (0.25%), device agrees
+base 34: 2099 of 350205 candidates survive (0.60%), device agrees
+base 40: 4472 of 288591 candidates survive (1.55%), device agrees
+ok
+test cubecl_backend::tests::cubecl_queue_faults_fail_the_field ... plane=false bits=1: stride walk b50: the survivor queues checked 6 fewer survivors than they queued
+plane=false bits=2: stride walk b50: the survivors the queues checked differ from those they queued (low words differ by 248052 mod 2^32)
+ok
+test cubecl_backend::tests::cubecl_queues_check_every_survivor_on_partly_filled_planes ... b50 plane=false ballot=true cube=256 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=256 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=100 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=100 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=48 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=48 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=36 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=true cube=36 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=false cube=256 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=false cube=256 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=false cube=100 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=false cube=100 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=false cube=48 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=false cube=48 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=false cube=36 lanes/range=1: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b50 plane=false ballot=false cube=36 lanes/range=4: 30449 of 30449 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=256 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=256 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=100 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=100 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=48 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=48 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=36 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=true cube=36 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=false cube=256 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=false cube=256 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=false cube=100 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=false cube=100 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=false cube=48 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=false cube=48 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=false cube=36 lanes/range=1: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+b40 plane=false ballot=false cube=36 lanes/range=4: 283 of 283 survivors, 0 missing, 0 duplicated, 0 extra
+32 runs, 0 wrong
+ok
+test cubecl_backend::tests::cubecl_reads_back_every_near_miss ... bases 10-24 in full: 27 near-misses match the CPU exactly
+ok
+test cubecl_backend::tests::pipeline_throughput_fixed_fields ... skipping: set NICE_TEST_FIELDS to run the throughput harness
+ok
+test cubecl_backend::tests::rev_multicube_cuda ... 
+thread 'cubecl_backend::tests::rev_multicube_cuda' (335304) panicked at common/src/cubecl_backend.rs:4641:27:
+REV multicube compact=false plane=false: Err stride walk b50: the device did not run every launch: its kernels finished 2 of 18 cubes (18 cubes)
+FAILED
+test cubecl_backend::tests::rev_multicube_wgpu ... 
+thread 'cubecl_backend::tests::rev_multicube_wgpu' (335305) panicked at common/src/cubecl_backend.rs:4641:27:
+REV multicube compact=false plane=false: Err stride walk b50: the device did not run every launch: its kernels finished 2 of 18 cubes (18 cubes)
+FAILED
+test cubecl_backend::tests::rev_plane_scoped_forced ... REV device llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan, wgpu<wgsl>)
+
+thread 'DSD-4-0' (335061) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-wgpu-0.10.0/src/compiler/wgsl/compiler.rs:670:17:
+Synchronization within a plane is not supported in WGSL
+
+thread 'DSD-4-0' (335061) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-wgpu-0.10.0/src/compiler/wgsl/compiler.rs:670:17:
+Synchronization within a plane is not supported in WGSL
+REV plane ballot=true dim=None: Err stride walk b50: the device did not run every launch: its kernels finished 0 of 2 cubes (2 cubes)
+
+thread 'DSD-4-0' (335061) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-wgpu-0.10.0/src/compiler/wgsl/compiler.rs:670:17:
+Synchronization within a plane is not supported in WGSL
+REV plane ballot=true dim=Some(100): Err stride walk b50: the device did not run every launch: its kernels finished 0 of 5 cubes (5 cubes)
+
+thread 'DSD-4-0' (335061) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-wgpu-0.10.0/src/compiler/wgsl/compiler.rs:670:17:
+Synchronization within a plane is not supported in WGSL
+
+thread 'DSD-4-0' (335061) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-wgpu-0.10.0/src/compiler/wgsl/compiler.rs:670:17:
+Synchronization within a plane is not supported in WGSL
+REV plane ballot=false dim=None: Err stride walk b50: the device did not run every launch: its kernels finished 0 of 2 cubes (2 cubes)
+
+thread 'DSD-4-0' (335061) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-wgpu-0.10.0/src/compiler/wgsl/compiler.rs:670:17:
+Synchronization within a plane is not supported in WGSL
+REV plane ballot=false dim=Some(100): Err stride walk b50: the device did not run every launch: its kernels finished 0 of 5 cubes (5 cubes)
+ok
+test cubecl_backend::tests::wgsl_dump_for_lint ... CUBECL_DEBUG_LOG is not set; no shaders to dump
+ok
+
+failures:
+
+failures:
+    cubecl_backend::tests::cubecl_cuda_matches_cpu_niceonly
+    cubecl_backend::tests::cubecl_matches_cpu_niceonly
+    cubecl_backend::tests::rev_multicube_cuda
+    cubecl_backend::tests::rev_multicube_wgpu
+
+test result: FAILED. 19 passed; 4 failed; 0 ignored; 0 measured; 287 filtered out; finished in 59.09s
+
+error: test failed, to rerun pass `-p nice_common --lib`

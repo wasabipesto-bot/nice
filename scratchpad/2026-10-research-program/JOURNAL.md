@@ -218,6 +218,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   the card; detailed mode never had the gap. **01:30 UTC: independent review started** on the same box (hard
   stop 03:15). The PR opens when its must-fix list is empty.
 
+- **03:08 UTC: PR #270 opened** (EXPERIMENTS SRA.2): the stride fix after an independent review ("merge with
+  fixes", no code defect; the test strengthened, the description corrected). Box 61303619 destroyed at 03:10.
+  Open on it: CI, and two named tests on a real Vulkan card (ten minutes on demoux, the user's to grant or run).
+  It is the only open non-draft PR, so it is the top-3 list.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);

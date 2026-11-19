@@ -1,0 +1,139 @@
+diff --git a/common/src/cubecl_backend.rs b/common/src/cubecl_backend.rs
+index ac761c0..493791d 100644
+--- a/common/src/cubecl_backend.rs
++++ b/common/src/cubecl_backend.rs
+@@ -1581,7 +1581,7 @@ fn niceonly_kernel(
+ #[cube]
+ fn cube_ran(nice_count: &mut Array<Atomic<u32>>) {
+     sync_cube();
+-    if UNIT_POS_X == 0u32 {
++    if ABSOLUTE_POS_X == 0u32 {
+         nice_count[3].fetch_add(1u32);
+     }
+ }
+@@ -4546,6 +4546,125 @@ mod tests {
+         dropped_launches(client, true);
+     }
+ 
++    /// Reviewer's probe (scratch only): the plane-scoped queue with the new
++    /// count, forced on a software rasterizer, so its SPIR-V module is built
++    /// and run; prints what the host accepts.
++    #[test]
++    #[ignore = "reviewer scratch"]
++    fn rev_plane_scoped_forced() {
++        let ctx = CubeclContext::new_default().expect("CubeCL init");
++        #[allow(irrefutable_let_patterns)]
++        let CubeclContext::Wgpu { client, .. } = &ctx else {
++            unreachable!("wgpu");
++        };
++        println!("REV device {}", ctx.device_name());
++        let (base, mask, start, len, want) = queue_cases().swap_remove(0);
++        let half = len / 2;
++        for ballot in [true, false] {
++            for (dim, shift) in [(None, None), (Some(100u32), Some(0u32))] {
++                let mut run = CubeclNiceonlyRun::new(client, base, start, false).expect("run");
++                run.probe = true;
++                run.compact_override = Some(true);
++                run.plane_override = Some(true);
++                run.ballot_override = Some(ballot);
++                run.cube_dim_override = dim;
++                run.lane_shift_override = shift;
++                if shift == Some(0) {
++                    // many ranges per launch: several cubes of 100 units
++                    let step = 997u32;
++                    let mut offs = Vec::new();
++                    let mut lens = Vec::new();
++                    let mut o = 0u32;
++                    while o < len {
++                        offs.push(u64::from(o));
++                        lens.push(step.min(len - o));
++                        o += step;
++                    }
++                    let masks = vec![mask; offs.len()];
++                    run.launch(0, &offs, &lens, &masks).expect("dispatch");
++                } else {
++                    for (offset, n) in [(0u64, half), (u64::from(half), len - half)] {
++                        run.launch(0, &[offset], &[n], &[mask]).expect("dispatch");
++                    }
++                }
++                let cubes = run.cubes;
++                let got = Box::new(run.end_field(0).expect("end field")).wait();
++                match got {
++                    Ok(r) => println!(
++                        "REV plane ballot={ballot} dim={dim:?}: Ok, {} of {} survivors, {cubes} cubes",
++                        r.nice_numbers.len(),
++                        want.len()
++                    ),
++                    Err(e) => println!("REV plane ballot={ballot} dim={dim:?}: Err {e:#} ({cubes} cubes)"),
++                }
++            }
++        }
++    }
++
++    /// Reviewer's probe: multi-cube launches through every path, clean.
++    fn rev_multicube<R: cubecl::prelude::Runtime>(
++        client: &cubecl::prelude::ComputeClient<R>,
++        plane: bool,
++    ) {
++        let (base, mask, start, len, want) = queue_cases().swap_remove(0);
++        let mut paths = vec![(false, false), (true, false)];
++        if plane {
++            paths.push((true, true));
++        }
++        for (compact, plane_scoped) in paths {
++            let mut run = CubeclNiceonlyRun::new(client, base, start, false).expect("run");
++            run.probe = true;
++            run.compact_override = Some(compact);
++            run.plane_override = Some(plane_scoped);
++            run.lane_shift_override = Some(0);
++            let step = 97u32;
++            let mut offs = Vec::new();
++            let mut lens = Vec::new();
++            let mut o = 0u32;
++            while o < len {
++                offs.push(u64::from(o));
++                lens.push(step.min(len - o));
++                o += step;
++            }
++            let masks = vec![mask; offs.len()];
++            let k = offs.len() / 2;
++            run.launch(0, &offs[..k], &lens[..k], &masks[..k]).expect("dispatch");
++            run.launch(0, &offs[k..], &lens[k..], &masks[k..]).expect("dispatch");
++            let cubes = run.cubes;
++            let got = Box::new(run.end_field(0).expect("end field")).wait();
++            match got {
++                Ok(r) => {
++                    let got: Vec<u128> = r.nice_numbers.iter().map(|n| n.number).collect();
++                    println!("REV multicube compact={compact} plane={plane_scoped}: Ok {} of {} survivors, {cubes} cubes", got.len(), want.len());
++                    assert_eq!(got, want);
++                }
++                Err(e) => panic!("REV multicube compact={compact} plane={plane_scoped}: Err {e:#} ({cubes} cubes)"),
++            }
++        }
++    }
++
++    #[test]
++    #[ignore = "reviewer scratch"]
++    fn rev_multicube_wgpu() {
++        let ctx = CubeclContext::new_default().expect("CubeCL init");
++        #[allow(irrefutable_let_patterns)]
++        let CubeclContext::Wgpu { client, .. } = &ctx else {
++            unreachable!("wgpu");
++        };
++        rev_multicube(client, plane_queue_runs(client, &ctx.device_name()));
++    }
++
++    #[test]
++    #[cfg(feature = "cubecl-cuda")]
++    #[ignore = "reviewer scratch"]
++    fn rev_multicube_cuda() {
++        let ctx = CubeclContext::new_cuda(0).expect("CubeCL CUDA init");
++        let CubeclContext::Cuda { client, .. } = &ctx else {
++            unreachable!("cuda");
++        };
++        rev_multicube(client, true);
++    }
++
+     #[test]
+     fn ran_complete_wants_every_launched_cube() {
+         assert!(ran_complete(50, &[0, 0, 0, 0], 0).is_ok());

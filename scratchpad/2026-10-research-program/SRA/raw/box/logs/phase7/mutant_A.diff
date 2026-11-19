@@ -1,0 +1,12 @@
+diff --git a/common/src/cubecl_backend.rs b/common/src/cubecl_backend.rs
+index 066117d..6d85d36 100644
+--- a/common/src/cubecl_backend.rs
++++ b/common/src/cubecl_backend.rs
+@@ -3195,7 +3195,6 @@ fn read_niceonly_hits<R: cubecl::prelude::Runtime>(
+         .read_one(nice_count.clone())
+         .map_err(|e| anyhow::anyhow!("nice count read failed: {e:?}"))?;
+     let counts = u32::from_bytes(&bytes);
+-    ran_complete(base, counts, cubes)?;
+     queue_complete(base, counts)?;
+     let written = counts[0] as usize;
+     ensure!(

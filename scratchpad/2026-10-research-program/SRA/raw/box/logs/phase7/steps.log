@@ -1,0 +1,34 @@
+2026-11-19T02:21:46Z start build_wgsl: cargo test --release --features cubecl -p nice_common --lib --no-run
+2026-11-19T02:24:03Z end build_wgsl rc=0
+2026-11-19T02:24:03Z start build_spirv: cargo test --release --features cubecl-spirv -p nice_common --lib --no-run
+2026-11-19T02:26:37Z end build_spirv rc=0
+2026-11-19T02:26:37Z start build_cuda: cargo test --release --features cubecl-cuda -p nice_common --lib --no-run
+2026-11-19T02:29:20Z end build_cuda rc=0
+2026-11-19T02:29:20Z start lvp_spirv: /root/sra/target/release/build/nice_common/394c88e9c300f4f8/out/nice_common-394c88e9c300f4f8 --ignored --nocapture cubecl_
+2026-11-19T02:29:20Z start lvp_wgsl: /root/sra/target/release/build/nice_common/0de253f4a6e1395f/out/nice_common-0de253f4a6e1395f --ignored --nocapture
+2026-11-19T02:29:20Z start cuda_new: /root/sra/target/release/build/nice_common/c29ae11497f8b508/out/nice_common-c29ae11497f8b508 --ignored --nocapture --exact cubecl_backend::tests::cubecl_cuda_dropped_launches_fail_the_field
+2026-11-19T02:29:22Z end cuda_new rc=0
+2026-11-19T02:29:22Z start cuda_stride: /root/sra/target/release/build/nice_common/c29ae11497f8b508/out/nice_common-c29ae11497f8b508 --ignored --nocapture --test-threads=1 cubecl_backend::tests::cubecl_cuda_
+2026-11-19T02:30:08Z end cuda_stride rc=0
+2026-11-19T02:30:08Z start just_lint: just lint
+2026-11-19T02:30:18Z end just_lint rc=0
+2026-11-19T02:30:18Z start clippy_cuda: cargo clippy -p nice_common --all-targets --features cubecl-cuda,cubecl-spirv -- -D warnings
+2026-11-19T02:30:22Z end clippy_cuda rc=0
+2026-11-19T02:30:22Z start suite: cargo test --locked --release --no-fail-fast
+2026-11-19T02:34:17Z end suite rc=0
+2026-11-19T02:34:17Z start gpu_lib: env NICE_REQUIRE_NVRTC=1 cargo test --locked --release -p nice_common --features gpu --lib
+2026-11-19T02:37:12Z end lvp_wgsl rc=0
+2026-11-19T02:40:15Z end gpu_lib rc=0
+2026-11-19T02:47:17Z end lvp_spirv rc=0
+2026-11-19T02:47:18Z start mutA_cuda: cargo test --release --features cubecl-cuda -p nice_common --lib -- --ignored --nocapture --exact cubecl_backend::tests::cubecl_cuda_dropped_launches_fail_the_field
+2026-11-19T02:50:03Z end mutA_cuda rc=101
+2026-11-19T02:50:03Z start mutA_lvp_wgsl: cargo test --release --features cubecl -p nice_common --lib -- --ignored --nocapture --exact cubecl_backend::tests::cubecl_dropped_launches_fail_the_field
+2026-11-19T02:52:21Z end mutA_lvp_wgsl rc=101
+2026-11-19T02:52:21Z start mutA_lvp_spirv: cargo test --release --features cubecl-spirv -p nice_common --lib -- --ignored --nocapture --exact cubecl_backend::tests::cubecl_dropped_launches_fail_the_field
+2026-11-19T02:54:58Z end mutA_lvp_spirv rc=101
+2026-11-19T02:54:58Z start mutB_cuda: cargo test --release --features cubecl-cuda -p nice_common --lib -- --ignored --nocapture --exact cubecl_backend::tests::cubecl_cuda_dropped_launches_fail_the_field
+2026-11-19T02:57:41Z end mutB_cuda rc=101
+2026-11-19T02:57:41Z start mutB_lvp_wgsl: cargo test --release --features cubecl -p nice_common --lib -- --ignored --nocapture --exact cubecl_backend::tests::cubecl_dropped_launches_fail_the_field
+2026-11-19T03:00:00Z end mutB_lvp_wgsl rc=101
+2026-11-19T03:00:00Z start mutB_lvp_spirv: cargo test --release --features cubecl-spirv -p nice_common --lib -- --ignored --nocapture --exact cubecl_backend::tests::cubecl_dropped_launches_fail_the_field
+2026-11-19T03:02:36Z end mutB_lvp_spirv rc=101

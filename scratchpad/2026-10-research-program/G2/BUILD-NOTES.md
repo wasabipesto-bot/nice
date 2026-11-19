@@ -1,18 +1,30 @@
-# The middle-out join, build day 1 (2026-11-18, 16:43–22:30 UTC) and step 2A (19:05–23:45 UTC)
+# The middle-out join, build day 1 (2026-11-18, 16:43–22:30 UTC), step 2A (19:05–23:45 UTC) and step 3A (2026-11-19, 01:25–05:15 UTC)
 
-Briefs: `G2/BUILD-BRIEF-1.md` (day one), `G2/BUILD-BRIEF-2A.md` (step 2A: pieces B, A, C of §7). Branch
+Briefs: `G2/BUILD-BRIEF-1.md` (day one), `G2/BUILD-BRIEF-2A.md` (step 2A: pieces B, A, C of §7), `G2/BUILD-BRIEF-3A.md`
+(step 3A: accounts that prove the work ran, from the audit `G2/AUDIT-MO.md`). Branch
 **`dev/middle-out-join`** (from upstream main `be9cc923`), worktree `~/projects/nice/.worktrees/midout`, pushed to the
 fork only. Box: Vast 61286074, RTX 3080 at the host's 240 W cap, i9-9900 with a **5.12-CPU cgroup quota** (16 threads
 visible), CUDA 12.8 image, Mesa 25.2.8 lavapipe. Box scripts and raw logs: day one `G2/build1/box/`, `G2/build1/raw/`;
-step 2A `G2/build2a/box/`, `G2/build2a/raw/`. Step 2A's account is §9; sections 1, 5, 6 and 7 are updated for it.
+step 2A `G2/build2a/box/`, `G2/build2a/raw/`; step 3A `G2/build3a/`. Step 2A's account is §9; step 3A's is §10
+(the accounts, the fault switches before and after, the cost, its tests in §10.7); section 1 is updated for it.
 
 ## 1. Where it stands (kept current)
 
-**2026-11-18 ~22:15 UTC, end of step 2A.** Branch head **`91ac0761`** (14 commits on `be9cc923`; step 2A added
-`4291e56f` … `91ac0761`), on ivory and on `fork/dev/middle-out-join`. Still nothing outside `common/src/midout/`,
-`common/examples/midout_bench.rs`, one line of `lib.rs` and the example entry in `common/Cargo.toml`; no route reaches
-it; no server, schema or API change.
+**2026-11-19 ~03:30 UTC, end of step 3A.** Branch head **`c0ad3f4a`** on ivory and on `fork/dev/middle-out-join`
+(step 3A: the merge of `dev/mo-audit` `7a9fd414`, then `197c1e94`, `a7d3099a`, `46c99784`, `c0ad3f4a`). Still nothing
+outside `common/src/midout/`, `common/examples/midout_bench.rs`, one line of `lib.rs` and the example entry in
+`common/Cargo.toml`; no route reaches it; no server, schema or API change.
 
+- **Step 3A: a launch that did nothing is no longer a success** (§10). Every stage of a slice returns positive
+  evidence that it ran (cubes or job instances that reached their end, tops placed, rows written, a done word per
+  slice) and two conservation laws hold per slice (probes run = 8 × tops; children the main kernel saw = children
+  counted from the parent list); the host compares each with what it queued. Every fault the audit showed silent is
+  now loud on CUDA and on lavapipe W 8 (SPIR-V); both reproductions (a failed device allocation, `MIDOUT_STOP` in the
+  environment) now fail loudly; `MIDOUT_STOP` is no longer read by the library. A sampled CPU check (one random
+  slice per field, on a host thread) is the only check that sees a kernel computing wrongly; it costs nothing on the
+  card's clock but one core for 27 s per field. **Cost: 1.6505 → 1.6911 fs (+2.5 %) without the sampled check, 1.6980
+  fs (+2.9 %) with it, same session; ×3.91 / ×3.90 against main's 6.615 fs** (×4.01 before).
+- *Step 2A's state, still true:*
 - **Runs end to end and exactly on the RTX 3080 (CUDA):** whole base-64 fields of the new kind, `(64, 2^75 + t·2^57,
   2^57)`, through `midout::gpu::search_field`: tops (now hierarchical), parents, main kernel, record expansion with
   production's middle-digit prefilter, and production's full check of the 2.9 % that pass, on the card, one
@@ -392,3 +404,191 @@ records per slice (about 0.25 ms at the card's bandwidth) and runs the prefilter
 survivors (estimated 0.15–0.25 ms), so ~0.6 ms of it is unexplained by the experiments above (piece K, §7). With the
 expansion at that floor and nothing else changed, the slice would be ~7.1 ms, **≈ ×4.3 (estimated)**; ×4.4 needs the
 main kernel (piece D) or the parents (piece L) as well.
+
+## 10. Step 3A: accounts that prove the work ran (2026-11-19, 01:25–05:15 UTC)
+
+Brief: `G2/BUILD-BRIEF-3A.md`; specification: the audit `G2/AUDIT-MO.md` (§1.1, §1.2, §1.3, §3, §4.1). Same box, same
+rules. Commits: `7a9fd414` (merge of `dev/mo-audit`: the auditor's sweep, tops scan, fault switches and tests),
+`197c1e94` (accounts, `MIDOUT_STOP` out of the library, guards, sampled CPU check), `a7d3099a` (the acceptance tests),
+`46c99784` (account checks moved off the main kernel's live range, one read per group, the sampled slice's own field
+counts), `c0ad3f4a` (MAXPOP's proof, group cap). Raw logs: `G2/build3a/` (`final/` is the head's verification chain,
+`run1/` the first measurement whose main-kernel cost led to `46c99784`, `ab/` the A/B runs; scripts alongside).
+
+### 10.1 Accounts: what every stage returns and what the host compares it with
+
+Each slice gets its own 20-word account buffer `acc` (created with the slice, zeroed by the upload); the 64-slice tops
+level gets a second word in its `l5n`; each launch batch's `stat` grows from 3 to 5 words; the group's counter buffer
+gains three words. Every count is made **positive**: it must equal a number the host queued or a number another stage
+counted, so all-zero counters fail for every slice, including slices that legitimately have no survivors or no tops
+(slice 0: 0 survivors, 504 jobs with no probe, passes; it still has its cubes, jobs, parents and tops to show).
+`GpuJoin::check_slice` and `finish_group` (`gpu.rs`) do the comparisons; one failed comparison is an error naming the
+slice, the account and the whole account vector.
+
+| stage (kernel) | evidence it returns (where) | the host compares it with |
+|---|---|---|
+| `tops5` (once per 64 slices) | cubes done (`l5n[1]`, thread 0 of each cube) | its grid, 2^21 / 256 = 8,192 |
+| `tops1` | valid parents examined (`A_T1_EXAM`), tops certified (`A_T1_CERT`); plane sums, lane 0 adds | `l5n[0]` (the valid parents `tops5` listed); `tstat[0]` (`tscan`'s sum of the segment counts) |
+| `tscan` | ran (`A_TSCAN`) | 1 |
+| `tops2` | tops placed (`A_T2_PLACED`) | `tstat[0]` (≤ the tops cap, checked as before) |
+| `tdigz2`, `toprec2` | rows written (`A_TDIG`, `A_TREC`) | `tstat[0]` |
+| `hist2` | cubes done (`A_H2_CUBES`); parents certified, counted by a ballot of `m ≠ 0` apart from the list's own count (`A_H2_CERT`, per cube in shared memory) | the grid, ⌈depth-4 roots / 256⌉ = 36,323; `lcnt` (the list length the expansion copies into `stat[0]`) |
+| `scan16` | ran (`A_SCAN16`) | 1 |
+| `scatter3` | rows moved (`A_SCAT`); **children of the listed parents** (`A_SC_CHILD`: for each parent, the 64 values of digit 4 whose child mask is valid, by the main kernel's own `child_mask`) | `lcnt`; the main kernel's children (below) |
+| `hsort` | cubes done (`A_HSORT`) | 16,128 |
+| main kernel (`g2_kernel`) | **job instances that reached their end** (`A_JOBS`, the wide branch's `C_JOBS` per slice); probes it runs (`A_PROBES`, added once per instance before the rounds); children seen (`A_CHILD`, the existing per-job count) | the instances queued for the slice (2·classes·64 per batch, summed over the batches queued); **8 × tops** (every top is a probe of exactly one job per root, over the job's two instances); **`A_SC_CHILD`** (the last two only when every batch of the slice was queued) |
+| expansion (`expand_kernel`, per batch) | cubes done (`stat[3]`), slabs walked once per plane (`stat[4]`) | 4,096; `min(slabn, slab cap)` |
+| check (production's, unchanged) | its `ran` words, as before | entries = list length, index sum (as before) |
+| per slice (`done_kernel`, new, after the slice's last batch) | `A_DONE` += 1 and the group's `C_SLICES` += 1 | 1; **the number of slices queued in the group** (the field's slice count now comes from the device, not the host's loop) |
+| any kernel | `A_ERR_PLANE` (`hist2`: plane width or lane layout differs from the comptime width); `C_ERR_IDX`, `C_ERR_CLST` (guards, §10.3) | 0 |
+
+The accounts that existed (kernel error counters, caps, list = check, bits read = survivors counted) are unchanged.
+The plane sums with a lane-0 add (`tops1`, `tops2`, `tdigz2`, `toprec2`, `scatter3`, the expansion's slabs) are
+self-checking against partly filled planes: a plane without lane 0 under-counts, and the comparison fails.
+
+Not done from the audit's list in §1.1: (c) the write-and-read-back of each large buffer at `new` (the accounts catch
+the same failure at the first group, shown below) and (d) a panic hook that aborts the process when CubeCL's stream
+thread panics (a library should not set a process-wide hook; **the client route (piece F) must**, so that nothing is
+submitted after such a panic).
+
+### 10.2 The fault switches and the reproductions, before and after
+
+Before: the audit's §1.3 table at `91ac0761` (`G2/audit1/faults*.log`). After: `accounts_faults_are_loud` (new,
+`audit.rs`; asserts each one), on the production group path (`queue_dev` + `finish_group`, exactly `search_field`'s),
+each fault followed by a clean run that must give the unfaulted counts. CUDA: slices {502136830, 0} and {806726610
+(a 141-probe job), 712012851, 2^30 − 1} (`build3a/final/faults_cuda*.log`); lavapipe W 8 through SPIR-V, 4 classes per
+batch: slice 712012851 (`final/lvp_faults.log`).
+
+| fault (switch) | before (`91ac0761`) | after: what fails (CUDA, first account to fail) | lavapipe W 8 |
+|---|---|---|---|
+| `F_SKIP_MAIN` (2), main kernel dropped | **silent** (survivors 0) | loud: "main-kernel job instances done: 0, want 8064" | loud (same account) |
+| `F_SKIP_TOPS` (4096), `tops1` dropped | **silent** (tops 0, survivors 0) | loud: "tops1 valid parents examined: 0, want 405593" (and `tops2` placed 219,137 stale tops from the previous slice: the account would have failed there too) | loud (same; `tops2` placed 238,813 stale tops, the same slice's from the clean run, which would have looked right) |
+| `F_DROP_PROBE` (8), each job's last probe not run | **silent** (−0.21 % survivors) | loud: "probes run = 8 x tops: 1906740, want 1910856" | loud (1906472 vs 1910504) |
+| `F_DROP_PARENT` (8192), 1 parent in 997 uncertified | **silent** (−0.20 % survivors) | loud: "parents certified (hist2) = listed: 1040898, want 1039848" | loud (1042046 vs 1040986) |
+| `F_PF_DROP` (1024), prefilter rejects ~1/1024 of survivors | **silent** (checked −672) | accounts still pass (no account can see it); **the sampled CPU check fails**: "device … checked 337845 …, CPU … checked 338191" | accounts pass; sampled check loud (337578 vs 337904) |
+| `F_DROP_REC`, `F_SLABCNT`, `F_SKIP_CHECK`, `F_PMAX300`, `F_POP12`, `F_SLAB_CAP`, `F_SCAP` | loud | loud (accounts unchanged) | — |
+| `F_IDX13` | loud by accident | loud by accident (the 16-bit guard checks the class size, not the read) | — |
+
+The reproductions of §1.1 and §1.2, now tests that fail if the path is silent:
+
+- **§1.1, a failed device allocation** (`audit_oom_is_loud`): in-process, 9,216 MiB filled first, CubeCL's stream thread
+  panics "can't allocate buffer of size: 647127040", `GpuJoin::new` still returns `Ok`, and **both slices fail
+  loudly**: "expansion ran 0 of 4096 cubes, walked 0 of 0 slabs" (`final/oom_inproc_9216.log`). With a helper process
+  holding 7,680 MiB (card at 8.9 GB), unmodified join in a fresh process: the same (`final/oom_helper_7680.log`). Before
+  (audit `oom*.log`): `Ok` with survivors 0, every account passed.
+- **§1.2, `MIDOUT_STOP` in the environment** (`audit_stop_env_is_loud`): with `MIDOUT_STOP=2` set, `GpuJoin::new` no
+  longer reads it (stop stays 6) and slice 712012851 gives its full counts (survivors 11,768,560, checked 337,904);
+  with the stop set through the new `set_timing_stop(2)` (the bench's only way), `search_field` refuses: "a timing stop
+  (2) is set: this join only times stages" (`final/stop_env.log`). Before: `Ok` in 5 s with survivors 0, slices 4,096.
+  Timing now goes through `time_field`, which returns only a time.
+
+### 10.3 The guards (AUDIT-MO §3)
+
+| § | guard | how |
+|---|---|---|
+| 3.1 | 16-bit pending parent index | per job, before the rounds: a class of more than 65,536 parents counts `C_ERR_IDX` (host: error) |
+| 3.2 | 20-bit top index in the probe word | `GpuJoin::new` refuses a tops cap above 2^20 |
+| 3.3 | child-list write unbounded per batch | the kernel takes the list's length; per job, the range `[lb, lb + class size)` past it counts `C_ERR_CLST`; the store is clamped to the list (no write past it) |
+| — | `scatter3` read the list up to `lcnt`, unbounded | bounded by the list's capacity (an overflow is already an error) |
+| 3.4 | MAXPOP 17, margin 0 | the audit's proof written at the constant |
+| 3.5 | slice count compared with itself | slices counted from the device's done words (`C_SLICES`), compared with the slices queued per group and per field |
+| 3.6 | nice numbers not checked to lie in the field | `search_field` checks each reported n's v lies in `[v_start, v_start + v_size)` |
+| 3.7 | u32 counters per unit per group | `search_field` refuses groups above 256 slices |
+| plane | kernels without a plane check | `hist2` (the one that takes a comptime width) checks `PLANE_DIM` and the lane layout (`A_ERR_PLANE`); the others use `PLANE_DIM` at run time and their lane-0 counts fail their account on a partly filled plane |
+
+### 10.4 The sampled CPU check (`GpuOptions::cpu_check`; on in the bench, `--no-cpu-check` turns it off)
+
+One slice of the field, chosen at random (`RandomState` hashed with the field), is computed by the CPU reference
+(`cpu::slice_join`, the same as the parity tests) on a host thread started with the field. When the field's slices are
+done: (1) the field run's **own** survivors and checked for that slice (the expansion's bits read and the check's
+entries for its batches, recorded by `finish_group`) must equal the CPU's; (2) the slice is run again alone on the
+device (`run_slice_dev`, the field's key) and its prefiltered list must equal the CPU's **n for n**. Any difference is
+an error for the field. On the 3080 box (10 fields): the CPU thread takes 26.6–27.1 s against a 30.6 s field, so the
+host never waited for it (0.00 s); the device rerun costs 0.16 s (0.32 s on the first field, with its compilation),
+**+0.4 % on the field**. It costs one host core for ~27 s per field (a client with fewer than 2 free cores would wait).
+
+What it sees that nothing else does: a kernel that does all its work and computes wrongly (§10.5); with probability
+about 1 − (1 − f)^k after k fields for a defect touching a fraction f of slices (f = 1/1,000: 1,000 fields ≈ 0.4 % of
+the base for 63 %).
+
+### 10.5 What only the sampled check, or nothing, can see
+
+- **Only the sampled CPU check** (all the accounts are conservation of work, not of correctness): a wrong certificate
+  in `tops5`/`tops1` (a valid top rejected lowers `tstat[0]`, the tops placed and the probes together); a wrong
+  `parent()` mask (the audit's `F_DROP_PARENT` is loud only because its flag is cleared after `parent()`: the
+  certified count is taken from `m`; a `parent()` that returns 0 for a valid parent is seen by nothing else); a wrong
+  `child_mask` (`scatter3` uses the same function); a false common-mask skip or a wrong transpose mask in phase 2; a
+  wrong segment table whose counts still sum right; a slice run with the wrong digits; a prefilter that rejects too much
+  (`F_PF_DROP`, shown); a wrong `r0` or top record written by the expansion.
+- **Partly**: a defect that only touches the field path and not a slice run alone is seen by the sampled check's
+  first half (the field run's own counts), at count level only (not n for n).
+- **Nothing**: a defect shared by the device and the CPU reference (the shape's predicate; covered by the small-base
+  brute-force test only); production's check kernel judging a nice n not nice (production's own exposure); a defect
+  in slices the sampled check never draws, until it draws one; the W 64 paths (never run).
+
+### 10.6 Cost (measured, Vast 61286074, RTX 3080 at its 240 W cap, one session)
+
+Ten fields (the set of §6), group 16, binaries `mo_bench_head` (`91ac0761`, md5 `51cef178`) and `mo_bench_final`
+(`46c99784`, md5 `fcdd191c`), back to back 02:19–02:35 UTC (`final/ten_*.log`, `final/smi_ten.csv`: 237 W mean, 1,553
+MHz mean SM clock, at most 72 °C). Survivors and checked equal field for field in all three runs.
+
+| run | 10 fields | fs per admissible n | against main (6.615 fs) |
+|---|---|---|---|
+| before, `91ac0761` | 302.04 s | **1.6505** (tonight's 1.647, repeated) | ×4.01 |
+| after, `46c99784`, no sampled check | 309.48 s | **1.6911** (+2.5 %) | ×3.91 |
+| after, `46c99784`, sampled check on (the bench's default) | 310.74 s | **1.6980** (+2.9 %) | ×3.90 |
+
+Per slice (field 77777, cumulative stops, `final/stops.log`), two rounds each, `91ac0761` against `c0ad3f4a`
+(02:55–03:03 UTC), seconds per field / 4,096; noise about ±0.03 ms per slice:
+
+| stage (cumulative stop) | before | after | change |
+|---|---|---|---|
+| tops (1) | 0.376 ms | 0.413 ms | +0.037 (tops accounts, the per-slice account buffer, the done kernel) |
+| parents (2 − 1) | 0.660 | 0.731 | +0.071 (mostly `scatter3`'s children count) |
+| main kernel (3 − 2) | 5.454 | 5.547 | +0.093 (job and probe counts, the guards) |
+| expansion (5 − 3) | 1.080 | 1.110 | +0.030 |
+| check and the group's accounts (full − 5) | 0.144 | 0.090 | −0.05 (noise; the accounts are read once per group) |
+| **slice, no sampled check** | **7.714** | **7.891** | **+0.177 (+2.3 %)** |
+| slice, sampled check on (one field per process: the rerun includes its compilation) | — | 7.975 | +0.261 |
+
+Over the ten fields the change is +2.5 % (no check) and +2.9 % (check on); the table above is one field.
+
+**The first form was dearer** (`run1/`): the per-write bound on the child list and the probe and guard checks at the
+kernel's end cost the main kernel 0.55 ms per slice (stop 3: 28.86 s against 26.59 s per field), which `46c99784`
+removed by taking those checks once per job before the rounds (no value stays live through them) and clamping the
+store: the kernel's cost fell to ~0.09 ms per slice (the commit message's "about 0.03" was from one A/B pair; the
+table above is the better number). Batching the group's reads into one call changed nothing
+measurable. The rest of the cost is the per-slice account buffer and done kernel (~0.03 ms), the children count in
+`scatter3` (64 child-mask tests for each of ~1.04M parents, ~0.06 ms) and the plane sums in the tops kernels.
+
+### 10.7 Tests at the head (`46c99784`; `c0ad3f4a` adds a doc comment and the group cap)
+
+| test | what | result |
+|---|---|---|
+| `audit::accounts_faults_are_loud`, CUDA | §10.2, two slice sets | pass (every fault loud) |
+| same, lavapipe W 8 (SPIR-V), 4 classes per batch | slice 712012851, no clean rerun between faults | pass (every fault loud; llvmpipe, Mesa 25.2.8, LLVM 20.1.2, 256 bits; 88 s) |
+| `audit::audit_oom_is_loud`, CUDA | in-process 9,216 MiB; helper process 7,680 MiB | pass (loud) |
+| `audit::audit_stop_env_is_loud`, CUDA | §10.2 | pass |
+| `gpu::gpu_slices_equal_cpu`, CUDA | the 5 slices of §5; host tops (712012851); part of a slice (3 batches of 4 classes: the probe and children laws skipped, the rest checked) | pass |
+| same, lavapipe W 8 | 712012851, 318575442, 4 classes per batch | pass (device tops = host tops, lists n for n, every count; 72 s) |
+| `gpu::gpu_check_rebuilds_the_survivors`, CUDA | probe mode | pass |
+| `audit::audit_sweep`, CUDA | the first 100 slices of the audit's list (its 48 extremes, 24 range-end slices, 28 seeded) | pass: all 100 equal (device tops, prefiltered lists n for n, whole survivor sets with the prefilter off, every count; 1,140,052,210 survivors, 32,714,757 checked; jobs up to 619 probes; slices 0 and 2^30 − 1 included), every account passed on every run (`final/sweep100.*`) |
+| production suite | `cargo test --release -p nice_common --lib`, default features | 214 passed, 0 failed, 10 ignored (as on main), at `c0ad3f4a` |
+| lint | `cargo fmt --all --check`; clippy `-D warnings`, all targets, default and `cubecl-cuda,cubecl-spirv` | clean at `c0ad3f4a` |
+
+### 10.8 What remains from the audit, and what it got wrong
+
+Remains: §1.1 (c) and (d) (above; (d) belongs to the client route); the W 64 parity run before any field on the RX
+9070 XT (§8.1); lavapipe W 16 (aborts in lavapipe); a sampled check of the host-tops path's field runs (the host path
+has the main-kernel, preparation and expansion accounts but no tops accounts: its tops come from the CPU); the wide
+kernels (`gpu_wide.rs`, untouched here) need the same accounts ported (only `C_JOBS` is there).
+
+The audit, checked against what was found here: nothing material was wrong; every reproduction and fault behaved as it said, the
+two conservation laws it proposed hold exactly on every slice run tonight (the 100-slice sweep, slices 0 and 2^30 − 1,
+the part-slice runs aside, where they do not apply), and its CPU estimate for the sampled check (35 s) was close (27 s
+measured). Three refinements: (1) §3.1's limit is a class of **65,536** parents, not 65,535 (indices 0…65,535 fit in
+16 bits); (2) `F_DROP_PARENT` is injected after `parent()` returns (the flag, not the mask), so it is loud through a
+count of `m ≠ 0`; the defect it is meant to model, a wrong `parent()`, is still seen only by the sampled check (§10.5);
+(3) with `tops1` dropped, `tops2` still places tops from the previous slice's buffers (219,137 on CUDA; on lavapipe,
+rerunning the same slice, exactly the right 238,813), so "tops 0" in its table was `tscan`'s count, not what the later
+kernels used: stale buffers can look exactly right, and only counts that each kernel makes of its own work, compared
+with each other (examined = listed, certified = counted, placed = counted), tell a dropped launch from a run.
