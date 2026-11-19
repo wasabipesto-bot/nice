@@ -35,6 +35,34 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.11 A maintainability read and a pull-request plan for the branch (2026-11-19 11:57–12:07 UTC, independent reviewer, ivory, read-only; `G2/PRPLAN-BRIEF.md`, `G2/MAINTAINABILITY.md`, `G2/PR-PLAN.md`)
+
+- **Size, corrected:** `git diff --shortstat origin/main...HEAD` at 66259bb0 is **13,300 insertions in 20 files, 49
+  commits** (I had been saying 6,500 to 7,000): the wide path is 4,516 of them and tests about 2,800.
+- **Must fix before any pull request** (file and line in `MAINTAINABILITY.md` §1): (M1) CI would fail or time out:
+  its lavapipe and Metal jobs run every ignored test in nice_common, and the branch adds 17 written for a CUDA
+  box (two need staged data that is not in the repo, one writes to /root, several run whole fields, one exceeds
+  lavapipe's binding limit); (M2) the kernels never ran through WGSL (naga) or Metal, the compilers CI uses, and
+  CI's SPIR-V step filters on a name no midout test has; the prefilter form is chosen by the runtime's name;
+  (M3) the narrow main kernel carries 10 comptime switches and about 15 dead branches from the prototype, launched
+  with bare literals; (M4) the data layouts are written down nowhere and the module docs are stale; (M5) 56
+  references to notes outside the repository and about 40 step labels; (M6) public functions that can return
+  something that is not a whole, checked field; (M7) the client flag shows in every release build's `--help`.
+- **Fine as it is:** no test switch can reach a release build; the edits to production files add behaviour
+  without changing any (two private constants are copied and could drift). 27 % of the wide file is verbatim
+  copy of the narrow one and 19 host functions exist twice: one generic kernel in CubeCL 0.10 is judged a trap,
+  a shared host driver worth doing later.
+- **Proposed series** (`PR-PLAN.md`): 1 the field coordinate (CPU, ≈ 530 lines); 2 the exact CPU reference
+  against brute force (≈ 1,090); 3 device tops (≈ 1,000); 4 one slice on the device with accounts (≈ 3,050);
+  5 a whole field and the sampled CPU check (≈ 700); 6 parent sharing (≈ 450); then, each needing the
+  maintainer's yes: 7–10 a bench example, the claim guard, the client route and flag, the coordinator script
+  (≈ 2,000); 11–12 the wide path (≈ 4,650). Stop points after 2 and after 5 or 6. Built as fresh commits from a
+  cleaned final tree, the branch kept as the archive. A first series without the wide path, the old coordinate,
+  the host-tops path, the timing functions and most of the audit harness is about 5,500 code and 1,400 test
+  lines.
+- **Seven questions for the maintainer** (in the report).
+- **Acted on:** step 6C (cleanup on `dev/mo-clean`, `G2/BUILD-BRIEF-6C.md`) started the same hour.
+
 ## MO.10 The 64-lane pre-flight repeated at the new head; card memory; predicted ×4.87 (2026-11-19 10:50–11:56 UTC, the offline engineer resumed, ivory only; `G2/BUILD-NOTES.md` §14, `G2/build4s/preflight_h5l.md`, `G2/WINDOW-PLAN-2.md` (top section), `G2/build4s/window/`, `G2/build4s/window_dryrun2/`; trunk e09ad7b0 → 66259bb0 (one test-only commit), on the fork)
 
 - **Pre-flight** [M, static]: every kernel of both paths compiled for 64 lanes, validated and run through ACO for

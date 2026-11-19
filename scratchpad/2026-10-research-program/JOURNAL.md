@@ -81,6 +81,14 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   smallest series of stacked PRs under the user's rules; what to cut; at most seven questions for them.
   Nothing else runs; no box is rented. The afternoon waits on the window (decision 15).
 
+- **12:07 UTC: the maintainability read and the PR plan are back (EXPERIMENTS MO.11).** The branch is 13,300
+  inserted lines, twice what I had told the user. Seven must-fix items before any PR, the worst being that CI
+  would fail or time out on the branch's tests and that the kernels have never been through the compilers CI
+  uses. A series of 12 PRs is proposed, the first six without any new surface.
+- **12:15 UTC: step 6C started** (`G2/BUILD-BRIEF-6C.md`, Opus, box 61441981 on m11295, branch `dev/mo-clean`,
+  hard stop 17:30): the seven must-fix items, test tiers CI can run, the kernels through WGSL; byte-identity or
+  parity plus timing as proof that the cleanup changes nothing.
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);
