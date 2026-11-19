@@ -33,11 +33,12 @@
 //!
 //! - `survivors`: the `n` of the field that pass the shape's predicate
 //!   ([`q_shape`]: `n`'s class mod `b − 1` is a root, its top and bottom are
-//!   certified, their masks are disjoint). This is what production's
-//!   `survivors` counts for the overlap join, for this join's shape.
+//!   certified, their masks are disjoint). The same kind of count as
+//!   production's `survivors`, for this join's shape (the numbers are not
+//!   comparable with the overlap join's).
 //! - `checked`: the survivors that also pass the middle-digit prefilter
-//!   ([`prefilter`], [`q_checked`]), i.e. the `n` the full check examines,
-//!   as production's `checked`.
+//!   ([`prefilter`], [`q_checked`]), i.e. the `n` the full check examines:
+//!   the same kind of count as production's `checked`.
 //!
 //! Both are defined by brute-force predicates here, so a search that finds
 //! the same nice numbers but examines a different set of `n` is caught by
@@ -67,11 +68,11 @@ impl Shape {
     /// digits (the small bases of the tests).
     #[must_use]
     pub fn for_coord(c: &Coord) -> Self {
-        match (c.k0, c.k1, c.q0) {
+        match (c.k0(), c.k1(), c.q0()) {
             (4, 8, 5) => Shape { f0: 4, k: 10 },
             _ => Shape {
-                f0: c.k0,
-                k: c.k1 + 1,
+                f0: c.k0(),
+                k: c.k1() + 1,
             },
         }
     }
@@ -82,14 +83,14 @@ impl Shape {
     /// # Errors
     /// A shape that cannot search a field of `c` slice by slice.
     pub fn fits(&self, c: &Coord) -> Result<()> {
-        let l = ndigits(c.end - 1, c.b);
+        let l = ndigits(c.end() - 1, c.b());
         ensure!(
-            self.f0 <= c.q0 && c.k1 < self.k && self.k <= l,
+            self.f0 <= c.q0() && c.k1() < self.k && self.k <= l,
             "middle-out: shape (f0 {}, k {}) cannot search fields fixing digits [{}, {}) of {l}-digit n",
             self.f0,
             self.k,
-            c.q0,
-            c.k1
+            c.q0(),
+            c.k1()
         );
         Ok(())
     }
@@ -97,12 +98,12 @@ impl Shape {
     /// The slices (`pip` = digits `[f0, k − 1)` of n) of one value `t` of a
     /// field's fixed digits `[q0, k1)`.
     pub fn slices_of(&self, c: &Coord, t: u128) -> impl Iterator<Item = u128> + use<> {
-        let b = u128::from(c.b);
-        let lo_n = c.q0 - self.f0; // free digits below the fixed ones
-        let hi_n = self.k - 1 - c.k1; // free digits above
+        let b = u128::from(c.b());
+        let lo_n = c.q0() - self.f0; // free digits below the fixed ones
+        let hi_n = self.k - 1 - c.k1(); // free digits above
         let lo_span = b.pow(lo_n);
         let mid = t * lo_span;
-        let hi_mul = b.pow(c.k1 - self.f0);
+        let hi_mul = b.pow(c.k1() - self.f0);
         let count = lo_span * b.pow(hi_n);
         (0..count).map(move |i| (i / lo_span) * hi_mul + mid + i % lo_span)
     }
@@ -126,15 +127,15 @@ impl Base {
         let mut pw = vec![1u128];
         while pw.len() < 40 {
             let last = *pw.last().unwrap();
-            pw.push(last.saturating_mul(u128::from(c.b)));
+            pw.push(last.saturating_mul(u128::from(c.b())));
         }
         Base {
-            b: c.b,
-            start: c.start,
-            end: c.end,
-            l: ndigits(c.end - 1, c.b),
+            b: c.b(),
+            start: c.start(),
+            end: c.end(),
+            l: ndigits(c.end() - 1, c.b()),
             pw,
-            roots: roots(c.b),
+            roots: roots(c.b()),
         }
     }
 }
@@ -202,8 +203,9 @@ pub fn top_cert_split<M: Mask>(
     Some((mask, mhi))
 }
 
-/// The middle-digit prefilter of a survivor `n` of shape `k` (production's,
-/// `cpu_join::CpuJoin::prefilter`, at the two positions above the bottom):
+/// The middle-digit prefilter of a survivor `n` of shape `k` (the same rule
+/// as production's `cpu_join::CpuJoin::prefilter`, computed independently,
+/// at the two positions above the bottom):
 /// the digits at positions `k` and `k + 1` of `n²` and `n³` are distinct,
 /// miss the bottom's digits (positions `0..k`), and miss `mhi`, the top's
 /// certified digits at positions `>= k + 2` (true for every nice n: its
@@ -448,18 +450,31 @@ pub fn key_digits(b: u32, fp: &[u64], ft: &[u64]) -> Vec<u32> {
 }
 
 /// Exact, device-independent counts of one slice (or a sum of slices).
-/// `survivors` and `checked` are the join's result; the rest describe its
-/// work and depend on the chunk order (the key) as well as the shape.
+/// `survivors` and `checked` are the join's result, and the tests check
+/// them against brute force. The rest describe its work and depend on the
+/// chunk order (the key) as well as the shape; they are here so that a GPU
+/// kernel's counts can be compared with them, and **no test checks them
+/// yet**.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Counts {
+    /// Top prefixes whose certificate was computed (every lead of every unit).
     pub tops_tested: u64,
+    /// Of those, the certified ones.
     pub tops: u64,
+    /// The slice's parents.
     pub parents: u64,
+    /// Certified children, summed over every (class, unit) pair.
     pub children: u64,
+    /// 64-child chunks of those children.
     pub chunks: u64,
+    /// Children × the tops probed against them: the pair work of a join
+    /// without chunks.
     pub pairs: u64,
+    /// (chunk, top) probes: each probed top against each chunk.
     pub flat: u64,
+    /// Probes that pass the chunk's common-mask skip.
     pub kept: u64,
+    /// Kept probes whose word of mask-disjoint children is not zero.
     pub words: u64,
     /// Survivors inside their top's interval: the n of the slice that pass
     /// the shape's predicate ([`q_shape`]).
@@ -674,11 +689,12 @@ pub fn q_checked<M: Mask>(base: &Base, sh: Shape, n: u128) -> bool {
 pub struct FieldOutcome {
     /// The nice numbers of the field, ascending.
     pub nice: Vec<u128>,
-    /// n of the field that pass the join's predicate (production's
-    /// `survivors`, for this shape).
+    /// n of the field that pass the join's predicate (the same kind of count
+    /// as production's `survivors`, for this shape).
     pub survivors: u64,
-    /// n the full check examined (production's `checked`: survivors that
-    /// pass the middle-digit prefilter, [`prefilter`]).
+    /// n the full check examined: survivors that pass the middle-digit
+    /// prefilter, [`prefilter`] (the same kind of count as production's
+    /// `checked`).
     pub checked: u64,
     /// Slices searched.
     pub slices: u64,
@@ -701,9 +717,9 @@ pub fn search_field<M: Mask>(
     threads: usize,
 ) -> Result<(FieldOutcome, Counts)> {
     ensure!(
-        coord.b <= M::BITS,
+        coord.b() <= M::BITS,
         "middle-out CPU: base {} needs wider masks",
-        coord.b
+        coord.b()
     );
     sh.fits(coord)?;
     let ts = coord.field_digits(v_start, v_size)?;
@@ -761,29 +777,24 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    /// The prefilter of a survivor `n` straight from its definition, on the
-    /// full digits of `n²` and `n³` rather than the reference's residues mod
-    /// `b^(k + 2)`: the digits at positions `0..k + 2` of both are distinct,
-    /// and the four at positions `k` and `k + 1` miss the top's certified
-    /// digits at positions `>= k + 2`. The same exemption for an `n²` that
-    /// may be too short ([`prefilter`]).
-    fn prefilter_direct(base: &Base, sh: Shape, n: u128) -> bool {
-        let k = sh.k as usize;
+    /// The prefilter from its definition, on the full digits of `n²` and
+    /// `n³` rather than the reference's residues mod `b^(k + 2)`: the digits
+    /// at positions `0..k + 2` of both are distinct, and the four at
+    /// positions `k` and `k + 1` miss `mhi`. The same exemption for an `n²`
+    /// that may be too short ([`prefilter`]).
+    fn prefilter_digits(base: &Base, k: u32, n: u128, mhi: u64) -> bool {
+        let k = k as usize;
         if n < base.pw[(k + 2).div_ceil(2)] {
             return true;
         }
-        let p = n / base.pw[sh.f0 as usize];
-        let a = (p * base.pw[sh.f0 as usize]).max(base.start);
-        let c = (p * base.pw[sh.f0 as usize] + base.pw[sh.f0 as usize] - 1).min(base.end - 1);
-        let (_, mhi) = top_cert_split::<u64>(base, a, c, sh.k, sh.k + 2).expect("a certified top");
         let x = U384::from_u128(n);
         let sq = x.mul(&x);
         let cu = sq.mul(&x);
         let mut seen = 0u64;
         for d in [sq.digits(u64::from(base.b)), cu.digits(u64::from(base.b))] {
-            for j in 0..k + 2 {
-                let bit = 1u64 << d.get(j).copied().unwrap_or(0);
-                if seen & bit != 0 || (j >= k && mhi & bit != 0) {
+            for (pos, &dig) in d.iter().take(k + 2).enumerate() {
+                let bit = 1u64 << dig;
+                if seen & bit != 0 || (pos >= k && mhi & bit != 0) {
                     return false;
                 }
                 seen |= bit;
@@ -792,101 +803,240 @@ mod tests {
         true
     }
 
-    /// Whole small bases, every field of the coordinate, against brute force:
-    /// the survivors are exactly the n passing the shape's predicate, no n
-    /// twice, `checked` is the number of them passing the prefilter, and
-    /// every nice number is found. Covers every b mod 5 class with a
-    /// range (0, 2, 3, 4), odd bases, and two shapes on the same fields.
-    #[test]
-    fn whole_small_bases_vs_brute_force() {
-        // (b, coordinate k0 k1 q0, shapes (f0, k))
-        type Case = (u32, (u32, u32, u32), &'static [(u32, u32)]);
-        let cases: &[Case] = &[
-            (10, (0, 1, 0), &[(0, 2)]),
-            (12, (1, 2, 1), &[(1, 3)]),
-            (13, (1, 2, 1), &[(1, 3), (0, 3)]),
-            (14, (1, 2, 1), &[(1, 3)]),
-            (17, (1, 2, 1), &[(1, 3), (1, 4)]),
-            (18, (1, 2, 1), &[(1, 3), (1, 4)]),
-            (19, (1, 2, 1), &[(1, 3), (0, 4)]),
-            (20, (2, 3, 2), &[(2, 4), (1, 4)]),
-            (22, (2, 3, 2), &[(2, 4)]),
-            (24, (1, 3, 2), &[(1, 4), (2, 4)]),
-            (25, (2, 4, 3), &[(2, 5)]),
-        ];
-        for &(b, (k0, k1, q0), shapes) in cases {
-            let coord = Coord::with_digits(b, k0, k1, q0).unwrap();
-            let base = Base::new(&coord);
-            let q = coord.quantum();
-            let nq = (coord.v_end() - coord.start) / q;
-            let mut nice_brute = Vec::new();
-            for n in coord.start..coord.end {
-                if unique_digits(n, b).1 {
-                    nice_brute.push(n);
+    /// [`prefilter_digits`] of a survivor, with its top's `mhi`.
+    fn prefilter_direct(base: &Base, sh: Shape, n: u128) -> bool {
+        let w = base.pw[sh.f0 as usize];
+        let p = n / w;
+        let (a, c) = ((p * w).max(base.start), (p * w + w - 1).min(base.end - 1));
+        let (_, mhi) = top_cert_split::<u64>(base, a, c, sh.k, sh.k + 2).expect("a certified top");
+        prefilter_digits(base, sh.k, n, mhi)
+    }
+
+    /// One small base, every field of its coordinate, against brute force:
+    /// the survivors are exactly the n passing the shape's predicate, each
+    /// once and in its own field; `checked` is the number of them passing
+    /// the prefilter (also recomputed from full digits); every nice number
+    /// is found. Then the field search itself: the whole base as one field
+    /// with `u128` masks, and the first field with `u64` masks, give the
+    /// same counts and nice numbers.
+    fn check_whole_base(b: u32, (k0, k1, q0): (u32, u32, u32), shapes: &[(u32, u32)]) {
+        let coord = Coord::with_digits(b, k0, k1, q0).unwrap();
+        let base = Base::new(&coord);
+        let (start, end) = (coord.start(), coord.end());
+        let q = coord.quantum();
+        let nq = (coord.v_end() - start) / q;
+        let field_of = |n: u128| (n / coord.pw(q0)) % coord.pw(k1 - q0);
+        let nice_brute: Vec<u128> = (start..end).filter(|&n| unique_digits(n, b).1).collect();
+        if b == 10 {
+            assert_eq!(nice_brute, vec![69]);
+        }
+        for &(f0, k) in shapes {
+            let sh = Shape { f0, k };
+            let mut got = HashSet::new();
+            let mut nice = Vec::new();
+            let (mut checked, mut surv0, mut checked0) = (0u64, 0u64, 0u64);
+            for t in 0..nq {
+                for pip in sh.slices_of(&coord, t) {
+                    slice_join::<u64>(&base, sh, pip, |_, n, pass| {
+                        assert_eq!(field_of(n), t, "b{b}: n {n} outside its field");
+                        assert!(got.insert(n), "b{b}: n {n} twice");
+                        checked += u64::from(pass);
+                        if t == 0 {
+                            surv0 += 1;
+                            checked0 += u64::from(pass);
+                        }
+                        if pass && unique_digits(n, b).1 {
+                            nice.push(n);
+                        }
+                    });
                 }
             }
-            for &(f0, k) in shapes {
-                let sh = Shape { f0, k };
-                let mut got = HashSet::new();
-                let mut nice = Vec::new();
-                let (mut surv, mut checked) = (0, 0);
-                // one field per quantum, plus one field of everything
-                for t in 0..nq {
-                    let mut sink = Vec::new();
-                    let (o, _) =
-                        search_field::<u64>(&coord, sh, coord.start + t * q, q, 2).unwrap();
-                    surv += o.survivors;
-                    checked += o.checked;
-                    nice.extend(o.nice);
-                    let base_t = Base::new(&coord);
-                    for pip in sh.slices_of(&coord, t) {
-                        slice_join::<u64>(&base_t, sh, pip, |_, n, _| sink.push(n));
-                    }
-                    for n in sink {
-                        assert_eq!(
-                            (n / coord.pw(q0)) % coord.pw(k1 - q0),
-                            t,
-                            "b{b}: n {n} outside its field"
-                        );
-                        assert!(got.insert(n), "b{b}: n {n} twice");
-                    }
-                }
-                let want: HashSet<u128> = (coord.start..coord.end)
-                    .filter(|&n| q_shape::<u64>(&base, sh, n))
-                    .collect();
-                assert_eq!(
-                    got, want,
-                    "b{b} shape {sh:?}: survivors differ from brute force"
-                );
-                assert_eq!(surv, want.len() as u64);
-                // checked: q_checked, and the same from the full digits of n²
-                // and n³ (prefilter_direct), so that the prefilter's own
-                // arithmetic is checked too
-                let want_checked = want
-                    .iter()
-                    .filter(|&&n| {
-                        let q = q_checked::<u64>(&base, sh, n);
-                        assert_eq!(q, prefilter_direct(&base, sh, n), "b{b} n {n}");
-                        q
+            let want: HashSet<u128> = (start..end)
+                .filter(|&n| q_shape::<u64>(&base, sh, n))
+                .collect();
+            assert_eq!(got, want, "b{b} {sh:?}: survivors differ from brute force");
+            let want_checked = want
+                .iter()
+                .filter(|&&n| {
+                    let qc = q_checked::<u64>(&base, sh, n);
+                    assert_eq!(qc, prefilter_direct(&base, sh, n), "b{b} n {n}");
+                    qc
+                })
+                .count() as u64;
+            assert_eq!(checked, want_checked, "b{b} {sh:?}: checked");
+            nice.sort_unstable();
+            assert_eq!(nice, nice_brute, "b{b} {sh:?}: nice numbers");
+            let (all, _) =
+                search_field::<u128>(&coord, sh, start, coord.v_end() - start, 3).unwrap();
+            assert_eq!(
+                (all.survivors, all.checked, &all.nice),
+                (want.len() as u64, checked, &nice_brute),
+                "b{b} {sh:?}: the whole base as one field, u128 masks"
+            );
+            let (first, _) = search_field::<u64>(&coord, sh, start, q, 2).unwrap();
+            let nice0: Vec<u128> = nice_brute
+                .iter()
+                .copied()
+                .filter(|&n| field_of(n) == 0)
+                .collect();
+            assert_eq!(
+                (first.survivors, first.checked, first.nice),
+                (surv0, checked0, nice0),
+                "b{b} {sh:?}: the first field, u64 masks"
+            );
+        }
+    }
+
+    // Whole small bases: every b mod 5 class with a range (0, 2, 3, 4), odd
+    // and even bases, and two shapes on the same fields where it is cheap.
+    // (b, coordinate (k0, k1, q0), shapes (f0, k)). Base 12 has no survivors
+    // in its shape; the prefilter is exempt over the whole of bases 10–14.
+    #[test]
+    fn whole_base_10_vs_brute_force() {
+        check_whole_base(10, (0, 1, 0), &[(0, 2)]);
+    }
+    #[test]
+    fn whole_base_12_vs_brute_force() {
+        check_whole_base(12, (1, 2, 1), &[(1, 3)]);
+    }
+    #[test]
+    fn whole_base_13_vs_brute_force() {
+        check_whole_base(13, (1, 2, 1), &[(1, 3), (0, 3)]);
+    }
+    #[test]
+    fn whole_base_14_vs_brute_force() {
+        check_whole_base(14, (1, 2, 1), &[(1, 3)]);
+    }
+    #[test]
+    fn whole_base_17_vs_brute_force() {
+        check_whole_base(17, (1, 2, 1), &[(1, 3), (1, 4)]);
+    }
+    #[test]
+    fn whole_base_18_vs_brute_force() {
+        check_whole_base(18, (1, 2, 1), &[(1, 3), (1, 4)]);
+    }
+    #[test]
+    fn whole_base_19_vs_brute_force() {
+        check_whole_base(19, (1, 2, 1), &[(1, 3), (0, 4)]);
+    }
+    #[test]
+    fn whole_base_20_vs_brute_force() {
+        check_whole_base(20, (2, 3, 2), &[(2, 4), (1, 4)]);
+    }
+    #[test]
+    fn whole_base_22_vs_brute_force() {
+        check_whole_base(22, (2, 3, 2), &[(2, 4)]);
+    }
+    #[test]
+    fn whole_base_24_vs_brute_force() {
+        check_whole_base(24, (1, 3, 2), &[(1, 4), (2, 4)]);
+    }
+    /// The only 5-digit bottom shape here, and the largest range (6.4 million n).
+    #[test]
+    fn whole_base_25_vs_brute_force() {
+        check_whole_base(25, (2, 4, 3), &[(2, 5)]);
+    }
+
+    /// The top certificate against its definition: the digits of `n²` and
+    /// `n³`, from the top down to position `k`, that are the same for every
+    /// `n` of the interval (each power on its own; one whose length changes
+    /// gives none), and the part at positions `>= k + 2`. Shapes with
+    /// `f0 = 0` are the ones where, at these bases, the certificate reaches
+    /// positions `k` to `k + 2`.
+    #[test]
+    fn top_certificate_equals_its_definition() {
+        let cert_of_every_n = |b: u32, a: u128, c: u128, k: u32| -> Option<(u64, u64)> {
+            let (mut mask, mut mhi) = (0u64, 0u64);
+            for power in [2, 3] {
+                let ds: Vec<Vec<u8>> = (a..=c)
+                    .map(|n| {
+                        let x = U384::from_u128(n);
+                        let sq = x.mul(&x);
+                        let pw = if power == 2 { sq } else { sq.mul(&x) };
+                        pw.digits(u64::from(b))
                     })
-                    .count() as u64;
-                assert_eq!(checked, want_checked, "b{b} shape {sh:?}: checked");
-                assert!(checked <= surv);
-                nice.sort_unstable();
-                assert_eq!(nice, nice_brute, "b{b} shape {sh:?}");
-                let (all, _) =
-                    search_field::<u128>(&coord, sh, coord.start, coord.v_end() - coord.start, 3)
-                        .unwrap();
-                assert_eq!(
-                    (all.survivors, all.checked, all.nice.clone()),
-                    (surv, checked, nice_brute.clone()),
-                    "b{b} u128 masks"
-                );
-                if b == 10 {
-                    assert_eq!(all.nice, vec![69]);
+                    .collect();
+                let len = ds[0].len();
+                if ds.iter().any(|d| d.len() != len) {
+                    continue;
                 }
+                for pos in (k as usize..len).rev() {
+                    if ds.iter().any(|d| d[pos] != ds[0][pos]) {
+                        break;
+                    }
+                    let bit = 1u64 << ds[0][pos];
+                    if mask & bit != 0 {
+                        return None;
+                    }
+                    mask |= bit;
+                    if pos >= k as usize + 2 {
+                        mhi |= bit;
+                    }
+                }
+            }
+            Some((mask, mhi))
+        };
+        for (b, f0, k) in [
+            (10u32, 0u32, 2u32),
+            (13, 0, 3),
+            (19, 0, 4),
+            (17, 1, 3),
+            (20, 2, 4),
+            (24, 1, 4),
+            (25, 2, 5),
+        ] {
+            let base = Base::new(&Coord::with_digits(b, 1, 2, 1).unwrap());
+            let w = base.pw[f0 as usize];
+            let (mut p, mut tested) = (base.start / w, 0);
+            while p * w < base.end && tested < 20_000 {
+                let (a, c) = ((p * w).max(base.start), (p * w + w - 1).min(base.end - 1));
+                assert_eq!(
+                    top_cert_split::<u64>(&base, a, c, k, k + 2),
+                    cert_of_every_n(b, a, c, k),
+                    "b{b} f0 {f0} k {k} prefix {p}"
+                );
+                p += 1 + p % 7;
+                tested += 1;
             }
         }
+    }
+
+    /// The residue classes a nice number can be in are production's
+    /// (`residue_filter`), for every base the reference serves.
+    #[test]
+    fn roots_equal_production_residue_filter() {
+        for b in 3..=128u32 {
+            assert_eq!(
+                roots(b),
+                crate::residue_filter::get_residue_filter(&b),
+                "b{b}"
+            );
+        }
+    }
+
+    /// The prefilter at base 64 and its shape `(4, 10)`, where `b^12 = 2^72`
+    /// takes `mm`'s large-modulus branch (no small base reaches it), against
+    /// the full digits of `n²` and `n³` on random `n` and random `mhi`.
+    #[test]
+    fn prefilter_at_base_64_equals_full_digits() {
+        let base = Base::new(&Coord::for_base(64).unwrap());
+        let mut x = 0x1234_5678_9ABC_DEF1_u64;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x
+        };
+        let mut passed = 0;
+        for _ in 0..100_000 {
+            let r = (u128::from(next()) << 64 | u128::from(next())) & ((1 << 75) - 1);
+            let n = (1u128 << 75) | r;
+            let mhi = next() & next() & next();
+            let got = prefilter::<u64>(&base, 10, n, mhi);
+            assert_eq!(got, prefilter_digits(&base, 10, n, mhi), "n {n}");
+            passed += u32::from(got);
+        }
+        assert!(passed > 100, "{passed} of 100,000 passed: too few to test");
     }
 
     /// Digit positions `(4, 8, 5)` and the (4, 10) shape: a field of one
@@ -915,7 +1065,7 @@ mod tests {
                     assert_eq!(p / bb, pips[i - i % b as usize] / bb);
                 }
                 // every n of the quantum lies in one of its slices (sampled along v)
-                let vs = c.start + t * q;
+                let vs = c.start() + t * q;
                 for j in 0..5_000u128 {
                     let v = vs + (q / 5_000) * j + j * 7_919 % (q / 5_000);
                     if let Some(n) = c.n_of_v(v) {
