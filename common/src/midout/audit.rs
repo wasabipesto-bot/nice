@@ -11,6 +11,7 @@
 
 use super::*;
 use crate::midout::cpu::{Base, Counts, parents, slice_join};
+use cubecl::prelude::ComputeClient;
 use std::io::Write;
 
 fn env_u64(k: &str, d: u64) -> u64 {
@@ -28,7 +29,11 @@ fn splitmix(x: &mut u64) -> u64 {
 /// The slices of a run: `AUDIT_SLICES`, else `AUDIT_N` seeded by `AUDIT_SEED`.
 fn audit_slices() -> Vec<u64> {
     if let Ok(s) = std::env::var("AUDIT_SLICES") {
-        return s.split(',').filter(|x| !x.is_empty()).map(|x| x.trim().parse().unwrap()).collect();
+        return s
+            .split(',')
+            .filter(|x| !x.is_empty())
+            .map(|x| x.trim().parse().unwrap())
+            .collect();
     }
     let mut st = env_u64("AUDIT_SEED", 20_261_118);
     (0..env_u64("AUDIT_N", 300))
@@ -123,7 +128,7 @@ fn cuda_client() -> cubecl::prelude::ComputeClient<cubecl::cuda::CudaRuntime> {
     match crate::cubecl_backend::CubeclContext::new_cuda(0).expect("a CUDA device") {
         crate::cubecl_backend::CubeclContext::Cuda { client, .. } => client,
         #[allow(unreachable_patterns)]
-        _ => panic!("not CUDA"),
+        crate::cubecl_backend::CubeclContext::Wgpu { .. } => panic!("not CUDA"),
     }
 }
 
@@ -137,7 +142,11 @@ fn audit_sweep() {
     let pips = audit_slices();
     let threads = env_u64("AUDIT_THREADS", 5) as usize;
     let out_path = std::env::var("AUDIT_OUT").unwrap_or_else(|_| "/root/audit/sweep.jsonl".into());
-    let mut out = std::fs::OpenOptions::new().create(true).append(true).open(&out_path).unwrap();
+    let mut out = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&out_path)
+        .unwrap();
     let client = cuda_client();
     let gj = GpuJoin::new(client.clone(), Caps::b64(63)).unwrap();
     let mut gn = GpuJoin::new(client, Caps::b64(63)).unwrap();
@@ -179,11 +188,20 @@ fn audit_sweep() {
                     (DevCounts::default(), Vec::new(), Vec::new())
                 }
             };
-            let mut htops: Vec<(u32, u64)> = r.st.thd.iter().copied().zip(r.st.tmask.iter().copied()).collect();
+            let mut htops: Vec<(u32, u64)> =
+                r.st.thd
+                    .iter()
+                    .copied()
+                    .zip(r.st.tmask.iter().copied())
+                    .collect();
             htops.sort_unstable();
             tops.sort_unstable();
             if tops != htops {
-                why.push(format!("tops differ: device {} host {}", tops.len(), htops.len()));
+                why.push(format!(
+                    "tops differ: device {} host {}",
+                    tops.len(),
+                    htops.len()
+                ));
             }
             got.sort_unstable();
             if got != r.pass {
@@ -220,10 +238,16 @@ fn audit_sweep() {
                 Err(e) => why.push(format!("device (no prefilter) error: {e}")),
             }
             if ah != r.all {
-                why.push(format!("survivor sets differ: device {ah:?} cpu {:?}", r.all));
+                why.push(format!(
+                    "survivor sets differ: device {ah:?} cpu {:?}",
+                    r.all
+                ));
             }
             if dn.checked != cn.survivors {
-                why.push(format!("no-prefilter checked {} != survivors {}", dn.checked, cn.survivors));
+                why.push(format!(
+                    "no-prefilter checked {} != survivors {}",
+                    dn.checked, cn.survivors
+                ));
             }
             let ok = why.is_empty();
             let line = format!(
@@ -257,7 +281,15 @@ fn audit_sweep() {
             );
             writeln!(out, "{line}").unwrap();
             out.flush().unwrap();
-            println!("[{k}/{}] slice {pip}: {}", pips.len(), if ok { "equal".to_string() } else { why.join(" | ") });
+            println!(
+                "[{k}/{}] slice {pip}: {}",
+                pips.len(),
+                if ok {
+                    "equal".to_string()
+                } else {
+                    why.join(" | ")
+                }
+            );
             if !ok {
                 bad.push(pip);
             }
@@ -273,7 +305,8 @@ fn audit_sweep() {
 fn audit_tops_scan() {
     let pips = audit_slices();
     let threads = env_u64("AUDIT_THREADS", 5) as usize;
-    let out_path = std::env::var("AUDIT_OUT").unwrap_or_else(|_| "/root/audit/tops_scan.jsonl".into());
+    let out_path =
+        std::env::var("AUDIT_OUT").unwrap_or_else(|_| "/root/audit/tops_scan.jsonl".into());
     let next = AtomicUsize::new(0);
     let lines = Mutex::new(Vec::new());
     std::thread::scope(|s| {
@@ -358,7 +391,13 @@ fn audit_faults() {
             Err(e) => println!("fault {f}: LOUD: {e}"),
             Ok(dc) => {
                 let same = (dc.survivors, dc.checked, dc.children, dc.chunks, dc.flat)
-                    == (base.survivors, base.checked, base.children, base.chunks, base.flat);
+                    == (
+                        base.survivors,
+                        base.checked,
+                        base.children,
+                        base.chunks,
+                        base.flat,
+                    );
                 println!(
                     "fault {f}: accounts PASS, counts {} (survivors {} vs {}, checked {} vs {}, children {} vs {}, flat {} vs {})",
                     if same { "unchanged" } else { "CHANGED: SILENT" },
@@ -380,13 +419,23 @@ fn audit_faults() {
     }
 }
 
-/// `MIDOUT_STOP` (a timing switch read from the environment by `GpuJoin::new`) set to anything but 6 makes
-/// `search_field` skip every account and return a field with no survivors as a success.
+/// (step 3A) Finding 1.2: `MIDOUT_STOP` in the environment made `search_field` a no-op that succeeded. Now the
+/// library never reads it (the bench does, and sets the stop with `set_timing_stop`), and `search_field` refuses a
+/// join with a stop set.
 #[test]
 #[ignore = "needs CUDA"]
-fn audit_stop_env_is_silent() {
+fn audit_stop_env_is_loud() {
+    // SAFETY: this test alone sets the variable (run it alone: `--exact`); nothing reads it concurrently.
+    unsafe { std::env::set_var("MIDOUT_STOP", "2") };
     let mut gj = GpuJoin::new(cuda_client(), Caps::b64(63)).unwrap();
-    gj.stop = 2;
+    assert_eq!(gj.stop, 6, "the library read MIDOUT_STOP");
+    let dc = group(&gj, &[712_012_851]).expect("a group with MIDOUT_STOP=2 in the environment");
+    println!(
+        "MIDOUT_STOP=2 in the environment: ignored, slice 712012851 survivors {} checked {}",
+        dc.survivors, dc.checked
+    );
+    assert_eq!((dc.survivors, dc.checked), (11_768_560, 337_904));
+    gj.set_timing_stop(2);
     let coord = Coord::for_base(64).unwrap();
     let t = 77_777u128;
     let r = search_field(
@@ -398,15 +447,109 @@ fn audit_stop_env_is_silent() {
             group: 16,
             host_threads: 1,
             device_tops: true,
+            cpu_check: false,
         },
     );
     match r {
-        Ok((o, dc, _)) => println!(
-            "MIDOUT_STOP=2: search_field returned Ok: survivors {} checked {} slices {} nice {:?} ({dc:?})",
-            o.survivors, o.checked, o.slices, o.nice
+        Ok((o, dc, _)) => panic!(
+            "timing stop 2: search_field returned Ok: survivors {} checked {} slices {} ({dc:?})",
+            o.survivors, o.checked, o.slices
         ),
-        Err(e) => println!("MIDOUT_STOP=2: search_field failed: {e}"),
+        Err(e) => println!("timing stop 2: search_field LOUD: {e}"),
     }
+}
+
+/// The device the acceptance tests run on: CUDA with `MIDOUT_CUDA`, else the default (wgpu: lavapipe on the box).
+macro_rules! on_device {
+    ($go:ident) => {{
+        #[cfg(feature = "cubecl-cuda")]
+        if std::env::var("MIDOUT_CUDA").is_ok() {
+            return $go(cuda_client());
+        }
+        match crate::cubecl_backend::CubeclContext::new_default().expect("a device") {
+            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => $go(client),
+            #[allow(unreachable_patterns)]
+            _ => panic!("unsupported runtime"),
+        }
+    }};
+}
+
+/// (step 3A) Acceptance: every fault the audit showed silent (§1.3) now fails loudly. `F_SKIP_MAIN`, `F_SKIP_TOPS`,
+/// `F_DROP_PROBE` and `F_DROP_PARENT` through the accounts of the production group path; `F_PF_DROP` (the
+/// prefilter rejecting too much, which no account can see) through the sampled CPU check. A clean run passes before
+/// and after each fault. `AUDIT_SLICES` (default 502136830, 0), `MIDOUT_CLASSES` (63; 4 on lavapipe),
+/// `AUDIT_AGAIN=0` skips the clean rerun after each fault.
+#[test]
+#[ignore = "needs a GPU (MIDOUT_CUDA=1 for CUDA) and a minute of CPU"]
+fn accounts_faults_are_loud() {
+    fn go<R: Runtime>(client: ComputeClient<R>) {
+        let pips: Vec<u64> = std::env::var("AUDIT_SLICES")
+            .unwrap_or_else(|_| "502136830,0".into())
+            .split(',')
+            .map(|x| x.trim().parse().unwrap())
+            .collect();
+        let classes = env_u64("MIDOUT_CLASSES", 63) as u32;
+        let again = env_u64("AUDIT_AGAIN", 1) == 1;
+        let coord = Coord::for_base(64).unwrap();
+        // the sampled slice's CPU reference, in parallel with the device runs
+        let sp = pips[0];
+        let cpu = std::thread::spawn({
+            let c = coord.clone();
+            move || cpu_slice(&c, sp)
+        });
+        let mut gj = GpuJoin::new(client, Caps::b64(classes)).unwrap();
+        println!("W {} classes {classes} slices {pips:?}", gj.w);
+        let base = group(&gj, &pips).expect("the run without a fault passes its accounts");
+        println!("fault 0: accounts pass: {base:?}");
+        let mut silent = Vec::new();
+        for (name, f) in [
+            ("F_SKIP_MAIN", F_SKIP_MAIN),
+            ("F_SKIP_TOPS", F_SKIP_TOPS),
+            ("F_DROP_PROBE", F_DROP_PROBE),
+            ("F_DROP_PARENT", F_DROP_PARENT),
+            ("F_PF_DROP", F_PF_DROP),
+        ] {
+            gj.set_fault(f);
+            let r = group(&gj, &pips);
+            gj.set_fault(0);
+            match r {
+                Err(e) => println!("{name} ({f}): accounts LOUD: {e}"),
+                Ok(dc) => {
+                    println!(
+                        "{name} ({f}): accounts pass: survivors {} vs {}, checked {} vs {}",
+                        dc.survivors, base.survivors, dc.checked, base.checked
+                    );
+                    if f != F_PF_DROP {
+                        silent.push(name);
+                    }
+                }
+            }
+            if again {
+                let a = group(&gj, &pips).expect("a clean run after the fault");
+                assert_eq!(
+                    (a.survivors, a.checked),
+                    (base.survivors, base.checked),
+                    "clean run after {name}"
+                );
+            }
+        }
+        let cpu = cpu.join().unwrap();
+        let rank = slice_tops(pips[0], gj.roots()).rank;
+        sample_compare(&gj, sp, &rank, &cpu).expect("the sampled check of a clean run is equal");
+        println!(
+            "sampled check, no fault: slice {sp} equal (survivors {} checked {})",
+            cpu.0, cpu.1
+        );
+        gj.set_fault(F_PF_DROP);
+        let r = sample_compare(&gj, sp, &rank, &cpu);
+        gj.set_fault(0);
+        match r {
+            Err(e) => println!("F_PF_DROP: sampled check LOUD: {e}"),
+            Ok(()) => silent.push("F_PF_DROP (sampled check)"),
+        }
+        assert!(silent.is_empty(), "silent faults: {silent:?}");
+    }
+    on_device!(go);
 }
 
 /// The coordinate layer, base 64 and the padded base 65: the slices of all fields are a partition of the slice keys
@@ -445,15 +588,25 @@ fn audit_coord_slices_partition() {
             let v = c.v_of_n(n);
             assert_eq!(c.n_of_v(v), Some(n));
             let t = (v - c.start) / c.quantum();
-            assert_eq!(c.field_digits(c.start + t * c.quantum(), c.quantum()).unwrap(), t..t + 1);
+            assert_eq!(
+                c.field_digits(c.start + t * c.quantum(), c.quantum())
+                    .unwrap(),
+                t..t + 1
+            );
             assert_eq!((n / bb.pow(6)) % bb.pow(3), t, "b{b} n {n}: field digits");
             let pip = (n / bb.pow(4)) % bb.pow(5);
-            assert!(sh.slices_of(&c, t).any(|p| p == pip), "b{b} n {n}: slice not in its field");
+            assert!(
+                sh.slices_of(&c, t).any(|p| p == pip),
+                "b{b} n {n}: slice not in its field"
+            );
             // inside the slice: unit d = digit 9 < b, lead h = n div b^10 in the leads the tops enumerate
             let h = n / bb.pow(10);
             assert!(h >= lead_lo && h <= lead_hi);
             if b == 64 {
-                assert!((H_LO as u128..H_HI as u128).contains(&h), "b64 n {n}: lead {h} outside the device's");
+                assert!(
+                    (H_LO as u128..H_HI as u128).contains(&h),
+                    "b64 n {n}: lead {h} outside the device's"
+                );
             }
         }
     }
@@ -496,7 +649,10 @@ fn audit_key_and_group_independence() {
             for n in gn.run_slice_dev(pip, k, usize::MAX).unwrap().1 {
                 h1.add(n);
             }
-            let ok = l1 == l0 && h1 == h0 && (d1.survivors, d1.checked, d1.children) == (d0.survivors, d0.checked, d0.children);
+            let ok = l1 == l0
+                && h1 == h0
+                && (d1.survivors, d1.checked, d1.children)
+                    == (d0.survivors, d0.checked, d0.children);
             if !ok {
                 bad += 1;
             }
@@ -519,7 +675,10 @@ fn audit_key_and_group_independence() {
             s.0 += dc.survivors;
             s.1 += dc.checked;
         }
-        println!("group path, groups of {g}: survivors {} checked {} (per-slice sums {sum_s} {sum_c})", s.0, s.1);
+        println!(
+            "group path, groups of {g}: survivors {} checked {} (per-slice sums {sum_s} {sum_c})",
+            s.0, s.1
+        );
         if s != (sum_s, sum_c) {
             bad += 1;
         }
@@ -527,12 +686,13 @@ fn audit_key_and_group_independence() {
     assert_eq!(bad, 0);
 }
 
-/// A device allocation that fails (here: the card's memory filled first, `AUDIT_FILL_MB`) panics in CubeCL's stream
-/// thread, not in the caller; the kernels that use the missing buffer are dropped. Does the production group path
-/// notice? Prints what `GpuJoin::new` and a group of one slice return.
+/// Finding 1.1: a device allocation that fails (here: the card's memory filled first, `AUDIT_FILL_MB`, or held by a
+/// helper process of this test with `AUDIT_HOLD_S`) panics in CubeCL's stream thread, not in the caller; the kernels
+/// that use the missing buffer are dropped. (Step 3A) the production group path must now fail loudly (or the caller
+/// panic); a group that returns `Ok` fails the test.
 #[test]
 #[ignore = "needs CUDA; fills the card's memory"]
-fn audit_oom_is_silent() {
+fn audit_oom_is_loud() {
     let client = cuda_client();
     let fill_mb = env_u64("AUDIT_FILL_MB", 0);
     let mut hold = Vec::new();
@@ -550,20 +710,32 @@ fn audit_oom_is_silent() {
     let gj = match GpuJoin::new(client, Caps::b64(63)) {
         Ok(g) => g,
         Err(e) => {
-            println!("GpuJoin::new failed: {e}");
+            println!("GpuJoin::new failed (loud): {e}");
             return;
         }
     };
     println!("GpuJoin::new returned Ok");
+    let mut silent = 0;
     for pip in [712_012_851u64, 318_575_442] {
         match group(&gj, &[pip]) {
-            Ok(dc) => println!("slice {pip}: group path returned Ok: {dc:?}"),
-            Err(e) => println!("slice {pip}: group path failed: {e}"),
+            Ok(dc) => {
+                println!(
+                    "slice {pip}: group path returned Ok (SILENT unless the counts are whole): {dc:?}"
+                );
+                if dc.survivors != 11_768_560 && pip == 712_012_851 {
+                    silent += 1;
+                }
+            }
+            Err(e) => println!("slice {pip}: group path LOUD: {e}"),
         }
     }
     let r = gj.nice();
     println!("nice(): {r:?}");
     drop(hold);
+    assert_eq!(
+        silent, 0,
+        "an allocation failure returned a slice as searched"
+    );
 }
 
 /// The production field path (groups of 16 slices, the field's key, the 64-slice parent level shared by consecutive
@@ -576,10 +748,25 @@ fn audit_group_vs_single() {
     let nsl = env_u64("AUDIT_NSL", 128) as usize;
     let coord = Coord::for_base(64).unwrap();
     let sh = Shape::for_coord(&coord);
-    let pips: Vec<u64> = sh.slices_of(&coord, t).take(nsl).map(|p| p as u64).collect();
+    let pips: Vec<u64> = sh
+        .slices_of(&coord, t)
+        .take(nsl)
+        .map(|p| p as u64)
+        .collect();
     let gj = GpuJoin::new(cuda_client(), Caps::b64(63)).unwrap();
     let rank = slice_tops(pips[0], gj.roots()).rank;
-    let key = |d: &DevCounts| (d.survivors, d.checked, d.children, d.chunks, d.flat, d.kept, d.tops, d.tested);
+    let key = |d: &DevCounts| {
+        (
+            d.survivors,
+            d.checked,
+            d.children,
+            d.chunks,
+            d.flat,
+            d.kept,
+            d.tops,
+            d.tested,
+        )
+    };
     let mut res = Vec::new();
     for round in 0..env_u64("AUDIT_ROUNDS", 1) {
         let mut single = DevCounts::default();
@@ -593,13 +780,22 @@ fn audit_group_vs_single() {
         for ch in pips.chunks(16) {
             grouped.add(&group(&gj, ch).unwrap());
         }
-        println!("field {t}, {nsl} slices, round {round}: single {:?}", key(&single));
-        println!("field {t}, {nsl} slices, round {round}: groups {:?}", key(&grouped));
+        println!(
+            "field {t}, {nsl} slices, round {round}: single {:?}",
+            key(&single)
+        );
+        println!(
+            "field {t}, {nsl} slices, round {round}: groups {:?}",
+            key(&grouped)
+        );
         println!("round {round}: per-slice kept (single) {:?}", &per[..8]);
         res.push((key(&single), key(&grouped)));
     }
     // the result: survivors and checked (and the counts that do not depend on the order of work) must agree
     for (a, b) in &res {
-        assert_eq!((a.0, a.1, a.2, a.3, a.4, a.6, a.7), (b.0, b.1, b.2, b.3, b.4, b.6, b.7));
+        assert_eq!(
+            (a.0, a.1, a.2, a.3, a.4, a.6, a.7),
+            (b.0, b.1, b.2, b.3, b.4, b.6, b.7)
+        );
     }
 }
