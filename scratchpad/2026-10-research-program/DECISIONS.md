@@ -1,11 +1,11 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-19 19:45 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-19 20:10 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
 separate document:** `../2026-11-midout-design/DESIGN.md` (with a one-screen picture,
 `../2026-11-midout-design/static/midout-overview.png`, and a clickable process map,
 `../2026-11-midout-design/interactive/midout-map.html`). To answer, reply in the chat with the numbers, for
-example: `D2 a, D3 yes, D5 yes hidden, D15 45`.
+example: `D2 a, D3 yes, D5 yes hidden, D14 45, D16 yes`.
 
 Paths below are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
 
@@ -165,6 +165,26 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 - A draft issue is ready (`G2/port/CUBECL-LOOP-BREAK-ISSUE-DRAFT.md`). The other two CubeCL defects found are
   gone in 0.11 by reading its source; none of the three is a reason to upgrade.
 - **If you do not answer:** nothing is filed.
+
+### D16. A crash at bases where no number can be nice (found 2026-11-19; not part of the middle-out work)
+
+- **What it is:** at every base that leaves 3 when divided by 4 (43, 47, 63, 67, …) no number can be nice. The
+  CPU nice-only search builds an empty table for such a base and panics at its first lookup
+  (`stride_filter.rs:165`, "index out of bounds") unless the leading-digit filter has already rejected the whole
+  field. Shown with today's client against a local stub serving a real base-43 field (id 49999): exit 101,
+  nothing submitted. `--gpu` is not affected (it answers such bases before building a table). `niceonly
+  --validate` is not affected either (the client refuses that combination outright); **an earlier message of
+  mine said validate "may crash about half the time": that was wrong.**
+- **Can production hit it today? No.** The database's bases of this kind (15, 19, 23, 27, 35, 39, 43, 47) are
+  all fully checked, and none above 50 was ever inserted. It needs a nice-only field of such a base, which only
+  appears if one is inserted (the insert script does not refuse them).
+- **Fix ready:** branch `pr/stride-empty-residues` on the fork: one guard, a test, a changelog line (48 lines).
+  The search then reports such a field searched with no numbers, which is the truth. Independent review:
+  see the line below this list.
+- **Decide:** may I open it as a small pull request? I read your hold as covering the middle-out series only,
+  but you wrote "hold the PRs", so I am not opening anything new without your word.
+- **Recommendation:** yes. **If you do not answer:** it stays a branch.
+- **Review status:** running on the evening of 2026-11-19 (this line is updated when it is back).
 
 ## C. Operations
 

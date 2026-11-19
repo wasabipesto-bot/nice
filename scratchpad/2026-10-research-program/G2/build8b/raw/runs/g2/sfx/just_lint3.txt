@@ -1,0 +1,70 @@
+cargo fmt --all --check
+cargo clippy -p "*" --all-targets -- -D warnings
+    Checking nice_common v3.4.9-dev (/root/sfx/common)
+    Checking nice-wasm-client v3.4.9-dev (/root/sfx/wasm-client)
+    Checking nice_client v3.4.9-dev (/root/sfx/client)
+    Checking nice_jobs v3.4.9-dev (/root/sfx/jobs)
+    Checking nice_api v3.4.9-dev (/root/sfx/api)
+warning: unused dependency `web-sys`
+  --> wasm-client/Cargo.toml:22:15
+   |
+22 | [dependencies.web-sys]
+   |               ^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `web-sys`
+warning: `nice-wasm-client` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.05s
+# The GPU/spirv code only exists under these features, so lint it too.
+cargo clippy -p "*" --all-targets --features nice_client/gpu,nice_client/cubecl-spirv -- -D warnings
+    Checking ciborium-io v0.2.2
+    Checking hashbrown v0.15.5
+   Compiling cubecl-common v0.10.0
+    Checking rustc-hash v2.1.3
+    Checking num-rational v0.4.2
+    Checking ciborium-ll v0.2.2
+    Checking num-iter v0.1.46
+    Checking num-complex v0.4.6
+    Checking ciborium v0.2.2
+   Compiling syn v1.0.109
+    Checking fixedbitset v0.5.7
+    Checking type-map v0.5.1
+   Compiling cudarc v0.19.10
+    Checking stable-vec v0.4.3
+    Checking num v0.4.3
+    Checking petgraph v0.8.3
+    Checking gpu-descriptor v0.3.2
+   Compiling libloading v0.9.0
+    Checking wgpu-hal v29.0.4
+    Checking cubecl-ir v0.10.0
+    Checking tracel-rspirv v0.12.1+sdk-1.4.341.0
+    Checking wgpu-core-deps-windows-linux-android v29.0.4
+    Checking wgpu-core v29.0.4
+   Compiling c2rust-bitfields-derive v0.20.0
+    Checking cubecl-runtime v0.10.0
+    Checking c2rust-bitfields v0.20.0
+   Compiling cubecl-wgpu v0.10.0
+   Compiling cubecl-cuda v0.10.0
+    Checking tracel-ash v0.39.5+sdk1.4.357
+    Checking cubecl-core v0.10.0
+    Checking wgpu v29.0.4
+    Checking cubecl-opt v0.10.0
+   Compiling cubecl v0.10.0
+    Checking cubecl-std v0.10.0
+    Checking cubecl-cpp v0.10.0
+   Compiling nice_common v3.4.9-dev (/root/sfx/common)
+    Checking cubecl-spirv v0.10.0
+    Checking nice_client v3.4.9-dev (/root/sfx/client)
+    Checking nice-wasm-client v3.4.9-dev (/root/sfx/wasm-client)
+    Checking nice_jobs v3.4.9-dev (/root/sfx/jobs)
+    Checking nice_api v3.4.9-dev (/root/sfx/api)
+warning: unused dependency `web-sys`
+  --> wasm-client/Cargo.toml:22:15
+   |
+22 | [dependencies.web-sys]
+   |               ^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `web-sys`
+warning: `nice-wasm-client` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.25s

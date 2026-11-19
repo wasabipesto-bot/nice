@@ -1,0 +1,13 @@
+cargo fmt --all --check
+Diff in /root/sfx/common/src/stride_filter.rs:1529:
+             4u32, 5, 7, 15, 19, 23, 27, 35, 39, 43, 47, 55, 59, 63, 67, 75, 79, 83, 87, 95,
+         ];
+         for base in bases {
+-            let r = crate::base_range::get_base_range_u128(base).unwrap().unwrap();
++            let r = crate::base_range::get_base_range_u128(base)
++                .unwrap()
++                .unwrap();
+             let table = StrideTable::new(base, 3);
+             assert!(table.valid_residues.is_empty(), "base {base}");
+             let span = r.end() - r.first();
+error: recipe `lint` failed on line 88 with exit code 1

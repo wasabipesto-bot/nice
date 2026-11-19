@@ -261,3 +261,70 @@ over the range): 26 of 32 panic. Test `niceonly_search_of_a_base_without_residue
 - **`scripts/naive_base_search.rs --base B`** (a rust-script, k = 1): yes for every base listed, by reading (it
   calls `process_range_niceonly` on the whole range in chunks).
 - Tests and `process_niceonly` (deprecated, k = 1) likewise, for those bases.
+
+## 7. The stride panic through the client (19:37–20:08 UTC)
+
+Upstream main `974d7194`, a clean clone on the box (`/root/upc`), the real `nice_client` built in release with
+`--features gpu` (md5 `27913a54`, version 3.4.9-dev; the build string `974d7194` found in the binary). It ran
+against a local stub (`build8b/box/stub_validate.py`, 127.0.0.1 only) that serves the four real rows the
+coordinator gave: base 43 ids 30000, 40000, 49999 and the base-42 control 25000. It serves them in the server's
+`ValidationData` shape on `/claim/validate`, and as claims on `/claim/niceonly` / `/claim/detailed`, and records
+every request and every POST body. The production hosts were mapped to 127.0.0.1 and ::1 again before every run
+(`hosts_proof.txt` and `etc_hosts.txt` in each run directory); nothing reached the production API. Scripts
+`build8b/box/g2run.sh`, `g2claim.sh` and `sfx.sh`; raw logs `build8b/raw/runs/g2/{g2c,g2k,g2k_fixed,sfx}/`.
+
+**Verdict per command**
+
+| command | fields | result |
+|---|---|---|
+| a. `nice_client niceonly --validate` (CPU) | all four | exit 1 at once: `ERROR Configuration not supported: Validation && Niceonly` (`client/src/main.rs:1732`); no request reaches the stub |
+| b. the same with `--gpu` (CUDA) and with `--gpu --gpu-backend cubecl` (lavapipe) | all four (wgpu: 25000, 30000) | the same refusal, exit 1 |
+| c. `nice_client detailed --validate` (CPU) | 30000 | runs: 10^9 n in 7.65 s, no panic; reports "Validation failed! ... Distribution doesn't match!" and exits 1, only because my stub has no canonical distribution to serve (the real canonical one is not public in my reach); not a defect |
+| d. `nice_client niceonly` (CPU), the rows as nice-only claims | 25000, 30000, 40000 | exit 0, submits `nice_numbers: []` (30000 and 40000: the MSD filter rejects the whole field, 0.01 s) |
+| d. same | **49999** | **exit 101, no submission: `thread '<unnamed>' panicked at common/src/stride_filter.rs:165:54: index out of bounds: the len is 0 but the index is 0`**, in `process_range_niceonly` on a rayon worker |
+| e. `nice_client niceonly --gpu` (CUDA) and `--gpu-backend cubecl` (lavapipe), the rows as claims | all four | exit 0, `nice_numbers: []`, 0.00 s at base 43: `gpu_route::begin_niceonly` answers residue-empty bases first (`gpu_niceonly::residue_empty_result`, whose comment names this exact panic) |
+
+**So:**
+- **The client-level claim in §6 is refuted for `--validate`.** The client refuses `niceonly --validate` before
+  it asks the server for anything, on every backend. My §6 "yes, probably" for `--validate` was wrong: I had not
+  read `main`'s option checks.
+- **The panic is real through production's own path, but only for a nice-only claim** of such a base: CPU client
+  (no `--gpu`), a field the MSD filter does not reject whole (49999 of the three real base-43 rows). The GPU
+  routes are already protected.
+- **Whether the server ever issues one is a database question.** The real base-43 rows are at check level 3–4,
+  and nice-only claims take check level 0 only, so today's rows would not be issued. Nothing in the code stops a
+  residue-empty base from being inserted, or a level-0 field of one from being claimed.
+
+**What `niceonly` prints when it works** (25000, CPU): `Nice Client v3.4.9-dev started in Nice-only mode, using CPU
+with 4 threads.` / `Acquired claim: 25000, Base 42` / `✓ Processed 1.00e9 numbers in 0.02s` and a POST
+`{"claim_id":25000,...,"unique_distribution":null,"nice_numbers":[]}`, exit 0. On 49999 the third line is the
+panic and a backtrace, with no POST and exit 101.
+
+### The fix: `pr/stride-empty-residues` (`3701a353`, one commit on `974d7194`)
+
+Worktree `~/projects/nice/.worktrees/stride-empty`, on the fork as `fork/pr/stride-empty-residues`. **No pull
+request.** Description draft: `G2/STRIDE-EMPTY-PR-BODY.md`.
+
+- **Change** (`common/src/stride_filter.rs`): `walk_masked` returns an empty list when `valid_residues` is empty,
+  before it calls `first_valid_at_or_after`. Every public walk (`iterate_range`, `iterate_range_masked`,
+  `iterate_range_masked_without_affine`, and through them `process_range_niceonly`) goes through `walk_masked`,
+  and the two-phase walk is reached only from it. `first_valid_at_or_after` gains a `# Panics` section and is
+  otherwise unchanged.
+  **No behaviour change for a base with residues:** the new branch is taken only when the list is empty; for a
+  non-empty table the table, the walk and its order are the same code as before.
+- **GPU paths:** not changed. Reading shows that `begin_niceonly` returns `residue_empty_result` before any
+  table is built, and both table builders `ensure!` a non-empty table. Run (e) confirms it on CUDA and on wgpu.
+- **Test** `residue_empty_bases_search_to_nothing`: all 20 bases the probe listed (4, 5, 7, 15, …, 95) at
+  k = 3, 16 windows of 10^6 n spread over each range, and base 43 on the real field 60991418181959–60992418181959.
+  With the guard removed it fails with the panic above (`sfx/test_without_guard.txt`, rc 101); with it, it and
+  the other 15 `stride_filter` tests pass.
+- **Checks on the box** (`sfx/rc.txt`):
+  - `just lint` passes at the final state. A first run caught `cargo fmt` and clippy's `assert_is_empty` in the
+    test; both are fixed, and the commit is the fixed state.
+  - Production's suite passes: workspace `cargo test --locked --release --no-fail-fast` (nice_common lib 208
+    pass) and `nice_common --features gpu --lib` (262 pass).
+  - The fixed client (`--features gpu`, release) on the four rows as nice-only claims on the CPU: all exit 0
+    and submit `nice_numbers: []`, including 49999 (`g2k_fixed/fixed_cpu_*`).
+- **Changelog:** one line under Unreleased with a `#NNN` placeholder.
+- **Not included:** `get_base_range_u128(3)` panicking; `insert_new_fields` accepting residue-empty bases; any
+  server-side check that would keep such bases out of the nice-only queue.

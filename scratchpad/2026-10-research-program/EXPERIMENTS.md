@@ -35,6 +35,34 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## SE.1 Production's stride table at bases with no valid residue: a CPU nice-only claim panics; `--validate` does not; no such field exists in production (2026-11-19 19:00–20:10 UTC, engineer on box 61490977, then the director's read-only API check; `G2/CARRYBACK-NOTES.md` §6 and §7, `G2/build8b/raw/runs/g/`, `runs/g2/`; fix branch `pr/stride-empty-residues` 3701a353 on upstream main 974d7194, on the fork, no PR)
+
+- **In the library** [M, upstream main 974d7194]: `StrideTable::new(base, k)` is empty at bases 4, 5, 7 and every
+  base ≡ 3 mod 4 with a range (15, 19, 23, 27, 35, 39, 43, 47, 55, 59, 63, 67, …, 95), at k = 1, 2, 3; its first
+  use panics at `stride_filter.rs:165`, "index out of bounds: the len is 0 but the index is 0". For b ≡ 3 mod 4:
+  n²(n+1) is even, the required residue (b−1)/2 mod (b−1) is odd and b−1 is even, so no residue passes [P].
+  `process_range_niceonly` panics only where the MSD filter keeps part of the field (base 43: 26 of 32 windows of
+  1e9 n).
+- **Through the real client against a local stub serving four real rows** [M; rows read by me from the public
+  data API: ids 25000 (base 42), 30000, 40000, 49999 (base 43), each 1e9 n, check level 3]:
+  - `niceonly --validate`: **refused before any request** on CPU, CUDA and lavapipe ("Configuration not
+    supported: Validation && Niceonly", `client/src/main.rs:1732`). **The engineer's first "yes, probably" and my
+    message to the user at about 19:50 UTC that it "may crash about half the time" were wrong.**
+  - `detailed --validate` on 30000: runs, no panic.
+  - the same rows as `niceonly` claims, CPU: 25000, 30000, 40000 exit 0 with no numbers (the MSD filter rejects
+    30000 and 40000 whole); **49999: exit 101, nothing submitted, the panic above**.
+  - CUDA and wgpu: fine on all four (`begin_niceonly` answers residue-empty bases through
+    `residue_empty_result`).
+- **Reach in production** [M, public data API, `/bases`]: the residue-empty bases in the database are 15, 19, 23,
+  27, 35, 39, 43, 47, all fully checked (`checked_niceonly` = `range_size`, `minimum_cl` ≥ 2); none above 50
+  exists (55, 59 were never inserted). So no check-level-0 field of such a base exists and **no production
+  client can hit this today**; it would take inserting such a base (the insert script does not refuse one).
+- **Fix** [M]: `walk_masked` returns no numbers for a table without residues before its first lookup; test
+  `residue_empty_bases_search_to_nothing` (20 bases at k = 3 and the real field 30000) fails without the guard
+  and passes with it; `just lint` clean; production's suite passes (workspace; `--features gpu --lib` 262); the
+  fixed client exits 0 with an empty submission on all four claims. Independent review: SE.2 (below, when
+  back).
+
 ## MO.16 The review's fixes carried back into `dev/mo-clean`; Metal refusal; panic hook first; kernels and speed unchanged (2026-11-19 18:00–19:36 UTC, engineer; `G2/BUILD-BRIEF-8B.md`, `G2/CARRYBACK-NOTES.md`, `G2/build8b/`; `dev/mo-clean` 5a048669 → c2152084 (bb9b12c0, a82ad9db, 07a7c60e, c2152084; on the fork); box 61490977 on m11295, RTX 3080 at 240 W)
 
 - **What changed** [by reading the diff]: `coord.rs`, `cpu.rs`, `arith.rs`, `mask.rs` are the cut branches' files

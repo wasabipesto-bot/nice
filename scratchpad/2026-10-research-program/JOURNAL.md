@@ -197,6 +197,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   `pr/stride-empty-residues` only if it reproduces. Not reported to the user as a defect until that is back
   (rule: reproduce through production's path first). A fix would be its own small PR, with an independent
   review first; it is not covered by the hold.
+- **20:08 UTC: the stride finding through the real client (EXPERIMENTS SE.1; LEDGER SE; DECISIONS D16).**
+  `niceonly --validate` is refused by the client before any request, so **the validate claim is refuted** (I had
+  told the user it "may crash about half the time", hedged as unverified; corrected in the next message). Real:
+  a CPU `niceonly` claim of a residue-empty base panics where the MSD filter keeps anything (base-43 field 49999:
+  exit 101); `--gpu` fine. Production holds no check-level-0 field of such a base (bases table read: 15…47 all
+  fully checked, none above 50), so nothing can hit it today. Fix branch `pr/stride-empty-residues` 3701a353 on
+  the fork (48 lines), **not opened**: the user wrote "hold the PRs", so a new PR, even an unrelated one, waits
+  for their word (D16). Independent review running on the same box to 21:15
+  (`G2/STRIDE-EMPTY-REVIEW-BRIEF.md`). One thing I saw reading the diff: the test's "real field" is id 30000,
+  which the MSD filter rejects whole (it does not panic without the guard); the field that panics is 49999. To
+  be fixed with whatever the review finds, in one further commit.
 
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
