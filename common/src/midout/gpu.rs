@@ -2704,7 +2704,7 @@ pub struct GpuJoin<R: Runtime> {
     stop: u32,
     /// (audit, dev/mo-audit) fault-injection bits; 0 in production (only the audit tests set it).
     pub(crate) fault: u32,
-    /// (step 5L) Share the parents' root pass across digit 8 inside a field ([`GpuJoin::set_parent_sharing`]).
+    /// (step 5L) Share the parents' root pass across digit 8 inside a field ([`GpuJoin::set_parent_sharing`], on).
     share8: bool,
     anc: Mutex<AncLists>,
 }
@@ -2876,7 +2876,7 @@ impl<R: Runtime> GpuJoin<R> {
             l5: e(4 << 21),
             l5cur: Mutex::new(None),
             watch: Mutex::new((None, None)),
-            share8: false,
+            share8: true,
             anc: Mutex::new(AncLists::default()),
             stop: 6,
             fault: 0,
@@ -2895,7 +2895,7 @@ impl<R: Runtime> GpuJoin<R> {
     /// 64 values of digits 4–7, each of them several times (a `(4, 8, 5)` field: 64 values, 64 slices each), the
     /// roots valid to depth 8 are listed once per value (`anc8_kernel`, at the field's start, one
     /// synchronisation) and each slice's `hist2` runs over its list instead of every root. Exact by containment
-    /// (see `anc8_kernel`); off unless set.
+    /// (see `anc8_kernel`). On by default since step 5L (−3.1 % per (4, 8, 5) field on the RTX 3080).
     pub fn set_parent_sharing(&mut self, on: bool) {
         self.share8 = on;
     }
@@ -4416,6 +4416,7 @@ mod tests {
         macro_rules! go {
             ($client:expr) => {{
                 let mut gj = GpuJoin::new($client, Caps::b64(classes)).unwrap();
+                gj.set_parent_sharing(false);
                 let opt1 = GpuOptions { group: 1, host_threads: 1, device_tops: true, cpu_check: false };
                 let opt16 = GpuOptions { group: 16, ..opt1 };
                 let (o0, r0) = search_field_groups(&gj, &cn, vs, q, opt1, 0..nsl).unwrap();

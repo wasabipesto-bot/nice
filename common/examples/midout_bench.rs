@@ -4,10 +4,10 @@
 //! no API, no claims, no submissions.
 //!
 //! usage: midout_bench [--cuda] [--fields T0,T1,..] [--group G] [--threads N] [--classes C] [--tops-only K]
-//!                     [--no-cpu-check] [--slices K] [--digits K0,K1,Q0] [--share-parents]
+//!                     [--no-cpu-check] [--slices K] [--digits K0,K1,Q0] [--no-share-parents]
 //!   --fields: values of the field's fixed digits (6-8 under 4,9,6; 5-7 under 4,8,5): field t covers v = 2^75 + t·2^57
 //!   --digits: the coordinate (default the base's, `Coord::for_base`)
-//!   --share-parents: the parents' root pass shared across digit 8 (`GpuJoin::set_parent_sharing`; (4, 8, 5) fields)
+//!   --no-share-parents: the parents' root pass not shared across digit 8 (`GpuJoin::set_parent_sharing`, on by default)
 //!   --tops-only K: time the host's tops for K slices on N threads and exit
 //!   --no-cpu-check: without the sampled CPU check of one random slice per field (on by default)
 //!   --slices K: only each field's first K slices (dry runs on a software device; times are then per K slices)
@@ -120,7 +120,7 @@ fn main() -> Result<()> {
                 gj.set_timing_stop(s);
             }
             let cpu_check = !args.iter().any(|a| a == "--no-cpu-check");
-            let share = args.iter().any(|a| a == "--share-parents");
+            let share = !args.iter().any(|a| a == "--no-share-parents");
             gj.set_parent_sharing(share);
             println!("device {name}; W {}; group {group}; host threads {threads}; classes per batch {classes}; cpu check {cpu_check}; timing stop {stop:?}; slices per field {part:?}; parent sharing {share}", gj.w);
             let q = coord.quantum();
