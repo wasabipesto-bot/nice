@@ -897,10 +897,9 @@ mod prep {
             | (dig2(clo, chi, 9u32) << 8u32)
             | (((2u32 * r0) & 63u32) << 16u32)
             | (((3u32 * r0 * r0) & 63u32) << 24u32);
-        // pip mod 63 from its halves (2^32 = 4 mod 63); uniform
-        let pm63 = (u32::cast_from(pip >> 32u64) % 63u32 * 4u32
-            + u32::cast_from(pip & 0xFFFF_FFFFu64) % 63u32)
-            % 63u32;
+        // pip mod 63; uniform. pip is a slice key (digits 4–8 of n: 30 bits), so its low word is all of it. (Not
+        // `u32(pip >> 32) % 63`: Apple's GPU compiler miscompiles a constant division of a u64's high word.)
+        let pm63 = u32::cast_from(pip & 0xFFFF_FFFFu64) % 63u32;
         let cls = (r4 % 63u32 + pm63) % 63u32;
         let mut k8 = 0u32;
         #[unroll]
@@ -2439,6 +2438,33 @@ pub struct Caps {
     /// Tests: run the check in production's probe mode (it writes every n
     /// it rebuilds from the list entry and the top record).
     pub probe: bool,
+    /// The prefilter's arithmetic; `None`: [`PrefilterForm::for_runtime`].
+    pub prefilter: Option<PrefilterForm>,
+}
+
+/// The arithmetic of the expansion's middle-digit prefilter. Both forms compute the same predicate (the device
+/// tests compare each with the CPU reference); they differ only in speed, by compiler.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PrefilterForm {
+    /// 32-bit limbs and the digits' one-hot bits in pairs of 32-bit words (`pf`): the faster form on CUDA (an
+    /// RTX 3080), where a 64-bit variable shift costs two funnel shifts and a select.
+    Limbs32,
+    /// 24-bit limbs and each digit's one-hot bit by one 64-bit shift (`pf24`): every product fits AMD's full-rate
+    /// 24-bit multiplies (measured with RADV's compiler for the RX 9070 XT, through SPIR-V).
+    Limbs24,
+}
+
+impl PrefilterForm {
+    /// The form for runtime `R`: [`Self::Limbs32`] on CUDA, where it was measured faster; [`Self::Limbs24`] on
+    /// every other runtime (wgpu through SPIR-V, WGSL or Metal, and HIP).
+    #[must_use]
+    pub fn for_runtime<R: Runtime>() -> Self {
+        #[cfg(feature = "cubecl-cuda")]
+        if std::any::TypeId::of::<R>() == std::any::TypeId::of::<cubecl::cuda::CudaRuntime>() {
+            return Self::Limbs32;
+        }
+        Self::Limbs24
+    }
 }
 
 impl Caps {
@@ -2453,6 +2479,7 @@ impl Caps {
             classes,
             nice: NICE_CAP,
             probe: false,
+            prefilter: None,
         }
     }
 }
@@ -2562,7 +2589,7 @@ pub struct GpuJoin<R: Runtime> {
     pub w: u32,
     fill: u32,
     ballot: bool,
-    /// The expansion's prefilter in its SPIR-V form (`pf24`: 24-bit limbs, 64-bit one-hot shifts).
+    /// The expansion's prefilter in 24-bit limbs (`pf24`, [`PrefilterForm::Limbs24`]); else `pf`.
     oh64: bool,
     caps: Caps,
     check: CheckShape,
@@ -2749,7 +2776,10 @@ impl<R: Runtime> GpuJoin<R> {
             w,
             fill,
             ballot: ballot_append(w),
-            oh64: R::name(&client).contains("spirv"),
+            oh64: caps
+                .prefilter
+                .unwrap_or_else(PrefilterForm::for_runtime::<R>)
+                == PrefilterForm::Limbs24,
             caps,
             check,
             roots,
@@ -4634,6 +4664,8 @@ mod tests {
         /// Compile for this plane width on any device, run, report and stop: only the generated code is wanted
         /// (`CUBECL_DEBUG_SPIRV`, `CUBECL_DEBUG_LOG`); the results are invalid.
         force_w: Option<u32>,
+        /// The prefilter's form (`None`: the runtime's).
+        prefilter: Option<PrefilterForm>,
     }
 
     /// The device's prefilter survivors of base-64 slices (the n its check takes) equal the CPU reference's, n
@@ -4647,8 +4679,12 @@ mod tests {
         macro_rules! go {
             ($client:expr) => {{
                 let force_w = case.force_w;
-                let gj = GpuJoin::with_width($client, Caps::b64(classes), force_w).unwrap();
-                println!("device {} W {}", ctx.device_name(), gj.w);
+                let caps = Caps {
+                    prefilter: case.prefilter,
+                    ..Caps::b64(classes)
+                };
+                let gj = GpuJoin::with_width($client, caps, force_w).unwrap();
+                println!("device {} W {} prefilter {}", ctx.device_name(), gj.w, if gj.oh64 { "24-bit" } else { "32-bit" });
                 for &pip in pips {
                     if force_w.is_some() {
                         let st = slice_tops(pip, gj.roots());
@@ -4730,21 +4766,26 @@ mod tests {
         }
     }
 
-    /// Tier (b): one slice, its first batch of 4 classes, against the CPU reference.
+    /// Tier (b): one slice, its first batch of 4 classes, against the CPU reference, with the prefilter in 32-bit
+    /// limbs and in 24-bit limbs (whichever the runtime would choose).
     #[test]
     #[ignore = "needs a GPU (lavapipe will do; MIDOUT_CUDA=1 for CUDA) and a minute"]
     fn cubecl_midout_slice_part_equals_cpu() {
-        slices_equal_cpu(&SliceCase {
-            pips: vec![712_012_851],
-            classes: 4,
-            batches: 1,
-            share: false,
-            host_tops: false,
-            force_w: None,
-        });
+        for form in [PrefilterForm::Limbs32, PrefilterForm::Limbs24] {
+            slices_equal_cpu(&SliceCase {
+                pips: vec![712_012_851],
+                classes: 4,
+                batches: 1,
+                share: false,
+                host_tops: false,
+                force_w: None,
+                prefilter: Some(form),
+            });
+        }
     }
 
-    /// Tier (b): the same with the parents from the shared depth-8 list (`anc8_kernel`).
+    /// Tier (b): one slice's first batch with the parents from the shared depth-8 list (`anc8_kernel`), the
+    /// runtime's prefilter.
     #[test]
     #[ignore = "needs a GPU (lavapipe will do; MIDOUT_CUDA=1 for CUDA) and a minute"]
     fn cubecl_midout_shared_parents_slice_part_equals_cpu() {
@@ -4755,12 +4796,13 @@ mod tests {
             share: true,
             host_tops: false,
             force_w: None,
+            prefilter: None,
         });
     }
 
     /// Tier (c): [`slices_equal_cpu`] from the environment: `MIDOUT_GPU_SLICES` (comma list of digit-4..8 values,
     /// default 712012851), `MIDOUT_CLASSES` (63), `MIDOUT_BATCHES` (all), `MIDOUT_SHARE8=1`, `MIDOUT_HOST_TOPS`,
-    /// `MIDOUT_FORCE_W` (the compile-only path).
+    /// `MIDOUT_FORCE_W` (the compile-only path), `MIDOUT_PREFILTER` (`32` or `24`; default the runtime's).
     #[cfg(feature = "midout-box-tests")]
     #[test]
     #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime) and minutes of CPU"]
@@ -4777,6 +4819,11 @@ mod tests {
             share: env("MIDOUT_SHARE8").is_some_and(|x| x == "1"),
             host_tops: env("MIDOUT_HOST_TOPS").is_some(),
             force_w: env("MIDOUT_FORCE_W").map(|x| x.parse().unwrap()),
+            prefilter: match env("MIDOUT_PREFILTER").as_deref() {
+                Some("32") => Some(PrefilterForm::Limbs32),
+                Some("24") => Some(PrefilterForm::Limbs24),
+                _ => None,
+            },
         });
     }
 }
