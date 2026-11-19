@@ -12,6 +12,8 @@
 //! - `gpu` (feature `cubecl`): the device path at base 64.
 //! - `gpu_wide` (feature `cubecl`): the device path with two-word masks,
 //!   bases 65–70 (and any base up to 70 in its tests).
+//! - [`wire`]: the claim and submit additions of the middle-out route, and
+//!   the guard every other route applies to a claim.
 //!
 //! A search of a field returns its nice numbers and two exact counters,
 //! `survivors` and `checked` ([`cpu::FieldOutcome`]); both are properties of
@@ -40,6 +42,7 @@ pub mod gpu;
 #[cfg(feature = "cubecl")]
 pub mod gpu_wide;
 pub mod mask;
+pub mod wire;
 
 pub use coord::Coord;
 pub use cpu::{FieldOutcome, Shape};
