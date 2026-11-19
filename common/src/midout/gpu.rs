@@ -1423,6 +1423,32 @@ mod post {
         (lo | a10 | a11, hi | b10 | b11, a10 | a11, b10 | b11)
     }
 
+    /// `digits12` with each digit as one 64-bit shift (step 4S, the SPIR-V path: ACO for GFX1201 makes one
+    /// `v_lshlrev_b64` and half an OR per digit, against about six 32-bit operations for `oh`; on CUDA a 64-bit
+    /// shift is two funnel shifts and a select, so CUDA keeps `digits12`).
+    #[cube]
+    fn digits12_64(w0: u32, w1: u32, w2: u32) -> (u32, u32, u32, u32) {
+        let mut m = 0u64;
+        #[unroll]
+        for j in 0..5u32 {
+            m |= 1u64 << u64::cast_from((w0 >> comptime!(6 * j)) & 63u32);
+        }
+        m |= 1u64 << u64::cast_from((w0 >> 30u32) | ((w1 & 15u32) << 2u32));
+        #[unroll]
+        for j in 0..4u32 {
+            m |= 1u64 << u64::cast_from((w1 >> comptime!(4 + 6 * j)) & 63u32);
+        }
+        let mm = (1u64 << u64::cast_from((w1 >> 28u32) | ((w2 & 3u32) << 4u32)))
+            | (1u64 << u64::cast_from(w2 >> 2u32));
+        let a = m | mm;
+        (
+            u32::cast_from(a & 0xFFFF_FFFFu64),
+            u32::cast_from(a >> 32u64),
+            u32::cast_from(mm & 0xFFFF_FFFFu64),
+            u32::cast_from(mm >> 32u64),
+        )
+    }
+
     /// The middle-digit prefilter of one survivor (`cpu::prefilter` at k
     /// 10): n mod 2^72 from `r0` and its top's P (bits 30-93 of n), in 32-bit
     /// limbs; the digits at positions 0-11 of n² and n³ (mod 2^72) must be
@@ -1430,7 +1456,7 @@ mod post {
     /// at 10-11 must miss the top's certified digits at positions >= 12
     /// (`top`).
     #[cube]
-    fn pf(r0: u32, plo: u32, phi: u32, top: u64) -> bool {
+    fn pf(r0: u32, plo: u32, phi: u32, top: u64, #[comptime] oh64: bool) -> bool {
         let x0 = r0 | (plo << 30u32);
         let x1 = (plo >> 2u32) | (phi << 30u32);
         let x2 = (phi >> 2u32) & 255u32;
@@ -1453,8 +1479,37 @@ mod post {
             + s0 * x2
             + s2 * x0)
             & 255u32;
-        let (sl, sh, sml, smh) = digits12(s0, s1, s2);
-        let (cl, ch, cml, cmh) = digits12(c0, c1, c2);
+        let mut sl = 0u32;
+        let mut sh = 0u32;
+        let mut sml = 0u32;
+        let mut smh = 0u32;
+        let mut cl = 0u32;
+        let mut ch = 0u32;
+        let mut cml = 0u32;
+        let mut cmh = 0u32;
+        if comptime!(oh64) {
+            let (a0, a1, a2, a3) = digits12_64(s0, s1, s2);
+            let (b0, b1, b2, b3) = digits12_64(c0, c1, c2);
+            sl = a0;
+            sh = a1;
+            sml = a2;
+            smh = a3;
+            cl = b0;
+            ch = b1;
+            cml = b2;
+            cmh = b3;
+        } else {
+            let (a0, a1, a2, a3) = digits12(s0, s1, s2);
+            let (b0, b1, b2, b3) = digits12(c0, c1, c2);
+            sl = a0;
+            sh = a1;
+            sml = a2;
+            smh = a3;
+            cl = b0;
+            ch = b1;
+            cml = b2;
+            cmh = b3;
+        }
         let lo = sl | cl;
         let hi = sh | ch;
         let mlo = sml | cml;
@@ -1484,6 +1539,7 @@ mod post {
         pip_hi: u32,
         nopf: bool,
         pfdrop: bool,
+        #[comptime] oh64: bool,
     ) -> (u32, u32, u32, u32) {
         // P = n div 2^30 = h·2^30 + d·2^24 + digits 5-8 (the top record's words 0-1), per record
         let ha = hda & 0xFFFFu32;
@@ -1518,8 +1574,13 @@ mod post {
             let r0 = lst[(pos + off) as usize] + r0hi;
             let top = select(ina, topa, topb);
             if nopf
-                || (pf(r0, select(ina, ploa, plob), select(ina, phia, phib), top)
-                    && !(pfdrop && (r0 >> 10u32).trailing_zeros() >= 10u32))
+                || (pf(
+                    r0,
+                    select(ina, ploa, plob),
+                    select(ina, phia, phib),
+                    top,
+                    oh64,
+                ) && !(pfdrop && (r0 >> 10u32).trailing_zeros() >= 10u32))
             {
                 let bit = 1u32 << b;
                 k0 |= select(ina && inlo, bit, 0u32);
@@ -1593,6 +1654,8 @@ mod post {
         pip_hi: u32,
         // (audit) F_NOPF (1): every survivor listed, no prefilter
         fault: u32,
+        // the prefilter's digit masks by 64-bit shifts (`digits12_64`: the SPIR-V path) or 32-bit pairs (CUDA)
+        #[comptime] oh64: bool,
     ) {
         let nopf = (fault & 1u32) != 0u32;
         // (audit) F_PF_DROP (1024): the prefilter wrongly drops survivors whose r0 has bits 10-19 zero
@@ -1638,7 +1701,7 @@ mod post {
                     + recb[2usize].count_ones()
                     + recb[3usize].count_ones();
                 let (kla, kha, klb, khb) = keep_bits2(
-                    reca, recb, hda, hdb, topa, topb, lst, r0hi, pip_hi, nopf, pfdrop,
+                    reca, recb, hda, hdb, topa, topb, lst, r0hi, pip_hi, nopf, pfdrop, oh64,
                 );
                 let nb = kla.count_ones() + kha.count_ones() + klb.count_ones() + khb.count_ones();
                 let excl = plane_exclusive_sum(nb);
@@ -2463,6 +2526,8 @@ pub struct GpuJoin<R: Runtime> {
     pub w: u32,
     fill: u32,
     ballot: bool,
+    /// The expansion's prefilter builds its digit masks by 64-bit shifts (the SPIR-V compiler; see `digits12_64`).
+    oh64: bool,
     caps: Caps,
     check: CheckShape,
     roots: Vec<u32>,
@@ -2642,6 +2707,7 @@ impl<R: Runtime> GpuJoin<R> {
             w,
             fill,
             ballot: ballot_append(w),
+            oh64: R::name(&client).contains("spirv"),
             caps,
             check,
             roots,
@@ -3179,6 +3245,7 @@ impl<R: Runtime> GpuJoin<R> {
                         ((pip & 63) as u32) << 24,
                         (pip >> 6) as u32,
                         self.fault,
+                        self.oh64,
                     );
                 }
                 if self.upto(6) && self.fault & F_SKIP_CHECK == 0 {
