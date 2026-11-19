@@ -138,7 +138,7 @@ fn main() -> Result<()> {
                     );
                 }
                 if let Some(gn) = &nj {
-                    let (o, dc, tm) = search_field(gn, &coord, vs, q, GpuOptions { group, host_threads: 1, device_tops: true, cpu_check: flag("--cpu-check") })?;
+                    let (o, dc, tm) = search_field(gn, &coord, vs, q, GpuOptions::new(group, flag("--cpu-check")))?;
                     wall_n += tm.wall;
                     println!(
                         "NARROW b{b} t {t} v [{vs}, +{q}) n {ncount}: {:.2} s = {:.4} fs per admissible n | slices {} survivors {} checked {} nice {:?} | tops {} children {} chunks {} flat {} kept {}",

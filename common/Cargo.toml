@@ -37,6 +37,10 @@ cubecl-hip = ["cubecl", "cubecl/hip"]
 # Test switch of the middle-out client route (development): lets the route
 # inject the library's fault bits. Never in a release build.
 midout-fault = ["cubecl"]
+# The middle-out join's benchmarks (`common/examples/midout_*bench.rs`): the
+# library's timing stops, part-field runs and host-made tops, which return
+# results that are not a whole, checked field. In no umbrella feature.
+midout-bench = ["cubecl"]
 
 [dependencies]
 # Pinned exactly: CubeCL is pre-1.0 and its host API drifts between
@@ -84,8 +88,8 @@ test-log = "0.2.19"
 
 [[example]]
 name = "midout_bench"
-required-features = ["cubecl"]
+required-features = ["cubecl", "midout-bench"]
 
 [[example]]
 name = "midout_wide_bench"
-required-features = ["cubecl"]
+required-features = ["cubecl", "midout-bench"]

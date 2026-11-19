@@ -2795,14 +2795,16 @@ impl<R: Runtime> WideJoin<R> {
         self.pf2 = on;
     }
 
-    /// Timing and bisection only (the bench's `MIDOUT_STOP`): run the stages up to `stop` (1 tops, 2 parents, 3
-    /// main kernel, 5 expansion, 6 all). A join with a stop below 6 only times stages: [`search_field_wide`]
-    /// refuses it, [`time_field_wide`] takes it.
+    /// Timing and bisection only (benches, feature `midout-bench`): run the stages up to `stop` (1 tops, 2
+    /// parents, 3 main kernel, 5 expansion, 6 all). A join with a stop below 6 only times stages:
+    /// [`search_field_wide`] refuses it, `time_field_wide` takes it.
+    #[cfg(any(test, feature = "midout-bench"))]
     pub fn set_timing_stop(&mut self, stop: u32) {
         self.stop = stop;
     }
 
-    /// A timing stop is set.
+    /// A timing stop is set (benches, feature `midout-bench`).
+    #[cfg(feature = "midout-bench")]
     pub fn stop_set(&self) -> bool {
         self.stop != 6
     }
@@ -3685,11 +3687,12 @@ pub(crate) fn search_field_wide_groups<R: Runtime>(
     Ok((o, rec))
 }
 
-/// Time a field with the join's timing stop ([`WideJoin::set_timing_stop`]): the stages up to it, nothing
-/// checked or returned but the time.
+/// **Timing only** (benches, feature `midout-bench`): time a field with the join's timing stop
+/// (`WideJoin::set_timing_stop`): the stages up to it, nothing checked or returned but the time.
 ///
 /// # Errors
 /// A field that is not whole quanta, or device errors.
+#[cfg(feature = "midout-bench")]
 pub fn time_field_wide<R: Runtime>(
     gj: &WideJoin<R>,
     coord: &Coord,

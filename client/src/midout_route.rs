@@ -97,7 +97,7 @@ fn field_of(c: &CoordClaim) -> Result<(Coord, u128, u128)> {
     let (k0, k1, q0) = wire::parse_coordinate_id(&c.coordinate)
         .with_context(|| format!("middle-out: claim {}", c.claim_id))?;
     ensure!(
-        (64..=70).contains(&c.base),
+        (64..=65).contains(&c.base),
         "middle-out: claim {}: base {} has no device path",
         c.claim_id,
         c.base

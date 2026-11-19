@@ -2732,9 +2732,10 @@ impl<R: Runtime> GpuJoin<R> {
         })
     }
 
-    /// Timing and bisection only (benches): queue the stages up to `stop`
-    /// (see the field) and skip every account. A join with a stop set can
-    /// only be timed ([`time_field`]); [`search_field`] refuses it.
+    /// Timing and bisection only (benches, feature `midout-bench`): queue the stages up to `stop` (see the
+    /// field) and skip every account. A join with a stop set can only be timed (`time_field`); [`search_field`]
+    /// refuses it.
+    #[cfg(any(test, feature = "midout-bench"))]
     pub fn set_timing_stop(&mut self, stop: u32) {
         self.stop = stop;
     }
@@ -3702,16 +3703,17 @@ impl<R: Runtime> GpuJoin<R> {
     }
 }
 
-/// How a field is run on the device.
+/// How a field is run on the device ([`GpuOptions::new`]).
 #[derive(Clone, Copy, Debug)]
 pub struct GpuOptions {
     /// Slices per synchronisation.
     pub group: usize,
     /// Host threads making tops (in parallel with the device), when the
     /// tops are made on the host.
-    pub host_threads: usize,
-    /// Tops on the device (the default: the box's 5-core quota cannot keep up).
-    pub device_tops: bool,
+    pub(crate) host_threads: usize,
+    /// Tops on the device (the only form outside the benches: the host-tops path has no tops accounts, and a
+    /// host of a few cores cannot keep up with a card).
+    pub(crate) device_tops: bool,
     /// The sampled CPU check: one random slice of the field recomputed by
     /// the CPU reference on a host thread while the card works; the field
     /// run's own survivors and checked for that slice must equal the CPU's,
@@ -3719,6 +3721,31 @@ pub struct GpuOptions {
     /// same prefiltered list, n for n. The only check that sees a kernel
     /// computing wrongly (the accounts see only work that did not run).
     pub cpu_check: bool,
+}
+
+impl GpuOptions {
+    /// Device tops, `group` slices per synchronisation, the sampled CPU check on or off.
+    pub fn new(group: usize, cpu_check: bool) -> Self {
+        Self {
+            group,
+            host_threads: 1,
+            device_tops: true,
+            cpu_check,
+        }
+    }
+
+    /// **Benches only** (feature `midout-bench`): the slices' tops made on `threads` host threads instead of on
+    /// the device. This path has no tops accounts (a dropped top is not seen by any count); it is kept to time
+    /// the device's tops against.
+    #[cfg(feature = "midout-bench")]
+    #[must_use]
+    pub fn with_host_tops(self, threads: usize) -> Self {
+        Self {
+            host_threads: threads,
+            device_tops: false,
+            ..self
+        }
+    }
 }
 
 /// The sampled check of one slice: the CPU reference (survivors, checked,
@@ -3822,11 +3849,13 @@ pub(crate) fn search_field_groups<R: Runtime>(
     Ok((o, rec))
 }
 
-/// [`search_field`] on the field's first `max_slices` slices only (benches and dry runs on a software device: a
-/// field is 4,096 slices). The outcome and the counts cover those slices; the sampled check draws among them.
+/// **Part of a field** (benches, feature `midout-bench`): [`search_field`] on the field's first `max_slices` slices
+/// only (dry runs on a software device: a field is 4,096 slices). The outcome and the counts cover those slices
+/// only, so the result is not a field's and must never be submitted; the sampled check draws among them.
 ///
 /// # Errors
 /// As [`search_field`].
+#[cfg(feature = "midout-bench")]
 pub fn search_field_part<R: Runtime>(
     gj: &GpuJoin<R>,
     coord: &Coord,
@@ -3851,10 +3880,11 @@ pub fn search_field_part<R: Runtime>(
     )
 }
 
-/// [`time_field`] on the field's first `max_slices` slices only.
+/// **Timing only** (benches, feature `midout-bench`): [`time_field`] on the field's first `max_slices` slices only.
 ///
 /// # Errors
 /// As [`time_field`].
+#[cfg(feature = "midout-bench")]
 pub fn time_field_part<R: Runtime>(
     gj: &GpuJoin<R>,
     coord: &Coord,
@@ -3879,11 +3909,12 @@ pub fn time_field_part<R: Runtime>(
     .2)
 }
 
-/// Time a field with the join's timing stop (benches): the stages up to
+/// **Timing only** (benches, feature `midout-bench`): time a field with the join's timing stop: the stages up to
 /// the stop are queued, no account is checked and no result is returned.
 ///
 /// # Errors
 /// A field that is not whole quanta of base 64, or a device error.
+#[cfg(feature = "midout-bench")]
 pub fn time_field<R: Runtime>(
     gj: &GpuJoin<R>,
     coord: &Coord,

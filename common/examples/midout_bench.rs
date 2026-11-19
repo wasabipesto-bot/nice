@@ -130,7 +130,11 @@ fn main() -> Result<()> {
                 let ncount = coord.n_count(vs, q)?;
                 // a part of the field: its share of the admissible n (4,096 slices per field)
                 let adm = ncount as f64 * 8.0 / 63.0 * part.map_or(1.0, |k| k.min(4096) as f64 / 4096.0);
-                let go = GpuOptions { group, host_threads: threads, device_tops: !args.iter().any(|a| a == "--host-tops"), cpu_check };
+                let go = if args.iter().any(|a| a == "--host-tops") {
+                    GpuOptions::new(group, cpu_check).with_host_tops(threads)
+                } else {
+                    GpuOptions::new(group, cpu_check)
+                };
                 if let Some(s) = stop {
                     let tm = match part {
                         Some(k) => time_field_part(&gj, &coord, vs, q, go, k)?,

@@ -1,6 +1,6 @@
 //! One entry point for a client route: a field of the middle-out coordinate
 //! of base `b`, searched on the path for that base (base 64: [`super::gpu`],
-//! 64-bit masks; bases 65–70: [`super::gpu_wide`], two-word masks), with
+//! 64-bit masks; base 65: [`super::gpu_wide`], two-word masks), with
 //! every account checked and, where asked, the sampled CPU check. Returns the
 //! outcome and the route's telemetry (the path, the join's shape, the
 //! counters, the sampled slice, the timings). Nothing here knows the wire.
@@ -25,15 +25,17 @@ const CLASSES_B64: u32 = 63;
 pub enum FieldJoin<R: Runtime> {
     /// Base 64.
     Narrow(Box<GpuJoin<R>>),
-    /// Bases 65–70.
+    /// Base 65 (the wide path, two-word masks).
     Wide(Box<WideJoin<R>>, u32),
 }
 
 impl<R: Runtime> FieldJoin<R> {
-    /// The join for base `b` (64: the 64-bit path; 65–70: the wide path).
+    /// The join for base `b` (64: the 64-bit path; 65: the wide path). Bases 66–70 are refused: the wide path
+    /// computes them, but only base 65 has been run end to end through it (and base 68 does not fit a
+    /// 10 GB card).
     ///
     /// # Errors
-    /// A base without a coordinate or a device path, or a device error.
+    /// A base other than 64 or 65, or a device error.
     pub fn new(client: ComputeClient<R>, b: u32) -> Result<Self> {
         let coord = Coord::for_base(b)?;
         match b {
@@ -41,7 +43,7 @@ impl<R: Runtime> FieldJoin<R> {
                 client,
                 Caps::b64(CLASSES_B64),
             )?))),
-            65..=70 => Ok(Self::Wide(
+            65 => Ok(Self::Wide(
                 Box::new(WideJoin::new(
                     client,
                     WideCaps::for_base(b),
@@ -97,12 +99,7 @@ impl<R: Runtime> FieldJoin<R> {
         let shape = Shape::for_coord(&coord);
         let (o, counts, tm, path, w) = match self {
             Self::Narrow(gj) => {
-                let opt = GpuOptions {
-                    group: GROUP,
-                    host_threads: 1,
-                    device_tops: true,
-                    cpu_check,
-                };
+                let opt = GpuOptions::new(GROUP, cpu_check);
                 let (o, dc, tm) = search_field(gj, &coord, v_start, v_size, opt)?;
                 let c = json!({"tops": dc.tops, "children": dc.children, "chunks": dc.chunks,
                                "flat": dc.flat, "kept": dc.kept, "slices": dc.slices});
