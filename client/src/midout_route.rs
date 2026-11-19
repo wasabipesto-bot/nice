@@ -7,8 +7,10 @@
 //! nothing for the field at hand):
 //! - the coordinator's address is explicit and is not the production API
 //!   (`midout::wire::check_coordinator_url`);
-//! - a claim must be marked `"coordinate": "midout"`, of a base with a device
-//!   path, whole quanta, with the `range_size` the coordinate gives;
+//! - a claim must name a middle-out coordinate this build knows
+//!   (`"coordinate": "midout:K0,K1,Q0"`, the base's `Coord::for_base`), of a
+//!   base with a device path, whole quanta, with the `range_size` the
+//!   coordinate gives;
 //! - a field whose accounts fail or whose sampled CPU check differs is not
 //!   submitted (the library returns an error);
 //! - a panic on any thread of the process (the GPU runtime's stream thread
@@ -86,20 +88,26 @@ async fn claim(client: &Client, url: &str) -> Result<Option<CoordClaim>> {
 /// The claim's field `(coord, v_start, v_size)`, after every check a claim
 /// must pass before any work starts.
 fn field_of(c: &CoordClaim) -> Result<(Coord, u128, u128)> {
-    ensure!(
-        c.coordinate == wire::MIDOUT,
-        "middle-out: claim {} is in coordinate '{}', not '{}'",
-        c.claim_id,
-        c.coordinate,
-        wire::MIDOUT
-    );
+    // the claim names its coordinate; build it from the claim, then refuse it
+    // unless it is the one this build's device path for the base searches
+    let (k0, k1, q0) = wire::parse_coordinate_id(&c.coordinate)
+        .with_context(|| format!("middle-out: claim {}", c.claim_id))?;
     ensure!(
         (64..=70).contains(&c.base),
         "middle-out: claim {}: base {} has no device path",
         c.claim_id,
         c.base
     );
-    let coord = Coord::for_base(c.base)?;
+    let coord = Coord::with_digits(c.base, k0, k1, q0)?;
+    let known = Coord::for_base(c.base)?;
+    ensure!(
+        coord == known,
+        "middle-out: claim {}: coordinate '{}' of base {} is not one this client knows (it searches '{}')",
+        c.claim_id,
+        c.coordinate,
+        c.base,
+        wire::coordinate_id(known.k0, known.k1, known.q0)
+    );
     let v_size = c
         .range_end
         .checked_sub(c.range_start)
@@ -234,15 +242,12 @@ fn drive<R: nice_common::midout::route::DeviceRuntime>(
                 .spawn(|| panic!("middle-out test fault: a runtime thread panics"))?
                 .join();
         }
-        let searched = j.search(v_start, v_size, cpu_check);
+        let searched = j.search(&coord, v_start, v_size, cpu_check);
         let wall = began.elapsed().as_secs_f64();
         let (o, route_tel) = match searched {
             Ok(x) => x,
             Err(e) => {
-                error!(
-                    "middle-out: claim {} NOT submitted: {e:#}",
-                    c.claim_id
-                );
+                error!("middle-out: claim {} NOT submitted: {e:#}", c.claim_id);
                 return Err(e.context(format!("middle-out: claim {} not submitted", c.claim_id)));
             }
         };
@@ -265,7 +270,7 @@ fn drive<R: nice_common::midout::route::DeviceRuntime>(
             "processing_secs": wall,
             "pipeline": {
                 "route": wire::ROUTE,
-                "coordinate": wire::MIDOUT,
+                "coordinate": c.coordinate,
                 "field": {"base": c.base, "v_start": v_start.to_string(), "v_size": v_size.to_string(),
                           "t0": t0.to_string(), "quanta": (v_size / q).to_string(),
                           "range_size": c.range_size.to_string()},
@@ -337,21 +342,51 @@ mod tests {
         let c64 = Coord::for_base(64).unwrap();
         let q = c64.quantum();
         let s = c64.start + 77_777 * q;
-        assert!(field_of(&claim(64, s, q, q, "midout")).is_ok());
-        assert!(field_of(&claim(64, s, 2 * q, 2 * q, "midout")).is_ok());
-        assert!(field_of(&claim(64, s, q, q, "n")).is_err(), "other coordinate");
-        assert!(field_of(&claim(64, s + 1, q, q, "midout")).is_err(), "misaligned");
-        assert!(field_of(&claim(64, s, q / 2, q / 2, "midout")).is_err(), "part of a quantum");
-        assert!(field_of(&claim(64, s, q, q - 1, "midout")).is_err(), "wrong range_size");
-        assert!(field_of(&claim(64, c64.v_end(), q, q, "midout")).is_err(), "past the end");
+        assert!(field_of(&claim(64, s, q, q, "midout:4,9,6")).is_ok());
+        assert!(field_of(&claim(64, s, 2 * q, 2 * q, "midout:4,9,6")).is_ok());
+        // a coordinate this client does not know is refused, even one midout::coord can express
+        // (the field-structure review's base-64 proposal fixes digits 5-7: midout:4,8,5)
+        for unknown in [
+            "midout:4,8,5",
+            "midout:4,9,7",
+            "midout:3,9,6",
+            "midout",
+            "midout:4,9",
+        ] {
+            let e = field_of(&claim(64, s, q, q, unknown)).unwrap_err();
+            assert!(format!("{e:#}").contains("coordinate"), "{unknown}: {e:#}");
+        }
+        assert!(
+            field_of(&claim(64, s, q, q, "n")).is_err(),
+            "other coordinate"
+        );
+        assert!(
+            field_of(&claim(64, s + 1, q, q, "midout:4,9,6")).is_err(),
+            "misaligned"
+        );
+        assert!(
+            field_of(&claim(64, s, q / 2, q / 2, "midout:4,9,6")).is_err(),
+            "part of a quantum"
+        );
+        assert!(
+            field_of(&claim(64, s, q, q - 1, "midout:4,9,6")).is_err(),
+            "wrong range_size"
+        );
+        assert!(
+            field_of(&claim(64, c64.v_end(), q, q, "midout:4,9,6")).is_err(),
+            "past the end"
+        );
         let c65 = Coord::for_base(65).unwrap();
         let q65 = c65.quantum();
         let s65 = c65.start + 13_731 * q65;
         let n65 = c65.n_count(s65, q65).unwrap();
-        assert!(field_of(&claim(65, s65, q65, n65, "midout")).is_ok());
-        assert!(field_of(&claim(65, s65, q65, n65 + 1, "midout")).is_err());
+        assert!(field_of(&claim(65, s65, q65, n65, "midout:4,9,6")).is_ok());
+        assert!(field_of(&claim(65, s65, q65, n65 + 1, "midout:4,9,6")).is_err());
         // base 65 is padded: a field holds fewer n than its v_size
         assert!(n65 <= q65);
-        assert!(field_of(&claim(62, 0, 1, 1, "midout")).is_err(), "no coordinate");
+        assert!(
+            field_of(&claim(62, 0, 1, 1, "midout:4,9,6")).is_err(),
+            "no coordinate"
+        );
     }
 }

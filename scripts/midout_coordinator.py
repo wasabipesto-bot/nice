@@ -5,7 +5,7 @@ Serves fields of the middle-out coordinate in production's claim/submit wire for
 (common/src/midout/wire.rs):
 
   GET  /claim/niceonly?coordinate=midout  -> 200 {"claim_id","base","range_start","range_end","range_size",
-                                                  "coordinate":"midout"}  (range_* in v), or 204: none left
+                                                  "coordinate":"midout:K0,K1,Q0"}  (range_* in v), or 204: none left
   POST /submit                            -> production's DataToServer; recorded as one JSON line
   GET  /status                            -> counts
 
@@ -14,13 +14,16 @@ instead hands the same marked fields to /claim/niceonly and /claim/detailed, to 
 routes refuse them.
 
 The work list (`common/examples/midout_fields.rs` makes one) is a JSON list of
-{"base","range_start","range_end","range_size"}. State lives in DIR: claims.jsonl (every claim issued) and
+{"base","coordinate","range_start","range_end","range_size"}: the coordinate is a parameter of each field (an id
+`midout:K0,K1,Q0` naming the coordinate's digit positions), handed to the client as it stands; this script knows
+nothing of what it means (the client builds its coordinate from it and refuses one it does not know). `--coordinate ID`
+(optional) refuses to start unless every field of the work list is in that coordinate. State lives in DIR: claims.jsonl (every claim issued) and
 submissions.jsonl (every submission, accepted or not, with the field, the claim time, the receive time and the
 whole body). A field is never handed out twice, across restarts too, unless --reissue-after SECONDS is given
 (then a claim older than that without an accepted submission is handed out again). A submission is accepted
 once per field, only for a claim this coordinator issued, and only with telemetry pipeline.route "midout".
 
-usage: midout_coordinator.py --worklist W.json --state DIR [--port 8470] [--reissue-after S] [--legacy-path]
+usage: midout_coordinator.py --worklist W.json --state DIR [--port 8470] [--reissue-after S] [--legacy-path] [--coordinate ID]
 """
 import argparse, json, os, sys, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -34,6 +37,7 @@ ap.add_argument("--state", required=True)
 ap.add_argument("--port", type=int, default=8470)
 ap.add_argument("--reissue-after", type=float, default=None)
 ap.add_argument("--legacy-path", action="store_true")
+ap.add_argument("--coordinate", default=None)
 a = ap.parse_args()
 
 fields = json.load(open(a.worklist))
@@ -43,6 +47,11 @@ for i, f in enumerate(fields):
             sys.exit(f"work list entry {i}: bad {k}: {f.get(k)!r}")
     if f["range_end"] <= f["range_start"]:
         sys.exit(f"work list entry {i}: empty")
+    c = f.get("coordinate")
+    if not isinstance(c, str) or not c.startswith(COORD + ":"):
+        sys.exit(f"work list entry {i}: coordinate {c!r} is not a middle-out coordinate id (midout:K0,K1,Q0)")
+    if a.coordinate is not None and c != a.coordinate:
+        sys.exit(f"work list entry {i}: coordinate {c!r}, not {a.coordinate!r}")
 os.makedirs(a.state, exist_ok=True)
 claims_path = os.path.join(a.state, "claims.jsonl")
 subs_path = os.path.join(a.state, "submissions.jsonl")
@@ -106,7 +115,7 @@ class H(BaseHTTPRequestHandler):
                 o.write(json.dumps(c) + "\n")
         f = fields[i]
         self._send(200, {"claim_id": cid, "base": f["base"], "range_start": f["range_start"],
-                         "range_end": f["range_end"], "range_size": f["range_size"], "coordinate": COORD})
+                         "range_end": f["range_end"], "range_size": f["range_size"], "coordinate": f["coordinate"]})
 
     def do_GET(self):
         u = urlsplit(self.path)

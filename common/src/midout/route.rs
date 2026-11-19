@@ -9,7 +9,7 @@ use super::coord::Coord;
 use super::cpu::{FieldOutcome, Shape};
 use super::gpu::{Caps, FieldTiming, GpuJoin, GpuOptions, search_field};
 use super::gpu_wide::{WideCaps, WideJoin, WideOptions, search_field_wide};
-use anyhow::{Result, bail};
+use anyhow::{Result, bail, ensure};
 use cubecl::prelude::*;
 use serde_json::{Value, json};
 
@@ -66,7 +66,8 @@ impl<R: Runtime> FieldJoin<R> {
         matches!(self, Self::Narrow(_))
     }
 
-    /// Search the field `[v_start, v_start + v_size)` of this join's base:
+    /// Search the field `[v_start, v_start + v_size)` of `coord` (which must
+    /// be this join's base's coordinate):
     /// every account checked, the sampled CPU check if `cpu_check`.
     ///
     /// # Errors
@@ -74,11 +75,22 @@ impl<R: Runtime> FieldJoin<R> {
     /// sampled check that differs.
     pub fn search(
         &self,
+        coord: &Coord,
         v_start: u128,
         v_size: u128,
         cpu_check: bool,
     ) -> Result<(FieldOutcome, Value)> {
-        let coord = Coord::for_base(self.base())?;
+        // the device paths are built for the base's coordinate (`Coord::for_base`) only
+        ensure!(
+            coord.b == self.base() && *coord == Coord::for_base(self.base())?,
+            "middle-out: the base-{} join cannot search a field of coordinate (base {}, digits {}, {}, {})",
+            self.base(),
+            coord.b,
+            coord.k0,
+            coord.k1,
+            coord.q0
+        );
+        let coord = coord.clone();
         let shape = Shape::for_coord(&coord);
         let (o, counts, tm, path, w) = match self {
             Self::Narrow(gj) => {

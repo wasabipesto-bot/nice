@@ -5,7 +5,11 @@
 //!
 //! - **Claim**: `GET /claim/niceonly?coordinate=midout` ([`CLAIM_PATH`]).
 //!   The body is production's `DataToClient` plus one key,
-//!   `"coordinate": "midout"` ([`COORDINATE_KEY`], [`MIDOUT`]):
+//!   `"coordinate": "midout:K0,K1,Q0"` ([`COORDINATE_KEY`], [`coordinate_id`]):
+//!   the coordinate named explicitly by its digit positions (`midout::coord`:
+//!   digits `[K0, K1)` go on top of v, a field fixes digits `[Q0, K1)`;
+//!   base 64 today is `midout:4,9,6`). A client builds its `Coord` from it
+//!   and refuses an id it does not know.
 //!   `range_start`/`range_end` are `v_start`/`v_start + v_size` in the base's
 //!   coordinate (`midout::coord`), and `range_size` is the field's count of
 //!   `n` (`Coord::n_count`, what the server sums). `204 No Content`: no
@@ -22,8 +26,8 @@ use serde::{Deserialize, Serialize};
 
 /// The claim key that marks a field as a range of a coordinate, not of `n`.
 pub const COORDINATE_KEY: &str = "coordinate";
-/// The value of [`COORDINATE_KEY`] for the middle-out coordinate of the
-/// claim's base.
+/// The family of the middle-out coordinate ids (and the claim path's
+/// selector): an id is `midout:K0,K1,Q0` ([`coordinate_id`]).
 pub const MIDOUT: &str = "midout";
 /// The middle-out claim path (relative to the API address).
 pub const CLAIM_PATH: &str = "/claim/niceonly?coordinate=midout";
@@ -45,6 +49,34 @@ pub struct CoordClaim {
     /// The `n` the field holds.
     pub range_size: u128,
     pub coordinate: String,
+}
+
+/// The id of the middle-out coordinate with digit positions
+/// `(k0, k1, q0)`: `midout:k0,k1,q0`.
+#[must_use]
+pub fn coordinate_id(k0: u32, k1: u32, q0: u32) -> String {
+    format!("{MIDOUT}:{k0},{k1},{q0}")
+}
+
+/// The digit positions `(k0, k1, q0)` a middle-out coordinate id names.
+///
+/// # Errors
+/// Not an id of the form `midout:K0,K1,Q0`.
+pub fn parse_coordinate_id(id: &str) -> Result<(u32, u32, u32)> {
+    let parsed = id
+        .strip_prefix(MIDOUT)
+        .and_then(|r| r.strip_prefix(':'))
+        .and_then(|r| {
+            let v: Vec<u32> = r
+                .split(',')
+                .map(|x| x.parse().ok())
+                .collect::<Option<_>>()?;
+            (v.len() == 3).then(|| (v[0], v[1], v[2]))
+        });
+    match parsed {
+        Some(d) if coordinate_id(d.0, d.1, d.2) == id => Ok(d),
+        _ => bail!("middle-out: '{id}' is not a middle-out coordinate id (midout:K0,K1,Q0)"),
+    }
 }
 
 /// The coordinate a claim body names, if any (`None` when the key is
@@ -109,7 +141,9 @@ fn url_host(url: &str) -> Option<String> {
 /// No host, another scheme, or a production host.
 pub fn check_coordinator_url(url: &str) -> Result<()> {
     let Some(host) = url_host(url) else {
-        bail!("middle-out: the coordinator address '{url}' is not an http(s)://host[:port] address");
+        bail!(
+            "middle-out: the coordinator address '{url}' is not an http(s)://host[:port] address"
+        );
     };
     if host == PRODUCTION_DOMAIN || host.ends_with(&format!(".{PRODUCTION_DOMAIN}")) {
         bail!(
@@ -124,6 +158,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn coordinate_ids() {
+        assert_eq!(coordinate_id(4, 9, 6), "midout:4,9,6");
+        assert_eq!(parse_coordinate_id("midout:4,9,6").unwrap(), (4, 9, 6));
+        assert_eq!(parse_coordinate_id("midout:4,8,5").unwrap(), (4, 8, 5));
+        for bad in [
+            "midout",
+            "midout:",
+            "midout:4,9",
+            "midout:4,9,6,1",
+            "midout:4, 9,6",
+            "midout:04,9,6",
+            "mo:4,9,6",
+            "midout:a,b,c",
+            "",
+        ] {
+            assert!(parse_coordinate_id(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
     fn production_hosts_are_refused() {
         for u in [
             "https://api.nicenumbers.net",
@@ -136,7 +190,13 @@ mod tests {
         ] {
             assert!(check_coordinator_url(u).is_err(), "{u} must be refused");
         }
-        for u in ["", "api.nicenumbers.net", "ftp://127.0.0.1", "http://", "http:///x"] {
+        for u in [
+            "",
+            "api.nicenumbers.net",
+            "ftp://127.0.0.1",
+            "http://",
+            "http:///x",
+        ] {
             assert!(check_coordinator_url(u).is_err(), "{u:?} is not an address");
         }
         for u in [
@@ -159,6 +219,8 @@ mod tests {
         assert!(refuse_coordinate_space(null).is_ok());
         let marked = br#"{"claim_id":7,"base":64,"range_start":37778931862957161709568,"range_end":37779075978145237565440,"range_size":144115188075855872,"coordinate":"midout"}"#;
         assert_eq!(claim_coordinate(marked).unwrap().as_deref(), Some(MIDOUT));
+        let marked_id = br#"{"claim_id":7,"base":64,"range_start":1,"range_end":2,"range_size":1,"coordinate":"midout:4,9,6"}"#;
+        assert!(refuse_coordinate_space(marked_id).is_err());
         let e = refuse_coordinate_space(marked).unwrap_err().to_string();
         assert!(e.contains("coordinate"), "{e}");
         // any value of the key is refused, not only today's
@@ -167,6 +229,10 @@ mod tests {
         // not an object: left to the caller's own parse
         assert!(refuse_coordinate_space(b"\"no field\"").is_ok());
         let c: CoordClaim = serde_json::from_slice(marked).unwrap();
+        assert!(
+            parse_coordinate_id(&c.coordinate).is_err(),
+            "a bare family name is not an id"
+        );
         assert_eq!(c.range_end - c.range_start, 1u128 << 57);
     }
 }

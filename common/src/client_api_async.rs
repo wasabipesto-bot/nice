@@ -234,7 +234,8 @@ mod tests {
                 .expect_err("a coordinate field must be refused");
             assert!(e.to_string().contains("coordinate"), "{e}");
         }
-        let plain = r#"{"claim_id":8,"base":40,"range_start":100,"range_end":200,"range_size":100}"#;
+        let plain =
+            r#"{"claim_id":8,"base":40,"range_start":100,"range_end":200,"range_size":100}"#;
         let d = get_field_from_server_async(&client, &SearchMode::Niceonly, &serve_once(plain), 1)
             .await
             .unwrap();
