@@ -3727,6 +3727,8 @@ impl<R: Runtime> GpuJoin<R> {
     /// One slice's account `a` (`A_*`; `l5n`, its 64-slice level's) against what the host queued: `jobs`
     /// main-kernel instances, `ntops` tops (the device's own count or the
     /// host's), `lcnt` parents (the expansion's copy of the list length).
+    // (step 5L) reads nothing of the join now (the hist2 grid comes with the head)
+    #[allow(clippy::unused_self)]
     fn check_slice(
         &self,
         h: &SliceHead,
