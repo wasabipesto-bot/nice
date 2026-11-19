@@ -56,6 +56,17 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **The window is ready** (`G2/WINDOW-PLAN-2.md`): about 20 of 45 minutes, exactness at 64 lanes first, plus
   PR #270's two tests. It needs the user's word (decision 15, asked this morning).
 
+- **08:28 UTC: the client route is back (EXPERIMENTS MO.8)** and the trunk is fast-forwarded to it (cc0a9e04):
+  26 fields claimed, searched and submitted against a local coordinator with results equal to the library's,
+  every guard shown by a negative run, no measurable cost; 4S's changes exact on CUDA, ×3.94.
+- **08:40 UTC: step 5L started on the same box** (`G2/BUILD-BRIEF-5L.md`, hard stop 12:10, the box dies 12:45):
+  the review's coordinate (4, 8, 5) made exact and default, parent preparation shared across digit 8, then the
+  wide prefilter's arithmetic.
+- **What is left before the user's review, as I see it:** the window on the card; a plan to split about 6,500
+  new lines into reviewable pull requests (coordinate and CPU reference; narrow device path; accounts and
+  audit tests; wide path; client route and coordinator); an independent read for maintainability; the server's
+  side as a proposal only.
+
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $18.29 invoiced of $30 (fleet $32.03);

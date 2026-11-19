@@ -1,0 +1,14 @@
+CASE prod:  https://api.nicenumbers.net:rc=1 http://API.nicenumbers.net.:8471:rc=1 https://nicenumbers.net/:rc=1; reason: Error: middle-out: refusing the production API (api.nicenumbers.net): this route claims only from a local coordinator
+  legacy niceonly --gpu:rc=1
+  legacy niceonly --threads 4:rc=1
+  legacy detailed --threads 4:rc=1
+  legacy detailed --gpu:rc=1
+CASE legacy: client rc=0; coordinator {"fields": 3, "claimed": 1, "done": 0}; submissions 0, accepted 0; reason: Error: refusing a field of the 'midout:4,9,6' coordinate: this route searches ranges of n, and the field's range is a range of a coordinate (only the middle-out route may search it)
+CASE plain404: client rc=1; coordinator {"fields": 3, "claimed": 0, "done": 0}; submissions 0, accepted 0; reason: Error: Failed to deserialize server response
+CASE accounts: client rc=1; coordinator {"fields": 3, "claimed": 1, "done": 0}; submissions 0, accepted 0; reason: [2026-11-19T07:57:03Z ERROR nice_client::midout_route] middle-out: claim 1000 NOT submitted: middle-out: slice 4096000: main-kernel job instances done: 0, want 8064 (account [406140, 238468, 1, 238468, 238468, 238468, 36323, 1041927, 1, 1041927, 33703385, 16128, 0, 0, 0, 1, 0, 0, 0, 0])
+CASE sample: client rc=1; coordinator {"fields": 3, "claimed": 1, "done": 0}; submissions 0, accepted 0; reason: [2026-11-19T07:57:37Z ERROR nice_client::midout_route] middle-out: claim 1000 NOT submitted: middle-out: sampled CPU check of slice 4099399: the field run counted survivors 11843957 checked 340372, CPU survivors 11843957 checked 340671
+CASE panic: client rc=1; coordinator {"fields": 3, "claimed": 1, "done": 0}; submissions 0, accepted 0; reason: thread 'midout-test-fault' (30285) panicked at client/src/midout_route.rs:238:27:
+CASE hog: client rc=1; coordinator {"fields": 3, "claimed": 1, "done": 0}; submissions 0, accepted 0; reason: thread 'DSD-0-0' (30332) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cubecl-cuda-0.10.0/src/compute/server.rs:124:46:
+CASE misaligned: client rc=1; coordinator {"fields": 1, "claimed": 1, "done": 0}; submissions 0, accepted 0; reason: Error: middle-out field [37923047051033017581569, +144115188075855872) at base 64 is not whole quanta of 144115188075855872
+CASE badsize: client rc=1; coordinator {"fields": 1, "claimed": 1, "done": 0}; submissions 0, accepted 0; reason: Error: middle-out: claim 1000: range_size 144115188075855871 but the field holds 144115188075855872 n
+CASE unknowncoord: client rc=1; coordinator {"fields": 1, "claimed": 1, "done": 0}; submissions 0, accepted 0; reason: Error: middle-out: claim 1000: coordinate 'midout:4,8,5' of base 64 is not one this client knows (it searches 'midout:4,9,6')

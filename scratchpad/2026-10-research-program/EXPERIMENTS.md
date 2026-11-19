@@ -35,6 +35,37 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.8 A client route against a local coordinator: 26 fields end to end, every guard tested; the trunk exact on CUDA at ×3.94 (step 4F; 2026-11-19 05:50–08:28 UTC, engineer; `G2/BUILD-BRIEF-4F.md`, `G2/BUILD-NOTES-CLIENT.md`, `G2/build4f/`; branch `dev/mo-client` cc0a9e04 (six commits on 4abfab5c and a merge of the trunk's 9b790647), fast-forwarded into the trunk by me at 08:30 and pushed; box 61386517, RTX 3080 at 240 W)
+
+- **What runs** [M]: a local coordinator (`scripts/midout_coordinator.py`, standard library, 127.0.0.1, state in
+  files, resumable) served 24 base-64 fields spread over the base and two base-65 fields; one client process
+  (`nice_client niceonly --midout-coordinator URL --repeat`) claimed, searched and submitted all 26. All recorded
+  results equal the library's own for the same fields (survivors, checked, slices, nice numbers); all 24 sampled
+  base-64 slices equal the CPU reference. Three rounds (two wire forms, then after the merge), all equal.
+- **Wire:** production's claim and submit format plus one addition: the claim names its coordinate,
+  `"coordinate": "midout:K0,K1,Q0"` (`midout:4,9,6` at base 64 today); the client builds its coordinate from it
+  and refuses one its device path was not built for (`midout:4,8,5` is refused today, by test).
+- **Guards, each with a test and a negative run that exits non-zero with nothing submitted** [M]: the production
+  API refused by name (three spellings); every ordinary route (nice-only GPU and CPU, detailed CPU and GPU)
+  refuses a field marked as coordinate-space; misaligned field, wrong size, unknown coordinate refused; failed
+  accounts (main kernel dropped); failed sampled CPU check (prefilter fault); a runtime-thread panic (hook);
+  a memory hog holding 7.5 GB; the coordinator never hands a field out twice (also across a restart), rejects a
+  submission whose route is not `midout` and a second submission for a field.
+- **The route's cost** [M, same session]: 1.6935 fs per admissible n through the client against the library's
+  1.6914 (×1.001; the other round ×0.9999); + 2 s once when the route switches from base 64 to base 65.
+- **Default client unchanged** [M]: common suite 217 passed, client suite 24 / 26; fmt and clippy clean on three
+  feature sets; on the stub the trunk's client and this branch's give equal submissions on five routes. The route
+  touches production files additively: `client/src/main.rs` (+24), `common/src/client_api_async.rs` (+52/−2: the
+  refusal at the ordinary claim).
+- **The trunk's 4S changes on CUDA** [M]: exact (slice parity on 5 slices, `accounts_faults_are_loud` with
+  yesterday's account values to the unit, wide parity at bases 30–65, the wide fault test, probe, stop-variable
+  and in-process OOM tests). Ten-field base-64 timing: 1.672 fs without the sampled check (yesterday 1.691),
+  1.681 with it: **×3.94 against main's 6.615**; every field's counts identical to yesterday's.
+- **Not done:** several clients on one coordinator; a coordinator on another machine; long runs; the route on
+  Vulkan; bases 68–70; the sampled check at base 65 (off: its CPU slice is too slow); no overlap between fields
+  (the client claims the next field only after submitting the last); the panic hook is installed after the
+  device context is created.
+
 ## MO.7 The library path prepared offline for the RX 9070 XT: clean at 64 lanes as far as can be told; predicted ×4.69 (step 4S; 2026-11-19 05:50–07:55 UTC, engineer, ivory only; `G2/BUILD-BRIEF-4S.md`, `G2/BUILD-NOTES.md` §12, `G2/WINDOW-PLAN-2.md`, `G2/build4s/` (SPIR-V and ACO listings, `preflight_*.md`, `model_4s.py`, exactness logs, the window driver and its dry run, a bundle); trunk 4abfab5c → 9b790647, seven commits, on the fork)
 
 - **Pre-flight at 64 lanes** [M, static]: every library kernel compiled for plane width 64 without a device
