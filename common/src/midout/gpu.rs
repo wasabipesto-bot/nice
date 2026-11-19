@@ -420,6 +420,18 @@ mod kernels {
         let mut going = nprobe > 0u32 || poff == 0u32;
         // the job's child list (midout) and the position of the round's first pending child in it
         let lb = 64u32 * (pb - pseg[c0 as usize]) + d * (pe - pb);
+        // (midout) here, not at the end, so that none of these values stays live through the rounds (registers):
+        // the probes this instance runs (the host's law: 8 x tops over all instances), the pending parent index
+        // (`pq`, `idx - pb`) within 16 bits, the job's child list [lb, lb + (pe - pb)) inside the batch's
+        if t == 0u32 {
+            acc[A_PROBES].fetch_add(nprobe);
+            if pe - pb > 65536u32 {
+                cnt[C_ERR_IDX].fetch_add(1u32);
+            }
+            if lb + (pe - pb) > lcap {
+                cnt[C_ERR_CLST].fetch_add(1u32);
+            }
+        }
         let mut cdone = 0u32;
         // a pending slot with odd index is ORed into its word after the next barrier (its even neighbour is written
         // by another lane, in this step or an earlier one); no atomics, no extra barrier per step
@@ -468,12 +480,8 @@ mod kernels {
                 if m != 0u64 {
                     let sl16 = npend + off + r;
                     if comptime!(mode == 2 && !noout) {
-                        let pos = lb + cdone + sl16;
-                        if pos < lcap {
-                            clst[pos as usize] = r4v;
-                        } else {
-                            cnt[C_ERR_CLST].fetch_add(1u32);
-                        }
+                        // bounded (the job's whole range is checked once, `C_ERR_CLST`)
+                        clst[min(lb + cdone + sl16, lcap - 1u32) as usize] = r4v;
                     }
                     if (sl16 & 1u32) == 0u32 {
                         pq[(sl16 >> 1u32) as usize] = idx - pb;
@@ -930,13 +938,8 @@ mod kernels {
         if t == 0u32 {
             cnt[(d * 5u32 + 2u32) as usize].fetch_add(my_flat);
             cnt[C_LSLOTS].fetch_add(my_lslots);
-            // (midout) positive evidence: this instance reached its end, and the probes it ran
+            // (midout) positive evidence: this instance reached its end
             acc[A_JOBS].fetch_add(1u32);
-            acc[A_PROBES].fetch_add(nprobe);
-            // the pending parent index (`pq`, `idx - pb`) is 16 bits
-            if pe - pb > 65536u32 {
-                cnt[C_ERR_IDX].fetch_add(1u32);
-            }
         }
     }
 }
@@ -2448,6 +2451,9 @@ pub struct GpuJoin<R: Runtime> {
     /// current 64 slices, and (digits 5-8, their count) once queued.
     l5: Handle,
     l5cur: Mutex<Option<(u32, Handle)>>,
+    /// The sampled CPU check's slice in a field run, and its (survivors,
+    /// checked) as that run counted them (`finish_group`).
+    watch: Mutex<(Option<u64>, Option<(u64, u64)>)>,
     /// Timing and bisection only ([`GpuJoin::set_timing_stop`], the bench's
     /// `MIDOUT_STOP`): queue the stages up to this one (1 tops, 2 parents, 3
     /// main kernel, 5 expansion, 6 all; 11–15: the first 1–5 device-top
@@ -2609,6 +2615,7 @@ impl<R: Runtime> GpuJoin<R> {
             tv: e(4 << 21),
             l5: e(4 << 21),
             l5cur: Mutex::new(None),
+            watch: Mutex::new((None, None)),
             stop: 6,
             fault: 0,
             client,
@@ -3161,7 +3168,31 @@ impl<R: Runtime> GpuJoin<R> {
         if self.stop != 6 {
             return Ok(DevCounts::default());
         }
-        let v = self.rd(cnt)?;
+        // every small buffer of the group in one read (in this order: cnt; per ticket scount, ran, stat, its
+        // tstat, its slice's acc and l5n)
+        let mut hs = vec![cnt.clone()];
+        for t in tickets {
+            hs.extend([t.scount.clone(), t.ran.clone(), t.stat.clone()]);
+            if let Some(ts) = &t.tstat {
+                hs.push(ts.clone());
+            }
+            if let Some(h) = &t.head {
+                hs.push(h.acc.clone());
+                if let Some(l) = &h.l5n {
+                    hs.push(l.clone());
+                }
+            }
+        }
+        let nh = hs.len();
+        let mut rv = cubecl::future::block_on(self.client.read_async(hs))
+            .map_err(|e| anyhow!("read: {e:?}"))?
+            .into_iter()
+            .map(|b| u32::from_bytes(&b).to_vec());
+        let mut next = || {
+            rv.next()
+                .ok_or_else(|| anyhow!("middle-out: {nh} buffers read, fewer returned"))
+        };
+        let v = next()?;
         ensure!(
             v[C_ERR_PLANE] == 0
                 && v[C_ERR_PMAX] == 0
@@ -3187,14 +3218,16 @@ impl<R: Runtime> GpuJoin<R> {
         }
         let mut listed = 0u64;
         let mut stats = Vec::with_capacity(tickets.len());
+        let mut accs = Vec::new();
         for t in tickets {
-            let n = self.rd(&t.scount)?[0];
+            let n = next()?[0];
             ensure!(
                 n <= self.s_cap(),
                 "middle-out: survivor list overflow {n} > {}",
                 self.s_cap()
             );
-            let ran = self.rd(&t.ran)?;
+            let ran = next()?;
+            let st = next()?;
             let want_sum = (u64::from(n) * u64::from(n.saturating_sub(1)) / 2 % (1 << 32)) as u32;
             ensure!(
                 ran[5] == n && ran[6] == want_sum,
@@ -3203,8 +3236,8 @@ impl<R: Runtime> GpuJoin<R> {
                 ran[6]
             );
             let mut ntops = None;
-            if let Some(ts) = &t.tstat {
-                let v = self.rd(ts)?;
+            if t.tstat.is_some() {
+                let v = next()?;
                 ensure!(
                     v[0] <= self.caps.tops,
                     "middle-out: {} tops > cap {}",
@@ -3220,7 +3253,11 @@ impl<R: Runtime> GpuJoin<R> {
                 dc.tested += u64::from(v[2]);
                 ntops = Some(v[0]);
             }
-            let st = self.rd(&t.stat)?;
+            if let Some(h) = &t.head {
+                let a = next()?;
+                let l = if h.l5n.is_some() { Some(next()?) } else { None };
+                accs.push((a, l));
+            }
             ensure!(
                 st[0] <= self.caps.parents,
                 "middle-out: {} parents > cap {}",
@@ -3245,7 +3282,7 @@ impl<R: Runtime> GpuJoin<R> {
             dc.slabs_max = dc.slabs_max.max(u64::from(st[1]));
             dc.list_max = dc.list_max.max(u64::from(n));
             dc.checked += u64::from(ran[5]);
-            stats.push((st, ntops));
+            stats.push((st, ntops, ran[5]));
         }
         ensure!(
             listed == dc.survivors,
@@ -3254,6 +3291,7 @@ impl<R: Runtime> GpuJoin<R> {
         );
         // per slice: its tickets are consecutive, the first carries its head
         let mut heads = 0u64;
+        let mut accs = accs.into_iter();
         let mut i = 0;
         while i < tickets.len() {
             let head = tickets[i]
@@ -3268,7 +3306,19 @@ impl<R: Runtime> GpuJoin<R> {
             let ((Some(ntops), _) | (None, Some(ntops))) = (stats[i].1, head.host_tops) else {
                 bail!("middle-out: slice {} without a top count", head.pip)
             };
-            self.check_slice(head, jobs, ntops, stats[i].0[0])?;
+            let (a, l) = accs
+                .next()
+                .ok_or_else(|| anyhow!("middle-out: a slice without its account"))?;
+            self.check_slice(head, &a, l.as_deref(), jobs, ntops, stats[i].0[0])?;
+            {
+                let mut w = self.watch.lock().expect("watch");
+                if w.0 == Some(head.pip) {
+                    // the slice's own counts in this run: bits the expansion read, entries the check took
+                    let surv = stats[i..j].iter().map(|x| u64::from(x.0[2])).sum();
+                    let chk = stats[i..j].iter().map(|x| u64::from(x.2)).sum();
+                    w.1 = Some((surv, chk));
+                }
+            }
             heads += 1;
             i = j;
         }
@@ -3282,11 +3332,18 @@ impl<R: Runtime> GpuJoin<R> {
         Ok(dc)
     }
 
-    /// One slice's account (`A_*`) against what the host queued: `jobs`
+    /// One slice's account `a` (`A_*`; `l5n`, its 64-slice level's) against what the host queued: `jobs`
     /// main-kernel instances, `ntops` tops (the device's own count or the
     /// host's), `lcnt` parents (the expansion's copy of the list length).
-    fn check_slice(&self, h: &SliceHead, jobs: u64, ntops: u32, lcnt: u32) -> Result<()> {
-        let a = self.rd(&h.acc)?;
+    fn check_slice(
+        &self,
+        h: &SliceHead,
+        a: &[u32],
+        l5n: Option<&[u32]>,
+        jobs: u64,
+        ntops: u32,
+        lcnt: u32,
+    ) -> Result<()> {
         let pip = h.pip;
         let fail = |what: &str, got: u64, want: u64| -> Result<()> {
             ensure!(
@@ -3297,8 +3354,7 @@ impl<R: Runtime> GpuJoin<R> {
         };
         fail("plane errors", u64::from(a[A_ERR_PLANE]), 0)?;
         fail("slice done", u64::from(a[A_DONE]), 1)?;
-        if let Some(l5n) = &h.l5n {
-            let l = self.rd(l5n)?;
+        if let Some(l) = l5n {
             fail(
                 "tops5 cubes done",
                 u64::from(l[1]),
@@ -3424,9 +3480,10 @@ pub struct GpuOptions {
     /// Tops on the device (the default: the box's 5-core quota cannot keep up).
     pub device_tops: bool,
     /// The sampled CPU check: one random slice of the field recomputed by
-    /// the CPU reference on a host thread while the card works, and run
-    /// again alone on the device at the end; survivors, checked and the
-    /// prefiltered list must be equal. The only check that sees a kernel
+    /// the CPU reference on a host thread while the card works; the field
+    /// run's own survivors and checked for that slice must equal the CPU's,
+    /// and the slice run again alone on the device at the end must give the
+    /// same prefiltered list, n for n. The only check that sees a kernel
     /// computing wrongly (the accounts see only work that did not run).
     pub cpu_check: bool,
 }
@@ -3457,6 +3514,17 @@ pub(crate) fn sample_compare<R: Runtime>(
     rank: &[u32; 8],
     cpu: &(u64, u64, Vec<u128>),
 ) -> Result<()> {
+    // the slice's counts as the field run made them (if it was watched), then the slice again alone
+    let in_field = std::mem::take(&mut *gj.watch.lock().expect("watch")).1;
+    if let Some((s, c)) = in_field {
+        ensure!(
+            s == cpu.0 && c == cpu.1,
+            "middle-out: sampled CPU check of slice {pip}: the field run counted survivors {s} checked {c}, \
+             CPU survivors {} checked {}",
+            cpu.0,
+            cpu.1
+        );
+    }
     let (dc, mut got, _) = gj.run_slice_dev(pip, rank, usize::MAX)?;
     got.sort_unstable();
     ensure!(
@@ -3542,6 +3610,7 @@ fn field_run<R: Runtime>(
         let mut hs = std::collections::hash_map::RandomState::new().build_hasher();
         hs.write_u128(v_start);
         let pip = pips[(hs.finish() % pips.len() as u64) as usize];
+        *gj.watch.lock().expect("watch") = (Some(pip), None);
         let c = coord.clone();
         Some((
             pip,
@@ -3660,6 +3729,10 @@ fn field_run<R: Runtime>(
             .map_err(|_| anyhow!("middle-out: the sampled CPU check panicked"))?;
         cpu_wait = tw.elapsed().as_secs_f64();
         cpu_s = s;
+        ensure!(
+            gj.watch.lock().expect("watch").1.is_some(),
+            "middle-out: the sampled slice {pip} was not seen in the field run"
+        );
         let td = Instant::now();
         sample_compare(gj, pip, &rank, &r)?;
         sample_s = td.elapsed().as_secs_f64();
