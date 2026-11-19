@@ -1,7 +1,10 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-19 17:45 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-19 18:00 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
-decision says what I will do if you do not answer. To answer, reply in the chat with the numbers, for
+decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
+separate document:** `../2026-11-midout-design/DESIGN.md` (with a one-screen picture,
+`../2026-11-midout-design/static/midout-overview.png`, and a clickable process map,
+`../2026-11-midout-design/interactive/midout-map.html`). To answer, reply in the chat with the numbers, for
 example: `D2 a, D3 yes, D5 yes hidden, D15 45`.
 
 Paths below are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
@@ -15,16 +18,16 @@ once for a far larger span and paired with a bit-sliced kernel.
 
 | | state on 2026-11-19 |
 |---|---|
-| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); about 13,000 inserted lines, no PR yet; the first two PRs (no GPU code) are being cut |
+| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); 13,525 inserted lines in 21 files, no PR (held at your word, see D9); the first two PRs (no GPU code) are cut, reviewed and waiting on the fork |
 | speed, base 64, RTX 3080, end to end against v3.4.8's join, same session | **×4.09** (1.62 fs against 6.62 fs per candidate) |
-| speed, base 64, RX 9070 XT (demoux), end to end against v3.4.8's join, same session | **×4.79** (0.99 fs against 4.76 fs per candidate), measured 2026-11-19 at 64 lanes; exact on every slice and field tried; the client route also ran there against a local coordinator (12 fields). At that speed base 64 on that card alone is about 55 days instead of about 266 |
+| speed, base 64, RX 9070 XT (demoux), end to end against v3.4.8's join, same session | **×4.79** (0.99 fs against 4.76 fs per candidate), measured 2026-11-19 at 64 lanes on the branch just before its cleanup (the cleaned branch has not run on that card; on the 3080 the cleanup changed the time by +0.17 %); exact on every slice and field tried; the client route also ran there against a local coordinator (12 fields). The 4.76 fs baseline there is production's join throughput harness (ten fields on 2026-11-18, scaled ×1.012 by two fields re-measured in the same session), not the client's own ten-field run that the 3080 baseline uses. At that speed base 64 on that card alone is about 55 days instead of about 266 |
 | base 65 (needs masks wider than 64 bits; production has no join there at all) | exact on a GPU; 3.47 fs per candidate, about half an RTX-3080-year for the whole base |
-| exactness | CPU reference equals brute force on whole bases 10–25; GPU equals the CPU reference on 1,073 real base-64 slices; an independent audit found no loss path on a healthy card |
+| exactness | CPU reference equals brute force on whole bases 10–25; GPU equals the CPU reference on 1,073 real base-64 slices (measured on 2026-11-18, before the execution checks and the digits-5–7 field were added; since then: 100 of them again, the first and last slice of the range, and every slice of one field under both field definitions); an independent audit found no loss path on a healthy card |
 | failure handling | every stage proves it ran (what ran = what was queued), two conservation checks, and one random slice per field recomputed on the CPU; a dropped kernel, a failed allocation or a wrong prefilter stops the field instead of reporting it empty |
 | how it runs today | a local coordinator script plus an off-by-default client flag; **no server, schema or API change exists or is proposed yet** |
 | what a field is | all n sharing digits 5–7 (base 64: 262,144 fields of 2^57 n; in the fields table it would still be a range, of a renumbered coordinate) |
 
-What it is not yet: reviewed by you, cleaned for review (in progress today), or connected to the real server.
+What it is not yet: reviewed by you, run on Apple hardware, or connected to the real server.
 
 Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumption that was four times too low.
 ×4.09 is the honest end-to-end number on NVIDIA.
@@ -93,8 +96,9 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 - **Proposal:** three tiers: fast CPU tests (always); small device tests that the lavapipe jobs run with both
   compilers; card-only and long tests behind a cargo feature that no default build enables.
 - **Also decide:** should the new device tests run on the macOS (Metal) job? The join has never run on Metal.
-- **Recommendation:** the three tiers; not on the Metal job for now, and the client flag refuses to run on
-  Metal until someone has checked it on Apple hardware.
+- **Recommendation:** the three tiers; not on the Metal job for now, and the client flag should refuse to run
+  on Metal until someone has checked it on Apple hardware. (That refusal is **not built**: today the flag
+  accepts any wgpu device. I will add it on the branch.)
 - **If you do not answer:** as recommended.
 
 ### D7. A benchmark example in the repository?
@@ -117,8 +121,12 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
   mutation testing, and fixed: `pr/midout-field-coordinate` (the field coordinate, about 570 lines) and
   `pr/midout-cpu-ref` (the exact CPU reference, about 1,300 lines), both on the fork, one commit each. Their
   drafted descriptions: `G2/PR1-BODY.md`, `G2/PR2-BODY.md` (to be shortened before opening).
-- **To read the design:** `../2026-11-midout-design/DESIGN.md` and the process map beside it (being written
-  on the evening of 2026-11-19; this line is updated when they exist).
+- **To read the design** (written 2026-11-19, all under `../2026-11-midout-design/`): `DESIGN.md` (the idea,
+  the pipeline stage by stage with measured costs, what a field commits the project to, how the code knows the
+  work ran, each internal design decision with its alternatives and numbers, what is measured, what is not done,
+  a file map and the command lines); `static/midout-overview.png` (one screen); `interactive/midout-map.html`
+  (open in a browser: click any stage for why it exists, what it costs on both cards, which check guards it and
+  its file:line on `dev/mo-clean`; a column beside it shows today's overlap join stage for stage).
 
 ## B. Production soundness
 

@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Middle-out join map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  color-scheme: light;
+  --surface-0:#f4f3f0; --surface-1:#fcfcfb; --surface-2:#ffffff;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#7a7974;
+  --grid:#d9d7d1; --edge:#8a8983;
+  --host:#2a78d6;  --host-bg:#e6f0fc;
+  --cpu:#1baf7a;   --cpu-bg:#e3f6ee;
+  --dev:#4a3aa7;   --dev-bg:#ebe8f8;
+  --coord:#c2457a; --coord-bg:#fcebf2;
+  --old:#7a7974;   --old-bg:#efeeea;
+  --reuse:#c98500;
+  --acc:#eb6834;
+  --wide:#0f8a8a;
+  --series:#2a78d6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --surface-0:#121211; --surface-1:#1a1a19; --surface-2:#232321;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#8f8e86;
+    --grid:#3a3a37; --edge:#8f8e86;
+    --host:#3987e5; --host-bg:#16263a;
+    --cpu:#199e70;  --cpu-bg:#11291f;
+    --dev:#9085e9;  --dev-bg:#221f3a;
+    --coord:#d55181; --coord-bg:#35182a;
+    --old:#9a9991;  --old-bg:#262624;
+    --reuse:#eda100;
+    --acc:#f07a45;
+    --wide:#2bb3b3;
+    --series:#3987e5;
+  }
+}
+:root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface-0:#121211; --surface-1:#1a1a19; --surface-2:#232321;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#8f8e86;
+    --grid:#3a3a37; --edge:#8f8e86;
+    --host:#3987e5; --host-bg:#16263a;
+    --cpu:#199e70;  --cpu-bg:#11291f;
+    --dev:#9085e9;  --dev-bg:#221f3a;
+    --coord:#d55181; --coord-bg:#35182a;
+    --old:#9a9991;  --old-bg:#262624;
+    --reuse:#eda100;
+    --acc:#f07a45;
+    --wide:#2bb3b3;
+    --series:#3987e5;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--surface-0);color:var(--text-primary);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:18px 24px 6px;max-width:1500px}
+h1{font-size:20px;margin:0 0 4px}
+h2{font-size:17px;margin:26px 0 8px}
+p{margin:6px 0}
+.sub{color:var(--text-secondary);max-width:1200px}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+.toolbar{display:flex;gap:12px 16px;flex-wrap:wrap;align-items:center;padding:8px 24px;position:sticky;top:0;background:var(--surface-0);z-index:5;border-bottom:1px solid var(--grid)}
+.toolbar label{display:flex;gap:6px;align-items:center;cursor:pointer;color:var(--text-secondary)}
+.toolbar label{max-width:100%;flex-wrap:wrap}
+.toolbar select{max-width:100%;min-width:0;width:auto}
+@media (max-width:600px){.toolbar select{width:100%}}
+.sub code{word-break:break-all}
+.toolbar select,.toolbar button{font:inherit;padding:3px 8px;border-radius:6px;border:1px solid var(--grid);background:var(--surface-2);color:var(--text-primary);cursor:pointer}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;padding:10px 24px;color:var(--text-secondary);font-size:12.5px;align-items:center}
+.legend svg{vertical-align:middle}
+.digits{margin:8px 24px 2px;overflow-x:auto}
+.wrap{display:flex;align-items:flex-start}
+.canvas{flex:1;overflow:auto;padding:4px 12px 12px;min-width:0}
+#diagram{display:block}
+#panel{position:sticky;top:46px;width:420px;max-height:calc(100vh - 56px);overflow:auto;background:var(--surface-2);border-left:1px solid var(--grid);padding:16px 18px;font-size:13.5px;flex:none}
+#panel h3{margin:14px 0 4px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
+#panel .title{font-size:16px;font-weight:650;margin-bottom:2px}
+#panel ul{margin:4px 0;padding-left:18px}
+#panel .refs code{display:block;padding:2px 0;word-break:break-all}
+#panel table{font-size:12.5px}
+.pill{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:9px;margin:0 4px 3px 0;border:1px solid currentColor}
+.chkbox{border-left:3px solid var(--acc);padding:6px 10px;margin-top:6px;border-radius:4px;background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.widebox{border-left:3px solid var(--wide);padding:6px 10px;margin-top:6px;border-radius:4px;background:color-mix(in srgb,var(--wide) 9%,transparent)}
+.oldbox{border-left:3px solid var(--old);padding:6px 10px;margin-top:6px;border-radius:4px;background:color-mix(in srgb,var(--old) 10%,transparent)}
+section.below{padding:4px 24px 40px;max-width:1500px}
+table{border-collapse:collapse;font-size:13px;margin:6px 0}
+th,td{border-bottom:1px solid var(--grid);padding:5px 10px;text-align:left;vertical-align:top}
+th{color:var(--text-secondary);font-weight:600}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.node{cursor:pointer}
+.node:focus{outline:none}
+.node:focus-visible .box{stroke-width:3.2}
+.node .box{stroke-width:1.6}
+.node:hover .box,.node.sel .box{stroke-width:3}
+.node text{pointer-events:none}
+.t-title{font-weight:650;font-size:12.5px;fill:var(--text-primary)}
+.t-sub{font-size:11px;fill:var(--text-secondary)}
+.t-badge{font-size:9px;font-weight:700;letter-spacing:.04em}
+.t-share{font-size:10px;font-weight:650;fill:var(--text-secondary);font-variant-numeric:tabular-nums}
+.frame-title{font-size:11.5px;font-weight:700;letter-spacing:.05em;fill:var(--text-secondary);text-transform:uppercase}
+.edge{fill:none;stroke:var(--edge);stroke-width:1.5}
+.edge.dotted{stroke-dasharray:2 4}
+.edge.loop{stroke-dasharray:7 5}
+.edge.err{stroke:var(--acc);stroke-dasharray:4 3}
+.edge.corr{stroke:var(--old);stroke-dasharray:1 5;stroke-width:1.6}
+.edge.acc{stroke:var(--acc);stroke-dasharray:3 3;stroke-width:1.4;display:none}
+.showacc .edge.acc{display:inline}
+.edge.hl{stroke-width:3;stroke:var(--text-primary)}
+.elabel{font-size:10.5px;fill:var(--text-secondary);paint-order:stroke;stroke:var(--surface-0);stroke-width:4px;stroke-linejoin:round}
+.dim{opacity:.16;transition:opacity .15s}
+.nobars .bar{display:none}
+.nocorr .edge.corr{display:none}
+#tip{position:fixed;pointer-events:none;background:var(--surface-2);border:1px solid var(--grid);padding:4px 8px;border-radius:6px;font-size:12px;display:none;z-index:9}
+@media (max-width:900px){.wrap{display:block}#panel{position:static;width:auto;max-height:none;border-left:0;border-top:1px solid var(--grid)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>The middle-out join: one field from claim to submit, beside today's overlap join</h1>
+  <p class="sub">Branch <code>dev/mo-clean</code> at <code>5a048669</code> (fork, worktree <code>~/projects/nice/.worktrees/midout-clean</code>). The left two lanes are the middle-out join's path for one base-64 field (4,096 slices): the host side and the coordinator on the left, the device kernels of one slice in the middle. The right lane is v3.4.8's GPU overlap join (<code>origin/main</code> at <code>974d7194</code>), placed beside the middle-out stage it corresponds to; dotted grey links mark the correspondence. Click any shape for why it exists, how it connects, what it costs, which check guards it and its file:line. Bars show each stage's share of a slice's time: RX 9070 XT for the middle-out lane (the RTX 3080's numbers are in the panel), a derived 3080 profile for the overlap lane (hatched). Prose version: <code>DESIGN.md</code> beside this folder.</p>
+</header>
+
+<div class="toolbar">
+  <label>Spotlight
+    <select id="optSpot">
+      <option value="">nothing</option>
+      <option value="P">once per process</option>
+      <option value="F">once per field</option>
+      <option value="6">once per 64 slices</option>
+      <option value="S">once per slice</option>
+      <option value="B">per launch batch</option>
+      <option value="G">per group of 16 slices</option>
+      <option value="acc">where each execution check is made and compared</option>
+      <option value="wide">base-64 path against the wide path (bases 65–70)</option>
+      <option value="fld">what a field fixes, and what depends on it</option>
+      <option value="re">reused from production unchanged</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="optBars" checked> time-share bars</label>
+  <label><input type="checkbox" id="optCorr" checked> links to the overlap join</label>
+  <button id="btnTheme" type="button">dark / light</button>
+  <span style="color:var(--text-muted);font-size:12.5px">Hover a shape to trace its edges; click to pin its details.</span>
+</div>
+
+<div class="legend" id="legend"></div>
+<div class="digits"><svg id="digits" width="1100" height="96" role="img" aria-label="the digits of n at base 64 and what each part of the join covers"></svg></div>
+
+<div class="wrap">
+  <div class="canvas"><svg id="diagram" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="process map of the middle-out join"></svg></div>
+  <aside id="panel"><div id="ph">
+    <div class="title">How to read this</div>
+    <p><b>Colour</b> is where a piece runs: <span style="color:var(--host)">host (the client's driver thread)</span>, <span style="color:var(--dev)">device kernels</span>, <span style="color:var(--cpu)">the CPU reference on a host thread</span>, <span style="color:var(--coord)">the coordinator script and the wire</span>, and <span style="color:var(--old)">today's overlap join</span>. A <span style="color:var(--reuse)">gold REUSED badge</span> marks production code used unchanged; everything else in the two left lanes is new.</p>
+    <p><b>Shape</b> is role: rounded box = step; hexagon = decision; double rounded box with ⟳ = loop; box with a top bar and cut corners = device kernel; curved box = data built once and kept.</p>
+    <p><b>Badges</b> give how often a piece runs: <b>PROC</b> once per process, <b>FIELD</b> once per field, <b>/64</b> once per 64 slices, <b>SLICE</b>, <b>BATCH</b>, <b>GROUP</b> (16 slices). <b>ACC</b> marks a piece that writes an execution account, <b>CHECKS</b> one that compares them.</p>
+    <p><b>Bars</b> are the share of a slice's time (stage totals, drawn on the stage's main shape). The RX 9070 XT profile was measured by cumulative timing stops on field 77777; its tops and parents ran off the operating point (the card idles on those stages alone), so those two are too high and the main kernel's share too low. Overlap-lane shares are derived, not measured per stage.</p>
+    <p>Line numbers are into <code>dev/mo-clean</code> at <code>5a048669</code> for the middle-out lanes, and <code>origin/main</code> at <code>974d7194</code> for the overlap lane; each was checked by printing the line.</p>
+  </div></aside>
+</div>
+
+<section class="below">
+  <h2>Per slice, ms (base 64, field 77777)</h2>
+  <table id="stageTable"></table>
+  <p class="sub">RX 9070 XT: 2026-11-19, trunk <code>66259bb0</code> (before the cleanup), RADV 64 lanes, raw <code>G2/build4s/window_1119/s_*.log</code>. RTX 3080 at 240 W: 2026-11-19, parents shared, raw <code>G2/build5l/raw/m2/</code>; the cleaned head has the same per-stage times. Overlap join: shares of v3.4.8-era main's 4.5 fs per admissible n at base 64 (RTX 3080 basis), derived from measured field times and counts in <code>G2/RESULTS.md</code> §2, not a per-stage measurement. All paths under <code>~/projects/nice/scratchpad/2026-10-research-program/</code>.</p>
+  <h2>End to end, against v3.4.8's join (same session)</h2>
+  <table>
+    <tr><th>card, base</th><th>middle-out, fs per admissible n</th><th>v3.4.8</th><th>ratio</th><th>conditions</th></tr>
+    <tr><td>RX 9070 XT, 64</td><td class="n">0.99</td><td class="n">4.76</td><td class="n">×4.79</td><td>2026-11-19, trunk <code>66259bb0</code>, 64 lanes, exact; the cleaned head has not run on this card</td></tr>
+    <tr><td>RTX 3080 (240 W), 64</td><td class="n">1.62</td><td class="n">6.62</td><td class="n">×4.09</td><td>2026-11-19, ten fields, sampled check on; cleaned head 1.627 against trunk 1.624</td></tr>
+    <tr><td>RTX 3080 (240 W), 65</td><td class="n">3.47</td><td>no join in production</td><td></td><td>sampled check off (does not fit at 65)</td></tr>
+    <tr><td>RX 9070 XT, 65</td><td class="n">3.1</td><td>no join in production</td><td></td><td>wide path untuned on this card</td></tr>
+  </table>
+</section>
+<div id="tip"></div>
+
+<script>
+// ---------------------------------------------------------------- data
+// refs: [path, line, identifier on that line, repo] ; repo 'mo' = dev/mo-clean 5a048669, 'main' = origin/main 974d7194
+const G='common/src/midout/gpu.rs', GW='common/src/midout/gpu_wide.rs', C='common/src/midout/cpu.rs', CO='common/src/midout/coord.rs',
+      RT='common/src/midout/route.rs', WI='common/src/midout/wire.rs', CR='client/src/midout_route.rs', CJ='common/src/cubecl_join.rs',
+      OJ='common/src/overlap_join.rs', JP='common/src/join_plan.rs', SC='scripts/midout_coordinator.py';
+const X1=230, X2=650, X3=1100, NW=330;
+const N=[
+// ---- lane 1: coordinator, route, field setup
+{id:'coord',x:X1,y:60,h:64,L:'coord',S:'proc',fq:'E',fld:1,t:'local coordinator (script)',s:['GET /claim/niceonly?coordinate=midout','POST /submit · 127.0.0.1 only'],
+ why:`With no server change, this is the only way to hand out fields of the new coordinate. Standard library Python; state in files; a field is never handed out twice (also across a restart) unless <code>--reissue-after</code> is given; a submission is accepted once per field and only with route <code>midout</code>. Every other path is 404, so an ordinary client pointed here gets no work.`,
+ con:`Serves the claim to the client route and records the submission (<code>claims.jsonl</code>, <code>submissions.jsonl</code>). Fields come from a work list cut by <code>common/examples/midout_fields.rs</code>.`,
+ cost:`Nothing measurable: the route measured 1.6935 fs against the library's 1.6914 on the 3080 (×1.001).`,
+ chk:`Refuses a submission whose route is not <code>midout</code> (422) and a second one for a field (409). Never tested: several clients at once, a coordinator on another machine, long runs.`,
+ refs:[[SC,79,'def next_field'],[SC,120,'def do_GET'],[SC,133,'def do_POST']],
+ ov:`Production's server hands out 1e17 ranges of n from the <code>fields</code> table. No server change exists or is proposed yet.`},
+{id:'claim',x:X1,y:160,h:76,L:'host',S:'dec',fq:'F',fld:1,t:'claim and its guards',s:['coordinate named: midout:4,8,5','known coordinate · whole quanta · size','not the production host'],
+ why:`A claim of this kind is a range of v, not of n: searching it as n would search the wrong numbers and call the field done. So the claim names its coordinate explicitly and the client builds the coordinate from it, refusing one it does not know.`,
+ con:`From the coordinator; → the per-base join. Any refusal exits non-zero and submits nothing.`,
+ cost:`Milliseconds.`,
+ chk:`The URL is refused if it is the production API (three spellings tested). The coordinate must be one of the base's known ones, the field whole quanta, <code>range_size</code> equal to the coordinate's count of n.`,
+ refs:[[CR,66,'async fn claim'],[CR,94,'fn field_of'],[WI,142,'pub fn check_coordinator_url'],[WI,65,'pub fn parse_coordinate_id']]},
+{id:'route',x:X1,y:268,h:58,L:'host',S:'dec',fq:'F',t:'FieldJoin per base',s:['64 → 64-bit path · 65 → wide path','66–70 refused'],
+ why:`One entry point for the client: the device path per base, telemetry, and whether the sampled CPU check is on (base 64 yes; base 65 no, its CPU slice is slower than the field).`,
+ con:`→ <code>search_field</code> (base 64, the lanes below) or <code>search_field_wide</code> (base 65). A change of base drops the old join first.`,
+ cost:`Building a join: about 2 s once when the route switches base (kernel compilation, buffers).`,
+ chk:`Refuses bases other than 64 and 65, and a coordinate the base does not know.`,
+ refs:[[RT,39,'pub fn new'],[RT,82,'pub fn search'],[RT,71,'pub fn cpu_check_default']],
+ wide:`Base 65 goes to <code>WideJoin</code> (<code>gpu_wide.rs:2642</code>) through <code>search_field_wide</code> (<code>:3704</code>).`},
+{id:'fcheck',x:X1,y:380,h:70,L:'host',S:'dec',fq:'F',fld:1,t:'a field this join can search?',s:['base 64 · shape (4, 10) fits','whole quanta · group 1–256'],
+ why:`The field is the contract; the shape is internal. <code>Shape::fits</code> is the only coupling between them: the field's fixed digits must lie inside the slice key, so a field is a whole number of slices.`,
+ con:`→ the slice list.`,
+ cost:`Microseconds.`,
+ chk:`An error, not a partial field, for anything else. Groups are capped at 256 slices because the per-unit counters are 32-bit.`,
+ refs:[[G,4048,'base 64 only'],[C,62,'pub fn fits'],[CO,214,'pub fn field_digits']]},
+{id:'fslices',x:X1,y:474,h:62,L:'host',S:'proc',fq:'F',fld:1,t:'the field’s 4,096 slices',s:['digit 4 × digit 8, digit 4 innermost','64 consecutive slices share digits 5–8'],
+ why:`A field of the default coordinate fixes digits 5–7. Its slices are every value of digits 4 and 8 with those fixed. Ordering digit 4 innermost lets 64 consecutive slices reuse one level of tops.`,
+ con:`→ key, shared parent lists, sampled slice, the group loop.`,
+ cost:`Host, negligible.`,
+ chk:`Tested: each field of bases 64 and 65 is exactly the slices with its digits 5–7 (4,096 / 4,225 distinct).`,
+ refs:[[C,77,'pub fn slices_of'],[G,4062,'let mut pips']]},
+{id:'fkey',x:X1,y:566,h:62,L:'host',S:'proc',fq:'F',t:'key from the first slice',s:['8 frequent certificate digits','host tops of one slice (~0.1 s)'],
+ why:`The 8 key digits only order the parents (frequent digits of the tops' certificates first), so that the 64-child chunks share digits and the common-mask skip removes more. Any key is exact.`,
+ con:`Uploaded once per field (<code>rankh</code>); read by <code>hist2</code> and the sampled rerun.`,
+ cost:`One slice's tops on one host thread: about 0.1 s per field (host wait 0.14–0.23 s measured on the RX 9070 XT, including the list build).`,
+ chk:`None needed: kept fraction 0.1963 with the field's key against 0.1960 with the slice's own (measured); every count but "kept" is independent of the key.`,
+ refs:[[G,4099,'let rank = slice_tops'],[G,2367,'pub fn slice_tops']]},
+{id:'fsample',x:X1,y:654,h:58,L:'host',S:'proc',fq:'F',acc:1,t:'pick the sampled slice',s:['one slice at random per field','→ a host thread starts at once'],
+ why:`The accounts prove that work ran, not that it was right. One random slice per field is recomputed on the CPU while the card works; it is the only check that sees a kernel computing wrongly.`,
+ con:`Spawns the CPU reference thread; the comparison waits at the end of the field.`,
+ cost:`Zero on the device thread.`,
+ chk:`The draw is hashed with the field's start through a per-process random state: not reproducible across runs, recorded in the telemetry.`,
+ refs:[[G,4077,'let sample = if opt.cpu_check'],[G,3856,'fn cpu_slice']]},
+{id:'cputhread',x:X1,y:900,h:86,L:'cpu',S:'loop',fq:'F',acc:1,t:'CPU reference on the sampled slice',s:['exact, generic join (u64 masks)','its survivors, checked, prefiltered list','runs while the card does the field'],
+ why:`The oracle: <code>cpu::slice_join</code>, written independently of the kernels, equal to brute force on whole small bases. An oracle should not reuse the code it checks, so nice-ness and residues are re-implemented in <code>arith.rs</code>.`,
+ con:`Result joined after the last group → the sampled comparison.`,
+ cost:`One host core: 27 s of a 30.6 s field on the 3080 host; 9.2 s of an 18.5 s field on demoux. The host never waited. Base 65: 70–93 s against a 55 s field, so off there.`,
+ chk:`Its own correctness rests on brute force at bases 10–25 (survivors) and 10–29 (nice numbers), and a mutation test (3 of 27 mutants survive; measured on the first-PR branch).`,
+ refs:[[C,460,'pub fn slice_join'],[C,195,'pub fn prefilter']],
+ wide:`<code>wide_sample_compare</code> (<code>gpu_wide.rs:3655</code>) with <code>slice_join::&lt;u128&gt;</code>; off by default at 65.`},
+{id:'group',x:X1,y:742,h:58,L:'host',S:'loop',fq:'F',t:'queue slices, 16 per group',s:['one stream · no sync inside a group','buffers allocated once, reused'],
+ why:`Slices are queued back to back with no synchronisation; the stream orders buffer reuse. One synchronisation per 16 slices reads every counter and checks every account.`,
+ con:`Each slice → its device stages (middle lane). After 16 → the group read.`,
+ cost:`Driver overhead measured at 0.04 ms per slice (every buffer made, nothing launched).`,
+ chk:`The slice count comes from the device's done words, not from this loop.`,
+ refs:[[G,4121,'while done < pips.len()'],[G,3008,'fn queue_dev']],
+ wide:`<code>queue_slice</code> (<code>gpu_wide.rs:3255</code>).`,
+ ov:`Today's join runs slices in order, building the next slice's host setup on a scoped thread, with batches of up to 16 partitions and 4 in flight.`},
+// ---- lane 2: device, once per field / process
+{id:'roots',x:X2,y:384,h:58,L:'dev',S:'store',fq:'P',t:'9.30M depth-4 roots',s:['r4 = n mod 2^24 with 8 distinct digits','uploaded once per process'],
+ why:`Every parent of every slice is a depth-4 root extended by the slice's digits 4–8, so the roots are shared by the whole base.`,
+ con:`→ the shared list build, or <code>hist2</code> directly when a field does not share.`,
+ cost:`Once per process (the join's construction).`,
+ chk:`<code>hist2</code>'s cube count is compared with its grid over these roots.`,
+ refs:[[G,2334,'pub fn depth4_roots'],[G,2758,'let roots = depth4_roots']]},
+{id:'anc8',x:X2,y:474,h:76,L:'dev',S:'kernel',fq:'F',acc:1,fld:1,t:'anc8: 64 shared root lists',s:['one list per value of digits 4–7','roots whose depth-8 ancestor is valid','20.3 % of the roots · 870 MB'],
+ why:`A parent's digits 0–7 of r² and r³ depend only on digits 0–7 of r, so the 64 slices that differ only in digit 8 can start from one list. Exact by containment. This sharing is the reason fields fix digits 5–7, not 6–8.`,
+ con:`Built at the field's start with one synchronisation; each slice's <code>hist2</code> then runs over its list. The sampled rerun deliberately does not use it.`,
+ cost:`About 0.002 ms per slice (judged from instruction counts). Worth: parents 0.728 → 0.525 ms per slice and −3.1 % on ten fields (3080, measured).`,
+ chk:`Its own account, checked at once: cubes done = grid, roots examined = 9,298,544, certified (ballot) = listed, listed ≤ capacity. A root wrongly left out passes every account; only the sampled check (unshared) sees it.`,
+ refs:[[G,937,'pub fn anc8_kernel'],[G,2856,'fn build_anc'],[G,4103,'gj.share8']],
+ wide:`<b>No wide counterpart.</b> Base 65's parents are not shared (estimated −0.4 ms per slice if built).`,
+ ov:`Nothing like it: today's bottoms are rebuilt per partition inside each 1e17 field.`},
+// ---- lane 2: per slice
+{id:'t5',x:X2,y:800,h:62,L:'dev',S:'kernel',fq:'6',acc:1,fld:1,t:'tops5: the coarse level',s:['2^21 prefixes n div 2^30 · 19.4 % valid','once per 64 slices (digits 5–8)'],
+ why:`A finer interval keeps every digit its parent certified, so a slice's tops need only be tried under the valid coarse ones. Possible because digit 4 is free inside a field and innermost in the slice order.`,
+ con:`Its list → <code>tops1</code> for each of the 64 slices sharing digits 5–8.`,
+ cost:`Inside the tops stage. The hierarchy took tops from 0.466 to 0.361 ms per slice on the 3080 (measured).`,
+ chk:`Cubes done = 8,192 (its grid); its list length = what <code>tops1</code> examined.`,
+ refs:[[G,1915,'pub fn tops5_kernel'],[G,3039,'let q = (pip >> 6)']],
+ wide:`<code>wtops5</code> (<code>gpu_wide.rs:1643</code>), once per b slices.`},
+{id:'t1',x:X2,y:884,h:76,L:'dev',S:'kernel',fq:'S',acc:1,st:'tops',t:'tops1 · tscan · tops2',s:['certify ~238k of 2^21 tops (lead h, unit d)','by n², n³ digits ≥ 10, 32-bit limbs','segments by (unit, class)'],
+ why:`A top is a lead value h in [2^15, 2^16) and a unit d under the slice: 2^24 n each. Its certificate is the digits of n² and n³ at positions ≥ 10 that are the same at both ends of its interval and distinct. On the device because the host could not keep up (91 ms per slice on one thread against a 5.4 ms kernel).`,
+ con:`→ digit words and top records; segments → the main kernel's probe lists.`,
+ cost:`<b>Tops stage</b> (all six kernels): RX 9070 XT 0.759 ms (17.6 %, off the operating point; the offline model said 0.12–0.24); RTX 3080 0.393 ms (5.2 %).`,
+ chk:`<code>A_T1_EXAM</code> = the coarse list's length; <code>A_T1_CERT</code> = <code>tscan</code>'s total; <code>A_TSCAN</code> = 1; <code>A_T2_PLACED</code> = tops certified. A top of more than 17 digits is an error (17 is proven the most at base 64, and every slice has one: no margin).`,
+ refs:[[G,1955,'pub fn tops1_kernel'],[G,2028,'pub fn tscan_kernel'],[G,2079,'pub fn tops2_kernel'],[G,1874,'fn cert_pow'],[G,142,'pub const MAXPOP']],
+ wide:`<code>wtops1</code>, <code>wscan</code>, <code>wtops2</code> (<code>gpu_wide.rs:1753, 1569, 1881</code>); MAXPOP per base, a top above it an error.`,
+ ov:`Today's tops are certified per field (f0 3, prefixes of 3 fewer digits) by <code>top_kernel</code> / <code>top_fd_kernel</code>.`},
+{id:'tdig',x:X2,y:982,h:58,L:'dev',S:'kernel',fq:'S',acc:1,t:'tdigz2 · toprec2',s:['each top as 20 six-bit digit fields','production’s 8-word top records'],
+ why:`The main kernel reads a probe's digits as one 16-byte vector; the check reads production's top-record layout, so the check kernel needs no change.`,
+ con:`→ the main kernel (digit words), the check (records).`,
+ cost:`Inside the tops stage.`,
+ chk:`Rows written = tops certified (<code>A_TDIG</code>, <code>A_TREC</code>).`,
+ refs:[[G,2119,'pub fn tdigz2_kernel'],[G,2164,'pub fn toprec2_kernel']],
+ wide:`<code>wtdigz</code> (<code>gpu_wide.rs:1932</code>, 7-bit fields); <b>no top records</b>: the wide check reads the tops itself.`},
+{id:'hist',x:X2,y:1068,h:76,L:'dev',S:'kernel',fq:'S',acc:1,st:'par',t:'hist2: the slice’s parents',s:['r = r4 + pip·2^24 valid if 18 distinct digits','~1.04M parents · class and key','over the shared list (20 % of roots)'],
+ why:`A parent is a depth-9 bottom (digits 0–8). Its 64 children add one digit each to r² and r³, affine in the unit digit, so children are never stored: the parent record carries the two digits and two steps.`,
+ con:`→ histogram for the scan and scatter.`,
+ cost:`<b>Parents stage</b> (four kernels): RX 9070 XT 0.476 ms (11.0 %, off the operating point); RTX 3080 0.525 ms (6.9 %).`,
+ chk:`Cubes done = its grid; parents certified, counted by a ballot apart from the list = the list length (<code>A_H2_*</code>); plane width checked (<code>A_ERR_PLANE</code>). A wrong <code>parent()</code> mask passes every account: only the sampled check sees it.`,
+ refs:[[G,1015,'pub fn hist2_kernel'],[G,890,'fn parent'],[G,3323,'fn queue_parents']],
+ wide:`<code>whist</code> (<code>gpu_wide.rs:1282</code>), always over every root.`,
+ ov:`Today's bottoms: <code>bucket_kernel</code> extends the host's bottom list by the partition's digits to k = 6 (12 output digits) per partition.`},
+{id:'scat',x:X2,y:1166,h:58,L:'dev',S:'kernel',fq:'S',acc:1,t:'scan16 · scatter3',s:['parent records into (class, key) buckets','and the children of every listed parent'],
+ why:`Moves the records into place, and counts each listed parent's certified children with the main kernel's own child test: the first half of a conservation law.`,
+ con:`→ <code>hsort</code>.`,
+ cost:`Inside the parents stage; the children count costs about 0.06 ms per slice (3080).`,
+ chk:`<code>A_SCAN16</code> = 1; rows moved = list length; <code>A_SC_CHILD</code> is compared with the main kernel's children.`,
+ refs:[[G,1291,'pub fn scan16_kernel'],[G,1124,'pub fn scatter3_kernel'],[G,1102,'pub fn child_count']],
+ wide:`<code>wscan</code>, <code>wscatter</code> (<code>gpu_wide.rs:1569, 1386</code>).`},
+{id:'hsort',x:X2,y:1246,h:54,L:'dev',S:'kernel',fq:'S',acc:1,t:'hsort: sort each bucket',s:['16,128 buckets = 63 classes × 256 keys'],
+ why:`Children inherit their parent's order, and chunks of 64 consecutive children then share digits, which is what the common-mask skip exploits. Sorting only inside tiles destroys the skip (kept 0.58 → 0.72–0.89); one 8-bit key over the whole class loses nothing.`,
+ con:`→ parent records and <code>pseg</code> for the main kernel.`,
+ cost:`Inside the parents stage.`,
+ chk:`Cubes done = 16,128 (<code>A_HSORT</code>).`,
+ refs:[[G,1169,'pub fn hsort_kernel']],
+ wide:`<code>wsort</code> (<code>gpu_wide.rs:1445</code>).`},
+{id:'batch',x:X2,y:1322,h:54,L:'host',S:'loop',fq:'S',t:'launch batches of classes',s:['63 classes (one batch) on CUDA and RADV','4 on lavapipe (128 MiB bindings)'],
+ why:`The records and child lists of all 63 classes fit one batch on a card; fewer classes per batch measured slower (21, 9, 3 classes: 32.2, 35.2, 47.6 s against 31.6 s per field).`,
+ con:`Per batch: main kernel → expansion → check.`,
+ cost:`—`,
+ chk:`The host counts the job instances it queued per batch.`,
+ refs:[[G,3390,'fn queue_batch'],[G,2488,'pub fn b64']],
+ wide:`<code>queue_batch</code> (<code>gpu_wide.rs:3112</code>).`,
+ ov:`Today: batches of up to 16 partitions, 4 in flight, every batch launched before any count is read.`},
+{id:'main',x:X2,y:1398,h:104,L:'dev',S:'kernel',fq:'B',acc:1,st:'main',t:'g2_kernel: the bit-sliced pairing',s:['cube per job (class c, unit d): 4,032 × 2','children → 64-chunks → per-digit words','common-mask skip (49 % kept)','OR the probe’s ~17 digit words → 64-pair word','one 16-byte record per nonzero word'],
+ why:`The heart. A probe (a top of unit d whose class pairs with c to a root) tests 64 children at once: OR the chunk's words for its certified digits; a zero bit is a disjoint pair. Every top is a probe of exactly one job per root. Phases 1 (append children and child lists), 2 (shuffle transpose, common digits), 3a (skip), 3b (words and records), 4 (carry).`,
+ con:`Records → plane-private slabs of 256; child lists (each certified child's r4) → the expansion.`,
+ cost:`<b>RX 9070 XT 2.607 ms (60.5 %)</b>, too low by what tops and parents over-read; tops + parents + kernel together 3.843 ms. <b>RTX 3080 5.542 ms (73.2 %)</b>. Per slice: 33.7M children, 250M flat and 123M kept (probe, chunk) pairs, 10.9M records (175 MB), 11.77M survivors. 21,504 B shared memory, 120 registers, 12 waves per SIMD on RDNA4.`,
+ chk:`Job instances finished = queued (<code>A_JOBS</code>); probes run = 8 × tops (<code>A_PROBES</code>); children seen = <code>scatter3</code>'s count (<code>A_CHILD</code>, the first conservation law). Guards: a class over 65,536 parents, a probe window overrun, a child-list position past the list (<code>C_ERR_*</code>). A false skip or a wrong child mask passes every account: only the sampled check sees it.`,
+ refs:[[G,278,'pub fn g2_kernel'],[G,252,'pub fn child_mask'],[G,133,'pub const PMAX']],
+ wide:`<code>wide_kernel</code> (<code>gpu_wide.rs:266</code>): the same kernel with two-word masks, digits by division, 7-bit fields, (b + 1) | 1 slice rows, jobs as several instances. Its shared memory is 3 KB over RDNA4's 12-wave threshold (untuned).`,
+ ov:`<code>join_kernel</code>: a cube per bucket, tops in shared memory, 4 bottoms per thread in registers, one 64-bit AND per (top, bottom) pair over a walk.`},
+{id:'expand',x:X2,y:1524,h:76,L:'dev',S:'kernel',fq:'B',acc:1,st:'exp',t:'expand_kernel + prefilter',s:['record bits → (top, r0 = n mod 2^30)','digits 10–11 of n², n³ new and distinct','2.87 % pass · two records per lane'],
+ why:`Turns 64-pair words into checkable n on the card without a search (records name their top and the chunk's child-list position), and drops 97 % before the expensive check. The predicate is production's at the same digits, using the top's certified digits above position 11.`,
+ con:`Survivor entries in production's layout → the check.`,
+ cost:`<b>RX 9070 XT 0.356 ms (8.3 %)</b>; RTX 3080 1.108 ms with the check (14.6 %), where about 0.6 ms is not explained by bandwidth or arithmetic (load latency is the reading). Two arithmetic forms: 32-bit limbs on CUDA, 24-bit limbs elsewhere.`,
+ chk:`Cubes done = 4,096; slabs walked = slabs used; <b>survivor bits read = the main kernel's survivors</b> (the second conservation law). A too-strict prefilter passes every account and is caught by the sampled check (shown by fault injection).`,
+ refs:[[G,1670,'pub fn expand_kernel'],[G,1505,'fn pf('],[G,1463,'fn pf24'],[G,1560,'fn keep_bits2'],[G,2462,'pub enum PrefilterForm']],
+ wide:`<code>wexpand_kernel</code> with <code>pf_w2</code> (<code>gpu_wide.rs:1993</code>): base-b² arithmetic. Its ~3.3 ms per b65 slice is not the prefilter (3.64 ms with none); the rest is unexplained.`,
+ ov:`Today the prefilter is fused into <code>join_kernel</code>'s walk and runs at each survivor flush.`},
+{id:'check',x:X2,y:1622,h:58,L:'dev',S:'kernel',fq:'B',re:1,acc:1,st:'chk',t:'check_kernel (production’s)',s:['full nice-ness test of ~338k entries','unchanged; imported, not copied'],
+ why:`Production's full check, fed in production's layout: n = P·64^5 + r0 with P from the top record. Sharing it means a change there cannot desynchronise this path.`,
+ con:`Hits → the nice-number buffer, read at the field's end.`,
+ cost:`<b>RX 9070 XT 0.112 ms (2.6 %)</b> with the done kernel and group reads; RTX 3080 about 0.09 ms (measured separately before parent sharing).`,
+ chk:`Its own <code>ran</code> words: entries checked = list length and their index sum = n(n − 1)/2.`,
+ refs:[[CJ,3475,'pub fn check_kernel'],[G,113,'use crate::cubecl_join']],
+ wide:`<b>Its own check</b>, <code>wcheck_kernel</code> (<code>gpu_wide.rs:2230</code>): production's holds digits in one 64-bit mask and refuses bases above 64. Not independently audited.`,
+ ov:`The same kernel in today's join.`},
+{id:'done',x:X2,y:1702,h:50,L:'dev',S:'kernel',fq:'S',acc:1,t:'done_kernel',s:['slice done word +1 · group slice count +1'],
+ why:`Positive evidence that the slice's last kernel ran, and the field's slice count from the device instead of the host's own loop.`,
+ con:`→ the group read.`,
+ cost:`Microseconds.`,
+ chk:`<code>A_DONE</code> = 1; <code>C_SLICES</code> = slices queued.`,
+ refs:[[G,1788,'pub fn done_kernel'],[G,2994,'fn queue_done']],
+ wide:`<code>wdone_kernel</code> (<code>gpu_wide.rs:1435</code>).`},
+// ---- lane 1: group end, field end
+{id:'fin',x:X1,y:1790,h:84,L:'host',S:'dec',fq:'G',cmp:1,t:'finish_group: sync and compare',s:['one read of every small buffer','error words 0 · caps · check complete','bits read = survivors · slices = queued'],
+ why:`Every counter starts at zero and zero survivors is a legal slice, so a launch that did nothing would look like an empty slice. Here every account is compared with what the host queued or with another stage's count.`,
+ con:`Per slice → <code>check_slice</code>. Pass → next group; any difference → an error for the field.`,
+ cost:`The group's synchronisation; reads batched into one call.`,
+ chk:`No retry: a failed account is an error and the client submits nothing.`,
+ refs:[[G,3501,'fn finish_group'],[G,3623,'listed == dc.survivors']],
+ wide:`<code>finish_group</code> (<code>gpu_wide.rs:3275</code>, other indices).`,
+ ov:`Today: <code>ensure_ran</code> compares cubes finished with cubes launched (<code>NotRun</code>), then refits the layout and retries.`},
+{id:'cslice',x:X2,y:1800,h:70,L:'host',S:'proc',fq:'S',cmp:1,t:'check_slice',s:['every A_* word against its source','probes = 8 × tops · children = children'],
+ why:`The per-slice half of the comparison: each stage's own count against the number the host queued or another stage counted. Shown by fault injection: dropped main kernel, dropped tops, a dropped probe, a dropped parent, a failed allocation all now fail here.`,
+ con:`Called by <code>finish_group</code>.`,
+ cost:`Host, negligible.`,
+ chk:`This is the check.`,
+ refs:[[G,3675,'fn check_slice'],[G,3732,'main-kernel job instances done']],
+ wide:`<code>check_slice</code> (<code>gpu_wide.rs:3429</code>).`},
+{id:'fend',x:X1,y:1912,h:62,L:'host',S:'dec',fq:'F',cmp:1,fld:1,t:'end of the field',s:['each nice n is nice and in the field','slices done = 4,096'],
+ why:`A nice number outside the field, or a field with a slice missing, is an error.`,
+ con:`→ the sampled comparison.`,
+ cost:`Microseconds.`,
+ chk:`Nice-ness rechecked by <code>arith::unique_digits</code>, a separate implementation; membership via the coordinate (<code>v_of_n</code>).`,
+ refs:[[G,4197,'every nice number'],[G,4211,'total.slices != pips.len()']]},
+{id:'fsamp',x:X1,y:2004,h:70,L:'host',S:'dec',fq:'F',cmp:1,t:'sampled comparison',s:['the slice’s counts in the field run = CPU','rerun alone, unshared: list = CPU, n for n'],
+ why:`The only check that sees a kernel that does all its work and computes wrongly (a wrong certificate, parent mask, child mask, skip, transpose, prefilter). A defect touching a fraction f of slices is seen after k fields with probability 1 − (1 − f)^k.`,
+ con:`Pass → the outcome. Fail → an error, nothing submitted.`,
+ cost:`The device rerun: 0.16 s per field on the 3080, +0.4 % with the CPU thread.`,
+ chk:`Not seen by anything: a defect shared by the device and the CPU reference; production's check judging a nice n not nice; slices not yet drawn; anything at base 65 (check off).`,
+ refs:[[G,3878,'pub(crate) fn sample_compare'],[G,4215,'if let Some((pip, h)) = sample']],
+ wide:`<code>wide_sample_compare</code>; off by default at 65.`},
+{id:'submit',x:X1,y:2104,h:70,L:'host',S:'proc',fq:'F',re:1,t:'submit, then the next claim',s:['FieldOutcome: nice, survivors, checked','production’s submit, route "midout"'],
+ why:`Production's submit format unchanged; the telemetry carries the coordinate, the field, the join's shape label and counters, the sampled slice. survivors and checked are properties of (shape, field), equal on every device.`,
+ con:`→ the coordinator. Then the next claim (no overlap between fields).`,
+ cost:`Network.`,
+ chk:`Nothing is submitted after a failed account, a failed sampled check, or a panic on any thread (a panic hook records it; installed after the device context is created).`,
+ refs:[[CR,293,'submit_field_to_server_async'],[CR,55,'fn no_panic_so_far'],[CR,41,'fn install_panic_hook'],[C,635,'pub struct FieldOutcome']]},
+// ---- lane 3: today's overlap join (origin/main)
+{id:'o_claim',x:X3,y:160,h:64,L:'old',S:'proc',fq:'F',t:'claim a 1e17 range of n',s:['/claim/niceonly · field = interval of n'],
+ why:`Today a field is a contiguous range of n; its tops are certified per field and its bottoms rebuilt per partition.`,
+ con:`→ the plan.`,cost:`—`,chk:`—`,refs:[]},
+{id:'guard',x:X3,y:262,h:62,L:'coord',S:'dec',fq:'F',fld:1,t:'ordinary claim refuses a coordinate field',s:['the one edit to production’s claim path'],
+ why:`If a server ever hands out base-64 fields of the new coordinate, an old route would search the v range as n and call the field done. Every ordinary route (nice-only and detailed, CPU and GPU) goes through this claim and refuses a body carrying the <code>coordinate</code> key. It does nothing unless that key is present, which the real server never sends today.`,
+ con:`Production's <code>get_field_from_server_async</code> → <code>wire::refuse_coordinate_space</code>.`,
+ cost:`A JSON parse of the claim body.`,
+ chk:`Tested in both modes; a negative run with the coordinator's test switch shows every ordinary route refusing.`,
+ refs:[['common/src/client_api_async.rs',128,'refuse_coordinate_space'],[WI,108,'pub fn refuse_coordinate_space']]},
+{id:'o_plan',x:X3,y:380,h:62,L:'old',S:'dec',fq:'F',t:'plan_join: verdict · slices · layout',s:['sized to the device, ≤ 1 GiB'],
+ why:`Sizes the join to the device and cuts the field into slices so any field fits.`,
+ con:`Corresponds to the middle-out field check, whose layout is fixed per base.`,cost:`Host.`,chk:`—`,
+ refs:[[JP,598,'pub fn plan_join','main']]},
+{id:'o_setup',x:X3,y:474,h:70,L:'old',S:'store',fq:'F',t:'FieldSetup (host)',s:['top layer · bottoms mod b^3 (bpre)','field certificate'],
+ why:`Everything that does not depend on the partition: built on the host per field (and per slice), the next one alongside the device.`,
+ con:`Corresponds to the middle-out field setup (key, shared lists) and the depth-4 roots.`,cost:`Part of the per-field fixed cost.`,chk:`—`,
+ refs:[[OJ,995,'pub struct FieldSetup','main'],[OJ,1050,'pub fn new','main']]},
+{id:'o_slice',x:X3,y:742,h:58,L:'old',S:'loop',fq:'F',t:'per slice · batches of 16 partitions',s:['4 batches in flight'],
+ why:`Every batch of a pass is launched before any count is read.`,
+ con:`Corresponds to the middle-out group loop.`,cost:`—`,chk:`—`,
+ refs:[[CJ,4693,'run_slices','main'],[CJ,4931,'fn run_pass','main'],[CJ,4199,'pub fn launch_batch','main']]},
+{id:'o_tops',x:X3,y:884,h:70,L:'old',S:'kernel',fq:'B',st:'otops',osh:0.13,t:'top_kernel / top_fd_kernel',s:['tops at f0 3, per field','bucketed by (key digit, class)'],
+ why:`Device-side certification of the field's prefixes.`,
+ con:`Corresponds to the middle-out tops (per slice, for the whole leading range).`,
+ cost:`Share 13 % of 4.5 fs at base 64 (derived): every field tests its own prefixes.`,chk:`—`,
+ refs:[[CJ,1933,'pub fn top_kernel','main'],[CJ,2759,'pub fn top_fd_kernel','main']]},
+{id:'o_bucket',x:X3,y:1080,h:70,L:'old',S:'kernel',fq:'B',st:'obucket',osh:0.17,t:'bucket_kernel',s:['bottoms extended to k = 6 per partition','(+ upload, host, other)'],
+ why:`Extends the host's bottom list by the partition's digits, listed under each key digit.`,
+ con:`Corresponds to the middle-out parents (digits 0–8, children to 9).`,
+ cost:`Share 17 % with uploads, host and other (derived).`,chk:`—`,
+ refs:[[CJ,277,'pub fn bucket_kernel','main']]},
+{id:'o_join',x:X3,y:1398,h:84,L:'old',S:'kernel',fq:'B',st:'ojoin',osh:0.22,t:'join_kernel: AND walk',s:['tops in shared memory, bottoms in registers','one 64-bit AND per pair','12-digit bottoms'],
+ why:`Pairs every top with every bottom of a compatible class by an AND over a walk.`,
+ con:`Corresponds to the middle-out main kernel. At base 64 both test about 3.5e-3 pairs per admissible n; the middle-out pair costs about ×6–8 less (judged).`,
+ cost:`AND and join base: 22 % (derived).`,chk:`—`,
+ refs:[[CJ,531,'pub fn join_kernel','main']]},
+{id:'o_pf',x:X3,y:1524,h:66,L:'old',S:'kernel',fq:'B',st:'opf',osh:0.37,t:'prefilter at each flush',s:['inside join_kernel’s walk','6 % pass to the check'],
+ why:`Production's middle-digit prefilter, fused into the join's walk.`,
+ con:`Corresponds to the middle-out expansion's prefilter (2.87 % pass there: bottoms carry 20 certified digits, not 12).`,
+ cost:`Prefilter and walk: 37 % (derived), the largest share today.`,chk:`—`,
+ refs:[[CJ,3267,'fn flush_survivors','main']]},
+{id:'o_check',x:X3,y:1622,h:58,L:'old',S:'kernel',fq:'B',re:1,st:'ochk',osh:0.11,t:'check_kernel',s:['the same kernel'],
+ why:`The full check.`,con:`Reused unchanged by the middle-out join.`,cost:`11 % (derived).`,chk:`Its <code>ran</code> words.`,
+ refs:[[CJ,3475,'pub fn check_kernel','main']]},
+{id:'o_ran',x:X3,y:1790,h:84,L:'old',S:'dec',fq:'B',t:'ensure_ran · refit · retry',s:['cubes finished vs launched (NotRun)','overflow → halve, retry'],
+ why:`Today's join detects a batch that did not run or a list that overflowed, lowers its layout ceiling and retries.`,
+ con:`Corresponds to <code>finish_group</code>: the middle-out join checks each stage's own work instead and never retries.`,
+ cost:`Normally never taken.`,chk:`—`,
+ refs:[[CJ,4400,'fn ensure_ran','main'],[CJ,4873,'fn refit','main'],[JP,178,'pub struct JoinCeiling','main']]},
+];
+// stage shares (9070 / 3080 ms per slice)
+const ST={tops:[0.759,0.393],par:[0.476,0.525],main:[2.607,5.542],exp:[0.356,1.108],chk:[0.112,null]};
+const SL9=4.312, SL3=7.568;
+const FR=[
+ {t:'Coordinator and client route · host',x:40,y:40,w:380,h:300,L:'host'},
+ {t:'Field setup · once per field (host; lists on the device)',x:40,y:350,w:800,h:378,L:'host',tx:440},
+ {t:'Sampled CPU check · host thread',x:40,y:868,w:380,h:140,L:'cpu'},
+ {t:'One slice · queued back to back on one stream · device',x:470,y:764,w:360,h:1004,L:'dev'},
+ {t:'Group end and field end · host',x:40,y:1776,w:790,h:420,L:'host',tb:1},
+ {t:'Today: v3.4.8 GPU overlap join (origin/main)',x:920,y:130,w:360,h:1760,L:'old'},
+];
+// edges [from,to,opts]
+const E=[
+ ['coord','claim',{label:'claim'}],
+ ['claim','route',{}],
+ ['route','fcheck',{}],
+ ['fcheck','fslices',{label:'yes'}],
+ ['fcheck','route',{fs:'l',ts:'l',via:[[52,415],[52,297]],cls:'err',label:'no',lx:58,ly:440,anchor:'start'}],
+ ['fslices','fkey',{}],
+ ['fslices','anc8',{fs:'r',ts:'l',label:'≤ 64 lists'}],
+ ['roots','anc8',{}],
+ ['fkey','fsample',{}],
+ ['fsample','group',{}],
+ ['fsample','cputhread',{fs:'l',ts:'l',via:[[56,683],[56,943]],cls:'dotted',label:'spawn',lx:60,ly:830,anchor:'start'}],
+ ['group','t5',{fs:'r',ts:'l',label:'each slice'}],
+ ['t5','t1',{}],['t1','tdig',{}],['tdig','hist',{}],
+ ['anc8','hist',{fs:'r',ts:'r',via:[[850,512],[850,1106]],cls:'dotted',label:'shared list',lx:856,ly:800,anchor:'start'}],
+ ['hist','scat',{}],['scat','hsort',{}],['hsort','batch',{}],
+ ['batch','main',{}],['main','expand',{label:'records, child lists'}],['expand','check',{label:'(top, r0)'}],
+ ['check','done',{}],
+ ['check','batch',{fs:'l',ts:'l',via:[[482,1651],[482,1349]],cls:'loop',label:'next batch',lx:486,ly:1500,anchor:'start'}],
+ ['done','fin',{fs:'b',ts:'r',via:[[650,1770],[440,1770],[440,1832]],label:'after 16 slices'}],
+ ['fin','cslice',{fs:'r',ts:'l'}],
+ ['fin','group',{fs:'l',ts:'l',via:[[60,1832],[60,771]],cls:'loop',label:'next group',lx:64,ly:1300,anchor:'start'}],
+ ['fin','fend',{label:'last group'}],
+ ['fend','fsamp',{}],
+ ['cputhread','fsamp',{fs:'r',ts:'r',via:[[430,943],[430,2039]],cls:'dotted',label:'join',lx:426,ly:1730,anchor:'end'}],
+ ['fsamp','submit',{label:'pass'}],
+ ['submit','coord',{fs:'l',ts:'l',via:[[48,2139],[48,92]],cls:'loop',label:'next claim',lx:52,ly:240,anchor:'start'}],
+ // overlap lane
+ ['o_claim','guard',{}],['guard','o_plan',{}],['o_plan','o_setup',{}],['o_setup','o_slice',{}],['o_slice','o_tops',{}],
+ ['o_tops','o_bucket',{}],['o_bucket','o_join',{}],['o_join','o_pf',{}],['o_pf','o_check',{}],['o_check','o_ran',{}],
+ // correspondences
+ ['claim','o_claim',{fs:'r',ts:'l',cls:'corr',pts:[[395,198],[935,192]]}],
+ ['fcheck','o_plan',{cls:'corr',pts:[[395,409],[455,409],[455,370],[860,370],[860,409],[935,409]]}],
+ ['anc8','o_setup',{fs:'r',ts:'l',cls:'corr'}],
+ ['group','o_slice',{cls:'corr',pts:[[395,771],[935,771]]}],
+ ['t1','o_tops',{fs:'r',ts:'l',cls:'corr'}],
+ ['hist','o_bucket',{fs:'r',ts:'l',cls:'corr'}],
+ ['main','o_join',{fs:'r',ts:'l',cls:'corr'}],
+ ['expand','o_pf',{fs:'r',ts:'l',cls:'corr'}],
+ ['check','o_check',{fs:'r',ts:'l',cls:'corr'}],
+ ['cslice','o_ran',{fs:'r',ts:'l',cls:'corr'}],
+ // account edges (shown with the checks spotlight)
+ ...['t5','t1','tdig','hist','scat','hsort','main','expand','done'].map(id=>[id,'cslice',{cls:'acc',fs:'l',ts:'t',tx:-40}]),
+ ['check','fin',{cls:'acc',fs:'l',ts:'t',tx:40}],
+ ['anc8','fslices',{cls:'acc',fs:'l',ts:'r'}],
+];
+</script>
+<script>
+// ---------------------------------------------------------------- render
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('diagram');
+const W=1300,Ht=2210;
+svg.setAttribute('viewBox',`0 0 ${W} ${Ht}`);svg.setAttribute('width',W);svg.setAttribute('height',Ht);
+for(const n of N){n.w=n.w||NW;}
+const byId=Object.fromEntries(N.map(n=>[n.id,n]));
+const col=L=>({host:['var(--host)','var(--host-bg)'],dev:['var(--dev)','var(--dev-bg)'],cpu:['var(--cpu)','var(--cpu-bg)'],coord:['var(--coord)','var(--coord-bg)'],old:['var(--old)','var(--old-bg)']}[L]);
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||svg).appendChild(e);return e;}
+const defs=el('defs',{});
+for(const [id,c] of [['ar','var(--edge)'],['arA','var(--acc)'],['arH','var(--text-primary)'],['arO','var(--old)']]){
+  const m=el('marker',{id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse'},defs);
+  el('path',{d:'M0,0 L10,5 L0,10 z',fill:c},m);
+}
+const pat=el('pattern',{id:'hatch',width:6,height:6,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'},defs);
+el('rect',{x:0,y:0,width:6,height:6,fill:'var(--old)','fill-opacity':.25},pat);
+el('line',{x1:0,y1:0,x2:0,y2:6,stroke:'var(--old)','stroke-width':2.5},pat);
+// frames
+const gF=el('g',{id:'frames'});
+for(const f of FR){
+  const [c]=col(f.L);
+  el('rect',{x:f.x,y:f.y,width:f.w,height:f.h,rx:14,fill:'var(--surface-1)',stroke:c,'stroke-opacity':.45,'stroke-width':1.2},gF);
+  const t=el('text',{x:f.x+(f.tx||12),y:f.tb?f.y+f.h-10:f.y+16,class:'frame-title'},gF);t.textContent=f.t;
+}
+function anchor(n,side,dx=0,dy=0){
+  const cx=n.x, top=n.y, h=n.h, w=n.w;
+  switch(side){case 't':return [cx+dx,top+dy];case 'b':return [cx+dx,top+h+dy];case 'l':return [cx-w/2+dx,top+h/2+dy];case 'r':return [cx+w/2+dx,top+h/2+dy];}
+}
+function route(a,b,o){
+  if(o.pts)return o.pts;
+  const fs=o.fs||'b', ts=o.ts||'t';
+  const p=anchor(a,fs,o.fx||0,o.fy||0), q=anchor(b,ts,o.tx||0,o.ty||0);
+  if(o.via)return [p,...o.via,q];
+  if(fs==='b'&&ts==='t'){ if(Math.abs(p[0]-q[0])<1)return [p,q]; const my=(p[1]+q[1])/2; return [p,[p[0],my],[q[0],my],q]; }
+  if((fs==='l'||fs==='r')&&ts==='t')return [p,[q[0],p[1]],q];
+  if(fs==='b'&&(ts==='l'||ts==='r'))return [p,[p[0],q[1]],q];
+  if((fs==='l'||fs==='r')&&(ts==='l'||ts==='r')){ if(Math.abs(p[1]-q[1])<1)return [p,q]; const mx=(p[0]+q[0])/2; return [p,[mx,p[1]],[mx,q[1]],q]; }
+  return [p,q];
+}
+const gE=el('g',{id:'edges'});const edgeEls=[];
+for(const [f,t,o] of E){
+  const a=byId[f], b=byId[t]; if(!a||!b){console.warn('edge',f,t);continue;}
+  const pts=route(a,b,o);
+  const d='M'+pts.map(p=>p.join(',')).join(' L');
+  const mk=o.cls==='acc'?'url(#arA)':o.cls==='corr'?'':o.cls==='err'?'url(#arA)':'url(#ar)';
+  const pe=el('path',{d,class:'edge '+(o.cls||'')},gE); if(mk)pe.setAttribute('marker-end',mk);
+  pe.dataset.f=f;pe.dataset.t=t;pe.dataset.mk=mk;edgeEls.push(pe);
+  if(o.label){
+    let lx,ly,an='middle';
+    if(o.lx!=null){lx=o.lx;ly=o.ly;an=o.anchor||'middle';}
+    else{let best=0,bi=0;for(let i=0;i<pts.length-1;i++){const L=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]);if(L>best){best=L;bi=i;}}
+      lx=(pts[bi][0]+pts[bi+1][0])/2; ly=(pts[bi][1]+pts[bi+1][1])/2;
+      if(pts[bi][0]===pts[bi+1][0]){lx+=6;an='start';ly+=4;} else ly-=5;}
+    const tl=el('text',{x:lx,y:ly,class:'elabel','text-anchor':an},gE);tl.textContent=o.label;tl.dataset.f=f;
+    if(o.cls==='err')tl.setAttribute('style','fill:var(--acc)');
+  }
+}
+const gN=el('g',{id:'nodes'});const nodeEls={};
+function shapePath(n){
+  const x=n.x-n.w/2,y=n.y,w=n.w,h=n.h;
+  if(n.S==='dec'){const k=16;return `M${x+k},${y} H${x+w-k} L${x+w},${y+h/2} L${x+w-k},${y+h} H${x+k} L${x},${y+h/2} Z`;}
+  if(n.S==='store'){const r=7;return `M${x},${y+r} Q${x+w/2},${y-r} ${x+w},${y+r} V${y+h-r} Q${x+w/2},${y+h+r} ${x},${y+h-r} Z`;}
+  if(n.S==='kernel'){const c=9;return `M${x+c},${y} H${x+w-c} L${x+w},${y+c} V${y+h-c} L${x+w-c},${y+h} H${x+c} L${x},${y+h-c} V${y+c} Z`;}
+  const r=n.S==='loop'?14:8;
+  return `M${x+r},${y} H${x+w-r} Q${x+w},${y} ${x+w},${y+r} V${y+h-r} Q${x+w},${y+h} ${x+w-r},${y+h} H${x+r} Q${x},${y+h} ${x},${y+h-r} V${y+r} Q${x},${y} ${x+r},${y} Z`;
+}
+const FQ={P:'PROC',F:'FIELD','6':'/64',S:'SLICE',B:'BATCH',G:'GROUP'};
+function share(n){
+  if(n.osh!=null)return {v:n.osh,old:1};
+  if(n.st&&ST[n.st])return {v:ST[n.st][0]/SL9};
+  return null;
+}
+for(const n of N){
+  const [c,bg]=col(n.L);
+  const g=el('g',{class:'node',tabindex:0,role:'button','aria-label':n.t},gN);g.dataset.id=n.id;
+  el('path',{d:shapePath(n),class:'box',fill:bg,stroke:c},g);
+  if(n.S==='loop'){
+    el('path',{d:shapePath({...n,y:n.y+3,w:n.w-6,h:n.h-6}),fill:'none',stroke:c,'stroke-opacity':.35},g);
+    const t=el('text',{x:n.x+n.w/2-18,y:n.y+17,style:`font-size:14px;fill:${c}`},g);t.textContent='⟳';
+  }
+  if(n.S==='kernel')el('line',{x1:n.x-n.w/2+9,y1:n.y+4,x2:n.x+n.w/2-9,y2:n.y+4,stroke:c,'stroke-width':2},g);
+  // wide-spotlight outline (hidden until the spotlight)
+  const wo=el('path',{d:shapePath({...n,y:n.y-4,w:n.w+8,h:n.h+8}),fill:'none',class:'wideo','stroke-width':2.4,style:'display:none'},g);
+  // text
+  const sh=share(n);
+  const lines=n.s||[];const lh=13.5, total=16+lines.length*lh;
+  let ty=n.y+n.h/2-total/2+12-(sh?3:0);
+  const tt=el('text',{x:n.x,y:ty,'text-anchor':'middle',class:'t-title'},g);tt.textContent=n.t;
+  for(const s of lines){ty+=lh;const ts=el('text',{x:n.x,y:ty+1,'text-anchor':'middle',class:'t-sub'},g);ts.textContent=s;}
+  // share bar
+  if(sh){
+    const bw=n.w-70, bx=n.x-n.w/2+12, by=n.y+n.h-9;
+    const gb=el('g',{class:'bar'},g);
+    el('rect',{x:bx,y:by,width:bw,height:5,rx:2.5,fill:'var(--grid)'},gb);
+    el('rect',{x:bx,y:by,width:Math.max(2,bw*sh.v),height:5,rx:2.5,fill:sh.old?'url(#hatch)':'var(--series)'},gb);
+    const tx=el('text',{x:bx+bw+6,y:by+5.5,class:'t-share'},gb);tx.textContent=(sh.v*100).toFixed(sh.v<0.1?1:0)+' %';
+  }
+  // badges
+  const badges=[];
+  if(n.fq&&FQ[n.fq])badges.push([FQ[n.fq],'var(--text-secondary)']);
+  if(n.re)badges.push(['REUSED','var(--reuse)']);
+  if(n.acc)badges.push(['ACC','var(--acc)']);
+  if(n.cmp)badges.push(['CHECKS','var(--acc)']);
+  let bx=n.x-n.w/2+8;
+  for(const [b,bc] of badges){
+    const tw=b.length*6+8;
+    el('rect',{x:bx,y:n.y-7,width:tw,height:13,rx:6.5,fill:'var(--surface-2)',stroke:bc,'stroke-width':1.2},g);
+    const bt=el('text',{x:bx+tw/2,y:n.y+3,'text-anchor':'middle',class:'t-badge',fill:bc},g);bt.textContent=b;
+    bx+=tw+4;
+  }
+  nodeEls[n.id]=g;
+  g.addEventListener('mouseenter',()=>hl(n.id,true));
+  g.addEventListener('mouseleave',()=>hl(n.id,false));
+  g.addEventListener('click',()=>select(n.id));
+  g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();select(n.id);}});
+}
+function hl(id,on){
+  for(const e of edgeEls){ if(e.dataset.f===id||e.dataset.t===id){ e.classList.toggle('hl',on); if(e.dataset.mk)e.setAttribute('marker-end',on?'url(#arH)':e.dataset.mk); } }
+}
+// ---------------------------------------------------------------- panel
+const panel=document.getElementById('panel');
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function rich(s){return esc(s).replace(/&lt;(\/?)(b|code|i)&gt;/g,'<$1$2>').replace(/&amp;lt;/g,'&lt;').replace(/&amp;gt;/g,'&gt;');}
+const LAYER={host:'host (driver thread)',dev:'device',cpu:'host thread (CPU reference)',coord:'coordinator / wire',old:'today’s overlap join (origin/main 974d7194)'};
+const SHAPE={proc:'step',dec:'decision',loop:'loop',store:'built once and kept',kernel:'device kernel'};
+const FQL={P:'once per process',F:'once per field',6:'once per 64 slices',S:'once per slice',B:'once per launch batch',G:'once per group of 16 slices',E:'standing process'};
+let selected=null;
+function select(id){
+  if(selected)nodeEls[selected].classList.remove('sel');
+  selected=id;nodeEls[id].classList.add('sel');
+  const n=byId[id];
+  const pills=[];
+  if(n.fq)pills.push(`<span class="pill" style="color:var(--text-secondary)">${esc(FQL[n.fq]||'')}</span>`);
+  if(n.re)pills.push('<span class="pill" style="color:var(--reuse)">REUSED FROM PRODUCTION</span>');
+  else if(n.L!=='old')pills.push('<span class="pill" style="color:var(--dev)">NEW</span>');
+  if(n.acc)pills.push('<span class="pill" style="color:var(--acc)">WRITES AN ACCOUNT</span>');
+  if(n.cmp)pills.push('<span class="pill" style="color:var(--acc)">COMPARES ACCOUNTS</span>');
+  if(n.fld)pills.push('<span class="pill" style="color:var(--coord)">FIELD-RELATED</span>');
+  const ins=E.filter(e=>e[1]===id&&!['acc','corr'].includes(e[2].cls)).map(e=>byId[e[0]].t),
+        outs=E.filter(e=>e[0]===id&&!['acc','corr'].includes(e[2].cls)).map(e=>byId[e[1]].t);
+  const corr=E.filter(e=>e[2].cls==='corr'&&(e[0]===id||e[1]===id)).map(e=>byId[e[0]===id?e[1]:e[0]].t);
+  let costTab='';
+  if(n.st&&ST[n.st]){const [a,b]=ST[n.st];
+    costTab=`<table><tr><th>stage</th><th>RX 9070 XT</th><th>RTX 3080</th></tr><tr><td>${esc({tops:'tops (6 kernels)',par:'parents (4 kernels)',main:'main kernel',exp:'expansion + prefilter',chk:'check, done, group read'}[n.st])}</td><td class="n">${a.toFixed(3)} ms (${(100*a/SL9).toFixed(1)} %)</td><td class="n">${b==null?'with expansion':b.toFixed(3)+' ms ('+(100*b/SL3).toFixed(1)+' %)'}</td></tr><tr><td>whole slice</td><td class="n">${SL9.toFixed(3)} ms</td><td class="n">${SL3.toFixed(3)} ms</td></tr></table>`;}
+  const repoNote=n.L==='old'?'origin/main 974d7194':'dev/mo-clean 5a048669';
+  panel.innerHTML=`
+    <div class="title">${esc(n.t)}</div>
+    <div style="color:var(--text-muted);font-size:12px;margin-bottom:6px">${esc(LAYER[n.L])} · ${esc(SHAPE[n.S])}</div>
+    <div>${pills.join('')}</div>
+    ${n.why?`<h3>Why it exists</h3><p>${rich(n.why)}</p>`:''}
+    ${n.con?`<h3>How it connects</h3><p>${rich(n.con)}</p>`:''}
+    <p style="font-size:12.5px;color:var(--text-secondary)">${ins.length?'← from: '+ins.map(esc).join(' · '):''}${ins.length&&outs.length?'<br>':''}${outs.length?'→ to: '+outs.map(esc).join(' · '):''}${corr.length?'<br>≈ corresponds to: '+corr.map(esc).join(' · '):''}</p>
+    ${n.cost?`<h3>Cost</h3><p>${rich(n.cost)}</p>${costTab}`:''}
+    ${n.chk&&n.chk!=='—'?`<h3>The check that guards it</h3><div class="chkbox">${rich(n.chk)}</div>`:''}
+    ${n.refs&&n.refs.length?`<h3>Code (${repoNote})</h3><div class="refs">${n.refs.map(r=>`<code>${esc(r[0])}:${r[1]}  ${esc(r[2])}</code>`).join('')}</div>`:''}
+    ${n.wide?`<h3>Wide path (bases 65–70)</h3><div class="widebox">${rich(n.wide)}</div>`:''}
+    ${n.ov?`<h3>Today’s overlap join</h3><div class="oldbox">${rich(n.ov)}</div>`:''}
+  `;
+}
+// ---------------------------------------------------------------- toolbar
+const optSpot=document.getElementById('optSpot');
+function applySpot(){
+  const v=optSpot.value;
+  document.body.classList.toggle('showacc',v==='acc');
+  for(const n of N){
+    let keep=true;
+    if(['P','F','6','S','B','G'].includes(v))keep=n.fq===v;
+    else if(v==='acc')keep=!!(n.acc||n.cmp);
+    else if(v==='wide')keep=n.L!=='old'&&n.L!=='coord'&&n.L!=='cpu'&&!['fkey','fslices','fend','submit','claim'].includes(n.id) || n.id==='cputhread';
+    else if(v==='fld')keep=!!n.fld;
+    else if(v==='re')keep=!!n.re;
+    nodeEls[n.id].classList.toggle('dim',!!v&&!keep);
+    const wo=nodeEls[n.id].querySelector('.wideo');
+    if(v==='wide'&&keep){wo.style.display='';const none=/No wide counterpart|no top records/.test(n.wide||'');wo.setAttribute('stroke',none?'var(--acc)':'var(--wide)');wo.setAttribute('stroke-dasharray',none?'5 4':'');}
+    else wo.style.display='none';
+  }
+  for(const e of edgeEls){
+    const a=byId[e.dataset.f],b=byId[e.dataset.t];
+    const dimmed=nodeEls[a.id].classList.contains('dim')||nodeEls[b.id].classList.contains('dim');
+    e.classList.toggle('dim',!!v&&dimmed&&!e.classList.contains('acc'));
+  }
+}
+optSpot.onchange=applySpot;
+document.getElementById('optBars').onchange=e=>document.body.classList.toggle('nobars',!e.target.checked);
+document.getElementById('optCorr').onchange=e=>document.body.classList.toggle('nocorr',!e.target.checked);
+document.getElementById('btnTheme').onclick=()=>{
+  const r=document.documentElement;const cur=r.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  r.dataset.theme=cur==='dark'?'light':'dark';
+};
+// ---------------------------------------------------------------- legend
+const lg=document.getElementById('legend');
+function sw(inner,label){return `<span><svg width="34" height="20" aria-hidden="true">${inner}</svg> ${label}</span>`;}
+lg.innerHTML=[
+ sw('<rect x="2" y="3" width="30" height="14" rx="4" fill="var(--host-bg)" stroke="var(--host)"/>','host'),
+ sw('<rect x="2" y="3" width="30" height="14" rx="4" fill="var(--dev-bg)" stroke="var(--dev)"/>','device'),
+ sw('<rect x="2" y="3" width="30" height="14" rx="4" fill="var(--cpu-bg)" stroke="var(--cpu)"/>','CPU reference thread'),
+ sw('<rect x="2" y="3" width="30" height="14" rx="4" fill="var(--coord-bg)" stroke="var(--coord)"/>','coordinator / wire'),
+ sw('<rect x="2" y="3" width="30" height="14" rx="4" fill="var(--old-bg)" stroke="var(--old)"/>','today’s overlap join'),
+ sw('<rect x="2" y="4" width="30" height="12" rx="6" fill="var(--surface-2)" stroke="var(--reuse)"/><text x="17" y="13" text-anchor="middle" font-size="7" font-weight="700" fill="var(--reuse)">REUSED</text>','production code, unchanged'),
+ sw('<path d="M8,3 H26 L32,10 L26,17 H8 L2,10 Z" fill="none" stroke="var(--text-secondary)"/>','decision'),
+ sw('<rect x="2" y="3" width="30" height="14" rx="7" fill="none" stroke="var(--text-secondary)"/><text x="22" y="13" font-size="10" fill="var(--text-secondary)">⟳</text>','loop'),
+ sw('<path d="M7,3 H27 L32,8 V12 L27,17 H7 L2,12 V8 Z" fill="none" stroke="var(--text-secondary)"/><line x1="7" y1="5" x2="27" y2="5" stroke="var(--text-secondary)" stroke-width="2"/>','device kernel'),
+ sw('<path d="M2,6 Q17,0 32,6 V14 Q17,20 2,14 Z" fill="none" stroke="var(--text-secondary)"/>','built once, kept'),
+ sw('<rect x="2" y="8" width="30" height="5" rx="2.5" fill="var(--grid)"/><rect x="2" y="8" width="18" height="5" rx="2.5" fill="var(--series)"/>','share of a slice (RX 9070 XT)'),
+ sw('<rect x="2" y="8" width="30" height="5" rx="2.5" fill="var(--grid)"/><rect x="2" y="8" width="14" height="5" rx="2.5" fill="url(#lgh)"/><defs><pattern id="lgh" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--old)" fill-opacity=".25"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--old)" stroke-width="2.5"/></pattern></defs>','share, derived (overlap)'),
+ sw('<line x1="2" y1="10" x2="32" y2="10" stroke="var(--edge)" stroke-dasharray="7 5" stroke-width="1.5"/>','loops back'),
+ sw('<line x1="2" y1="10" x2="32" y2="10" stroke="var(--old)" stroke-dasharray="1 5" stroke-width="1.6"/>','corresponds to'),
+ sw('<line x1="2" y1="10" x2="32" y2="10" stroke="var(--acc)" stroke-dasharray="3 3" stroke-width="1.5"/>','account compared (spotlight)'),
+].join('');
+// ---------------------------------------------------------------- digits strip
+(function(){
+  const d=document.getElementById('digits');
+  const e=(t,a,p)=>{const x=document.createElementNS(NS,t);for(const k in a)x.setAttribute(k,a[k]);(p||d).appendChild(x);return x;};
+  const cw=56, x0=150;
+  const pos=[12,11,10,9,8,7,6,5,4,3,2,1,0];
+  const lab=e('text',{x:4,y:30,'font-size':11.5,fill:'var(--text-secondary)','font-weight':650});lab.textContent='digits of n (b64):';
+  pos.forEach((p,i)=>{
+    const fixed=p>=5&&p<=7, slice=p>=4&&p<=8, unit=p===9;
+    e('rect',{x:x0+i*cw,y:16,width:cw-4,height:22,rx:4,fill:fixed?'var(--coord-bg)':slice?'var(--dev-bg)':unit?'var(--host-bg)':'var(--surface-2)',stroke:fixed?'var(--coord)':slice?'var(--dev)':unit?'var(--host)':'var(--grid)'});
+    const t=e('text',{x:x0+i*cw+(cw-4)/2,y:31,'text-anchor':'middle','font-size':11.5,fill:'var(--text-primary)'});t.textContent=p;
+  });
+  const bar=(i0,i1,y,c,txt)=>{const xa=x0+i0*cw, xb=x0+(i1+1)*cw-4;e('line',{x1:xa,y1:y,x2:xb,y2:y,stroke:c,'stroke-width':3});const t=e('text',{x:(xa+xb)/2,y:y+13,'text-anchor':'middle','font-size':10.5,fill:c});t.textContent=txt;};
+  bar(0,8,48,'var(--dev)','top = n div 64^4 (lead h, unit, slice)');
+  bar(3,12,72,'var(--host)','bottom = n mod 64^10 (parent = digits 0–8, child adds 9)');
+  const t2=e('text',{x:4,y:52,'font-size':10.5,fill:'var(--coord)'});t2.textContent='pink: a field fixes';
+  const t3=e('text',{x:4,y:66,'font-size':10.5,fill:'var(--dev)'});t3.textContent='purple: the slice (4–8)';
+  const t4=e('text',{x:4,y:80,'font-size':10.5,fill:'var(--host)'});t4.textContent='blue: the unit (9)';
+})();
+// ---------------------------------------------------------------- stage table
+(function(){
+  const rows=[['tops (tops5 per 64 slices, tops1, tscan, tops2, tdigz2, toprec2)',0.759,0.393,'tops 13 %'],
+   ['parents (hist2 over the shared list, scan16, scatter3, hsort)',0.476,0.525,'bucket, upload, host, other 17 %'],
+   ['main kernel (g2_kernel)',2.607,5.542,'AND + join base 22 %'],
+   ['expansion + prefilter',0.356,null,'prefilter + walk 37 %'],
+   ['check, done, group read',0.112,null,'check 11 %'],
+   ['whole slice',4.312,7.568,'4.5 fs per admissible n']];
+  let h='<tr><th>stage</th><th>RX 9070 XT</th><th>RTX 3080</th><th>overlap join, share (derived)</th></tr>';
+  for(const [s,a,b,o] of rows){h+=`<tr><td>${s}</td><td class="n">${a.toFixed(3)} (${(100*a/4.312).toFixed(1)} %)</td><td class="n">${b==null?(s.startsWith('expansion')?'1.108 (14.6 %) with the check':'(with the expansion)'):b.toFixed(3)+' ('+(100*b/7.568).toFixed(1)+' %)'}</td><td>${o}</td></tr>`;}
+  h+='<tr><td colspan="4" style="color:var(--text-muted)">RX 9070 XT tops and parents were measured off the operating point (about 1.55 GHz, 90 W): too high, and the main kernel’s difference too low by the same amount. Tops + parents + main kernel together: 3.843 ms, measured loaded.</td></tr>';
+  document.getElementById('stageTable').innerHTML=h;
+})();
+</script>
+</body>
+</html>

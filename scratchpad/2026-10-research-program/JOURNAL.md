@@ -162,6 +162,25 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   kernels for the RX 9070 XT (base 65 is 3.1 fs there against 0.99 at base 64) and bases 68–70 on the merged
   code; (6) verify the `StrideTable` panic at bases 15, 19, 23, 27 and offer a fix (its own small PR, not covered
   by the hold); (7) keep `DECISIONS.md` and the design document current. Budget: $7.46 left under the cap.
+- **17:52 UTC: the design material for the user's read-through exists** (`../2026-11-midout-design/`, written by
+  an Opus agent from `BRIEF.md` there, read-only on the code): `DESIGN.md` (665 lines; every claim labelled
+  measured, proven or judged), `static/midout-overview.png` (one screen), `interactive/midout-map.html` (38
+  shapes in three lanes, today's overlap join beside it; 87 file:line references checked against `dev/mo-clean`
+  5a048669 and `origin/main` 974d7194 by `tools/check_refs.py`, 0 bad), `README.md`, `tools/`, `screenshots/`.
+  I read the whole document against my records and looked at the renders; one clipped edge label fixed.
+- **What its writer found wrong in my own documents, corrected in `DECISIONS.md` at about 17:56:** D6 said the client
+  flag refuses Metal (it does not: a recommendation, not built); the "1,073 slices" evidence predates the
+  execution checks and the 5–7 field (now dated, with what was re-run since); the RX 9070 XT baseline is
+  production's join harness scaled by two bracket fields, not the client's ten-field run (now said); the
+  "being cut / in progress" lines were stale. Still wrong on the branch itself, for the carry-back: `coord.rs:21–24`
+  (old renumbering under "Base 64"), `gpu.rs:281` (`tdig_kernel`), `route.rs` (70 s against the notes' 93 s for
+  the base-65 CPU slice).
+- **`sync.sh` now also snapshots `scratchpad/2026-11-midout-design`** (without `screenshots/`).
+- **18:00 UTC (box 61490977 on m11295, $0.127/h, TTL 4 h, logged in 17:58), started tonight instead of at the 05:41 cycle, because the user is about to read `dev/mo-clean`:**
+  the carry-back of the review's changes into `dev/mo-clean` (`G2/BUILD-BRIEF-8B.md`, Opus, one rented 3080, to
+  21:45), plus the Metal refusal the decisions document promised, the three stale comments, and a
+  reproduce-or-refute of the `StrideTable` panic on production main (no fix). When the branch head moves, the
+  map's and the design document's file:line references are re-checked against the new head.
 
 ## 2026-11-18 (cycle 9 of the new director; routine fired 05:41 UTC)
 

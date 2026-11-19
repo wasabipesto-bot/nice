@@ -4,7 +4,7 @@
 # 5 MB and build dirs are left out; raw data that size goes to braize or the fork's
 # releases instead.
 set -euo pipefail
-REPO="$HOME/projects/nice"; DIRS="scratchpad/2026-10-research-program scratchpad/2026-11-fresh-eyes"; BRANCH="research-program"
+REPO="$HOME/projects/nice"; DIRS="scratchpad/2026-10-research-program scratchpad/2026-11-fresh-eyes scratchpad/2026-11-midout-design"; BRANCH="research-program"
 MSG="${1:-sync $(date -u +%F)}"
 cd "$REPO"
 if ! git show-ref --quiet "refs/heads/$BRANCH"; then
@@ -13,7 +13,7 @@ fi
 export GIT_INDEX_FILE; GIT_INDEX_FILE="$(mktemp)"
 trap 'rm -f "$GIT_INDEX_FILE"' EXIT
 git read-tree "refs/heads/$BRANCH"
-find $DIRS -type f -size -5M -not -path '*/target/*' -not -path '*/__pycache__/*' -not -path '*/.worktrees/*' -print0 \
+find $DIRS -type f -size -5M -not -path '*/target/*' -not -path '*/__pycache__/*' -not -path '*/.worktrees/*' -not -path '*/2026-11-midout-design/screenshots/*' -print0 \
   | xargs -0 git add -f --
 tree="$(git write-tree)"
 if [ "$tree" = "$(git rev-parse "refs/heads/$BRANCH^{tree}")" ]; then echo "sync: no changes"; exit 0; fi
