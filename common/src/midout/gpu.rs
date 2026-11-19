@@ -1423,23 +1423,26 @@ mod post {
         (lo | a10 | a11, hi | b10 | b11, a10 | a11, b10 | b11)
     }
 
-    /// `digits12` with each digit as one 64-bit shift (step 4S, the SPIR-V path: ACO for GFX1201 makes one
-    /// `v_lshlrev_b64` and half an OR per digit, against about six 32-bit operations for `oh`; on CUDA a 64-bit
-    /// shift is two funnel shifts and a select, so CUDA keeps `digits12`).
+    /// Bits 24-47 of a product of two 24-bit values (`x·y < 2^48`): its low and high 32-bit words recombined.
     #[cube]
-    fn digits12_64(w0: u32, w1: u32, w2: u32) -> (u32, u32, u32, u32) {
+    fn hi24(x: u32, y: u32) -> u32 {
+        ((x * y) >> 24u32) | (u32::mul_hi(x, y) << 8u32)
+    }
+
+    /// The 12 low base-64 digits of a residue mod 2^72 in 24-bit limbs (four digits per limb, none straddles) as a
+    /// one-hot pair (lo, hi) by 64-bit shifts, and digits 10-11 alone as another.
+    #[cube]
+    fn digits12_24(l0: u32, l1: u32, l2: u32) -> (u32, u32, u32, u32) {
         let mut m = 0u64;
         #[unroll]
-        for j in 0..5u32 {
-            m |= 1u64 << u64::cast_from((w0 >> comptime!(6 * j)) & 63u32);
-        }
-        m |= 1u64 << u64::cast_from((w0 >> 30u32) | ((w1 & 15u32) << 2u32));
-        #[unroll]
         for j in 0..4u32 {
-            m |= 1u64 << u64::cast_from((w1 >> comptime!(4 + 6 * j)) & 63u32);
+            m |= 1u64 << u64::cast_from((l0 >> comptime!(6 * j)) & 63u32);
+            m |= 1u64 << u64::cast_from((l1 >> comptime!(6 * j)) & 63u32);
         }
-        let mm = (1u64 << u64::cast_from((w1 >> 28u32) | ((w2 & 3u32) << 4u32)))
-            | (1u64 << u64::cast_from(w2 >> 2u32));
+        m |= 1u64 << u64::cast_from(l2 & 63u32);
+        m |= 1u64 << u64::cast_from((l2 >> 6u32) & 63u32);
+        let mm = (1u64 << u64::cast_from((l2 >> 12u32) & 63u32))
+            | (1u64 << u64::cast_from((l2 >> 18u32) & 63u32));
         let a = m | mm;
         (
             u32::cast_from(a & 0xFFFF_FFFFu64),
@@ -1449,6 +1452,47 @@ mod post {
         )
     }
 
+    /// [`pf`] in 24-bit limbs (step 4S, the SPIR-V path): every product is of two values below 2^24, which ACO
+    /// for GFX1201 can issue as full-rate 24-bit multiplies instead of the quarter-rate `v_mul_lo/hi_u32` of the
+    /// 32-bit limbs; no 64-bit adds, no digit straddling two limbs, and each digit's one-hot as one 64-bit shift
+    /// (ACO spent about six 32-bit operations per digit on `oh`'s pair; on CUDA a 64-bit variable shift is two
+    /// funnel shifts and a select, so CUDA keeps `pf`).
+    #[cube]
+    fn pf24(r0: u32, plo: u32, phi: u32, top: u64) -> bool {
+        let mk = 0xFF_FFFFu32;
+        // n mod 2^72 = x0 + x1·2^24 + x2·2^48: r0 is bits 0-29, plo bits 30-61, phi bits 62-93
+        let x0 = r0 & mk;
+        let x1 = (r0 >> 24u32) | ((plo & 0x3_FFFFu32) << 6u32);
+        let x2 = (plo >> 18u32) | ((phi & 0x3FFu32) << 14u32);
+        // n² mod 2^72: column sums stay below 2^32 (at most five 24-bit terms and a carry)
+        let p00 = x0 * x0;
+        let s0 = p00 & mk;
+        let v1 = hi24(x0, x0) + 2u32 * ((x0 * x1) & mk);
+        let s1 = v1 & mk;
+        let v2 = (v1 >> 24u32) + 2u32 * hi24(x0, x1) + ((x1 * x1) & mk) + 2u32 * ((x0 * x2) & mk);
+        let s2 = v2 & mk;
+        // n³ = n²·n mod 2^72
+        let c0 = (s0 * x0) & mk;
+        let u1 = hi24(s0, x0) + ((s0 * x1) & mk) + ((s1 * x0) & mk);
+        let c1 = u1 & mk;
+        let u2 = (u1 >> 24u32)
+            + hi24(s0, x1)
+            + hi24(s1, x0)
+            + ((s0 * x2) & mk)
+            + ((s1 * x1) & mk)
+            + ((s2 * x0) & mk);
+        let c2 = u2 & mk;
+        let (sl, sh, sml, smh) = digits12_24(s0, s1, s2);
+        let (cl, ch, cml, cmh) = digits12_24(c0, c1, c2);
+        let lo = sl | cl;
+        let hi = sh | ch;
+        let mlo = sml | cml;
+        let mhi = smh | cmh;
+        let tlo = u32::cast_from(top & 0xFFFF_FFFFu64);
+        let thi = u32::cast_from(top >> 32u64);
+        lo.count_ones() + hi.count_ones() == 24u32 && ((mlo & tlo) | (mhi & thi)) == 0u32
+    }
+
     /// The middle-digit prefilter of one survivor (`cpu::prefilter` at k
     /// 10): n mod 2^72 from `r0` and its top's P (bits 30-93 of n), in 32-bit
     /// limbs; the digits at positions 0-11 of n² and n³ (mod 2^72) must be
@@ -1456,7 +1500,7 @@ mod post {
     /// at 10-11 must miss the top's certified digits at positions >= 12
     /// (`top`).
     #[cube]
-    fn pf(r0: u32, plo: u32, phi: u32, top: u64, #[comptime] oh64: bool) -> bool {
+    fn pf(r0: u32, plo: u32, phi: u32, top: u64) -> bool {
         let x0 = r0 | (plo << 30u32);
         let x1 = (plo >> 2u32) | (phi << 30u32);
         let x2 = (phi >> 2u32) & 255u32;
@@ -1479,37 +1523,8 @@ mod post {
             + s0 * x2
             + s2 * x0)
             & 255u32;
-        let mut sl = 0u32;
-        let mut sh = 0u32;
-        let mut sml = 0u32;
-        let mut smh = 0u32;
-        let mut cl = 0u32;
-        let mut ch = 0u32;
-        let mut cml = 0u32;
-        let mut cmh = 0u32;
-        if comptime!(oh64) {
-            let (a0, a1, a2, a3) = digits12_64(s0, s1, s2);
-            let (b0, b1, b2, b3) = digits12_64(c0, c1, c2);
-            sl = a0;
-            sh = a1;
-            sml = a2;
-            smh = a3;
-            cl = b0;
-            ch = b1;
-            cml = b2;
-            cmh = b3;
-        } else {
-            let (a0, a1, a2, a3) = digits12(s0, s1, s2);
-            let (b0, b1, b2, b3) = digits12(c0, c1, c2);
-            sl = a0;
-            sh = a1;
-            sml = a2;
-            smh = a3;
-            cl = b0;
-            ch = b1;
-            cml = b2;
-            cmh = b3;
-        }
+        let (sl, sh, sml, smh) = digits12(s0, s1, s2);
+        let (cl, ch, cml, cmh) = digits12(c0, c1, c2);
         let lo = sl | cl;
         let hi = sh | ch;
         let mlo = sml | cml;
@@ -1517,6 +1532,19 @@ mod post {
         let tlo = u32::cast_from(top & 0xFFFF_FFFFu64);
         let thi = u32::cast_from(top >> 32u64);
         lo.count_ones() + hi.count_ones() == 24u32 && ((mlo & tlo) | (mhi & thi)) == 0u32
+    }
+
+    /// The prefilter in the runtime's form: 24-bit limbs and 64-bit one-hot shifts on the SPIR-V path (`pf24`),
+    /// 32-bit limbs and one-hot pairs on CUDA (`pf`, as measured there).
+    #[cube]
+    fn pfx(r0: u32, plo: u32, phi: u32, top: u64, #[comptime] oh64: bool) -> bool {
+        let mut ok = false;
+        if comptime!(oh64) {
+            ok = pf24(r0, plo, phi, top);
+        } else {
+            ok = pf(r0, plo, phi, top);
+        }
+        ok
     }
 
     /// The bits of two records (top index, chunk position, word lo, hi) whose
@@ -1574,7 +1602,7 @@ mod post {
             let r0 = lst[(pos + off) as usize] + r0hi;
             let top = select(ina, topa, topb);
             if nopf
-                || (pf(
+                || (pfx(
                     r0,
                     select(ina, ploa, plob),
                     select(ina, phia, phib),
@@ -1654,7 +1682,7 @@ mod post {
         pip_hi: u32,
         // (audit) F_NOPF (1): every survivor listed, no prefilter
         fault: u32,
-        // the prefilter's digit masks by 64-bit shifts (`digits12_64`: the SPIR-V path) or 32-bit pairs (CUDA)
+        // the prefilter in 24-bit limbs with 64-bit one-hot shifts (`pf24`: the SPIR-V path) or as measured on CUDA (`pf`)
         #[comptime] oh64: bool,
     ) {
         let nopf = (fault & 1u32) != 0u32;
@@ -2526,7 +2554,7 @@ pub struct GpuJoin<R: Runtime> {
     pub w: u32,
     fill: u32,
     ballot: bool,
-    /// The expansion's prefilter builds its digit masks by 64-bit shifts (the SPIR-V compiler; see `digits12_64`).
+    /// The expansion's prefilter in its SPIR-V form (`pf24`: 24-bit limbs, 64-bit one-hot shifts).
     oh64: bool,
     caps: Caps,
     check: CheckShape,
