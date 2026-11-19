@@ -35,6 +35,45 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## SRA.3 Census: which production submissions ran the exposed path (2026-11-19 03:15–03:40 UTC, director, ivory, read-only API; `SRA/census/` (`probe.py`, `census.py`, `census.log`, `state.json`, `rows.jsonl`, `followup.py`, `analyze.py`, `msd_check.py` and their outputs))
+
+- **Method:** every nice-only submission since 2026-08-28 (the day v3.4.0, the first release with CubeCL's stride
+  kernel, was tagged): submission ids 245,600,000–297,600,000 in 520 primary-key ranges of 100k, two requests per
+  range 0.25 s apart, 682 s in all, no retry or error. Request 1 counted version, backend and route of every
+  nice-only row; request 2 stored the rows with an explicit non-join route or with the CubeCL CUDA backend and
+  no route field, with their field's base and size.
+- **984,248 nice-only submissions** [M]:
+
+  | client | backend | route | submissions |
+  |---|---|---|---|
+  | 3.3.0 – 3.4.5 | none (CPU) | none | 142,904 |
+  | 3.4.2 – 3.4.5 | cubecl (wgpu) | none (stride) | 360,041 |
+  | 3.4.2 – 3.4.5 | cuda (hand-written) | none (stride) | 15,046 |
+  | **3.4.3** | **cubecl-cuda** | **none (stride)** | **451** |
+  | 3.4.5 (pre-release builds) | cubecl (wgpu) | join | 150,310 |
+  | 3.4.6 | none (CPU) | none / join | 1,901 / 226 |
+  | 3.4.6 | cubecl (wgpu) / cuda | join | 121,836 / 62,837 |
+  | 3.4.7, 3.4.8 and their dev builds | cubecl (wgpu) | join | 105,354 |
+  | 3.4.7, 3.4.8 | cubecl-cuda | join | 23,342 |
+
+- **Since v3.4.6 no GPU submission took the stride route**: every GPU row from 3.4.6 on reads `route: join`
+  (0 rows with any other route value in the whole scan).
+- **The exposed combination (nice-only, CubeCL's stride kernel, CUDA runtime) occurs in exactly 451
+  submissions**: v3.4.3, user `vast-pipeline-test`, 2026-09-03 14:30–14:54 (−04:00), base-54 fields of 1e13,
+  339 on an RTX 4090 and 112 on an RTX 3060, none disqualified.
+- **All 451 fields had already been searched on the CPU** [M]: each has exactly one other nice-only submission,
+  from v3.2.15 (`vast-test`, 450 fields) or v3.2.14 (1 field). No field rests on the exposed runs alone.
+- **No sign that any of the 451 dropped its launches** [M + exact arithmetic]: 30 of them returned in under 15 %
+  of their card's median processing time; for every field I computed the share that survives the leading-digit
+  test (binary splitting to 4,096 pieces, exact integers). The 30 fast runs are the fields with at most 7.7 %
+  surviving (27 of them 0), and time rises with the share bin by bin (minimum time over median: 0.17, 0.30,
+  0.47, 0.61, 0.69, 0.88, 1.00 for shares 0.1–0.2 … 0.7–0.8). A run that dropped its launches would be fast
+  with a large share; there is none (smallest share among the 421 normal runs: 0.059).
+- **Not examined** (different runtimes, mechanism not shown there): the 15,046 stride submissions on the
+  hand-written CUDA backend (v3.4.2–v3.4.5) and the 360,041 on wgpu (v3.4.2–v3.4.5, almost all the RX 9070 XT).
+- **Conclusion:** the defect PR #270 fixes has no known effect on production's results. It was reachable by
+  default only from v3.4.7 on and only for stride-routed fields, and no such field was ever submitted.
+
 ## SRA.2 Review of the stride fix, its fixes, and PR #270 (2026-11-19 01:30–03:10 UTC, independent reviewer then the author; `SRA/REVIEW-BRIEF.md`, `SRA/REVIEW.md`, `SRA/raw/review/`, `SRA/RESULTS.md` "After review", `SRA/PR-BODY.md`; branch `pr/stride-ran-account` 0f3a4542 + changelog link 05f18331; https://github.com/wasabipesto/nice/pull/270; box 61303619, destroyed 03:10 after 8.2 h)
 
 - **Verdict: merge with fixes; no defect found in the code.** The reviewer ran everything on its own clones:

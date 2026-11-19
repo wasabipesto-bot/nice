@@ -248,6 +248,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     a v3.4.7+ NVIDIA client on a field under 1e13 or a base outside 40–64; and any from v3.4.0–v3.4.6 with the
     CubeCL CUDA backend selected (telemetry's backend field, if it has one).**
 
+- **03:40 UTC: the census, run at the user's request (EXPERIMENTS SRA.3).** 984,248 nice-only submissions since
+  v3.4.0 scanned read-only in 11 minutes. The exposed combination appears 451 times, all in one fleet pipeline
+  test on 2026-09-03 at base 54, all on fields with an earlier CPU result, and none shows dropped launches
+  (their run times follow the share of each field that survives the leading-digit test, checked by exact
+  arithmetic). Since v3.4.6 every GPU submission took the join. Open for the cycle: the hand-written CUDA
+  backend under an allocation failure (15,046 stride submissions, one rented hour), and wgpu on a real card.
+
 ## 2026-11-17 (cycle 8 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $17.70 invoiced of $30 (fleet $30.17);
