@@ -4,6 +4,38 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-20 (cycle 11 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $22.91 invoiced of $30 (fleet $35.45), credit $52.91.
+  No day missed. Nothing from the user since the hold (2026-11-19 17:40 UTC). PR #271 open, mergeable, 25 checks
+  pass, 3 skipped, no comments. Four Dependabot PRs opened overnight (#272–#275; not the program's). Drafts #255,
+  #242, #194, #160 parked. Upstream main 974d7194 unchanged; no new release; nothing new to measure on the fleet.
+- **Standing rule today:** no new pull request of any kind without the user's word (the middle-out series is
+  held; the stride fix waits on DECISIONS D16).
+- **Plan, with kill criteria:**
+  - **CEIL, how far the pair join is from its floor** (deep line; `CEIL/BRIEF.md`, Opus, a 20-core rented box,
+    CPU only, to 11:45 UTC; my own note `CEIL/NOTES.md`). The main kernel is 60 % of a slice and is a
+    disjointness join of about 472 top masks against 8.4k child masks per job. On paper (my note): generic
+    indexing cannot beat the bit-sliced scan by much (it is an orthogonal-vectors instance in 64 dimensions; a
+    job has only about 7 bits of chunk key), and two restructurings I tried fail (a slice-invariant first stage;
+    a trie over the bottoms' tree). One source of coherence is unused: **the magnitude of L** (children sorted by
+    n mod 64^4: over a chunk's span the next digits of n² and n³ below a top's certificate are constant, so a
+    top can discard whole chunks from its own digits, and test with more digits elsewhere). Exact counts on real
+    slices decide. **Kill criterion: if the best exact variant cuts the main kernel's work (lane slots × ORs, in
+    the wave model that reproduces today's 60.5 % busy lanes) by less than ×1.3 against today's order and skip,
+    the pair-join family is closed with the measured ceiling; at ×1.3 or more it gets a kernel prototype on the
+    branch.**
+  - **W2, the wide path (bases 65–70), support work the user allowed** (`G2/BUILD-BRIEF-9W.md`, Opus, RTX 3080
+    on m11295, branch `dev/mo-clean`, to 11:45 UTC): where the wide expansion spends 3.3 ms (narrow: 1.1) and
+    what of it can go; a multithreaded CPU slice so the sampled CPU check fits base 65 (today it is off there: a
+    soundness gap of the wide path); the wide main kernel's shared memory under the RX 9070 XT's 12-wave
+    threshold, prepared offline. Stop rule: a change that costs exactness or more than 1 % at base 64 is
+    reverted.
+  - **Mutants** (rote; rides on the CEIL box): the 27 mutants of the CPU reference rerun on `dev/mo-clean`
+    c2152084.
+- **Not started, on purpose:** bases 68–70 (after the wide path's check and expansion are in order); anything
+  on the RX 9070 XT (no lease); any pull request.
+
 ## 2026-11-19 (cycle 10 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances at the start; November research $21.08 invoiced of $30 (fleet $33.79),
