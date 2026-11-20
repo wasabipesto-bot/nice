@@ -1,0 +1,25 @@
+   Compiling cubecl v0.10.0
+   Compiling nice_common v3.4.9-dev (/root/mcc/common)
+error: using decimal literal for bitwise operation
+   --> common/src/midout/gpu_wide.rs:259:67
+    |
+259 |             dg = (pv[0usize] >> 28u32) | ((pv[1usize] >> 24u32) & 112u32);
+    |                                                                   ^^^^^^
+    |
+    = help: use binary (0b111_0000_u32), hex (0x0070_u32), or octal (0o160_u32) notation for better readability
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#decimal_bitwise_operands
+    = note: `-D clippy::decimal-bitwise-operands` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::decimal_bitwise_operands)]`
+
+error: using decimal literal for bitwise operation
+   --> common/src/midout/gpu_wide.rs:261:67
+    |
+261 |             dg = (pv[2usize] >> 28u32) | ((pv[3usize] >> 24u32) & 112u32);
+    |                                                                   ^^^^^^
+    |
+    = help: use binary (0b111_0000_u32), hex (0x0070_u32), or octal (0o160_u32) notation for better readability
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#decimal_bitwise_operands
+
+error: could not compile `nice_common` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nice_common` (lib test) due to 2 previous errors

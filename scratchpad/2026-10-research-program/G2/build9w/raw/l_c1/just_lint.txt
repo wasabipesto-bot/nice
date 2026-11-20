@@ -1,0 +1,58 @@
+cargo fmt --all --check
+cargo clippy -p "*" --all-targets -- -D warnings
+    Checking nice_common v3.4.9-dev (/root/mcc/common)
+    Checking nice-wasm-client v3.4.9-dev (/root/mcc/wasm-client)
+    Checking nice_jobs v3.4.9-dev (/root/mcc/jobs)
+    Checking nice_client v3.4.9-dev (/root/mcc/client)
+    Checking nice_api v3.4.9-dev (/root/mcc/api)
+warning: unused dependency `web-sys`
+  --> wasm-client/Cargo.toml:22:15
+   |
+22 | [dependencies.web-sys]
+   |               ^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `web-sys`
+warning: `nice-wasm-client` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.66s
+# The GPU/spirv code only exists under these features, so lint it too.
+cargo clippy -p "*" --all-targets --features nice_client/gpu,nice_client/cubecl-spirv -- -D warnings
+    Checking ciborium-ll v0.2.2
+    Checking num-rational v0.4.2
+    Checking num-iter v0.1.46
+    Checking num-complex v0.4.6
+    Checking petgraph v0.8.3
+    Checking gpu-descriptor v0.3.2
+    Checking ciborium v0.2.2
+    Checking wgpu-hal v29.0.4
+    Checking tracel-rspirv v0.12.1+sdk-1.4.341.0
+    Checking num v0.4.3
+   Compiling nice_common v3.4.9-dev (/root/mcc/common)
+    Checking cubecl-common v0.10.0
+    Checking cubecl-ir v0.10.0
+    Checking wgpu-core-deps-windows-linux-android v29.0.4
+    Checking wgpu-core v29.0.4
+    Checking cubecl-runtime v0.10.0
+    Checking cubecl-core v0.10.0
+    Checking wgpu v29.0.4
+    Checking cubecl-opt v0.10.0
+    Checking cubecl-std v0.10.0
+    Checking cubecl-cpp v0.10.0
+    Checking cubecl-spirv v0.10.0
+    Checking cubecl-cuda v0.10.0
+    Checking cubecl-wgpu v0.10.0
+    Checking cubecl v0.10.0
+    Checking nice_client v3.4.9-dev (/root/mcc/client)
+    Checking nice-wasm-client v3.4.9-dev (/root/mcc/wasm-client)
+    Checking nice_jobs v3.4.9-dev (/root/mcc/jobs)
+    Checking nice_api v3.4.9-dev (/root/mcc/api)
+warning: unused dependency `web-sys`
+  --> wasm-client/Cargo.toml:22:15
+   |
+22 | [dependencies.web-sys]
+   |               ^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `web-sys`
+warning: `nice-wasm-client` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.37s

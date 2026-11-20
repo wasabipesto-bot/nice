@@ -36,6 +36,19 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **Not started, on purpose:** bases 68–70 (after the wide path's check and expansion are in order); anything
   on the RX 9070 XT (no lease); any pull request.
 
+- **09:20 UTC: CEIL is back and closed by its rule (EXPERIMENTS CEIL.1).** The instrument reproduces the
+  kernel's counts and the card's 60.5 % busy lanes exactly. Sort keys saturate at 8 bits; the magnitude-of-L
+  skip is as strong as I predicted (0.506 of visits dead) but it empties the common masks, so it replaces the
+  key's skip instead of adding to it: ×0.89; best hybrid ×0.92; probe sharing ×1.13–1.17; a perfect skip ×1.99.
+  **Best exact variant ×1.18: the order-and-skip family of the pairing is finished as research.** What the
+  study turned up that I had not asked: 91 % of kept visits yield a zero word, and the only lever that moves
+  lane slots is the width of a lane's word (128 or 256 children: ×0.5 / ×0.25 lane slots at the same bytes),
+  worth ×1.0 to ×2 depending on whether a slot is bound by bandwidth or by instructions. That is lead **CW**
+  for tomorrow: first the RX 9070 XT model that predicted the slice within 3 % (`G2/build4s/model_4s.py`) asked
+  what binds a slot there, then a word-phase microbenchmark at width 128 on a rented card; kill under ×1.15 on
+  the main kernel. Mutants: 3 of 27 survive on `dev/mo-clean`, the expected three. Box 61586715 destroyed 09:08
+  (3.2 h, about $0.20).
+
 ## 2026-11-19 (cycle 10 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances at the start; November research $21.08 invoiced of $30 (fleet $33.79),

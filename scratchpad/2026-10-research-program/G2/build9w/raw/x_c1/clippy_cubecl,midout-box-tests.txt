@@ -1,0 +1,45 @@
+   Compiling num-traits v0.2.19
+    Checking indexmap v2.14.1
+    Checking gpu-descriptor v0.3.2
+   Compiling nice_common v3.4.9-dev (/root/mcc/common)
+    Checking half v2.7.1
+    Checking ordered-float v5.5.0
+    Checking chrono v0.4.45
+    Checking float8 v0.7.0
+    Checking naga v29.0.4
+   Compiling cubecl-common v0.10.0
+   Compiling cubecl-macros v0.10.0
+    Checking cubecl-ir v0.10.0
+    Checking cubecl-runtime v0.10.0
+    Checking cubecl-core v0.10.0
+    Checking wgpu-naga-bridge v29.0.4
+    Checking wgpu-hal v29.0.4
+    Checking cubecl-std v0.10.0
+    Checking wgpu-core-deps-windows-linux-android v29.0.4
+    Checking wgpu-core v29.0.4
+    Checking wgpu v29.0.4
+    Checking cubecl-wgpu v0.10.0
+    Checking cubecl v0.10.0
+error: using decimal literal for bitwise operation
+   --> common/src/midout/gpu_wide.rs:259:67
+    |
+259 |             dg = (pv[0usize] >> 28u32) | ((pv[1usize] >> 24u32) & 112u32);
+    |                                                                   ^^^^^^
+    |
+    = help: use binary (0b111_0000_u32), hex (0x0070_u32), or octal (0o160_u32) notation for better readability
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#decimal_bitwise_operands
+    = note: `-D clippy::decimal-bitwise-operands` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::decimal_bitwise_operands)]`
+
+error: using decimal literal for bitwise operation
+   --> common/src/midout/gpu_wide.rs:261:67
+    |
+261 |             dg = (pv[2usize] >> 28u32) | ((pv[3usize] >> 24u32) & 112u32);
+    |                                                                   ^^^^^^
+    |
+    = help: use binary (0b111_0000_u32), hex (0x0070_u32), or octal (0o160_u32) notation for better readability
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#decimal_bitwise_operands
+
+error: could not compile `nice_common` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nice_common` (lib test) due to 2 previous errors

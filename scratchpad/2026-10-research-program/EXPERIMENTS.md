@@ -35,6 +35,45 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## CEIL.1 The pairing of the middle-out join is within ×1.2 of the best any order or skip test can do; the magnitude-of-L idea loses; only the width of a lane's word is left (2026-11-20 06:05–09:20 UTC, engineer + the director's note; `CEIL/BRIEF.md`, `CEIL/NOTES.md`, `CEIL/RESULTS.md`, `CEIL/raw/`, `CEIL/box/`; scratch branch `exp/mo-ceiling` 52120649 on c2152084, on the fork; box 61586715, 20 threads, CPU only, 3.2 h)
+
+- **Instrument** [M]: the CPU reference's own tops, children and classes, re-sorted per variant; on all 12 slices
+  (10 at base 64, 2 at base 65) and in every pass its walk equals `cpu::slice_join` field for field (slice
+  712012851: 33,705,647 children, 250,486,772 flat visits, 123,163,397 kept (0.4917), 10,929,765 records,
+  11,768,560 survivors, 337,904 checked). The lane model reproduces the card's 60.5 % busy lanes (0.6050) with
+  the kernel's real rounds of 16 chunks: a probe costs the 16 lanes of a round if any of its chunks keeps it.
+- **What a sort key can buy** [M, 8 slices]: kept fraction 1.00, 0.738, 0.593, 0.518, **0.492**, 0.488, 0.488
+  for a key of 0, 2, 4, 6, **8 (today)**, 10, 12 bits; lexicographic on the full mask 0.459; greedy clustering
+  0.406. Lane slots do not move: lexicographic ×1.0045, greedy ×0.83 (worse). Busy lanes are a property of the
+  round, not of the key.
+- **The magnitude of L (the new idea)** [M, 8 slices; my prior in `CEIL/NOTES.md` §4 was ×1.0–1.25]: with a
+  job's children sorted by L, self-collision of the top's extended certificate kills 0.506 of visits without
+  reading a child (prior 0.47–0.55), 2.37 extended digits per visit; but the common masks become empty (0.0003),
+  so kept is 0.494 against 0.492 today, and each kept slot ORs 18.7 digits: **work ×0.893 of today's (worse)**.
+  Hybrids (j leading bits of L, then the key): best j = 1, ×0.923. Records ÷6.8, survivors ÷7.3 (only the
+  expansion, 8 % of a slice, would feel it).
+- **Exactness of the extended tests** [M + P]: 1,095,468,692 survivors discarded by the variants (32.8M of them
+  passing the prefilter) all taken through brute force on the full digits of n², n³: 0 nice, 0 claim failures;
+  monotonicity proof in `CEIL/RESULTS.md`.
+- **From the bottom's side** [M]: 0.538 of (child, top digit 10) pairs are dead by the child's own digits
+  (prior 0.54); records ×0.48, no visit skipped, one more OR per slot: ×0.94 or less.
+- **Sharing ORs between consecutive probes** [M counts, J lane model]: ×1.26 in summed ORs, ×1.13–1.17 once a
+  wave pays its slowest stream (×1.16–1.20 by the table's two wave widths).
+- **Bounds** [M]: 91.1 % of kept visits produce a zero word; a free and perfect skip test would give ×1.99 at
+  base 64 (×1.66 at base 65): the ceiling of the whole skip family in this lane layout.
+- **Base 65** [M, 2 slices, all jobs]: today's skip is weaker (kept 0.615, busy 0.711); L order ×1.14, hybrid
+  j = 5 ×1.19, with probe sharing ×1.35–1.39 in counted work. The per-(top, cell) certificates it needs cost
+  about three times what they save when priced from the tops stage's measured time [J].
+- **Verdict by the rule written in advance (×1.3):** **closed.** Best exact variant at base 64 ×1.18 (probe
+  sharing with a lexicographic order); at base 65 nothing net of its decision data.
+- **Left open, not a count:** chunks of 128 or 256 children halve or quarter the lane slots at the same bytes
+  (kept 0.552 / 0.626, busy 0.678 / 0.767): ×1.0 if a slot is bound by shared-memory bandwidth, up to ×2.0 /
+  ×3.9 if by instructions; a two-part model from the kernel benchmark gives ×1.33 / ×1.6 [J]. One
+  microbenchmark of the word phase on a card decides it.
+- **Mutants** [M]: the 27 mutants of the CPU reference rerun on `dev/mo-clean` c2152084: 24 killed (one after a
+  quoting fix in the list), 3 survive, the same three as on the cut branch (two change only work counters, one
+  edits an exemption no test base reaches).
+
 ## SE.2 Independent review of the stride empty-table fix: ready with fixes, nothing must-fix in the code (2026-11-19 20:10–20:35 UTC, independent reviewer; `G2/STRIDE-EMPTY-REVIEW-BRIEF.md`, `G2/STRIDE-EMPTY-REVIEW.md`; branch `pr/stride-empty-residues` 3701a353; box 61490977, own clone)
 
 - **Soundness** [P and M by the reviewer]: the parity argument for b ≡ 3 mod 4 re-derived; the guard fires only on

@@ -119,7 +119,7 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
 <body>
 <header>
   <h1>The middle-out join: one field from claim to submit, beside today's overlap join</h1>
-  <p class="sub">Branch <code>dev/mo-clean</code> at <code>c2152084</code> (fork, worktree <code>~/projects/nice/.worktrees/midout-clean</code>). The left two lanes are the middle-out join's path for one base-64 field (4,096 slices): the host side and the coordinator on the left, the device kernels of one slice in the middle. The right lane is v3.4.8's GPU overlap join (<code>origin/main</code> at <code>974d7194</code>), placed beside the middle-out stage it corresponds to; dotted grey links mark the correspondence. Click any shape for why it exists, how it connects, what it costs, which check guards it and its file:line. Bars show each stage's share of a slice's time: RX 9070 XT for the middle-out lane (the RTX 3080's numbers are in the panel), a derived 3080 profile for the overlap lane (hatched). Prose version: <code>DESIGN.md</code> beside this folder.</p>
+  <p class="sub">Branch <code>dev/mo-clean</code> at <code>85185fef</code> (fork, worktree <code>~/projects/nice/.worktrees/midout-clean</code>). The left two lanes are the middle-out join's path for one base-64 field (4,096 slices): the host side and the coordinator on the left, the device kernels of one slice in the middle. The right lane is v3.4.8's GPU overlap join (<code>origin/main</code> at <code>974d7194</code>), placed beside the middle-out stage it corresponds to; dotted grey links mark the correspondence. Click any shape for why it exists, how it connects, what it costs, which check guards it and its file:line. Bars show each stage's share of a slice's time: RX 9070 XT for the middle-out lane (the RTX 3080's numbers are in the panel), a derived 3080 profile for the overlap lane (hatched). Prose version: <code>DESIGN.md</code> beside this folder.</p>
 </header>
 
 <div class="toolbar">
@@ -155,7 +155,7 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
     <p><b>Shape</b> is role: rounded box = step; hexagon = decision; double rounded box with ⟳ = loop; box with a top bar and cut corners = device kernel; curved box = data built once and kept.</p>
     <p><b>Badges</b> give how often a piece runs: <b>PROC</b> once per process, <b>FIELD</b> once per field, <b>/64</b> once per 64 slices, <b>SLICE</b>, <b>BATCH</b>, <b>GROUP</b> (16 slices). <b>ACC</b> marks a piece that writes an execution account, <b>CHECKS</b> one that compares them.</p>
     <p><b>Bars</b> are the share of a slice's time (stage totals, drawn on the stage's main shape). The RX 9070 XT profile was measured by cumulative timing stops on field 77777; its tops and parents ran off the operating point (the card idles on those stages alone), so those two are too high and the main kernel's share too low. Overlap-lane shares are derived, not measured per stage.</p>
-    <p>Line numbers are into <code>dev/mo-clean</code> at <code>c2152084</code> for the middle-out lanes, and <code>origin/main</code> at <code>974d7194</code> for the overlap lane; each was checked by printing the line.</p>
+    <p>Line numbers are into <code>dev/mo-clean</code> at <code>85185fef</code> for the middle-out lanes, and <code>origin/main</code> at <code>974d7194</code> for the overlap lane; each was checked by printing the line.</p>
   </div></aside>
 </div>
 
@@ -176,7 +176,7 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
 
 <script>
 // ---------------------------------------------------------------- data
-// refs: [path, line, identifier on that line, repo] ; repo 'mo' = dev/mo-clean c2152084, 'main' = origin/main 974d7194
+// refs: [path, line, identifier on that line, repo] ; repo 'mo' = dev/mo-clean 85185fef, 'main' = origin/main 974d7194
 const G='common/src/midout/gpu.rs', GW='common/src/midout/gpu_wide.rs', C='common/src/midout/cpu.rs', CO='common/src/midout/coord.rs',
       RT='common/src/midout/route.rs', WI='common/src/midout/wire.rs', CR='client/src/midout_route.rs', CJ='common/src/cubecl_join.rs',
       OJ='common/src/overlap_join.rs', JP='common/src/join_plan.rs', SC='scripts/midout_coordinator.py';
@@ -201,45 +201,45 @@ const N=[
  con:`→ <code>search_field</code> (base 64, the lanes below) or <code>search_field_wide</code> (base 65). A change of base drops the old join first.`,
  cost:`Building a join: about 2 s once when the route switches base (kernel compilation, buffers).`,
  chk:`Refuses bases other than 64 and 65, and a coordinate the base does not know.`,
- refs:[[RT,39,'pub fn new'],[RT,85,'pub fn search'],[RT,74,'pub fn cpu_check_default']],
+ refs:[[RT,39,'pub fn new'],[RT,87,'pub fn search'],[RT,74,'pub fn cpu_check_default']],
  wide:`Base 65 goes to <code>WideJoin</code> (<code>gpu_wide.rs:2642</code>) through <code>search_field_wide</code> (<code>:3704</code>).`},
 {id:'fcheck',x:X1,y:380,h:70,L:'host',S:'dec',fq:'F',fld:1,t:'a field this join can search?',s:['base 64 · shape (4, 10) fits','whole quanta · group 1–256'],
  why:`The field is the contract; the shape is internal. <code>Shape::fits</code> is the only coupling between them: the field's fixed digits must lie inside the slice key, so a field is a whole number of slices.`,
  con:`→ the slice list.`,
  cost:`Microseconds.`,
  chk:`An error, not a partial field, for anything else. Groups are capped at 256 slices because the per-unit counters are 32-bit.`,
- refs:[[G,4053,'base 64 only'],[C,90,'pub fn fits'],[CO,283,'pub fn field_digits']]},
+ refs:[[G,4081,'base 64 only'],[C,90,'pub fn fits'],[CO,283,'pub fn field_digits']]},
 {id:'fslices',x:X1,y:474,h:62,L:'host',S:'proc',fq:'F',fld:1,t:'the field’s 4,096 slices',s:['digit 4 × digit 8, digit 4 innermost','64 consecutive slices share digits 5–8'],
  why:`A field of the default coordinate fixes digits 5–7. Its slices are every value of digits 4 and 8 with those fixed. Ordering digit 4 innermost lets 64 consecutive slices reuse one level of tops.`,
  con:`→ key, shared parent lists, sampled slice, the group loop.`,
  cost:`Host, negligible.`,
  chk:`Tested: each field of bases 64 and 65 is exactly the slices with its digits 5–7 (4,096 / 4,225 distinct).`,
- refs:[[C,105,'pub fn slices_of'],[G,4067,'let mut pips']]},
+ refs:[[C,105,'pub fn slices_of'],[G,4095,'let mut pips']]},
 {id:'fkey',x:X1,y:566,h:62,L:'host',S:'proc',fq:'F',t:'key from the first slice',s:['8 frequent certificate digits','host tops of one slice (~0.1 s)'],
  why:`The 8 key digits only order the parents (frequent digits of the tops' certificates first), so that the 64-child chunks share digits and the common-mask skip removes more. Any key is exact.`,
  con:`Uploaded once per field (<code>rankh</code>); read by <code>hist2</code> and the sampled rerun.`,
  cost:`One slice's tops on one host thread: about 0.1 s per field (host wait 0.14–0.23 s measured on the RX 9070 XT, including the list build).`,
  chk:`None needed: kept fraction 0.1963 with the field's key against 0.1960 with the slice's own (measured); every count but "kept" is independent of the key.`,
- refs:[[G,4104,'let rank = slice_tops'],[G,2372,'pub fn slice_tops']]},
+ refs:[[G,4133,'let rank = slice_tops'],[G,2372,'pub fn slice_tops']]},
 {id:'fsample',x:X1,y:654,h:58,L:'host',S:'proc',fq:'F',acc:1,t:'pick the sampled slice',s:['one slice at random per field','→ a host thread starts at once'],
  why:`The accounts prove that work ran, not that it was right. One random slice per field is recomputed on the CPU while the card works; it is the only check that sees a kernel computing wrongly.`,
  con:`Spawns the CPU reference thread; the comparison waits at the end of the field.`,
  cost:`Zero on the device thread.`,
  chk:`The draw is hashed with the field's start through a per-process random state: not reproducible across runs, recorded in the telemetry.`,
- refs:[[G,4082,'let sample = if opt.cpu_check'],[G,3861,'fn cpu_slice']]},
+ refs:[[G,4110,'let sample = if opt.cpu_check'],[G,3888,'fn cpu_slice']]},
 {id:'cputhread',x:X1,y:900,h:86,L:'cpu',S:'loop',fq:'F',acc:1,t:'CPU reference on the sampled slice',s:['exact, generic join (u64 masks)','its survivors, checked, prefiltered list','runs while the card does the field'],
  why:`The oracle: <code>cpu::slice_join</code>, written independently of the kernels, equal to brute force on whole small bases. An oracle should not reuse the code it checks, so nice-ness and residues are re-implemented in <code>arith.rs</code>.`,
  con:`Result joined after the last group → the sampled comparison.`,
  cost:`One host core: 27 s of a 30.6 s field on the 3080 host; 9.2 s of an 18.5 s field on demoux. The host never waited. Base 65: 70–93 s against a 55 s field, so off there.`,
  chk:`Its own correctness rests on brute force at bases 10–25 (survivors) and 10–29 (nice numbers), and a mutation test (3 of 27 mutants survive; measured on the first-PR branch).`,
- refs:[[C,522,'pub fn slice_join'],[C,232,'pub fn prefilter']],
+ refs:[[C,624,'pub fn slice_join'],[C,232,'pub fn prefilter']],
  wide:`<code>wide_sample_compare</code> (<code>gpu_wide.rs:3655</code>) with <code>slice_join::&lt;u128&gt;</code>; off by default at 65.`},
 {id:'group',x:X1,y:742,h:58,L:'host',S:'loop',fq:'F',t:'queue slices, 16 per group',s:['one stream · no sync inside a group','buffers allocated once, reused'],
  why:`Slices are queued back to back with no synchronisation; the stream orders buffer reuse. One synchronisation per 16 slices reads every counter and checks every account.`,
  con:`Each slice → its device stages (middle lane). After 16 → the group read.`,
  cost:`Driver overhead measured at 0.04 ms per slice (every buffer made, nothing launched).`,
  chk:`The slice count comes from the device's done words, not from this loop.`,
- refs:[[G,4126,'while done < pips.len()'],[G,3013,'fn queue_dev']],
+ refs:[[G,4155,'while done < pips.len()'],[G,3013,'fn queue_dev']],
  wide:`<code>queue_slice</code> (<code>gpu_wide.rs:3255</code>).`,
  ov:`Today's join runs slices in order, building the next slice's host setup on a scoped thread, with batches of up to 16 partitions and 4 in flight.`},
 // ---- lane 2: device, once per field / process
@@ -254,7 +254,7 @@ const N=[
  con:`Built at the field's start with one synchronisation; each slice's <code>hist2</code> then runs over its list. The sampled rerun deliberately does not use it.`,
  cost:`About 0.002 ms per slice (judged from instruction counts). Worth: parents 0.728 → 0.525 ms per slice and −3.1 % on ten fields (3080, measured).`,
  chk:`Its own account, checked at once: cubes done = grid, roots examined = 9,298,544, certified (ballot) = listed, listed ≤ capacity. A root wrongly left out passes every account; only the sampled check (unshared) sees it.`,
- refs:[[G,942,'pub fn anc8_kernel'],[G,2861,'fn build_anc'],[G,4108,'gj.share8']],
+ refs:[[G,942,'pub fn anc8_kernel'],[G,2861,'fn build_anc'],[G,4137,'gj.share8']],
  wide:`<b>No wide counterpart.</b> Base 65's parents are not shared (estimated −0.4 ms per slice if built).`,
  ov:`Nothing like it: today's bottoms are rebuilt per partition inside each 1e17 field.`},
 // ---- lane 2: per slice
@@ -362,20 +362,20 @@ const N=[
  con:`→ the sampled comparison.`,
  cost:`Microseconds.`,
  chk:`Nice-ness rechecked by <code>arith::unique_digits</code>, a separate implementation; membership via the coordinate (<code>v_of_n</code>).`,
- refs:[[G,4202,'every nice number'],[G,4216,'total.slices != pips.len()']]},
+ refs:[[G,4231,'every nice number'],[G,4245,'total.slices != pips.len()']]},
 {id:'fsamp',x:X1,y:2004,h:70,L:'host',S:'dec',fq:'F',cmp:1,t:'sampled comparison',s:['the slice’s counts in the field run = CPU','rerun alone, unshared: list = CPU, n for n'],
  why:`The only check that sees a kernel that does all its work and computes wrongly (a wrong certificate, parent mask, child mask, skip, transpose, prefilter). A defect touching a fraction f of slices is seen after k fields with probability 1 − (1 − f)^k.`,
  con:`Pass → the outcome. Fail → an error, nothing submitted.`,
  cost:`The device rerun: 0.16 s per field on the 3080, +0.4 % with the CPU thread.`,
  chk:`Not seen by anything: a defect shared by the device and the CPU reference; production's check judging a nice n not nice; slices not yet drawn; anything at base 65 (check off).`,
- refs:[[G,3883,'pub(crate) fn sample_compare'],[G,4220,'if let Some((pip, h)) = sample']],
+ refs:[[G,3911,'pub(crate) fn sample_compare'],[G,4249,'if let Some((pip, h)) = sample']],
  wide:`<code>wide_sample_compare</code>; off by default at 65.`},
 {id:'submit',x:X1,y:2104,h:70,L:'host',S:'proc',fq:'F',re:1,t:'submit, then the next claim',s:['FieldOutcome: nice, survivors, checked','production’s submit, route "midout"'],
  why:`Production's submit format unchanged; the telemetry carries the coordinate, the field, the join's shape label and counters, the sampled slice. survivors and checked are properties of (shape, field), equal on every device.`,
  con:`→ the coordinator. Then the next claim (no overlap between fields).`,
  cost:`Network.`,
  chk:`Nothing is submitted after a failed account, a failed sampled check, or a panic on any thread (a panic hook records it; installed before the device context is created).`,
- refs:[[CR,307,'submit_field_to_server_async'],[CR,57,'fn no_panic_so_far'],[CR,43,'fn install_panic_hook'],[C,702,'pub struct FieldOutcome']]},
+ refs:[[CR,307,'submit_field_to_server_async'],[CR,57,'fn no_panic_so_far'],[CR,43,'fn install_panic_hook'],[C,914,'pub struct FieldOutcome']]},
 // ---- lane 3: today's overlap join (origin/main)
 {id:'o_claim',x:X3,y:160,h:64,L:'old',S:'proc',fq:'F',t:'claim a 1e17 range of n',s:['/claim/niceonly · field = interval of n'],
  why:`Today a field is a contiguous range of n; its tops are certified per field and its bottoms rebuilt per partition.`,
@@ -631,7 +631,7 @@ function select(id){
   let costTab='';
   if(n.st&&ST[n.st]){const [a,b]=ST[n.st];
     costTab=`<table><tr><th>stage</th><th>RX 9070 XT</th><th>RTX 3080</th></tr><tr><td>${esc({tops:'tops (6 kernels)',par:'parents (4 kernels)',main:'main kernel',exp:'expansion + prefilter',chk:'check, done, group read'}[n.st])}</td><td class="n">${a.toFixed(3)} ms (${(100*a/SL9).toFixed(1)} %)</td><td class="n">${b==null?'with expansion':b.toFixed(3)+' ms ('+(100*b/SL3).toFixed(1)+' %)'}</td></tr><tr><td>whole slice</td><td class="n">${SL9.toFixed(3)} ms</td><td class="n">${SL3.toFixed(3)} ms</td></tr></table>`;}
-  const repoNote=n.L==='old'?'origin/main 974d7194':'dev/mo-clean c2152084';
+  const repoNote=n.L==='old'?'origin/main 974d7194':'dev/mo-clean 85185fef';
   panel.innerHTML=`
     <div class="title">${esc(n.t)}</div>
     <div style="color:var(--text-muted);font-size:12px;margin-bottom:6px">${esc(LAYER[n.L])} · ${esc(SHAPE[n.S])}</div>

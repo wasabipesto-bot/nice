@@ -1,0 +1,88 @@
+--- a/common/src/midout/gpu_wide.rs	2026-11-20 06:10:27.398616588 +0000
++++ b/common/src/midout/gpu_wide.rs	2026-11-20 06:10:27.414616981 +0000
+@@ -2035,6 +2035,11 @@
+     ) {
+         let nopf = (fault & 1u32) != 0u32;
+         let pfdrop = (fault & 1024u32) != 0u32;
++        let x_nowrite = (fault & 65536u32) != 0u32;
++        let x_trivpf = (fault & 131072u32) != 0u32;
++        let x_nobits = (fault & 262144u32) != 0u32;
++        let x_notop = (fault & 524288u32) != 0u32;
++        let x_norec = (fault & 1048576u32) != 0u32;
+         let bw = comptime!(b as u64);
+         let plo = u64::cast_from(clip[0usize]) | (u64::cast_from(clip[1usize]) << 32u64);
+         let phi = u64::cast_from(clip[2usize]) | (u64::cast_from(clip[3usize]) << 32u64);
+@@ -2070,7 +2075,7 @@
+             while r0 < cnt {
+                 let r = r0 + UNIT_POS_PLANE;
+                 let i = s * SLAB + r;
+-                let live = r < cnt;
++                let live = r < cnt && !x_norec;
+                 let mut wlo = 0u32;
+                 let mut whi = 0u32;
+                 let mut ti = 0u32;
+@@ -2084,7 +2089,7 @@
+                     whi = rec[3usize];
+                     let cc = (c + du) % m;
+                     let mut rem = ps;
+-                    let mut found = false;
++                    let mut found = x_notop;
+                     for kk in 0..nroot {
+                         let ct = (roots[kk as usize] + m - cc) % m;
+                         let sx = (du * m + ct) * 2u32;
+@@ -2099,9 +2104,11 @@
+                             }
+                         }
+                     }
+-                    let pb = pseg[c as usize];
+-                    let pe = pseg[(c + 1u32) as usize];
+-                    pos = (pb - pseg[c0 as usize]) * b + du * (pe - pb) + rec[1usize];
++                    if !x_notop {
++                        let pb = pseg[c as usize];
++                        let pe = pseg[(c + 1u32) as usize];
++                        pos = (pb - pseg[c0 as usize]) * b + du * (pe - pb) + rec[1usize];
++                    }
+                 }
+                 // the entries of the record that are survivors inside the range and pass the prefilter
+                 nread += wlo.count_ones() + whi.count_ones();
+@@ -2137,6 +2144,9 @@
+                     }
+                     for half in 0..2u32 {
+                         let mut x = select(half == 0u32, wlo, whi);
++                        if x_nobits {
++                            x = 0u32;
++                        }
+                         while x != 0u32 {
+                             let bt = x.trailing_zeros();
+                             x &= x - 1u32;
+@@ -2146,7 +2156,11 @@
+                             } else {
+                                 let mut pfok = false;
+                                 if comptime!(pf2) {
+-                                    pfok = pf_w2(&sf, rf, mq, mqh, hz, b, f0, k);
++                                    if x_trivpf {
++                                        pfok = rf % 31u32 == 0u32;
++                                    } else {
++                                        pfok = pf_w2(&sf, rf, mq, mqh, hz, b, f0, k);
++                                    }
+                                 } else {
+                                     let mut y = rf;
+                                     let mut rz = true;
+@@ -2166,7 +2180,7 @@
+                                 let pass = nopf
+                                     || (pfok
+                                         && !(pfdrop && (rf >> 10u32).trailing_zeros() >= 10u32));
+-                                if pass {
++                                if pass && !x_nowrite {
+                                     if half == 0u32 {
+                                         plo_b |= 1u32 << bt;
+                                     } else {
+@@ -3184,7 +3198,7 @@
+                     wb.nlead,
+                     wb.hlo,
+                     1u32,
+-                    self.fault,
++                    self.fault | std::env::var("MIDOUT_XABL").ok().and_then(|x| x.parse::<u32>().ok()).unwrap_or(0),
+                     self.nslab_cap,
+                     self.scap,
+                     *c0,

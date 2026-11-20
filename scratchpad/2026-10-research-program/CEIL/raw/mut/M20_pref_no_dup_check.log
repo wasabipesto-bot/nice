@@ -1,0 +1,93 @@
+
+running 28 tests
+... 3/28
+midout::cpu::tests::prefilter_at_base_64_equals_full_digits --- FAILED
+............ 16/28
+midout::cpu::tests::whole_base_17_vs_brute_force --- FAILED
+midout::cpu::tests::whole_base_18_vs_brute_force --- FAILED
+.. 20/28
+midout::cpu::tests::whole_base_20_vs_brute_force --- FAILED
+... 24/28
+midout::cpu::tests::whole_base_22_vs_brute_force --- FAILED
+midout::cpu::tests::whole_base_24_vs_brute_force --- FAILED
+. 27/28
+midout::cpu::tests::whole_base_25_vs_brute_force --- FAILED
+
+failures:
+
+---- midout::cpu::tests::prefilter_at_base_64_equals_full_digits stdout ----
+
+thread 'midout::cpu::tests::prefilter_at_base_64_equals_full_digits' (7662) panicked at common/src/midout/cpu.rs:1051:13:
+assertion `left == right` failed: n 44965356235087348974374
+  left: true
+ right: false
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- midout::cpu::tests::whole_base_17_vs_brute_force stdout ----
+
+thread 'midout::cpu::tests::whole_base_17_vs_brute_force' (7678) panicked at common/src/midout/cpu.rs:875:21:
+assertion `left == right` failed: b17 n 10327
+  left: true
+ right: false
+
+---- midout::cpu::tests::whole_base_18_vs_brute_force stdout ----
+
+thread 'midout::cpu::tests::whole_base_18_vs_brute_force' (7679) panicked at common/src/midout/cpu.rs:875:21:
+assertion `left == right` failed: b18 n 23153
+  left: true
+ right: false
+
+---- midout::cpu::tests::whole_base_20_vs_brute_force stdout ----
+
+thread 'midout::cpu::tests::whole_base_20_vs_brute_force' (7681) panicked at common/src/midout/cpu.rs:875:21:
+assertion `left == right` failed: b20 n 126977
+  left: true
+ right: false
+
+---- midout::cpu::tests::whole_base_22_vs_brute_force stdout ----
+
+thread 'midout::cpu::tests::whole_base_22_vs_brute_force' (7682) panicked at common/src/midout/cpu.rs:875:21:
+assertion `left == right` failed: b22 n 504573
+  left: true
+ right: false
+
+---- midout::cpu::tests::whole_base_24_vs_brute_force stdout ----
+
+thread 'midout::cpu::tests::whole_base_24_vs_brute_force' (7683) panicked at common/src/midout/cpu.rs:875:21:
+assertion `left == right` failed: b24 n 2628531
+  left: true
+ right: false
+
+---- midout::cpu::tests::whole_base_25_vs_brute_force stdout ----
+
+thread 'midout::cpu::tests::whole_base_25_vs_brute_force' (7684) panicked at common/src/midout/cpu.rs:875:21:
+assertion `left == right` failed: b25 n 4216442
+  left: true
+ right: false
+
+
+failures:
+    midout::cpu::tests::prefilter_at_base_64_equals_full_digits
+    midout::cpu::tests::whole_base_17_vs_brute_force
+    midout::cpu::tests::whole_base_18_vs_brute_force
+    midout::cpu::tests::whole_base_20_vs_brute_force
+    midout::cpu::tests::whole_base_22_vs_brute_force
+    midout::cpu::tests::whole_base_24_vs_brute_force
+    midout::cpu::tests::whole_base_25_vs_brute_force
+
+test result: FAILED. 21 passed; 7 failed; 0 ignored; 0 measured; 216 filtered out; finished in 25.57s
+
+warning: unnecessary parentheses around `if` condition
+   --> common/src/midout/cpu.rs:250:16
+    |
+250 |             if (j >= k && !(mhi & bit).is_zero()) {
+    |                ^                                ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+250 -             if (j >= k && !(mhi & bit).is_zero()) {
+250 +             if j >= k && !(mhi & bit).is_zero() {
+    |
+
+error: test failed, to rerun pass `-p nice_common --lib`

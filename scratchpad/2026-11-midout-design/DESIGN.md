@@ -1,7 +1,7 @@
 # The middle-out join: design
 
 *A description of what is on the branch and why, for a reader who knows the project and today's overlap join and
-has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean` head `c2152084` (worktree
+has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean` head `85185fef` (worktree
 `~/projects/nice/.worktrees/midout-clean`) and from the measurements recorded beside it. The open decisions are
 not repeated here; they are in `~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md` (section A).*
 
@@ -83,7 +83,7 @@ residues for a nice number; 8 of 63 at base 64.) §8 has the table and the condi
 ## 2. The pipeline for one field, stage by stage
 
 A field at base 64 is 4,096 slices. The library entry point is `midout::gpu::search_field`
-(`common/src/midout/gpu.rs:3925`), which calls `field_run` (`:4044`). The stage table in `gpu.rs:11–18` is the
+(`common/src/midout/gpu.rs:3953`), which calls `field_run` (`:4072`). The stage table in `gpu.rs:11–18` is the
 code's own summary; this section expands it.
 
 **Costs** are ms per slice, measured on field 77777 by *cumulative timing stops* (the bench runs the field's
@@ -114,18 +114,18 @@ kernels up to a stage and nothing after; a stage's cost is the difference betwee
 - **In:** `(Coord, v_start, v_size)`. **Out:** the field's list of 4,096 slice keys, the sampled slice, the 8 key
   digits, the shared parent lists.
 - `field_run` refuses anything but base 64, shape (4, 10), whole quanta, groups of 1–256 slices
-  (`gpu.rs:4053–4065`; 256 because the per-unit counters are 32-bit, `:4060`). `Coord::field_digits`
+  (`gpu.rs:4081–4093`; 256 because the per-unit counters are 32-bit, `:4088`). `Coord::field_digits`
   (`coord.rs:283`) turns the v range into the values t of the fixed digits; `Shape::slices_of` (`cpu.rs:105`)
   lists each t's slices, digit 4 innermost, so 64 consecutive slices share digits 5–8.
 - **The key**: the 8 digits that order the parents (frequent digits in the tops' certificates first) come from
-  the field's first slice, computed on the host by `slice_tops` (`gpu.rs:2372`, `:4104`). Any key is exact; the
+  the field's first slice, computed on the host by `slice_tops` (`gpu.rs:2372`, `:4133`). Any key is exact; the
   key only changes how many chunks the skip removes. [measured: kept fraction on one slice 0.1963 with the field's
   key against 0.1960 with its own]
 - **The shared parent lists** (`build_anc`, `gpu.rs:2861`, kernel `anc8_kernel` `:942`): when the field's slices
   take at most 64 values of digits 4–7, each more than once (true for every field of the default coordinate),
   64 lists of depth-4 roots are built at once, one per value of digits 4–7. 870 MB of card memory.
-- **The sampled slice**: one slice drawn at random (`RandomState` hashed with `v_start`, `:4082–4096`) is handed
-  to a host thread that runs the CPU reference on it (`cpu_slice`, `:3861`) while the card works.
+- **The sampled slice**: one slice drawn at random (`RandomState` hashed with `v_start`, `:4110–4125`) is handed
+  to a host thread that runs the CPU reference on it (`cpu_slice`, `:3888`) while the card works.
 
 ### Stage 1. Tops (device; `dtops` module, `gpu.rs:1828–2202`)
 
@@ -212,11 +212,11 @@ kernels up to a stage and nothing after; a stage's cost is the difference betwee
 
 ### Stage 7. The sampled CPU check, and the end of the field
 
-- After the last group (`gpu.rs:4192–4237`): every reported nice n must be nice (`arith::unique_digits`, a
+- After the last group (`gpu.rs:4221–4266`): every reported nice n must be nice (`arith::unique_digits`, a
   separate implementation) and inside the field; the slices the device reports done must equal the field's slice
   count; then the sampled slice's counts from the field run must equal the CPU's, and the slice is run again
   alone on the device, unshared, and its prefiltered list must equal the CPU's **n for n** (`sample_compare`,
-  `:3883`). Any difference is an error for the field. The result is `FieldOutcome` (`cpu.rs:702`): nice numbers,
+  `:3911`). Any difference is an error for the field. The result is `FieldOutcome` (`cpu.rs:914`): nice numbers,
   `survivors`, `checked`, slices.
 - `survivors` and `checked` (survivors after the prefilter) are exact properties of (shape, field): equal on the
   CPU and on every device [measured: field 77777's 48,216,914,309 / 1,384,731,444 on CUDA at 32 lanes and on
@@ -337,13 +337,13 @@ f = 1/1,000 is seen with 63 % probability after 1,000 fields, 0.4 % of the base 
 
 Guards on widths (`C_ERR_IDX`: a class of more than 65,536 parents; a top index above 2^20; child-list positions
 past the list, clamped; groups ≤ 256 slices) and the nice numbers' membership are listed in `gpu.rs:154–162` and
-`:4202–4214`. For the long version: `G2/BUILD-NOTES.md` §10 and the soundness audit `G2/AUDIT-MO.md`.
+`:4231–4243`. For the long version: `G2/BUILD-NOTES.md` §10 and the soundness audit `G2/AUDIT-MO.md`.
 
 ---
 
 ## 5. Data that passes between stages
 
-Written in the code (`gpu.rs:30–71`, and `gpu_wide.rs:39–60` where the wide path differs); summarised:
+Written in the code (`gpu.rs:30–71`, and `gpu_wide.rs:40–61` where the wide path differs); summarised:
 
 | between | what | size per slice (b64) |
 |---|---|---|
@@ -468,7 +468,7 @@ said; counts come from an exact CPU prototype on real slices.
   kernel in CubeCL 0.10 is judged a trap (comptime branching across every kernel, generated code harder to
   verify) [judged].
 - **Why:** base 64 pays nothing for width by construction; what the narrow path gains must be ported by hand,
-  and the correspondence table at `gpu_wide.rs:62–80` is the map. Not ported: parent sharing, the host-tops
+  and the correspondence table at `gpu_wide.rs:63–81` is the map. Not ported: parent sharing, the host-tops
   path. The wide path has its own check kernel (production's holds digits in one 64-bit mask and refuses bases
   above 64), and that kernel has not been independently audited.
 
@@ -609,7 +609,7 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
 
 ## 10. Where the code is, and how to run it
 
-**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `c2152084`, 18 commits on the development
+**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `85185fef`, 18 commits on the development
 trunk `66259bb0`; worktree `~/projects/nice/.worktrees/midout-clean`. The development history before the cleanup
 stays on `dev/middle-out-join`. No pull request is open (`DECISIONS.md` D9).
 

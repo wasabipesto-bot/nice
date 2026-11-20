@@ -1,0 +1,54 @@
+w_64_712012851.txt: Q0 slice_join match=True ref=(33705647, 528635, 15970966125, 250486772, 123163397, 10929765, 11768560, 337904) mine=(33705647, 528635, None, 250486772, 123163397, 10929765, 11768560, 337904)
+w_64_502136830.txt: Q0 slice_join match=True ref=(33654175, 527842, 15949565738, 250156876, 123181024, 10917490, 11756699, 338191) mine=(33654175, 527842, None, 250156876, 123181024, 10917490, 11756699, 338191)
+w_64_4977728.txt: Q0 slice_join match=True ref=(33718638, 528831, 16032466675, 251447411, 123690652, 10986804, 11830109, 339922) mine=(33718638, 528831, None, 251447411, 123690652, 10986804, 11830109, 339922)
+w_64_952265258.txt: Q0 slice_join match=True ref=(33754605, 529399, 16005004630, 251017821, 123463338, 10947893, 11787664, 338114) mine=(33754605, 529399, None, 251017821, 123463338, 10947893, 11787664, 338114)
+
+4 slices of base 64
+
+| variant | kept/flat | dead a | dead b | ORs/kept | records | survivors | checked | lane slots (round) | busy (round) | busy (64-chunk wave) | work rel, issue | work rel, bytes | work64 rel | ORs rel | oracle lane slots rel |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| code | 0.4920 | 0.0000 | 0.5080 | 16.38 | 43781952 | 47143032 | 1354131 | 815297735 | 0.6053 | 0.4921 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.5031 |
+| lex | 0.4587 | 0.0000 | 0.5413 | 16.38 | 43250104 | 47143032 | 1354131 | 811665591 | 0.5668 | 0.4593 | 0.9955 | 0.9955 | 0.9988 | 0.9322 | 0.5035 |
+| code_c128 | 0.5520 | 0.0000 | 0.4480 | 16.38 | 43781952 | 47143032 | 1354131 | 409970914 | 0.6779 | 0.5520 | 0.5028 | 1.0057 | 0.5020 | 0.5633 | 0.2519 |
+| lex_c128 | 0.5215 | 0.0000 | 0.4785 | 16.38 | 43250104 | 47143032 | 1354131 | 408089834 | 0.6434 | 0.5216 | 0.5005 | 1.0011 | 0.5020 | 0.5321 | 0.2521 |
+| key12_c128 | 0.5520 | 0.0000 | 0.4480 | 16.38 | 43629207 | 47143032 | 1354131 | 409967941 | 0.6779 | 0.5520 | 0.5028 | 1.0057 | 0.5020 | 0.5632 | 0.2518 |
+| code_c256 | 0.6260 | 0.0000 | 0.3740 | 16.39 | 43781952 | 47143032 | 1354131 | 206811442 | 0.7671 | 0.6260 | 0.2537 | 1.0147 | 0.2527 | 0.3216 | 0.1262 |
+| lex_c256 | 0.5985 | 0.0000 | 0.4015 | 16.38 | 43250104 | 47143032 | 1354131 | 205811262 | 0.7371 | 0.5985 | 0.2524 | 1.0097 | 0.2527 | 0.3074 | 0.1263 |
+| lorder_ext_c128 | 0.5383 | 0.4616 | 0.0003 | 18.40 | 8397684 | 8478426 | 230760 | 403578463 | 0.6716 | 0.5539 | 0.5619 | 1.1239 | 0.5595 | 0.6169 | 0.0744 |
+| hyb3_cell_c128 | 0.7125 | 0.1677 | 0.1462 | 17.04 | 25824370 | 26726526 | 735929 | 441816963 | 0.8119 | 0.7178 | 0.5615 | 1.1230 | 0.5274 | 0.7559 | 0.1977 |
+
+Exactness (discarded survivors relative to today's word under the same order):
+
+| variant | discarded survivors | of which pass prefilter | nice among them | claim verified | claim failed | dead_clip |
+|---|---|---|---|---|---|---|
+| lorder_ext_c128 | 38664606 | 1123371 | 0 | 38664606 | 0 | 0 |
+| hyb3_cell_c128 | 20416506 | 618202 | 0 | 20416506 | 0 | 0 |
+
+Extended-digit count per visit (all visits; kept visits), summed:
+
+- lorder_ext_c128: 0: 0.019, 1: 0.205, 2: 0.455, 3: 0.278, 4: 0.040, 5: 0.002, 6: 0.000, 7: 0.000, 8: 0.000, 9: 0.000, 10: 0.000, 11: 0.000, 12: 0.000, 13: 0.000, 14: 0.000, 15: 0.000, 16: 0.000, 17: 0.000, 18: 0.000, 19: 0.000, 20: 0.000, 21: 0.000, 22: 0.000, 23: 0.000, 24: 0.000, 25: 0.000, 26: 0.000, 27: 0.000, 28: 0.000, 29: 0.000, 30: 0.000, 31: 0.000  | kept: [9783788, 76580182, 124056047, 54922697, 5559958, 127045, 1000, 37, 1, 1]
+- hyb3_cell_c128: 0: 0.430, 1: 0.449, 2: 0.112, 3: 0.008, 4: 0.000, 5: 0.000, 6: 0.000  | kept: [187513007, 143563682, 26260522, 1362466, 18532]
+
+Q3 (code order):
+  (child, a0) dead 4643330390/8629316160 = 0.5381; records 43781952 -> 21031296 (0.4804); survivors 47143032 -> 21775165 (0.4619); kept visits whose dead word covers the chunk 34088 (0.0001); violations 0
+Q4 under the lane model (code): slot ORs by digits 13361605598, shared in mask order 11011988835 (0.8242); against today's 17 per slot: 0.7945 (code's lane16×17 = 13860061495); oracle: listed only where a word is nonzero, lane slots 410154683 (0.5031 of code's)
+Q4 under the lane model (lex): slot ORs by digits 13299223395, shared in mask order 10961547553 (0.8242); against today's 17 per slot: 0.7909 (code's lane16×17 = 13860061495); oracle: listed only where a word is nonzero, lane slots 410518028 (0.5058 of lex's)
+Q4 under the lane model (code_c128): slot ORs by digits 6718887586, shared in mask order 5537107339 (0.8241); against today's 17 per slot: 0.3995 (code's lane16×17 = 13860061495); oracle: listed only where a word is nonzero, lane slots 205360622 (0.5009 of code_c128's)
+Q4 under the lane model (lex_c128): slot ORs by digits 6686629519, shared in mask order 5511027049 (0.8242); against today's 17 per slot: 0.3976 (code's lane16×17 = 13860061495); oracle: listed only where a word is nonzero, lane slots 205549271 (0.5037 of lex_c128's)
+Q4 under the lane model (lex_c256): slot ORs by digits 3372287571, shared in mask order 2779285788 (0.8242); against today's 17 per slot: 0.2005 (code's lane16×17 = 13860061495); oracle: listed only where a word is nonzero, lane slots 103002019 (0.5005 of lex_c256's)
+Q4 lockstep (code, csz 64): wave of 4 streams: 17/slot 14129514096, digits 14003816616 (0.9911), trie 12216523880 (0.8646); wave of 2: digits 0.9801, trie 0.8358; trie (wave 4) against code's 17 x lane slots x csz/64: 0.8814, against code's lockstep 17: 0.8646
+Q4 lockstep (lex, csz 64): wave of 4 streams: 17/slot 14068040124, digits 13941760364 (0.9910), trie 12162386992 (0.8645); wave of 2: digits 0.9800, trie 0.8357; trie (wave 4) against code's 17 x lane slots x csz/64: 0.8775, against code's lockstep 17: 0.8608
+Q4 lockstep (code_c128, csz 128): wave of 4 streams: 17/slot 7104746080, digits 7041571856 (0.9911), trie 6142560396 (0.8646); wave of 2: digits 0.9801, trie 0.8357; trie (wave 4) against code's 17 x lane slots x csz/64: 0.8864, against code's lockstep 17: 0.8695
+Q4 lockstep (lex_c128, csz 128): wave of 4 streams: 17/slot 7072896172, digits 7009440468 (0.9910), trie 6114553236 (0.8645); wave of 2: digits 0.9800, trie 0.8356; trie (wave 4) against code's 17 x lane slots x csz/64: 0.8823, against code's lockstep 17: 0.8655
+Q4 lockstep (lex_c256, csz 256): wave of 4 streams: 17/slot 3566935308, digits 3534954544 (0.9910), trie 3083530904 (0.8645); wave of 2: digits 0.9800, trie 0.8356; trie (wave 4) against code's 17 x lane slots x csz/64: 0.8899, against code's lockstep 17: 0.8729
+Q4 (code order, kept probes per chunk):
+  ORs plain 8084407094; shared, probes by top value 7590339225 (0.9389); by mask (trie over kept) 6727806322 (0.8322); trie over all probes x chunks 13516069141 (1.6719)
+
+Per-slice kept fraction and work16 relative to code, for selected variants:
+
+| slice | code | lex |
+|---|---|---|
+| w_64_712012851.txt | 0.492 / 1.000 | 0.458 / 0.996 |
+| w_64_502136830.txt | 0.492 / 1.000 | 0.459 / 0.995 |
+| w_64_4977728.txt | 0.492 / 1.000 | 0.459 / 0.995 |
+| w_64_952265258.txt | 0.492 / 1.000 | 0.459 / 0.996 |
