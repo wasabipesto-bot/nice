@@ -946,6 +946,7 @@ fn study<M: Mask>(
         vars.push(v("lex", Ord_::Lex, 64, Ivl::None, true));
         vars.push(v("lorder_ext", Ord_::LOrder, 64, Ivl::Tight, true));
         vars.push(v("hyb3_cell", Ord_::Hybrid(3), 64, Ivl::Cell(3), true));
+        vars.push(v("hyb5_cell", Ord_::Hybrid(5), 64, Ivl::Cell(5), true));
     }
     let nv = vars.len();
     let njobs = m * bu;
