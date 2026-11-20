@@ -385,24 +385,37 @@ fn eval<M: Mask>(
             let dead = rep || bdead;
             // the word, today's (top only) and the extended one
             let sl = &slabs[qi];
-            let or_of = |mk: M| -> u64 {
+            let or_of = |mk: M, wi: usize| -> u64 {
                 let mut acc = 0u64;
                 let mut y = mk;
                 while !y.is_zero() {
-                    acc |= sl[(y.trailing_zeros() as usize) * wpc];
+                    acc |= sl[(y.trailing_zeros() as usize) * wpc + wi];
                     y = y.clear_lowest();
                 }
                 acc
             };
-            let w_ext = if dead || csz > 64 { 0 } else { !or_of(un) & q.valid };
+            let nq = q.idx.len();
+            let vw = |wi: usize| -> u64 {
+                let lo = 64 * wi;
+                let hi = (lo + 64).min(nq);
+                if hi <= lo {
+                    0
+                } else if hi - lo == 64 {
+                    !0
+                } else {
+                    (1u64 << (hi - lo)) - 1
+                }
+            };
+            let w_ext_of = |wi: usize| -> u64 { if dead { 0 } else { !or_of(un, wi) & vw(wi) } };
             // survivors, and the discarded ones
-            if csz <= 64 && ivl != Ivl::None {
-                let w_plain = if plain_dead { 0 } else { !or_of(tp.mask) & q.valid };
-                let mut disc = w_plain & !w_ext;
+            if ivl != Ivl::None {
+              for wi in 0..wpc {
+                let w_plain = if plain_dead { 0 } else { !or_of(tp.mask, wi) & vw(wi) };
+                let mut disc = w_plain & !w_ext_of(wi);
                 while disc != 0 {
                     let i = disc.trailing_zeros() as usize;
                     disc &= disc - 1;
-                    let c = &ch[q.idx[i] as usize];
+                    let c = &ch[q.idx[64 * wi + i] as usize];
                     let nn = base_n + u128::from(c.l);
                     let nn2 = tp.h * cx.bkk + dterm + cx.ps[c.pi as usize].r;
                     assert_eq!(nn, nn2);
@@ -451,6 +464,7 @@ fn eval<M: Mask>(
                         st.disc_claim_bad += 1;
                     }
                 }
+              }
             }
             if dead {
                 st.dead_c += 1;
@@ -466,9 +480,8 @@ fn eval<M: Mask>(
             if extras {
                 keptlist[qi].push(pi as u32);
             }
-            if csz > 64 {
-                continue;
-            }
+            for wi in 0..wpc {
+            let w_ext = w_ext_of(wi);
             if w_ext != 0 {
                 st.records += 1;
                 rec_flags[qi] = true;
@@ -479,14 +492,14 @@ fn eval<M: Mask>(
                 if w3 != 0 {
                     st.q3_records += 1;
                 }
-                if (q.valid & !dead3[qi][(tp.h % u128::from(cx.b)) as usize]) == 0 {
+                if (vw(0) & !dead3[qi][(tp.h % u128::from(cx.b)) as usize]) == 0 {
                     st.q3_skip += 1;
                 }
             }
             while w != 0 {
                 let i = w.trailing_zeros() as usize;
                 w &= w - 1;
-                let c = &ch[q.idx[i] as usize];
+                let c = &ch[q.idx[64 * wi + i] as usize];
                 let nn = base_n + u128::from(c.l);
                 if nn >= tp.lo && nn <= tp.hi {
                     st.surv += 1;
@@ -500,6 +513,7 @@ fn eval<M: Mask>(
                         }
                     }
                 }
+            }
             }
         }
         // lane model for this probe
@@ -646,7 +660,7 @@ struct Var {
     extras: bool,
 }
 
-fn run<M: Mask>(b: u32, pip: u128, threads: usize, greedy: bool) {
+fn run<M: Mask>(b: u32, pip: u128, threads: usize, greedy: bool, wide: bool) {
     let coord = Coord::for_base(b).unwrap();
     let sh = Shape::for_coord(&coord);
     let base = Base::new(&coord);
@@ -658,13 +672,14 @@ fn run<M: Mask>(b: u32, pip: u128, threads: usize, greedy: bool) {
             let c = cpu::slice_join::<M>(&base, sh, pip, |_, _, _| {});
             (c, t.elapsed().as_secs_f64())
         });
-        study::<M>(&base, sh, b, pip, threads, greedy, t0);
+        study::<M>(&base, sh, b, pip, threads, greedy, wide, t0);
         h.join().unwrap()
     });
     println!("Q0REF secs={:.1} {:?}", q0.1, q0.0);
 }
 
-fn study<M: Mask>(base: &Base, sh: Shape, b: u32, pip: u128, threads: usize, greedy: bool, t0: std::time::Instant) {
+#[allow(clippy::too_many_arguments)]
+fn study<M: Mask>(base: &Base, sh: Shape, b: u32, pip: u128, threads: usize, greedy: bool, wide: bool, t0: std::time::Instant) {
     let bu = b as usize;
     let m = bu - 1;
     // --- the preamble of cpu::slice_join, copied (same objects, same order) ---
@@ -826,6 +841,18 @@ fn study<M: Mask>(base: &Base, sh: Shape, b: u32, pip: u128, threads: usize, gre
     if greedy {
         vars.push(v("greedy", Ord_::Greedy, 64, Ivl::None, false));
     }
+    if wide {
+        // wide-only pass: chunk widths 128 and 256 with records (the default list above is unchanged)
+        vars.clear();
+        vars.push(v("code", Ord_::Code, 64, Ivl::None, true));
+        vars.push(v("code_c128", Ord_::Code, 128, Ivl::None, false));
+        vars.push(v("lex_c128", Ord_::Lex, 128, Ivl::None, false));
+        vars.push(v("key12_c128", Ord_::Key(12), 128, Ivl::None, false));
+        vars.push(v("code_c256", Ord_::Code, 256, Ivl::None, false));
+        vars.push(v("lex_c256", Ord_::Lex, 256, Ivl::None, false));
+        vars.push(v("lorder_ext_c128", Ord_::LOrder, 128, Ivl::Tight, false));
+        vars.push(v("hyb3_cell_c128", Ord_::Hybrid(3), 128, Ivl::Cell(3), false));
+    }
     let nv = vars.len();
     let njobs = m * bu;
     let next = AtomicUsize::new(0);
@@ -931,10 +958,11 @@ fn main() {
     let b: u32 = a[1].parse().unwrap();
     let pip: u128 = a[2].parse().unwrap();
     let threads: usize = a[3].parse().unwrap();
-    let greedy = a.get(4).is_some_and(|s| s == "greedy");
+    let greedy = a.iter().skip(4).any(|s| s == "greedy");
+    let wide = a.iter().skip(4).any(|s| s == "wide");
     if b <= 64 {
-        run::<u64>(b, pip, threads, greedy);
+        run::<u64>(b, pip, threads, greedy, wide);
     } else {
-        run::<u128>(b, pip, threads, greedy);
+        run::<u128>(b, pip, threads, greedy, wide);
     }
 }
