@@ -71,7 +71,7 @@
 //! | `tops5`, `tops1`, `tscan`, `tops2`, `tdigz2` | `wtops5`, `wtops1`, `wscan`, `wtops2`, `wtdigz` |
 //! | `toprec2` (production's top records) | — (`wcheck_kernel` reads the tops itself) |
 //! | `hist2`, `scan16`, `scatter3`, `hsort` | `whist`, `wscan`, `wscatter`, `wsort` |
-//! | `expand_kernel` with `pf` / `pf24` | `wexpand_kernel` with `pf_w2` (`pf_w`: the earlier form) |
+//! | `expand_kernel` with `keep_bits2`, `put_bits`, `pf` / `pf24` | `wexpand_kernel` with `wrec_top`, `wtop_ctx`, `put_bits_w`, `pf_w2` (`pf_w`: the earlier form) |
 //! | production's `check_kernel` | `wcheck_kernel` |
 //! | `done_kernel` | `wdone_kernel` |
 //! | `queue_dev_prep`, `queue_batch`, `queue_done`, `queue_dev` | `queue_prep`, `queue_batch`, `queue_done`, `queue_slice` |
@@ -1130,9 +1130,12 @@ mod wp {
             carry = t / bb;
             cu[j as usize] = t - carry * bb;
         }
+        // every digit's bit into one mask (all 2(k + 2) digits distinct iff it has that many bits), the four at
+        // positions k and k + 1 also into a second, which must miss the top's
         let mut lo = 0u64;
         let mut hi = 0u32;
-        let mut ok = true;
+        let mut tlo = 0u64;
+        let mut thi = 0u32;
         #[unroll]
         for j in 0..ns {
             let s1 = sq[j as usize] / b;
@@ -1140,42 +1143,27 @@ mod wp {
             let (a0, ah0) = dbit(sq[j as usize] - s1 * b);
             let (c0, ch0) = dbit(cu[j as usize] - c1 * b);
             // digit 2j of r², r³
-            if (lo & a0) != 0u64 || (hi & ah0) != 0u32 {
-                ok = false;
-            }
-            lo |= a0;
-            hi |= ah0;
-            if (lo & c0) != 0u64 || (hi & ch0) != 0u32 {
-                ok = false;
-            }
-            lo |= c0;
-            hi |= ch0;
+            lo |= a0 | c0;
+            hi |= ah0 | ch0;
             if comptime!(2 * j >= k) {
-                if ((a0 | c0) & mlo) != 0u64 || ((ah0 | ch0) & mhi) != 0u32 {
-                    ok = false;
-                }
+                tlo |= a0 | c0;
+                thi |= ah0 | ch0;
             }
             // digit 2j + 1, if below k + 2
             if comptime!(2 * j + 1 < kk) {
                 let (a1, ah1) = dbit(s1);
                 let (c1b, ch1) = dbit(c1);
-                if (lo & a1) != 0u64 || (hi & ah1) != 0u32 {
-                    ok = false;
-                }
-                lo |= a1;
-                hi |= ah1;
-                if (lo & c1b) != 0u64 || (hi & ch1) != 0u32 {
-                    ok = false;
-                }
-                lo |= c1b;
-                hi |= ch1;
+                lo |= a1 | c1b;
+                hi |= ah1 | ch1;
                 if comptime!(2 * j + 1 >= k) {
-                    if ((a1 | c1b) & mlo) != 0u64 || ((ah1 | ch1) & mhi) != 0u32 {
-                        ok = false;
-                    }
+                    tlo |= a1 | c1b;
+                    thi |= ah1 | ch1;
                 }
             }
         }
+        let ok = lo.count_ones() + hi.count_ones() == comptime!(2 * kk)
+            && (tlo & mlo) == 0u64
+            && (thi & mhi) == 0u32;
         ok || (small_rec && rz)
     }
 
@@ -1993,6 +1981,116 @@ mod wp {
         }
     }
 
+    /// A record's top index and its chunk's first position in the batch's child list (an all-zero record past a
+    /// slab's count: any in-range index; its words are zero, so nothing is read through them). The probe slot is
+    /// counted through the job's compatible top classes (ct with ct + c + unit a root), in root order.
+    #[cube]
+    fn wrec_top(
+        rec: Vector<u32, Const<4>>,
+        pseg: &Array<u32>,
+        tseg: &Array<u32>,
+        roots: &Array<u32>,
+        c0: u32,
+        #[comptime] b: u32,
+        #[comptime] nroot: u32,
+    ) -> (u32, u32) {
+        let m = comptime!(b - 1);
+        let ps = rec[0usize] & 0xFFFFu32;
+        let du = (rec[0usize] >> 16u32) & 255u32;
+        let c = rec[0usize] >> 24u32;
+        let cc = (c + du) % m;
+        let mut rem = ps;
+        let mut found = false;
+        let mut ti = 0u32;
+        for kk in 0..nroot {
+            let ct = (roots[kk as usize] + m - cc) % m;
+            let sx = (du * m + ct) * 2u32;
+            let b0 = tseg[sx as usize];
+            let len = tseg[(sx + 1u32) as usize] - b0;
+            if !found {
+                if rem < len {
+                    ti = b0 + rem;
+                    found = true;
+                } else {
+                    rem -= len;
+                }
+            }
+        }
+        let pb = pseg[c as usize];
+        let pe = pseg[(c + 1u32) as usize];
+        (
+            ti,
+            (pb - pseg[c0 as usize]) * b + du * (pe - pb) + rec[1usize],
+        )
+    }
+
+    /// A top's (h, unit), the bounds of r_f inside the range (`[lo, hi]`: all of it unless the range's first or
+    /// last prefix, which `clip` names, cuts the top) and the small-n flag (1: n < b^ceil((k+2)/2) is possible).
+    #[cube]
+    fn wtop_ctx(
+        ti: u32,
+        thd: &Array<u32>,
+        nlead: u32,
+        hlo: u32,
+        hsmall: u32,
+        clip: &Array<u32>,
+        pipv: u64,
+        hzs: u32,
+        #[comptime] b: u32,
+        #[comptime] f0: u32,
+        #[comptime] k: u32,
+    ) -> (u32, u32, u32, u32, u32) {
+        let ix = thd[ti as usize];
+        let du = ix / nlead;
+        let h = hlo + ix % nlead;
+        let bp = comptime!((b as u64).pow(k - 1 - f0));
+        let pp = u64::cast_from(h * b + du) * bp + pipv;
+        let plo = u64::cast_from(clip[0usize]) | (u64::cast_from(clip[1usize]) << 32u64);
+        let phi = u64::cast_from(clip[2usize]) | (u64::cast_from(clip[3usize]) << 32u64);
+        let lo = select(pp == plo, clip[4usize], 0u32);
+        let hi = select(pp == phi, clip[5usize], u32::MAX);
+        let tsm = comptime!((k + 3) / 2);
+        let hz = select(
+            h < hsmall && hzs != 0u32 && du * select(comptime!(k > tsm), 1u32, 0u32) == 0u32,
+            1u32,
+            0u32,
+        );
+        (h, du, lo, hi, hz)
+    }
+
+    /// Writes the kept bits' entries `(ti, r_f)` from `slot` on; returns the next slot.
+    #[cube]
+    fn put_bits_w(
+        ti: u32,
+        pos: u32,
+        klo: u32,
+        khi: u32,
+        lst: &Array<u32>,
+        surv: &mut Array<u32>,
+        slot0: u32,
+        scap: u32,
+    ) -> u32 {
+        let mut slot = slot0;
+        let mut x = klo;
+        let mut y = khi;
+        while (x | y) != 0u32 {
+            let inlo = x != 0u32;
+            let bt = select(inlo, x.trailing_zeros(), y.trailing_zeros());
+            let off = select(inlo, bt, 32u32 + bt);
+            if inlo {
+                x &= x - 1u32;
+            } else {
+                y &= y - 1u32;
+            }
+            if slot < scap {
+                surv[(2u32 * slot) as usize] = ti;
+                surv[(2u32 * slot + 1u32) as usize] = lst[(pos + off) as usize];
+            }
+            slot += 1u32;
+        }
+        slot
+    }
+
     /// Records → survivor entries (top index, r mod b^f0); thread 0 copies the parent and slab counts to `stat`.
     #[cube(launch_unchecked)]
     pub fn wexpand_kernel(
@@ -2036,10 +2134,6 @@ mod wp {
         let nopf = (fault & 1u32) != 0u32;
         let pfdrop = (fault & 1024u32) != 0u32;
         let bw = comptime!(b as u64);
-        let plo = u64::cast_from(clip[0usize]) | (u64::cast_from(clip[1usize]) << 32u64);
-        let phi = u64::cast_from(clip[2usize]) | (u64::cast_from(clip[3usize]) << 32u64);
-        let slo = clip[4usize];
-        let ehi = clip[5usize];
         // n < b^ceil((k+2)/2) needs every slice digit at positions >= ceil((k+2)/2) zero
         let tsm = comptime!((k + 3) / 2);
         let mut pipz = true;
@@ -2053,11 +2147,22 @@ mod wp {
         }
         let mut nread = 0u32;
         let mut nclip = 0u32;
-        let m = comptime!(b - 1);
         if ABSOLUTE_POS_X == 0u32 {
             stat[0usize] = lcnt[0usize];
             stat[1usize] = slabn[0usize];
         }
+        // the slice's digits f0..k-1, once per thread
+        let mut pd = Array::<u32>::new(comptime!((k - 1 - f0) as usize));
+        let mut pipv = 0u64;
+        #[unroll]
+        for j in 0..comptime!(k - 1 - f0) {
+            pd[j as usize] = pipd[j as usize];
+            pipv = pipv * bw + u64::cast_from(pipd[comptime!(k - 2 - f0 - j) as usize]);
+        }
+        let hzs = select(pipz, 1u32, 0u32);
+        // one plane per slab at a time, its lanes over the slab's rows; two records per lane and take, their loads
+        // issued together, and one loop over both records' bits (a plane runs as many rounds as its lane with the
+        // most bits: max(a + b), not max(a lo) + max(a hi) + ...)
         let ns = min(slabn[0usize], nslab_cap);
         let ppc = NT / PLANE_DIM;
         let pstride = CUBE_COUNT_X * ppc;
@@ -2068,148 +2173,119 @@ mod wp {
             let cnt = slabcnt[s as usize];
             let mut r0 = 0u32;
             while r0 < cnt {
-                let r = r0 + UNIT_POS_PLANE;
-                let i = s * SLAB + r;
-                let live = r < cnt;
-                let mut wlo = 0u32;
-                let mut whi = 0u32;
-                let mut ti = 0u32;
-                let mut pos = 0u32;
-                if live {
-                    let rec = out[i as usize];
-                    let ps = rec[0usize] & 0xFFFFu32;
-                    let du = (rec[0usize] >> 16u32) & 255u32;
-                    let c = rec[0usize] >> 24u32;
-                    wlo = rec[2usize];
-                    whi = rec[3usize];
-                    let cc = (c + du) % m;
-                    let mut rem = ps;
-                    let mut found = false;
-                    for kk in 0..nroot {
-                        let ct = (roots[kk as usize] + m - cc) % m;
-                        let sx = (du * m + ct) * 2u32;
-                        let b0 = tseg[sx as usize];
-                        let len = tseg[(sx + 1u32) as usize] - b0;
-                        if !found {
-                            if rem < len {
-                                ti = b0 + rem;
-                                found = true;
-                            } else {
-                                rem -= len;
-                            }
-                        }
-                    }
-                    let pb = pseg[c as usize];
-                    let pe = pseg[(c + 1u32) as usize];
-                    pos = (pb - pseg[c0 as usize]) * b + du * (pe - pb) + rec[1usize];
+                let ra = r0 + UNIT_POS_PLANE;
+                let rb = ra + PLANE_DIM;
+                let mut reca = Vector::<u32, Const<4>>::empty();
+                let mut recb = Vector::<u32, Const<4>>::empty();
+                #[unroll]
+                for kk in 0..4u32 {
+                    reca[kk as usize] = 0u32;
+                    recb[kk as usize] = 0u32;
                 }
-                // the entries of the record that are survivors inside the range and pass the prefilter
-                nread += wlo.count_ones() + whi.count_ones();
-                let mut plo_b = 0u32;
-                let mut phi_b = 0u32;
-                if live {
-                    let ix = thd[ti as usize];
-                    let du = ix / nlead;
-                    let h = hlo + ix % nlead;
-                    let mq = ttq[ti as usize];
-                    let mqh = ttqh[ti as usize];
-                    let mut pp = u64::cast_from(h * b + du);
-                    #[unroll]
-                    for j in 0..comptime!(k - 1 - f0) {
-                        pp = pp * bw + u64::cast_from(pipd[comptime!(k - 2 - f0 - j) as usize]);
-                    }
-                    let edge_lo = pp == plo;
-                    let edge_hi = pp == phi;
-                    let mut rd = Array::<u32>::new(comptime!((k + 2) as usize));
-                    #[unroll]
-                    for j in 0..comptime!(k - 1 - f0) {
-                        rd[comptime!(f0 + j) as usize] = pipd[j as usize];
-                    }
-                    rd[comptime!(k - 1) as usize] = du;
-                    let h0 = h % b;
-                    rd[comptime!(k) as usize] = h0;
-                    rd[comptime!(k + 1) as usize] = ((h - h0) / b) % b;
-                    let hz =
-                        h < hsmall && pipz && du * select(comptime!(k > tsm), 1u32, 0u32) == 0u32;
-                    let mut sf = Array::<u32>::new(comptime!(((k + 3) / 2) as usize));
-                    if comptime!(pf2) {
-                        pf_w2_fixed(&rd, &mut sf, b, f0, k);
-                    }
-                    for half in 0..2u32 {
-                        let mut x = select(half == 0u32, wlo, whi);
-                        while x != 0u32 {
-                            let bt = x.trailing_zeros();
-                            x &= x - 1u32;
-                            let rf = lst[(pos + bt + 32u32 * half) as usize];
-                            if (edge_lo && rf < slo) || (edge_hi && rf > ehi) {
-                                nclip += 1u32;
-                            } else {
-                                let mut pfok = false;
-                                if comptime!(pf2) {
-                                    pfok = pf_w2(&sf, rf, mq, mqh, hz, b, f0, k);
-                                } else {
-                                    let mut y = rf;
-                                    let mut rz = true;
-                                    #[unroll]
-                                    for j in 0..f0 {
-                                        let q = y / b;
-                                        rd[j as usize] = y - q * b;
-                                        if comptime!(j >= tsm) {
-                                            if y - q * b != 0u32 {
-                                                rz = false;
-                                            }
-                                        }
-                                        y = q;
+                if ra < cnt {
+                    reca = out[(s * SLAB + ra) as usize];
+                }
+                if rb < cnt {
+                    recb = out[(s * SLAB + rb) as usize];
+                }
+                nread += reca[2usize].count_ones()
+                    + reca[3usize].count_ones()
+                    + recb[2usize].count_ones()
+                    + recb[3usize].count_ones();
+                // each record's top (its probe slot among the job's compatible classes) and child-list position
+                let (tia, posa) = wrec_top(reca, pseg, tseg, roots, c0, b, nroot);
+                let (tib, posb) = wrec_top(recb, pseg, tseg, roots, c0, b, nroot);
+                // each top's (h, unit), certified digits >= k + 2, range clip bounds and small-n flag
+                let (ha, dua, lla, hla, hza) =
+                    wtop_ctx(tia, thd, nlead, hlo, hsmall, clip, pipv, hzs, b, f0, k);
+                let (hb, dub, llb, hlb, hzb) =
+                    wtop_ctx(tib, thd, nlead, hlo, hsmall, clip, pipv, hzs, b, f0, k);
+                let mqa = ttq[tia as usize];
+                let mqb = ttq[tib as usize];
+                let mha = ttqh[tia as usize];
+                let mhb = ttqh[tib as usize];
+                let mut w0 = reca[2usize];
+                let mut w1 = reca[3usize];
+                let mut w2 = recb[2usize];
+                let mut w3 = recb[3usize];
+                let mut k0 = 0u32;
+                let mut k1 = 0u32;
+                let mut k2 = 0u32;
+                let mut k3 = 0u32;
+                let mut rd = Array::<u32>::new(comptime!((k + 2) as usize));
+                let mut sf = Array::<u32>::new(comptime!(((k + 3) / 2) as usize));
+                #[unroll]
+                for j in 0..comptime!(k - 1 - f0) {
+                    rd[comptime!(f0 + j) as usize] = pd[j as usize];
+                }
+                while (w0 | w1 | w2 | w3) != 0u32 {
+                    // the lowest set bit of the first nonzero word, in the order a lo, a hi, b lo, b hi
+                    let ina = (w0 | w1) != 0u32;
+                    let x = select(ina, w0, w2);
+                    let y = select(ina, w1, w3);
+                    let inlo = x != 0u32;
+                    let wd = select(inlo, x, y);
+                    let bt = wd.trailing_zeros();
+                    let off = select(inlo, bt, 32u32 + bt);
+                    let cl = wd & (wd - 1u32);
+                    w0 = select(ina && inlo, cl, w0);
+                    w1 = select(ina && !inlo, cl, w1);
+                    w2 = select(!ina && inlo, cl, w2);
+                    w3 = select(!ina && !inlo, cl, w3);
+                    let rf = lst[(select(ina, posa, posb) + off) as usize];
+                    if rf < select(ina, lla, llb) || rf > select(ina, hla, hlb) {
+                        // outside a clipped top's part of the range: not a survivor, never listed
+                        nclip += 1u32;
+                    } else {
+                        let h = select(ina, ha, hb);
+                        let du = select(ina, dua, dub);
+                        let mq = select(ina, mqa, mqb);
+                        let mqh = select(ina, mha, mhb);
+                        let hz = select(ina, hza, hzb) != 0u32;
+                        rd[comptime!(k - 1) as usize] = du;
+                        let h0 = h % b;
+                        rd[comptime!(k) as usize] = h0;
+                        rd[comptime!(k + 1) as usize] = ((h - h0) / b) % b;
+                        let mut pfok = false;
+                        if comptime!(pf2) {
+                            pf_w2_fixed(&rd, &mut sf, b, f0, k);
+                            pfok = pf_w2(&sf, rf, mq, mqh, hz, b, f0, k);
+                        } else {
+                            let mut yy = rf;
+                            let mut rz = true;
+                            #[unroll]
+                            for j in 0..f0 {
+                                let q = yy / b;
+                                rd[j as usize] = yy - q * b;
+                                if comptime!(j >= tsm) {
+                                    if yy - q * b != 0u32 {
+                                        rz = false;
                                     }
-                                    pfok = pf_w(&rd, mq, mqh, hz && rz, b, k);
                                 }
-                                let pass = nopf
-                                    || (pfok
-                                        && !(pfdrop && (rf >> 10u32).trailing_zeros() >= 10u32));
-                                if pass {
-                                    if half == 0u32 {
-                                        plo_b |= 1u32 << bt;
-                                    } else {
-                                        phi_b |= 1u32 << bt;
-                                    }
-                                }
+                                yy = q;
                             }
+                            pfok = pf_w(&rd, mq, mqh, hz && rz, b, k);
+                        }
+                        if nopf || (pfok && !(pfdrop && (rf >> 10u32).trailing_zeros() >= 10u32)) {
+                            let bit = 1u32 << bt;
+                            k0 |= select(ina && inlo, bit, 0u32);
+                            k1 |= select(ina && !inlo, bit, 0u32);
+                            k2 |= select(!ina && inlo, bit, 0u32);
+                            k3 |= select(!ina && !inlo, bit, 0u32);
                         }
                     }
                 }
-                wlo = plo_b;
-                whi = phi_b;
-                let nb = wlo.count_ones() + whi.count_ones();
+                let nb = k0.count_ones() + k1.count_ones() + k2.count_ones() + k3.count_ones();
                 let excl = plane_exclusive_sum(nb);
                 let tot = plane_sum(nb);
                 let mut bs = 0u32;
                 if UNIT_POS_PLANE == 0u32 && tot > 0u32 {
                     bs = scount[0usize].fetch_add(tot);
                 }
-                let mut slot = plane_sum(bs) + excl;
-                if live {
-                    let mut x = wlo;
-                    while x != 0u32 {
-                        let bt = x.trailing_zeros();
-                        x &= x - 1u32;
-                        if slot < scap {
-                            surv[(2u32 * slot) as usize] = ti;
-                            surv[(2u32 * slot + 1u32) as usize] = lst[(pos + bt) as usize];
-                        }
-                        slot += 1u32;
-                    }
-                    let mut y = whi;
-                    while y != 0u32 {
-                        let bt = y.trailing_zeros();
-                        y &= y - 1u32;
-                        if slot < scap {
-                            surv[(2u32 * slot) as usize] = ti;
-                            surv[(2u32 * slot + 1u32) as usize] = lst[(pos + 32u32 + bt) as usize];
-                        }
-                        slot += 1u32;
-                    }
-                }
-                r0 += PLANE_DIM;
+                let slot = plane_sum(bs) + excl;
+                let sb = put_bits_w(tia, posa, k0, k1, lst, surv, slot, scap);
+                put_bits_w(tib, posb, k2, k3, lst, surv, sb, scap);
+                r0 += 2u32 * PLANE_DIM;
             }
             s += pstride;
         }
