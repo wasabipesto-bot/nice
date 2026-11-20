@@ -487,8 +487,8 @@ fn eval<M: Mask>(
                 rec_flags[qi] = true;
             }
             let mut w = w_ext;
-            let w3 = if extras { w_ext & !dead3[qi][(tp.h % u128::from(cx.b)) as usize] } else { 0 };
-            if extras {
+            let w3 = if extras && csz == 64 { w_ext & !dead3[qi][(tp.h % u128::from(cx.b)) as usize] } else { 0 };
+            if extras && csz == 64 {
                 if w3 != 0 {
                     st.q3_records += 1;
                 }
@@ -505,7 +505,7 @@ fn eval<M: Mask>(
                     st.surv += 1;
                     let pass = prefilter(cx.base, cx.sh.k, nn, tp.mhi);
                     st.checked += u64::from(pass);
-                    if extras {
+                    if extras && csz == 64 {
                         if w3 & (1u64 << i) != 0 {
                             st.q3_surv += 1;
                         } else if pass {
@@ -845,11 +845,12 @@ fn study<M: Mask>(base: &Base, sh: Shape, b: u32, pip: u128, threads: usize, gre
         // wide-only pass: chunk widths 128 and 256 with records (the default list above is unchanged)
         vars.clear();
         vars.push(v("code", Ord_::Code, 64, Ivl::None, true));
-        vars.push(v("code_c128", Ord_::Code, 128, Ivl::None, false));
-        vars.push(v("lex_c128", Ord_::Lex, 128, Ivl::None, false));
+        vars.push(v("lex", Ord_::Lex, 64, Ivl::None, true));
+        vars.push(v("code_c128", Ord_::Code, 128, Ivl::None, true));
+        vars.push(v("lex_c128", Ord_::Lex, 128, Ivl::None, true));
         vars.push(v("key12_c128", Ord_::Key(12), 128, Ivl::None, false));
         vars.push(v("code_c256", Ord_::Code, 256, Ivl::None, false));
-        vars.push(v("lex_c256", Ord_::Lex, 256, Ivl::None, false));
+        vars.push(v("lex_c256", Ord_::Lex, 256, Ivl::None, true));
         vars.push(v("lorder_ext_c128", Ord_::LOrder, 128, Ivl::Tight, false));
         vars.push(v("hyb3_cell_c128", Ord_::Hybrid(3), 128, Ivl::Cell(3), false));
     }
