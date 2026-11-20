@@ -3638,16 +3638,27 @@ impl<R: Runtime> WideJoin<R> {
     }
 }
 
-/// The sampled check's CPU half: slice `pip` through the CPU reference (`u128` masks): its survivors, and those
-/// that pass the prefilter, sorted.
-pub(crate) fn wide_cpu_slice(coord: &Coord, sh: Shape, pip: u64) -> (u64, Vec<u128>) {
+/// The sampled check's CPU half: slice `pip` through the CPU reference (`u128` masks) on `threads` threads: its
+/// survivors, and those that pass the prefilter, sorted.
+pub(crate) fn wide_cpu_slice(
+    coord: &Coord,
+    sh: Shape,
+    pip: u64,
+    threads: usize,
+) -> (u64, Vec<u128>) {
     let base = Base::new(coord);
     let mut v = Vec::new();
-    let cn = super::cpu::slice_join::<u128>(&base, sh, u128::from(pip), |_, n, pass| {
-        if pass {
-            v.push(n);
-        }
-    });
+    let cn = super::cpu::slice_join_threads::<u128>(
+        &base,
+        sh,
+        u128::from(pip),
+        threads,
+        |_, n, pass| {
+            if pass {
+                v.push(n);
+            }
+        },
+    );
     v.sort_unstable();
     (cn.survivors, v)
 }
@@ -3694,10 +3705,12 @@ pub struct WideOptions {
     pub group: usize,
     /// The sampled CPU check (as on the base-64 path): one random slice of the field recomputed by the CPU reference on a
     /// host thread while the card works; the field run's own survivors for that slice must equal the CPU's, and
-    /// the slice run again alone on the device must give the same survivors, n for n. At base 65 the CPU takes
-    /// longer than the field (70–93 s measured, against a field of 55–56 s on an RTX 3080): the host waits for
-    /// it.
+    /// the slice run again alone on the device must give the same survivors, n for n. The CPU slice runs on
+    /// `cpu_threads` threads (0: [`super::gpu::sample_threads`]); at base 65 it took 106 s on one thread and 33 s
+    /// on four (a 5-CPU box), against a field of 56 s on an RTX 3080.
     pub cpu_check: bool,
+    /// Threads for the sampled check's CPU slice; 0 for [`super::gpu::sample_threads`]' default.
+    pub cpu_threads: usize,
 }
 
 /// Search a field on the wide device path: the key from the field's first slice (the device's tops and parents),
@@ -3758,6 +3771,7 @@ pub fn time_field_wide<R: Runtime>(
     let opt = WideOptions {
         group,
         cpu_check: false,
+        cpu_threads: 0,
     };
     Ok(run_field_wide(gj, coord, v_start, v_size, opt, None, None)?.2)
 }
@@ -3803,11 +3817,12 @@ fn run_field_wide<R: Runtime>(
         hs.write_u128(v_start);
         let pip = pips[(hs.finish() % pips.len() as u64) as usize];
         let c = coord.clone();
+        let threads = super::gpu::sample_threads(opt.cpu_threads);
         Some((
             pip,
             std::thread::spawn(move || {
                 let t = Instant::now();
-                let r = wide_cpu_slice(&c, sh, pip);
+                let r = wide_cpu_slice(&c, sh, pip, threads);
                 (r, t.elapsed().as_secs_f64())
             }),
         ))
@@ -3988,7 +4003,7 @@ mod tests {
         macro_rules! go {
             ($client:expr) => {{
                 let gj = WideJoin::new($client, WideCaps::for_base(b), &cn, sh).unwrap();
-                let opt1 = WideOptions { group: 1, cpu_check: false };
+                let opt1 = WideOptions { group: 1, cpu_check: false, cpu_threads: 0 };
                 let bu = b as usize;
                 let (mut newc, mut oldc): (HashMap<u64, WCounts>, HashMap<u64, WCounts>) = (HashMap::new(), HashMap::new());
                 let (d5, hi) = (tn % bb, tn / bb);
@@ -4022,7 +4037,7 @@ mod tests {
                 println!("b65 (4, 8, 5) field t {tn}, digit 8 in {d8s:?}: {} slices equal to (4, 9, 6)'s, survivors {ns}, checked {nc}", newc.len());
                 if std::env::var("MIDOUT_485_WHOLE").is_ok_and(|x| x == "1") {
                     let cpu_check = std::env::var("MIDOUT_485_CHECK").is_ok_and(|x| x == "1");
-                    let (o, _, tm) = search_field_wide(&gj, &cn, cn.start() + tn * qn, qn, WideOptions { group: 16, cpu_check }).unwrap();
+                    let (o, _, tm) = search_field_wide(&gj, &cn, cn.start() + tn * qn, qn, WideOptions { group: 16, cpu_check, cpu_threads: 0 }).unwrap();
                     println!(
                         "b65 (4, 8, 5) whole field t {tn}: survivors {}, checked {}, slices {}, nice {:?}, sampled {:?} ({:.1} s), n {}",
                         o.survivors, o.checked, o.slices, o.nice, tm.sampled, tm.wall, cn.n_count(cn.start() + tn * qn, qn).unwrap()
@@ -4339,7 +4354,7 @@ mod tests {
         let sp = pips[0];
         let cpu = std::thread::spawn({
             let c = coord.clone();
-            move || wide_cpu_slice(&c, sh, sp)
+            move || wide_cpu_slice(&c, sh, sp, crate::midout::gpu::sample_threads(0))
         });
         let mut caps = WideCaps::for_base(b);
         if let Some(c) = classes {
@@ -4510,6 +4525,7 @@ mod tests {
             let opt = WideOptions {
                 group: 16,
                 cpu_check: false,
+                cpu_threads: 0,
             };
             match search_field_wide(&gj, &coord, coord.start(), coord.quantum(), opt) {
                 Ok((o, _, _)) => panic!("timing stop 2: search_field_wide returned Ok: {o:?}"),

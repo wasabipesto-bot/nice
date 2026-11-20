@@ -5,12 +5,13 @@
 //! Needs the feature `midout-bench`.
 //!
 //! usage: midout_bench [--cuda] [--fields T0,T1,..] [--group G] [--threads N] [--classes C] [--tops-only K]
-//!                     [--no-cpu-check] [--slices K] [--digits K0,K1,Q0] [--no-share-parents]
+//!                     [--no-cpu-check] [--cpu-threads N] [--slices K] [--digits K0,K1,Q0] [--no-share-parents]
 //!   --fields: values of the field's fixed digits (6-8 under 4,9,6; 5-7 under 4,8,5): field t covers v = 2^75 + t·2^57
 //!   --digits: the coordinate (default the base's, `Coord::for_base`)
 //!   --no-share-parents: the parents' root pass not shared across digit 8 (`GpuJoin::set_parent_sharing`, on by default)
 //!   --tops-only K: time the host's tops for K slices on N threads and exit
 //!   --no-cpu-check: without the sampled CPU check of one random slice per field (on by default)
+//!   --cpu-threads N: the sampled check's CPU slice on N threads (default: `gpu::sample_threads`)
 //!   --slices K: only each field's first K slices (dry runs on a software device; times are then per K slices)
 //!   `MIDOUT_STOP` (environment, this bench only): time the stages up to a stop (1 tops, 2 parents, 3 main
 //!   kernel, 5 expansion, 6 all; 11-15 the device-top kernels), no accounts and no result
@@ -37,6 +38,7 @@ fn main() -> Result<()> {
     let group: usize = opt("--group").map_or(Ok(16), |s| s.parse())?;
     let classes: u32 = opt("--classes").map_or(Ok(63), |s| s.parse())?;
     let part: Option<usize> = opt("--slices").map(|s| s.parse()).transpose()?;
+    let cpu_threads: usize = opt("--cpu-threads").map_or(Ok(0), |s| s.parse())?;
     let fields: Vec<u128> = opt("--fields")
         .unwrap_or_else(|| "77777".into())
         .split(',')
@@ -128,7 +130,7 @@ fn main() -> Result<()> {
             let cpu_check = !args.iter().any(|a| a == "--no-cpu-check");
             let share = !args.iter().any(|a| a == "--no-share-parents");
             gj.set_parent_sharing(share);
-            println!("device {name}; W {}; group {group}; host threads {threads}; classes per batch {classes}; cpu check {cpu_check}; timing stop {stop:?}; slices per field {part:?}; parent sharing {share}", gj.w);
+            println!("device {name}; W {}; group {group}; host threads {threads}; classes per batch {classes}; cpu check {cpu_check} ({} threads); timing stop {stop:?}; slices per field {part:?}; parent sharing {share}", gj.w, nice_common::midout::gpu::sample_threads(cpu_threads));
             let q = coord.quantum();
             let (mut wall, mut adm_all) = (0f64, 0f64);
             for &t in &fields {
@@ -137,9 +139,9 @@ fn main() -> Result<()> {
                 // a part of the field: its share of the admissible n (4,096 slices per field)
                 let adm = ncount as f64 * 8.0 / 63.0 * part.map_or(1.0, |k| k.min(4096) as f64 / 4096.0);
                 let go = if args.iter().any(|a| a == "--host-tops") {
-                    GpuOptions::new(group, cpu_check).with_host_tops(threads)
+                    GpuOptions::new(group, cpu_check).with_cpu_threads(cpu_threads).with_host_tops(threads)
                 } else {
-                    GpuOptions::new(group, cpu_check)
+                    GpuOptions::new(group, cpu_check).with_cpu_threads(cpu_threads)
                 };
                 if let Some(s) = stop {
                     let tm = match part {

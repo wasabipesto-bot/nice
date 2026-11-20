@@ -489,7 +489,7 @@ fn faults_are_loud<R: Runtime>(client: ComputeClient<R>, pips: &[u64], classes: 
     let sp = pips[0];
     let cpu = std::thread::spawn({
         let c = coord.clone();
-        move || cpu_slice(&c, sp)
+        move || cpu_slice(&c, sp, super::sample_threads(0))
     });
     let mut gj = GpuJoin::new(client, Caps::b64(classes)).unwrap();
     println!("W {} classes {classes} slices {pips:?}", gj.w);

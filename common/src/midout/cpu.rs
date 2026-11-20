@@ -292,55 +292,152 @@ pub struct Bot<M> {
 pub fn bottoms<M: Mask>(base: &Base, k: u32, f: u32, forced: u128) -> Vec<Bot<M>> {
     let bk = base.pw[k as usize];
     assert!(bk < (1u128 << 96), "bottoms: b^k must be below 2^96");
-    let b = u128::from(base.b);
+    bottoms_below(base, k, f, forced, vec![(0, 0, 0, 0, M::default())])
+}
+
+/// [`bottoms`] on `threads` threads: the walk below each digit 0 on its own.
+/// The same residues (each once), in another order.
+///
+/// # Panics
+/// If `b^k` is not below 2^96, or a thread panics.
+fn bottoms_threads<M: Mask>(
+    base: &Base,
+    k: u32,
+    f: u32,
+    forced: u128,
+    threads: usize,
+) -> Vec<Bot<M>> {
+    if threads <= 1 || k == 0 {
+        return bottoms(base, k, f, forced);
+    }
+    let bk = base.pw[k as usize];
+    assert!(bk < (1u128 << 96), "bottoms: b^k must be below 2^96");
+    let mut first = Vec::new();
+    bot_children(base, k, f, forced, (0, 0, 0, 0, M::default()), &mut |x| {
+        first.push(x);
+    });
+    par_map(threads, first.len(), |i| {
+        bottoms_below(base, k, f, forced, vec![first[i]])
+    })
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+/// A node of the bottoms' walk: depth `j`, `r`, `r²`, `r³` mod `b^k`, mask.
+type BotNode<M> = (u32, u128, u128, u128, M);
+
+/// The bottoms' walk from the nodes on `stack` (popped last first).
+fn bottoms_below<M: Mask>(
+    base: &Base,
+    k: u32,
+    f: u32,
+    forced: u128,
+    mut stack: Vec<BotNode<M>>,
+) -> Vec<Bot<M>> {
     let mut out = Vec::new();
-    let mut stack: Vec<(u32, u128, u128, u128, M)> = vec![(0, 0, 0, 0, M::default())];
-    while let Some((j, r, r2, r3, mask)) = stack.pop() {
-        if j == k {
-            out.push(Bot { r, mask });
+    while let Some(nd) = stack.pop() {
+        if nd.0 == k {
+            out.push(Bot {
+                r: nd.1,
+                mask: nd.4,
+            });
             continue;
         }
-        let bj = base.pw[j as usize];
-        let b2j = if 2 * j < k {
-            base.pw[(2 * j) as usize]
-        } else {
-            0
-        };
-        let b3j = if 3 * j < k {
-            base.pw[(3 * j) as usize]
-        } else {
-            0
-        };
-        let (dlo, dhi) = if j < f {
-            (0u128, b - 1)
-        } else {
-            let d = (forced / base.pw[(j - f) as usize]) % b;
-            (d, d)
-        };
-        let two_r = (2 * r) % bk;
-        let three_r2 = (3 * r2) % bk;
-        let three_r = (3 * r) % bk;
-        for d in dlo..=dhi {
-            let nr = r + d * bj;
-            let nr2 = (r2 + mm((two_r * d) % bk, bj, bk) + mm(d * d % bk, b2j, bk)) % bk;
-            let nr3 = (r3
-                + mm((three_r2 * d) % bk, bj, bk)
-                + mm((three_r * (d * d)) % bk, b2j, bk)
-                + mm((d * d * d) % bk, b3j, bk))
-                % bk;
-            #[allow(clippy::cast_possible_truncation)]
-            let (e2, e3) = (((nr2 / bj) % b) as u32, ((nr3 / bj) % b) as u32);
-            if e2 == e3 {
-                continue;
-            }
-            let add = M::bit(e2) | M::bit(e3);
-            if !(mask & add).is_zero() {
-                continue;
-            }
-            stack.push((j + 1, nr, nr2, nr3, mask | add));
-        }
+        bot_children(base, k, f, forced, nd, &mut |x| {
+            stack.push(x);
+        });
     }
     out
+}
+
+/// The certified children of a node of depth `j < k` (its digit `j` added), in digit order.
+fn bot_children<M: Mask>(
+    base: &Base,
+    k: u32,
+    f: u32,
+    forced: u128,
+    (j, r, r2, r3, mask): BotNode<M>,
+    push: &mut impl FnMut(BotNode<M>),
+) {
+    let bk = base.pw[k as usize];
+    let b = u128::from(base.b);
+    let bj = base.pw[j as usize];
+    let b2j = if 2 * j < k {
+        base.pw[(2 * j) as usize]
+    } else {
+        0
+    };
+    let b3j = if 3 * j < k {
+        base.pw[(3 * j) as usize]
+    } else {
+        0
+    };
+    let (dlo, dhi) = if j < f {
+        (0u128, b - 1)
+    } else {
+        let d = (forced / base.pw[(j - f) as usize]) % b;
+        (d, d)
+    };
+    let two_r = (2 * r) % bk;
+    let three_r2 = (3 * r2) % bk;
+    let three_r = (3 * r) % bk;
+    for d in dlo..=dhi {
+        let nr = r + d * bj;
+        let nr2 = (r2 + mm((two_r * d) % bk, bj, bk) + mm(d * d % bk, b2j, bk)) % bk;
+        let nr3 = (r3
+            + mm((three_r2 * d) % bk, bj, bk)
+            + mm((three_r * (d * d)) % bk, b2j, bk)
+            + mm((d * d * d) % bk, b3j, bk))
+            % bk;
+        #[allow(clippy::cast_possible_truncation)]
+        let (e2, e3) = (((nr2 / bj) % b) as u32, ((nr3 / bj) % b) as u32);
+        if e2 == e3 {
+            continue;
+        }
+        let add = M::bit(e2) | M::bit(e3);
+        if !(mask & add).is_zero() {
+            continue;
+        }
+        push((j + 1, nr, nr2, nr3, mask | add));
+    }
+}
+
+/// `f(0), …, f(n − 1)` on up to `threads` threads, returned in index order
+/// (on the calling thread when `threads` is 1).
+///
+/// # Panics
+/// If `f` panics.
+fn par_map<T: Send>(threads: usize, n: usize, f: impl Fn(usize) -> T + Sync) -> Vec<T> {
+    if threads <= 1 || n <= 1 {
+        return (0..n).map(f).collect();
+    }
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let parts: Vec<Vec<(usize, T)>> = std::thread::scope(|s| {
+        let hs: Vec<_> = (0..threads.min(n))
+            .map(|_| {
+                s.spawn(|| {
+                    let mut got = Vec::new();
+                    loop {
+                        let i = next.fetch_add(1, Ordering::Relaxed);
+                        if i >= n {
+                            break;
+                        }
+                        got.push((i, f(i)));
+                    }
+                    got
+                })
+            })
+            .collect();
+        hs.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+    let mut out: Vec<Option<T>> = (0..n).map(|_| None).collect();
+    for (i, x) in parts.into_iter().flatten() {
+        out[i] = Some(x);
+    }
+    out.into_iter()
+        .map(|x| x.expect("every index computed"))
+        .collect()
 }
 
 /// A certified top of one unit.
@@ -401,11 +498,17 @@ pub struct Parent<M> {
 /// The slice's parents, `r` ascending.
 #[must_use]
 pub fn parents<M: Mask>(base: &Base, sh: Shape, pip: u128) -> Vec<Parent<M>> {
+    parents_threads(base, sh, pip, 1)
+}
+
+/// [`parents`] on `threads` threads (the same list: residues are distinct and
+/// the list is sorted by them).
+fn parents_threads<M: Mask>(base: &Base, sh: Shape, pip: u128, threads: usize) -> Vec<Parent<M>> {
     let b = u128::from(base.b);
     let bk = base.pw[sh.k as usize];
     let bj = base.pw[(sh.k - 1) as usize];
     let m = b - 1;
-    let mut v: Vec<Parent<M>> = bottoms::<M>(base, sh.k - 1, sh.f0, pip)
+    let mut v: Vec<Parent<M>> = bottoms_threads::<M>(base, sh.k - 1, sh.f0, pip, threads)
         .into_iter()
         .map(|p| {
             let r2 = mm(p.r % bk, p.r % bk, bk);
@@ -518,82 +621,192 @@ impl Counts {
 
 /// One slice through the join; calls `sink(d, n, pass)` for every survivor
 /// (unit digit `d`; `pass`: it passes the prefilter). Single-threaded.
-#[allow(clippy::too_many_lines)] // one loop nest, kept whole to mirror a kernel
 pub fn slice_join<M: Mask>(
     base: &Base,
     sh: Shape,
     pip: u128,
+    sink: impl FnMut(u32, u128, bool),
+) -> Counts {
+    slice_join_threads::<M>(base, sh, pip, 1, sink)
+}
+
+/// [`slice_join`] on `threads` threads, with the same result: the same
+/// counts, and `sink` called on the calling thread for the same survivors
+/// in the same order. The slice's parents (one walk per digit 0), its tops
+/// (one unit at a time) and its classes (`threads` at a time, each class's
+/// survivors held until every class before it has been passed on) are
+/// independent pieces of work; their results are put back in the
+/// single-threaded order before anything depends on it.
+///
+/// # Panics
+/// If a thread panics.
+pub fn slice_join_threads<M: Mask>(
+    base: &Base,
+    sh: Shape,
+    pip: u128,
+    threads: usize,
     mut sink: impl FnMut(u32, u128, bool),
 ) -> Counts {
-    let b = base.b as usize;
-    let m = b - 1;
+    let threads = threads.max(1);
     let mut cn = Counts::default();
-    let ps = parents::<M>(base, sh, pip);
-    cn.parents = ps.len() as u64;
-    let step = base.pw[(sh.k - 1 - sh.f0) as usize];
-    let mut tops_by_d: Vec<Vec<Top<M>>> = Vec::with_capacity(b);
-    for d in 0..b as u128 {
-        let t = unit_tops::<M>(base, sh, pip + d * step, &mut cn.tops_tested);
-        cn.tops += t.len() as u64;
-        tops_by_d.push(t);
+    let sj = SliceSetup::<M>::new(base, sh, pip, threads, &mut cn);
+    if threads == 1 {
+        let mut scr = ClassScratch::default();
+        for c in 0..sj.m {
+            sj.class(c, &mut scr, &mut cn, &mut sink);
+        }
+        return cn;
     }
-    let digit_count = |it: &mut dyn Iterator<Item = M>| -> Vec<u64> {
-        let mut f = vec![0u64; b];
-        for mut x in it {
-            while !x.is_zero() {
-                f[x.trailing_zeros() as usize] += 1;
-                x = x.clear_lowest();
+    // classes in waves of `threads`: each wave's survivors are buffered per class and passed on in class order
+    let mut c0 = 0;
+    while c0 < sj.m {
+        let wave = threads.min(sj.m - c0);
+        let parts = par_map(threads, wave, |i| {
+            let mut scr = ClassScratch::default();
+            let mut ci = Counts::default();
+            let mut got = Vec::new();
+            sj.class(c0 + i, &mut scr, &mut ci, &mut |d, n, pass| {
+                got.push((d, n, pass));
+            });
+            (ci, got)
+        });
+        for (ci, got) in parts {
+            cn.add(&ci);
+            for (d, n, pass) in got {
+                sink(d, n, pass);
             }
         }
-        f
-    };
-    let fp = digit_count(&mut ps.iter().map(|p| p.mask));
-    let ft = digit_count(&mut tops_by_d.iter().flatten().map(|t| t.mask));
-    let rank = key_digits(base.b, &fp, &ft);
-    let key = |mk: M| -> u64 {
-        let mut kk = 0u64;
-        for (i, &v) in rank.iter().enumerate() {
-            kk |= u64::from(!(mk & M::bit(v)).is_zero()) << (7 - i);
+        c0 += wave;
+    }
+    cn
+}
+
+/// A slice made ready for its classes: parents sorted by class and key,
+/// tops per unit, both split by class.
+struct SliceSetup<'a, M> {
+    base: &'a Base,
+    sh: Shape,
+    m: usize,
+    ps: Vec<Parent<M>>,
+    /// Class `c`'s parents are `ps[pseg[c]..pseg[c + 1]]`.
+    pseg: Vec<usize>,
+    tops_by_d: Vec<Vec<Top<M>>>,
+    /// `tseg[d][ct]`: indices into `tops_by_d[d]` of the tops of class `ct`.
+    tseg: Vec<Vec<Vec<usize>>>,
+}
+
+/// One class's working space (reused across its units).
+#[derive(Default)]
+struct ClassScratch<M> {
+    cm: Vec<M>,
+    cp: Vec<usize>,
+    probes: Vec<usize>,
+    sl: Vec<u64>,
+}
+
+impl<'a, M: Mask> SliceSetup<'a, M> {
+    /// Parents, tops and the key; sets `cn`'s parents, tops and tops tested.
+    fn new(base: &'a Base, sh: Shape, pip: u128, threads: usize, cn: &mut Counts) -> Self {
+        let b = base.b as usize;
+        let m = b - 1;
+        let ps = parents_threads::<M>(base, sh, pip, threads);
+        cn.parents = ps.len() as u64;
+        let step = base.pw[(sh.k - 1 - sh.f0) as usize];
+        let tops_by_d: Vec<Vec<Top<M>>> = par_map(threads, b, |d| {
+            let mut tested = 0u64;
+            let t = unit_tops::<M>(base, sh, pip + d as u128 * step, &mut tested);
+            (t, tested)
+        })
+        .into_iter()
+        .map(|(t, tested)| {
+            cn.tops_tested += tested;
+            cn.tops += t.len() as u64;
+            t
+        })
+        .collect();
+        let digit_count = |it: &mut dyn Iterator<Item = M>| -> Vec<u64> {
+            let mut f = vec![0u64; b];
+            for mut x in it {
+                while !x.is_zero() {
+                    f[x.trailing_zeros() as usize] += 1;
+                    x = x.clear_lowest();
+                }
+            }
+            f
+        };
+        let fp = digit_count(&mut ps.iter().map(|p| p.mask));
+        let ft = digit_count(&mut tops_by_d.iter().flatten().map(|t| t.mask));
+        let rank = key_digits(base.b, &fp, &ft);
+        let key = |mk: M| -> u64 {
+            let mut kk = 0u64;
+            for (i, &v) in rank.iter().enumerate() {
+                kk |= u64::from(!(mk & M::bit(v)).is_zero()) << (7 - i);
+            }
+            kk
+        };
+        let mut ps = ps;
+        ps.sort_by_key(|p| (u64::from(p.cls) << 8) + (255 - key(p.mask)));
+        let mut pseg = vec![0usize; m + 1];
+        {
+            let mut i = 0;
+            for (c, seg) in pseg.iter_mut().enumerate().take(m) {
+                *seg = i;
+                while i < ps.len() && ps[i].cls as usize == c {
+                    i += 1;
+                }
+            }
+            pseg[m] = ps.len();
         }
-        kk
-    };
-    let mut ps = ps;
-    ps.sort_by_key(|p| (u64::from(p.cls) << 8) + (255 - key(p.mask)));
-    let mut pseg = vec![0usize; m + 1];
-    {
-        let mut i = 0;
-        for (c, seg) in pseg.iter_mut().enumerate().take(m) {
-            *seg = i;
-            while i < ps.len() && ps[i].cls as usize == c {
-                i += 1;
+        let mut tseg: Vec<Vec<Vec<usize>>> = vec![vec![Vec::new(); m]; b];
+        for (d, tv) in tops_by_d.iter().enumerate() {
+            for (i, t) in tv.iter().enumerate() {
+                tseg[d][(t.h % m as u128) as usize].push(i);
             }
         }
-        pseg[m] = ps.len();
-    }
-    let mut tseg: Vec<Vec<Vec<usize>>> = vec![vec![Vec::new(); m]; b];
-    for (d, tv) in tops_by_d.iter().enumerate() {
-        for (i, t) in tv.iter().enumerate() {
-            tseg[d][(t.h % m as u128) as usize].push(i);
+        SliceSetup {
+            base,
+            sh,
+            m,
+            ps,
+            pseg,
+            tops_by_d,
+            tseg,
         }
     }
-    let bk1 = base.pw[(sh.k - 1) as usize];
-    let bkk = base.pw[sh.k as usize];
-    let (mut cm, mut cp, mut probes): (Vec<M>, Vec<usize>, Vec<usize>) =
-        (Vec::new(), Vec::new(), Vec::new());
-    let mut sl = vec![0u64; b];
-    for c in 0..m {
+
+    /// Class `c` against every unit, in unit order: adds to `cn` and calls `sink` for each survivor.
+    fn class(
+        &self,
+        c: usize,
+        scr: &mut ClassScratch<M>,
+        cn: &mut Counts,
+        sink: &mut impl FnMut(u32, u128, bool),
+    ) {
+        let base = self.base;
+        let b = base.b as usize;
+        let m = self.m;
+        let bk1 = base.pw[(self.sh.k - 1) as usize];
+        let bkk = base.pw[self.sh.k as usize];
+        let ClassScratch { cm, cp, probes, sl } = scr;
+        sl.resize(b, 0);
         for d in 0..b {
             // a top of class ct pairs with a child of class c + d when ct + c + d is a root
             let cc = (c + d) % m;
             probes.clear();
             for &rt in &base.roots {
                 let ct = (rt as usize + m - cc) % m;
-                probes.extend_from_slice(&tseg[d][ct]);
+                probes.extend_from_slice(&self.tseg[d][ct]);
             }
             cm.clear();
             cp.clear();
             #[allow(clippy::cast_possible_truncation)]
-            for (p, par) in ps.iter().enumerate().take(pseg[c + 1]).skip(pseg[c]) {
+            for (p, par) in self
+                .ps
+                .iter()
+                .enumerate()
+                .take(self.pseg[c + 1])
+                .skip(self.pseg[c])
+            {
                 let x = child_mask(base.b, par, d as u32);
                 if !x.is_zero() {
                     cm.push(x);
@@ -604,7 +817,7 @@ pub fn slice_join<M: Mask>(
             cn.pairs += cm.len() as u64 * probes.len() as u64;
             let nch = cm.len().div_ceil(64);
             cn.chunks += nch as u64;
-            let tv = &tops_by_d[d];
+            let tv = &self.tops_by_d[d];
             for qi in 0..nch {
                 let n0 = qi * 64;
                 let n = (cm.len() - n0).min(64);
@@ -621,7 +834,7 @@ pub fn slice_join<M: Mask>(
                     }
                 }
                 cn.flat += probes.len() as u64;
-                for &ti in &probes {
+                for &ti in probes.iter() {
                     let tp = &tv[ti];
                     if !(common & tp.mask).is_zero() {
                         continue;
@@ -639,10 +852,10 @@ pub fn slice_join<M: Mask>(
                     }
                     while w != 0 {
                         let i = w.trailing_zeros() as usize;
-                        let nn = tp.h * bkk + d as u128 * bk1 + ps[cp[n0 + i]].r;
+                        let nn = tp.h * bkk + d as u128 * bk1 + self.ps[cp[n0 + i]].r;
                         if nn >= tp.lo && nn <= tp.hi {
                             cn.survivors += 1;
-                            let pass = prefilter(base, sh.k, nn, tp.mhi);
+                            let pass = prefilter(base, self.sh.k, nn, tp.mhi);
                             cn.checked += u64::from(pass);
                             #[allow(clippy::cast_possible_truncation)]
                             sink(d as u32, nn, pass);
@@ -655,7 +868,6 @@ pub fn slice_join<M: Mask>(
             }
         }
     }
-    cn
 }
 
 /// The shape's predicate at one n, straight from the definitions (brute
@@ -950,6 +1162,104 @@ mod tests {
     #[test]
     fn whole_base_25_vs_brute_force() {
         check_whole_base(25, (2, 4, 3), &[(2, 5)]);
+    }
+
+    /// The slice join on several threads equals it on one: the same counts
+    /// and the same survivors in the same order, on every slice of three
+    /// small bases (with survivors, more classes than threads and fewer),
+    /// in `u64` and `u128` masks.
+    #[test]
+    fn threaded_slice_join_equals_single_threaded() {
+        for (b, (k0, k1, q0), (f0, k)) in [
+            (20, (2, 3, 2), (2, 4)),
+            (24, (1, 3, 2), (1, 4)),
+            (25, (2, 4, 3), (2, 5)),
+        ] {
+            let coord = Coord::with_digits(b, k0, k1, q0).unwrap();
+            let base = Base::new(&coord);
+            let sh = Shape { f0, k };
+            let nq = (coord.v_end() - coord.start()) / coord.quantum();
+            let mut total = 0u64;
+            for t in 0..nq {
+                for pip in sh.slices_of(&coord, t) {
+                    let mut one = Vec::new();
+                    let c1 = slice_join::<u64>(&base, sh, pip, |d, n, p| {
+                        one.push((d, n, p));
+                    });
+                    total += c1.survivors;
+                    for threads in [2, 3, 7, 64] {
+                        let mut many = Vec::new();
+                        let cm = slice_join_threads::<u64>(&base, sh, pip, threads, |d, n, p| {
+                            many.push((d, n, p));
+                        });
+                        assert_eq!(cm, c1, "b{b} slice {pip}, {threads} threads: counts");
+                        assert_eq!(many, one, "b{b} slice {pip}, {threads} threads: survivors");
+                    }
+                    let mut wide = Vec::new();
+                    let cw = slice_join_threads::<u128>(&base, sh, pip, 3, |d, n, p| {
+                        wide.push((d, n, p));
+                    });
+                    assert_eq!((cw, &wide), (c1, &one), "b{b} slice {pip}, u128, 3 threads");
+                }
+            }
+            assert!(total > 0, "b{b}: no survivors to compare");
+        }
+    }
+
+    /// The sampled check's CPU slice at bases 64 and 65 on each thread count
+    /// of `MIDOUT_CPU_THREADS` (default `1,2,4`): every count and the
+    /// survivors in order equal the first count's, with the time of each.
+    /// Slices `MIDOUT_CPU_SLICES` as `base:slice,…` (default one of each).
+    /// Minutes of CPU per slice and thread count.
+    #[cfg(feature = "midout-box-tests")]
+    #[test]
+    #[ignore = "minutes of CPU per slice and thread count"]
+    fn threaded_slice_join_real_slices() {
+        type Survivor = (u32, u128, bool);
+        let threads: Vec<usize> = std::env::var("MIDOUT_CPU_THREADS")
+            .unwrap_or_else(|_| "1,2,4".into())
+            .split(',')
+            .map(|x| x.parse().unwrap())
+            .collect();
+        let slices = std::env::var("MIDOUT_CPU_SLICES")
+            .unwrap_or_else(|_| "65:717171717,64:712012851".into());
+        for item in slices.split(',') {
+            let (b, pip) = item.split_once(':').unwrap();
+            let (b, pip): (u32, u128) = (b.parse().unwrap(), pip.parse().unwrap());
+            let coord = Coord::for_base(b).unwrap();
+            let base = Base::new(&coord);
+            let sh = Shape::for_coord(&coord);
+            // the first thread count's counts and survivors (unit, n, passes the prefilter)
+            let mut first: Option<(Counts, Vec<Survivor>)> = None;
+            for &th in &threads {
+                let t = std::time::Instant::now();
+                let mut v = Vec::new();
+                let cn = if b > 64 {
+                    slice_join_threads::<u128>(&base, sh, pip, th, |d, n, p| {
+                        v.push((d, n, p));
+                    })
+                } else {
+                    slice_join_threads::<u64>(&base, sh, pip, th, |d, n, p| {
+                        v.push((d, n, p));
+                    })
+                };
+                let secs = t.elapsed().as_secs_f64();
+                println!(
+                    "CPUSLICE b{b} slice {pip} threads {th}: {secs:.2} s survivors {} checked {} tops {} parents {}",
+                    cn.survivors, cn.checked, cn.tops, cn.parents
+                );
+                match &first {
+                    None => first = Some((cn, v)),
+                    Some((c0, v0)) => {
+                        assert_eq!(&cn, c0, "b{b} slice {pip}, {th} threads: counts");
+                        assert!(
+                            v == *v0,
+                            "b{b} slice {pip}, {th} threads: survivors or their order differ"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     /// The top certificate against its definition: the digits of `n²` and

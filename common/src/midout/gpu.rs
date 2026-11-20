@@ -3829,6 +3829,8 @@ pub struct GpuOptions {
     /// same prefiltered list, n for n. The only check that sees a kernel
     /// computing wrongly (the accounts see only work that did not run).
     pub cpu_check: bool,
+    /// Threads for the sampled check's CPU slice; 0 for [`sample_threads`]' default.
+    pub(crate) cpu_threads: usize,
 }
 
 impl GpuOptions {
@@ -3839,6 +3841,16 @@ impl GpuOptions {
             host_threads: 1,
             device_tops: true,
             cpu_check,
+            cpu_threads: 0,
+        }
+    }
+
+    /// The sampled check's CPU slice on `threads` threads (0: [`sample_threads`]' default).
+    #[must_use]
+    pub fn with_cpu_threads(self, threads: usize) -> Self {
+        Self {
+            cpu_threads: threads,
+            ..self
         }
     }
 
@@ -3856,15 +3868,31 @@ impl GpuOptions {
     }
 }
 
-/// The sampled check of one slice: the CPU reference (survivors, checked,
-/// the prefiltered list, sorted).
-fn cpu_slice(coord: &Coord, pip: u64) -> (u64, u64, Vec<u128>) {
+/// Threads for the sampled check's CPU slice: `requested`, or if it is 0,
+/// the CPUs this process may use less one (left to the thread that queues
+/// the device's work), at most [`SAMPLE_THREADS_MAX`], at least 1.
+#[must_use]
+pub fn sample_threads(requested: usize) -> usize {
+    if requested > 0 {
+        return requested;
+    }
+    let cpus = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
+    cpus.saturating_sub(1).clamp(1, SAMPLE_THREADS_MAX)
+}
+
+/// The most threads the sampled check's CPU slice takes by default.
+pub const SAMPLE_THREADS_MAX: usize = 4;
+
+/// The sampled check of one slice: the CPU reference on `threads` threads
+/// (survivors, checked, the prefiltered list, sorted).
+fn cpu_slice(coord: &Coord, pip: u64, threads: usize) -> (u64, u64, Vec<u128>) {
     let base = super::cpu::Base::new(coord);
     let mut pass = Vec::new();
-    let cn = super::cpu::slice_join::<u64>(
+    let cn = super::cpu::slice_join_threads::<u64>(
         &base,
         Shape::for_coord(coord),
         u128::from(pip),
+        threads,
         |_, n, p| {
             if p {
                 pass.push(n);
@@ -4086,11 +4114,12 @@ fn field_run<R: Runtime>(
         let pip = pips[(hs.finish() % pips.len() as u64) as usize];
         *gj.watch.lock().expect("watch") = (Some(pip), None);
         let c = coord.clone();
+        let threads = sample_threads(opt.cpu_threads);
         Some((
             pip,
             std::thread::spawn(move || {
                 let t = Instant::now();
-                let r = cpu_slice(&c, pip);
+                let r = cpu_slice(&c, pip, threads);
                 (r, t.elapsed().as_secs_f64())
             }),
         ))
@@ -4402,7 +4431,7 @@ mod tests {
             ($client:expr) => {{
                 let mut gj = GpuJoin::new($client, Caps::b64(classes)).unwrap();
                 gj.set_parent_sharing(false);
-                let opt1 = GpuOptions { group: 1, host_threads: 1, device_tops: true, cpu_check: false };
+                let opt1 = GpuOptions { group: 1, host_threads: 1, device_tops: true, cpu_check: false, cpu_threads: 0 };
                 let opt16 = GpuOptions { group: 16, ..opt1 };
                 let (o0, r0) = search_field_groups(&gj, &cn, vs, q, opt1, 0..nsl).unwrap();
                 gj.set_parent_sharing(true);
@@ -4495,7 +4524,7 @@ mod tests {
         macro_rules! go {
             ($client:expr) => {{
                 let gj = GpuJoin::new($client, Caps::b64(classes)).unwrap();
-                let opt1 = GpuOptions { group: 1, host_threads: 1, device_tops: true, cpu_check: false };
+                let opt1 = GpuOptions { group: 1, host_threads: 1, device_tops: true, cpu_check: false, cpu_threads: 0 };
                 // the new field, slice by slice (all of it, or the slices of the listed digit-8 values)
                 let mut newc: HashMap<u64, DevCounts> = HashMap::new();
                 let (mut ns, mut nc) = (0u64, 0u64);
@@ -4546,7 +4575,7 @@ mod tests {
                 assert_eq!((os, oc), (ns, nc));
                 println!("slice by slice: {} slices equal (kept equal on {kept_eq}: kept depends on the field's key)", newc.len());
                 if whole {
-                    let opt = GpuOptions { group: 16, host_threads: 1, device_tops: true, cpu_check: true };
+                    let opt = GpuOptions { group: 16, host_threads: 1, device_tops: true, cpu_check: true, cpu_threads: 0 };
                     let (o, dc, tm) = search_field(&gj, &cn, cn.start() + tn * q, q, opt).unwrap();
                     println!(
                         "the production path: survivors {}, checked {}, slices {}, nice {:?}, sampled slice {:?} equal ({:.1} s)",

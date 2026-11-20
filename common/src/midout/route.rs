@@ -65,14 +65,16 @@ impl<R: Runtime> FieldJoin<R> {
         }
     }
 
-    /// Whether the sampled CPU check is on by default for this base: at base
-    /// 64 it costs +0.4 % of a field (RTX 3080); at base 65 the CPU slice
-    /// takes longer than the whole field (70–93 s measured, against a field
-    /// of 55–56 s on the same card), so the check would set the field's
-    /// pace; it is off there unless asked.
+    /// Whether the sampled CPU check is on by default for this base: on at
+    /// both. Its CPU slice runs on up to four threads beside the device's
+    /// (`gpu::sample_threads`); on a box with a 5-CPU quota and an RTX 3080
+    /// it took 33 s at base 65 against a 56 s field, and 11 s at base 64
+    /// against a 30 s field, so the host does not wait for it.
     #[must_use]
     pub fn cpu_check_default(&self) -> bool {
-        matches!(self, Self::Narrow(_))
+        match self {
+            Self::Narrow(_) | Self::Wide(..) => true,
+        }
     }
 
     /// Search the field `[v_start, v_start + v_size)` of `coord` (which must
@@ -113,6 +115,7 @@ impl<R: Runtime> FieldJoin<R> {
                 let opt = WideOptions {
                     group: GROUP,
                     cpu_check,
+                    cpu_threads: 0,
                 };
                 let (o, dc, tm) = search_field_wide(gj, &coord, v_start, v_size, opt)?;
                 let c = json!({"tops": dc.tops, "children": dc.children, "chunks": dc.chunks,

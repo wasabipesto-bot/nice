@@ -7,7 +7,9 @@
 //!
 //! usage: midout_wide_bench [--cuda] [--base B] [--fields T0,T1,..] [--group G] [--classes C]
 //!                          [--maxpop P] [--ninst I] [--narrow] [--narrow-only] [--digits K0,K1,Q0] [--pf-digits]
+//!                          [--cpu-check] [--cpu-threads N]
 //!   --fields: values of the field's fixed digits (5-7 under the default 4,8,5; 6-8 under 4,9,6): v = start + t·quantum
+//!   --cpu-check: the sampled CPU check of one random slice per field, on N threads (default `gpu::sample_threads`)
 //!   --pf-digits: the expansion's prefilter digit by digit (`pf_w`, the earlier form) instead of in base b² (A/B)
 #![allow(clippy::cast_precision_loss)]
 
@@ -30,6 +32,7 @@ fn main() -> Result<()> {
     let flag = |name: &str| args.iter().any(|a| a == name);
     let b: u32 = opt("--base").map_or(Ok(65), |s| s.parse())?;
     let group: usize = opt("--group").map_or(Ok(16), |s| s.parse())?;
+    let cpu_threads: usize = opt("--cpu-threads").map_or(Ok(0), |s| s.parse())?;
     let fields: Vec<u128> = opt("--fields")
         .unwrap_or_else(|| "77777".into())
         .split(',')
@@ -120,7 +123,7 @@ fn main() -> Result<()> {
                         println!("WIDE b{b} t {t} TIMING STOP: {:.2} s = {:.4} fs per admissible n", tm.wall, tm.wall / adm * 1e15);
                         continue;
                     }
-                    let (o, dc, tm) = search_field_wide(gj, &coord, vs, q, WideOptions { group, cpu_check: flag("--cpu-check") })?;
+                    let (o, dc, tm) = search_field_wide(gj, &coord, vs, q, WideOptions { group, cpu_check: flag("--cpu-check"), cpu_threads })?;
                     wall_w += tm.wall;
                     if let Some(p) = tm.sampled {
                         println!("WIDE b{b} t {t} sampled CPU check: slice {p} equal (cpu {:.1} s, host waited {:.1} s, device rerun {:.2} s; field alone {:.2} s)", tm.cpu_check, tm.cpu_wait, tm.sample_dev, tm.field);
@@ -143,7 +146,7 @@ fn main() -> Result<()> {
                     );
                 }
                 if let Some(gn) = &nj {
-                    let (o, dc, tm) = search_field(gn, &coord, vs, q, GpuOptions::new(group, flag("--cpu-check")))?;
+                    let (o, dc, tm) = search_field(gn, &coord, vs, q, GpuOptions::new(group, flag("--cpu-check")).with_cpu_threads(cpu_threads))?;
                     wall_n += tm.wall;
                     println!(
                         "NARROW b{b} t {t} v [{vs}, +{q}) n {ncount}: {:.2} s = {:.4} fs per admissible n | slices {} survivors {} checked {} nice {:?} | tops {} children {} chunks {} flat {} kept {}",
