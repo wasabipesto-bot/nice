@@ -926,6 +926,16 @@ fn study<M: Mask>(
         vars.push(v("hyb2_cell", Ord_::Hybrid(2), 64, Ivl::Cell(2), false));
         vars.push(v("hyb3_cell", Ord_::Hybrid(3), 64, Ivl::Cell(3), false));
     }
+    if a_q6b() {
+        // a second base-65 pass: the hybrids with more bits of L, and L order at 32
+        vars.clear();
+        vars.push(v("code", Ord_::Code, 64, Ivl::None, false));
+        vars.push(v("hyb4_cell", Ord_::Hybrid(4), 64, Ivl::Cell(4), false));
+        vars.push(v("hyb5_cell", Ord_::Hybrid(5), 64, Ivl::Cell(5), false));
+        vars.push(v("hyb6_cell", Ord_::Hybrid(6), 64, Ivl::Cell(6), false));
+        vars.push(v("lorder_ext_c32", Ord_::LOrder, 32, Ivl::Tight, false));
+        vars.push(v("lorder_ext_c128", Ord_::LOrder, 128, Ivl::Tight, false));
+    }
     let nv = vars.len();
     let njobs = m * bu;
     let next = AtomicUsize::new(0);
@@ -1024,6 +1034,10 @@ fn study<M: Mask>(
         println!("{} ord={:?} csz={} ivl={:?}", st.line(&var.name), var.ord, var.csz, var.ivl);
     }
     println!("TIME secs={:.1}", t0.elapsed().as_secs_f64());
+}
+
+fn a_q6b() -> bool {
+    std::env::args().skip(4).any(|s| s == "q6b")
 }
 
 fn main() {
