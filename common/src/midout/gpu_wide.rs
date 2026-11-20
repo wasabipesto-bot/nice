@@ -20,7 +20,8 @@
 //!   child's affine digits are `(c + a·d) mod b`;
 //! - **7-bit digit fields**: a top's digits are 7-bit fields, 4 per word, in
 //!   up to 5 words (20 digits; `maxpop` comptime, the fifth word only when
-//!   `maxpop > 16`);
+//!   `maxpop > 16`); the main kernel's shared copy of a probe keeps digits
+//!   16 and 17 in the four words' spare top bits when `maxpop <= 18`;
 //! - **more slice rows**: 65 rows per chunk up to base 64, `(b + 1) | 1`
 //!   above (67 at b65, 69 at b68, 71 at b69/b70), a zero row for the pad
 //!   digit of an empty top mask; the digits 64..b are transposed by ballots
@@ -239,6 +240,29 @@ mod wk {
         n
     }
 
+    /// Digit `k` of a probe: 7-bit fields, four per word of `pv` (bits 0-27); with `maxpop` 17-18, digits 16 and
+    /// 17 split over the words' bits 28-31 (low four bits in words 0 and 2, high three in words 1 and 3); above
+    /// 18, digits 16.. in `pe` (four per word).
+    #[cube]
+    fn probe_digit(
+        pv: Vector<u32, Const<4>>,
+        pe: u32,
+        #[comptime] k: u32,
+        #[comptime] maxpop: u32,
+    ) -> u32 {
+        let mut dg = 0u32;
+        if comptime!(k < 16) {
+            dg = (pv[comptime!(k / 4) as usize] >> comptime!(7 * (k % 4))) & 127u32;
+        } else if comptime!(maxpop > 18) {
+            dg = (pe >> comptime!(7 * (k - 16))) & 127u32;
+        } else if comptime!(k == 16) {
+            dg = (pv[0usize] >> 28u32) | ((pv[1usize] >> 24u32) & 0x70u32);
+        } else {
+            dg = (pv[2usize] >> 28u32) | ((pv[3usize] >> 24u32) & 0x70u32);
+        }
+        dg
+    }
+
     /// The bit of digit `v` as (lo, hi).
     #[cube]
     pub fn dbit(v: u32) -> (u64, u32) {
@@ -319,14 +343,17 @@ mod wk {
         ));
         let comm = SharedMemory::<Atomic<u32>>::new(32usize); // [2q + half], digits 0..64
         let commh = SharedMemory::<Atomic<u32>>::new(32usize); // [q], digits 64..
+        // a probe's digits 0-15 in `prob_d`; up to two more (maxpop 17-18) in the words' spare top nibbles
+        // (`probe_digit`); a fifth word per probe (`prob_e`) only above 18, which keeps base 65's shared memory
+        // under the 21,504 bytes a 64-lane RDNA SIMD needs for 12 waves of this kernel
         let mut prob_d = SharedMemory::<Vector<u32, Const<4>>>::new(comptime!(PMAX as usize));
         let mut prob_e =
-            SharedMemory::<u32>::new(comptime!((if maxpop > 16 { PMAX } else { 32 }) as usize));
+            SharedMemory::<u32>::new(comptime!((if maxpop > 18 { PMAX } else { 32 }) as usize));
         let mut wcnt = SharedMemory::<u32>::new(comptime!(
             (if 2 * NT / w < 32 { 32 } else { 2 * NT / w }) as usize
         ));
-        let s_nl = SharedMemory::<Atomic<u32>>::new(32usize);
-        let mut s_np = SharedMemory::<u32>::new(32usize);
+        let s_nl = SharedMemory::<Atomic<u32>>::new(1usize);
+        let mut s_np = SharedMemory::<u32>::new(1usize);
         let mut cmv = SharedMemory::<u32>::new(96usize);
 
         let t = UNIT_POS_X;
@@ -389,11 +416,19 @@ mod wk {
                         for k in 0..4u32 {
                             pv[k as usize] = tdig[((b0 + j) * TDW + k) as usize];
                         }
-                        prob_d[(base + j - poff) as usize] = pv;
                         if comptime!(maxpop > 16) {
-                            prob_e[(base + j - poff) as usize] =
-                                tdig[((b0 + j) * TDW + 4u32) as usize];
+                            let e = tdig[((b0 + j) * TDW + 4u32) as usize];
+                            if comptime!(maxpop > 18) {
+                                prob_e[(base + j - poff) as usize] = e;
+                            } else {
+                                // digits 16 and 17 (bits 0-13 of the fifth word) into the four words' bits 28-31
+                                pv[0usize] |= (e & 15u32) << 28u32;
+                                pv[1usize] |= ((e >> 4u32) & 7u32) << 28u32;
+                                pv[2usize] |= ((e >> 7u32) & 15u32) << 28u32;
+                                pv[3usize] |= ((e >> 11u32) & 7u32) << 28u32;
+                            }
                         }
+                        prob_d[(base + j - poff) as usize] = pv;
                     }
                     j += NT;
                 }
@@ -685,17 +720,12 @@ mod wk {
                     let mut hitm = 0u32;
                     let pv = prob_d[pp as usize];
                     let mut pe5 = 0u32;
-                    if comptime!(maxpop > 16) {
+                    if comptime!(maxpop > 18) {
                         pe5 = prob_e[pp as usize];
                     }
                     #[unroll]
                     for k in 0..maxpop {
-                        let mut dg = 0u32;
-                        if comptime!(k < 16) {
-                            dg = (pv[comptime!(k / 4) as usize] >> comptime!(7 * (k % 4))) & 127u32;
-                        } else {
-                            dg = (pe5 >> comptime!(7 * (k - 16))) & 127u32;
-                        }
+                        let dg = probe_digit(pv, pe5, k, maxpop);
                         hitm |= cmv[dg as usize];
                     }
                     let km = allq & !hitm;
@@ -736,18 +766,12 @@ mod wk {
                         let mut ahi = 0u32;
                         let dws = prob_d[(p16 >> 4u32) as usize];
                         let mut de = 0u32;
-                        if comptime!(maxpop > 16) {
+                        if comptime!(maxpop > 18) {
                             de = prob_e[(p16 >> 4u32) as usize];
                         }
                         #[unroll]
                         for k in 0..maxpop {
-                            let mut dg = 0u32;
-                            if comptime!(k < 16) {
-                                dg = (dws[comptime!(k / 4) as usize] >> comptime!(7 * (k % 4)))
-                                    & 127u32;
-                            } else {
-                                dg = (de >> comptime!(7 * (k - 16))) & 127u32;
-                            }
+                            let dg = probe_digit(dws, de, k, maxpop);
                             let row = (dg + qr) * 2u32;
                             alo |= sl[row as usize];
                             ahi |= sl[(row + 1u32) as usize];
