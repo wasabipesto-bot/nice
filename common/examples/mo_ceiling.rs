@@ -48,6 +48,10 @@ struct St {
     lane64: u64,
     wpop64: u64,
     wext64: u64,
+    // the oracle skip: a probe listed for a group only if some chunk of it gives a nonzero word
+    listed16_or: u64,
+    lane16_or: u64,
+    lane64_or: u64,
     // exactness of discarded survivors (relative to today's word, same order)
     disc_surv: u64,
     disc_checked: u64, // discarded ones that pass the prefilter
@@ -72,7 +76,7 @@ impl St {
     fn add(&mut self, o: &St) {
         macro_rules! a { ($($f:ident),*) => { $( self.$f += o.$f; )* } }
         a!(jobs, children, chunks, flat, dead_plain, dead_a, dead_b, dead_c, dead_clip, kept, ors, records, surv,
-           checked, listed16, lane16, wpop16, wext16, listed64, lane64, wpop64, wext64, disc_surv, disc_checked,
+           checked, listed16, lane16, wpop16, wext16, listed64, lane64, wpop64, wext64, listed16_or, lane16_or, lane64_or, disc_surv, disc_checked,
            disc_nice, disc_claim_ok, disc_claim_bad, q3_pairs, q3_dead_pairs, q3_records, q3_surv, q3_skip, q3_viol,
            q4_plain, q4_trie_h, q4_trie_mask, q4_trie_mask_kept);
         for i in 0..NH {
@@ -84,7 +88,7 @@ impl St {
         let mut s = format!("VAR {name}");
         macro_rules! p { ($($f:ident),*) => { $( s += &format!(" {}={}", stringify!($f), self.$f); )* } }
         p!(jobs, children, chunks, flat, dead_plain, dead_a, dead_b, dead_c, dead_clip, kept, ors, records, surv,
-           checked, listed16, lane16, wpop16, wext16, listed64, lane64, wpop64, wext64, disc_surv, disc_checked,
+           checked, listed16, lane16, wpop16, wext16, listed64, lane64, wpop64, wext64, listed16_or, lane16_or, lane64_or, disc_surv, disc_checked,
            disc_nice, disc_claim_ok, disc_claim_bad, q3_pairs, q3_dead_pairs, q3_records, q3_surv, q3_skip, q3_viol,
            q4_plain, q4_trie_h, q4_trie_mask, q4_trie_mask_kept);
         let last = self.hist.iter().rposition(|&x| x > 0).map_or(0, |i| i + 1);
@@ -333,9 +337,12 @@ fn eval<M: Mask>(
             dead3.push(dw);
         }
     }
-    let ngr16 = chunks.len().div_ceil(16);
+    // a round is 1,024 children (the kernel's fill): 16 chunks of 64, 32 of 32, 8 of 128 ("16" in the names)
+    let rnd = (1024 / csz).max(1);
+    let ngr16 = chunks.len().div_ceil(rnd);
     let ngr64 = chunks.len().div_ceil(64);
     let mut kept_flags = vec![false; chunks.len()];
+    let mut rec_flags = vec![false; chunks.len()];
     let mut extra_of = vec![0u32; chunks.len()];
     let mut pop_of = vec![0u32; chunks.len()];
     // Q4 per chunk: the kept probes (indices), in probe order
@@ -347,6 +354,7 @@ fn eval<M: Mask>(
         let base_n = p0 * cx.pw4; // = h·b^k + uval·b^f0
         for (qi, q) in chunks.iter().enumerate() {
             kept_flags[qi] = false;
+            rec_flags[qi] = false;
             let plain_dead = !(q.common & tp.mask).is_zero();
             st.dead_plain += u64::from(plain_dead);
             let (mut un, mut rep, mut extra, mut cert) = (tp.mask, false, 0u32, None);
@@ -458,6 +466,7 @@ fn eval<M: Mask>(
             }
             if w_ext != 0 {
                 st.records += 1;
+                rec_flags[qi] = true;
             }
             let mut w = w_ext;
             let w3 = if extras { w_ext & !dead3[qi][(tp.h % u128::from(cx.b)) as usize] } else { 0 };
@@ -490,7 +499,7 @@ fn eval<M: Mask>(
         }
         // lane model for this probe
         for (g, ngr, listed, lane, wpop, wext) in [
-            (16usize, ngr16, &mut st.listed16, &mut st.lane16, &mut st.wpop16, &mut st.wext16),
+            (rnd, ngr16, &mut st.listed16, &mut st.lane16, &mut st.wpop16, &mut st.wext16),
             (64usize, ngr64, &mut st.listed64, &mut st.lane64, &mut st.wpop64, &mut st.wext64),
         ] {
             for gi in 0..ngr {
@@ -510,6 +519,22 @@ fn eval<M: Mask>(
                     *lane += nch;
                     *wpop += nch * u64::from(mp);
                     *wext += nch * u64::from(me);
+                }
+            }
+        }
+        for (g, ngr, listed, lane) in [
+            (rnd, ngr16, Some(&mut st.listed16_or), &mut st.lane16_or),
+            (64usize, ngr64, None, &mut st.lane64_or),
+        ] {
+            let mut listed = listed;
+            for gi in 0..ngr {
+                let r = gi * g..((gi + 1) * g).min(chunks.len());
+                let nch = r.len() as u64;
+                if r.into_iter().any(|qi| rec_flags[qi]) {
+                    if let Some(l) = listed.as_deref_mut() {
+                        *l += 1;
+                    }
+                    *lane += nch;
                 }
             }
         }
@@ -768,6 +793,7 @@ fn study<M: Mask>(base: &Base, sh: Shape, b: u32, pip: u128, threads: usize, gre
     }
     vars.push(v("lex", Ord_::Lex, 64, Ivl::None, false));
     vars.push(v("code_c32", Ord_::Code, 32, Ivl::None, false));
+    vars.push(v("lex_c32", Ord_::Lex, 32, Ivl::None, false));
     vars.push(v("code_c128", Ord_::Code, 128, Ivl::None, false));
     vars.push(v("lorder_plain", Ord_::LOrder, 64, Ivl::None, false));
     vars.push(v("lorder_ext", Ord_::LOrder, 64, Ivl::Tight, false));
