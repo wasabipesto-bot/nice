@@ -74,6 +74,14 @@ struct St {
     // previous listed probe (probes in mask order), × the round's chunks
     q4l_plain: u64,
     q4l_trie: u64,
+    // Q4 in lockstep: the round's listed probes (mask order) cut into 16 contiguous stream segments; a wave of
+    // 4 streams (64 lanes) or 2 streams (32 lanes) pays, per step, the largest ORs among its streams
+    q4w4_17: u64,
+    q4w4_len: u64,
+    q4w4_trie: u64,
+    q4w2_17: u64,
+    q4w2_len: u64,
+    q4w2_trie: u64,
 }
 
 impl St {
@@ -82,7 +90,8 @@ impl St {
         a!(jobs, children, chunks, flat, dead_plain, dead_a, dead_b, dead_c, dead_clip, kept, ors, records, surv,
            checked, listed16, lane16, wpop16, wext16, listed64, lane64, wpop64, wext64, listed16_or, lane16_or, lane64_or, disc_surv, disc_checked,
            disc_nice, disc_claim_ok, disc_claim_bad, q3_pairs, q3_dead_pairs, q3_records, q3_surv, q3_skip, q3_viol,
-           q4_plain, q4_trie_h, q4_trie_mask, q4_trie_mask_kept, q4l_plain, q4l_trie);
+           q4_plain, q4_trie_h, q4_trie_mask, q4_trie_mask_kept, q4l_plain, q4l_trie,
+           q4w4_17, q4w4_len, q4w4_trie, q4w2_17, q4w2_len, q4w2_trie);
         for i in 0..NH {
             self.hist[i] += o.hist[i];
             self.hist_kept[i] += o.hist_kept[i];
@@ -94,7 +103,8 @@ impl St {
         p!(jobs, children, chunks, flat, dead_plain, dead_a, dead_b, dead_c, dead_clip, kept, ors, records, surv,
            checked, listed16, lane16, wpop16, wext16, listed64, lane64, wpop64, wext64, listed16_or, lane16_or, lane64_or, disc_surv, disc_checked,
            disc_nice, disc_claim_ok, disc_claim_bad, q3_pairs, q3_dead_pairs, q3_records, q3_surv, q3_skip, q3_viol,
-           q4_plain, q4_trie_h, q4_trie_mask, q4_trie_mask_kept, q4l_plain, q4l_trie);
+           q4_plain, q4_trie_h, q4_trie_mask, q4_trie_mask_kept, q4l_plain, q4l_trie,
+           q4w4_17, q4w4_len, q4w4_trie, q4w2_17, q4w2_len, q4w2_trie);
         let last = self.hist.iter().rposition(|&x| x > 0).map_or(0, |i| i + 1);
         s += &format!(" hist={:?}", &self.hist[..last]);
         let last = self.hist_kept.iter().rposition(|&x| x > 0).map_or(0, |i| i + 1);
@@ -624,6 +634,47 @@ fn eval<M: Mask>(
                 st.q4l_plain += nch * sq.len() as u64;
                 st.q4l_trie += nch * (sq.len() as u64 - prev.map_or(0, |p| lcp(p, sq)));
                 prev = Some(sq);
+            }
+            let n = rl.len();
+            let seg = n.div_ceil(16).max(1);
+            // per stream: (17, digits, digits − LCP with the previous probe of the same stream)
+            let streams: Vec<Vec<(u64, u64, u64)>> = (0..16)
+                .map(|sx| {
+                    let part = &rl[(sx * seg).min(n)..((sx + 1) * seg).min(n)];
+                    let mut pv: Option<&[u32]> = None;
+                    part.iter()
+                        .map(|&i| {
+                            let sq = &seqs[i as usize];
+                            let l = sq.len() as u64;
+                            let t = l - pv.map_or(0, |p| lcp(p, sq));
+                            pv = Some(sq);
+                            (17u64, l, t)
+                        })
+                        .collect()
+                })
+                .collect();
+            for (nsw, a17, alen, atrie) in [
+                (4usize, &mut st.q4w4_17, &mut st.q4w4_len, &mut st.q4w4_trie),
+                (2usize, &mut st.q4w2_17, &mut st.q4w2_len, &mut st.q4w2_trie),
+            ] {
+                for w in 0..16 / nsw {
+                    let ss = &streams[w * nsw..(w + 1) * nsw];
+                    let steps = ss.iter().map(Vec::len).max().unwrap_or(0);
+                    for t in 0..steps {
+                        let (mut m17, mut ml, mut mt) = (0u64, 0u64, 0u64);
+                        for sv in ss {
+                            if let Some(&(x, y, z)) = sv.get(t) {
+                                m17 = m17.max(x);
+                                ml = ml.max(y);
+                                mt = mt.max(z);
+                            }
+                        }
+                        let lanes = nsw as u64 * nch;
+                        *a17 += lanes * m17;
+                        *alen += lanes * ml;
+                        *atrie += lanes * mt;
+                    }
+                }
             }
         }
     }
