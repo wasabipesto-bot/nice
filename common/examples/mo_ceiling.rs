@@ -711,7 +711,7 @@ struct Var {
     extras: bool,
 }
 
-fn run<M: Mask>(b: u32, pip: u128, threads: usize, greedy: bool, wide: bool) {
+fn run<M: Mask>(b: u32, pip: u128, threads: usize, greedy: bool, wide: bool, q6: bool) {
     let coord = Coord::for_base(b).unwrap();
     let sh = Shape::for_coord(&coord);
     let base = Base::new(&coord);
@@ -723,14 +723,24 @@ fn run<M: Mask>(b: u32, pip: u128, threads: usize, greedy: bool, wide: bool) {
             let c = cpu::slice_join::<M>(&base, sh, pip, |_, _, _| {});
             (c, t.elapsed().as_secs_f64())
         });
-        study::<M>(&base, sh, b, pip, threads, greedy, wide, t0);
+        study::<M>(&base, sh, b, pip, threads, greedy, wide, q6, t0);
         h.join().unwrap()
     });
     println!("Q0REF secs={:.1} {:?}", q0.1, q0.0);
 }
 
 #[allow(clippy::too_many_arguments)]
-fn study<M: Mask>(base: &Base, sh: Shape, b: u32, pip: u128, threads: usize, greedy: bool, wide: bool, t0: std::time::Instant) {
+fn study<M: Mask>(
+    base: &Base,
+    sh: Shape,
+    b: u32,
+    pip: u128,
+    threads: usize,
+    greedy: bool,
+    wide: bool,
+    q6: bool,
+    t0: std::time::Instant,
+) {
     let bu = b as usize;
     let m = bu - 1;
     // --- the preamble of cpu::slice_join, copied (same objects, same order) ---
@@ -905,6 +915,17 @@ fn study<M: Mask>(base: &Base, sh: Shape, b: u32, pip: u128, threads: usize, gre
         vars.push(v("lorder_ext_c128", Ord_::LOrder, 128, Ivl::Tight, false));
         vars.push(v("hyb3_cell_c128", Ord_::Hybrid(3), 128, Ivl::Cell(3), false));
     }
+    if q6 {
+        // the base-65 pass (Q6): today's order, the best orders of Q1, Q2's L order and the first hybrids
+        vars.clear();
+        vars.push(v("code", Ord_::Code, 64, Ivl::None, true));
+        vars.push(v("lex", Ord_::Lex, 64, Ivl::None, false));
+        vars.push(v("key12", Ord_::Key(12), 64, Ivl::None, false));
+        vars.push(v("lorder_ext", Ord_::LOrder, 64, Ivl::Tight, false));
+        vars.push(v("hyb1_cell", Ord_::Hybrid(1), 64, Ivl::Cell(1), false));
+        vars.push(v("hyb2_cell", Ord_::Hybrid(2), 64, Ivl::Cell(2), false));
+        vars.push(v("hyb3_cell", Ord_::Hybrid(3), 64, Ivl::Cell(3), false));
+    }
     let nv = vars.len();
     let njobs = m * bu;
     let next = AtomicUsize::new(0);
@@ -1012,9 +1033,10 @@ fn main() {
     let threads: usize = a[3].parse().unwrap();
     let greedy = a.iter().skip(4).any(|s| s == "greedy");
     let wide = a.iter().skip(4).any(|s| s == "wide");
+    let q6 = a.iter().skip(4).any(|s| s == "q6");
     if b <= 64 {
-        run::<u64>(b, pip, threads, greedy, wide);
+        run::<u64>(b, pip, threads, greedy, wide, q6);
     } else {
-        run::<u128>(b, pip, threads, greedy, wide);
+        run::<u128>(b, pip, threads, greedy, wide, q6);
     }
 }
