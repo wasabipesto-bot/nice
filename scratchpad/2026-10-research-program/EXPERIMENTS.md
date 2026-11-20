@@ -35,6 +35,41 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## MO.17 The wide path: the sampled CPU check on threads and on at base 65; the wide expansion a third cheaper; the wide main kernel at 12 waves for the RX 9070 XT (offline) (step 9W; 2026-11-20 06:05–10:29 UTC, engineer; `G2/BUILD-BRIEF-9W.md`, `G2/WIDE2-NOTES.md`, `G2/build9w/`; `dev/mo-clean` c2152084 → 10ddbf17 (1d4d6920, 64cf6c24, 85185fef, 10ddbf17; on the fork); box 61587396 on m11295, RTX 3080 at 240 W, 4.5 h)
+
+- **A, the sampled check** [M]: `cpu::slice_join_threads` (std threads; `nice_common` has no rayon) gives the
+  identical result, survivor order included (argued; tested on every slice of bases 20, 24, 25 at 2, 3, 7, 64
+  threads and on real slices b65 717171717 and b64 712012851). CPU slice, b65 / b64, on a 5-CPU quota: 1 thread
+  105.9 / 29.5 s; 2: 58.1 / 18.8; 3: 40.4 / 13.2; 4: 33.4 / 10.7; 5: 24.0 / 6.8; 16: 27.0 / 14.3 (single runs on a
+  shared host). Default: usable CPUs − 1, capped at 4. During real fields: 29–35 s per b65 slice against a
+  57 s field (0.51–0.61), host waited 0.0 s. Device time with the threads beside it: b64 −0.09 % (5 pairs), b65
+  +0.72 % (+2.4 % with the check's device rerun of about 1 s). The route now runs the check at base 65.
+- **B, the wide expansion** [M by ablation, field 77777]: 3.45 ms per slice before = prefilter arithmetic 1.88,
+  per-bit work and writes 0.83 (writes 0.04), record reads 0.54, top walk 0.11, slab walk 0.09. **My statement
+  of 11-19 that it was "not the prefilter" was wrong**: the no-prefilter run writes 16.5M survivors instead of
+  0.5M and happens to cost the same. Fix: two records per lane in one loop, the digit test as one mask:
+  2.01 ms by interleaved stops, 2.33 ms by the quiet whole-field difference (the after-split by part is judged,
+  not re-ablated). Exact on b30/40/50/65 slices incl. both range ends, b64 forced wide, 17 small-base shapes,
+  the wide fault test.
+- **C + D, the wide main kernel's memory** [M offline: SPIR-V from the box, RADV/ACO for GFX1201 in the `g2mesa`
+  container on ivory]: probe digits 16–17 moved into spare bits of the four digit words; shared memory 23,680 →
+  21,376 B, VGPRs 192 → 120, **waves per SIMD 8 → 12**, no spills. C alone made the 3080 bimodal (3 of 5
+  processes about 16 % slower in the main kernel, counts equal; cause not proven, placement of the shared arrays
+  suspected); D restores two arrays to 32 words and the 3080 is fast in 5 of 5 fields.
+- **Timings** [M, RTX 3080 at 240 W, five warm fields, alternating with c2152084, one session]: **base 65 3.290
+  against 3.655 fs per admissible n (−10.0 %)**; base 64 1.769 against 1.807 (−2.1 %, device time equal: the old
+  single-threaded check made the host wait on 2 of 5 fields on this box). Counts equal in every run. (This box
+  reads about 5 % slower than the 11-19 box: 3.655 here for the head that measured 3.468 there.)
+- **Prediction for the RX 9070 XT** [J]: base 65 2.4–3.0 fs, central 2.7 (3.02 warm on 11-19): ×2.4–3.0 of base
+  64 there instead of ×3.1. Not run on the card.
+- **Tiers** [M]: at every commit `just lint` + three clippy sets, production's suite, ordinary tests, device
+  tests on lavapipe through both compilers, the card tier. (C's suite and tier runs predate a comment and a
+  `112` → `0x70` respelling of the same value; its lint and card tier ran on the final file.)
+- **Design directory:** 14 of 88 map references and 20 inline references remapped to 10ddbf17 by the engineer;
+  prose updated by me the same morning.
+- **Left:** run the 12-wave kernel and the new expansion on the RX 9070 XT; the check's device rerun (~1 s per
+  b65 field); bases 68–70 keep a fifth probe array.
+
 ## CEIL.1 The pairing of the middle-out join is within ×1.2 of the best any order or skip test can do; the magnitude-of-L idea loses; only the width of a lane's word is left (2026-11-20 06:05–09:20 UTC, engineer + the director's note; `CEIL/BRIEF.md`, `CEIL/NOTES.md`, `CEIL/RESULTS.md`, `CEIL/raw/`, `CEIL/box/`; scratch branch `exp/mo-ceiling` 52120649 on c2152084, on the fork; box 61586715, 20 threads, CPU only, 3.2 h)
 
 - **Instrument** [M]: the CPU reference's own tops, children and classes, re-sorted per variant; on all 12 slices

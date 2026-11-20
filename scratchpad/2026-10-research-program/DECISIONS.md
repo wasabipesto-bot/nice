@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-19 20:45 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-20 10:50 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
@@ -18,12 +18,12 @@ once for a far larger span and paired with a bit-sliced kernel.
 
 | | state on 2026-11-19 |
 |---|---|
-| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); 13,939 inserted lines in 21 files (head `c2152084` since the evening of 2026-11-19), no PR (held at your word, see D9); the first two PRs (no GPU code) are cut, reviewed and waiting on the fork |
+| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); 14,405 inserted lines in 21 files (head `10ddbf17` since 2026-11-20), no PR (held at your word, see D9); the first two PRs (no GPU code) are cut, reviewed and waiting on the fork |
 | speed, base 64, RTX 3080, end to end against v3.4.8's join, same session | **×4.09** (1.62 fs against 6.62 fs per candidate) |
 | speed, base 64, RX 9070 XT (demoux), end to end against v3.4.8's join, same session | **×4.79** (0.99 fs against 4.76 fs per candidate), measured 2026-11-19 at 64 lanes on the branch just before its cleanup (the cleaned branch has not run on that card; on the 3080 the cleanup changed the time by +0.17 %); exact on every slice and field tried; the client route also ran there against a local coordinator (12 fields). The 4.76 fs baseline there is production's join throughput harness (ten fields on 2026-11-18, scaled ×1.012 by two fields re-measured in the same session), not the client's own ten-field run that the 3080 baseline uses. At that speed base 64 on that card alone is about 55 days instead of about 266 |
-| base 65 (needs masks wider than 64 bits; production has no join there at all) | exact on a GPU; 3.47 fs per candidate, about half an RTX-3080-year for the whole base |
+| base 65 (needs masks wider than 64 bits; production has no join there at all) | exact on a GPU; 3.47 fs per candidate on 2026-11-19, about half an RTX-3080-year for the whole base; 10 % less since 2026-11-20 (3.29 against 3.66 fs in one session on a slower box). On your card it measured 3.1 fs on 2026-11-19; the wide kernel has since been fitted to that card offline (12 waves instead of 8), not re-run: predicted 2.4–3.0 fs |
 | exactness | CPU reference equals brute force on whole bases 10–25; GPU equals the CPU reference on 1,073 real base-64 slices (measured on 2026-11-18, before the execution checks and the digits-5–7 field were added; since then: 100 of them again, the first and last slice of the range, and every slice of one field under both field definitions); an independent audit found no loss path on a healthy card |
-| failure handling | every stage proves it ran (what ran = what was queued), two conservation checks, and one random slice per field recomputed on the CPU; a dropped kernel, a failed allocation or a wrong prefilter stops the field instead of reporting it empty |
+| failure handling | every stage proves it ran (what ran = what was queued), two conservation checks, and one random slice per field recomputed on the CPU (at base 65 too since 2026-11-20: the CPU slice now runs on up to 4 threads); a dropped kernel, a failed allocation or a wrong prefilter stops the field instead of reporting it empty |
 | how it runs today | a local coordinator script plus an off-by-default client flag; **no server, schema or API change exists or is proposed yet** |
 | what a field is | all n sharing digits 5–7 (base 64: 262,144 fields of 2^57 n; in the fields table it would still be a range, of a renumbered coordinate) |
 
@@ -31,6 +31,12 @@ What it is not yet: reviewed by you, run on Apple hardware, or connected to the 
 
 Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumption that was four times too low.
 ×4.09 is the honest end-to-end number on NVIDIA.
+
+**How much more is in it (counted 2026-11-20):** the pairing kernel is 60 % of a slice. Exact counts on real
+slices show that no other order of the work and no extra skip test beats today's by more than ×1.18, and that a
+perfect skip test would give ×1.99 at most. So the join is near the end of what this kind of join can do; what
+is left is ordinary tuning for the card (wider words per lane are the one untested lever) and the stages around
+the kernel. The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
 
 ## A. The middle-out join
 
@@ -188,6 +194,17 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
   into an empty result; no nice number exists at any base it covers (bases 4 and 5 are covered too: checked by
   brute force); `just lint` and the suites CI runs pass. Description drafted: `G2/STRIDE-EMPTY-PR-BODY.md`.
 
+### D17. A short window on demoux, when convenient (new 2026-11-20; nothing waits on it)
+
+- **Why:** three things are predicted for your card and not measured there: (a) the cleaned branch at base 64
+  (×4.79 was measured just before the cleanup; on an RTX 3080 the cleanup and everything since changed nothing);
+  (b) base 65 with the wide kernel as fitted to the card on 2026-11-20 (3.02 fs measured before; 2.4–3.0
+  predicted); (c) the stage profile for tops and parents at the card's operating point (the one I have was taken
+  with the card idling and reads too high).
+- **What it takes:** about 45 minutes with the production client stopped by you, as on 2026-11-19; I use the
+  window only for these three and clean up.
+- **If you do not answer:** nothing runs there; the numbers stay labelled as predictions.
+
 ## C. Operations
 
 ### D14. Rented-card budget
@@ -210,6 +227,8 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
    `pr/midout-cpu-ref` on the fork.
 2. **Nothing is opened from this work until you say so** (your hold of 2026-11-19). Meanwhile I keep working
    on the branch. Done on the evening of 2026-11-19: the review's changes carried back into `dev/mo-clean`
-   (head `c2152084`; every test tier re-run; kernels' generated code and speed unchanged). Next: base 65 tuned
-   for your card, bases 68–70, optimisation.
+   (head `c2152084`; every test tier re-run; kernels' generated code and speed unchanged). Done on 2026-11-20
+   (head `10ddbf17`): the CPU spot check on several threads and on at base 65; the wide expansion a third
+   cheaper (base 65 −10 % on an RTX 3080); the wide kernel fitted to your card offline. Next: a test of wider
+   words per lane, bases 68–70.
 3. Nothing touches the server, the fleet, or the default client's behaviour.

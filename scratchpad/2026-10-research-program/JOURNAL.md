@@ -49,6 +49,32 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   the main kernel. Mutants: 3 of 27 survive on `dev/mo-clean`, the expected three. Box 61586715 destroyed 09:08
   (3.2 h, about $0.20).
 
+- **10:29 UTC: the wide-path step is back (EXPERIMENTS MO.17).** `dev/mo-clean` c2152084 → **10ddbf17** (4
+  commits, on the fork; every tier at every commit). The sampled CPU check runs on up to 4 threads with the
+  identical result and is on at base 65 (33 s per slice against a 57 s field on 5 CPUs); the wide expansion is a
+  third cheaper (3.45 → 2.0–2.3 ms; its cost was the prefilter's arithmetic after all: my "not the prefilter"
+  of 11-19 was a wrong inference from a run that traded prefilter time for 33 times the writes); the wide main
+  kernel fits 12 waves per SIMD on the RX 9070 XT by the offline compile (8 before). RTX 3080: base 65 3.290
+  against 3.655 fs (−10.0 %), base 64 1.769 against 1.807. Prediction for the RX 9070 XT at base 65: 2.4–3.0 fs
+  (3.02 measured before). Box 61587396 destroyed 10:30 (4.5 h, about $0.64).
+- **Design material brought to 10ddbf17 by me** (DESIGN.md §1, §2, §4, §7, §8, §9, §10 and a new §6.13 on the
+  pairing's ceiling; four map panels; the static overview; map re-rendered, 88 references, 0 bad).
+  `DECISIONS.md`: §0 updated; new D17 (a 45-minute window on demoux when convenient: the cleaned branch at base
+  64, base 65 with the fitted wide kernel, a tops/parents profile at the operating point; nothing waits on it).
+- **Spend today:** three rentals (one stopped itself after 6 minutes and was replaced), about $0.85; month
+  $23.76 invoiced of $30 before today's last charges land. Agents: 2 Opus (433k and 572k tokens).
+- **For the 05:41 cycle of 11-21:** (1) what the user wrote; PR #271; no new PR of any kind without their word.
+  (2) **CW, wider words per lane** (LEDGER CW): a width-128 word loop behind a test-only switch on a scratch
+  branch, exact by the parity tests; offline compile for the RX 9070 XT first (cycles per slot against today's
+  171, registers, waves per SIMD), then an RTX 3080 timing; drop under ×1.15 on the main kernel. (3) Bases
+  68–70 on the merged wide path (2D tops grid for Vulkan; base 70's (4, 11) shape), since the user's test of
+  this join is "all further work": needs a card with more than 10 GB. (4) A deep line to open, since the
+  pairing family is now closed: **what the stages around the kernel could become if a slice were not the unit
+  of device work** (tops, parents, expansion and check are 40 % of a slice at base 64 and more at base 65; they
+  are per-slice launches of small kernels): price a design in which a whole field's slices share one launch per
+  stage, from the measured stage costs, before building anything. (5) Keep the design directory at the head.
+  Budget: about $6 left under the cap; D14 unanswered.
+
 ## 2026-11-19 (cycle 10 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances at the start; November research $21.08 invoiced of $30 (fleet $33.79),

@@ -1,7 +1,7 @@
 # The middle-out join: design
 
 *A description of what is on the branch and why, for a reader who knows the project and today's overlap join and
-has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean` head `85185fef` (worktree
+has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean` head `10ddbf17` (worktree
 `~/projects/nice/.worktrees/midout-clean`) and from the measurements recorded beside it. The open decisions are
 not repeated here; they are in `~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md` (section A).*
 
@@ -74,7 +74,9 @@ today's overlap join at base 64: top = digits 3..12, bottom = digits 0..5, field
 **Where it stands** [measured, 2026-11-19]: on the RX 9070 XT, base 64, 0.99 fs per admissible n against 4.76 fs
 for v3.4.8's join, **×4.79**, exact at 64 lanes (on the development branch just before the cleanup, `66259bb0`).
 On an RTX 3080 at a 240 W cap, 1.62 against 6.62 fs, **×4.09**; the cleanup changed it by +0.17 % (1.627 against
-1.624). Base 65, which production has no join for: 3.47 fs on the 3080, 3.1 fs on the RX 9070 XT (untuned there).
+1.624). Base 65, which production has no join for: 3.47 fs on the 3080 on 2026-11-19 and 10 % less since 2026-11-20 (3.29
+against 3.66 fs in one session on a slower box); 3.1 fs on the RX 9070 XT on 2026-11-19, before the wide kernel was
+fitted to that card offline (12 waves instead of 8; not re-run there).
 (*fs per admissible n*: card time divided by the n whose residue mod b − 1 is one of the base's possible
 residues for a nice number; 8 of 63 at base 64.) §8 has the table and the conditions.
 
@@ -106,7 +108,7 @@ kernels up to a stage and nothing after; a stage's cost is the difference betwee
 | 4. expansion + prefilter | device, per batch | 0.356 (8.3 %) | 1.108 with stage 5 (14.6 %) | cubes done, slabs walked, bits read = stage 3's survivors |
 | 5. full check (production's, unchanged) | device, per batch | 0.112 (2.6 %) with stage 6 | (in stage 4) | its `ran` words: entries = list length, index sum |
 | 6. done, group read | device word; host once per 16 slices | (in stage 5) | (in stage 4) | `A_DONE`; slices done = slices queued |
-| 7. sampled CPU check | host thread during the field; one device rerun at the end | 9.2 s of CPU per 18.5 s field; host never waited | 27 s of CPU per 30.6 s field; +0.4 % | the slice's counts and its list, n for n |
+| 7. sampled CPU check | host threads during the field (up to 4 since 2026-11-20); one device rerun at the end | 9.2 s on one thread per 18.5 s field (2026-11-19); host never waited | one thread: 27 s per 30.6 s field; four threads: 7.6–11.6 s per 31.6 s field, device time unchanged; rerun +0.4 to +1.1 % | the slice's counts and its list, n for n |
 | **whole slice** | | **4.312** | **7.568** | |
 
 ### Stage 0. Field setup (host)
@@ -125,7 +127,8 @@ kernels up to a stage and nothing after; a stage's cost is the difference betwee
   take at most 64 values of digits 4–7, each more than once (true for every field of the default coordinate),
   64 lists of depth-4 roots are built at once, one per value of digits 4–7. 870 MB of card memory.
 - **The sampled slice**: one slice drawn at random (`RandomState` hashed with `v_start`, `:4110–4125`) is handed
-  to a host thread that runs the CPU reference on it (`cpu_slice`, `:3888`) while the card works.
+  to a host thread that runs the CPU reference on it, on up to 4 threads since 2026-11-20 (same result, order
+  included), (`cpu_slice`, `:3888`) while the card works.
 
 ### Stage 1. Tops (device; `dtops` module, `gpu.rs:1828–2202`)
 
@@ -331,8 +334,9 @@ f = 1/1,000 is seen with 63 % probability after 1,000 fields, 0.4 % of the base 
   reference against brute force on whole small bases (10–25 and 10–29 for nice numbers) [measured];
 - production's check kernel judging a nice n not nice (production's own exposure, unchanged);
 - a defect in slices the sample has not yet drawn;
-- **at base 65 the sampled check is off** (its CPU slice takes 70–93 s against a 55 s field), so a wide kernel that
-  computes wrongly while every account holds would be submitted;
+- at base 65 the sampled check was off until 2026-11-20 (one thread took 70–106 s against a 55–57 s field); it
+  is on now, on 4 threads (29–35 s per slice on a 5-CPU box [measured]); with fewer free CPUs the slice outlasts
+  the field and the route waits for it;
 - the host-tops path (benchmarks only, feature `midout-bench`) has no tops accounts.
 
 Guards on widths (`C_ERR_IDX`: a class of more than 65,536 parents; a top index above 2^20; child-list positions
@@ -506,6 +510,23 @@ said; counts come from an exact CPU prototype on real slices.
 - **Nice-ness rechecked on the host by a separate implementation** (`arith.rs` deliberately re-implements it: an
   oracle should not reuse the code it checks).
 
+### 6.13 What another order or more skip tests could still buy (counted 2026-11-20: closed)
+
+- **Question:** the pairing is 60 % of a slice; could another order of the children, another skip test, or
+  digits that are known only for part of a job remove much of it?
+- **Numbers** [measured: exact counts on 10 base-64 and 2 base-65 slices with the CPU reference's own lists; the
+  counting model reproduces the card's 60.5 % busy lanes]: a longer key changes nothing after 8 bits (kept 0.492
+  → 0.488); the strongest clustering reaches 0.41 but costs lane slots; sorting a job's children by the size of
+  their low four digits lets a top discard 50.6 % of visits from its own digits (the next digits of n² and n³
+  below its certificate are constant over a chunk), but chunks then share no digit, so this replaces the key's
+  skip instead of adding to it, and costs ×1.12; sharing ORs between neighbouring probes gains ×1.13–1.17; a
+  perfect skip at any price would gain ×1.99 (91 % of kept visits yield a zero word). At base 65 the best
+  combination reaches ×1.35 in counted work and loses once its tables are paid for [judged].
+- **Why closed:** the best exact variant is ×1.18 against a bar of ×1.3 set in advance. Left open and not a
+  count: wider words per lane (128 or 256 children), ×1.0 to ×2 depending on what limits a slot on the card.
+- **Long version:** `~/projects/nice/scratchpad/2026-10-research-program/CEIL/NOTES.md` (the argument, with two
+  restructurings that fail on paper) and `CEIL/RESULTS.md` beside it (the counts).
+
 ---
 
 ## 7. The CPU reference and the tests
@@ -516,7 +537,7 @@ said; counts come from an exact CPU prototype on real slices.
   in one or two shapes each; its roots equal production's residue filter for bases 3–128 [measured]. A mutation
   test of it (27 mutants) left 3 alive after three independent tests were added: two change only work counts,
   one edits an exemption no test base reaches [measured on the first cut branch; the same tests are on this
-  branch since 2026-11-19 evening, the mutants were not rerun here].
+  branch since 2026-11-19 evening, and the 27 mutants were rerun on it on 2026-11-20: the same three survive].
 - Device against CPU: 1,073 real base-64 slices equal n for n in an independent sweep (on the branch as it was on
   2026-11-18, before the accounts and the 5–7 coordinate) [measured]; since then, 100 of them again, the range's
   first and last slices, and every slice of one field under both coordinates [measured].
@@ -540,7 +561,9 @@ and it) in the same session.
 | RTX 3080 240 W, b64 | **1.619 fs** | 6.615 fs | **×4.09** | 2026-11-19 09:20–09:42; trunk with parent sharing; ten fields at 0.05–0.95 of the base; sampled check on | counts equal with and without sharing, field for field; every sampled slice equal | `G2/build5l/raw/m2/` |
 | RTX 3080 240 W, b64, cleanup | head `5a048669` 1.6269 against trunk `66259bb0` 1.6242 (+0.17 %) | | | 2026-11-19 13:58–14:44; four alternating runs each | survivors, checked equal in all eight runs; 80 of 80 sampled checks | `G2/build6c/raw/ten_head`, `ten2_head` |
 | RTX 3080 240 W, b65 | **3.468 fs** (×2.17 of b64's 1.600 in the same session) | none (production has no join above 64) | | 2026-11-19 10:21–10:33; five warm fields; sampled check off | slices n for n against the CPU reference incl. both range ends; whole small bases against brute force | `G2/build5l/raw/m4/` |
-| RX 9070 XT, b65 | **3.12 fs** (two fields incl. warm-up; 3.02 the warm one) | none | | 2026-11-19 14:16; wide path untuned for this card | b40 and b65 slices at 64 lanes | `…/window_1119/w_65.log` |
+| RTX 3080 240 W, b65, a day later | **3.290 fs** against 3.655 fs for the head of the day before (−10.0 %) | none | | 2026-11-20 09:41–09:57; head `10ddbf17` against `c2152084`, five warm fields, alternating, on a box 5 % slower than the one above; sampled check on (4 threads) | counts equal in every run; slices n for n incl. both range ends; wide fault test | `G2/build9w/raw/five_d/` |
+| RTX 3080 240 W, b64, a day later | 1.769 fs against 1.807 fs for `c2152084` (−2.1 %: device time equal; the threaded check no longer makes the host wait on this box) | | | 2026-11-20, same session | counts equal | `G2/build9w/raw/` |
+| RX 9070 XT, b65 | **3.12 fs** (two fields incl. warm-up; 3.02 the warm one) | none | | 2026-11-19 14:16; wide path untuned for this card (since fitted to it offline, not re-run: predicted 2.4–3.0 fs [judged]) | b40 and b65 slices at 64 lanes | `…/window_1119/w_65.log` |
 
 How the baselines were measured: on the 3080, production's client against a local stub, the same ten 1e17 fields
 three times in one day (6.615 fs each time, to 0.1 s). On the RX 9070 XT, production's join throughput harness:
@@ -561,9 +584,12 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   check 0.13): about four times the assumption. The first end-to-end number was ×3.78 on the 3080; the
   expansion, the prefilter, the top hierarchy and parent sharing brought it to ×4.09 there. [measured]
 - **"The prefilter adds 2.6 ms to the wide expansion"** was a difference against a different kernel on another
-  card; with no prefilter at all the wide expansion takes 3.64 ms against 3.37 ms with it [measured].
+  card; with no prefilter at all the wide expansion takes 3.64 ms against 3.37 ms with it [measured]. **The
+  conclusion I drew from that pair on 2026-11-19, that the wide expansion's time was not the prefilter, was wrong
+  as well:** by ablation on 2026-11-20 the prefilter's arithmetic was 1.88 of the expansion's 3.45 ms; the run
+  without a prefilter cost the same only because it wrote 16.5M survivors instead of 0.5M [measured].
 - **The size of the branch** was reported as 6,500–7,000 lines; it was 13,525 insertions in 21 files against
-  `origin/main` at `5a048669` and is 13,939 at `c2152084` (the wide path about 4,600, tests about 2,800) [measured by `git diff --stat`].
+  `origin/main` at `5a048669` 13,939 at `c2152084` and 14,405 at `10ddbf17` (the wide path about 4,600, tests about 2,800) [measured by `git diff --stat`].
 
 ---
 
@@ -580,15 +606,20 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   cleanup (head `c2152084`) change no kernel: the generated CUDA of all 15 narrow and 14 wide kernels is identical
   to `5a048669`'s, and five warm fields timed 1.7162 against 1.7187 fs on a 3080 in one session [measured]. Byte-identical generated code
   cannot be shown on CubeCL 0.10 (two runs of one binary give different SPIR-V) [measured].
-- **The wide path is untuned on the RX 9070 XT** (its main kernel's shared memory is 3 KB over the 12-wave
-  threshold): base 65 is ×3.2 of base 64 there against ×2.17 on the 3080. **What the wide expansion spends ~3.3
-  ms per slice on is not known** (narrow: 1.1 ms on the 3080); it is not the prefilter.
+- **The wide path's fit to the RX 9070 XT is offline only.** Until 2026-11-20 its main kernel needed 192
+  registers and 23.7 KB of shared memory: 8 waves per SIMD where the narrow kernel runs 12, and base 65 measured
+  ×3.1–3.2 of base 64 there against ×2.17 on the 3080. It now compiles for that card at 120 registers, 21.4 KB
+  and 12 waves [measured with the driver's compiler, offline]. **It has not run on the card**: predicted
+  2.4–3.0 fs at base 65, from 3.02 [judged]. The wide expansion took 3.45 ms per slice, 1.88 of it the
+  prefilter's arithmetic [measured by ablation]; two records per lane in one loop and the digit test as one
+  mask brought it to 2.0–2.3 ms [measured, RTX 3080].
 - **Bases 66–70: partly.** Base 68 was exact on two slices before the paths were merged (2.13 fs on a 20 GB card)
   and has not run since; it needs a 2D tops grid to launch on Vulkan. Bases 69 and 70 have never run; base 70
   needs the (4, 11) shape and a 64-bit slice key. The route refuses 66–70 (`route.rs:36–58`).
-- **The sampled check does not fit base 65** (CPU slice 70–93 s against a 55 s field): off there, so base 65
-  relies on the accounts alone for a kernel that computes wrongly. A multithreaded CPU slice would fix it; not
-  built.
+- **The sampled check at base 65 depends on free CPUs.** On since 2026-11-20: the CPU slice runs on up to 4
+  threads (33 s on a 5-CPU box against a 57 s field; one thread 106 s). The threads cost base 65 +0.7 % of
+  device time and base 64 nothing measurable; the check's device rerun costs about 1 s per base-65 field and
+  0.2–0.4 s at base 64 [measured]. Thread priority is not lowered.
 - **No server design is chosen**; nothing on the server exists. The coordinator has served one client at a time
   on the same machine; several clients, a remote coordinator and long runs are untested. A killed client leaves
   its field claimed unless `--reissue-after` is given. The client claims the next field only after submitting the
@@ -609,7 +640,7 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
 
 ## 10. Where the code is, and how to run it
 
-**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `85185fef`, 18 commits on the development
+**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `10ddbf17`, 22 commits on the development
 trunk `66259bb0`; worktree `~/projects/nice/.worktrees/midout-clean`. The development history before the cleanup
 stays on `dev/middle-out-join`. No pull request is open (`DECISIONS.md` D9).
 
@@ -617,13 +648,13 @@ stays on `dev/middle-out-join`. No pull request is open (`DECISIONS.md` D9).
 |---|---|---|
 | `common/src/midout/mod.rs` | 62 | module map; the three test tiers |
 | `common/src/midout/coord.rs` | 634 | the work unit: coordinate, quantum, field ↔ fixed digits, `n_count` |
-| `common/src/midout/cpu.rs` | 1,150 | the exact CPU reference: shape, certificates, parents, slice join, prefilter, brute-force predicates |
+| `common/src/midout/cpu.rs` | 1,460 | the exact CPU reference: shape, certificates, parents, slice join, prefilter, brute-force predicates |
 | `common/src/midout/arith.rs` | 138 | 384-bit arithmetic and nice-ness for the reference (re-implemented on purpose) |
 | `common/src/midout/mask.rs` | 75 | digit masks generic over `u64` / `u128` |
-| `common/src/midout/gpu.rs` | 4,852 | base-64 device path: kernels (`kernels`, `prep`, `post`, `dtops`), driver `GpuJoin`, `search_field`, tests |
-| `common/src/midout/gpu_wide.rs` | 4,594 | two-word-mask device path for bases 65–70 (and small bases in tests), its own check kernel |
+| `common/src/midout/gpu.rs` | 4,881 | base-64 device path: kernels (`kernels`, `prep`, `post`, `dtops`), driver `GpuJoin`, `search_field`, tests |
+| `common/src/midout/gpu_wide.rs` | 4,713 | two-word-mask device path for bases 65–70 (and small bases in tests), its own check kernel |
 | `common/src/midout/audit.rs` | 872 | parity sweep and fault injection (tests only) |
-| `common/src/midout/route.rs` | 170 | one entry point per base for a client route, with telemetry |
+| `common/src/midout/route.rs` | 173 | one entry point per base for a client route, with telemetry |
 | `common/src/midout/wire.rs` | 238 | the claim key, the route name, the production-host refusal, the ordinary-route guard |
 | `common/src/cubecl_join.rs` | +2/−2 | two constants (`CHECK_CUBES`, `RAN_WORDS`) made `pub(crate)` so the check's grid and account are shared, not copied |
 | `common/src/client_api_async.rs` | +50/−2 | the ordinary claim refuses a coordinate-space field (and its test) |
@@ -663,4 +694,5 @@ field, §3 decisions, §9–§14 the measured steps), `AUDIT-MO.md` (the soundne
 structure), `BUILD-NOTES-CLIENT.md` (coordinator and route), `BUILD-NOTES-WIDE.md` (bases above 64),
 `CLEAN-NOTES.md` (the cleanup), `MAINTAINABILITY.md` and `PR-PLAN.md` (the proposed series of pull requests),
 `PR12-REVIEW.md` (the review of the first two), `CARRYBACK-NOTES.md` (that review's fixes brought onto this
-branch, with every test tier re-run), and `../EXPERIMENTS.md` for every number with its raw data.
+branch, with every test tier re-run), `WIDE2-NOTES.md` (the wide path's check, expansion and shared memory,
+2026-11-20), and `../EXPERIMENTS.md` for every number with its raw data.

@@ -12,11 +12,13 @@ t just_lint /usr/local/bin/just lint
 for f in cubecl-cuda,cubecl-spirv,midout-bench,midout-box-tests cubecl,midout-box-tests cubecl-spirv; do
   t clippy_$f cargo clippy -p nice_common --all-targets --features $f -- -D warnings
 done
+if [ -z "${SKIPSUITE:-}" ]; then
 export CARGO_TARGET_DIR=/root/t/${S}s
 t suite_workspace cargo test --locked --release --no-fail-fast
 t suite_common_gpu cargo test --locked --release -p nice_common --features gpu --lib
 t suite_client_cubecl cargo test --locked --release -p nice_client --features cubecl-cuda
 unset CARGO_TARGET_DIR
+fi
 bash /root/bt.sh $S $T; cp /root/logs/$T/bins.txt $O/
 LVP=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -1)
 t tier_a_release /root/bin/$T/t_sc --test-threads 4

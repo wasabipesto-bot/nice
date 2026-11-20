@@ -7,7 +7,7 @@
 set -u; O=/root/runs/$1; mkdir -p $O; rm -f $O/done
 until mkdir /root/gpu.lockd 2>/dev/null; do sleep 10; done; trap 'rmdir /root/gpu.lockd' EXIT
 source /root/guard.sh $O || exit 1
-R=/root/bin/base; B=/root/bin/Bh; C=/root/bin/Ch
+R=/root/bin/base; B=/root/bin/Bh; C=${HB:-/root/bin/Ch}
 md5sum $R/midout_bench $R/midout_wide_bench $B/midout_wide_bench $C/midout_bench $C/midout_wide_bench > $O/bins.txt
 uptime > $O/uptime.txt
 nvidia-smi --query-gpu=timestamp,power.draw,clocks.sm,temperature.gpu,utilization.gpu,memory.used --format=csv,noheader -lms 1000 > $O/smi.csv & MP=$!

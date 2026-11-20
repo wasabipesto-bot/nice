@@ -11,7 +11,24 @@ directory). Box scripts `G2/build9w/box/`, raw logs `G2/build9w/raw/`. Labels as
 The box's host was shared and busy (load average 15–28 on the host while nothing of ours ran): CPU timings move by
 several per cent between runs; GPU timings were taken with nothing else of ours running.
 
-## A. The sampled CPU check at base 65 (`commit A`)
+## Where it stands (10:30 UTC)
+
+**`dev/mo-clean` head `10ddbf17`**, four commits on `c2152084`, on ivory and `fork/dev/mo-clean`; no pull request,
+nothing to `origin`. Every tier passes at every commit (§E). A: the sampled CPU check runs on up to 4 threads and
+is on at base 65 (33 s against a 57 s field here). B: the wide expansion 3.45 → 2.0–2.3 ms per slice; base 65
+3.655 → 3.290 fs per admissible n on the 3080 (−10 %). C + D: the wide main kernel's shared memory 23,680 →
+21,376 bytes, 12 waves per SIMD on GFX1201 offline (was 8); no change on the 3080 (C alone was bimodal there and
+is fixed by D). Base 64: unchanged device time; −2.1 % per field with the check on (the old single-threaded check
+made the host wait on this box).
+
+| commit | what |
+|---|---|
+| `1d4d6920` | A: `slice_join_threads`, `sample_threads`, the check on at base 65 |
+| `64cf6c24` | B: two records per lane in one loop; the prefilter's digit test as one mask |
+| `85185fef` | C: probe digits 16–17 in the four words' spare bits; `prob_e` only above 18 digits |
+| `10ddbf17` | D: `s_np`, `s_nl` back to 32 words (C's one-word arrays made the 3080 bimodal) |
+
+## A. The sampled CPU check at base 65 (commit A, `1d4d6920`)
 
 ### What was done
 
@@ -126,7 +143,7 @@ often a plane runs it: one record per lane and two loops (the record's low word,
 pays max(bits in a lo word) + max(bits in a hi word) rounds per take: ~3.4 rounds for ~35 bits per 32 records
 [judged from the narrow path's bits-per-record histogram, §12.3 of `BUILD-NOTES.md`].
 
-### What was removed (`commit B`)
+### What was removed (commit B, `64cf6c24`)
 
 1. **Two records per lane, one loop over both** (the base-64 path's `keep_bits2` pattern): each lane loads two
    records of a take together and walks the lowest set bit of the first nonzero of their four words (a lo, a hi,
@@ -155,7 +172,14 @@ lavapipe tests running on the CPU beside it (`raw/bstop_b1/`):
 | ref | 43.02, 42.98 | 56.42, 57.35 | 3.29 |
 | new | 42.57, 43.04 | 50.76, 51.80 | **2.01** |
 
-−1.28 ms per slice (−39 %), −9.4 % of a base-65 slice. The quiet five-field timing is in §D.
+−1.28 ms per slice (−39 %). The quiet five-field timings (§D) give −4.75 s of device time per field, −1.12 ms per
+slice: so the wide expansion now takes **2.0–2.3 ms per slice** (2.01 by these stops; 3.45 − 1.12 = 2.33 from the
+quiet ablation baseline and the quiet whole fields), against 3.3–3.45 ms before. Target "under 2 ms": met by the
+stop measurement, not clearly by the whole-field difference.
+
+**After, by part** [judged from the ACO counts and the rounds argument; the ablation build was not repeated on
+the new kernel]: records 0.54 ms and the slab walk 0.09 are unchanged; the per-bit work (child-list read, clip,
+prefilter, write: 2.71 ms before) now runs ~1.5 rounds per 32 records instead of ~3.4, i.e. ~1.3–1.6 ms.
 
 Exactness of B (CUDA, `raw/bpar_b1/`, binary of the B tree before formatting; the committed tree differs by
 `cargo fmt` and one doc-table row): `wide_slices_equal_cpu` b30 100, b40 1234, b50 77777; **b65 717171717,
@@ -168,7 +192,7 @@ wide b40 included) and the card tier: §E.
 ACO for GFX1201 (W 64, `raw/spv/c1_w/`, the B+C tree): `wexpand` 72 VGPRs, 20 waves, 1,174 instructions (was 48,
 32, 2,015); its per-bit loop 658 vcyc against 771 per loop before (now one loop where there were two).
 
-## C. The wide main kernel's shared memory on the RX 9070 XT (`commit C`; offline)
+## C. The wide main kernel's shared memory on the RX 9070 XT (commit C `85185fef`, its fix commit D `10ddbf17`; offline)
 
 ### The 3 KB [measured from the SPIR-V's explicit layout]
 
@@ -195,9 +219,10 @@ narrow kernel sits exactly at it). Over by 2,176 bytes raw (3,072 as ACO rounds)
   and `probe_digit` reads them back (`(w0 >> 28) | ((w1 >> 24) & 0x70)`). Above 18 (base 68: 19) the fifth array
   stays, so bases 68–70 run the same code as before. The probe window (576), the instances per job and the rows are
   unchanged.
-- `s_np` and `s_nl` are one word each (only `[0]` was ever used).
-- New layout: 21,128 bytes (`raw/spv/c1_w/`). Not changed: `sl`'s odd row stride (67, for conflict-free banks),
-  `pq`, `cmv`.
+- C also made `s_np` and `s_nl` one word each (only `[0]` is used): 21,128 bytes. That made the 3080 bimodal
+  (§D), so **D puts them back to 32 words**: final layout **21,376 bytes** (`raw/spv/d1_w/`, from the SPIR-V's
+  offsets), every array a multiple of 128 bytes as before. Not changed: `sl`'s odd row stride (67, for
+  conflict-free banks), `pq`, `cmv`.
 
 ### The offline compile [measured, ivory, container `g2mesa`: Mesa 26.0.8 RADV/ACO for GFX1201 on the drm shim]
 
@@ -206,15 +231,16 @@ of `wide_slices_equal_cpu` at b65, `box/wdump.sh`), compiled with `aco.sh`, summ
 same method for `c2152084`'s binary as the before. 13 modules each; spirv-val passes all but `wscatter` (the
 known duplicate-`ArrayStride` note, unchanged). 25 minutes including the dump binaries' builds.
 
-| `wide_kernel`, b65, W 64 | `c2152084` | B + C |
-|---|---|---|
-| LDS (ACO) | 24,576 | **21,504** |
-| waves per SIMD | 8 | **12** |
-| VGPRs | 192 | 120 |
-| spills, scratch | 0, 0 | 0, 0 |
-| instructions | 2,393 | 2,412 |
-| phase 3b loop (vcyc / LDS ops per wave-iteration) | 181 / 43 | 187 / 41 |
-| phase 3a loop | 56 / 23 | 59 / 22 |
+| `wide_kernel`, b65, W 64 | `c2152084` | B + C | B + C + D (the head) |
+|---|---|---|---|
+| shared memory (SPIR-V layout) | 23,680 | 21,128 | 21,376 |
+| LDS (ACO) | 24,576 | **21,504** | **21,504** |
+| waves per SIMD | 8 | **12** | **12** |
+| VGPRs | 192 | 120 | 120 |
+| spills, scratch | 0, 0 | 0, 0 | 0, 0 |
+| instructions | 2,393 | 2,412 | 2,411 |
+| phase 3b loop (vcyc / LDS ops per wave-iteration) | 181 / 43 | 187 / 41 | 187 / 41 |
+| phase 3a loop | 56 / 23 | 59 / 22 | 59 / 22 |
 
 ACO now gives the kernel the narrow kernel's resources (120 VGPRs, 21,504 B, 12 waves). The digit extraction
 costs +3 % VALU in phase 3b and saves 2 LDS loads per wave-iteration.
@@ -241,9 +267,65 @@ to a latency-bound kernel (×1.5 at most from occupancy).
 - What could make it miss: RADV choosing different code at 120 VGPRs; the kernel being bound by LDS bandwidth
   (phase 3b's 41 LDS ops per wave-iteration) rather than latency; the +3 % VALU of the digit extraction.
 
-## D. The timings (`raw/five_final/`)
+## D. The timings
 
-(pending)
+### The first final run (`raw/five_final/`, 09:02–09:24 UTC, nothing else running on the box)
+
+RTX 3080 at its 240 W cap (mean 225 W over the run, SM 1,640 MHz, at most 69 °C), one process per field after a
+warm-up field. Binaries: `c2152084` (`bin/base`), the B tree (`Bh`), the C tree (`Ch`, = `85185fef` but for a
+comment); md5s in `raw/bins/` and `five_final/bins.txt`.
+
+**Base 64** (narrow path; the bench's defaults, sampled check on), alternating head and `c2152084`:
+
+| | fs per admissible n (5 fields) | mean | CPU slice | host waited for it | device time (sync+reads) |
+|---|---|---|---|---|---|
+| `c2152084` (1 thread) | 1.9368, 1.7369, 1.8879, 1.7116, 1.7612 | 1.8069 | 29.5–35.0 s | 0–3.3 s (2 of 5) | 26.63 s |
+| head (4 threads) | 1.7715, 1.7827, 1.7158, 1.7895, 1.7843 | **1.7688 (−2.1 %)** | 7.8–11.6 s | 0 | 26.59 s |
+
+Nothing costs base 64 more: the device time is the same (−0.15 %); the whole field is 2.1 % faster on this box
+because the single-threaded check took longer than the field here and the host waited for it in two of five; the
+field's own time excluding the check differs by +1.2 % ± 3 % per pair (the same pair-order scatter as §A).
+Counts equal field for field (survivors, checked) and every sampled check equal (10 of 10).
+
+**Base 65** (wide path, sampled check off), the three rotated per field:
+
+| | fs per admissible n | mean | device time |
+|---|---|---|---|
+| `c2152084` | 3.6479, 3.6736, 3.6843, 3.6666, 3.6677 | 3.6680 | 44.85–45.22 s |
+| B (`64cf6c24`) | 3.3241, 3.3138, 3.3121, 3.3113, 3.3015 | **3.3126 (−9.7 %)** | 40.10–40.39 s |
+| C (`85185fef`) | 3.6632, **3.3196**, 3.6716, **3.3086**, 3.6460 | 3.5218 | 44.67–44.96 or 40.23–40.27 |
+
+**C is bimodal on the 3080**: two of five processes as fast as B, three as slow as `c2152084` (+4.6 s of device
+time, ~+1.1 ms per slice, ~+16 % of the main kernel), with equal counts. Four quiet stop-3 runs afterwards gave B
+42.54, 43.21 s and C 42.72, 41.93 s (both fast), so it is per process, not per kernel. What differs per process:
+CubeCL's CUDA target places the shared arrays in one buffer in an order that changes from process to process
+(three C processes' CUDA source, `raw/cu_layouts.txt`); before C every array was a multiple of 128 bytes, so every
+offset was 16-byte aligned whatever the order; C's two one-word arrays (`s_np`, `s_nl`) leave the arrays after
+them 4 bytes off, and in those orders the compiler can no longer pair `sl[row]`, `sl[row + 1]` into one 64-bit
+shared load in the hot loop [judged: the mechanism is not proven; the SASS was not read]. **C as committed is
+therefore not acceptable on the 3080**; fix: commit D. (The three CUDA layouts captured, `raw/cu_layouts.txt`,
+were taken with CubeCL's debug log on, which slows every run, so they cannot be told slow from fast; in all three
+`sl` happened to sit 8-byte aligned. The mechanism stays a judgement; the fix is measured below.)
+
+### D: the two arrays back to 32 words (`raw/five_d/`, 09:41–09:57 UTC, nothing else running)
+
+Same protocol, base 65 only, `c2152084` / B / the D tree (`Dh`) rotated per field:
+
+| | fs per admissible n | mean | device time |
+|---|---|---|---|
+| `c2152084` | 3.5957, 3.6679, 3.6823, 3.6669, 3.6601 | 3.6546 | 44.92–45.11 s |
+| B (`64cf6c24`) | 3.2489, 3.3010, 3.3174, 3.3018, 3.3127 | 3.2964 | 40.12–40.39 s |
+| **D (the head)** | 3.2425, 3.2778, 3.3094, 3.3077, 3.3128 | **3.2900** | 40.13–40.35 s |
+
+**No slowdown on the RTX 3080 from the shared-memory change** (D against B: −0.2 %, inside the scatter; five of five
+fast), and **base 65 is 10.0 % cheaper than at `c2152084`** (3.290 against 3.655 fs per admissible n; B's
+expansion alone gave 9.8 %). Survivors and checked equal field for field across all fifteen runs. Card: 226 W mean,
+1,648 MHz, at most 69 °C. As a multiple of base 64 (the head's 1.769 fs of the run before, the narrow bench's
+defaults, check on): ×1.86 per admissible n, against ×2.07 for `c2152084`'s 3.655 on the same basis [arithmetic on
+the measured means of two sessions on this box].
+
+With the route's sampled check on at b65 (§A: +2.4 %), the head costs ~3.37 fs per admissible n at base 65 on this
+3080 [judged: §A's measured overhead applied to the measured mean].
 
 ## E. Tiers per commit
 
@@ -252,21 +334,24 @@ to a latency-bound kernel (×1.5 at most from occupancy).
 | A `1d4d6920` | clean | workspace pass; `nice_common --features gpu --lib` 293 pass, 0 fail, 72 ignored; client cubecl-cuda 27 pass | release pass (219 s), debug pass (2,088 s, CPU-contended) | 8 / 8 pass each | tier (b) on CUDA, 2 b64 slices n for n, both prefilter forms, narrow faults, parent sharing, b65 slice, wide faults: all pass | `lint_a1b/`, `suite_a1/`, `a1/`, `card_a1/` |
 | B `64cf6c24` | clean | all three pass | release pass | 8 / 8 pass each | all pass | `x_b1/`, `card_b1/` |
 | C `85185fef` | clean (`l_c1/`; the gate's first lint run found two decimal bit masks, fixed before the commit) | all three pass | release pass | 8 / 8 pass each | all pass | `x_c1/`, `l_c1/`, `card_c1/` |
+| D `10ddbf17` | clean | all three pass | release pass | 8 / 8 pass each | all pass; plus `raw/cpar_d1/` (b65 717171717, 532260419, b64 forced wide, wide faults) | `x_d1/`, `s_d1/`, `l_d1/`, `card_d1/`, `cpar_d1/` |
 
 Every tree was tested as the exact committed tree, file for file (md5 of every `midout/*.rs` compared between
 ivory and the box), except that C's suite and tier runs were built before a code comment's wording and a mask's
-spelling (`112u32` → `0x70u32`, the same value) were changed; its lint and card tier were run on the final file.
+spelling (`112u32` → `0x70u32`, the same value) were changed (its lint and card tier ran on the final file), and
+D's lint was rerun on the final file after its three-line comment was added (`l_d1/`). D's first
+suite run failed for want of disk on the box (40 GB; old target directories removed, rerun).
 Tier (a) in debug was run for A only (CI runs release; 35 minutes here). Lint in `just lint` is the box's
 `just` 1.59.
 
-## F. The design directory, re-checked against `85185fef`
+## F. The design directory, re-checked against `10ddbf17`
 
-`tools/check_refs.py interactive/midout-map.html`: 14 BAD of 88 at the new head (all line shifts from A in `gpu.rs`,
+`tools/check_refs.py interactive/midout-map.html`: 14 BAD of 88 at the new code (all line shifts from A in `gpu.rs`,
 `cpu.rs`, `route.rs`), fixed in the map's `N` array (each mapped by its old line's exact text at `c2152084`):
 88 refs, 0 bad. `DESIGN.md`'s inline refs (`tools/print_inline_refs.py`): 20 lines' numbers remapped the same way
 (`gpu.rs` after line 3816 +27 to +29, `cpu.rs:702` → 914, `gpu_wide.rs` +1), each target line read. The head
 named where references were checked: the map (4 places), `DESIGN.md` lines 4 and 612, `README.md` lines 4 and
-19 → `85185fef`. No other wording changed.
+19 → `10ddbf17` (re-checked after D: 88 refs, 0 bad; D moved no referenced line). No other wording changed.
 
 **What in `DESIGN.md` is now out of date** (not edited):
 
@@ -285,7 +370,7 @@ named where references were checked: the map (4 places), `DESIGN.md` lines 4 and
 - §9 (l. 583–585): "untuned on the RX 9070 XT (3 KB over)" and "what the wide expansion spends ~3.3 ms on is not
   known; it is not the prefilter": both answered (§B, §C); the 12-wave kernel has not run on the card.
 - §9 (l. 589–591): "The sampled check does not fit base 65 … not built": built and on.
-- §10 (l. 612): "18 commits on the development trunk": 21. The file table's line counts (l. 620–626): `cpu.rs`
+- §10 (l. 612): "18 commits on the development trunk": 22. The file table's line counts (l. 620–626): `cpu.rs`
   1,460, `gpu.rs` 4,881, `gpu_wide.rs` 4,710, `route.rs` 173.
 - `README.md` l. 4: "since 2026-11-19 evening" (the head moved today).
 - The interactive map's panels for the sampled check and the wide expansion carry the same old statements
@@ -302,4 +387,3 @@ named where references were checked: the map (4 places), `DESIGN.md` lines 4 and
   slice [judged]; not measured.
 - Bases 68–70 keep the fifth probe array (19+ digits); a 6-word packing was not attempted.
 
-(further sections follow)

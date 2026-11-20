@@ -1,0 +1,24 @@
+cargo fmt --all --check
+cargo clippy -p "*" --all-targets -- -D warnings
+warning: unused dependency `web-sys`
+  --> wasm-client/Cargo.toml:22:15
+   |
+22 | [dependencies.web-sys]
+   |               ^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `web-sys`
+warning: `nice-wasm-client` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.38s
+# The GPU/spirv code only exists under these features, so lint it too.
+cargo clippy -p "*" --all-targets --features nice_client/gpu,nice_client/cubecl-spirv -- -D warnings
+warning: unused dependency `web-sys`
+  --> wasm-client/Cargo.toml:22:15
+   |
+22 | [dependencies.web-sys]
+   |               ^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `web-sys`
+warning: `nice-wasm-client` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.37s

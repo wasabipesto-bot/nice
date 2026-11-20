@@ -1,4 +1,4 @@
-"""Static overview of the middle-out join (dev/mo-clean c2152084): python3 make.py, run inside static/."""
+"""Static overview of the middle-out join (dev/mo-clean 10ddbf17): python3 make.py, run inside static/."""
 from html import escape
 W, H = 1500, 1060
 INK, INK2, MUTED = "#0b0b0b", "#52514e", "#8a8983"
@@ -33,7 +33,7 @@ a(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" he
 a(f'<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{MUTED}"/></marker></defs>')
 a(f'<rect width="{W}" height="{H}" fill="{PAGE}"/>')
 text(40, 44, "The middle-out join: one base-64 field, end to end", 22, 700, INK, "start")
-text(40, 68, "A nice-only GPU join whose unit of work is every n sharing five middle digits. Branch dev/mo-clean (c2152084); not merged, no server change.", 13.5, 400, INK2, "start")
+text(40, 68, "A nice-only GPU join whose unit of work is every n sharing five middle digits. Branch dev/mo-clean (10ddbf17); not merged, no server change.", 13.5, 400, INK2, "start")
 
 # --- digits strip
 x0, y0, cw = 60, 104, 62
@@ -115,8 +115,8 @@ ny = oy + 90
 text(rx - 150, ny, "MEASURED, 2026-11-19, AGAINST v3.4.8's JOIN", 11.5, 700, MUTED, "start")
 rows = [("RX 9070 XT, base 64", "0.99 vs 4.76 fs", "×4.79"),
         ("RTX 3080 240 W, base 64", "1.62 vs 6.62 fs", "×4.09"),
-        ("RTX 3080, base 65", "3.47 fs", "no join today"),
-        ("RX 9070 XT, base 65", "3.1 fs", "untuned")]
+        ("RTX 3080, base 65", "3.29 fs", "no join today"),
+        ("RX 9070 XT, base 65", "3.1 fs", "before its fit")]
 for i, (c, v, r) in enumerate(rows):
     yy = ny + 26 + i*26
     text(rx - 150, yy, c, 13, 500, INK, "start")
