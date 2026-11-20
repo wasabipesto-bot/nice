@@ -357,7 +357,7 @@ fn eval<M: Mask>(
     let ngr64 = chunks.len().div_ceil(64);
     let mut kept_flags = vec![false; chunks.len()];
     let mut rec_flags = vec![false; chunks.len()];
-    let mut round_lists: Vec<Vec<u32>> = vec![Vec::new(); ngr16];
+    let mut round_lists: Vec<Vec<(u32, u32)>> = vec![Vec::new(); ngr16]; // (probe, largest extension over the round's kept lanes)
     let mut extra_of = vec![0u32; chunks.len()];
     let mut pop_of = vec![0u32; chunks.len()];
     // Q4 per chunk: the kept probes (indices), in probe order
@@ -545,7 +545,7 @@ fn eval<M: Mask>(
                 }
                 if any {
                     if g == rnd && extras {
-                        round_lists[gi].push(pi as u32);
+                        round_lists[gi].push((pi as u32, me));
                     }
                     *listed += 1;
                     *lane += nch;
@@ -627,12 +627,13 @@ fn eval<M: Mask>(
         st.q4_trie_mask += nodes * chunks.len() as u64;
         for (gi, rl) in round_lists.iter_mut().enumerate() {
             let nch = ((gi + 1) * rnd).min(chunks.len()) as u64 - (gi * rnd) as u64;
-            rl.sort_by(|&x, &y| seqs[x as usize].cmp(&seqs[y as usize]));
+            rl.sort_by(|x, y| seqs[x.0 as usize].cmp(&seqs[y.0 as usize]));
             let mut prev: Option<&[u32]> = None;
-            for &i in rl.iter() {
+            for &(i, me) in rl.iter() {
                 let sq = &seqs[i as usize];
-                st.q4l_plain += nch * sq.len() as u64;
-                st.q4l_trie += nch * (sq.len() as u64 - prev.map_or(0, |p| lcp(p, sq)));
+                let me = u64::from(me);
+                st.q4l_plain += nch * (sq.len() as u64 + me);
+                st.q4l_trie += nch * (sq.len() as u64 - prev.map_or(0, |p| lcp(p, sq)) + me);
                 prev = Some(sq);
             }
             let n = rl.len();
@@ -643,12 +644,14 @@ fn eval<M: Mask>(
                     let part = &rl[(sx * seg).min(n)..((sx + 1) * seg).min(n)];
                     let mut pv: Option<&[u32]> = None;
                     part.iter()
-                        .map(|&i| {
+                        .map(|&(i, me)| {
                             let sq = &seqs[i as usize];
+                            let me = u64::from(me);
                             let l = sq.len() as u64;
                             let t = l - pv.map_or(0, |p| lcp(p, sq));
                             pv = Some(sq);
-                            (17u64, l, t)
+                            // the extension digits are per lane, not shared: every column pays them
+                            (17 + me, l + me, t + me)
                         })
                         .collect()
                 })
@@ -935,6 +938,14 @@ fn study<M: Mask>(
         vars.push(v("hyb6_cell", Ord_::Hybrid(6), 64, Ivl::Cell(6), false));
         vars.push(v("lorder_ext_c32", Ord_::LOrder, 32, Ivl::Tight, false));
         vars.push(v("lorder_ext_c128", Ord_::LOrder, 128, Ivl::Tight, false));
+    }
+    if std::env::args().skip(4).any(|s| s == "q6c") {
+        // L order and a hybrid with Q4's sharing (the probes' own digits shared, the extension per lane)
+        vars.clear();
+        vars.push(v("code", Ord_::Code, 64, Ivl::None, true));
+        vars.push(v("lex", Ord_::Lex, 64, Ivl::None, true));
+        vars.push(v("lorder_ext", Ord_::LOrder, 64, Ivl::Tight, true));
+        vars.push(v("hyb3_cell", Ord_::Hybrid(3), 64, Ivl::Cell(3), true));
     }
     let nv = vars.len();
     let njobs = m * bu;
