@@ -70,6 +70,10 @@ struct St {
     q4_trie_h: u64,
     q4_trie_mask: u64,
     q4_trie_mask_kept: u64,
+    // Q4 under the lane model: per round, the listed probes; slot ORs = digits, or digits − LCP with the
+    // previous listed probe (probes in mask order), × the round's chunks
+    q4l_plain: u64,
+    q4l_trie: u64,
 }
 
 impl St {
@@ -78,7 +82,7 @@ impl St {
         a!(jobs, children, chunks, flat, dead_plain, dead_a, dead_b, dead_c, dead_clip, kept, ors, records, surv,
            checked, listed16, lane16, wpop16, wext16, listed64, lane64, wpop64, wext64, listed16_or, lane16_or, lane64_or, disc_surv, disc_checked,
            disc_nice, disc_claim_ok, disc_claim_bad, q3_pairs, q3_dead_pairs, q3_records, q3_surv, q3_skip, q3_viol,
-           q4_plain, q4_trie_h, q4_trie_mask, q4_trie_mask_kept);
+           q4_plain, q4_trie_h, q4_trie_mask, q4_trie_mask_kept, q4l_plain, q4l_trie);
         for i in 0..NH {
             self.hist[i] += o.hist[i];
             self.hist_kept[i] += o.hist_kept[i];
@@ -90,7 +94,7 @@ impl St {
         p!(jobs, children, chunks, flat, dead_plain, dead_a, dead_b, dead_c, dead_clip, kept, ors, records, surv,
            checked, listed16, lane16, wpop16, wext16, listed64, lane64, wpop64, wext64, listed16_or, lane16_or, lane64_or, disc_surv, disc_checked,
            disc_nice, disc_claim_ok, disc_claim_bad, q3_pairs, q3_dead_pairs, q3_records, q3_surv, q3_skip, q3_viol,
-           q4_plain, q4_trie_h, q4_trie_mask, q4_trie_mask_kept);
+           q4_plain, q4_trie_h, q4_trie_mask, q4_trie_mask_kept, q4l_plain, q4l_trie);
         let last = self.hist.iter().rposition(|&x| x > 0).map_or(0, |i| i + 1);
         s += &format!(" hist={:?}", &self.hist[..last]);
         let last = self.hist_kept.iter().rposition(|&x| x > 0).map_or(0, |i| i + 1);
@@ -343,6 +347,7 @@ fn eval<M: Mask>(
     let ngr64 = chunks.len().div_ceil(64);
     let mut kept_flags = vec![false; chunks.len()];
     let mut rec_flags = vec![false; chunks.len()];
+    let mut round_lists: Vec<Vec<u32>> = vec![Vec::new(); ngr16];
     let mut extra_of = vec![0u32; chunks.len()];
     let mut pop_of = vec![0u32; chunks.len()];
     // Q4 per chunk: the kept probes (indices), in probe order
@@ -515,6 +520,9 @@ fn eval<M: Mask>(
                     }
                 }
                 if any {
+                    if g == rnd && extras {
+                        round_lists[gi].push(pi as u32);
+                    }
                     *listed += 1;
                     *lane += nch;
                     *wpop += nch * u64::from(mp);
@@ -593,6 +601,17 @@ fn eval<M: Mask>(
             prev = Some(s);
         }
         st.q4_trie_mask += nodes * chunks.len() as u64;
+        for (gi, rl) in round_lists.iter_mut().enumerate() {
+            let nch = ((gi + 1) * rnd).min(chunks.len()) as u64 - (gi * rnd) as u64;
+            rl.sort_by(|&x, &y| seqs[x as usize].cmp(&seqs[y as usize]));
+            let mut prev: Option<&[u32]> = None;
+            for &i in rl.iter() {
+                let sq = &seqs[i as usize];
+                st.q4l_plain += nch * sq.len() as u64;
+                st.q4l_trie += nch * (sq.len() as u64 - prev.map_or(0, |p| lcp(p, sq)));
+                prev = Some(sq);
+            }
+        }
     }
 }
 
@@ -791,7 +810,7 @@ fn study<M: Mask>(base: &Base, sh: Shape, b: u32, pip: u128, threads: usize, gre
     for k in [0u32, 2, 4, 6, 8, 10, 12, 16] {
         vars.push(v(&format!("key{k}"), Ord_::Key(k), 64, Ivl::None, false));
     }
-    vars.push(v("lex", Ord_::Lex, 64, Ivl::None, false));
+    vars.push(v("lex", Ord_::Lex, 64, Ivl::None, true));
     vars.push(v("code_c32", Ord_::Code, 32, Ivl::None, false));
     vars.push(v("lex_c32", Ord_::Lex, 32, Ivl::None, false));
     vars.push(v("code_c128", Ord_::Code, 128, Ivl::None, false));
