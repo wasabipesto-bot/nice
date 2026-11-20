@@ -352,8 +352,11 @@ mod wk {
         let mut wcnt = SharedMemory::<u32>::new(comptime!(
             (if 2 * NT / w < 32 { 32 } else { 2 * NT / w }) as usize
         ));
-        let s_nl = SharedMemory::<Atomic<u32>>::new(1usize);
-        let mut s_np = SharedMemory::<u32>::new(1usize);
+        // 32 words each though only [0] is used: every shared array a multiple of 128 bytes keeps every offset
+        // aligned in CubeCL's CUDA layout, whose order changes from process to process (one word each made the
+        // kernel ~16 % slower on an RTX 3080 in some processes)
+        let s_nl = SharedMemory::<Atomic<u32>>::new(32usize);
+        let mut s_np = SharedMemory::<u32>::new(32usize);
         let mut cmv = SharedMemory::<u32>::new(96usize);
 
         let t = UNIT_POS_X;
