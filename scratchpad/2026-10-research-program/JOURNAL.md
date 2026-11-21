@@ -4,6 +4,35 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-21 (cycle 12 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $23.77 invoiced of $30 (fleet $37.18), credit $50.32.
+  No day missed. PR #271 open, mergeable, 25 checks pass, 3 skipped, no comments; Dependabot #272–#275 open (not
+  the program's); drafts parked. Upstream main 974d7194 unchanged; no release; nothing to measure on the fleet.
+- **The user since the last report (05:00–05:35 UTC):** asked whether a proof of GRH would matter to the project
+  (answered: no; notes `L7/2026-11-21.md`); invited "a little research" on recent mathematics; then pointed out
+  that my searches had missed the two GRH proof claims of 2026-11-20 (Alpöge with Claude, in Lean; Masullo).
+  Cause: I ran every search in the tool's standard mode, whose index lags by days; the same query in extended
+  mode finds both. Rule saved to memory (extended mode for anything recent). Then: "take the news of recent
+  Claude-assisted developments as encouragement about your abilities and a broadening of what sorts of
+  advancements are possible given continual pressure." **Applied (my reading): one hard line stays open as a
+  standing track with real effort every cycle; a negative round on it is a status, not a verdict.**
+- **Plan, with kill criteria:**
+  - **BX round 2, the standing hard line (mine, today):** can anything find a nice number without work
+    proportional to the candidates, at any base? Today's angle, not covered in round 1: locality of moves on n
+    and structured families at large bases, where nice numbers must exist in numbers (`BX/ROUND2.md`). No kill
+    criterion: the line stays open; each round records what was tried and names the next attack.
+  - **CW, wider words per lane** (optimisation; `CW/BRIEF.md`, Opus, RTX 3080 box, to 11:30 UTC): a
+    microbenchmark of the pairing's word loop at 64, 128 and 256 children per word on real data, timed on the
+    card and compiled offline for the RX 9070 XT. **Kill: under ×1.15 on the whole main kernel by both the card
+    timing and the offline cycle count → dropped.**
+  - **LEAN-MO, scope only** (`LEAN-MO/BRIEF.md`, Opus, ivory, read-only, to 08:30 UTC): what a machine-checked
+    proof that the middle-out join examines every candidate would consist of, what the parked Lean work
+    already gives, its size, and what it would leave unproved. A scope document, no proof work, nothing near
+    the user's draft PR #160.
+- **Not started, on purpose:** bases 68–70 (needs a card over 10 GB; about $6 left under the cap with the
+  decision on the cap unanswered); any pull request.
+
 ## 2026-11-20 (cycle 11 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $22.91 invoiced of $30 (fleet $35.45), credit $52.91.

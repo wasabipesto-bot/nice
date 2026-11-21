@@ -35,6 +35,28 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## BX.2 Below exhaustive, round 2: the target stated (control 90 % of the outputs, not 40 %), the window lemma, structured families (2026-11-21 05:45–06:30 UTC, the director; `BX/ROUND2.md`, `BX/round2/window.py`, `window.out`)
+
+- **Where nice numbers are** [P, uniform model]: log10 of the expected count per base: 64: −3.9; 70: −3.4; 100:
+  −2.1; 130: −0.1; 140: +0.7; 150: +1.5; 200: +6.7. A second nice number is expected near bases 130–150 (n of
+  26–30 digits), far beyond any exhaustive search.
+- **What a method must control** [P]: with a fraction u of the outputs left to chance a trial succeeds with
+  probability (ub)!/b^(ub); at base 140: 10^54 trials at u = 0.60, 10^19 at u = 0.10, 10^11 at u = 0.05. The join
+  family with ends that share s positions (each list grows by b^(s/2)) balances at about 10^44 operations at base
+  140 and 10^65 at base 200 (the same crude model gives 10^16 surviving pairs for base 64's middle-out shape;
+  measured 1.3·10^16).
+- **Window lemma** [P; M]: a change of n by δ·b^i leaves n², n³ unchanged below position i and above i + L + 1,
+  i + 2L + 1: it scrambles 60 % of the outputs wherever i is. Measured share of outputs unchanged by a one-digit
+  change: 0.371, 0.380, 0.388, 0.390 at bases 60, 100, 150, 200, flat across the digit's position (40 random n
+  per base, every digit position).
+- **Structured families** [P]: n = [x][0^m][y] (blocks of n² abut) is the best sparse family: 8/15 of the
+  outputs controlled, u = 0.47; it has b^(2b/15) members, so it is expected to hold a nice number only for
+  b > 1,808. Closed forms with provably distinct digits (ramps, cyclic numbers) are too few and lead to
+  "a ramp is a perfect square" equations without solutions in the cases worked [J].
+- **Status:** nothing below exhaustive. Not excluded and named for the next rounds: certified digits from a
+  description of n that is not an end (n = u·v); batch rejection of the affine middle digits per bottom (next
+  round); bases where the uniform model might be wrong.
+
 ## MO.17 The wide path: the sampled CPU check on threads and on at base 65; the wide expansion a third cheaper; the wide main kernel at 12 waves for the RX 9070 XT (offline) (step 9W; 2026-11-20 06:05–10:29 UTC, engineer; `G2/BUILD-BRIEF-9W.md`, `G2/WIDE2-NOTES.md`, `G2/build9w/`; `dev/mo-clean` c2152084 → 10ddbf17 (1d4d6920, 64cf6c24, 85185fef, 10ddbf17; on the fork); box 61587396 on m11295, RTX 3080 at 240 W, 4.5 h)
 
 - **A, the sampled check** [M]: `cpu::slice_join_threads` (std threads; `nice_common` has no rayon) gives the
