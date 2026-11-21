@@ -385,6 +385,8 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
     let pips: Vec<String> = opt("--pips").ok_or_else(|| anyhow!("--pips"))?.split(',').map(String::from).collect();
     let reps: usize = opt("--reps").map_or(Ok(10), |s| s.parse())?;
     let once = args.iter().any(|a| a == "--once");
+    // --max-inst N: only the first N instances (a SPIR-V dump on a software device; counts then cover those only)
+    let max_inst: Option<usize> = opt("--max-inst").map(|s| s.parse()).transpose()?;
     let vars: Vec<Var> = match opt("--variants") {
         Some(s) => s
             .split(',')
@@ -405,7 +407,10 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
             if !vars.iter().any(|v| v.nw * 32 == wd) {
                 continue;
             }
-            let d = load(&format!("{dir}/s{pip}_w{wd}.bin"))?;
+            let mut d = load(&format!("{dir}/s{pip}_w{wd}.bin"))?;
+            if let Some(m) = max_inst {
+                d.ninst = d.ninst.min(m);
+            }
             assert_eq!(d.w, wd);
             let nz: u64 = (0..d.ninst).map(|i| u64::from(d.expect[i * 4])).sum();
             let cap = (nz / 160 + d.ninst as u64 * u64::from(NT / w) + 2048) as u32;
