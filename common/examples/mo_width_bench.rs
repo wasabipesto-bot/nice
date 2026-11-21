@@ -75,6 +75,7 @@ mod k {
         #[comptime] nw: u32,
         #[comptime] hh: u32,
         #[comptime] vec: bool,
+        #[comptime] swz: bool,
     ) {
         let cpr = comptime!(32 / nw); // chunks per round (lanes per probe stream)
         let nst = comptime!(NT / (32 / nw)); // probe streams
@@ -110,6 +111,10 @@ mod k {
         let st = t / cpr;
         let q65 = 65u32 * q;
         let qs = 16u32 + q;
+        let mut odd1 = 0u32;
+        if comptime!(swz) {
+            odd1 = st & 1u32;
+        }
         let mut r = 0u32;
         while r < nr {
             let rb = (rbase + r) * 8u32;
@@ -180,7 +185,12 @@ mod k {
                             let row = (dg + q65) * comptime!(nw / 4);
                             #[unroll]
                             for jj in 0..comptime!(nw / 4) {
-                                let v = slv[(row + jj) as usize];
+                                // swz (nw = 8): odd probe streams read the two halves in the other order, so that the
+                                // two streams of an 8-lane LDS.128 phase fall on different banks
+                                let mut v = slv[(row + jj) as usize];
+                                if comptime!(swz) {
+                                    v = slv[(row + (jj ^ odd1)) as usize];
+                                }
                                 #[unroll]
                                 for kk in 0..4u32 {
                                     a[comptime!(jj * 4 + kk) as usize] |= v[kk as usize];
@@ -192,6 +202,16 @@ mod k {
                             for kk in 0..nw {
                                 a[kk as usize] |= sl[(row + kk) as usize];
                             }
+                        }
+                    }
+                    if comptime!(swz) {
+                        let odd = (st & 1u32) != 0u32;
+                        #[unroll]
+                        for kk in 0..4u32 {
+                            let x = a[kk as usize];
+                            let y = a[comptime!(kk + 4) as usize];
+                            a[kk as usize] = select(odd, y, x);
+                            a[comptime!(kk + 4) as usize] = select(odd, x, y);
                         }
                     }
                     #[unroll]
@@ -242,7 +262,8 @@ mod k {
                             have_slab = true;
                         }
                         let sbase = slab_id * 256u32 + slab_used;
-                        if slab_id < nslab_cap {
+                        // mode bit 2 (timing only): the records are not written (their count and slabs are)
+                        if slab_id < nslab_cap && (mode & 2u32) == 0u32 {
                             #[unroll]
                             for h in 0..hh {
                                 if nz[h as usize] {
@@ -324,17 +345,20 @@ struct Var {
     nw: u32,
     hh: u32,
     vec: bool,
+    swz: bool,
 }
 
 const VARS: &[Var] = &[
-    Var { name: "w64", nw: 2, hh: 2, vec: false },
-    Var { name: "w128s2", nw: 4, hh: 2, vec: false },
-    Var { name: "w128v2", nw: 4, hh: 2, vec: true },
-    Var { name: "w128s1", nw: 4, hh: 1, vec: false },
-    Var { name: "w128v1", nw: 4, hh: 1, vec: true },
-    Var { name: "w256s1", nw: 8, hh: 1, vec: false },
-    Var { name: "w256v1", nw: 8, hh: 1, vec: true },
-    Var { name: "w256v2", nw: 8, hh: 2, vec: true },
+    Var { name: "w64", nw: 2, hh: 2, vec: false, swz: false },
+    Var { name: "w128s2", nw: 4, hh: 2, vec: false, swz: false },
+    Var { name: "w128v2", nw: 4, hh: 2, vec: true, swz: false },
+    Var { name: "w128s1", nw: 4, hh: 1, vec: false, swz: false },
+    Var { name: "w128v1", nw: 4, hh: 1, vec: true, swz: false },
+    Var { name: "w256s1", nw: 8, hh: 1, vec: false, swz: false },
+    Var { name: "w256v1", nw: 8, hh: 1, vec: true, swz: false },
+    Var { name: "w256v2", nw: 8, hh: 2, vec: true, swz: false },
+    Var { name: "w256x1", nw: 8, hh: 1, vec: true, swz: true },
+    Var { name: "w256x2", nw: 8, hh: 2, vec: true, swz: true },
 ];
 
 struct Dev {
@@ -434,6 +458,7 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
                     v.nw,
                     v.hh,
                     v.vec,
+                    v.swz,
                 );
             }
             Ok((slabn, res))
@@ -488,14 +513,14 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
             continue;
         }
         // timing: modes {full, no-3b} × variants, interleaved, `reps` rounds of 3 launches each
-        let mut tm: Vec<[Vec<f64>; 2]> = vars.iter().map(|_| [Vec::new(), Vec::new()]).collect();
+        let mut tm: Vec<[Vec<f64>; 3]> = vars.iter().map(|_| [Vec::new(), Vec::new(), Vec::new()]).collect();
         for _rep in 0..reps {
             for (vi, v) in vars.iter().enumerate() {
                 if !ok[vi] {
                     continue;
                 }
                 let (_, dv, _) = devs.iter().find(|(wd, _, _)| *wd == v.nw * 32).unwrap();
-                for (mi, mode) in [1u32, 0].iter().enumerate() {
+                for (mi, mode) in [1u32, 0, 3].iter().enumerate() {
                     let pre: Vec<_> = (0..3).map(|_| (mk(&[0u32]), mk(&vec![0u32; dv.ninst * 4]))).collect();
                     drop(pre);
                     sync()?;
@@ -519,10 +544,12 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
             };
             let (f, fmin, fmax) = med(&mut tm[vi][0].clone());
             let (z, zmin, zmax) = med(&mut tm[vi][1].clone());
+            let (ns, nsmin, nsmax) = med(&mut tm[vi][2].clone());
             println!(
-                "TIME s{pip} {}: full {f:.4} ms [{fmin:.4}, {fmax:.4}] | no-3b {z:.4} ms [{zmin:.4}, {zmax:.4}] | 3b {:.4} ms (median difference) | raw full {:?} | raw no3b {:?}",
+                "TIME s{pip} {}: full {f:.4} ms [{fmin:.4}, {fmax:.4}] | no-3b {z:.4} ms [{zmin:.4}, {zmax:.4}] | 3b {:.4} ms (median difference) | no-store {ns:.4} ms [{nsmin:.4}, {nsmax:.4}] store {:.4} ms | raw full {:?} | raw no3b {:?}",
                 v.name,
                 f - z,
+                f - ns,
                 tm[vi][0].iter().map(|x| (x * 1e4).round() / 1e4).collect::<Vec<_>>(),
                 tm[vi][1].iter().map(|x| (x * 1e4).round() / 1e4).collect::<Vec<_>>()
             );
