@@ -35,8 +35,9 @@ Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumptio
 **How much more is in it (counted 2026-11-20):** the pairing kernel is 60 % of a slice. Exact counts on real
 slices show that no other order of the work and no extra skip test beats today's by more than ×1.18, and that a
 perfect skip test would give ×1.99 at most. So the join is near the end of what this kind of join can do; what
-is left is ordinary tuning for the card (wider words per lane are the one untested lever) and the stages around
-the kernel. The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
+is left is ordinary tuning for the card and the stages around the kernel. Wider words per lane were tested on
+2026-11-21: ×1.09 on an RTX 3080; for your card ×1.10–1.16 or ×1.27–1.34 is predicted, and only a short run there
+can tell (D17). The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
 
 ## A. The middle-out join
 

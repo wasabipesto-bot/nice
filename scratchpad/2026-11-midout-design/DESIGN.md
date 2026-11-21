@@ -522,10 +522,13 @@ said; counts come from an exact CPU prototype on real slices.
   skip instead of adding to it, and costs ×1.12; sharing ORs between neighbouring probes gains ×1.13–1.17; a
   perfect skip at any price would gain ×1.99 (91 % of kept visits yield a zero word). At base 65 the best
   combination reaches ×1.35 in counted work and loses once its tables are paid for [judged].
-- **Why closed:** the best exact variant is ×1.18 against a bar of ×1.3 set in advance. Left open and not a
-  count: wider words per lane (128 or 256 children), ×1.0 to ×2 depending on what limits a slot on the card.
+- **Why closed:** the best exact variant is ×1.18 against a bar of ×1.3 set in advance. Wider words per lane
+  (128 or 256 children) were then measured with a microbenchmark of the word loop on 2026-11-21: ×1.09 on the
+  whole kernel on an RTX 3080, where the loop is bound by shared-memory bandwidth; for the RX 9070 XT the offline
+  compile predicts ×1.10–1.16 or ×1.27–1.34 depending on that card's shared-memory speed, which only a run on
+  the card can tell. Parked.
 - **Long version:** `~/projects/nice/scratchpad/2026-10-research-program/CEIL/NOTES.md` (the argument, with two
-  restructurings that fail on paper) and `CEIL/RESULTS.md` beside it (the counts).
+  restructurings that fail on paper), `CEIL/RESULTS.md` beside it (the counts), and `CW/RESULTS.md` (word width).
 
 ---
 
