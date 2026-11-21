@@ -695,7 +695,8 @@ mod kernels {
                         pp += NT;
                     }
                     sync_cube();
-                    let nlist = s_nl[0usize].load();
+                    // scratch branch exp/mo-word-width: fault bit 1 << 20 (env MIDOUT_ABL3B, timing only) skips phase 3b
+                    let nlist = select((fault & 1048576u32) != 0u32, 0u32, s_nl[0usize].load());
                     // phase 3b: lane = chunk (q = t % 16), 16 probe streams, two list entries per unit per step
                     let q = t % 16u32;
                     let st = t / 16u32;
@@ -3432,7 +3433,7 @@ impl<R: Runtime> GpuJoin<R> {
                         self.ns_cap(),
                         a(&self.clst, self.lcap as usize),
                         *c0,
-                        self.fault,
+                        self.fault | if std::env::var_os("MIDOUT_ABL3B").is_some() { 1 << 20 } else { 0 },
                         a(acc, ACC_WORDS),
                         self.lcap,
                         self.w,
