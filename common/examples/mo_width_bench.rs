@@ -409,7 +409,17 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
             }
             let mut d = load(&format!("{dir}/s{pip}_w{wd}.bin"))?;
             if let Some(m) = max_inst {
+                // the first m instances and only the rows they use (a software device's binding limit)
                 d.ninst = d.ninst.min(m);
+                let l = &d.inst[(d.ninst - 1) * 8..d.ninst * 8];
+                let (pend, rend) = ((l[5] + l[4]) as usize, (l[6] + l[7]) as usize);
+                let lr = &d.rounds[(rend - 1) * 8..rend * 8];
+                let (lend, send) = ((lr[3] + lr[4]) as usize, d.rounds[..rend * 8].chunks(8).map(|r| r[0]).max().unwrap() as usize + 1);
+                d.inst.truncate(d.ninst * 8);
+                d.rounds.truncate(rend * 8);
+                d.probes.truncate(pend * 4);
+                d.lists.truncate(lend.max(1));
+                d.words.truncate(send * SLW);
             }
             assert_eq!(d.w, wd);
             let nz: u64 = (0..d.ninst).map(|i| u64::from(d.expect[i * 4])).sum();
@@ -438,9 +448,7 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
             devs.push((wd, dv, d.expect));
         }
         sync()?;
-        let launch = |v: &Var, dv: &Dev, mode: u32| -> Result<(Handle, Handle)> {
-            let slabn = mk(&[0u32]);
-            let res = mk(&vec![0u32; dv.ninst * 4]);
+        let launch_with = |v: &Var, dv: &Dev, mode: u32, slabn: Handle, res: Handle| -> Result<(Handle, Handle)> {
             let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
             unsafe {
                 k::w3b_kernel::launch_unchecked::<R>(
@@ -467,6 +475,9 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
                 );
             }
             Ok((slabn, res))
+        };
+        let launch = |v: &Var, dv: &Dev, mode: u32| -> Result<(Handle, Handle)> {
+            launch_with(v, dv, mode, mk(&[0u32]), mk(&vec![0u32; dv.ninst * 4]))
         };
         // exactness first: every variant once, counts per instance against the dump
         let mut ok = Vec::new();
@@ -517,25 +528,40 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
         if once {
             continue;
         }
-        // timing: modes {full, no-3b} × variants, interleaved, `reps` rounds of 3 launches each
+        // timing: modes {full, no-3b, no-store} x variants, interleaved in a shuffled order per rep (the card's clock
+        // follows the power of the launch before), each measurement `nl` launches back to back with their small
+        // buffers made before the clock starts; every measurement printed with its UTC interval (for the clock log)
+        let nl: usize = opt("--launches").map_or(Ok(3), |s| s.parse())?;
         let mut tm: Vec<[Vec<f64>; 3]> = vars.iter().map(|_| [Vec::new(), Vec::new(), Vec::new()]).collect();
-        for _rep in 0..reps {
-            for (vi, v) in vars.iter().enumerate() {
+        let mut seed = 0x9E37_79B9_7F4A_7C15u64;
+        let unix = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64();
+        for rep in 0..reps {
+            let mut order: Vec<(usize, usize)> = (0..vars.len()).flat_map(|vi| (0..3).map(move |mi| (vi, mi))).collect();
+            for i in (1..order.len()).rev() {
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                order.swap(i, (seed % (i as u64 + 1)) as usize);
+            }
+            for (vi, mi) in order {
                 if !ok[vi] {
                     continue;
                 }
+                let v = &vars[vi];
+                let mode = [1u32, 0, 3][mi];
                 let (_, dv, _) = devs.iter().find(|(wd, _, _)| *wd == v.nw * 32).unwrap();
-                for (mi, mode) in [1u32, 0, 3].iter().enumerate() {
-                    let pre: Vec<_> = (0..3).map(|_| (mk(&[0u32]), mk(&vec![0u32; dv.ninst * 4]))).collect();
-                    drop(pre);
-                    sync()?;
-                    let t0 = Instant::now();
-                    for _ in 0..3 {
-                        launch(v, dv, *mode)?;
-                    }
-                    sync()?;
-                    tm[vi][mi].push(t0.elapsed().as_secs_f64() / 3.0 * 1e3);
+                let bufs: Vec<_> = (0..nl).map(|_| (mk(&[0u32]), mk(&vec![0u32; dv.ninst * 4]))).collect();
+                sync()?;
+                let u0 = unix();
+                let t0 = Instant::now();
+                for (a, b) in bufs {
+                    launch_with(v, dv, mode, a, b)?;
                 }
+                sync()?;
+                let ms = t0.elapsed().as_secs_f64() / nl as f64 * 1e3;
+                let u1 = unix();
+                println!("M s{pip} {} mode {mode} rep {rep} t0 {u0:.4} t1 {u1:.4} ms {ms:.5}", v.name);
+                tm[vi][mi].push(ms);
             }
         }
         for (vi, v) in vars.iter().enumerate() {
