@@ -86,12 +86,24 @@ families cannot change the fraction. What is not excluded, because none of the a
    bases ≤ 62). A base family in which squares and cubes repel each other's digits (b with special factors,
    b = c^k) would raise the count; no reason is known, and it has not been measured above 62 by sampling.
 
-**Next round (named now so the line does not lapse): item 2, the batch test**, because it is the only one with
-a mechanism already half built (the affine structure is used per pair in the prefilter): count, on real base-64
-slices and on sampled pairs at bases 100–140, how many top values survive the affine middle digits for a fixed
-bottom, and whether a lattice or rotation argument lists them faster than testing each (the rotation's target
-set is a union of digit boxes; if its structure allows listing survivors in time near their number, the
-per-pair lottery becomes a per-bottom one: at base 64's shape 18 of the 27 uncertified digits are affine in the
-top's free part, so u would fall from 0.42 to 0.14 for the price of one listing per bottom). My own first
-estimate says the listing costs more than the tests it saves at base 64 (a box per allowed digit pattern);
-the round is to find out whether that estimate survives at large bases, where the free part of the top is long.
+**Next round, as first named: item 2, the batch test.** For a fixed bottom of k positions, the digits of n² and
+n³ at positions k … 2k − 1 are affine functions of the top's free part A (the A² terms start at position 2k), so
+one might hope to reject many A at once.
+
+**Same morning, before any experiment: item 2 collapses [P].** The affine digit at position k + j depends on A
+only through A mod b^(j+1), that is, through n mod b^(k+j+1). Listing the A that pass the affine digits from the
+low end is therefore exactly the bottom tree continued j levels deeper: the "affine middle" is not a third kind
+of digit, it is the next levels of the tree the join already has, and how deep to take that tree is the shape
+question that was priced when the join was designed (deeper bottoms lose to their own list sizes). The same
+holds from the other side: for a fixed top the next digits below its certificate are the top tree continued.
+**So every output digit is certified by an end of n, read to some depth, and by nothing else; the whole design
+space is "two trees met at chosen depths"**, whose floors the review of the no-shortcut argument computed
+(`N5/REVIEW.md`). Item 1 falls with it: a digit of n² at position p is a function of n² mod b^(p+1) or of n² to
+a relative precision b^(p − len), and each of those is an end of n; a factorisation n = u·v or any other
+description refines an end, it does not replace one.
+
+**What is left, honestly:** item 3 (is the uniform model wrong somewhere in our favour: sampling at bases
+100–200 is cheap and has not been done) and whatever I cannot yet name. **Round 3 will be item 3 by sampling,
+plus one written attempt to turn "every certified digit comes from an end" into a lower bound on any exact
+method (not only joins), because a proof that fails would show where a loophole is.** The line stays open; I do
+not expect it to yield, and I will say so each time rather than dress a negative as progress.

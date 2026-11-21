@@ -53,9 +53,12 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
   outputs controlled, u = 0.47; it has b^(2b/15) members, so it is expected to hold a nice number only for
   b > 1,808. Closed forms with provably distinct digits (ramps, cyclic numbers) are too few and lead to
   "a ramp is a perfect square" equations without solutions in the cases worked [J].
-- **Status:** nothing below exhaustive. Not excluded and named for the next rounds: certified digits from a
-  description of n that is not an end (n = u·v); batch rejection of the affine middle digits per bottom (next
-  round); bases where the uniform model might be wrong.
+- **Status:** nothing below exhaustive. Two of the three ideas I had named as not excluded fell the same
+  morning, on paper [P]: the affine middle digits for a fixed bottom are the bottom tree continued (the digit
+  at position k + j depends on A only through n mod b^(k+j+1)), and no description of n other than an end
+  certifies a digit (a factorisation refines an end). So the design space is "two trees met at chosen depths",
+  which `N5/REVIEW.md` bounds. Left for round 3: sampling at bases 100–200 for any departure from the uniform
+  model, and a written attempt at a lower bound for any exact method.
 
 ## MO.17 The wide path: the sampled CPU check on threads and on at base 65; the wide expansion a third cheaper; the wide main kernel at 12 waves for the RX 9070 XT (offline) (step 9W; 2026-11-20 06:05–10:29 UTC, engineer; `G2/BUILD-BRIEF-9W.md`, `G2/WIDE2-NOTES.md`, `G2/build9w/`; `dev/mo-clean` c2152084 → 10ddbf17 (1d4d6920, 64cf6c24, 85185fef, 10ddbf17; on the fork); box 61587396 on m11295, RTX 3080 at 240 W, 4.5 h)
 

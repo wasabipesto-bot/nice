@@ -1,11 +1,11 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-20 10:50 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-21 06:40 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
 separate document:** `../2026-11-midout-design/DESIGN.md` (with a one-screen picture,
 `../2026-11-midout-design/static/midout-overview.png`, and a clickable process map,
 `../2026-11-midout-design/interactive/midout-map.html`). To answer, reply in the chat with the numbers, for
-example: `D2 a, D3 yes, D5 yes hidden, D14 45, D16 yes`.
+example: `D2 a, D3 yes, D5 yes hidden, D14 45, D16 yes, D18 a`.
 
 Paths below are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
 
@@ -193,6 +193,33 @@ the kernel. The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
   (branch head `82108efb`, two commits). The reviewer's findings: the guard is correct and can only turn a panic
   into an empty result; no nice number exists at any base it covers (bases 4 and 5 are covered too: checked by
   brute force); `just lint` and the suites CI runs pass. Description drafted: `G2/STRIDE-EMPTY-PR-BODY.md`.
+
+### D18. A machine-checked proof that the middle-out join misses no candidate (new 2026-11-21)
+
+- **Why it is worth having:** today the join's rules (what tops and bottoms certify, the residue classes, the
+  prefilter) are checked only by a CPU reference against brute force on small bases, where nice numbers are
+  nearly absent. A wrong rule shared by the CPU reference and the device would pass every test: one such
+  mutant (a top certificate off by one position) did pass the first test suite. A proof closes exactly that
+  hole.
+- **What it would and would not claim** (scope: `LEAN-MO/SCOPE.md`): "the algorithm, as a Lean function that
+  mirrors the Rust reference, returns every nice number of a field, for every base and coordinate; the Rust
+  reference agrees with the Lean function on published fixtures; the device agreed with the Rust reference on a
+  sampled slice of every field." It would **not** claim that base 64's result is formally verified: the Rust,
+  the kernels and the hardware stay outside the proof.
+- **Size:** 550–1,000 new Lean lines and 35–55 theorems if it may import the library of your parked draft PR
+  #160 (which already proves about half of what is needed: residue classes, both certificates, the affine
+  digit step); 700–1,000 lines more if it must stand alone. Three to six working sessions. No new mathematics.
+- **Options for where it lives:**
+  - **a.** A separate Lean project on a fork branch that imports #160's library pinned at its current commit;
+    nothing in #160 is touched; no pull request.
+  - b. The same but standing alone, duplicating the definitions it needs.
+  - c. As an extension of #160's own branch.
+  - d. Nothing until you ask.
+- **Recommendation: a.** It costs you nothing to ignore and it does not move your parked PR.
+- **If you do not answer:** I start with the first step only, which is useful even without the proofs: the
+  Lean function that mirrors the reference, compared against tables generated from the Rust code (it is a
+  second, independent definition of the search). On a fork branch, no pull request, and only when the day's
+  rented-card budget is not needed elsewhere (this machine cannot build Mathlib).
 
 ### D17. A short window on demoux, when convenient (new 2026-11-20; nothing waits on it)
 
