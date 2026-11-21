@@ -102,8 +102,25 @@ space is "two trees met at chosen depths"**, whose floors the review of the no-s
 a relative precision b^(p − len), and each of those is an end of n; a factorisation n = u·v or any other
 description refines an end, it does not replace one.
 
-**What is left, honestly:** item 3 (is the uniform model wrong somewhere in our favour: sampling at bases
-100–200 is cheap and has not been done) and whatever I cannot yet name. **Round 3 will be item 3 by sampling,
-plus one written attempt to turn "every certified digit comes from an end" into a lower bound on any exact
-method (not only joins), because a proof that fails would show where a loophole is.** The line stays open; I do
-not expect it to yield, and I will say so each time rather than dress a negative as progress.
+**Item 3 done the same morning, by sampling [M, `BX/round2/sample.py`, `sample.out`].** For random n in a base's
+range, the number of equal pairs among the b output digits, against uniform digits:
+
+| base | samples | measured | uniform | difference (standard error) |
+|---|---|---|---|---|
+| 62 | 400,000 | 30.807 | 30.500 | +0.307 (0.009) |
+| 64 | 400,000 | 31.880 | 31.500 | +0.380 (0.009) |
+| 100 | 300,000 | 49.783 | 49.500 | +0.283 (0.013) |
+| 140 | 200,000 | 69.663 | 69.500 | +0.163 (0.019) |
+| 200 | 100,000 | 99.682 | 99.500 | +0.182 (0.032) |
+
+Squares and cubes repeat digits slightly *more* often than uniform digits, by a bounded 0.2–0.4 pairs that does
+not grow with the base (part of it is the last digit: n² ≡ n³ mod b for 9 of 64 residues at base 64 where
+uniform digits give 1). By the Poisson heuristic that makes nice numbers rarer than the uniform model by a
+constant factor of about e^(−0.2) to e^(−0.4), i.e. ×0.7–0.85 (the project's cost model already carries a
+correction of this size), and moves the base where one is expected from about 131 to about 133. **No bias in
+our favour at any base sampled.**
+
+**What is left, honestly:** nothing I can name as a mechanism. Round 3 is the written attempt to turn "every
+certified digit comes from an end" into a lower bound on any exact method (not only joins), because a proof
+that fails would show where a loophole is. The line stays open; I do not expect it to yield, and I will say so
+each time rather than dress a negative as progress.

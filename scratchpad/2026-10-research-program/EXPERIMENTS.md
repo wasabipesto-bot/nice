@@ -35,6 +35,30 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## CW.1 Wider words per lane in the pairing kernel: ×1.09 on an RTX 3080 (under the bar); ×1.10–1.16 or ×1.27–1.34 predicted for the RX 9070 XT depending on its shared-memory bandwidth (2026-11-21 06:00–06:56 UTC, engineer; `CW/BRIEF.md`, `CW/RESULTS.md`, `CW/raw/`, `CW/box/`; scratch branch `exp/mo-word-width` 6f7559d1 on 10ddbf17, on the fork; box 61761289, RTX 3080 at 320 W, 0.99 h, about $0.12)
+
+- **Microbenchmark** [M]: the kernel's word loop (phase 3b) alone, on dumps of three real base-64 slices, at 64,
+  128 and 256 children per lane word; every variant's non-zero words and survivor bits equal the dump's for all
+  4,032 job instances of every slice; the dump equals the CPU reference's counters; the width-64 kernel's
+  generated loop matches `g2_kernel`'s (ACO 173 VALU cycles and 39 LDS operations per wave-iteration against
+  171 / 39).
+- **RTX 3080** [M, 15 × 20 launches per (slice, variant), shuffled, clock logged 1,595–1,606 MHz]: ps per pair
+  0.187 (64), 0.161 (128), 0.166 (256, with a swizzle; 2-way bank conflict without it: ×1.6 slower than 64);
+  phase 3b 2.99 → 2.58 ms per slice (×1.17). Phase 3b is 0.59–0.61 of the main kernel there (ablation bit in
+  `g2_kernel`, whole fields, in cycles because the card throttled at 92 °C): **whole main kernel ×1.09**.
+  Width 128 stops at 78 % of the card's shared-memory peak (width 64 runs at 66 %) although its instruction
+  count per pair falls by 30–45 %.
+- **RX 9070 XT, offline** [M compile, P times]: width 128: 122 VALU cycles and 37 LDS operations per
+  wave-iteration, 120 registers, 12 waves per SIMD, no spills. Phase 3b per slice: 2.27 ms (64) → 1.60 by the
+  issue-bound model that predicted the slice within 3 % (**main kernel ×1.27–1.34**), → 1.92 with an LDS limit of
+  128 B per clock per CU added (**×1.10–1.16**). Which holds is not knowable offline.
+- **Verdict by the rule (under ×1.15 by both → dropped):** not dropped by the letter (one measure passes), judged
+  ×1.10–1.16 by the engineer. **Parked until one run of the microbenchmark on the RX 9070 XT** (ready: SPIR-V
+  build, exact on lavapipe): if width 128's phase 3b is not at least ×1.35 faster than width 64's there, drop.
+- **Side findings:** a wide record must stay a 16-byte record per non-zero 64-bit half (whole wide records add
+  about 0.3 ms of memory writes on the RX 9070 XT); the kernel's word loop is bound by shared-memory bandwidth on
+  the 3080, which makes sharing loads between probes (CEIL.1, ×1.13–1.17) the better-founded kernel lever.
+
 ## BX.2 Below exhaustive, round 2: the target stated (control 90 % of the outputs, not 40 %), the window lemma, structured families (2026-11-21 05:45–06:30 UTC, the director; `BX/ROUND2.md`, `BX/round2/window.py`, `window.out`)
 
 - **Where nice numbers are** [P, uniform model]: log10 of the expected count per base: 64: −3.9; 70: −3.4; 100:
@@ -57,8 +81,13 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
   morning, on paper [P]: the affine middle digits for a fixed bottom are the bottom tree continued (the digit
   at position k + j depends on A only through n mod b^(k+j+1)), and no description of n other than an end
   certifies a digit (a factorisation refines an end). So the design space is "two trees met at chosen depths",
-  which `N5/REVIEW.md` bounds. Left for round 3: sampling at bases 100–200 for any departure from the uniform
-  model, and a written attempt at a lower bound for any exact method.
+  which `N5/REVIEW.md` bounds.
+- **The uniform model at large bases** [M, `BX/round2/sample.py`, 100,000–400,000 random n per base]: equal
+  pairs among the b output digits exceed the uniform expectation by +0.307 (b62), +0.380 (b64), +0.283 (b100),
+  +0.163 (b140), +0.182 (b200), standard errors 0.009–0.032: a bounded excess that does not grow with the base
+  (the last digit alone gives +0.05 to +0.17). Nice numbers are rarer than uniform by a constant ×0.7–0.85 [J,
+  Poisson heuristic]; no bias in our favour. Left for round 3: a written attempt at a lower bound for any exact
+  method.
 
 ## MO.17 The wide path: the sampled CPU check on threads and on at base 65; the wide expansion a third cheaper; the wide main kernel at 12 waves for the RX 9070 XT (offline) (step 9W; 2026-11-20 06:05–10:29 UTC, engineer; `G2/BUILD-BRIEF-9W.md`, `G2/WIDE2-NOTES.md`, `G2/build9w/`; `dev/mo-clean` c2152084 → 10ddbf17 (1d4d6920, 64cf6c24, 85185fef, 10ddbf17; on the fork); box 61587396 on m11295, RTX 3080 at 240 W, 4.5 h)
 

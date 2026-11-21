@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-21 06:40 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-21 07:05 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
@@ -223,13 +223,15 @@ the kernel. The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
 
 ### D17. A short window on demoux, when convenient (new 2026-11-20; nothing waits on it)
 
-- **Why:** three things are predicted for your card and not measured there: (a) the cleaned branch at base 64
+- **Why:** four things are predicted for your card and not measured there: (a) the cleaned branch at base 64
   (×4.79 was measured just before the cleanup; on an RTX 3080 the cleanup and everything since changed nothing);
   (b) base 65 with the wide kernel as fitted to the card on 2026-11-20 (3.02 fs measured before; 2.4–3.0
   predicted); (c) the stage profile for tops and parents at the card's operating point (the one I have was taken
-  with the card idling and reads too high).
+  with the card idling and reads too high). Added 2026-11-21: (d) a five-minute microbenchmark that decides
+  whether wider words per lane in the pairing kernel are worth building (×1.09 on an RTX 3080; ×1.10–1.16 or
+  ×1.27–1.34 predicted for your card depending on how fast its shared memory is: `CW/RESULTS.md`).
 - **What it takes:** about 45 minutes with the production client stopped by you, as on 2026-11-19; I use the
-  window only for these three and clean up.
+  window only for these and clean up.
 - **If you do not answer:** nothing runs there; the numbers stay labelled as predictions.
 
 ## C. Operations

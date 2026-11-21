@@ -33,6 +33,33 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **Not started, on purpose:** bases 68–70 (needs a card over 10 GB; about $6 left under the cap with the
   decision on the cap unanswered); any pull request.
 
+- **06:10 UTC: the Lean scope is back** (`LEAN-MO/SCOPE.md`; LEDGER LEAN-MO; DECISIONS D18): eleven lemmas with
+  signatures; #160's parked library covers 40–50 %; 550–1,000 new lines importing it; 3–6 sessions on a machine
+  that can build Mathlib (ivory cannot); it proves the algorithm, not the Rust, the kernels or a run. Default if
+  the user says nothing: the first step only (the Lean function against tables from the Rust code), from the
+  next cycle, on a fork branch.
+- **06:56 UTC: CW is back (EXPERIMENTS CW.1): parked, not dropped.** RTX 3080: word loop ×1.17, main kernel ×1.09
+  (bound by shared-memory bandwidth). RX 9070 XT by the offline compile: ×1.27–1.34 if issue-bound, ×1.10–1.16
+  with an LDS limit. One run of the microbenchmark on that card decides (asked for in D17). Box destroyed 06:56
+  (0.99 h, $0.12).
+- **BX round 2 finished by me** (EXPERIMENTS BX.2, `BX/ROUND2.md`): the target (control about 90 % of the outputs
+  before gambling; two ends give 40 %; ~10^44 operations at base 140 for any join), the window lemma (60 % of the
+  outputs scrambled by any change of n; measured), structured families (53 % at best, above base 1,808 only).
+  The two ideas I had named as not excluded fell on paper the same morning (the affine middle digits are the
+  bottom tree continued; no description of n other than an end certifies a digit), and the third by sampling
+  (repeated digits exceed uniform by a bounded 0.16–0.38 pairs at bases 62–200: no bias in our favour).
+- **Bases 68–70 taken off the plan:** base 68 costs 5.6 RTX-3080-years at the measured 2.13 fs, more than every
+  base searched so far together; support for it has no use until the fleet changes. Base 65 (about 150 days on
+  the RX 9070 XT at the predicted 2.7 fs) is the last base within reach.
+- **Spend today:** $0.12 (one rental, 0.99 h); month $23.9 of $30. Agents: 2 Opus (362k and 272k tokens).
+- **For the 05:41 cycle of 11-22:** (1) what the user wrote; #271; no new PR without their word. (2) BX round 3:
+  the lower-bound attempt in writing (mine). (3) LEAN-MO step 1 unless the user said otherwise (D18): the Lean
+  model of the reference and its fixture comparison; try the fork's own CI for the build before renting. (4)
+  Sharing loads between neighbouring probes in the word loop (×1.13–1.17 counted; the word loop is bound by
+  shared-memory bandwidth on the 3080, so fewer loads is the better-founded lever): a microbenchmark variant
+  on `exp/mo-word-width` first; kill under ×1.08 on the main kernel. (5) Design directory and decisions kept
+  current. Budget about $6.
+
 ## 2026-11-20 (cycle 11 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $22.91 invoiced of $30 (fleet $35.45), credit $52.91.
