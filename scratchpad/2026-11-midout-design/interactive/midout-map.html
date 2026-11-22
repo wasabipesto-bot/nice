@@ -119,7 +119,7 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
 <body>
 <header>
   <h1>The middle-out join: one field from claim to submit, beside today's overlap join</h1>
-  <p class="sub">Branch <code>dev/mo-clean</code> at <code>10ddbf17</code> (fork, worktree <code>~/projects/nice/.worktrees/midout-clean</code>). The left two lanes are the middle-out join's path for one base-64 field (4,096 slices): the host side and the coordinator on the left, the device kernels of one slice in the middle. The right lane is v3.4.8's GPU overlap join (<code>origin/main</code> at <code>974d7194</code>), placed beside the middle-out stage it corresponds to; dotted grey links mark the correspondence. Click any shape for why it exists, how it connects, what it costs, which check guards it and its file:line. Bars show each stage's share of a slice's time: RX 9070 XT for the middle-out lane (the RTX 3080's numbers are in the panel), a derived 3080 profile for the overlap lane (hatched). Prose version: <code>DESIGN.md</code> beside this folder.</p>
+  <p class="sub">Branch <code>dev/mo-clean</code> at <code>eb9ef776</code> (fork, worktree <code>~/projects/nice/.worktrees/midout-clean</code>). The left two lanes are the middle-out join's path for one base-64 field (4,096 slices): the host side and the coordinator on the left, the device kernels of one slice in the middle. The right lane is v3.4.8's GPU overlap join (<code>origin/main</code> at <code>974d7194</code>), placed beside the middle-out stage it corresponds to; dotted grey links mark the correspondence. Click any shape for why it exists, how it connects, what it costs, which check guards it and its file:line. Bars show each stage's share of a slice's time: RX 9070 XT for the middle-out lane (the RTX 3080's numbers are in the panel), a derived 3080 profile for the overlap lane (hatched). Prose version: <code>DESIGN.md</code> beside this folder.</p>
 </header>
 
 <div class="toolbar">
@@ -155,7 +155,7 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
     <p><b>Shape</b> is role: rounded box = step; hexagon = decision; double rounded box with ⟳ = loop; box with a top bar and cut corners = device kernel; curved box = data built once and kept.</p>
     <p><b>Badges</b> give how often a piece runs: <b>PROC</b> once per process, <b>FIELD</b> once per field, <b>/64</b> once per 64 slices, <b>SLICE</b>, <b>BATCH</b>, <b>GROUP</b> (16 slices). <b>ACC</b> marks a piece that writes an execution account, <b>CHECKS</b> one that compares them.</p>
     <p><b>Bars</b> are the share of a slice's time (stage totals, drawn on the stage's main shape). The RX 9070 XT profile was measured by cumulative timing stops on field 77777; its tops and parents ran off the operating point (the card idles on those stages alone), so those two are too high and the main kernel's share too low. Overlap-lane shares are derived, not measured per stage.</p>
-    <p>Line numbers are into <code>dev/mo-clean</code> at <code>10ddbf17</code> for the middle-out lanes, and <code>origin/main</code> at <code>974d7194</code> for the overlap lane; each was checked by printing the line.</p>
+    <p>Line numbers are into <code>dev/mo-clean</code> at <code>eb9ef776</code> for the middle-out lanes, and <code>origin/main</code> at <code>974d7194</code> for the overlap lane; each was checked by printing the line.</p>
   </div></aside>
 </div>
 
@@ -176,7 +176,7 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
 
 <script>
 // ---------------------------------------------------------------- data
-// refs: [path, line, identifier on that line, repo] ; repo 'mo' = dev/mo-clean 10ddbf17, 'main' = origin/main 974d7194
+// refs: [path, line, identifier on that line, repo] ; repo 'mo' = dev/mo-clean eb9ef776, 'main' = origin/main 974d7194
 const G='common/src/midout/gpu.rs', GW='common/src/midout/gpu_wide.rs', C='common/src/midout/cpu.rs', CO='common/src/midout/coord.rs',
       RT='common/src/midout/route.rs', WI='common/src/midout/wire.rs', CR='client/src/midout_route.rs', CJ='common/src/cubecl_join.rs',
       OJ='common/src/overlap_join.rs', JP='common/src/join_plan.rs', SC='scripts/midout_coordinator.py';
@@ -631,7 +631,7 @@ function select(id){
   let costTab='';
   if(n.st&&ST[n.st]){const [a,b]=ST[n.st];
     costTab=`<table><tr><th>stage</th><th>RX 9070 XT</th><th>RTX 3080</th></tr><tr><td>${esc({tops:'tops (6 kernels)',par:'parents (4 kernels)',main:'main kernel',exp:'expansion + prefilter',chk:'check, done, group read'}[n.st])}</td><td class="n">${a.toFixed(3)} ms (${(100*a/SL9).toFixed(1)} %)</td><td class="n">${b==null?'with expansion':b.toFixed(3)+' ms ('+(100*b/SL3).toFixed(1)+' %)'}</td></tr><tr><td>whole slice</td><td class="n">${SL9.toFixed(3)} ms</td><td class="n">${SL3.toFixed(3)} ms</td></tr></table>`;}
-  const repoNote=n.L==='old'?'origin/main 974d7194':'dev/mo-clean 10ddbf17';
+  const repoNote=n.L==='old'?'origin/main 974d7194':'dev/mo-clean eb9ef776';
   panel.innerHTML=`
     <div class="title">${esc(n.t)}</div>
     <div style="color:var(--text-muted);font-size:12px;margin-bottom:6px">${esc(LAYER[n.L])} · ${esc(SHAPE[n.S])}</div>

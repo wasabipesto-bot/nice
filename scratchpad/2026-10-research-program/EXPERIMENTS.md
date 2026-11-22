@@ -35,6 +35,29 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## LEAN.2 Bridge proofs in Lean; two Rust tests that close gaps the Lean comparison exposed (2026-11-22 06:50–07:42 UTC, the same proof engineer; `LEAN-MO/STEP1-NOTES.md` "After step 1"; fork `lean/midout` f25f988a → 4934b0ca (CI run 44996514840, green, 8 min); `dev/mo-clean` 10ddbf17 → eb9ef776 (one test-only commit, +168 lines in `cpu.rs`); box 61919150, 1.95 h in all, about $0.13)
+
+- **Proved** [M: `lake build --wfail`, axiom check; 83 theorems in all, standard axioms only, no `sorry`]:
+  `baseRangeC_eq` for every base (the computable range equals the earlier library's), every coordinate the
+  constructor accepts is valid, and `sliceRun_surv_perm`: the survivor list of the form that runs is a
+  permutation of `sliceSurvivors` (the run form was first rewritten as plain list functions; conformance rerun:
+  81,484 checks equal). Counters proved: `survivors`, `checked`, `parents` (`tops_tested`, `tops` by
+  definition); the other seven are tested by the fixtures only.
+- **Two Rust tests on `dev/mo-clean`** [M, no fixture file; 0.04 s release, 0.13 s debug]:
+  `deep_shape_tops_equal_their_definition` ((4, 16) tops through `unit_tops` against the certificate from the
+  interval's two ends; 358 tops, 200 certify position k + 1) and
+  `prefilter_exemption_boundary_equals_full_digits` (n around b^j at six bases and every k against the full
+  digits of n², n³). Kill evidence in a scratch copy: M21 (the prefilter exemption edited on both sides) is
+  killed only by the new prefilter test; the listed M04 (inside `top_cert_split`) was already killed by an
+  existing test (**my message to the user and LEAN.1 said the Rust missed it: wrong**); what the Rust missed is
+  the same error at the caller (`unit_tops` passing k + 1), which only the new deep-shape test kills. **Mutants
+  alive on the branch now: 2 of 27 (M17, M26), both changing only work counters.**
+- **Checks at eb9ef776** [M]: `just lint` clean; midout tests 13.5 s release, 53.2 s debug; production's
+  workspace suite and the gpu host tests (295 passed, 72 ignored) pass.
+- **Design directory:** 88 map references, 0 bad at eb9ef776 (the tests were appended after every referenced
+  line); prose of DESIGN.md §7, §8, §10 updated by me. The Lean fixtures regenerated from eb9ef776 are
+  byte-identical to the committed ones.
+
 ## LEAN.1 The middle-out reference as a Lean model: 81,484 comparisons with the Rust all equal; the coordinate lemmas proved (2026-11-22 05:50–06:48 UTC, proof engineer; `LEAN-MO/BRIEF-STEP1.md`, `LEAN-MO/STEP1-NOTES.md`; fork branch `lean/midout` f25f988a (4 commits on 10ddbf17), directory `lean-midout/`, 1,698 lines; CI run 44994398962 on the fork, 11 min; box 61919150, 23 CPUs)
 
 - **Dependency** [M]: Lake takes the earlier library as a git dependency with `subDir = "proofs"` at 4cdaa47f
@@ -50,7 +73,8 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conformance** [M]: 81,484 checks, all equal; no disagreement between the model and the Rust at any point.
 - **Mutants of the model** [M, on the box]: caught: the prefilter-exemption mutant (the Rust's M21, which
   survives every Rust test), a missing e2 ≠ e3 check, a missing `mhi`, a strict top interval, reversed key
-  ties; `mhi` at k + 1 (the Rust's M04) passed until a deep (4, 16) tops table was added.
+  ties; `mhi` at k + 1 passed until a deep (4, 16) tops table was added (corrected in LEAN.2: the Rust's own
+  M04 was already caught by a Rust test; the caller-side form was not).
 - **Proved** [M: `lake build --wfail`, axiom check; 48 theorems, no `sorry`, no added axiom, no
   `native_decide`]: v is one to one on the range and inverted by its inverse; the quantum index of v(n) is n's
   digits [q0, k1); a field holds exactly the n with its field digits; the slices of a value are exactly the

@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-22 06:55 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-22 07:55 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
@@ -18,7 +18,7 @@ once for a far larger span and paired with a bit-sliced kernel.
 
 | | state on 2026-11-19 |
 |---|---|
-| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); 14,405 inserted lines in 21 files (head `10ddbf17` since 2026-11-20), no PR (held at your word, see D9); the first two PRs (no GPU code) are cut, reviewed and waiting on the fork |
+| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); 14,573 inserted lines in 21 files (head `eb9ef776` since 2026-11-22), no PR (held at your word, see D9); the first two PRs (no GPU code) are cut, reviewed and waiting on the fork |
 | speed, base 64, RTX 3080, end to end against v3.4.8's join, same session | **×4.09** (1.62 fs against 6.62 fs per candidate) |
 | speed, base 64, RX 9070 XT (demoux), end to end against v3.4.8's join, same session | **×4.79** (0.99 fs against 4.76 fs per candidate), measured 2026-11-19 at 64 lanes on the branch just before its cleanup (the cleaned branch has not run on that card; on the 3080 the cleanup changed the time by +0.17 %); exact on every slice and field tried; the client route also ran there against a local coordinator (12 fields). The 4.76 fs baseline there is production's join throughput harness (ten fields on 2026-11-18, scaled ×1.012 by two fields re-measured in the same session), not the client's own ten-field run that the 3080 baseline uses. At that speed base 64 on that card alone is about 55 days instead of about 266 |
 | base 65 (needs masks wider than 64 bits; production has no join there at all) | exact on a GPU; 3.47 fs per candidate on 2026-11-19, about half an RTX-3080-year for the whole base; 10 % less since 2026-11-20 (3.29 against 3.66 fs in one session on a slower box). On your card it measured 3.1 fs on 2026-11-19; the wide kernel has since been fitted to that card offline (12 waves instead of 8), not re-run: predicted 2.4–3.0 fs |
@@ -228,8 +228,11 @@ pairing loop. The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
   a program that recomputes all of it in Lean: **81,484 comparisons, all equal, no disagreement ever met**; and
   the coordinate lemmas proved (48 theorems, no `sorry`, no added axiom: the renumbering is one to one, a field
   is a whole number of slices, fields partition the range). The fork's own CI builds and checks it in 11 minutes.
-  A by-product: the comparison catches two mutants of the Rust reference that the Rust's own tests did not;
-  the two checks are being added to the Rust tests on `dev/mo-clean`.
+  The same day: the form of the join that runs is proved to return the same survivors as the form the theorems
+  are about (83 theorems in all, CI green). A by-product for the Rust: two new fast tests on `dev/mo-clean`
+  kill two errors its own tests did not catch (an edited prefilter exemption; a top certificate asked for one
+  position too high by its caller). (An earlier message of mine said the Rust missed the plain
+  one-position-too-high mutant; it did not: an existing test already caught that one.)
 - **If you do not answer:** from the next cycle I continue with the lemmas of the join itself (certificates,
   pairing, prefilter, the end-to-end statement), about one session a day on a rented CPU box at about $0.30 a
   session, on that fork branch, with no pull request. Say `D18 stop` to stop it, or `D18 d` to stop and remove

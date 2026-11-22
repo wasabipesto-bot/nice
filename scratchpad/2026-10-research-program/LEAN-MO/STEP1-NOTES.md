@@ -159,3 +159,96 @@ model's `vOfN`, `nOfV`, `fieldDigits`, `slicesOf`, `fieldSlices`, not about the 
 Head `f25f988a` on `fork/lean/midout`, green: https://github.com/wasabipesto-bot/nice/actions/runs/44994398962
 (earlier green run on `06a74362`: https://github.com/wasabipesto-bot/nice/actions/runs/44992831227; the run on
 `0a52f49f` was cancelled by the next push). Box left idle; no pull request, nothing pushed to `origin`.
+
+## After step 1 (2026-11-22, 06:50–07:50 UTC)
+
+### A. One model: tested = proved-about (`lean/midout`, head `4934b0ca`)
+
+Green CI on the head: https://github.com/wasabipesto-bot/nice/actions/runs/44996514840 (8m07s; conformance 81,484
+checks equal; axiom check 83 theorems, standard axioms only). Commits: `5fd938de` (range), `951abecb` (run form as
+functions), `4934b0ca` (refinement). No `sorry` anywhere in the tree.
+
+1. **`baseRangeC = baseRange`** — proved (`NiceMidOut/RangeProofs.lean`): `ceilRootC_go_eq` (bisection invariant
+   `lo^e < x ≤ hi^e`, `hi − lo ≤ 2^fuel` ⇒ the result is `ceilRoot e x`, via the earlier library's `le_ceilRoot_iff`),
+   `ceilRootC_eq` (for `e ≠ 0`, every x; the initial fuel `log2 x + 2` suffices by `Nat.lt_log2_self`),
+   `baseRangeC_eq` (all b), and `Coord.valid_of_withDigits` (a coordinate the executable constructor accepts satisfies
+   `Coord.Valid`, the theorems' hypothesis).
+2. **`sliceRun` against `sliceSurvivors`** — proved (`NiceMidOut/RunProofs.lean`), finished by 07:04, so nothing was cut.
+   To make it provable, `sliceRun` was first rewritten from a loop with mutable state into list functions
+   (`sliceSetup`, `probesOf`, `kidsOf`, `chunkCommon`, `pairSurv`, `probeSurv`, `probeCounts`, `unitRun`, `unitSurv`,
+   `unitCounts`; `sliceSurvivors` now names the same `probesOf`/`kidsOf`, unchanged in meaning); the conformance
+   tables were rerun on the new form: all 81,484 equal, so the tested model is this one.
+   - `sliceRun_surv_perm`: `(sliceRun b lo hi sh pip).surv ~ (sliceSurvivors b lo hi sh pip).map (fun x => (x.1,
+     x.2.1, midPrefilter b sh.k x.2.1 x.2.2))`, for every b, range, shape, pip (no hypotheses). Lemmas: the chunk skip
+     loses nothing (`probeSurv_eq`, from `chunkCommon_subset`: the common mask lies in every child's), the chunks
+     concatenate to the children (`chunksOf_flatten`), the key order is a permutation of `r` order (`mergeSort_perm`),
+     nested `flatMap`s commute up to permutation (`flatMap_comm_perm`), the setup's tops are `unitTops` per unit.
+   - **Counters, exactly:** proved — `survivors` = the survivor list's length (`sliceRun_survivors`), `checked` = the
+     number of reported survivors with `pass` (`sliceRun_checked`), `parents` = `(parents b sh pip).length`
+     (`sliceRun_parents`). `tops_tested` and `tops` are by definition the sums of `unitLeads`/`unitTops` lengths (no
+     separate theorem). **Not proved, tested only** (against the Rust on all 9,411 small-base slices): `children`,
+     `chunks`, `pairs`, `flat`, `kept`, `words`, `clipped` — they describe the work, depend on the chunk order, and no
+     theorem is about them. Not proved either: that `survivors` equals the brute-force predicate count (L11).
+   - Still model-to-Rust only by fixtures: the bit-sliced word (`cpu.rs:826–849`) is modelled by its meaning, and the
+     `f64` products of `key_digits` by exact ℕ.
+
+### B. Two Rust tests on `dev/mo-clean` (head `eb9ef776`, one commit on `10ddbf17`)
+
+In `common/src/midout/cpu.rs`'s test module, no fixture file, expected values recomputed in the test:
+- `deep_shape_tops_equal_their_definition`: 3,000 random units of the shape (4, 16) at base 64 through `unit_tops`,
+  against the certificate's definition from the interval's two ends (position i certified ⟺ both ends' powers have
+  the same length and agree at every position ≥ i; repeats counted afterwards; `mhi` = positions ≥ k + 2). 358 tops,
+  200 of them certify position k + 1 (asserted > 100 and > 10).
+- `prefilter_exemption_boundary_equals_full_digits`: bases 10, 13, 17, 24, 40, 64, every k = 1..12 with b^(k+2) < 2^96,
+  n in b^j ± 40 (j counted: least with 2j ≥ k + 2), mhi empty, full, random: below b^j the prefilter must pass, from
+  b^j on the verdict must equal the rule on the full digits of n², n³ (their length ≥ k + 2 is asserted). 8,640
+  exempt, 141 pass and 8,715 fail by the rule (asserted > 1000, > 50, > 1000).
+
+**Kill evidence** (box, scratch copy `/work/mutsrc`, release, `cargo test -p nice_common --lib -- midout::`, 31 tests;
+the mutations by text, since `CEIL/box/mut_list.sh`'s line numbers are for `c2152084`):
+
+| mutant | edit | result |
+|---|---|---|
+| M21 (both sides) | `prefilter` and the test helper `prefilter_digits`: `(k + 2).div_ceil(2)` → `(k + 2) / 2` | **killed only by** `prefilter_exemption_boundary_equals_full_digits` (30 pass, 1 fail) |
+| M04 (as listed) | `top_cert_split`: `if j >= kmid` → `if j + 1 >= kmid` | killed by the new test **and** by the existing `top_certificate_equals_its_definition` (as `CEIL/RESULTS.md` records: the list's M04 was already killed in Rust) |
+| M04c (caller) | `unit_tops`: `top_cert_split(.., k, k + 2)` → `(.., k, k + 1)` (the form the Lean mutant took) | **killed only by** `deep_shape_tops_equal_their_definition` |
+
+Unmutated: both pass. So the correction to my step-1 wording: the Rust's tests already catch M04 inside the scan; what
+they missed was the same error at the caller, and the M21 exemption change.
+
+**Timings and checks** (box, 23-CPU quota): the two new tests 0.04 s release, 0.13 s debug; the midout suite 13.5 s
+release (31 tests), 53.2 s debug (52.97 s without the new tests: they add 0.2 s). `just lint` rc 0 (134 s, fmt +
+clippy both feature sets, `-D warnings`; one pre-existing manifest warning about `web-sys` in `wasm-client`, not an
+error). Production CI's test commands: `cargo test --locked --release --no-fail-fast` rc 0 (257 s; `libpq-dev`
+installed on the box for it); `NICE_REQUIRE_NVRTC=1 cargo test --locked --release -p nice_common --features gpu --lib`
+with NVRTC 12.9.86 from PyPI as CI fetches it: rc 0, 295 passed, 72 ignored (394 s). The file was edited on ivory
+and synced; the committed `cpu.rs` is byte-identical (SHA-256) to the one tested on the box, so no bundle was needed.
+Pushed `git push -u fork dev/mo-clean` (`10ddbf17..eb9ef776`); no pull request.
+
+### C. The design map and `DESIGN.md` (on ivory)
+
+`tools/check_refs.py interactive/midout-map.html` at `eb9ef776`: **88 refs, 0 bad** (the tests were inserted after
+`cpu.rs:1339`; no map reference and no inline `DESIGN.md` reference points past it; `print_inline_refs.py` shows no
+out-of-range line). Changed in the map only the head its references are checked against: the sub-title, the "Line
+numbers are into" note, the refs comment and the `repoNote` string (`10ddbf17` → `eb9ef776`, 4 lines). `DESIGN.md`
+unchanged: its head mention (line 4) says the text was *written* from `10ddbf17`, which stays true.
+
+Now out of date in `DESIGN.md`:
+- §7: "A mutation test of it (27 mutants) left 3 alive after three independent tests were added: two change only work
+  counts, one edits an exemption no test base reaches" — M21 is now killed (by the boundary test); 2 survive (M17, M26,
+  work counts only), after five independent tests; and the caller form of M04 is a new, now-killed mutant.
+- §9 (line 598): the branch size "14,405 at `10ddbf17`" — now 14,578 insertions in 24 files against `origin/main`.
+- §10: "head `10ddbf17`, 22 commits" — now `eb9ef776`, 23 commits on `66259bb0`; `cpu.rs` 1,460 lines → 1,628.
+- Measurement rows naming `10ddbf17` (§8 line 570, the map's line 171) are about what was measured then and stay right.
+
+### `lean/midout` and a moving `dev/mo-clean`
+
+Nothing was merged between them; `lean/midout` stays on `10ddbf17`. To regenerate its fixtures for a new
+`dev/mo-clean` head H: in a scratch worktree at H, copy (not merge) the generator, `git show
+lean/midout:common/examples/midout_lean_fixtures.rs > common/examples/midout_lean_fixtures.rs`, run `cargo run
+--release -p nice_common --example midout_lean_fixtures -- OUT` and compare `sha256sum OUT/*.json` with
+`lean-midout/fixtures/SHA256SUMS`. Equal: the model still describes H (done today for H = `eb9ef776`: all three
+tables byte-identical, as expected for a tests-only commit). Different: copy the tables onto `lean/midout` in an
+ordinary commit and let its CI run conformance; a mismatch then means either a change in the Rust the model must
+follow (edit the model, rerun) or a defect in the Rust (report it with the smallest input). The CI's own
+"regenerate and compare" job only checks the branch's own `10ddbf17` code.

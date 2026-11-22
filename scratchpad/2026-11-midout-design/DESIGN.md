@@ -1,7 +1,7 @@
 # The middle-out join: design
 
 *A description of what is on the branch and why, for a reader who knows the project and today's overlap join and
-has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean` head `10ddbf17` (worktree
+has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean`, kept current; head `eb9ef776` (worktree
 `~/projects/nice/.worktrees/midout-clean`) and from the measurements recorded beside it. The open decisions are
 not repeated here; they are in `~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md` (section A).*
 
@@ -541,9 +541,17 @@ said; counts come from an exact CPU prototype on real slices.
   the oracle for the device and for audits, not a route. Its nice numbers equal production's
   `process_range_niceonly` on whole bases 10–29; its survivors equal brute force on every field of bases 10–25
   in one or two shapes each; its roots equal production's residue filter for bases 3–128 [measured]. A mutation
-  test of it (27 mutants) left 3 alive after three independent tests were added: two change only work counts,
-  one edits an exemption no test base reaches [measured on the first cut branch; the same tests are on this
-  branch since 2026-11-19 evening, and the 27 mutants were rerun on it on 2026-11-20: the same three survive].
+  test of it (27 mutants) left 3 alive after three independent tests were added; since 2026-11-22 two more
+  tests (deep-shape tops against their definition; the prefilter at its exemption boundary against full digits)
+  kill the one that mattered (an edited prefilter exemption) and a caller-side form of "certificate one position
+  too high" that no Rust test caught; **2 survive, both changing only work counters** [measured].
+- **A second, independent definition in Lean** (fork branch `lean/midout`, directory `lean-midout/`, not part of
+  this branch; since 2026-11-22): the reference as Lean functions, compared with tables generated from this
+  Rust code: 81,484 comparisons (every survivor of 9,411 small-base slices in order, residue classes of bases
+  3–128, base-64 and base-65 samples with two real slices), all equal, no disagreement ever met. Proved there
+  (83 theorems, no `sorry`): the coordinate is one to one, a field is a whole number of slices, fields partition
+  the range, and the form that runs returns the same survivors as the form the theorems are about. The join's
+  own lemmas are not proved yet.
 - Device against CPU: 1,073 real base-64 slices equal n for n in an independent sweep (on the branch as it was on
   2026-11-18, before the accounts and the 5–7 coordinate) [measured]; since then, 100 of them again, the range's
   first and last slices, and every slice of one field under both coordinates [measured].
@@ -595,7 +603,7 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   as well:** by ablation on 2026-11-20 the prefilter's arithmetic was 1.88 of the expansion's 3.45 ms; the run
   without a prefilter cost the same only because it wrote 16.5M survivors instead of 0.5M [measured].
 - **The size of the branch** was reported as 6,500–7,000 lines; it was 13,525 insertions in 21 files against
-  `origin/main` at `5a048669` 13,939 at `c2152084` and 14,405 at `10ddbf17` (the wide path about 4,600, tests about 2,800) [measured by `git diff --stat`].
+  `origin/main` at `5a048669` 13,939 at `c2152084`, 14,405 at `10ddbf17` and 14,573 at `eb9ef776` (the wide path about 4,600, tests about 2,800) [measured by `git diff --stat`].
 
 ---
 
@@ -646,7 +654,7 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
 
 ## 10. Where the code is, and how to run it
 
-**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `10ddbf17`, 22 commits on the development
+**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `eb9ef776`, 23 commits on the development
 trunk `66259bb0`; worktree `~/projects/nice/.worktrees/midout-clean`. The development history before the cleanup
 stays on `dev/middle-out-join`. No pull request is open (`DECISIONS.md` D9).
 
@@ -654,7 +662,7 @@ stays on `dev/middle-out-join`. No pull request is open (`DECISIONS.md` D9).
 |---|---|---|
 | `common/src/midout/mod.rs` | 62 | module map; the three test tiers |
 | `common/src/midout/coord.rs` | 634 | the work unit: coordinate, quantum, field ↔ fixed digits, `n_count` |
-| `common/src/midout/cpu.rs` | 1,460 | the exact CPU reference: shape, certificates, parents, slice join, prefilter, brute-force predicates |
+| `common/src/midout/cpu.rs` | 1,628 | the exact CPU reference: shape, certificates, parents, slice join, prefilter, brute-force predicates |
 | `common/src/midout/arith.rs` | 138 | 384-bit arithmetic and nice-ness for the reference (re-implemented on purpose) |
 | `common/src/midout/mask.rs` | 75 | digit masks generic over `u64` / `u128` |
 | `common/src/midout/gpu.rs` | 4,881 | base-64 device path: kernels (`kernels`, `prep`, `post`, `dtops`), driver `GpuJoin`, `search_field`, tests |

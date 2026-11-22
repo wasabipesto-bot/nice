@@ -22,6 +22,29 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     shared-memory-limited prediction → dropped.**
 - **Not started, on purpose:** anything on the RX 9070 XT (no lease; D17 asks); any pull request.
 
+- **06:35 UTC: PS is back and dropped (EXPERIMENTS PS.1).** Every load-sharing kernel is slower than today's
+  loop (best ×0.85 on the main kernel on a 3080; ×0.46–0.77 predicted for the RX 9070 XT); the saved loads move
+  the time by ≤ 1.5 %. With CEIL and CW that is three failed attempts on the pairing loop in three days; kernel
+  work on it is finished unless the RX 9070 XT run for width 128 says otherwise. Box destroyed 06:37 (0.86 h).
+- **06:48 and 07:42 UTC: the Lean step is back (LEAN.1, LEAN.2).** Fork branch `lean/midout` 4934b0ca: a Lean
+  model of the reference, 81,484 comparisons with the Rust all equal (no disagreement ever), 83 theorems (the
+  coordinate lemmas; the run form is a permutation of the definitional form), the fork's CI green in 8–11
+  minutes. For the Rust: `dev/mo-clean` → eb9ef776, two fast tests that kill an edited prefilter exemption and a
+  caller-side "certificate one position too high"; mutants alive 2 of 27. I had told the user the Rust missed
+  the plain M04 mutant; it had not; corrected in today's report and in D18. Box destroyed 07:42 (1.95 h).
+- **BX round 3 written (BX.3).** No further round planned for its own sake.
+- **Design directory and decisions at eb9ef776** (DESIGN.md §6.13, §7, §8, §10; D18 with what exists and the
+  next default; §0).
+- **Spend today:** two rentals, about $0.23; month $24.12 invoiced of $30. Agents: 2 Opus (397k and 382k tokens).
+- **For the 05:41 cycle of 11-23:** (1) what the user wrote (D18 stop? the hold?); #271. (2) LEAN-MO step 2
+  unless stopped: `parents` characterised point by point (L5a), then L2, L3, L9, L4; before each lemma the
+  fixture that would catch its mutant; one session, a CPU box (about $0.15–0.30) with the fork's CI as the final
+  check. (3) With the pairing loop closed, the remaining engineering is the stages around it (27 % of a slice on
+  the RX 9070 XT by the model: tops, parents, expansion, check): price a field-wide launch per stage from the
+  measured stage costs before building anything; kill under ×1.08 on the slice. (4) A literature sweep in the
+  search tool's extended mode (the last proper one was 11-15). Budget about $5.9; the wrapper holds a reserve
+  from 11-24.
+
 ## 2026-11-21 (cycle 12 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $23.77 invoiced of $30 (fleet $37.18), credit $50.32.
