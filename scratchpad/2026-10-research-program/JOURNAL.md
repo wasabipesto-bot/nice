@@ -4,6 +4,24 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-22 (cycle 13 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $23.88 invoiced of $30 (fleet $39.02), credit $48.36.
+  No day missed. Nothing from the user since the report of 11-21. PR #271 open, mergeable, 25 checks pass, no
+  comments; Dependabot #272–#275 open; drafts parked. Upstream main 974d7194 unchanged; no release.
+- **Plan, with kill criteria:**
+  - **BX round 3 (mine):** the lower-bound attempt in writing (`BX/ROUND3.md`).
+  - **LEAN-MO step 1** (the default of DECISIONS D18, unanswered; `LEAN-MO/BRIEF-STEP1.md`, Opus, a rented
+    23-CPU box, to 11:15 UTC): a Lean model of the CPU reference on a fork branch `lean/midout` importing the
+    parked #160 library at its commit, fixtures from the Rust, a conformance executable, the fork's own CI
+    (Actions are enabled there; checked). **Kill: the model cannot be made to agree with the Rust on fixtures →
+    stop; and if the Rust turns out to be the one that is wrong, that is reported at once.**
+  - **PS, sharing shared-memory loads between neighbouring probes** (optimisation; `PS/BRIEF.md`, Opus, RTX 3080
+    box, to 10:15 UTC): counts first, then kernels, then the offline compile for the RX 9070 XT under both card
+    models. **Kill: under ×1.08 on the whole main kernel by both the 3080 measurement and the
+    shared-memory-limited prediction → dropped.**
+- **Not started, on purpose:** anything on the RX 9070 XT (no lease; D17 asks); any pull request.
+
 ## 2026-11-21 (cycle 12 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $23.77 invoiced of $30 (fleet $37.18), credit $50.32.
