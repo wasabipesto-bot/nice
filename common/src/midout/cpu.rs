@@ -1339,6 +1339,174 @@ mod tests {
         }
     }
 
+    /// The tops `unit_tops` returns for a deep shape, `(4, 16)` at base 64,
+    /// against the certificate's definition from the interval's ends: the
+    /// powers are increasing, so the digit at position `i` of `n²` (or `n³`)
+    /// is the same for every `n` of `[a, c]` exactly when `a²` and `c²` have
+    /// the same length and agree at every position `>= i`. The certified
+    /// digits are those at positions `>= k`, `None` if two coincide, and
+    /// `mhi` is the part at positions `>= k + 2` (the prefilter's own
+    /// positions are `k` and `k + 1`). In this shape the square certifies
+    /// positions down to about 17, so tops with a certified digit at
+    /// position `k + 1` exist and an `mhi` taken from `k + 1` is caught,
+    /// whether the scan moves it (the mutant M04) or `unit_tops` passes
+    /// `k + 1` as the split: the whole-base tests reach neither, and
+    /// `top_certificate_equals_its_definition` calls `top_cert_split`
+    /// itself, not through `unit_tops`.
+    #[test]
+    fn deep_shape_tops_equal_their_definition() {
+        let base = Base::new(&Coord::for_base(64).unwrap());
+        let (f0, k) = (4u32, 16u32);
+        let sh = Shape { f0, k };
+        let definition = |a: u128, c: u128| -> Option<(u64, u64, bool)> {
+            let mut certified: Vec<(usize, u8)> = Vec::new();
+            for power in [2, 3] {
+                let pw = |n: u128| {
+                    let x = U384::from_u128(n);
+                    let sq = x.mul(&x);
+                    let p = if power == 2 { sq } else { sq.mul(&x) };
+                    p.digits(64)
+                };
+                let (da, dc) = (pw(a), pw(c));
+                if da.len() != dc.len() {
+                    continue;
+                }
+                for i in k as usize..da.len() {
+                    if da[i..] == dc[i..] {
+                        certified.push((i, da[i]));
+                    }
+                }
+            }
+            let mut count = [0u32; 64];
+            for &(_, d) in &certified {
+                count[d as usize] += 1;
+            }
+            if count.iter().any(|&x| x > 1) {
+                return None;
+            }
+            let bits = |lo: usize| -> u64 {
+                certified
+                    .iter()
+                    .filter(|&&(i, _)| i >= lo)
+                    .fold(0, |m, &(_, d)| m | 1u64 << d)
+            };
+            let at_k1 = certified.iter().any(|&(i, _)| i == k as usize + 1);
+            Some((bits(k as usize), bits(k as usize + 2), at_k1))
+        };
+        let mut x = 0x0DDB_1A5E_5BAD_5EED_u64;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x
+        };
+        let (mut tops, mut with_k1) = (0, 0);
+        for _ in 0..3000 {
+            // digits [4, 16) of an n of the range: the unit's one lead is 0
+            let u = (1u128 << 51) + u128::from(next() >> 13);
+            let mut tested = 0u64;
+            let got = unit_tops::<u64>(&base, sh, u, &mut tested);
+            assert_eq!(tested, 1, "unit {u}");
+            let (a, c) = (u << 24, (u << 24) + (1 << 24) - 1);
+            match definition(a, c) {
+                None => assert!(got.is_empty(), "unit {u}: a top the definition refuses"),
+                Some((mask, mhi, at_k1)) => {
+                    assert_eq!(
+                        got.len(),
+                        1,
+                        "unit {u}: no top where the definition has one"
+                    );
+                    let t = &got[0];
+                    assert_eq!((t.h, t.lo, t.hi), (0, a, c), "unit {u}");
+                    assert_eq!((t.mask, t.mhi), (mask, mhi), "unit {u}: certificate");
+                    tops += 1;
+                    with_k1 += u32::from(at_k1);
+                }
+            }
+        }
+        assert!(
+            tops > 100 && with_k1 > 10,
+            "{tops} tops, {with_k1} certify position k + 1"
+        );
+    }
+
+    /// The prefilter's exemption at its boundary, against full digits. Below
+    /// `b^j`, `j` the least integer with `2j >= k + 2` (found by counting,
+    /// not by the reference's formula), `n²` may lack a digit at position
+    /// `k + 1`, so the reference must pass every `n`; from `b^j` on, `n²` and
+    /// `n³` have real digits at every position `0..k + 2` (checked here), and
+    /// the verdict must be the rule on them: those `2k + 4` digits distinct,
+    /// the four at `k` and `k + 1` missing `mhi`. Windows of `n` around `b^j`
+    /// at several bases and every `k` the reference serves there, with `mhi`
+    /// empty, full (which fails every `n` the rule applies to, so a boundary
+    /// moved down by one power, as in the mutant M21, which changes the
+    /// exemption on both sides of the other prefilter tests, is caught when
+    /// `k` is odd) and random.
+    #[test]
+    fn prefilter_exemption_boundary_equals_full_digits() {
+        let mut x = 0x5EED_0FB0_DA7E_5757_u64;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x
+        };
+        let (mut exempt, mut ruled_pass, mut ruled_fail) = (0, 0, 0);
+        for b in [10u32, 13, 17, 24, 40, 64] {
+            let base = Base::new(&Coord::with_digits(b, 0, 1, 0).unwrap());
+            let bb = u128::from(b);
+            let full = if b == 64 { !0u64 } else { (1u64 << b) - 1 };
+            for k in 1u32..=12 {
+                if bb.checked_pow(k + 2).is_none_or(|m| m >= 1 << 96) {
+                    break;
+                }
+                let mut j = 0;
+                while 2 * j < k + 2 {
+                    j += 1;
+                }
+                let edge = bb.pow(j);
+                for n in edge.saturating_sub(40).max(1)..=edge + 40 {
+                    for mhi in [0, full, next() & next() & full] {
+                        let got = prefilter::<u64>(&base, k, n, mhi);
+                        if n < edge {
+                            assert!(got, "b{b} k {k} n {n}: below b^{j}, exempt");
+                            exempt += 1;
+                            continue;
+                        }
+                        let xn = U384::from_u128(n);
+                        let sq = xn.mul(&xn);
+                        let cu = sq.mul(&xn);
+                        let (ds, dc) = (sq.digits(u64::from(b)), cu.digits(u64::from(b)));
+                        assert!(ds.len() >= k as usize + 2, "b{b} k {k} n {n}: n² too short");
+                        let low: Vec<u8> = ds[..k as usize + 2]
+                            .iter()
+                            .chain(&dc[..k as usize + 2])
+                            .copied()
+                            .collect();
+                        let distinct = (0..low.len()).all(|i| !low[..i].contains(&low[i]));
+                        let new = [
+                            ds[k as usize],
+                            ds[k as usize + 1],
+                            dc[k as usize],
+                            dc[k as usize + 1],
+                        ];
+                        let want = distinct && new.iter().all(|&d| (mhi >> d) & 1 == 0);
+                        assert_eq!(got, want, "b{b} k {k} n {n} mhi {mhi:#x}");
+                        if want {
+                            ruled_pass += 1;
+                        } else {
+                            ruled_fail += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            exempt > 1000 && ruled_pass > 50 && ruled_fail > 1000,
+            "{exempt} exempt, {ruled_pass} pass and {ruled_fail} fail by the rule"
+        );
+    }
+
     /// The prefilter at base 64 and its shape `(4, 10)`, where `b^12 = 2^72`
     /// takes `mm`'s large-modulus branch (no small base reaches it), against
     /// the full digits of `n²` and `n³` on random `n` and random `mhi`.
