@@ -1,0 +1,25 @@
+name = "NiceMidOut"
+version = "0.1.0"
+keywords = ["math", "number-theory", "verification"]
+defaultTargets = ["NiceMidOut"]
+
+[leanOptions]
+pp.unicode.fun = true
+autoImplicit = false
+relaxedAutoImplicit = false
+
+# The earlier library (`NiceSearch`, draft PR #160), pinned at its commit
+# 4cdaa47f on the fork's branch `lean-proofs`; Mathlib and its dependencies
+# come pinned through that library's own manifest (Lean and Mathlib v4.33.1).
+[[require]]
+name = "Nice"
+git = "https://github.com/wasabipesto-bot/nice"
+rev = "4cdaa47fa12eed47cbc6728175ebc3c9ef856959"
+subDir = "proofs"
+
+[[lean_lib]]
+name = "NiceMidOut"
+
+[[lean_exe]]
+name = "conformance"
+root = "Conformance"

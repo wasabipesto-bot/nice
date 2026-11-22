@@ -1,0 +1,47 @@
+# TEMPORARY: builds the Lean model of the middle-out join (lean-midout/) on
+# pushes to lean/** branches of this fork only. Remove before any merge.
+name: Lean middle-out (temporary)
+
+on:
+    push:
+        branches: ["lean/**"]
+
+concurrency:
+    group: lean-midout-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    lean:
+        name: lake build --wfail, conformance
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Fixture checksums
+              working-directory: lean-midout/fixtures
+              run: sha256sum -c SHA256SUMS
+
+            # Mathlib comes from its cache (lake exe cache get).
+            - uses: leanprover/lean-action@v1
+              with:
+                  lake-package-directory: lean-midout
+                  build-args: "--wfail"
+                  test: false
+                  lint: false
+
+            - name: Conformance (the Lean model against the Rust tables)
+              working-directory: lean-midout
+              run: lake exe conformance
+
+    fixtures:
+        name: fixtures regenerate from the Rust
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Regenerate and compare
+              run: |
+                  rustup show active-toolchain || rustup toolchain install
+                  cargo run --release -p nice_common --example midout_lean_fixtures -- "$RUNNER_TEMP/fixtures"
+                  cp lean-midout/fixtures/SHA256SUMS "$RUNNER_TEMP/fixtures/"
+                  cd "$RUNNER_TEMP/fixtures" && sha256sum -c SHA256SUMS
