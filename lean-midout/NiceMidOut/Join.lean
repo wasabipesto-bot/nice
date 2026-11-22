@@ -8,7 +8,7 @@ Two forms of the join of one slice:
 - `sliceSurvivors`: the definition the theorems are to be about. For each
   class `c`, unit digit `d`, probed top and certified child (parents in
   ascending `r`), the survivors `(d, n, mhi)`.
-- `sliceRun`: the Rust's `SliceSetup::new` + `class` step by step: parents
+- `sliceRun`: the Rust's `SliceSetup::new` + `class` as functions (no loop state): parents
   reordered by class and chunk key, 64-child chunks with the common-mask
   skip, and every counter of `Counts`. Its survivors are the Rust's, in the
   Rust's order. Refinement still to be proved: `(sliceRun ..).surv` is a
@@ -134,23 +134,29 @@ def midPrefilter (b k n : ℕ) (mhi : Finset ℕ) : Bool :=
 
 /-! ### The join of one slice: the definition -/
 
+/-- The tops of unit `d` probed against the children of class `c`: classes
+`(rt − (c + d)) mod (b − 1)` over the roots `rt`, in roots order then lead order
+(`cpu.rs:794–799`). -/
+def probesOf (b : ℕ) (tv : List Top) (c d : ℕ) : List Top :=
+  (roots b).flatMap fun rt => tv.filter fun t => t.h % (b - 1) = (rt + (b - 1) - (c + d) % (b - 1)) % (b - 1)
+
+/-- The certified children at unit `d` of the parents `pc`, as `(r, mask)`
+(`cpu.rs:803–815`). -/
+def kidsOf (b : ℕ) (pc : List Parent) (d : ℕ) : List (ℕ × Finset ℕ) :=
+  pc.filterMap fun p => (childMask b p d).map fun x => (p.r, x)
+
 /-- The survivors `(d, n, mhi)` of slice `pip`: for each class `c` and unit
 `d`, each top probed (classes `(rt − (c + d)) mod (b − 1)` over the roots
 `rt`, `cpu.rs:794–799`) against each certified child of a class-`c` parent,
 masks disjoint and `n` in the top's interval (`cpu.rs:849–856`). -/
 def sliceSurvivors (b lo hi : ℕ) (sh : Shape) (pip : ℕ) : List (ℕ × ℕ × Finset ℕ) :=
-  let m := b - 1
   let ps := parents b sh pip
-  (List.range m).flatMap fun c =>
+  (List.range (b - 1)).flatMap fun c =>
     (List.range b).flatMap fun d =>
-      let tops := unitTops b lo hi sh.f0 sh.k (pip + d * b ^ (sh.k - 1 - sh.f0))
-      let probes := (roots b).flatMap fun rt =>
-        tops.filter fun t => t.h % m = (rt + m - (c + d) % m) % m
-      let kids := (ps.filter fun p => p.cls = c).filterMap fun p =>
-        (childMask b p d).map fun x => (p.r, x)
-      probes.flatMap fun t => kids.filterMap fun x =>
-        let n := t.h * b ^ sh.k + d * b ^ (sh.k - 1) + x.1
-        if Disjoint t.mask x.2 ∧ t.lo ≤ n ∧ n ≤ t.hi then some (d, n, t.mhi) else none
+      (probesOf b (unitTops b lo hi sh.f0 sh.k (pip + d * b ^ (sh.k - 1 - sh.f0))) c d).flatMap
+        fun t => (kidsOf b (ps.filter fun p => p.cls = c) d).filterMap fun x =>
+          let n := t.h * b ^ sh.k + d * b ^ (sh.k - 1) + x.1
+          if Disjoint t.mask x.2 ∧ t.lo ≤ n ∧ n ≤ t.hi then some (d, n, t.mhi) else none
 
 /-- What `search_field` (`cpu.rs:937`) returns: the nice numbers ascending,
 `survivors`, `checked`, `slices`. -/
@@ -223,55 +229,89 @@ structure SliceRun where
   counts : Counts
   surv : List (ℕ × ℕ × Bool)
 
-/-- `slice_join` (`cpu.rs:624`), step by step: `SliceSetup::new` (parents
-sorted stably by `(class, 255 − key)`, tops per unit) and `class` for each
-class in order (units, 64-child chunks, the common-mask skip, the
-disjoint-children word, the interval test, the prefilter), with the
-bit-sliced word replaced by its meaning (a child is in the word iff its mask
-misses the top's). -/
-def sliceRun (b lo hi : ℕ) (sh : Shape) (pip : ℕ) : SliceRun := Id.run do
-  let m := b - 1
+def Counts.add (x y : Counts) : Counts :=
+  ⟨x.topsTested + y.topsTested, x.tops + y.tops, x.parents + y.parents, x.children + y.children,
+    x.chunks + y.chunks, x.pairs + y.pairs, x.flat + y.flat, x.kept + y.kept, x.words + y.words,
+    x.survivors + y.survivors, x.checked + y.checked, x.clipped + y.clipped⟩
+
+def Counts.sum (l : List Counts) : Counts := l.foldr Counts.add {}
+
+/-- `SliceSetup::new` (`cpu.rs:709`): the parents sorted stably by
+`(class, 255 − key)`, the tops of each unit, the leads tested per unit. -/
+structure Setup where
+  ps : List Parent
+  topsByD : List (List Top)
+  leads : List ℕ
+
+def sliceSetup (b lo hi : ℕ) (sh : Shape) (pip : ℕ) : Setup :=
   let ps0 := parents b sh pip
   let step := b ^ (sh.k - 1 - sh.f0)
-  let leads := (List.range b).map fun d => (unitLeads b lo hi sh.f0 sh.k (pip + d * step)).length
   let topsByD := (List.range b).map fun d => unitTops b lo hi sh.f0 sh.k (pip + d * step)
   let fp := digitFreq b (ps0.map (·.mask))
   let ft := digitFreq b (topsByD.flatten.map (·.mask))
   let rank := keyDigits b fp ft
   let sk := fun (p : Parent) => p.cls * 256 + (255 - chunkKey rank p.mask)
-  let ps := ps0.mergeSort fun p q => sk p ≤ sk q
-  let mut cn : Counts :=
-    { topsTested := leads.sum, tops := (topsByD.map (·.length)).sum, parents := ps.length }
-  let mut out : Array (ℕ × ℕ × Bool) := #[]
-  for c in List.range m do
-    let pc := ps.filter fun p => p.cls = c
-    for d in List.range b do
-      let tv := topsByD.getD d []
-      let cc := (c + d) % m
-      let probes := (roots b).flatMap fun rt => tv.filter fun t => t.h % m = (rt + m - cc) % m
-      let kids := pc.filterMap fun p => (childMask b p d).map fun x => (p.r, x)
-      cn := { cn with
-        children := cn.children + kids.length
-        pairs := cn.pairs + kids.length * probes.length
-        chunks := cn.chunks + (kids.length + 63) / 64 }
-      for ch in chunksOf 64 kids do
-        let common := ch.foldl (fun acc x => acc ∩ x.2) ((ch.headD (0, ∅)).2)
-        cn := { cn with flat := cn.flat + probes.length }
-        for t in probes do
-          if (common ∩ t.mask).Nonempty then continue
-          cn := { cn with kept := cn.kept + 1 }
-          let w := ch.filter fun x => Disjoint x.2 t.mask
-          if !w.isEmpty then cn := { cn with words := cn.words + 1 }
-          for x in w do
-            let nn := t.h * b ^ sh.k + d * b ^ (sh.k - 1) + x.1
-            if t.lo ≤ nn ∧ nn ≤ t.hi then
-              let pass := midPrefilter b sh.k nn t.mhi
-              cn := { cn with
-                survivors := cn.survivors + 1
-                checked := cn.checked + (if pass then 1 else 0) }
-              out := out.push (d, nn, pass)
-            else
-              cn := { cn with clipped := cn.clipped + 1 }
-  return ⟨cn, out.toList⟩
+  ⟨ps0.mergeSort fun p q => sk p ≤ sk q, topsByD,
+    (List.range b).map fun d => (unitLeads b lo hi sh.f0 sh.k (pip + d * step)).length⟩
+
+/-- The common mask of a chunk (`cpu.rs:825–829`): the intersection of its
+children's masks. -/
+def chunkCommon (ch : List (ℕ × Finset ℕ)) : Finset ℕ :=
+  ch.foldl (fun acc x => acc ∩ x.2) ((ch.headD (0, ∅)).2)
+
+/-- One (top, child) pair (`cpu.rs:849–861`): the survivor `(d, n, pass)` when
+the masks are disjoint and `n` is in the top's interval. -/
+def pairSurv (b k d : ℕ) (t : Top) (x : ℕ × Finset ℕ) : Option (ℕ × ℕ × Bool) :=
+  let nn := t.h * b ^ k + d * b ^ (k - 1) + x.1
+  if Disjoint t.mask x.2 ∧ t.lo ≤ nn ∧ nn ≤ t.hi then some (d, nn, midPrefilter b k nn t.mhi)
+  else none
+
+/-- One probe (top `t`, chunk `ch`), `cpu.rs:837–867`: nothing if the chunk's
+common mask meets the top's (the skip); otherwise the word's survivors, in
+child order. -/
+def probeSurv (b k d : ℕ) (t : Top) (ch : List (ℕ × Finset ℕ)) : List (ℕ × ℕ × Bool) :=
+  if (chunkCommon ch ∩ t.mask).Nonempty then [] else ch.filterMap (pairSurv b k d t)
+
+/-- One probe's counters: `kept`, `words` (the word of disjoint children is
+not zero), `survivors`, `checked`, `clipped` (`cpu.rs:839–866`). -/
+def probeCounts (b k d : ℕ) (t : Top) (ch : List (ℕ × Finset ℕ)) : Counts :=
+  if (chunkCommon ch ∩ t.mask).Nonempty then {}
+  else
+    let w := ch.filter fun x => Disjoint x.2 t.mask
+    let s := probeSurv b k d t ch
+    { kept := 1, words := if w.isEmpty then 0 else 1, survivors := s.length,
+      checked := (s.filter fun x => x.2.2).length, clipped := w.length - s.length }
+
+/-- Class `c` at unit `d` of a set-up slice (`cpu.rs:792–868`): its probes, its
+children (parents of class `c` in the setup's order), in 64-child chunks. -/
+def unitRun (b : ℕ) (st : Setup) (c d : ℕ) :
+    List Top × List (ℕ × Finset ℕ) :=
+  (probesOf b (st.topsByD.getD d []) c d, kidsOf b (st.ps.filter fun p => p.cls = c) d)
+
+def unitSurv (b : ℕ) (sh : Shape) (st : Setup) (c d : ℕ) : List (ℕ × ℕ × Bool) :=
+  let u := unitRun b st c d
+  (chunksOf 64 u.2).flatMap fun ch => u.1.flatMap fun t => probeSurv b sh.k d t ch
+
+def unitCounts (b : ℕ) (sh : Shape) (st : Setup) (c d : ℕ) : Counts :=
+  let u := unitRun b st c d
+  let top : Counts :=
+    { children := u.2.length, pairs := u.2.length * u.1.length, chunks := (u.2.length + 63) / 64 }
+  Counts.add top
+    (Counts.sum ((chunksOf 64 u.2).map fun ch =>
+      Counts.add { flat := u.1.length } (Counts.sum (u.1.map fun t => probeCounts b sh.k d t ch))))
+
+/-- `slice_join` (`cpu.rs:624`) as the Rust runs it: `SliceSetup::new`, then
+`class` for each class in order (units in order, 64-child chunks, the
+common-mask skip, the word of disjoint children in child order, the
+interval test, the prefilter), with the bit-sliced word replaced by its
+meaning (a child is in the word iff its mask misses the top's). -/
+def sliceRun (b lo hi : ℕ) (sh : Shape) (pip : ℕ) : SliceRun :=
+  let st := sliceSetup b lo hi sh pip
+  let setup : Counts :=
+    { topsTested := st.leads.sum, tops := (st.topsByD.map (·.length)).sum, parents := st.ps.length }
+  ⟨Counts.add setup
+      (Counts.sum ((List.range (b - 1)).map fun c =>
+        Counts.sum ((List.range b).map fun d => unitCounts b sh st c d))),
+    (List.range (b - 1)).flatMap fun c => (List.range b).flatMap fun d => unitSurv b sh st c d⟩
 
 end NiceMidOut
