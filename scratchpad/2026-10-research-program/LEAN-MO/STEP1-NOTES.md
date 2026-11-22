@@ -1,8 +1,8 @@
 # The middle-out join in Lean, step 1: notes (2026-11-22)
 
 *Written on ivory; every build on the rented box (Vast 61919150) and in the fork's CI. Branch `lean/midout` on the
-fork `wasabipesto-bot/nice`, from `dev/mo-clean` at `10ddbf17`; worktree `~/projects/nice/.worktrees/lean-midout`.
-Paths below are relative to that worktree. CI run URLs: see "Status" at the end.*
+fork `wasabipesto-bot/nice`, from `dev/mo-clean` at `10ddbf17`, head `f25f988a`; worktree
+`~/projects/nice/.worktrees/lean-midout`. Paths below are relative to that worktree. CI: see "Status" at the end.*
 
 ## What is on the branch
 
@@ -139,7 +139,7 @@ model's `vOfN`, `nOfV`, `fieldDigits`, `slicesOf`, `fieldSlices`, not about the 
   and Mathlib) + `lake exe cache get` (8,690 files) ≈ 12 min incl. one retry; first `lake build` of `Nice` (the earlier
   library from source) + the model ≈ 1 min; `lake build conformance` (C compilation of every imported module) 1m52s;
   conformance run 1m49s; rebuild after a proof edit ≈ 10 s.
-- CI: the first green run 8m43s (fixture job 1m23s; the Lean job's cache, build, conformance; see the run page).
+- CI (`f25f988a`, run 44994398962, 11 min): fixture regeneration job 1m12s; Lean job: cache + `lake build --wfail` 1m39s, conformance 8m41s (of which about 7 min compiling the executable's imported modules on a 4-core runner, 70 s running), axioms 32 s.
 
 ## What step 2 should start with
 
@@ -156,4 +156,6 @@ model's `vOfN`, `nOfV`, `fieldDigits`, `slicesOf`, `fieldSlices`, not about the 
 
 ## Status
 
-See the final report for the CI run URL of the last push (`f25f988a`).
+Head `f25f988a` on `fork/lean/midout`, green: https://github.com/wasabipesto-bot/nice/actions/runs/44994398962
+(earlier green run on `06a74362`: https://github.com/wasabipesto-bot/nice/actions/runs/44992831227; the run on
+`0a52f49f` was cancelled by the next push). Box left idle; no pull request, nothing pushed to `origin`.

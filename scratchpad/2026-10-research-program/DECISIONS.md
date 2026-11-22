@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-21 07:05 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-22 06:55 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
@@ -37,7 +37,9 @@ slices show that no other order of the work and no extra skip test beats today's
 perfect skip test would give ×1.99 at most. So the join is near the end of what this kind of join can do; what
 is left is ordinary tuning for the card and the stages around the kernel. Wider words per lane were tested on
 2026-11-21: ×1.09 on an RTX 3080; for your card ×1.10–1.16 or ×1.27–1.34 is predicted, and only a short run there
-can tell (D17). The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
+can tell (D17). Sharing memory loads between neighbouring probes was tested on 2026-11-22 and is slower than
+the present kernel on every measure: dropped. Three attempts in three days have failed to beat the present
+pairing loop. The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
 
 ## A. The middle-out join
 
@@ -217,10 +219,21 @@ can tell (D17). The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
   - c. As an extension of #160's own branch.
   - d. Nothing until you ask.
 - **Recommendation: a.** It costs you nothing to ignore and it does not move your parked PR.
-- **If you do not answer:** I start with the first step only, which is useful even without the proofs: the
-  Lean function that mirrors the reference, compared against tables generated from the Rust code (it is a
-  second, independent definition of the search). On a fork branch, no pull request, and only when the day's
-  rented-card budget is not needed elsewhere (this machine cannot build Mathlib).
+- **State (2026-11-22): the first step is done**, because you had not answered and that was the stated
+  default. Branch `lean/midout` on the fork (four commits on `dev/mo-clean`'s head; a Lean project in
+  `lean-midout/` that imports #160's library at its commit as a dependency, so nothing of #160 is copied or
+  touched; no pull request). It holds: the search algorithm as Lean functions mirroring the Rust reference;
+  tables generated from the Rust code (9,411 slices of 11 small bases with every survivor in order, the residue
+  classes of every base 3–128, base-64 and base-65 samples including two real slices of a million parents);
+  a program that recomputes all of it in Lean: **81,484 comparisons, all equal, no disagreement ever met**; and
+  the coordinate lemmas proved (48 theorems, no `sorry`, no added axiom: the renumbering is one to one, a field
+  is a whole number of slices, fields partition the range). The fork's own CI builds and checks it in 11 minutes.
+  A by-product: the comparison catches two mutants of the Rust reference that the Rust's own tests did not;
+  the two checks are being added to the Rust tests on `dev/mo-clean`.
+- **If you do not answer:** from the next cycle I continue with the lemmas of the join itself (certificates,
+  pairing, prefilter, the end-to-end statement), about one session a day on a rented CPU box at about $0.30 a
+  session, on that fork branch, with no pull request. Say `D18 stop` to stop it, or `D18 d` to stop and remove
+  the branch.
 
 ### D17. A short window on demoux, when convenient (new 2026-11-20; nothing waits on it)
 

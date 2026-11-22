@@ -526,9 +526,12 @@ said; counts come from an exact CPU prototype on real slices.
   (128 or 256 children) were then measured with a microbenchmark of the word loop on 2026-11-21: ×1.09 on the
   whole kernel on an RTX 3080, where the loop is bound by shared-memory bandwidth; for the RX 9070 XT the offline
   compile predicts ×1.10–1.16 or ×1.27–1.34 depending on that card's shared-memory speed, which only a run on
-  the card can tell. Parked.
+  the card can tell. Parked. Sharing the loads of digits that neighbouring probes have in common was measured
+  the next day: every kernel that does it is slower than the present loop (best ×0.85 on the whole kernel on
+  an RTX 3080, worse predicted for the RX 9070 XT); the loads saved change the time by under 1.5 %, the control
+  that skips them costs more. Dropped.
 - **Long version:** `~/projects/nice/scratchpad/2026-10-research-program/CEIL/NOTES.md` (the argument, with two
-  restructurings that fail on paper), `CEIL/RESULTS.md` beside it (the counts), and `CW/RESULTS.md` (word width).
+  restructurings that fail on paper), `CEIL/RESULTS.md` beside it (the counts), `CW/RESULTS.md` (word width) and `PS/RESULTS.md` (shared loads).
 
 ---
 

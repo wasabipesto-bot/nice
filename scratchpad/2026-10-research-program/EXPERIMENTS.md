@@ -35,6 +35,32 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## LEAN.1 The middle-out reference as a Lean model: 81,484 comparisons with the Rust all equal; the coordinate lemmas proved (2026-11-22 05:50–06:48 UTC, proof engineer; `LEAN-MO/BRIEF-STEP1.md`, `LEAN-MO/STEP1-NOTES.md`; fork branch `lean/midout` f25f988a (4 commits on 10ddbf17), directory `lean-midout/`, 1,698 lines; CI run 44994398962 on the fork, 11 min; box 61919150, 23 CPUs)
+
+- **Dependency** [M]: Lake takes the earlier library as a git dependency with `subDir = "proofs"` at 4cdaa47f
+  (Lean v4.33.1, Mathlib 0df444a3 through its manifest); nothing copied.
+- **Model** [by reading]: `Coord.lean`, `Join.lean` mirror `coord.rs`, `cpu.rs`, `arith.rs` (v and its inverse,
+  quanta, slices, roots, top certificates, unit tops, parents, child masks, prefilter with its exemption, final
+  check, one slice's join, `searchField`). Two forms of the join: `sliceSurvivors` (for theorems) and
+  `sliceRun` (runs as the Rust does, same order, 12 counters). Not modelled: `mm`, `U384`, mask width.
+- **Fixtures** [M, 3.6 MB, fixed seeds, checksummed; CI regenerates them from the Rust and compares]: every
+  slice of the 11 small bases and 17 shapes the Rust tests run (9,411 slices, 20,058 survivors in order with
+  counters); roots and ranges for bases 3–128; base-64/65 samples (v, fields, 3,000 top certificates, unit
+  tops, parents and child masks, two real (4, 10) slices of about 1.04M parents, 4,000 prefilter verdicts).
+- **Conformance** [M]: 81,484 checks, all equal; no disagreement between the model and the Rust at any point.
+- **Mutants of the model** [M, on the box]: caught: the prefilter-exemption mutant (the Rust's M21, which
+  survives every Rust test), a missing e2 ≠ e3 check, a missing `mhi`, a strict top interval, reversed key
+  ties; `mhi` at k + 1 (the Rust's M04) passed until a deep (4, 16) tops table was added.
+- **Proved** [M: `lake build --wfail`, axiom check; 48 theorems, no `sorry`, no added axiom, no
+  `native_decide`]: v is one to one on the range and inverted by its inverse; the quantum index of v(n) is n's
+  digits [q0, k1); a field holds exactly the n with its field digits; the slices of a value are exactly the
+  pips with those digits, so a field is a whole number of slices; every n lies in exactly one quantum.
+  Statements about the model, not the Rust.
+- **Side finding:** `get_base_range_u128(3)` panics (empty range), so `Coord::with_digits(3, …)` panics where
+  its doc promises an error; no field exists at base 3.
+- **Same day, continuing on the box:** the bridge proofs (`baseRangeC = baseRange`; `sliceRun` a permutation of
+  `sliceSurvivors`) and two Rust tests on `dev/mo-clean` that kill M04 and M21 (LEAN.2 when back).
+
 ## BX.3 Below exhaustive, round 3: the attempted lower bound and its three exits (2026-11-22 05:45–06:10 UTC, the director; `BX/ROUND3.md`)
 
 - **The numbers at base 64** [M / P]: 1.7·10^19 pair tests made; 1.3·10^16 pairs survive (37 certified digits
