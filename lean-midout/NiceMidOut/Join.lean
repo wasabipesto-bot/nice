@@ -11,10 +11,10 @@ Two forms of the join of one slice:
 - `sliceRun`: the Rust's `SliceSetup::new` + `class` as functions (no loop state): parents
   reordered by class and chunk key, 64-child chunks with the common-mask
   skip, and every counter of `Counts`. Its survivors are the Rust's, in the
-  Rust's order. Refinement still to be proved: `(sliceRun ..).surv` is a
-  permutation of `sliceSurvivors` (with `mhi` replaced by the prefilter's
-  verdict), equal when no (class, unit) has more than 64 children and the
-  parents of each class keep their order.
+  Rust's order. Proved in `RunProofs`: its survivors are a permutation of
+  `sliceSurvivors`'s (with `mhi` replaced by the prefilter's verdict), and its
+  counters `survivors`, `checked` and `parents` are the list's length, the
+  passing survivors and the parents; the other counters are tested only.
 
 Reused from the earlier library (`NiceSearch`, commit 4cdaa47f): `digit`,
 `numDigits`, `IsNice` (the final check), `cert` / `certDigits` (the top

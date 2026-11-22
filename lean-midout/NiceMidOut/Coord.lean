@@ -7,8 +7,7 @@ Executable model, base-generic. Ranges are carried as data (`Coord.lo`,
 `Coord.hi`); `baseRangeC` is a computable form of the earlier library's
 `NiceSearch.baseRange` (noncomputable: its cube and square roots are
 `Nat.find`), checked against the Rust's closed form for every base 3-128
-by the conformance executable; `baseRangeC = baseRange` is a refinement still
-to be proved.
+by the conformance executable and proved equal (`baseRangeC_eq`, `RangeProofs`).
 -/
 import Nice
 
