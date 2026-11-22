@@ -35,6 +35,47 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## BX.3 Below exhaustive, round 3: the attempted lower bound and its three exits (2026-11-22 05:45–06:10 UTC, the director; `BX/ROUND3.md`)
+
+- **The numbers at base 64** [M / P]: 1.7·10^19 pair tests made; 1.3·10^16 pairs survive (37 certified digits
+  distinct; measured 11.77M per slice); about 1.2·10^9 n have 52 distinct digits when both ends are read to full
+  depth (uniform model); 1.2·10^-4 nice numbers expected.
+- **The argument** [P + M]: output digit p of n² is a function of n² mod b^(p+1) or of n² to relative precision
+  b^(p − len), so every certificate is a union of bottom-tree or top-tree nodes; the middle is uniform given
+  the ends (BX.1); hence every method is a choice of tree nodes to examine, the view model whose optimum BX.1
+  computed (flat join within ×1.03–1.11 at production weights, an ideal pairing on the floor). Not a theorem
+  for all methods.
+- **Exits:** (1) a certificate that is not a tree node: excluded [P]; (2) less than one unit per pair:
+  constants (CEIL.1, CW.1, PS.1); (3) counting without visiting: number of nice n = Σ_S (−1)^(b−|S|)·#{n : n²,
+  n³ use only digits in S} (Ryser), equivalently the digit histogram's Fourier transform vanishes off zero; both
+  need 2^64 exact restricted-digit counts cancelling from 10^22, and the balance conditions prune nothing that
+  distinctness of the certified digits does not [P].
+- **Status:** nothing below exhaustive; no round 4 planned for its own sake.
+
+## PS.1 Sharing shared-memory loads between neighbouring probes in the pairing kernel: every sharing kernel is slower than today's loop; dropped (2026-11-22 05:50–06:35 UTC, engineer; `PS/BRIEF.md`, `PS/RESULTS.md`, `PS/raw/`, `PS/box/`; scratch branch `exp/mo-word-width` 6f7559d1 → b3967fb5, on the fork; box 61919190, RTX 3080 at 350 W, 0.86 h, about $0.10)
+
+- **Counts** [exact, three real base-64 slices; loads per (probe, lane) visit of 17: summed / in lockstep on a
+  32-lane warp / on a 64-lane wave]: today 17.00 / 17.02 / 17.07; probes ordered by digit frequency with one
+  saved partial OR 14.15 / 15.11 / 16.10; a stack of three 13.74 / 14.58 / 15.39; an unbounded trie 13.61 /
+  14.48 / 14.99. Consecutive listed probes share only 2.6 leading digits on average, and a 64-lane plane holds
+  2 (CUDA) or 4 (RDNA) independent probe streams. Ceiling at zero overhead: ×1.07 (3080) and ×1.04–1.05
+  (RX 9070 XT) for one saved OR; ×1.10–1.12 for an unbounded stack.
+- **RTX 3080** [M, 15 × 20 launches per variant, shuffled, clock 1,830–1,990 MHz, no throttling; today's loop
+  0.157 ps per pair, 2.51 ms per slice]: best sharing kernel ×0.78 on the word loop (main kernel ×0.85); blocks
+  of four ×0.72; any level ×0.50; prefix stack ×0.69. **Turning the sharing off inside the same kernels changes
+  their time by at most 1.5 %**: the loads saved are not what limits the loop; the control structure that skips
+  them costs far more than it saves. Phase 3b's share of the main kernel re-measured: 0.592–0.607.
+- **RX 9070 XT, offline** [M compile, P times]: VALU cycles per wave-iteration rise from 173 to 245–403; the
+  loop stays issue-bound under both card models (the shared-memory bound is 1.43–1.62 ms against 2.5–4.1 ms):
+  main kernel ×0.46–0.77.
+- **Exactness** [M]: every variant, slice and pass equal to the dump on all 4,032 job instances; 15 variants
+  exact on lavapipe.
+- **Verdict by the rule (under ×1.08 by both → dropped): dropped.** It also corrects an inference of CW.1: the
+  3080's word loop is not simply bound by shared-memory bandwidth (17 % fewer loads moved its time by 1.5 %).
+- **Where this leaves the pairing kernel:** three independent attempts this week (orders and skip tests,
+  CEIL.1; wider words, CW.1; shared loads, PS.1) each failed to beat the present loop on the RTX 3080; one
+  question remains open only because it needs the RX 9070 XT (width 128 there).
+
 ## CW.1 Wider words per lane in the pairing kernel: ×1.09 on an RTX 3080 (under the bar); ×1.10–1.16 or ×1.27–1.34 predicted for the RX 9070 XT depending on its shared-memory bandwidth (2026-11-21 06:00–06:56 UTC, engineer; `CW/BRIEF.md`, `CW/RESULTS.md`, `CW/raw/`, `CW/box/`; scratch branch `exp/mo-word-width` 6f7559d1 on 10ddbf17, on the fork; box 61761289, RTX 3080 at 320 W, 0.99 h, about $0.12)
 
 - **Microbenchmark** [M]: the kernel's word loop (phase 3b) alone, on dumps of three real base-64 slices, at 64,

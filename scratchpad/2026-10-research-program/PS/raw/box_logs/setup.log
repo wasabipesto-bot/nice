@@ -1,0 +1,32 @@
++ export DEBIAN_FRONTEND=noninteractive
++ DEBIAN_FRONTEND=noninteractive
++ apt-get update -q
+Hit:1 http://archive.ubuntu.com/ubuntu noble InRelease
+Hit:2 http://security.ubuntu.com/ubuntu noble-security InRelease
+Hit:3 http://archive.ubuntu.com/ubuntu noble-updates InRelease
+Hit:4 http://archive.ubuntu.com/ubuntu noble-backports InRelease
+Hit:5 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64  InRelease
+Reading package lists...
+W: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/InRelease: Key is stored in legacy trusted.gpg keyring (/etc/apt/trusted.gpg), see the DEPRECATION section in apt-key(8) for details.
++ apt-get install -yq mesa-vulkan-drivers vulkan-tools spirv-tools libvulkan1 git curl build-essential pkg-config libssl-dev just python3
++ echo apt rc=0
+apt rc=0
++ curl -sSf https://sh.rustup.rs
++ sh -s -- -y --default-toolchain 1.100.0 --profile minimal -c clippy,rustfmt
++ echo rustup rc=0
+rustup rc=0
++ source /root/.cargo/env
+++ case ":${PATH}:" in
+++ export PATH=/root/.cargo/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/root/.cargo/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++ rustc -V
+rustc 1.100.0 (0ef1bc386 2026-11-09)
++ cargo -V
+cargo 1.100.0 (3acc79c0c 2026-11-05)
++ just --version
+just 1.21.0
++ vulkaninfo --summary
++ grep -i 'deviceName\|driverName'
+	deviceName         = llvmpipe (LLVM 20.1.2, 256 bits)
+	driverName         = llvmpipe
++ echo done
