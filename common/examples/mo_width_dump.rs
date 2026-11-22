@@ -26,6 +26,9 @@ use nice_common::midout::cpu::{
     self, Base, Parent, Shape, Top, child_mask, key_digits, parents, unit_tops,
 };
 use std::io::Write;
+
+#[path = "mo_width_dump/share.rs"]
+mod share;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -81,6 +84,33 @@ struct Job {
     d: u32,
     kids: Vec<u64>,
     probes: Vec<(u64, u32)>, // (mask, global top index)
+    /// per probe: its certificate's digits in position order (n² from the most significant down, then n³)
+    certs: Vec<(Vec<u8>, Vec<u8>)>,
+}
+
+/// The certificate's digits of the top over `[a, c]` in position order, as `top_cert_split` finds them: n²'s
+/// constant leading digits from the most significant down, then n³'s.
+fn cert_order(b: u64, a: u128, c: u128, kpos: u32) -> (Vec<u8>, Vec<u8>) {
+    use nice_common::midout::arith::U384;
+    let (xa, xc) = (U384::from_u128(a), U384::from_u128(c));
+    let (sa, sc) = (xa.mul(&xa), xc.mul(&xc));
+    let (ca, cc) = (sa.mul(&xa), sc.mul(&xc));
+    let mut out = (Vec::new(), Vec::new());
+    for (w, (p, q)) in [(sa, sc), (ca, cc)].into_iter().enumerate() {
+        let (dp, dq) = (p.digits(b), q.digits(b));
+        if dp.len() != dq.len() {
+            continue;
+        }
+        let mut j = dp.len();
+        while j > kpos as usize {
+            j -= 1;
+            if dp[j] != dq[j] {
+                break;
+            }
+            if w == 0 { out.0.push(dp[j]) } else { out.1.push(dp[j]) }
+        }
+    }
+    out
 }
 
 #[derive(Default)]
@@ -254,6 +284,21 @@ fn main() {
             let mut tt = 0;
             unit_tops::<u64>(&base, sh, pip + d as u128 * step, &mut tt)
         });
+        let certs_by_d: Vec<Vec<(Vec<u8>, Vec<u8>)>> = par_jobs(threads, b, |d| {
+            tops_by_d[d]
+                .iter()
+                .map(|t| {
+                    let co = cert_order(64, t.lo, t.hi, sh.k);
+                    let mut mk = 0u64;
+                    for &v in co.0.iter().chain(co.1.iter()) {
+                        assert!(mk >> v & 1 == 0);
+                        mk |= 1 << v;
+                    }
+                    assert_eq!(mk, t.mask, "certificate order differs from the mask");
+                    co
+                })
+                .collect()
+        });
         let digit_count = |it: &mut dyn Iterator<Item = u64>| -> Vec<u64> {
             let mut f = vec![0u64; b];
             for mut x in it {
@@ -303,10 +348,12 @@ fn main() {
             let (c, d) = (jx / b, jx % b);
             let cc = (c + d) % m;
             let mut probes = Vec::new();
+            let mut certs = Vec::new();
             for &rt in &base.roots {
                 let ct = (rt as usize + m - cc) % m;
                 for &ti in &tseg[d][ct] {
                     probes.push((tops_by_d[d][ti].mask, toff[d] + ti as u32));
+                    certs.push(certs_by_d[d][ti].clone());
                 }
             }
             let mut kids = Vec::new();
@@ -321,6 +368,7 @@ fn main() {
                 d: d as u32,
                 kids,
                 probes,
+                certs,
             }
         });
         let nk: usize = jobs.iter().map(|j| j.kids.len()).sum();
@@ -332,6 +380,10 @@ fn main() {
             jobs.iter().map(|j| j.probes.len()).max().unwrap(),
             t0.elapsed().as_secs_f64()
         );
+        if std::env::var("MO_SHARE").is_ok() {
+            share::run(&jobs, pip, dir, threads);
+            return h.join().unwrap();
+        }
         for wd in [64usize, 128, 256] {
             let parts: Vec<WidthOut> = par_jobs(threads, jobs.len(), |jx| job_width(&jobs[jx], wd));
             let mut all = WidthOut::default();

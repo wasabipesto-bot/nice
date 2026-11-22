@@ -303,6 +303,264 @@ mod k {
             res[(CUBE_POS_X * 4u32 + 2u32) as usize].fetch_add(1u32);
         }
     }
+    /// Phase 3b at width 64 with one saved partial OR per lane (scratch measurement): the round's list is in the
+    /// sorted probe order, cut into 16 contiguous segments of `2·⌈nlist/32⌉` entries (stream `st` takes
+    /// segment `st`, two entries per step, as `w3b_kernel`'s `hh = 2`), and `meta[e] = n | s0 << 5 | sv << 10`
+    /// says: start from the saved OR if `s0 > 0` and load digits `s0..n`; after digit `sv − 1` save the OR.
+    /// Levels are multiples of `qb` (the plan guarantees it), so the 17 digits run in blocks of `qb`: a lane
+    /// skips a block below `s0` or at or above `n` (a block a whole plane skips is not issued), and the save
+    /// test is one compare per block.
+    #[cube(launch_unchecked)]
+    pub fn ps_kernel(
+        inst: &Array<u32>,
+        rounds: &Array<u32>,
+        probes: &Array<Vector<u32, Const<4>>>,
+        lists: &Array<u32>,
+        meta: &Array<u32>,
+        words: &Array<Vector<u32, Const<4>>>,
+        out: &mut Array<Vector<u32, Const<4>>>,
+        slabn: &mut Array<Atomic<u32>>,
+        slabcnt: &mut Array<u32>,
+        slabinst: &mut Array<u32>,
+        res: &mut Array<Atomic<u32>>,
+        nslab_cap: u32,
+        mode: u32,
+        #[comptime] w: u32,
+        #[comptime] qb: u32,
+        #[comptime] c32: bool,
+        #[comptime] uni: bool,
+        #[comptime] gm: bool,
+    ) {
+        let mut pq = SharedMemory::<u32>::new(comptime!((576 + 128) as usize));
+        // gm: the plan is read from global memory per entry (no shared copy: the kernel's shared size as w3b's)
+        let mut pm = SharedMemory::<u32>::new(comptime!((if gm { 4 } else { 576 + 128 }) as usize));
+        let mut sl = SharedMemory::<u32>::new(2080usize);
+        let mut prob_d = SharedMemory::<Vector<u32, Const<4>>>::new(576usize);
+
+        let t = UNIT_POS_X;
+        let lane = UNIT_POS_PLANE;
+        let rl = UNIT_POS_PLANE;
+        let rlo = select(rl >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(rl, 31u32)) - 1u32);
+        let rhi = select(rl >= 32u32, (1u32 << (rl & 31u32)) - 1u32, 0u32);
+        let ib = CUBE_POS_X * 8u32;
+        let nprobe = inst[(ib + 4u32) as usize];
+        let pbase = inst[(ib + 5u32) as usize];
+        let rbase = inst[(ib + 6u32) as usize];
+        let nr = inst[(ib + 7u32) as usize];
+        {
+            let mut j = t;
+            while j < nprobe {
+                prob_d[j as usize] = probes[(pbase + j) as usize];
+                j += NT;
+            }
+        }
+        let mut my_surv = 0u32;
+        let mut my_lslots = 0u32;
+        let mut slab_id = 0u32;
+        let mut slab_used = 256u32;
+        let mut have_slab = false;
+        let q = t % 16u32;
+        let st = t / 16u32;
+        let q65 = 65u32 * q;
+        let qs = 16u32 + q;
+        // the saved ORs: one (c16x2) or one per entry slot (c32: 32 segments, slot h takes segment st + 16 h)
+        let mut svr = Array::<u32>::new(4usize);
+        #[unroll]
+        for kk in 0..4u32 {
+            svr[kk as usize] = 0u32;
+        }
+        let noshare = (mode & 4u32) != 0u32;
+        let mut r = 0u32;
+        while r < nr {
+            let rb = (rbase + r) * 8u32;
+            let slr = rounds[rb as usize];
+            let nch = rounds[(rb + 1u32) as usize];
+            let ntake = rounds[(rb + 2u32) as usize];
+            let loff = rounds[(rb + 3u32) as usize];
+            let nlist0 = rounds[(rb + 4u32) as usize];
+            let cdone = rounds[(rb + 5u32) as usize];
+            sync_cube();
+            {
+                let mut z = t;
+                while z < 520u32 {
+                    let v = words[(slr * 520u32 + z) as usize];
+                    #[unroll]
+                    for kk in 0..4u32 {
+                        sl[(z * 4u32 + kk) as usize] = v[kk as usize];
+                    }
+                    z += NT;
+                }
+                let mut z2 = t;
+                while z2 < nlist0 {
+                    pq[z2 as usize] = lists[(loff + z2) as usize];
+                    if comptime!(!gm) {
+                        pm[z2 as usize] = meta[(loff + z2) as usize];
+                    }
+                    z2 += NT;
+                }
+            }
+            sync_cube();
+            let nlist = select((mode & 1u32) != 0u32, nlist0, 0u32);
+            let nq = select(q < nch, min(64u32, ntake - min(ntake, q * 64u32)), 0u32);
+            let v0 = select(nq >= 32u32, 0xFFFF_FFFFu32, select(nq > 0u32, (1u32 << (nq % 32u32)) - 1u32, 0u32));
+            let v1 = select(nq >= 64u32, 0xFFFF_FFFFu32, select(nq > 32u32, (1u32 << ((nq - min(nq, 32u32)) % 32u32)) - 1u32, 0u32));
+            let cpos = cdone + q * 64u32;
+            let mut seg = 2u32 * ((nlist + 31u32) / 32u32);
+            if comptime!(c32) {
+                seg = (nlist + 31u32) / 32u32;
+            }
+            let mut e0 = 0u32;
+            while e0 < nlist {
+                let mut wv = Array::<u32>::new(4usize);
+                let mut pk = Array::<u32>::new(2usize);
+                #[unroll]
+                for h in 0..2u32 {
+                    let si = comptime!(if c32 { 2 * h } else { 0 });
+                    let mut e = st * seg + e0 / 16u32 + h;
+                    let mut send = min(st * seg + seg, nlist);
+                    if comptime!(c32) {
+                        e = (st + comptime!(16 * h)) * seg + e0 / 32u32;
+                        send = min((st + comptime!(16 * h)) * seg + seg, nlist);
+                    }
+                    let ok = e < send;
+                    let ei = select(ok, e, 0u32);
+                    let ent = select(ok, pq[ei as usize], 0u32);
+                    let mut mt0 = 0u32;
+                    if comptime!(gm) {
+                        mt0 = select(ok, meta[(loff + ei) as usize], 0u32);
+                    } else {
+                        mt0 = select(ok, pm[ei as usize], 0u32);
+                    }
+                    // mode bit 4 (a control): no sharing, the same segments and block skips
+                    let mt = select(noshare, mt0 & 31u32, mt0);
+                    let nd = mt & 31u32;
+                    let s0 = (mt >> 5u32) & 31u32;
+                    let sv = (mt >> 10u32) & 31u32;
+                    let p16 = ent & 0xFFFFu32;
+                    let kmask = 0u32 - ((ent >> qs) & 1u32);
+                    let reuse = s0 > 0u32;
+                    let mut a0 = select(reuse, svr[si as usize], 0u32);
+                    let mut a1 = select(reuse, svr[comptime!(si + 1) as usize], 0u32);
+                    let dws = prob_d[(p16 >> 4u32) as usize];
+                    pk[h as usize] = dws[3usize] >> 12u32;
+                    // uni: the plane's lanes run each digit together (guard = some lane needs it: plane minimum
+                    // of s0, maximum of n; a lane with s0 above the digit loads it again, harmlessly), digits
+                    // one by one, the save per digit
+                    if comptime!(uni) {
+                        let kmin = plane_min(s0);
+                        let nmax = plane_max(nd);
+                        #[unroll]
+                        for k in 0..17u32 {
+                            if kmin <= k && nmax > k {
+                                let dg = (dws[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5))) & 63u32;
+                                let row = (dg + q65) * 2u32;
+                                a0 |= sl[row as usize];
+                                a1 |= sl[(row + 1u32) as usize];
+                            }
+                            if comptime!(k < 16) {
+                                let sav = sv == comptime!(k + 1);
+                                svr[si as usize] = select(sav, a0, svr[si as usize]);
+                                svr[comptime!(si + 1) as usize] = select(sav, a1, svr[comptime!(si + 1) as usize]);
+                            }
+                        }
+                    }
+                    #[unroll]
+                    for b in 0..comptime!(if uni { 0 } else { (17 + qb - 1) / qb }) {
+                        let lo = comptime!(b * qb);
+                        let hi = comptime!(if (b + 1) * qb < 17 { (b + 1) * qb } else { 17 });
+                        if s0 <= lo && nd > lo {
+                            #[unroll]
+                            for k in lo..hi {
+                                let dg = (dws[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5))) & 63u32;
+                                let row = (dg + q65) * 2u32;
+                                a0 |= sl[row as usize];
+                                a1 |= sl[(row + 1u32) as usize];
+                            }
+                        }
+                        if comptime!(hi <= 16) {
+                            let sav = sv == hi;
+                            svr[si as usize] = select(sav, a0, svr[si as usize]);
+                            svr[comptime!(si + 1) as usize] = select(sav, a1, svr[comptime!(si + 1) as usize]);
+                        }
+                    }
+                    wv[comptime!(h * 2) as usize] = !a0 & v0 & kmask;
+                    wv[comptime!(h * 2 + 1) as usize] = !a1 & v1 & kmask;
+                }
+                if t == 0u32 {
+                    my_lslots += min(32u32, nlist - e0) * nch;
+                }
+                let mut nz = Array::<bool>::new(2usize);
+                #[unroll]
+                for h in 0..2u32 {
+                    nz[h as usize] = (wv[comptime!(h * 2) as usize] | wv[comptime!(h * 2 + 1) as usize]) != 0u32;
+                }
+                {
+                    let mut base = Array::<u32>::new(2usize);
+                    let mut rk = Array::<u32>::new(2usize);
+                    let mut nn = 0u32;
+                    #[unroll]
+                    for h in 0..2u32 {
+                        base[h as usize] = nn;
+                        nn += plane_count(nz[h as usize], w);
+                    }
+                    #[unroll]
+                    for h in 0..2u32 {
+                        rk[h as usize] = plane_rank_m(nz[h as usize], rlo, rhi, w);
+                    }
+                    if nn > 0u32 {
+                        if slab_used + nn > 256u32 {
+                            if lane == 0u32 && have_slab {
+                                slabcnt[slab_id as usize] = slab_used;
+                            }
+                            let mut sid = 0u32;
+                            if lane == 0u32 {
+                                sid = slabn[0usize].fetch_add(1u32);
+                                if sid < nslab_cap {
+                                    slabinst[sid as usize] = CUBE_POS_X;
+                                }
+                            }
+                            slab_id = plane_sum(sid);
+                            slab_used = 0u32;
+                            have_slab = true;
+                        }
+                        let sbase = slab_id * 256u32 + slab_used;
+                        if slab_id < nslab_cap && (mode & 2u32) == 0u32 {
+                            #[unroll]
+                            for h in 0..2u32 {
+                                if nz[h as usize] {
+                                    let ri = sbase + base[h as usize] + rk[h as usize];
+                                    let mut rv = Vector::<u32, Const<4>>::empty();
+                                    rv[0usize] = pk[h as usize];
+                                    rv[1usize] = cpos;
+                                    rv[2usize] = wv[comptime!(h * 2) as usize];
+                                    rv[3usize] = wv[comptime!(h * 2 + 1) as usize];
+                                    out[ri as usize] = rv;
+                                }
+                            }
+                        }
+                        #[unroll]
+                        for kk in 0..4u32 {
+                            my_surv += wv[kk as usize].count_ones();
+                        }
+                        slab_used += nn;
+                    }
+                }
+                e0 += 32u32;
+            }
+            r += 1u32;
+        }
+        if lane == 0u32 && have_slab && slab_id < nslab_cap {
+            slabcnt[slab_id as usize] = slab_used;
+        }
+        let ss = plane_sum(my_surv);
+        if lane == 0u32 && ss > 0u32 {
+            res[(CUBE_POS_X * 4u32 + 1u32) as usize].fetch_add(ss);
+        }
+        if t == 0u32 {
+            res[(CUBE_POS_X * 4u32 + 3u32) as usize].fetch_add(my_lslots);
+            res[(CUBE_POS_X * 4u32 + 2u32) as usize].fetch_add(1u32);
+        }
+    }
 }
 
 struct Dump {
@@ -314,6 +572,7 @@ struct Dump {
     lists: Vec<u32>,
     words: Vec<u32>,
     expect: Vec<u32>,
+    meta: Vec<u32>,
 }
 
 fn load(path: &str) -> Result<Dump> {
@@ -336,7 +595,8 @@ fn load(path: &str) -> Result<Dump> {
     let lists = take(nlist.max(1));
     let words = take(nslr * SLW);
     let expect = take(ninst * 4);
-    Ok(Dump { w, ninst, inst, rounds, probes, lists, words, expect })
+    let meta = if v[7] == 1 { take(nlist.max(1)) } else { vec![0u32] };
+    Ok(Dump { w, ninst, inst, rounds, probes, lists, words, expect, meta })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -346,22 +606,47 @@ struct Var {
     hh: u32,
     vec: bool,
     swz: bool,
+    /// 0: `w3b_kernel`; q > 0: `ps_kernel` with blocks of q digits
+    ps: u32,
+    /// the dump file: "" = `s<pip>_w<W>.bin`, else `s<pip>_w64_ps_<tag>.bin`
+    tag: &'static str,
+    /// `ps_kernel` with sharing off (mode bit 4)
+    nos: bool,
+}
+
+const fn pv(name: &'static str, ps: u32, tag: &'static str, nos: bool) -> Var {
+    Var { name, nw: 2, hh: 2, vec: false, swz: false, ps, tag, nos }
 }
 
 const VARS: &[Var] = &[
-    Var { name: "w64", nw: 2, hh: 2, vec: false, swz: false },
-    Var { name: "w128s2", nw: 4, hh: 2, vec: false, swz: false },
-    Var { name: "w128v2", nw: 4, hh: 2, vec: true, swz: false },
-    Var { name: "w128s1", nw: 4, hh: 1, vec: false, swz: false },
-    Var { name: "w128v1", nw: 4, hh: 1, vec: true, swz: false },
-    Var { name: "w256s1", nw: 8, hh: 1, vec: false, swz: false },
-    Var { name: "w256v1", nw: 8, hh: 1, vec: true, swz: false },
-    Var { name: "w256v2", nw: 8, hh: 2, vec: true, swz: false },
-    Var { name: "w256x1", nw: 8, hh: 1, vec: true, swz: true },
-    Var { name: "w256x2", nw: 8, hh: 2, vec: true, swz: true },
+    Var { name: "w64", nw: 2, hh: 2, vec: false, swz: false, ps: 0, tag: "", nos: false },
+    Var { name: "w128s2", nw: 4, hh: 2, vec: false, swz: false, ps: 0, tag: "", nos: false },
+    Var { name: "w128v2", nw: 4, hh: 2, vec: true, swz: false, ps: 0, tag: "", nos: false },
+    Var { name: "w128s1", nw: 4, hh: 1, vec: false, swz: false, ps: 0, tag: "", nos: false },
+    Var { name: "w128v1", nw: 4, hh: 1, vec: true, swz: false, ps: 0, tag: "", nos: false },
+    Var { name: "w256s1", nw: 8, hh: 1, vec: false, swz: false, ps: 0, tag: "", nos: false },
+    Var { name: "w256v1", nw: 8, hh: 1, vec: true, swz: false, ps: 0, tag: "", nos: false },
+    Var { name: "w256v2", nw: 8, hh: 2, vec: true, swz: false, ps: 0, tag: "", nos: false },
+    Var { name: "w256x1", nw: 8, hh: 1, vec: true, swz: true, ps: 0, tag: "", nos: false },
+    Var { name: "w256x2", nw: 8, hh: 2, vec: true, swz: true, ps: 0, tag: "", nos: false },
+    // probe sharing (one saved OR): the plain W64 loop on the sorted dump, the ps loop without and with sharing
+    pv("w64o_q4", 0, "c32_q4", false),
+    pv("ps_q4n", 4, "c32_q4", true),
+    pv("ps_q4", 4, "c32_q4", false),
+    pv("ps_q2", 2, "c32_q2", false),
+    pv("ps_q1n", 1, "c32_17", true),
+    pv("ps_q1", 1, "c32_17", false),
+    pv("ps_q4g", 4, "c32_q4", false),
+    pv("ps_q4ng", 4, "c32_q4", true),
+    pv("ps_q1g", 1, "c32_17", false),
+    pv("ps_u1", 1, "c32_17", false),
+    pv("ps_u1n", 1, "c32_17", true),
+    pv("ps16_q4", 4, "c16x2_q4", false),
+    pv("ps16_q1", 1, "c16x2_17", false),
 ];
 
 struct Dev {
+    meta: Handle,
     inst: Handle,
     rounds: Handle,
     probes: Handle,
@@ -402,12 +687,16 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
     println!("W(plane) {w}; reps {reps}; variants {:?}", vars.iter().map(|v| v.name).collect::<Vec<_>>());
     for pip in &pips {
         // the three widths of this slice on the device at once (interleaved timing)
-        let mut devs: Vec<(u32, Dev, Vec<u32>)> = Vec::new();
-        for wd in [64u32, 128, 256] {
-            if !vars.iter().any(|v| v.nw * 32 == wd) {
-                continue;
+        let mut devs: Vec<((u32, &str), Dev, Vec<u32>)> = Vec::new();
+        let mut keys: Vec<(u32, &str)> = Vec::new();
+        for v in &vars {
+            if !keys.contains(&(v.nw * 32, v.tag)) {
+                keys.push((v.nw * 32, v.tag));
             }
-            let mut d = load(&format!("{dir}/s{pip}_w{wd}.bin"))?;
+        }
+        for (wd, tag) in keys {
+            let path = if tag.is_empty() { format!("{dir}/s{pip}_w{wd}.bin") } else { format!("{dir}/s{pip}_w64_ps_{tag}.bin") };
+            let mut d = load(&path)?;
             if let Some(m) = max_inst {
                 // the first m instances and only the rows they use (a software device's binding limit)
                 d.ninst = d.ninst.min(m);
@@ -419,6 +708,9 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
                 d.rounds.truncate(rend * 8);
                 d.probes.truncate(pend * 4);
                 d.lists.truncate(lend.max(1));
+                if d.meta.len() > 1 {
+                    d.meta.truncate(lend.max(1));
+                }
                 d.words.truncate(send * SLW);
             }
             assert_eq!(d.w, wd);
@@ -426,6 +718,7 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
             let cap = (nz / 160 + d.ninst as u64 * u64::from(NT / w) + 2048) as u32;
             let nv = (wd / 64) as usize;
             let dv = Dev {
+                meta: mk(&d.meta),
                 inst: mk(&d.inst),
                 rounds: mk(&d.rounds),
                 probes: mk(&d.probes),
@@ -442,14 +735,43 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
                 nslr: d.words.len() / SLW,
             };
             println!(
-                "LOADED s{pip} w{wd}: inst {} rounds {} probes {} list {} word-rounds {} expected nonzero {nz} slab cap {cap}",
+                "LOADED {path}: inst {} rounds {} probes {} list {} word-rounds {} expected nonzero {nz} slab cap {cap}",
                 d.ninst, dv.nround, dv.nprobe, dv.nlist, dv.nslr
             );
-            devs.push((wd, dv, d.expect));
+            devs.push(((wd, tag), dv, d.expect));
         }
         sync()?;
         let launch_with = |v: &Var, dv: &Dev, mode: u32, slabn: Handle, res: Handle| -> Result<(Handle, Handle)> {
             let a = |h: &Handle, n: usize| unsafe { ArrayArg::from_raw_parts(h.clone(), n) };
+            let mode = if v.nos { mode | 4 } else { mode };
+            if v.ps > 0 {
+                unsafe {
+                    k::ps_kernel::launch_unchecked::<R>(
+                        client,
+                        CubeCount::Static(dv.ninst as u32, 1, 1),
+                        CubeDim::new_1d(NT),
+                        a(&dv.inst, dv.ninst * 8),
+                        a(&dv.rounds, dv.nround * 8),
+                        a(&dv.probes, dv.nprobe),
+                        a(&dv.lists, dv.nlist),
+                        a(&dv.meta, dv.nlist),
+                        a(&dv.words, dv.nslr * SLW / 4),
+                        a(&dv.out, dv.cap as usize * SLAB as usize),
+                        a(&slabn, 1),
+                        a(&dv.slabcnt, dv.cap as usize),
+                        a(&dv.slabinst, dv.cap as usize),
+                        a(&res, dv.ninst * 4),
+                        dv.cap,
+                        mode,
+                        w,
+                        v.ps,
+                        v.tag.starts_with("c32"),
+                        v.name.starts_with("ps_u"),
+                        v.name.ends_with('g'),
+                    );
+                }
+                return Ok((slabn, res));
+            }
             unsafe {
                 k::w3b_kernel::launch_unchecked::<R>(
                     client,
@@ -482,7 +804,7 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
         // exactness first: every variant once, counts per instance against the dump
         let mut ok = Vec::new();
         for v in &vars {
-            let (_, dv, ex) = devs.iter().find(|(wd, _, _)| *wd == v.nw * 32).unwrap();
+            let (_, dv, ex) = devs.iter().find(|(key, _, _)| *key == (v.nw * 32, v.tag)).unwrap();
             let (slabn, res) = launch(v, dv, 1)?;
             sync()?;
             let ns = rd(&slabn)?[0];
@@ -549,7 +871,7 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
                 }
                 let v = &vars[vi];
                 let mode = [1u32, 0, 3][mi];
-                let (_, dv, _) = devs.iter().find(|(wd, _, _)| *wd == v.nw * 32).unwrap();
+                let (_, dv, _) = devs.iter().find(|(key, _, _)| *key == (v.nw * 32, v.tag)).unwrap();
                 let bufs: Vec<_> = (0..nl).map(|_| (mk(&[0u32]), mk(&vec![0u32; dv.ninst * 4]))).collect();
                 sync()?;
                 let u0 = unix();
