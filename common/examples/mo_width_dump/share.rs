@@ -426,9 +426,12 @@ fn write_bench(jobs: &[Job], insts: &[(usize, usize, usize)], pip: u128, dir: &s
     let (_, ord, sorted) = *ORDS.iter().find(|o| o.0 == f[0]).expect("order");
     let (_, asg) = *ASGS.iter().find(|a| a.0 == f[1]).expect("assignment");
     // cap: a number (levels ≤ cap) or qN (levels multiples of N, ≤ 16)
-    let (cap, allow) = match f[2].strip_prefix('q') {
-        Some(q) => (16u8, qmask(q.parse().unwrap())),
-        None => (f[2].parse::<u8>().unwrap(), !0u32),
+    // tN: no plan, the stack of the entry's own prefixes at levels 1..N: s0 = min(LCP with the previous, N)
+    let tlev: Option<u8> = f[2].strip_prefix('t').map(|x| x.parse().unwrap());
+    let (cap, allow) = match (tlev, f[2].strip_prefix('q')) {
+        (Some(_), _) => (0u8, 0u32),
+        (None, Some(q)) => (16u8, qmask(q.parse().unwrap())),
+        (None, None) => (f[2].parse::<u8>().unwrap(), !0u32),
     };
     // the original W64 rows per job (words, rounds, expected), then permute probes and lists per instance
     // the kernel's blocks of qb digits: per plane size (2, 4 streams) and entry slot h, how many plane-iterations
@@ -437,6 +440,8 @@ fn write_bench(jobs: &[Job], insts: &[(usize, usize, usize)], pip: u128, dir: &s
         Some(q) => q.parse().unwrap(),
         None => 1,
     };
+    // [plane size][0: plane-iterations with a valid entry, 1: digits run with the plane-uniform start (17 − min s0)]
+    let uni_acc = std::sync::Mutex::new([[0u64; 2]; 2]);
     let nb = 17usize.div_ceil(qb);
     let parts: Vec<(super::WidthOut, Vec<u32>, u64, Vec<u64>)> = par_jobs(threads, jobs.len(), |jx| {
         let j = &jobs[jx];
@@ -484,7 +489,10 @@ fn write_bench(jobs: &[Job], insts: &[(usize, usize, usize)], pip: u128, dir: &s
                     let ns: Vec<u8> = s.iter().map(|x| x.len() as u8).collect();
                     let l: Vec<u8> = (0..s.len()).map(|i| if i == 0 { 0 } else { lcp(s[i - 1], s[i]) }).collect();
                     let nx: Vec<u8> = (0..s.len()).map(|i| if i + 1 < s.len() { l[i + 1] } else { 0 }).collect();
-                    let pl = d1_plan(&ns, &l, &nx, cap, allow);
+                    let pl: Vec<(u8, u8, u8)> = match tlev {
+                        Some(t) => (0..ns.len()).map(|i| (ns[i] - l[i].min(t), l[i].min(t), 0)).collect(),
+                        None => d1_plan(&ns, &l, &nx, cap, allow),
+                    };
                     for (k, &e) in ch.iter().enumerate() {
                         let (ld, s0, sv) = pl[k];
                         planned += u64::from(ld);
@@ -492,6 +500,22 @@ fn write_bench(jobs: &[Job], insts: &[(usize, usize, usize)], pip: u128, dir: &s
                     }
                 }
                 let steps = n.div_ceil(32);
+                for (pi, ps) in [2usize, 4].into_iter().enumerate() {
+                    let np = 16 / ps;
+                    let mut mn = vec![u32::MAX; steps * np * 2];
+                    for e in 0..n {
+                        let (st, step, h, _) = place(asg, n, e);
+                        let ix = (step * np + st / ps) * 2 + h;
+                        mn[ix] = mn[ix].min(meta[lo + e] >> 5 & 31);
+                    }
+                    let mut u = uni_acc.lock().unwrap();
+                    for &m in &mn {
+                        if m != u32::MAX {
+                            u[pi][0] += 1;
+                            u[pi][1] += u64::from(17 - m);
+                        }
+                    }
+                }
                 for (pi, ps) in [2usize, 4].into_iter().enumerate() {
                     let np = 16 / ps;
                     bx[2 * 2 * nb + pi] += (steps * np) as u64;
@@ -591,6 +615,15 @@ fn write_bench(jobs: &[Job], insts: &[(usize, usize, usize)], pip: u128, dir: &s
     drop(put);
     fo.flush().unwrap();
     println!("WROTE {path}");
+    let u = uni_acc.into_inner().unwrap();
+    for (pi, nm) in ["warp32", "wave64"].iter().enumerate() {
+        println!(
+            "UNIFORM {pip} spec {spec} {nm}: plane entry-slots with a valid entry {} | digits run from the plane's minimum s0 to 17: {:.3} per slot (vs 17: {:.4})",
+            u[pi][0],
+            u[pi][1] as f64 / u[pi][0] as f64,
+            u[pi][1] as f64 / u[pi][0] as f64 / 17.0
+        );
+    }
     for (pi, nm) in ["warp32", "wave64"].iter().enumerate() {
         let tot = bxt[2 * 2 * nb + pi];
         let mut v = Vec::new();

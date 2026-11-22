@@ -330,6 +330,7 @@ mod k {
         #[comptime] c32: bool,
         #[comptime] uni: bool,
         #[comptime] gm: bool,
+        #[comptime] tl: u32,
     ) {
         let mut pq = SharedMemory::<u32>::new(comptime!((576 + 128) as usize));
         // gm: the plan is read from global memory per entry (no shared copy: the kernel's shared size as w3b's)
@@ -368,6 +369,12 @@ mod k {
         #[unroll]
         for kk in 0..4u32 {
             svr[kk as usize] = 0u32;
+        }
+        // tl > 0: per chain slot, the entry's own prefix ORs at levels 1..tl (2 u32 each)
+        let mut stk = Array::<u32>::new(comptime!((if tl > 0 { 4 * tl } else { 1 }) as usize));
+        #[unroll]
+        for kk in 0..comptime!(if tl > 0 { 4 * tl } else { 1 }) {
+            stk[kk as usize] = 0u32;
         }
         let noshare = (mode & 4u32) != 0u32;
         let mut r = 0u32;
@@ -446,6 +453,45 @@ mod k {
                     // uni: the plane's lanes run each digit together (guard = some lane needs it: plane minimum
                     // of s0, maximum of n; a lane with s0 above the digit loads it again, harmlessly), digits
                     // one by one, the save per digit
+                    if comptime!(tl > 0) {
+                        // the stack scheme: start from the own-prefix OR at level s0 (≤ tl), the plane skips the
+                        // digits below its minimum s0 (only the first tl digits are guarded); loads first, ORs after
+                        let kmin = plane_min(s0);
+                        let sb = comptime!(if c32 { 2 * tl * h } else { 0 });
+                        #[unroll]
+                        for lv in 1..comptime!(tl + 1) {
+                            a0 = select(s0 == lv, stk[comptime!(sb + 2 * (lv - 1)) as usize], a0);
+                            a1 = select(s0 == lv, stk[comptime!(sb + 2 * (lv - 1) + 1) as usize], a1);
+                        }
+                        let mut tv = Array::<u32>::new(34usize);
+                        #[unroll]
+                        for k in 0..17u32 {
+                            let dg = (dws[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5))) & 63u32;
+                            let row = (dg + q65) * 2u32;
+                            tv[comptime!(2 * k) as usize] = 0u32;
+                            tv[comptime!(2 * k + 1) as usize] = 0u32;
+                            if comptime!(k < tl) {
+                                if kmin <= k {
+                                    tv[comptime!(2 * k) as usize] = sl[row as usize];
+                                    tv[comptime!(2 * k + 1) as usize] = sl[(row + 1u32) as usize];
+                                }
+                            } else {
+                                tv[comptime!(2 * k) as usize] = sl[row as usize];
+                                tv[comptime!(2 * k + 1) as usize] = sl[(row + 1u32) as usize];
+                            }
+                        }
+                        #[unroll]
+                        for k in 0..17u32 {
+                            a0 |= tv[comptime!(2 * k) as usize];
+                            a1 |= tv[comptime!(2 * k + 1) as usize];
+                            if comptime!(k < tl) {
+                                let keep = s0 > k;
+                                stk[comptime!(sb + 2 * k) as usize] = select(keep, stk[comptime!(sb + 2 * k) as usize], a0);
+                                stk[comptime!(sb + 2 * k + 1) as usize] =
+                                    select(keep, stk[comptime!(sb + 2 * k + 1) as usize], a1);
+                            }
+                        }
+                    }
                     if comptime!(uni) {
                         let kmin = plane_min(s0);
                         let nmax = plane_max(nd);
@@ -465,7 +511,7 @@ mod k {
                         }
                     }
                     #[unroll]
-                    for b in 0..comptime!(if uni { 0 } else { (17 + qb - 1) / qb }) {
+                    for b in 0..comptime!(if uni || tl > 0 { 0 } else { (17 + qb - 1) / qb }) {
                         let lo = comptime!(b * qb);
                         let hi = comptime!(if (b + 1) * qb < 17 { (b + 1) * qb } else { 17 });
                         if s0 <= lo && nd > lo {
@@ -636,6 +682,15 @@ const VARS: &[Var] = &[
     pv("ps_q2", 2, "c32_q2", false),
     pv("ps_q1n", 1, "c32_17", true),
     pv("ps_q1", 1, "c32_17", false),
+    // diagnostics: one block of 17 (no per-block branches or saves), sharing off; and blocks of 8
+    pv("ps_q17n", 17, "c32_q4", true),
+    pv("ps_q8n", 8, "c32_q4", true),
+    pv("ps_t4", 1, "c32_t4", false),
+    pv("ps_t4n", 1, "c32_t4", true),
+    pv("ps_t2", 1, "c32_t2", false),
+    pv("ps_t4g", 1, "c32_t4", false),
+    pv("ps_u1g", 1, "c32_17", false),
+    pv("ps_q2g", 2, "c32_q2", false),
     pv("ps_q4g", 4, "c32_q4", false),
     pv("ps_q4ng", 4, "c32_q4", true),
     pv("ps_q1g", 1, "c32_17", false),
@@ -768,6 +823,7 @@ fn run<R: Runtime>(client: &ComputeClient<R>, w: u32) -> Result<()> {
                         v.tag.starts_with("c32"),
                         v.name.starts_with("ps_u"),
                         v.name.ends_with('g'),
+                        if v.tag.ends_with("_t4") { 4 } else if v.tag.ends_with("_t2") { 2 } else { 0 },
                     );
                 }
                 return Ok((slabn, res));
