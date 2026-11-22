@@ -98,6 +98,15 @@ def checkWhole : M Unit := do
   for bj in ← orFail (asArr j) do
     let b ← orFail (nat bj "base")
     let c ← checkCoord bj s!"whole b{b}"
+    for p in ← orFail (arr bj "n_of_v") do
+      let [v, n] ← orFail (asArr p) | throw (IO.userError "n_of_v shape")
+      let v ← orFail (asNat v)
+      let want ← match n with | .null => pure none | x => do pure (some (← orFail (asNat x)))
+      ensure (c.nOfV v == want) s!"whole b{b} n_of_v {v}: model {c.nOfV v}, Rust {want}"
+      match want with
+      | some n => ensure (c.vOfN n == v) s!"whole b{b} v_of_n {n}"
+      | none => pure ()
+      tick
     for sj in ← orFail (arr bj "shapes") do
       let sh : Shape := ⟨← orFail (nat sj "f0"), ← orFail (nat sj "k")⟩
       let place := s!"whole b{b} ({c.k0}, {c.k1}, {c.q0}) shape ({sh.f0}, {sh.k})"

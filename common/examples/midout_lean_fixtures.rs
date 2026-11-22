@@ -12,7 +12,8 @@
 //! - `whole.json`: every slice of every field of the small bases the Rust
 //!   tests run (`check_whole_base`): the slice's `pip`, its counters and
 //!   every survivor `(d, n, pass)` in the order the reference reports them;
-//!   and `search_field` on the whole base and on the first field.
+//!   `search_field` on the whole base and on the first field; and `n_of_v`
+//!   of every `v` of the coordinate where it has at most 20,000.
 //! - `bases.json`: for every base 3-128, its roots and its range (the
 //!   closed form, exact).
 //! - `b64.json`: base-64 (and base-65) pieces: `v` and `n_of_v` of sampled
@@ -130,8 +131,16 @@ fn whole() -> Value {
                 "field_all": outcome(&all), "field_first": outcome(&first),
             }));
         }
+        // every v of a small coordinate with its n (padding included)
+        let all_v: Vec<Value> = if coord.v_end() - coord.start() <= 20_000 {
+            (coord.start()..coord.v_end())
+                .map(|v| json!([s(v), coord.n_of_v(v).map_or(Value::Null, s)]))
+                .collect()
+        } else {
+            Vec::new()
+        };
         out.push(json!({
-            "base": b, "k0": k0, "k1": k1, "q0": q0,
+            "base": b, "k0": k0, "k1": k1, "q0": q0, "n_of_v": all_v,
             "start": s(coord.start()), "end": s(coord.end()),
             "h0": s(coord.h0()), "hn": s(coord.hn()),
             "quantum": s(q), "v_end": s(coord.v_end()),
@@ -174,6 +183,14 @@ fn b64() -> Value {
                 1 => c.v_end() - 1,
                 _ => c.start() + rng.below(c.v_end() - c.start()),
             };
+            ns.push(json!([s(v), c.n_of_v(v).map_or(Value::Null, s)]));
+        }
+        // v in the first and last values of h, where a padded coordinate pads
+        let (bk0, bk1) = (c.pw(k0), c.pw(k1));
+        for i in 0..200 {
+            let key = rng.below(bk1 / bk0);
+            let hh = if i % 2 == 0 { 0 } else { c.hn() - 1 };
+            let v = c.start() + key * (c.hn() * bk0) + hh * bk0 + rng.below(bk0);
             ns.push(json!([s(v), c.n_of_v(v).map_or(Value::Null, s)]));
         }
         // fields: sampled whole-quanta fields, and refused ones
@@ -243,6 +260,19 @@ fn b64() -> Value {
             .map(|t| json!([s(t.h), digits_of(t.mask), digits_of(t.mhi), s(t.lo), s(t.hi)]))
             .collect();
         units.push(json!({"f0": sh.f0, "k": sh.k, "u": s(uval), "tested": tested, "tops": tl}));
+    }
+    // tops of a deep shape, (4, 16), where the square certifies positions
+    // down to about 17, so that the split at k + 2 (mhi) is exercised
+    for _ in 0..300 {
+        let shd = Shape { f0: 4, k: 16 };
+        let uval = (1u128 << 51) + rng.below(1 << 51);
+        let mut tested = 0u64;
+        let tops = unit_tops::<u64>(&base, shd, uval, &mut tested);
+        let tl: Vec<Value> = tops
+            .iter()
+            .map(|t| json!([s(t.h), digits_of(t.mask), digits_of(t.mhi), s(t.lo), s(t.hi)]))
+            .collect();
+        units.push(json!({"f0": shd.f0, "k": shd.k, "u": s(uval), "tested": tested, "tops": tl}));
     }
     // whole parent lists of small shapes at base 64, with sampled child masks
     let mut plists = Vec::new();
