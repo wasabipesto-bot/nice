@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
     lean:
-        name: lake build --wfail, conformance
+        name: lake build --wfail, conformance, axioms
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v6
@@ -32,6 +32,10 @@ jobs:
             - name: Conformance (the Lean model against the Rust tables)
               working-directory: lean-midout
               run: lake exe conformance
+
+            - name: Axioms (no sorry, no native_decide, nothing added)
+              working-directory: lean-midout
+              run: bash scripts/check_axioms.sh
 
     fixtures:
         name: fixtures regenerate from the Rust
