@@ -35,6 +35,43 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## LEAN.3 The join's lemmas proved in two halves and merged (2026-11-23 05:55–06:50 UTC, two proof engineers at once; `LEAN-MO/BRIEF-STEP2.md`, `LEAN-MO/STEP2-NOTES-T.md`, `STEP2-NOTES-B.md`; fork branches `lean/midout-tops` 38a7d77f (CI run 45125119602, green) and `lean/midout-bottoms` 55a09ef0 (run 45124449585, green), both from 4934b0ca; merged by me into `lean/midout` 75ac981d; box 62104162, 24 cores)
+
+- **Half T** [M: `lake build --wfail`, conformance, axiom check: 138 theorems, standard axioms only, no `sorry`]:
+  every nice n of the range has a top in `unitTops` with lead n / b^k, the prefix interval clipped to the
+  range, and n inside it (`mem_unitTops_of_isNice`); `mhi` is the certificate at its cap and lies in the mask
+  (`topCertSplit_mhi`); for any n in a top's interval the mask's digits are digits of n², n³ at positions ≥ k
+  (`highDigit_of_mem_unitTops`); a step-for-step copy of the Rust scan equals the model's certificate
+  (`topCertScan_eq`); a nice n's top is among the probes of its class and unit exactly as often as in the
+  unit's list (`mem_probesOf_of_isNice`, `count_probesOf_of_isNice`); range and digit lengths
+  (`mem_range_of_isNice`, `Coord.le_numDigits_pow`); residue classes (`mod_mem_roots_of_isNice`); the final
+  check is the definition (`finalCheck_iff`).
+- **Half B** [M: the same checks, 128 theorems]: a slice's parent list is exactly the residues with the slice's
+  digits that the bottom certificate accepts, with that mask, without repeats (`mem_parents_iff`,
+  `parents_nodup`); a nice n's parent and child are in the lists with masks `lowSet b n (k−1)` and
+  `lowSet b n k` (`mkParent_mem_parents_of_isNice`, `mem_kidsOf_of_isNice`); the child's two new digits are the
+  affine expressions (`childMask_digits`); a nice n's top and child masks are disjoint and the pair survives
+  the run form through the chunk skip (`pairSurv_of_isNice`, `mem_probeSurv_of_isNice`); every nice n passes
+  the prefilter, with the exemption proved and shown necessary (`midPrefilter_of_isNice`,
+  `bare_rule_rejects_69`: without it 69 is rejected at base 10, k = 3).
+- **Findings:** none. Every lemma held for the model as written; no disagreement with the Rust on any
+  reachable input; no change proposed to a shared definition. Two unreachable edges noted (a shape with
+  kmid < kpos; an empty range).
+- **Not proved:** the bit-sliced word and partial-chunk mask (the model states their meaning; fixtures test
+  them); MAXPOP 17 (device only); exactness of survivor sets (optional L11).
+- **Same day:** the end-to-end theorem on the merged branch (LEAN.4 when back).
+
+## L7.7 Literature sweep #7, 2026-11-15 to 2026-11-23 (Sonnet, extended search mode; `L7/BRIEF-2026-11-23.md`, `L7/2026-11-23.md`)
+
+- Nothing on digits of squares or cubes, pandigital powers, restricted digits, or orthogonal vectors that bears
+  on the search (sixth null); one theory item to skim (arXiv 2610.10446, subset sum via partial match).
+- Status of the proof claims, as reported: Alpöge's Lean formalisation of RH/GRH compiles and is accepted by
+  several independent checkers (a page kept by A. Sutherland), unrefereed, no readable proof; Masullo's
+  manuscript has reported gaps; the October quasi-RH and Landau–Siegel results have independent write-ups, no
+  refutation, no journal acceptance.
+- For the Lean work here: an axiom audit plus an independent checker is the cheap trust package; Lean v4.36
+  improves bit-vector automation. Platform: no CubeCL 0.12 final; Mesa 26.3.1 ACO fixes, nothing RDNA4-compute.
+
 ## ST.0 Field-wide launches for the stages around the kernel: at most ×1.04–1.05 on a slice; dropped by arithmetic (2026-11-23, the director; derived from MO.13–MO.15's measurements on the RX 9070 XT and `G2/BUILD-NOTES.md` §12.3)
 
 - **Inputs** [M unless marked]: slice 4.312 ms on the RX 9070 XT (2026-11-19); main kernel 3.09–3.35 ms by the
