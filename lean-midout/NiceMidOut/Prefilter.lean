@@ -82,7 +82,7 @@ theorem midPrefilter_of_isNice {b k n : ℕ} {mhi : Finset ℕ} (hb : 2 ≤ b) (
 /-- Every element of `certDigits b a c cap` is, for every `n ∈ [a, c]`, a
 digit of `n²` or `n³` at a position `≥ cap` (the `mhi` of a top is
 `certDigits` at cap `k + 2`, whether or not the certificate has repeats). -/
-theorem highDigit_of_mem_certDigits {b a c cap n x : ℕ} (hb : 2 ≤ b) (han : a ≤ n) (hnc : n ≤ c)
+theorem certDigits_mem_highDigit {b a c cap n x : ℕ} (hb : 2 ≤ b) (han : a ≤ n) (hnc : n ≤ c)
     (hx : x ∈ certDigits b a c cap) : HighDigit b cap n x := by
   rw [certDigits_eq hb han hnc, List.mem_append, List.mem_map, List.mem_map] at hx
   rcases hx with ⟨i, hi, rfl⟩ | ⟨i, hi, rfl⟩
@@ -115,7 +115,7 @@ theorem midPrefilter_of_mem_unitTops {b lo hi f0 k u n : ℕ} {t : Top} (hb : 2 
   apply midPrefilter_of_isNice hb h
   intro x hx
   rw [(cert_of_mem_unitTops ht).2, List.mem_toFinset] at hx
-  exact highDigit_of_mem_certDigits hb hlo hhi hx
+  exact certDigits_mem_highDigit hb hlo hhi hx
 
 /-- The exemption is needed: the rule without it rejects base 10's nice
 number 69 at `k = 3` (`69² = 4761` has no digit at position 4, read as a
