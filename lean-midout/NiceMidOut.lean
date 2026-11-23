@@ -5,3 +5,4 @@ import NiceMidOut.RangeProofs
 import NiceMidOut.RunProofs
 import NiceMidOut.Bottoms
 import NiceMidOut.Prefilter
+import NiceMidOut.Pairing
