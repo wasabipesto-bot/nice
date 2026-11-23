@@ -9,3 +9,9 @@ import NiceMidOut.RangeDigits
 import NiceMidOut.CheckProofs
 import NiceMidOut.TopsScan
 import NiceMidOut.ClassesTops
+import NiceMidOut.Bottoms
+import NiceMidOut.Prefilter
+import NiceMidOut.Pairing
+import NiceMidOut.BottomsExact
+import NiceMidOut.BottomsNodup
+import NiceMidOut.BottomsKids
