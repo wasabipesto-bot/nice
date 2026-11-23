@@ -7,3 +7,4 @@ import NiceMidOut.TopsProofs
 import NiceMidOut.ClassesProofs
 import NiceMidOut.RangeDigits
 import NiceMidOut.CheckProofs
+import NiceMidOut.TopsScan
