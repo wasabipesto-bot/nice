@@ -3,3 +3,5 @@ import NiceMidOut.Join
 import NiceMidOut.CoordProofs
 import NiceMidOut.RangeProofs
 import NiceMidOut.RunProofs
+import NiceMidOut.TopsProofs
+import NiceMidOut.ClassesProofs
