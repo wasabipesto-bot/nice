@@ -280,10 +280,91 @@ def checkB64 : M Unit := do
 
 end Conformance
 
+namespace Conformance
+
+/-- `check.json`: the final check (`uniqueDigits`, the mirror of `unique_digits`)
+against the Rust's count of distinct digits and verdict. -/
+def checkCheck : M Unit := do
+  let j ← load "check.json"
+  for bj in ← orFail (asArr j) do
+    let b ← orFail (nat bj "base")
+    for r in ← orFail (arr bj "rows") do
+      let [n, u, ok] ← orFail (asArr r) | throw (IO.userError "check row shape")
+      let n ← orFail (asNat n)
+      let want := (← orFail (asNat u), ← orFail (asBool ok))
+      let got := uniqueDigits b n
+      ensure (got == want) s!"check b{b} n {n}: model {got}, Rust {want}"
+      ensure (finalCheck b n == want.2) s!"check b{b} n {n}: final check"
+      tick
+
+/-- `wide.json`: whole slices at larger bases, through the run form (counters
+and every survivor in order) and the definition (survivors as a set). -/
+def checkWide (verbose : Bool := false) : M Unit := do
+  let j ← load "wide.json"
+  for bj in ← orFail (asArr j) do
+    let b ← orFail (nat bj "base")
+    let c ← checkCoord bj s!"wide b{b}"
+    let sh : Shape := ⟨← orFail (nat bj "f0"), ← orFail (nat bj "k")⟩
+    let place := s!"wide b{b} ({c.k0}, {c.k1}, {c.q0}) shape ({sh.f0}, {sh.k})"
+    for s in ← orFail (arr bj "slices") do
+      let pip ← orFail (nat s "pip")
+      let wantC ← orFail ((← orFail (arr s "counts")).mapM asNat)
+      let wantS ← orFail ((← orFail (arr s "surv")).mapM survOf)
+      let t0 ← IO.monoMsNow
+      let run := sliceRun c.b c.lo c.hi sh pip
+      ensureList run.counts.toList wantC s!"{place} slice {pip} counters"
+      ensureList run.surv wantS s!"{place} slice {pip} survivors (in order)"
+      let t1 ← IO.monoMsNow
+      let defn := (sliceSurvivors c.b c.lo c.hi sh pip).map fun x =>
+        (x.1, x.2.1, midPrefilter c.b sh.k x.2.1 x.2.2)
+      let srt := fun (l : List (ℕ × ℕ × Bool)) => l.mergeSort fun x y => x.2.1 ≤ y.2.1
+      ensureList (srt defn) (srt wantS) s!"{place} slice {pip} survivors of the definition"
+      let t2 ← IO.monoMsNow
+      if verbose then
+        IO.println s!"{place} slice {pip}: run {t1 - t0} ms, definition {t2 - t1} ms"
+        (← IO.getStdout).flush
+      tick 3
+
+/-- The survivor checksum of the generator's `surv_hash`. -/
+def survHash (l : List (ℕ × ℕ × Bool)) : ℕ :=
+  let m := 2 ^ 61 - 1
+  l.foldl (fun h x => (h * 1000003 + (x.2.1 * 128 + x.1 * 2 + if x.2.2 then 1 else 0) % m) % m) 0
+
+/-- `slice64.json` (not committed; `lake exe conformance --slice64`): one
+base-64 slice of shape (4, 10) through the run form, counters, survivor count
+and checksum. -/
+def checkSlice64 : M Unit := do
+  let j ← load "slice64.json"
+  let some c := Coord.withDigits (← orFail (nat j "base")) (← orFail (nat j "k0"))
+      (← orFail (nat j "k1")) (← orFail (nat j "q0"))
+    | throw (IO.userError "slice64: the model refuses the coordinate")
+  let sh : Shape := ⟨← orFail (nat j "f0"), ← orFail (nat j "k")⟩
+  let pip ← orFail (nat j "pip")
+  let wantC ← orFail ((← orFail (arr j "counts")).mapM asNat)
+  let t0 ← IO.monoMsNow
+  let run := sliceRun c.b c.lo c.hi sh pip
+  ensureList run.counts.toList wantC s!"slice64 {pip} counters"
+  let t1 ← IO.monoMsNow
+  IO.println s!"slice64: counters equal after {(t1 - t0) / 1000} s"
+  (← IO.getStdout).flush
+  ensure (run.surv.length == (← orFail (nat j "nsurv"))) "slice64 survivor count"
+  ensure (survHash run.surv == (← orFail (nat j "hash"))) "slice64 survivor checksum"
+  tick 3
+
+end Conformance
+
 open Conformance in
-def main : IO UInt32 := do
+def main (args : List String) : IO UInt32 := do
   try
-    let ((), n) ← (do checkBases; checkB64; checkWhole : M Unit).run 0
+    if args.contains "--wide" then
+      let ((), n) ← (checkWide true : M Unit).run 0
+      IO.println s!"conformance --wide: {n} checks, all equal to the Rust table"
+      return 0
+    if args.contains "--slice64" then
+      let ((), n) ← (checkSlice64 : M Unit).run 0
+      IO.println s!"conformance --slice64: {n} checks, all equal to the Rust table"
+      return 0
+    let ((), n) ← (do checkBases; checkB64; checkWhole; checkCheck; checkWide : M Unit).run 0
     IO.println s!"conformance: {n} checks, all equal to the Rust tables"
     pure 0
   catch e =>

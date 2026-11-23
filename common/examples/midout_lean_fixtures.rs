@@ -21,9 +21,18 @@
 //!   certificates of sampled intervals, the tops of sampled units, parent
 //!   lists of small shapes, sampled parents and child masks of real
 //!   slices, prefilter verdicts.
+//! - `check.json`: `unique_digits` (count and verdict) of about 2,000 n per
+//!   base for 12 bases: random n of the range, n whose count is one or two
+//!   short of the base where sampling finds them, the range's ends and the
+//!   numbers just outside it, and every nice number found.
+//! - `wide.json`: whole slices at larger bases (30, 40, 50) at shapes like
+//!   production's (k = L): counters and every survivor in order.
+//! - `slice64.json` (only with `--slice64`, not part of the committed set):
+//!   one base-64 slice of shape (4, 10): counters, survivor count and an
+//!   order-sensitive checksum of the survivors.
 
 use nice_common::base_range::get_base_range_natural;
-use nice_common::midout::arith::roots;
+use nice_common::midout::arith::{roots, unique_digits};
 use nice_common::midout::coord::Coord;
 use nice_common::midout::cpu::{
     Base, Counts, Parent, Shape, child_mask, parents, prefilter, search_field, slice_join,
@@ -352,11 +361,141 @@ fn b64() -> Value {
            "parent_samples": psamples, "prefilter": pf})
 }
 
+/// Bases of the final-check table.
+const CHECK_BASES: &[u32] = &[10, 12, 13, 14, 17, 20, 25, 30, 40, 50, 64, 65];
+
+fn check() -> Value {
+    let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
+    let mut out = Vec::new();
+    for &b in CHECK_BASES {
+        let c = Coord::with_digits(b, 0, 1, 0).unwrap();
+        let (lo, hi) = (c.start(), c.end());
+        let mut ns: Vec<u128> = Vec::new();
+        // the range's ends and the numbers just outside it
+        for i in 0..20u128 {
+            ns.push(lo + i);
+            ns.push(hi - 1 - i);
+            ns.push(lo - 1 - i);
+            ns.push(hi + i);
+        }
+        // random n of the range
+        for _ in 0..1500 {
+            ns.push(lo + rng.below(hi - lo));
+        }
+        // n one or two digits short of nice, and nice n, where sampling finds them
+        let mut near = 0;
+        for _ in 0..400_000 {
+            let n = lo + rng.below(hi - lo);
+            let (u, _) = unique_digits(n, b);
+            if u + 2 >= b {
+                ns.push(n);
+                near += 1;
+                if near == 400 {
+                    break;
+                }
+            }
+        }
+        if b == 10 {
+            ns.extend(lo..hi);
+        }
+        let rows: Vec<Value> = ns
+            .iter()
+            .map(|&n| {
+                let (u, ok) = unique_digits(n, b);
+                json!([s(n), u, u8::from(ok)])
+            })
+            .collect();
+        out.push(json!({"base": b, "rows": rows}));
+    }
+    json!(out)
+}
+
+/// Larger bases, shapes like production's (`k = L`):
+/// `(b, (k0, k1, q0), (f0, k), slices kept)`. Six slices are drawn per base
+/// (first and a random one of the first, a random and the last field value);
+/// at base 50 only the second is kept: the model's run form takes about five
+/// minutes on one slice there.
+const WIDE: &[(u32, (u32, u32, u32), (u32, u32), &[usize])] = &[
+    (30, (2, 4, 3), (2, 6), &[0, 1, 2, 3, 4, 5]),
+    (40, (3, 6, 4), (3, 8), &[0, 1, 2, 3, 4, 5]),
+    (50, (4, 8, 5), (4, 10), &[1]),
+];
+
+fn wide() -> Value {
+    let mut rng = Rng(0x1234_5678_9ABC_DEF1);
+    let mut out = Vec::new();
+    for &(b, (k0, k1, q0), (f0, k), keep) in WIDE {
+        let coord = Coord::with_digits(b, k0, k1, q0).unwrap();
+        let base = Base::new(&coord);
+        let sh = Shape { f0, k };
+        let nq = (coord.v_end() - coord.start()) / coord.quantum();
+        let mut drawn = Vec::new();
+        for t in [0, rng.below(nq), nq - 1] {
+            let pips: Vec<u128> = sh.slices_of(&coord, t).collect();
+            drawn.push(pips[0]);
+            drawn.push(pips[rng.below(pips.len() as u128) as usize]);
+        }
+        let mut slices = Vec::new();
+        for &i in keep {
+            let pip = drawn[i];
+            let mut surv = Vec::new();
+            let c = slice_join::<u64>(&base, sh, pip, |d, n, pass| {
+                surv.push(json!([d, s(n), u8::from(pass)]));
+            });
+            slices.push(json!({"pip": s(pip), "counts": counts(&c), "surv": surv}));
+        }
+        out.push(json!({"base": b, "k0": k0, "k1": k1, "q0": q0, "f0": f0, "k": k,
+            "start": s(coord.start()), "end": s(coord.end()),
+            "h0": s(coord.h0()), "hn": s(coord.hn()),
+            "quantum": s(coord.quantum()), "v_end": s(coord.v_end()),
+            "slices": slices}));
+    }
+    json!(out)
+}
+
+/// The order-sensitive checksum of a survivor list (`(d, n, pass)` in order):
+/// `h ← (h·1000003 + (128·n + 2·d + pass) mod M) mod M`, `M = 2^61 − 1`.
+fn surv_hash(h: u128, d: u32, n: u128, pass: bool) -> u128 {
+    const M: u128 = (1 << 61) - 1;
+    let x = (n * 128 + u128::from(d) * 2 + u128::from(pass)) % M;
+    (h * 1_000_003 + x) % M
+}
+
+fn slice64() -> Value {
+    let coord = Coord::with_digits(64, 4, 8, 5).unwrap();
+    let base = Base::new(&coord);
+    let sh = Shape { f0: 4, k: 10 };
+    let t = 12345;
+    let pip = sh.slices_of(&coord, t).next().unwrap();
+    let mut h = 0u128;
+    let mut nsurv = 0u64;
+    let start = std::time::Instant::now();
+    let c = slice_join::<u64>(&base, sh, pip, |d, n, pass| {
+        h = surv_hash(h, d, n, pass);
+        nsurv += 1;
+    });
+    eprintln!("slice64: {:?}", start.elapsed());
+    json!({"base": 64, "k0": 4, "k1": 8, "q0": 5, "f0": 4, "k": 10, "t": t, "pip": s(pip),
+        "counts": counts(&c), "nsurv": nsurv, "hash": s(h)})
+}
+
 fn main() {
     let dir = std::env::args().nth(1).unwrap_or_else(|| "lean-midout/fixtures".into());
     let dir = Path::new(&dir);
     fs::create_dir_all(dir).unwrap();
-    for (name, v) in [("bases.json", bases()), ("b64.json", b64()), ("whole.json", whole())] {
+    if std::env::args().any(|a| a == "--slice64") {
+        let text = serde_json::to_string(&slice64()).unwrap();
+        fs::write(dir.join("slice64.json"), text + "\n").unwrap();
+        eprintln!("wrote slice64.json");
+        return;
+    }
+    for (name, v) in [
+        ("bases.json", bases()),
+        ("b64.json", b64()),
+        ("whole.json", whole()),
+        ("check.json", check()),
+        ("wide.json", wide()),
+    ] {
         let text = serde_json::to_string(&v).unwrap();
         fs::write(dir.join(name), text + "\n").unwrap();
         eprintln!("wrote {name}");
