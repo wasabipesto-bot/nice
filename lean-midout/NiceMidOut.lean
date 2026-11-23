@@ -15,3 +15,4 @@ import NiceMidOut.Pairing
 import NiceMidOut.BottomsExact
 import NiceMidOut.BottomsNodup
 import NiceMidOut.BottomsKids
+import NiceMidOut.EndToEnd
