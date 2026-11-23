@@ -6,3 +6,4 @@ import NiceMidOut.RunProofs
 import NiceMidOut.Bottoms
 import NiceMidOut.Prefilter
 import NiceMidOut.Pairing
+import NiceMidOut.BottomsExact
