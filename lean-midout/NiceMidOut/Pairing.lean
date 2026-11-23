@@ -11,6 +11,7 @@ Reused from the earlier library: `disjoint_high_lowSet` (JOIN-3),
 `probeSurv_eq` (`RunProofs`).
 -/
 import NiceMidOut.Prefilter
+import NiceMidOut.Bottoms
 import NiceMidOut.RunProofs
 
 namespace NiceMidOut
@@ -66,5 +67,40 @@ theorem mem_probeSurv_of_isNice {b lo hi f0 k u n d r : ℕ} {t : Top}
     (d, n, true) ∈ probeSurv b k d t ch := by
   rw [probeSurv_eq, List.mem_filterMap]
   exact ⟨_, hch, pairSurv_of_isNice hb h ht hn hlo hhi h2 h3⟩
+
+/-- A probed top is a top of its unit. -/
+theorem mem_of_mem_probesOf {b c d : ℕ} {tv : List Top} {t : Top} (ht : t ∈ probesOf b tv c d) :
+    t ∈ tv := by
+  unfold probesOf at ht
+  rw [List.mem_flatMap] at ht
+  obtain ⟨_, _, ht⟩ := ht
+  exact (List.mem_filter.mp ht).1
+
+/-- **L5 + L7 + L8 in `sliceSurvivors`'s terms (what L10 needs from this
+half).** Let `n` be nice with `2 ≤ k` and both powers having at least `k`
+digits. If a top `t` with `t.h = n div b^k` and `n` in its interval is probed
+at class `c = (n mod b^(k−1)) mod (b − 1)` and unit digit `d = digit_(k−1) n`
+among the tops of `n`'s unit (L4 and L6, the other half), then `(d, n, t.mhi)`
+is a survivor of `n`'s slice, and `t.mhi` passes the prefilter
+(`midPrefilter_of_mem_unitTops`). -/
+theorem mem_sliceSurvivors_of_isNice {b lo hi n : ℕ} {sh : Shape} {t : Top} (hb : 2 ≤ b)
+    (h : IsNice b n) (hk : 2 ≤ sh.k) (h2 : sh.k ≤ numDigits b (n ^ 2))
+    (h3 : sh.k ≤ numDigits b (n ^ 3))
+    (ht : t ∈ probesOf b (unitTops b lo hi sh.f0 sh.k
+      (n / b ^ sh.f0 % b ^ (sh.k - 1 - sh.f0) + digit b n (sh.k - 1) * b ^ (sh.k - 1 - sh.f0)))
+      (n % b ^ (sh.k - 1) % (b - 1)) (digit b n (sh.k - 1)))
+    (hh : t.h = n / b ^ sh.k) (hlo : t.lo ≤ n) (hhi : n ≤ t.hi) :
+    (digit b n (sh.k - 1), n, t.mhi) ∈
+      sliceSurvivors b lo hi sh (n / b ^ sh.f0 % b ^ (sh.k - 1 - sh.f0)) := by
+  have hn : n = t.h * b ^ sh.k + digit b n (sh.k - 1) * b ^ (sh.k - 1) + n % b ^ (sh.k - 1) := by
+    rw [hh]; exact eq_top_unit_residue b n sh.k (by omega)
+  have hp := pair_passes_of_isNice hb h (mem_of_mem_probesOf ht) hn hlo hhi h2 h3
+  unfold sliceSurvivors
+  simp only [List.mem_flatMap, List.mem_range, List.mem_filterMap]
+  refine ⟨n % b ^ (sh.k - 1) % (b - 1), Nat.mod_lt _ (by omega), digit b n (sh.k - 1),
+    digit_lt_base (by omega) _ _, t, ht, (n % b ^ (sh.k - 1), lowSet b n sh.k),
+    mem_kidsOf_of_isNice hb h hk h2 h3, ?_⟩
+  rw [← hn] at hp ⊢
+  rw [if_pos hp]
 
 end NiceMidOut
