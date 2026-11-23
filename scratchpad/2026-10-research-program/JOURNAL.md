@@ -30,6 +30,27 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   and the stages both at their measured limits, no engineering on base 64 remains that I can measure without
   that card.
 
+- **06:00–06:50 UTC: sweep #7 and both Lean halves back** (EXPERIMENTS L7.7, LEAN.3): no lemma false, no
+  disagreement with the Rust; merged by me into `lean/midout` 75ac981d (only the import list conflicted).
+- **07:20 UTC: the end-to-end theorems proved** (LEAN.4; `searchField_complete`, `searchField_sound`).
+- **07:25–07:50 UTC: independent audit** (`LEAN-MO/REVIEW.md`): accurate with corrections; the important one:
+  the theorems were per field and conditional on the model accepting the field.
+- **09:30 UTC: corrections applied** (LEAN.5): `lean/midout` 05747baa, 208 theorems, conformance 102,603
+  comparisons, CI green; **`no_nice_of_searched_withDigits`: if every field of a covering set returns nothing,
+  the base has no nice number.** A base-64 slice through the Lean model did not finish in 45 minutes: left out.
+  Box destroyed 09:31 (3.72 h, about $0.38).
+- **Design and decisions updated** (DESIGN.md §4, §7; D18 rewritten: done; options for what to do with it; the
+  possible next step, the device path's algorithmic differences, to be scoped only).
+- **Spend today:** about $0.38; month $24.67 invoiced of $30. Agents: 3 Opus proof engineers (one resumed
+  twice), 1 Opus auditor, 1 Sonnet (sweep).
+- **For the 05:41 cycle of 11-24:** (1) what the user wrote; #271. (2) LEAN: a scope document for the device
+  path's algorithmic differences (shared parent lists, top hierarchy, job split, records and expansion): what a
+  model and a refinement proof would consist of, with the lesson of today's audit built in (whole-object
+  statements, mutants, vacuity checks); no proof work until scoped; plus, cheaply, "each number once" if the
+  scope engineer has time on the fork's CI alone. (3) No engineering on base 64 remains that I can measure
+  without the RX 9070 XT (D17). (4) The wrapper holds a reserve from 11-24: about $5.3 left; plan sessions that
+  need no rental (the fork's CI builds Lean in 8–11 minutes).
+
 ## 2026-11-22 (cycle 13 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $23.88 invoiced of $30 (fleet $39.02), credit $48.36.

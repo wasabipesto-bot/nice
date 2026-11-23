@@ -254,3 +254,123 @@ and replays its declarations through the kernel again, independently of the elab
   still to be read in the source.)
 
 Box left idle (no process of mine running); `/work/merged` holds the clone.
+
+## After the audit (2026-11-23, 07:52–11:00 UTC)
+
+*On `lean/midout` from `5eb715f3`, worktree `~/projects/nice/.worktrees/lean-midout`, builds in `/work/merged` on
+the box (Rust 1.100.0 installed there under `/work/merged/{rustup,cargo}` for the fixture generator). Commits
+`536eda22` (B1 + A1's model change), `61d38a77` (fixtures, conformance, README), and the last one listed under
+Status below.*
+
+### B1, the whole-base statement — done (`NiceMidOut/WholeBase.lean`, new)
+
+```lean
+def Coord.WholeQuanta (c : Coord) (vs vz : ℕ) : Prop :=
+  0 < vz ∧ c.lo ≤ vs ∧ vs + vz ≤ c.vEnd ∧ c.quantum ∣ vs - c.lo ∧ c.quantum ∣ vz
+def Coord.Covers (c : Coord) (fs : List (ℕ × ℕ)) : Prop :=
+  ∀ v, c.lo ≤ v → v < c.vEnd → ∃ f ∈ fs, f.1 ≤ v ∧ v < f.1 + f.2
+
+theorem Coord.fieldDigits_isSome_iff : (c.fieldDigits vs vz).isSome ↔ c.WholeQuanta vs vz
+theorem searchField_isSome_iff : (searchField c sh vs vz).isSome ↔ sh.Fits c ∧ c.WholeQuanta vs vz
+theorem searchField_complete_wq (hc : c.Valid) (hfit : sh.Fits c) (hw : c.WholeQuanta vs vz) :
+    ∃ o, searchField c sh vs vz = some o ∧
+      ∀ n, IsNice c.b n → vs ≤ c.vOfN n → c.vOfN n < vs + vz → n ∈ o.nice
+theorem isNice_iff_mem_fields (hc : c.Valid) (hfit : sh.Fits c)
+    (hw : ∀ f ∈ fs, c.WholeQuanta f.1 f.2) (hcov : c.Covers fs) (n : ℕ) :
+    IsNice c.b n ↔ ∃ f ∈ fs, ∃ o, searchField c sh f.1 f.2 = some o ∧ n ∈ o.nice
+theorem no_nice_of_searched (hc : c.Valid) (hcov : c.Covers fs)
+    (hrun : ∀ f ∈ fs, ∃ o, searchField c sh f.1 f.2 = some o ∧ o.nice = []) :
+    ∀ n, ¬ IsNice c.b n
+theorem no_nice_of_searched_withDigits (hc : Coord.withDigits b k0 k1 q0 = some c)
+    (hcov : c.Covers fs)
+    (hrun : ∀ f ∈ fs, ∃ o, searchField c sh f.1 f.2 = some o ∧ o.nice = []) :
+    ∀ n, ¬ IsNice b n
+```
+In words: (a) the model's field function accepts exactly the plain whole-quanta fields, so acceptance is proved, not
+assumed (mutant M6 now breaks `fieldDigits_isSome_iff`, which `no_nice_of_searched` uses); completeness holds for
+every such field. (b) For a valid coordinate, a fitting shape and whole-quanta fields covering `[lo, vEnd)`, n is
+nice iff some field's search returns it. **The claim the project would make** is `no_nice_of_searched_withDigits`:
+its only hypotheses are that the coordinate was built by `Coord.withDigits b k0 k1 q0`, that the fields cover the
+coordinate's values `[lo, vEnd)`, and that each field's search returned an outcome with an empty nice list (the
+shape's fit and the fields' whole quanta follow from "returned an outcome", `searchField_isSome_iff`). The tiling is
+only required to *cover* (overlaps allowed): the fewest honest hypotheses.
+
+The two tilings as instances (proved): `Coord.wholeField c = [(c.lo, c.vEnd − c.lo)]` and `Coord.quantumFields c =
+(List.range (b^(k1−q0))).map (fun i => (lo + i·Q, Q))`, each with `_wholeQuanta` and `_covers`, and
+`isNice_iff_mem_wholeField`, `isNice_iff_mem_quantumFields`. Helpers: `Coord.fieldDigits_of_wholeQuanta`,
+`vOfN_mem_of_isNice`, `Coord.b_of_withDigits`. Nothing false found.
+
+### A1, soundness with content — done
+
+`Join.lean` now defines `uniqueDigits` (moved from `CheckProofs`, unchanged: distinct count of `outputDigits`, and
+whether it and the total count are `b`) and `finalCheck b n := (uniqueDigits b n).2`; `searchField` filters with it.
+`finalCheck_iff (hb : 2 ≤ b) : finalCheck b n = true ↔ IsNice b n` is now a theorem through
+`numUniques_eq_iff_isNice` and `length_outputDigits` (it was `decide_eq_true_iff`); `uniqueDigits_snd` is restated
+as `(uniqueDigits b n).2 = decide (IsNice b n)`. `searchField_sound` goes through it (its hypothesis `c.Valid` gives
+`b ≥ 3`). The conformance after the change: 81,484 equal (unchanged tables).
+
+New table `fixtures/check.json` (392 kB): `unique_digits(n, b)` (count and verdict) for 12 bases (10, 12, 13, 14, 17,
+20, 25, 30, 40, 50, 64, 65), 1,580–2,033 rows each, 21,077 in all: 1,500 random n of the range; the 20 lowest and 20
+highest n of the range and the 20 just below and above it; up to 400 n with count ≥ b − 2 found among 400,000 random
+draws (found at bases 10–25 only: 654, 434, 444, 409, 404, 63, 2 rows at 10, 12, 13, 14, 17, 20, 25; none at 30 and
+above, where such numbers are too rare to sample); at base 10 every n of [47, 100) (so 69, verdict 1, and 70, count
+4, verdict 0). Conformance compares the mirror's pair `(count, verdict)` and `finalCheck` with the Rust's: 21,077
+checks. Mutant M9 (also accepts 70) fails at `check b10 n 70` (by construction of the row; not rerun as a mutant).
+
+### A2, end-to-end comparisons beyond the small bases — done in part
+
+New table `fixtures/wide.json` (14 kB), compared by `checkWide`: whole slices through `sliceRun` (12 counters, every
+survivor in order) and through the definition `sliceSurvivors` (survivors as a set), at
+- base 30, coordinate (2, 4, 3), shape (2, 6): 6 slices, 8 survivors; ~25 ms per slice in the model;
+- base 40, coordinate (3, 6, 4), shape (3, 8): 6 slices, 98 survivors; ~0.7 s run form + 0.2 s definition per slice;
+- base 50, coordinate (4, 8, 5), shape (4, 10) (production's shape, k = L): **1 slice**, 380 survivors, 147,047
+  parents, 2.9 M children. The model takes ~5 min for the run form on one such slice (312 s measured on slice 0;
+  the definition 12 s), so I kept one slice; the six drawn are in the generator, five not run.
+All equal. Full conformance now **102,603 checks, all equal** (~10 min on 4 box cores).
+
+**The base-64 slice** (shape (4, 10), coordinate (4, 8, 5), t = 12345, pip = 790080; Rust single-thread 24 s:
+1,042,534 parents, 33.7 M children, 1.6·10^10 pairs, 251.6 M flat probes, 11,818,511 survivors). Generator mode
+`--slice64` writes `slice64.json` (counters, survivor count, an order-sensitive checksum mod 2^61 − 1), conformance
+mode `--slice64` compares; the table is not committed. Outcome: **did not finish**. Started 08:32:41 UTC on 6 cores
+(`taskset -c 4-9`, though the model runs on one), stopped by my watchdog at 09:18:11 (45.5 min) with no counters
+produced; resident memory rose to 0.89 GB within 3 minutes and stayed there (no memory pressure). The run form is
+one pure function call with no progress output, so I have no rate from inside it; by extrapolation from base 50
+(312 s for a slice with 147 k parents and 2.9 M children, against 1.04 M parents, 33.7 M children and 251.6 M
+probe–chunk pairs here) I judge it to need several hours [judged]. Left out of the tests, as instructed; the
+`--slice64` modes of the generator and of the conformance stay committed for whoever runs it longer.
+
+### B2, B3, B4, C1, C4 — the README
+
+`lean-midout/README.md` rewritten: the auditor's two sentences, extended with the whole-base consequence and the
+wider fixtures, as its Summary; bases 3–128 with a range; the Rust's refusals not modelled (`u128` range/overflow,
+the prefilter's 2^96 assertion, mask width) — the model accepts more, harmless; the run form linked by
+`sliceRun_surv_perm` only; soundness's history (by construction before, through the mirror now) and that the
+substance is completeness plus "in the field"; the fixtures at 64/65 component by component and the end-to-end ones
+by base; `leanchecker` per module and `--fresh` on one module, the import-only root not checked; "each number
+appears once" not proved. B4 (brittleness vs dependence) is the auditor's methodological point and needs no change
+in the proofs; it is not repeated in the README.
+
+### C1 ("each nice number appears exactly once") — not attempted
+
+It needs, per nice n: one slice across the field (`slicesOf_nodup`, `field_disjoint` exist), one class and unit,
+the top listed once in its unit (no lemma yet that `unitTops` has no repeats), probed once (`count_probesOf_of_isNice`
+exists), the child once (`parents_nodup` exists; `kidsOf` keeps it), and the survivor determining all of them. I
+judged it at 150+ lines, not short; the time went to B1/A1/A2.
+
+### Checks and status
+
+- Box, on the Lean and fixture tree of `61d38a77` (README-only change after): `lake build --wfail` ok; axiom check
+  **208 theorems, standard axioms only**; conformance **102,603 checks, all equal** (81,484 before + 21,077 final-check
+  rows + 42 wide); the regenerated tables identical across two generator runs, and the three old tables
+  byte-identical to the committed ones.
+- `leanchecker`, rerun on the new tree: all 19 `NiceMidOut.*` modules with declarations rc 0 (`WholeBase` included);
+  `--fresh NiceMidOut.WholeBase` rc 0 (08:46:52–09:04:13 UTC). The root module was not rerun (it did not finish
+  before; it only imports).
+- Fork CI, all green: `536eda22` https://github.com/wasabipesto-bot/nice/actions/runs/45135243527, `61d38a77`
+  https://github.com/wasabipesto-bot/nice/actions/runs/45141353006 (the fixture job regenerated `check.json` and
+  `wide.json` from the Rust and matched the checksums), head **`05747baa`**
+  https://github.com/wasabipesto-bot/nice/actions/runs/45145903363.
+- Tooling: `pkill -f` inside an ssh command killed its own shell once (no harm; used `kill <pid>` after); Lean's
+  stdout to a file is buffered, so the conformance's timing lines needed an explicit flush.
+- Box left idle: no process of mine running; `/work/merged` holds the clone, the Rust toolchain and the logs;
+  `/work/review` untouched.

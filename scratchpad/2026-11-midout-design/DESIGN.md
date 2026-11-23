@@ -330,8 +330,10 @@ f = 1/1,000 is seen with 63 % probability after 1,000 fields, 0.4 % of the base 
 
 **What nothing catches:**
 
-- a defect shared by the device and the CPU reference (the join's predicate itself); covered only by the CPU
-  reference against brute force on whole small bases (10–25 and 10–29 for nice numbers) [measured];
+- a defect shared by the device and the Rust CPU reference in how they *implement* the join's rules. The rules
+  themselves (certificates, classes, pairing, prefilter, coverage of the range by fields) are proved complete
+  in Lean since 2026-11-23 for a model that agrees with the Rust reference on 102,603 table comparisons (§7);
+  before that they rested on the reference against brute force at bases 10–25 only;
 - production's check kernel judging a nice n not nice (production's own exposure, unchanged);
 - a defect in slices the sample has not yet drawn;
 - at base 65 the sampled check was off until 2026-11-20 (one thread took 70–106 s against a 55–57 s field); it
@@ -545,13 +547,20 @@ said; counts come from an exact CPU prototype on real slices.
   tests (deep-shape tops against their definition; the prefilter at its exemption boundary against full digits)
   kill the one that mattered (an edited prefilter exemption) and a caller-side form of "certificate one position
   too high" that no Rust test caught; **2 survive, both changing only work counters** [measured].
-- **A second, independent definition in Lean** (fork branch `lean/midout`, directory `lean-midout/`, not part of
-  this branch; since 2026-11-22): the reference as Lean functions, compared with tables generated from this
-  Rust code: 81,484 comparisons (every survivor of 9,411 small-base slices in order, residue classes of bases
-  3–128, base-64 and base-65 samples with two real slices), all equal, no disagreement ever met. Proved there
-  (83 theorems, no `sorry`): the coordinate is one to one, a field is a whole number of slices, fields partition
-  the range, and the form that runs returns the same survivors as the form the theorems are about. The join's
-  own lemmas are not proved yet.
+- **The algorithm is proved in Lean** (fork branch `lean/midout`, directory `lean-midout/`, its own README; not
+  part of this branch; 2026-11-22 and 23). The reference is written a second time as Lean functions and
+  compared with tables generated from this Rust code: 102,603 comparisons, all equal, no disagreement ever met
+  (every survivor in order of 9,411 slices at bases 10–25 and of whole slices at bases 30, 40 and 50; the final
+  check on 21,077 numbers; residue classes of bases 3–128; at bases 64 and 65 the components: coordinates,
+  fields, certificates, unit tops, parents, children, prefilter). Proved about those functions (208 theorems, no
+  `sorry`, Lean's three standard axioms, accepted by Lean's independent checker; audited by a reviewer who did
+  not write them): **for every base 3–128 with a range, every coordinate the constructor accepts and every set
+  of whole-quanta fields covering the range, a number is nice exactly when some field's search returns it; so if
+  every field's search returns nothing, the base has no nice number** (`no_nice_of_searched_withDigits`,
+  `isNice_iff_mem_fields`, `searchField_complete_wq`, `searchField_sound`). **What that does not cover:** the Rust
+  itself, its 384-bit arithmetic, the bit-sliced word (the model states its meaning), mask widths, the GPU
+  kernels and drivers, the coordinator's record of which fields were searched, and "each number is reported
+  once". No whole base-64 slice has been run through the Lean model (it would take hours).
 - Device against CPU: 1,073 real base-64 slices equal n for n in an independent sweep (on the branch as it was on
   2026-11-18, before the accounts and the 5–7 coordinate) [measured]; since then, 100 of them again, the range's
   first and last slices, and every slice of one field under both coordinates [measured].

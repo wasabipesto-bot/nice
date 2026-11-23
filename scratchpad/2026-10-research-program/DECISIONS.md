@@ -1,11 +1,11 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-22 07:55 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-23 09:45 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
 separate document:** `../2026-11-midout-design/DESIGN.md` (with a one-screen picture,
 `../2026-11-midout-design/static/midout-overview.png`, and a clickable process map,
 `../2026-11-midout-design/interactive/midout-map.html`). To answer, reply in the chat with the numbers, for
-example: `D2 a, D3 yes, D5 yes hidden, D14 45, D16 yes, D18 a`.
+example: `D2 a, D3 yes, D5 yes hidden, D14 45, D16 yes, D18 b`.
 
 Paths below are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
 
@@ -22,7 +22,7 @@ once for a far larger span and paired with a bit-sliced kernel.
 | speed, base 64, RTX 3080, end to end against v3.4.8's join, same session | **×4.09** (1.62 fs against 6.62 fs per candidate) |
 | speed, base 64, RX 9070 XT (demoux), end to end against v3.4.8's join, same session | **×4.79** (0.99 fs against 4.76 fs per candidate), measured 2026-11-19 at 64 lanes on the branch just before its cleanup (the cleaned branch has not run on that card; on the 3080 the cleanup changed the time by +0.17 %); exact on every slice and field tried; the client route also ran there against a local coordinator (12 fields). The 4.76 fs baseline there is production's join throughput harness (ten fields on 2026-11-18, scaled ×1.012 by two fields re-measured in the same session), not the client's own ten-field run that the 3080 baseline uses. At that speed base 64 on that card alone is about 55 days instead of about 266 |
 | base 65 (needs masks wider than 64 bits; production has no join there at all) | exact on a GPU; 3.47 fs per candidate on 2026-11-19, about half an RTX-3080-year for the whole base; 10 % less since 2026-11-20 (3.29 against 3.66 fs in one session on a slower box). On your card it measured 3.1 fs on 2026-11-19; the wide kernel has since been fitted to that card offline (12 waves instead of 8), not re-run: predicted 2.4–3.0 fs |
-| exactness | CPU reference equals brute force on whole bases 10–25; GPU equals the CPU reference on 1,073 real base-64 slices (measured on 2026-11-18, before the execution checks and the digits-5–7 field were added; since then: 100 of them again, the first and last slice of the range, and every slice of one field under both field definitions); an independent audit found no loss path on a healthy card |
+| exactness | **the algorithm is proved in Lean (2026-11-23, D18): if every field of a base returns nothing, the base has no nice number**, for a model that agrees with the Rust reference on 102,603 comparisons; CPU reference equals brute force on whole bases 10–25; GPU equals the CPU reference on 1,073 real base-64 slices (measured on 2026-11-18, before the execution checks and the digits-5–7 field were added; since then: 100 of them again, the first and last slice of the range, and every slice of one field under both field definitions); an independent audit found no loss path on a healthy card |
 | failure handling | every stage proves it ran (what ran = what was queued), two conservation checks, and one random slice per field recomputed on the CPU (at base 65 too since 2026-11-20: the CPU slice now runs on up to 4 threads); a dropped kernel, a failed allocation or a wrong prefilter stops the field instead of reporting it empty |
 | how it runs today | a local coordinator script plus an off-by-default client flag; **no server, schema or API change exists or is proposed yet** |
 | what a field is | all n sharing digits 5–7 (base 64: 262,144 fields of 2^57 n; in the fields table it would still be a range, of a renumbered coordinate) |
@@ -197,46 +197,34 @@ pairing loop. The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
   into an empty result; no nice number exists at any base it covers (bases 4 and 5 are covered too: checked by
   brute force); `just lint` and the suites CI runs pass. Description drafted: `G2/STRIDE-EMPTY-PR-BODY.md`.
 
-### D18. A machine-checked proof that the middle-out join misses no candidate (new 2026-11-21)
+### D18. The machine-checked proof that the middle-out join misses no candidate: done; what to do with it
 
-- **Why it is worth having:** today the join's rules (what tops and bottoms certify, the residue classes, the
-  prefilter) are checked only by a CPU reference against brute force on small bases, where nice numbers are
-  nearly absent. A wrong rule shared by the CPU reference and the device would pass every test: one such
-  mutant (a top certificate off by one position) did pass the first test suite. A proof closes exactly that
-  hole.
-- **What it would and would not claim** (scope: `LEAN-MO/SCOPE.md`): "the algorithm, as a Lean function that
-  mirrors the Rust reference, returns every nice number of a field, for every base and coordinate; the Rust
-  reference agrees with the Lean function on published fixtures; the device agreed with the Rust reference on a
-  sampled slice of every field." It would **not** claim that base 64's result is formally verified: the Rust,
-  the kernels and the hardware stay outside the proof.
-- **Size:** 550–1,000 new Lean lines and 35–55 theorems if it may import the library of your parked draft PR
-  #160 (which already proves about half of what is needed: residue classes, both certificates, the affine
-  digit step); 700–1,000 lines more if it must stand alone. Three to six working sessions. No new mathematics.
-- **Options for where it lives:**
-  - **a.** A separate Lean project on a fork branch that imports #160's library pinned at its current commit;
-    nothing in #160 is touched; no pull request.
-  - b. The same but standing alone, duplicating the definitions it needs.
-  - c. As an extension of #160's own branch.
-  - d. Nothing until you ask.
-- **Recommendation: a.** It costs you nothing to ignore and it does not move your parked PR.
-- **State (2026-11-22): the first step is done**, because you had not answered and that was the stated
-  default. Branch `lean/midout` on the fork (four commits on `dev/mo-clean`'s head; a Lean project in
-  `lean-midout/` that imports #160's library at its commit as a dependency, so nothing of #160 is copied or
-  touched; no pull request). It holds: the search algorithm as Lean functions mirroring the Rust reference;
-  tables generated from the Rust code (9,411 slices of 11 small bases with every survivor in order, the residue
-  classes of every base 3–128, base-64 and base-65 samples including two real slices of a million parents);
-  a program that recomputes all of it in Lean: **81,484 comparisons, all equal, no disagreement ever met**; and
-  the coordinate lemmas proved (48 theorems, no `sorry`, no added axiom: the renumbering is one to one, a field
-  is a whole number of slices, fields partition the range). The fork's own CI builds and checks it in 11 minutes.
-  The same day: the form of the join that runs is proved to return the same survivors as the form the theorems
-  are about (83 theorems in all, CI green). A by-product for the Rust: two new fast tests on `dev/mo-clean`
-  kill two errors its own tests did not catch (an edited prefilter exemption; a top certificate asked for one
-  position too high by its caller). (An earlier message of mine said the Rust missed the plain
-  one-position-too-high mutant; it did not: an existing test already caught that one.)
-- **If you do not answer:** from the next cycle I continue with the lemmas of the join itself (certificates,
-  pairing, prefilter, the end-to-end statement), about one session a day on a rented CPU box at about $0.30 a
-  session, on that fork branch, with no pull request. Say `D18 stop` to stop it, or `D18 d` to stop and remove
-  the branch.
+- **State (2026-11-23):** proved, checked and independently audited, on the fork branch `lean/midout`
+  (directory `lean-midout/`, with its own README; it imports the library of your parked PR #160 at its commit
+  as a dependency and touches nothing of it; no pull request). I took this decision's stated default on
+  2026-11-22 and 23 because it was unanswered; it cost three sessions and about $0.50 of rented CPU.
+- **What is proved** (208 theorems, no `sorry`, Lean's three standard axioms, the fork's CI, Lean's independent
+  checker): for every base 3–128 with a range and every set of fields covering it, a number is nice exactly
+  when some field's search returns it; so if every field's search returns nothing, the base has no nice
+  number. The Lean functions it is proved about agree with tables generated from the Rust reference on 102,603
+  comparisons.
+- **What it does not say:** nothing about the Rust code itself, the GPU kernels, the hardware or the record of
+  which fields were searched; it does not prove that a number is reported only once; no whole base-64 slice
+  has been run through the Lean model.
+- **What the audit found** (`LEAN-MO/REVIEW.md`; a reviewer who did not write the proof): definitions right,
+  hypotheses satisfiable at bases 64 and 65, tested function = proved function, no corruption of the model got
+  past both the proofs and the tables; four corrections, all applied the same day (the whole-base statement;
+  soundness through a mirror of the Rust's digit check instead of by definition; end-to-end tables at bases
+  30–50; exact wording).
+- **A by-product already on `dev/mo-clean`:** two fast Rust tests for errors the Lean comparison exposed.
+- **Options now:** a. leave it on the fork branch as it is (nothing for you to do); b. when you lift the hold,
+  I propose it as a pull request of its own (its CI job runs in about 10 minutes and regenerates the tables
+  from the Rust, so a change to the reference that breaks agreement fails the job); c. remove it.
+- **Recommendation: a now, b when the join itself is under review.** **If you do not answer:** a.
+- **Possible next step, not started:** the same treatment for what the GPU path does differently from the
+  reference (parent lists shared across digit 8, the top hierarchy, the split of large jobs, the records and
+  their expansion): a model of those and a proof that they return what the reference returns. About the size
+  of what was done. **If you do not answer:** I scope it (a document, like the first scope) and wait.
 
 ### D17. A short window on demoux, when convenient (new 2026-11-20; nothing waits on it)
 

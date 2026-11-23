@@ -35,6 +35,35 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## LEAN.5 Independent audit of the Lean proof, and its corrections applied: the whole-base theorem (2026-11-23 07:25–09:30 UTC; auditor `LEAN-MO/REVIEW-BRIEF.md` → `LEAN-MO/REVIEW.md`; then the author, `LEAN-MO/STEP2-NOTES-B.md` "After the audit"; fork `lean/midout` 5eb715f3 → 05747baa (CI run 45145903363, green); box 62104162, 3.72 h in all today, about $0.38)
+
+- **Audit verdict: accurate with stated corrections** [M, the auditor's own runs]: `IsNice` is the intended
+  property (brute force over the ranges of bases 3–22 in Lean and in Python gives only 69 at base 10;
+  `niceOf 10 = [69]` by the kernel); the hypotheses are satisfiable at bases 64 and 65 with (4, 8, 5) and
+  (4, 10) and every production coordinate is accepted (kernel evaluation); the conformance runs `searchField`
+  itself; standard axioms only, no `sorry`, `native_decide`, `extern`, `implemented_by` or `unsafe` in either
+  project; the pinned dependency is 4cdaa47f; `leanchecker` passes on every module. 17 mutants of the model:
+  none passes both the proofs and the conformance.
+- **Findings:** A1 soundness's "is nice" half was true by construction (`finalCheck` defined as `IsNice`), and
+  a check that also accepts 70 passed all tables; A2 end-to-end tables only at bases 10–25; B1 the theorems
+  were per field and assumed the model accepts the field (a model refusing every coordinate's last field still
+  proved them); B2 "every base" is 3–128 and the Rust's refusals are not modelled; B3 the run form is linked
+  by the permutation lemma only; B4 a broken proof under mutation is not always dependence; C1 "once" unproved.
+- **Applied** [M: `lake build --wfail`; 208 theorems, standard axioms only; conformance 102,603 comparisons all
+  equal; `leanchecker` on all 19 modules and `--fresh` on `WholeBase`]:
+  - `WholeBase.lean`: the model accepts exactly the whole-quanta fields (`fieldDigits_isSome_iff`,
+    `searchField_isSome_iff`); `isNice_iff_mem_fields` (for whole-quanta fields covering [lo, vEnd), n is nice
+    iff some field's search returns it); **`no_nice_of_searched_withDigits`: if `Coord.withDigits b k0 k1 q0 =
+    some c`, the fields cover the range and every field's search returns an outcome with no nice number, then
+    no n is nice in base b**; the single-field and quantum-by-quantum tilings proved as instances.
+  - The final check is now the Lean mirror of the Rust's `unique_digits`, proved equivalent to `IsNice`
+    (`finalCheck_iff`), with a table of 21,077 verdicts and counts at 12 bases.
+  - Whole slices in run order at bases 30 (6 slices), 40 (6) and 50 (1 slice of shape (4, 10), 380 survivors).
+  - README rewritten to the audited wording.
+- **Left:** a real base-64 slice through the model did not finish in 45 minutes (the Rust takes 24 s; several
+  hours estimated; the generator and comparison modes are committed, the table is not); "each number once";
+  exact survivor sets; nothing about the Rust, the kernels or a run.
+
 ## LEAN.4 The end-to-end theorem: the model's search returns exactly the nice numbers of a field (2026-11-23 06:50–07:20 UTC, the bottoms-half engineer on the merged branch; `LEAN-MO/STEP2-NOTES-B.md` "The end-to-end theorem"; fork `lean/midout` 75ac981d → 5eb715f3 (CI run 45127427003, green, 8 min); `lean-midout/NiceMidOut/EndToEnd.lean`, `lean-midout/README.md`)
 
 - **Completeness** [M: `lake build --wfail`; 191 theorems on `propext`, `Classical.choice`, `Quot.sound` only; no
