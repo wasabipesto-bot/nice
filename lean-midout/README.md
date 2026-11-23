@@ -88,7 +88,10 @@ the fields `fs` (pairs `(vs, vz)`).
   - *Components at bases 64 and 65* (`b64.json`): coordinates (4, 8, 5), (4, 9, 6) at 64 and (4, 8, 5) at 65
     (derived values, `v` and `n_of_v` samples, fields and slice lists); 3,000 top certificates; the tops of one
     unit of the production shape (4, 10) and of 300 units of (4, 16); whole parent lists at shapes (2, 5), (1, 4)
-    and sampled parents and child masks of two (4, 10) slices; 4,000 prefilter verdicts at `k = 10`.
+    and sampled parents and child masks of two (4, 10) slices; 4,000 prefilter verdicts at `k = 10`. No whole
+    base-64 slice or field is compared: one (4, 10) slice (11.8 million survivors in the Rust) was run through the
+    model (`lake exe conformance --slice64` with a table from the generator's `--slice64`) and had not finished
+    after 45 minutes, so it is not part of the tests.
   - *The final check* (`check.json`): `unique_digits`' distinct count and verdict on 1,580–2,033 numbers per base
     at bases 10, 12, 13, 14, 17, 20, 25, 30, 40, 50, 64, 65: random numbers of the range, the range's 20 lowest
     and highest numbers and the 20 just outside each end, numbers one or two digits short of nice where random
@@ -119,6 +122,7 @@ other than the three standard ones. Every theorem depends on at most `propext`, 
 regenerates the fixtures from the Rust to compare their checksums.
 
 A second kernel check: the toolchain's `leanchecker` replays the compiled declarations. It was run on each of the
-`NiceMidOut.*` modules that hold declarations (all accepted) and with `--fresh` on `NiceMidOut.EndToEnd`
-(replaying its whole import closure, Mathlib included: accepted). The root module `NiceMidOut`, which only imports
+19 `NiceMidOut.*` modules that hold declarations (all accepted) and with `--fresh` on `NiceMidOut.WholeBase`
+(replaying its whole import closure from scratch: the end-to-end and whole-base theorems with everything they
+depend on, Mathlib included: accepted). The root module `NiceMidOut`, which only imports
 the others, was not checked (the tool did not finish on it).
