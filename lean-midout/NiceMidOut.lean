@@ -8,3 +8,4 @@ import NiceMidOut.ClassesProofs
 import NiceMidOut.RangeDigits
 import NiceMidOut.CheckProofs
 import NiceMidOut.TopsScan
+import NiceMidOut.ClassesTops
