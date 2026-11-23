@@ -5,3 +5,5 @@ import NiceMidOut.RangeProofs
 import NiceMidOut.RunProofs
 import NiceMidOut.TopsProofs
 import NiceMidOut.ClassesProofs
+import NiceMidOut.RangeDigits
+import NiceMidOut.CheckProofs
