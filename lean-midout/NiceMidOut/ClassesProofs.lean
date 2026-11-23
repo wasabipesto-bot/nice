@@ -9,6 +9,9 @@ loop of `SliceSetup::class`, `cpu.rs:794–799`).
   top of lead `h` in a unit's list is probed against class `r mod (b − 1)` at
   unit `d`; `count_probesOf_of_isNice`: exactly as often as it is in the list
   (the roots are distinct, and a top's class picks one root).
+- `mem_probesOf_iff` (the probes as a set) and the converse
+  `mod_mem_roots_of_mem_probesOf`: every number a probe makes has its residue
+  mod `b − 1` among the roots.
 
 Reused from the earlier library: `joinRoots` (= `roots`),
 `mem_joinRoots_of_isNice`.
@@ -127,5 +130,38 @@ theorem count_probesOf_of_isNice {b k n d r : ℕ} {tv : List Top} {t : Top} (hb
   calc _ = ((roots b).map fun rt => if rt = n % (b - 1) then tv.count t else 0).sum := by
         congr 1; exact List.map_congr_left key
     _ = _ := by rw [sum_map_ite_count, List.count_eq_one_of_mem (roots_nodup b) hr0, one_mul]
+
+/-- The probes, as a set: the unit's tops whose class `h mod (b − 1)` is some
+root minus `(c + d) mod (b − 1)`. -/
+theorem mem_probesOf_iff {b c d : ℕ} {tv : List Top} {t : Top} :
+    t ∈ probesOf b tv c d ↔
+      t ∈ tv ∧ ∃ rt ∈ roots b, t.h % (b - 1) = (rt + (b - 1) - (c + d) % (b - 1)) % (b - 1) := by
+  unfold probesOf
+  rw [List.mem_flatMap]
+  constructor
+  · rintro ⟨rt, hrt, ht⟩
+    rw [List.mem_filter, decide_eq_true_iff] at ht
+    exact ⟨ht.1, rt, hrt, ht.2⟩
+  · rintro ⟨ht, rt, hrt, hc⟩
+    exact ⟨rt, hrt, List.mem_filter.mpr ⟨ht, decide_eq_true hc⟩⟩
+
+/-- L6, converse. Whatever a probe of class `r mod (b − 1)` at unit `d` makes,
+`n = h·b^k + d·b^(k−1) + r`, has its residue mod `b − 1` among the roots. -/
+theorem mod_mem_roots_of_mem_probesOf {b k n d r : ℕ} {tv : List Top} {t : Top} (hb : 2 ≤ b)
+    (ht : t ∈ probesOf b tv (r % (b - 1)) d) (hn : n = t.h * b ^ k + d * b ^ (k - 1) + r) :
+    n % (b - 1) ∈ roots b := by
+  obtain ⟨-, rt, hrt, hc⟩ := mem_probesOf_iff.mp ht
+  have hm : 0 < b - 1 := by omega
+  have hrt' := (mem_roots.mp hrt).1
+  have hx : (r % (b - 1) + d) % (b - 1) < b - 1 := Nat.mod_lt _ hm
+  have hn' : n % (b - 1) = (t.h + (r % (b - 1) + d)) % (b - 1) := by
+    rw [hn]; exact class_split (by omega)
+  -- `n ≡ h + x` and `h ≡ rt − x`, so `n ≡ rt`
+  have e : n % (b - 1) = rt := by
+    rw [hn', Nat.add_mod, hc]
+    generalize (r % (b - 1) + d) % (b - 1) = x at hx ⊢
+    rw [Nat.mod_add_mod, show rt + (b - 1) - x + x = rt + (b - 1) by omega, Nat.add_mod_right,
+      Nat.mod_eq_of_lt hrt']
+  rw [e]; exact hrt
 
 end NiceMidOut
