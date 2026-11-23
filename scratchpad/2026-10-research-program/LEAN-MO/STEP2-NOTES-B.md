@@ -151,3 +151,106 @@ https://github.com/wasabipesto-bot/nice/actions/runs/45124449585 (both jobs succ
 CPU) ≈ 17 min (06:01–06:18); later runs about a minute; CI run ≈ 14 min in all. Name clashes with Half T's branch
 (`fork/lean/midout-tops` at `38a7d77f`, 06:39) rechecked: none. No pull request, nothing to `origin`; box left idle
 (no process of mine running; `/work/bottoms` holds the clone and `.lake`).
+
+## The end-to-end theorem (L10), on the merged `lean/midout`
+
+*Added 06:45–07:30 UTC. Base: the merged head `75ac981d` (Half T `38a7d77f` + this half). Work in
+`~/projects/nice/.worktrees/lean-midout` on ivory, builds in a fresh clone under `/work/merged` on the box.*
+
+**The merge itself (step 1).** `75ac981d` built as it was: `lake build --wfail` ok, axiom check 183 theorems
+(standard axioms only), conformance 81,484 checks all equal. Nothing broke; no fix was needed (the one clashing name
+had already been renamed on my side, `certDigits_mem_highDigit`).
+
+**File** `lean-midout/NiceMidOut/EndToEnd.lean` (new), plus one import line and `lean-midout/README.md`. Commit
+`5eb715f3`.
+
+### Completeness
+
+```lean
+theorem searchField_complete {c : Coord} {sh : Shape} {vs vz t0 t1 : ℕ} (hc : c.Valid)
+    (hfit : sh.Fits c) (hf : c.fieldDigits vs vz = some (t0, t1)) :
+    ∃ o, searchField c sh vs vz = some o ∧
+      ∀ n, IsNice c.b n → vs ≤ c.vOfN n → c.vOfN n < vs + vz → n ∈ o.nice
+```
+In words: for a valid coordinate, a shape that fits it and a field the model's own `fieldDigits` accepts (`some`
+exactly when the field is non-empty, inside `[lo, vEnd)` and whole quanta), `searchField` returns an outcome, and
+every nice `n` whose renumbered value `v(n)` lies in `[vs, vs + vz)` is in the outcome's list of nice numbers.
+
+```lean
+theorem sliceRun_complete {c : Coord} {sh : Shape} {vs vz t0 t1 n : ℕ} (hc : c.Valid)
+    (hfit : sh.Fits c) (hf : c.fieldDigits vs vz = some (t0, t1)) (h : IsNice c.b n)
+    (hv1 : vs ≤ c.vOfN n) (hv2 : c.vOfN n < vs + vz) :
+    ∃ pip ∈ fieldSlices c sh vs vz,
+      (digit c.b n (sh.k - 1), n, true) ∈ (sliceRun c.b c.lo c.hi sh pip).surv
+```
+In words: the same `n` is reported, with prefilter verdict `true`, by the run form `sliceRun` (the form the
+fixtures compare with the Rust, survivor for survivor in order) of its slice, and that slice is one of the field's
+slices (through `sliceRun_surv_perm`).
+
+### Soundness
+
+```lean
+theorem searchField_sound {c : Coord} {sh : Shape} {vs vz : ℕ} {o : FieldOutcome} {n : ℕ}
+    (hc : c.Valid) (ho : searchField c sh vs vz = some o) (hn : n ∈ o.nice) :
+    IsNice c.b n ∧ vs ≤ c.vOfN n ∧ c.vOfN n < vs + vz
+```
+In words: everything `searchField` returns is nice and has `v(n)` in the field. (The shape's fit and the field's
+acceptance come from `searchField` returning `some`.) Supporting: `survivor_mem_field` — every survivor of every
+slice of the field is in `[lo, hi)` with `v` in the field, whether or not it passes the prefilter or is nice.
+
+**Not proved: "appears once".** `o.nice` has no repeats would need each nice n to be a survivor once (the tops'
+side of L11: no top listed twice per probe, one probe per root); `count_probesOf_of_isNice` and `parents_nodup` are
+pieces of it, the rest is not cheap. Not attempted.
+
+### Hypotheses, against what the constructors give
+
+- `c.Valid` is exactly what `Coord.withDigits` guarantees (`Coord.valid_of_withDigits`, step 1); the corollaries
+  `searchField_complete_of_withDigits` and `searchField_sound_of_withDigits` take `Coord.withDigits b k0 k1 q0 =
+  some c` instead.
+- `sh.Fits c` is the model's `Shape::fits`; `searchField` itself refuses a shape that does not fit.
+- `c.fieldDigits vs vz = some (t0, t1)` is the model's own field function; `searchField` refuses exactly the fields
+  where it is `none`.
+- **No other hypothesis was needed**: none on the base beyond `Valid` (3 ≤ b ≤ 128), none at the range's ends,
+  at clipped tops or at the prefilter's exemption. One edge met and handled inside the proof: at base 3 the range
+  `[2, 2)` is empty yet `Coord.Valid` can hold (L = numDigits 1 = 1, so k1 = 1); `unitTops_prefix` assumes
+  `lo < hi`, so the soundness proof derives `lo < hi` from the existence of a listed top (`lo ≤ t.lo ≤ t.hi ≤
+  hi − 1`) and `hi ≥ 2` (`Coord.two_le_hi`). No disagreement with the Rust; no statement turned out false.
+
+### How it is composed
+
+Completeness: `mem_range_of_isNice` (n in range) → `Coord.le_numDigits_pow` (k digits) →
+`Coord.mem_fieldSlices_iff` (n's slice is a field slice) → `probed_top_of_isNice` (n's top among the probes of
+its class and unit digit) → `mem_sliceSurvivors_of_isNice` (parent, child, disjoint masks, interval) →
+`midPrefilter_of_mem_unitTops` (passes) → `finalCheck_iff` → membership in the sorted list. Soundness:
+`finalCheck_iff` (nice) and `survivor_mem_field` (`Shape.mem_slicesOf_iff` and `Coord.fieldDigits_le` bound the
+slice, `mem_unitTops`/`mem_unitLeads` give `lo < hi`, `unitTops_prefix` gives the survivor's range and unit, so its
+slice is the slice it was found in, then `Coord.mem_fieldSlices_iff`).
+
+### Checks at `5eb715f3`
+
+Box: `lake build --wfail` ok (3,050 jobs), axiom check **191 theorems, standard axioms only**, conformance
+**81,484 checks, all equal**; files byte-identical (SHA-256) to the commit.
+
+Fork CI on `5eb715f3`, green (both jobs): https://github.com/wasabipesto-bot/nice/actions/runs/45127427003. (The run
+on the merge head `75ac981d` was cancelled by this push, the workflow's concurrency group; the same tree had passed
+all three checks on the box first.)
+
+### A second checker: `leanchecker`
+
+The Lean `v4.33.1` toolchain ships `leanchecker` (the former `lean4checker`): it reads a module's compiled `.olean`
+and replays its declarations through the kernel again, independently of the elaborator that produced them.
+- **Per module** (`lake env leanchecker <Module>`, replaying the module's own declarations on top of its imports as
+  stored): every `NiceMidOut.*` module that holds declarations — all 18 (`Coord`, `Join`, `CoordProofs`,
+  `RangeProofs`, `RunProofs`, `TopsProofs`, `ClassesProofs`, `RangeDigits`, `CheckProofs`, `TopsScan`,
+  `ClassesTops`, `Bottoms`, `Prefilter`, `Pairing`, `BottomsExact`, `BottomsNodup`, `BottomsKids`, `EndToEnd`) —
+  exit 0 with no output, about 40 s each (mostly loading Mathlib). A missing module gives exit 1 ("Could not find
+  any oleans"), so the tool does load what it is given. The root module `NiceMidOut` (imports only, no declaration)
+  did not finish within 600 s and was killed (exit 137), as did a `-h` call within 60 s; it holds nothing to check,
+  so I did not pursue it.
+- **Fresh** (`leanchecker --fresh NiceMidOut.EndToEnd`: replays every declaration in its import closure from
+  scratch, the earlier library `Nice`, Mathlib, Lean core included): **exit 0, no output**, 07:06:11–07:19:08 UTC (≈ 13 min,
+  one core, ≈ 3.5 GB). So every theorem above, with everything it depends on, was accepted by a second pass of the
+  kernel over the compiled files. (This checks the kernel terms, not the statements: what the statements mean is
+  still to be read in the source.)
+
+Box left idle (no process of mine running); `/work/merged` holds the clone.

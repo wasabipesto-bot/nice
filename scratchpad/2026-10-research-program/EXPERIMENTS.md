@@ -35,6 +35,24 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## LEAN.4 The end-to-end theorem: the model's search returns exactly the nice numbers of a field (2026-11-23 06:50–07:20 UTC, the bottoms-half engineer on the merged branch; `LEAN-MO/STEP2-NOTES-B.md` "The end-to-end theorem"; fork `lean/midout` 75ac981d → 5eb715f3 (CI run 45127427003, green, 8 min); `lean-midout/NiceMidOut/EndToEnd.lean`, `lean-midout/README.md`)
+
+- **Completeness** [M: `lake build --wfail`; 191 theorems on `propext`, `Classical.choice`, `Quot.sound` only; no
+  `sorry`, no `native_decide`]: `searchField_complete`: for a valid coordinate c, a shape that fits it and a
+  field with `c.fieldDigits vs vz = some (t0, t1)`, there is an outcome o with `searchField c sh vs vz = some o`
+  and every n with `IsNice c.b n` and `vs ≤ c.vOfN n < vs + vz` is in `o.nice`. `sliceRun_complete` carries it
+  to the run form the fixtures test. A form taking `Coord.withDigits … = some c` instead of validity exists.
+- **Soundness** [M]: `searchField_sound`: every n in `o.nice` is nice and has v(n) in the field.
+- **Not proved:** that a number appears only once in the result; exact survivor sets; the bit-sliced word; the
+  seven work counters; anything about the Rust, the kernels or a run.
+- **No extra hypothesis was needed** at the range's ends, at clipped tops or at the prefilter's exemption; one
+  edge (base 3's empty range) handled inside the proof.
+- **Second checker** [M]: the toolchain's `leanchecker` exits 0 on each of the 18 project modules with
+  declarations and on `--fresh NiceMidOut.EndToEnd` (a replay from scratch including the earlier library,
+  Mathlib and core; 13 minutes).
+- **Conformance at the head** [M]: 81,484 comparisons with the Rust tables, all equal.
+- **Next:** an independent audit of the statements and definitions (LEAN.5), started 07:25 UTC.
+
 ## LEAN.3 The join's lemmas proved in two halves and merged (2026-11-23 05:55–06:50 UTC, two proof engineers at once; `LEAN-MO/BRIEF-STEP2.md`, `LEAN-MO/STEP2-NOTES-T.md`, `STEP2-NOTES-B.md`; fork branches `lean/midout-tops` 38a7d77f (CI run 45125119602, green) and `lean/midout-bottoms` 55a09ef0 (run 45124449585, green), both from 4934b0ca; merged by me into `lean/midout` 75ac981d; box 62104162, 24 cores)
 
 - **Half T** [M: `lake build --wfail`, conformance, axiom check: 138 theorems, standard axioms only, no `sorry`]:
