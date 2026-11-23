@@ -35,6 +35,20 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## ST.0 Field-wide launches for the stages around the kernel: at most ×1.04–1.05 on a slice; dropped by arithmetic (2026-11-23, the director; derived from MO.13–MO.15's measurements on the RX 9070 XT and `G2/BUILD-NOTES.md` §12.3)
+
+- **Inputs** [M unless marked]: slice 4.312 ms on the RX 9070 XT (2026-11-19); main kernel 3.09–3.35 ms by the
+  model that predicted the slice within 3 % [P] (the stop measurement of 2.607 ms is too low by what the tops
+  and parents stops over-read); so the stages around it are 0.96–1.22 ms (22–28 %): parents about 0.5,
+  expansion 0.356, tops 0.12–0.24 [P], check and done 0.112. A queued launch costs 7–9 µs, a synced one
+  0.12 ms (one per 16 slices); about 14 launches per slice.
+- **What one launch per field (or per 64 slices) per stage could save** [D]: launches 0.10–0.13 ms, small
+  uploads 0.02–0.05 ms, sync 0.008 ms. A parent order shared by the 64 slices of a list would save the sort
+  (about 0.1 ms) and cost 4.2–7.0 % more kept words in the kernel (0.13–0.22 ms; counted in G2.9): no gain.
+- **Verdict:** at most 0.15–0.2 ms of 4.31, ×1.04–1.05, under the ×1.08 set in advance: dropped without
+  building. The tops and parents numbers on that card were taken with the card idling; a profile at the
+  operating point (DECISIONS D17) is the only thing that could reopen it.
+
 ## LEAN.2 Bridge proofs in Lean; two Rust tests that close gaps the Lean comparison exposed (2026-11-22 06:50–07:42 UTC, the same proof engineer; `LEAN-MO/STEP1-NOTES.md` "After step 1"; fork `lean/midout` f25f988a → 4934b0ca (CI run 44996514840, green, 8 min); `dev/mo-clean` 10ddbf17 → eb9ef776 (one test-only commit, +168 lines in `cpu.rs`); box 61919150, 1.95 h in all, about $0.13)
 
 - **Proved** [M: `lake build --wfail`, axiom check; 83 theorems in all, standard axioms only, no `sorry`]:

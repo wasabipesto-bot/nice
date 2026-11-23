@@ -4,6 +4,32 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-23 (cycle 14 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $24.12 invoiced of $30 (over 80 % of the cap; fleet
+  $40.83), credit $46.30. No day missed. Nothing from the user since the report of 11-22. PR #271 open,
+  mergeable, 25 checks pass, no comments; Dependabot #272–#275 open; drafts parked. Upstream main 974d7194
+  unchanged; no release.
+- **Plan, with kill criteria:**
+  - **LEAN-MO step 2** (the stated default of DECISIONS D18, unanswered; `LEAN-MO/BRIEF-STEP2.md`; two Opus
+    proof engineers at once on one rented 24-core box, to 11:15 UTC): the join's lemmas in two halves on two
+    branches from `lean/midout` 4934b0ca: `lean/midout-tops` (L2, L3, L4, L6, L9) and `lean/midout-bottoms`
+    (L5, L7, L8); shared files frozen; I merge afterwards; the composition (L10) is the next session. **Kill:
+    a lemma false for the model as written is reported at once (a finding about the search or the model), not
+    worked around.**
+  - **Literature sweep #7** (`L7/BRIEF-2026-11-23.md`, Sonnet, extended search mode): status of the recent
+    proof claims; digit problems; orthogonal vectors; AI-assisted Lean at scale; platform notes.
+  - **Stages around the kernel as field-wide launches: dropped by arithmetic before building anything (mine,
+    EXPERIMENTS ST.0).** On the RX 9070 XT the stages around the kernel are 0.96–1.22 ms of a 4.31 ms slice
+    (the kernel is 3.09–3.35 by the model that predicted the slice); queued launches cost 7–9 µs each (about 14
+    per slice: 0.10–0.13 ms), small uploads 0.02–0.05 ms, the group sync 0.008 ms per slice; a shared parent
+    order would save about 0.1 ms of sorting and cost 4–7 % more kernel words. Reachable: at most 0.15–0.2 ms,
+    ×1.04–1.05 on a slice, under the ×1.08 I set. Reopened only by a stage profile taken at the card's
+    operating point (asked for in D17).
+- **Not started, on purpose:** anything on the RX 9070 XT (no lease); any pull request. With the pairing loop
+  and the stages both at their measured limits, no engineering on base 64 remains that I can measure without
+  that card.
+
 ## 2026-11-22 (cycle 13 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $23.88 invoiced of $30 (fleet $39.02), credit $48.36.
