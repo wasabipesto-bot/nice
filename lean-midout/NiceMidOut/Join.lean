@@ -32,9 +32,16 @@ open NiceSearch
 /-- `arith::roots` (`arith.rs:119`) is the earlier library's `joinRoots`. -/
 abbrev roots (b : ℕ) : List ℕ := joinRoots b
 
-/-- `arith::unique_digits(n, b).1` (`arith.rs:92`): the earlier library's
-`IsNice`, decided. -/
-def finalCheck (b n : ℕ) : Bool := decide (IsNice b n)
+/-- `unique_digits(n, b)` (`arith.rs:92`): the number of distinct digits of
+`n²` and `n³` together, and whether both that number and the total number of
+digits are `b`. (The Rust expands a `U384`; the model reads `Nat.digits`.) -/
+def uniqueDigits (b n : ℕ) : ℕ × Bool :=
+  ((outputDigits b n).toFinset.card,
+    decide ((outputDigits b n).toFinset.card = b ∧ (outputDigits b n).length = b))
+
+/-- The final check, `unique_digits(n, b).1` (`arith.rs:92`, `cpu.rs:999`):
+the mirror's verdict. That it is `IsNice` is a theorem (`finalCheck_iff`). -/
+def finalCheck (b n : ℕ) : Bool := (uniqueDigits b n).2
 
 /-! ### Tops -/
 

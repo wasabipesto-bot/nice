@@ -79,7 +79,7 @@ theorem searchField_complete {c : Coord} {sh : Shape} {vs vz t0 t1 : ℕ} (hc : 
   rw [(List.mergeSort_perm _ _).mem_iff, List.mem_map]
   refine ⟨(digit c.b n (sh.k - 1), n, t.mhi), ?_, rfl⟩
   rw [List.mem_filter, List.mem_filter, List.mem_flatMap]
-  exact ⟨⟨⟨_, hpip, hs⟩, midPrefilter_of_mem_unitTops hb h ht htlo hthi⟩, finalCheck_iff.mpr h⟩
+  exact ⟨⟨⟨_, hpip, hs⟩, midPrefilter_of_mem_unitTops hb h ht htlo hthi⟩, (finalCheck_iff hb).mpr h⟩
 
 /-- **END-MO, completeness, in the run form.** The same `n` is reported as
 `(digit_(k−1) n, n, true)` by `sliceRun` (the Rust's order and counters, the
@@ -167,7 +167,7 @@ theorem searchField_sound {c : Coord} {sh : Shape} {vs vz : ℕ} {o : FieldOutco
   rw [List.mem_filter, List.mem_filter, List.mem_flatMap] at hs
   obtain ⟨⟨⟨pip, hpip, hsv⟩, -⟩, hfc⟩ := hs
   obtain ⟨-, -, hv1, hv2⟩ := survivor_mem_field hc hfit hf hpip hsv
-  exact ⟨finalCheck_iff.mp hfc, hv1, hv2⟩
+  exact ⟨(finalCheck_iff (by have := hc.1; omega)).mp hfc, hv1, hv2⟩
 
 /-- END-MO, completeness, for a coordinate built by the executable constructor
 `Coord.withDigits` (the model's `Coord::with_digits`). -/
