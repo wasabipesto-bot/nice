@@ -39,7 +39,7 @@ def sortFields (fs : List (Nat × Nat)) : List (Nat × Nat) :=
 def coversRaw (lo e q : Nat) (fs : List (Nat × Nat)) : Bool :=
   fs.all (wqRaw lo e q) &&
     match reach lo (sortFields fs) with
-    | some r => decide (e ≤ r)
+    | some _ => true  -- MUTANT: forgets the last gap [r, e)
     | none => false
 
 theorem wqRaw_iff {lo e q : Nat} {f : Nat × Nat} :
