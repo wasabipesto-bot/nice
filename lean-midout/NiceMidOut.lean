@@ -17,3 +17,5 @@ import NiceMidOut.BottomsNodup
 import NiceMidOut.BottomsKids
 import NiceMidOut.EndToEnd
 import NiceMidOut.WholeBase
+import NiceMidOut.CoverRaw
+import NiceMidOut.Coverage

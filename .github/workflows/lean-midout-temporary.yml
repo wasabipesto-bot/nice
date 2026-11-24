@@ -37,6 +37,36 @@ jobs:
               working-directory: lean-midout
               run: bash scripts/check_axioms.sh
 
+            - name: Coverage certificate (tests; the checker on synthetic coordinator records)
+              working-directory: lean-midout
+              run: |
+                  lake build --wfail coverage coverage_tests
+                  bin=.lake/build/bin
+                  t="$RUNNER_TEMP"
+                  time "$bin/coverage_tests"
+                  expect() {  # expect EXIT BASE K0 K1 Q0 [testdata options]
+                      want=$1; shift
+                      python3 -I scripts/coverage_testdata.py "$1" "$2" "$3" "$4" "$t/s.jsonl" "${@:5}"
+                      python3 -I scripts/coverage_fields.py "$t/s.jsonl" "$t/f.txt"
+                      set +e; "$bin/coverage" "$1" "$2" "$3" "$4" "$t/f.txt"; got=$?; set -e
+                      [ "$got" = "$want" ] || { echo "coverage $*: exit $got, expected $want"; exit 1; }
+                  }
+                  expect 0 10 0 2 1
+                  expect 1 10 0 2 1 --drop 0
+                  expect 1 10 0 2 1 --drop 4
+                  expect 1 10 0 2 1 --drop -1
+                  expect 1 10 0 2 1 --nice 3
+                  expect 0 20 1 3 2
+                  expect 1 20 1 3 2 --drop -1
+                  python3 -I scripts/coverage_testdata.py 64 4 8 5 "$t/s64.jsonl"
+                  time python3 -I scripts/coverage_fields.py "$t/s64.jsonl" "$t/f64.txt"
+                  time "$bin/coverage" 64 4 8 5 "$t/f64.txt"
+                  head -n -1 "$t/f64.txt" > "$t/f64-last.txt"
+                  set +e; time "$bin/coverage" 64 4 8 5 "$t/f64-last.txt"; got=$?; set -e
+                  [ "$got" = 1 ] || { echo "base 64 without its last field: exit $got, expected 1"; exit 1; }
+                  set +e; "$bin/coverage" 64 4 8 6 "$t/f64.txt"; got=$?; set -e
+                  [ "$got" = 1 ] || { echo "base 64 under another coordinate: exit $got, expected 1"; exit 1; }
+
     fixtures:
         name: fixtures regenerate from the Rust
         runs-on: ubuntu-latest
