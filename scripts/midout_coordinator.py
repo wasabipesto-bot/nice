@@ -21,7 +21,9 @@ nothing of what it means (the client builds its coordinate from it and refuses o
 submissions.jsonl (every submission, accepted or not, with the field, the claim time, the receive time and the
 whole body). A field is never handed out twice, across restarts too, unless --reissue-after SECONDS is given
 (then a claim older than that without an accepted submission is handed out again). A submission is accepted
-once per field, only for a claim this coordinator issued, and only with telemetry pipeline.route "midout".
+once per field, only for a claim this coordinator issued (an integer claim_id), only with telemetry pipeline.route
+"midout", and only if telemetry pipeline names the claim's own field (coordinate; field.base, v_start, v_size,
+range_size), as the client's route reports it.
 
 usage: midout_coordinator.py --worklist W.json --state DIR [--port 8470] [--reissue-after S] [--legacy-path] [--coordinate ID]
 """
@@ -140,6 +142,25 @@ sys.stderr.write("coordinator: %d fields, %d claimed, %d done (resumed), port %d
                  % (len(fields), len(last_claim), len(done), a.port, a.reissue_after, a.legacy_path))
 
 
+def mismatch(d, f):
+    """Why a submission's body does not describe field f, or None if it does: the client reports the field it
+    searched in telemetry.pipeline (coordinate; field.base, v_start, v_size, range_size, as numbers or decimal
+    strings), and a body for another field must not be recorded under this field's claim."""
+    def num(x):
+        return x if type(x) is int else int(x) if isinstance(x, str) and x.isdigit() else None
+    tel = d.get("telemetry")
+    pl = tel.get("pipeline") if isinstance(tel, dict) else None
+    fd = pl.get("field") if isinstance(pl, dict) else None
+    if not isinstance(fd, dict):
+        return "telemetry pipeline.field is missing"
+    want = {"coordinate": f["coordinate"], "base": f["base"], "v_start": f["range_start"],
+            "v_size": f["range_end"] - f["range_start"], "range_size": f["range_size"]}
+    got = {"coordinate": pl.get("coordinate"), "base": num(fd.get("base")), "v_start": num(fd.get("v_start")),
+           "v_size": num(fd.get("v_size")), "range_size": num(fd.get("range_size"))}
+    bad = ["%s %r (the claim's field: %r)" % (k, got[k], want[k]) for k in want if got[k] != want[k]]
+    return "the submission describes another field: " + ", ".join(bad) if bad else None
+
+
 def next_field(now):
     for i in range(len(fields)):
         if i in done:
@@ -202,7 +223,9 @@ class H(BaseHTTPRequestHandler):
         raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
         try:
             d = json.loads(raw)
-            cid = int(d["claim_id"])
+            cid = d["claim_id"]
+            if type(cid) is not int:
+                raise ValueError("claim_id %r is not an integer" % (cid,))
         except Exception as e:  # noqa: BLE001 (record anything malformed as rejected)
             return self._send(400, "malformed submission: %s" % e)
         with lock:
@@ -215,6 +238,8 @@ class H(BaseHTTPRequestHandler):
                 reason, code = "field already submitted (claim %d)" % done[c["field"]], 409
             elif route != ROUTE:
                 reason, code = "telemetry pipeline.route is %r, not %r" % (route, ROUTE), 422
+            elif mismatch(d, fields[c["field"]]):
+                reason, code = mismatch(d, fields[c["field"]]), 422
             else:
                 code = 200
             rec = {"recv": recv, "claim_id": cid, "field": None if c is None else c["field"],
