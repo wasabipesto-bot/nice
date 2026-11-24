@@ -80,27 +80,28 @@ next_id = 1000
 
 
 def load(path):
-    """The records of a state file. A last line without its newline is a write cut short (a kill, a full disk): it
-    was never acknowledged, so it is cut off, and the next record starts on a line of its own. Any other line that
-    does not read stops the coordinator."""
+    """The records of a state file, read line by line. A last line without its newline is a write cut short (a
+    kill, a full disk): it was never acknowledged, so it is cut off, and the next record starts on a line of its own.
+    Any other line that does not read stops the coordinator."""
     if not os.path.exists(path):
-        return []
-    data = open(path, "rb").read()
-    whole = data.rfind(b"\n") + 1
-    if whole < len(data):
+        return
+    whole = 0
+    with open(path, "rb") as f:
+        for n, line in enumerate(f, 1):
+            if not line.endswith(b"\n"):
+                break
+            try:
+                yield json.loads(line)
+            except ValueError as e:
+                sys.exit("%s line %d does not read (%s): refusing to start" % (path, n, e))
+            whole += len(line)
+    if whole < os.path.getsize(path):
         sys.stderr.write("coordinator: %s: cutting off a torn last line (%d bytes, never acknowledged)\n"
-                         % (path, len(data) - whole))
+                         % (path, os.path.getsize(path) - whole))
         with open(path, "r+b") as o:
             o.truncate(whole)
             o.flush()
             os.fsync(o.fileno())
-    recs = []
-    for n, line in enumerate(data[:whole].splitlines(), 1):
-        try:
-            recs.append(json.loads(line))
-        except ValueError as e:
-            sys.exit("%s line %d does not read (%s): refusing to start" % (path, n, e))
-    return recs
 
 
 broken = None  # set when a failed write could not be undone: nothing more is written until a restart
@@ -148,8 +149,8 @@ def same_field(path, n, rec):
 for n, c in enumerate(load(claims_path), 1):
     if c["claim_id"] in claims:
         sys.exit("%s line %d: claim id %d recorded twice: refusing to start" % (claims_path, n, c["claim_id"]))
-    claims[c["claim_id"]] = c
-    last_claim[same_field(claims_path, n, c)] = (c["claim_id"], c["time"])
+    claims[c["claim_id"]] = {"field": same_field(claims_path, n, c), "time": c["time"]}
+    last_claim[c["field"]] = (c["claim_id"], c["time"])
     next_id = max(next_id, c["claim_id"] + 1)
 for n, s in enumerate(load(subs_path), 1):
     if s.get("accepted"):
@@ -227,7 +228,7 @@ class H(BaseHTTPRequestHandler):
             if err:
                 return self._send(503, "claim not recorded: %s" % err)
             next_id += 1
-            claims[cid] = c
+            claims[cid] = {"field": i, "time": now}
             last_claim[i] = (cid, now)
         f = fields[i]
         self._send(200, {"claim_id": cid, "base": f["base"], "range_start": f["range_start"],
