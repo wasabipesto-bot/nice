@@ -19,3 +19,5 @@ import NiceMidOut.EndToEnd
 import NiceMidOut.WholeBase
 import NiceMidOut.CoverRaw
 import NiceMidOut.Coverage
+import NiceMidOut.NodupMap
+import NiceMidOut.Once
