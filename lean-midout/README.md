@@ -14,8 +14,9 @@ once, and only such numbers; consequently, for any list of whole-quanta fields c
 nice exactly when one of the fields returns it, and if every field's search returns no nice number the base has
 none. The theorems are about the Lean model, which was checked against the Rust CPU reference on fixture tables
 (whole slices and fields at bases 10–40, whole slices at base 50; coordinates, fields, tops, parents, children, the
-prefilter and the final check at bases 64 and 65); they do not cover the Rust code itself, the GPU kernels, or the
-coordinator's record of which fields were searched.
+prefilter and the final check at bases 64 and 65); they do not cover the Rust code itself, the GPU kernels, or
+whether the searches a coordinator records really ran (a checked certificate, `lake exe coverage`, decides whether
+the recorded fields cover the base and report no nice number).
 
 ## What is proved
 
@@ -44,6 +45,19 @@ the fields `fs` (pairs `(vs, vz)`).
   an outcome and every outcome's list of nice numbers is empty, no number is nice in base `c.b`.
   `no_nice_of_searched_withDigits`: the same for `Coord.withDigits b k0 k1 q0 = some c`, concluding
   `∀ n, ¬ IsNice b n`. These are the statements a claim about a whole base rests on.
+
+**The coverage certificate** (`NiceMidOut/CoverRaw.lean`, `NiceMidOut/Coverage.lean`). `Coord.coversB c fs` is a
+computable check (sort by start, every field whole quanta, no gap in `[lo, vEnd)`; overlaps and duplicates
+allowed, since `Covers` is all the theorem needs): `Coord.coversB_iff` proves it true exactly when every field is
+whole quanta and `c.Covers fs`. `no_nice_of_coversB` is `no_nice_of_searched_withDigits` with that check.
+`certOk b k0 k1 q0 recs` is the decision of the executable `lake exe coverage BASE K0 K1 Q0 FILE` on records
+`(range_start, range_size, nice_count)` (coordinate accepted, fields cover, every count 0), and
+`no_nice_of_certOk`: if it is true and each record's search returned an outcome with as many nice numbers as
+recorded, base `b` has no nice number. `scripts/coverage_fields.py` writes the records from a coordinator's
+`submissions.jsonl` (accepted submissions only; the second column is the field's length in v, not the
+coordinator's `range_size`, which counts n). The checker does not check that the searches ran, or ran correctly.
+Tests: `lake exe coverage_tests` (small bases; base 64 with its 262,144 quantum fields) and the CI step that runs
+the script and the checker on synthetic coordinator records (`scripts/coverage_testdata.py`).
 
 **What the statements do not say.**
 - *Soundness's "is nice"* goes through the model's final check, which is `uniqueDigits`, the mirror of the Rust's
@@ -102,7 +116,8 @@ the fields `fs` (pairs `(vs, vz)`).
     digit expansion of `unique_digits`, and the mask width (masks are `Finset ℕ` here, so widths above 64 bits are
     untested beyond the small bases).
 - **Not covered at all**: the Rust code itself, the GPU kernels and their device-side check, compilers, drivers
-  and hardware, and the coordinator's record of which fields were searched.
+  and hardware, and whether the searches in the coordinator's record ran and returned what is recorded (only
+  the record's coverage is checked, by `coverage`).
 
 ## Building and checking
 
@@ -112,6 +127,7 @@ Lean `v4.33.1` and Mathlib `v4.33.1` are pinned (`lean-toolchain`, `lake-manifes
 lake exe cache get          # Mathlib's compiled files
 lake build --wfail          # the model and every proof; warnings fail the build
 lake exe conformance        # the model against the Rust tables
+lake exe coverage_tests     # the coverage check on built work lists, base 64 timed
 bash scripts/check_axioms.sh
 ```
 

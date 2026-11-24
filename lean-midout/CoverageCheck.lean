@@ -68,14 +68,18 @@ def run (args : List String) : IO UInt32 := do
   let some k0 := k0S.toNat? | IO.eprintln usage; return 2
   let some k1 := k1S.toNat? | IO.eprintln usage; return 2
   let some q0 := q0S.toNat? | IO.eprintln usage; return 2
+  let tp ← IO.monoMsNow
   let text ← if file == "-" then (← IO.getStdin).readToEnd else IO.FS.readFile file
   let recs ← match parseAll (text.splitOn "\n") with
     | .ok r => pure r
     | .error e => IO.eprintln s!"coverage: {file}: {e}"; return 2
+  IO.println s!"base {b}, coordinate digits (k0, k1, q0) = ({k0}, {k1}, {q0}), {recs.length} fields listed \
+    (read and parsed in {(← IO.monoMsNow) - tp} ms)"
   let t0 ← IO.monoMsNow
   let ok := certOk b k0 k1 q0 recs
+  -- printed here so that the decision is evaluated before the clock is read again
+  IO.println s!"certOk: {ok}"
   let t1 ← IO.monoMsNow
-  IO.println s!"base {b}, coordinate digits (k0, k1, q0) = ({k0}, {k1}, {q0}), {recs.length} fields listed"
   match Coord.withDigits b k0 k1 q0 with
   | none =>
     IO.println "coordinate: REFUSED (Coord.withDigits gives none: no range, or not k0 ≤ q0 < k1 ≤ L)"
@@ -97,7 +101,7 @@ def run (args : List String) : IO UInt32 := do
   let withNice := recs.filter fun r => r.2.2 != 0
   let total := withNice.foldl (fun a r => a + r.2.2) 0
   IO.println s!"fields reporting a nice number: {withNice.length} ({total} nice numbers in all)"
-  IO.println s!"check time: {t1 - t0} ms"
+  IO.println s!"check time (certOk): {t1 - t0} ms"
   if ok then
     IO.println s!"YES (certOk): if each listed field's search really returned what is recorded, then by \
       no_nice_of_searched_withDigits (through no_nice_of_certOk) base {b} has no nice number. Not checked: \
