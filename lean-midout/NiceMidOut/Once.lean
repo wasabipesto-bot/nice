@@ -10,7 +10,7 @@ its unit, `top_eq_of_h`), the parent's `r` (which determines the parent,
 lists walked (classes, unit digits, probed tops, children) have no repeats
 (`unitTops_nodup`, `probesOf_nodup`, `kidsOf_nodup`, `fieldSlices_nodup`).
 -/
-import NiceMidOut.EndToEnd
+import NiceMidOut.WholeBase
 import NiceMidOut.BottomsExact
 import NiceMidOut.BottomsNodup
 import NiceMidOut.NodupMap
@@ -301,5 +301,14 @@ theorem searchField_nice_nodup {c : Coord} {sh : Shape} {vs vz : ℕ} {o : Field
       (lt_of_mem_fieldSlices (by omega) hf0 (Nat.le_of_lt hq) hk1k hf hpip') hs'
     rw [← e1, ← e2, hss]
   · cases ho
+
+/-- **Each nice number of a whole-quanta field appears exactly once** in its
+outcome: completeness (`searchField_complete_wq`) and `searchField_nice_nodup`. -/
+theorem searchField_count_eq_one {c : Coord} {sh : Shape} {vs vz n : ℕ} (hc : c.Valid)
+    (hfit : sh.Fits c) (hw : c.WholeQuanta vs vz) (h : IsNice c.b n) (hv1 : vs ≤ c.vOfN n)
+    (hv2 : c.vOfN n < vs + vz) :
+    ∃ o, searchField c sh vs vz = some o ∧ o.nice.count n = 1 := by
+  obtain ⟨o, ho, hmem⟩ := searchField_complete_wq hc hfit hw
+  exact ⟨o, ho, count_eq_one_of_nodup_mem (searchField_nice_nodup hc ho) (hmem n h hv1 hv2)⟩
 
 end NiceMidOut

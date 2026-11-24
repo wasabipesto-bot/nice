@@ -96,4 +96,23 @@ theorem ite_some_eq {α : Type} {p : Prop} [Decidable p] {a b : α}
   · exact Option.some.inj h
   · cases h
 
+theorem count_eq_one_of_nodup_mem {α : Type} [BEq α] [LawfulBEq α] {a : α} :
+    ∀ {l : List α}, l.Nodup → a ∈ l → l.count a = 1
+  | [], _, h => by cases h
+  | b :: l, hn, h => by
+    rw [List.nodup_cons] at hn
+    rw [List.count_cons]
+    by_cases hab : b = a
+    · subst hab
+      rw [List.count_eq_zero_of_not_mem hn.1, beq_self_eq_true]
+      rfl
+    · have hl : a ∈ l := by
+        rcases List.mem_cons.mp h with h | h
+        · exact absurd h.symm hab
+        · exact h
+      rw [count_eq_one_of_nodup_mem hn.2 hl]
+      have : (b == a) = false := beq_false_of_ne hab
+      rw [this]
+      rfl
+
 end NiceMidOut
