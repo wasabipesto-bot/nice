@@ -10,7 +10,7 @@ digits, the range, the top certificate and the bottom walk.
 A Lean 4 model of the middle-out join's CPU reference is machine-checked (Lean and Mathlib v4.33.1, standard
 axioms only) to return, for every base 3–128 with a range, every valid coordinate, every fitting shape and every
 whole-quanta field, every number in that field whose square and cube together use each digit of the base exactly
-once, and only such numbers; consequently, for any list of whole-quanta fields covering a coordinate, a number is
+once, and only such numbers, each once; consequently, for any list of whole-quanta fields covering a coordinate, a number is
 nice exactly when one of the fields returns it, and if every field's search returns no nice number the base has
 none. The theorems are about the Lean model, which was checked against the Rust CPU reference on fixture tables
 (whole slices and fields at bases 10–40, whole slices at base 50; coordinates, fields, tops, parents, children, the
@@ -65,7 +65,10 @@ the script and the checker on synthetic coordinator records (`scripts/coverage_t
   the first version of this model the final check was `IsNice` itself, so that half was true by construction.) The
   substantive content of the theorems is completeness (the join's pruning loses no nice number) and that returned
   numbers lie in their field.
-- *Each nice number is returned once* is not proved.
+- *Each nice number is returned once* (proved, `NiceMidOut/Once.lean`): `searchField_nice_nodup`, for a valid
+  coordinate the outcome's list of nice numbers has no repeats, and `searchField_count_eq_one`, a nice number of a
+  whole-quanta field appears in its outcome exactly once. Through the model: a survivor's `n` gives back its slice,
+  unit digit, top and parent, and the lists walked have no repeats (`sliceSurvivors_nodup_n`).
 - *The run form.* `searchField` (in the theorems) is built on the definitional join `sliceSurvivors`; `sliceRun`,
   which mirrors the Rust's order and counters and is what the fixtures compare survivor by survivor, is linked to
   it by the permutation lemma `sliceRun_surv_perm` (and `sliceRun_complete`), not by being the same function.
@@ -87,6 +90,8 @@ the script and the checker on synthetic coordinator records (`scripts/coverage_t
 | prefilter | `Prefilter` | `midPrefilter_of_isNice` (with the exemption: `midPrefilter_of_lt`, `lt_numDigits_of_not_exempt`, `bare_rule_rejects_69`), `midPrefilter_of_mem_unitTops` |
 | final check | `CheckProofs` | `finalCheck_iff` (the `unique_digits` mirror accepts exactly the nice numbers) |
 | run form | `RunProofs` | `sliceRun_surv_perm`, `sliceRun_survivors`, `sliceRun_checked`, `sliceRun_parents` |
+| no repeats | `Once`, `NodupMap` | `unitTops_nodup`, `top_eq_of_h`, `probesOf_nodup`, `parent_eq_of_r`, `kidsOf_nodup`, `sliceSurvivors_nodup_n`, `survivor_slice`, `fieldSlices_nodup`, `searchField_nice_nodup`, `searchField_count_eq_one` |
+| coverage | `CoverRaw`, `Coverage` | `coversRaw_sound`, `coversRaw_complete`, `Coord.coversB_iff`, `no_nice_of_coversB`, `no_nice_of_certOk` |
 
 ## Model, tested, proved
 
