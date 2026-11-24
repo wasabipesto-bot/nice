@@ -34,6 +34,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlsplit, parse_qs
 
 ROUTE, COORD = "midout", "midout"
+MAX_BODY = 1 << 20  # a submission is about 1.5 kB
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--worklist", required=True)
@@ -245,9 +246,15 @@ class H(BaseHTTPRequestHandler):
         recv = time.time()
         if urlsplit(self.path).path.rstrip("/") != "/submit":
             return self._send(404, "not found")
-        raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        n = self.headers.get("Content-Length", "")
+        if not n.isdigit() or int(n) > MAX_BODY:
+            self.close_connection = True
+            return self._send(413 if n.isdigit() else 400, "Content-Length %r: want 0..%d" % (n, MAX_BODY))
+        raw = self.rfile.read(int(n))
         try:
             d = json.loads(raw)
+            if not isinstance(d, dict):
+                raise ValueError("not a JSON object")
             cid = d["claim_id"]
             if type(cid) is not int:
                 raise ValueError("claim_id %r is not an integer" % (cid,))
@@ -255,7 +262,9 @@ class H(BaseHTTPRequestHandler):
             return self._send(400, "malformed submission: %s" % e)
         with lock:
             c = claims.get(cid)
-            route = (((d.get("telemetry") or {}).get("pipeline") or {}).get("route"))
+            tel = d.get("telemetry")
+            pl = tel.get("pipeline") if isinstance(tel, dict) else None
+            route = pl.get("route") if isinstance(pl, dict) else None
             reason = None
             if c is None:
                 reason, code = "unknown claim", 404
