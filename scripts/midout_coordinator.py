@@ -19,8 +19,10 @@ The work list (`common/examples/midout_fields.rs` makes one) is a JSON list of
 nothing of what it means (the client builds its coordinate from it and refuses one it does not know). `--coordinate ID`
 (optional) refuses to start unless every field of the work list is in that coordinate. State lives in DIR: claims.jsonl (every claim issued) and
 submissions.jsonl (every submission, accepted or not, with the field, the claim time, the receive time and the
-whole body). A field is never handed out twice, across restarts too, unless --reissue-after SECONDS is given
-(then a claim older than that without an accepted submission is handed out again). A submission is accepted
+whole body); every record names its field by index and by value, and a start whose work list no longer has that
+field at that index is refused (fields may be appended; overlapping fields are refused). A field is never handed
+out twice, across restarts too, unless --reissue-after SECONDS is given (then a claim older than that without an
+accepted submission is handed out again). A submission is accepted
 once per field, only for a claim this coordinator issued (an integer claim_id), only with telemetry pipeline.route
 "midout", and only if telemetry pipeline names the claim's own field (coordinate; field.base, v_start, v_size,
 range_size), as the client's route reports it.
@@ -54,6 +56,12 @@ for i, f in enumerate(fields):
         sys.exit(f"work list entry {i}: coordinate {c!r} is not a middle-out coordinate id (midout:K0,K1,Q0)")
     if a.coordinate is not None and c != a.coordinate:
         sys.exit(f"work list entry {i}: coordinate {c!r}, not {a.coordinate!r}")
+prev = {}
+for i in sorted(range(len(fields)), key=lambda i: (fields[i]["base"], fields[i]["coordinate"], fields[i]["range_start"])):
+    k = (fields[i]["base"], fields[i]["coordinate"])
+    if k in prev and fields[i]["range_start"] < fields[prev[k]]["range_end"]:
+        sys.exit("work list entries %d and %d overlap" % (prev[k], i))
+    prev[k] = i
 os.makedirs(a.state, exist_ok=True)
 # one coordinator per state directory: the lock is held for the process's life (the kernel drops it when it dies)
 lock_file = open(os.path.join(a.state, "lock"), "a")
@@ -124,14 +132,31 @@ def append(path, rec):
         os.close(fd)
 
 
+def same_field(path, n, rec):
+    """A record names its field by index and by value: refuse to start unless the work list still has that field at
+    that index (a changed work list would make the record mean another field; fields may be appended)."""
+    i, w = rec.get("field"), rec.get("work")
+    if not isinstance(i, int) or not 0 <= i < len(fields) or w != fields[i]:
+        sys.exit("%s line %d names field %r = %s, but the work list has %s there: refusing to start (a record must "
+                 "keep meaning its own field)" % (path, n, i, json.dumps(w), json.dumps(fields[i]) if
+                                                   isinstance(i, int) and 0 <= i < len(fields) else "nothing"))
+    return i
+
+
 # resume
-for c in load(claims_path):
+for n, c in enumerate(load(claims_path), 1):
+    if c["claim_id"] in claims:
+        sys.exit("%s line %d: claim id %d recorded twice: refusing to start" % (claims_path, n, c["claim_id"]))
     claims[c["claim_id"]] = c
-    last_claim[c["field"]] = (c["claim_id"], c["time"])
+    last_claim[same_field(claims_path, n, c)] = (c["claim_id"], c["time"])
     next_id = max(next_id, c["claim_id"] + 1)
-for s in load(subs_path):
+for n, s in enumerate(load(subs_path), 1):
     if s.get("accepted"):
-        done[s["field"]] = s["claim_id"]
+        i = same_field(subs_path, n, s)
+        if i in done or claims.get(s["claim_id"], {}).get("field") != i:
+            sys.exit("%s line %d: field %d accepted under claim %d, which is %s: refusing to start" % (
+                subs_path, n, i, s["claim_id"], "its second acceptance" if i in done else "not its claim on record"))
+        done[i] = s["claim_id"]
 for path in (claims_path, subs_path):
     if not os.path.exists(path):
         open(path, "a").close()
@@ -192,7 +217,7 @@ class H(BaseHTTPRequestHandler):
             if i is None:
                 return self._send(204)
             cid = next_id
-            c = {"claim_id": cid, "field": i, "time": now}
+            c = {"claim_id": cid, "field": i, "time": now, "work": fields[i]}
             err = append(claims_path, c)
             if err:
                 return self._send(503, "claim not recorded: %s" % err)
