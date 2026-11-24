@@ -11,6 +11,8 @@ lists walked (classes, unit digits, probed tops, children) have no repeats
 (`unitTops_nodup`, `probesOf_nodup`, `kidsOf_nodup`, `fieldSlices_nodup`).
 -/
 import NiceMidOut.EndToEnd
+import NiceMidOut.BottomsExact
+import NiceMidOut.BottomsNodup
 import NiceMidOut.NodupMap
 
 namespace NiceMidOut
