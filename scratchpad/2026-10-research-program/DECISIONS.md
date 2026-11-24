@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-23 09:45 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-24 11:00 UTC)
 
 This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
 decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
@@ -18,7 +18,7 @@ once for a far larger span and paired with a bit-sliced kernel.
 
 | | state on 2026-11-19 |
 |---|---|
-| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); 14,573 inserted lines in 21 files (head `eb9ef776` since 2026-11-22), no PR (held at your word, see D9); the first two PRs (no GPU code) are cut, reviewed and waiting on the fork |
+| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); 14,875 inserted lines in 22 files (head `66305ada` since 2026-11-24), no PR (held at your word, see D9); the first two PRs (no GPU code) are cut, reviewed and waiting on the fork |
 | speed, base 64, RTX 3080, end to end against v3.4.8's join, same session | **×4.09** (1.62 fs against 6.62 fs per candidate) |
 | speed, base 64, RX 9070 XT (demoux), end to end against v3.4.8's join, same session | **×4.79** (0.99 fs against 4.76 fs per candidate), measured 2026-11-19 at 64 lanes on the branch just before its cleanup (the cleaned branch has not run on that card; on the 3080 the cleanup changed the time by +0.17 %); exact on every slice and field tried; the client route also ran there against a local coordinator (12 fields). The 4.76 fs baseline there is production's join throughput harness (ten fields on 2026-11-18, scaled ×1.012 by two fields re-measured in the same session), not the client's own ten-field run that the 3080 baseline uses. At that speed base 64 on that card alone is about 55 days instead of about 266 |
 | base 65 (needs masks wider than 64 bits; production has no join there at all) | exact on a GPU; 3.47 fs per candidate on 2026-11-19, about half an RTX-3080-year for the whole base; 10 % less since 2026-11-20 (3.29 against 3.66 fs in one session on a slower box). On your card it measured 3.1 fs on 2026-11-19; the wide kernel has since been fitted to that card offline (12 waves instead of 8), not re-run: predicted 2.4–3.0 fs |
@@ -79,6 +79,21 @@ pairing loop. The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
 - **Decide:** (i) is this new flag acceptable at all; (ii) hidden from `--help`; (iii) where the script lives.
 - **Recommendation:** yes; hidden; `scripts/`. It goes in its own PRs (7–10), after the first series.
 - **If you do not answer:** I prepare those PRs but do not open them.
+- **State (2026-11-24): the coordinator has been attacked on purpose and repaired.** A harness of fake clients
+  and injected failures found nine defects in the script as first written; four could have recorded a field as
+  searched when it was not (a reply sent before the record was safely on disk; a second coordinator on the same
+  state directory; a submission for another field accepted under a known claim; records reinterpreted after a
+  changed work list). All fixed on `dev/mo-clean`; the fixed script passed 4,950 randomized runs. New:
+  `scripts/midout_audit.py` (checks a state directory against its work list). Details: `COORD/RESULTS.md`.
+- **Why this matters for timing:** base 62 ends in late December. If you want base 64 to start on the new join
+  (about 55 days on your RX 9070 XT against about 266 on the old one) without any server change, this
+  coordinator on your machine is the path, and the decision is this one plus the "how base 64's fields reach
+  clients" one below (option C there).
+- **Still open before I would call it ready for a two-month run** (none built; all on the client side, which I
+  cannot build without a rented machine until 12-01): keep a finished field's result on disk until the
+  coordinator has acknowledged it; treat "already accepted for my own claim" as success; retry a failed claim;
+  and a soak with the real client on a rented card. Operating rule meanwhile: start the coordinator with
+  `--reissue-after` at a few field times.
 
 ### D4. How base 64's fields reach clients (the server side)
 
@@ -221,10 +236,20 @@ pairing loop. The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
   I propose it as a pull request of its own (its CI job runs in about 10 minutes and regenerates the tables
   from the Rust, so a change to the reference that breaks agreement fails the job); c. remove it.
 - **Recommendation: a now, b when the join itself is under review.** **If you do not answer:** a.
-- **Possible next step, not started:** the same treatment for what the GPU path does differently from the
-  reference (parent lists shared across digit 8, the top hierarchy, the split of large jobs, the records and
-  their expansion): a model of those and a proof that they return what the reference returns. About the size
-  of what was done. **If you do not answer:** I scope it (a document, like the first scope) and wait.
+- **Added 2026-11-24** (same branch, now 246 theorems): each nice number of a field is proved to be reported
+  exactly once; and a checker program decides whether the fields a coordinator accepted cover the base (2.6 s
+  for base 64's 262,144 fields), with a proof that its "yes" is the theorem's hypothesis. So the chain a result
+  would rest on is: coordinator record → coverage check (proved) → "if each recorded search returned what is
+  recorded, the base has no nice number" (proved) → the searches themselves (tests and the execution checks,
+  not proof).
+- **Possible next step, scoped only (`LEAN-MO/DEVICE-SCOPE.md`):** the same treatment for the fourteen places
+  where the GPU path computes the reference's objects by another route. About 1,500–2,500 Lean lines; it would
+  cover what each stage is meant to compute, not the kernels. The scope recommends the top hierarchy and the
+  shared parent lists first (silent if wrong, cheap to prove). It also found two things worth doing in the
+  device path itself whatever is proved: compare the final check's verdicts on the sampled slice (today the
+  spot check compares the list before the final check), and prove that a top with no certified digit cannot
+  occur at base 64 (the kernel does not handle one). **If you do not answer:** nothing is started on the proof;
+  the two device items are queued for when a card can be rented.
 
 ### D17. A short window on demoux, when convenient (new 2026-11-20; nothing waits on it)
 

@@ -35,6 +35,64 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Conclusion:** end to end ×3.9 on the RTX 3080 with execution proven per stage and one slice per field
   recomputed on the CPU.
 
+## COORD.1 The local coordinator under injected failures: nine defects, four of them able to record an unsearched field; fixed; 4,950 randomized runs clean (2026-11-24 05:50–07:33 UTC, engineer, ivory only, Python only; `COORD/BRIEF.md`, `COORD/RESULTS.md`, `COORD/harness/` (`run_all.sh`); `dev/mo-clean` eb9ef776 → 66305ada (9 fix commits and `scripts/midout_audit.py`), on the fork)
+
+- **Invariants written first** (`COORD/RESULTS.md` §1): files S1–S7 (readable after a kill, a torn last line is
+  "never acknowledged"; fsync before the acknowledging reply; memory never ahead of disk; restart rebuilds
+  exactly the disk; claim ids never reused; one coordinator per directory; a changed work list refused), HTTP
+  H1–H6, end of run E1–E2 (every field accepted exactly once or open; accepted fields cover the work list).
+- **Defects in the script as first written** [M, each with a smallest reproduction]: critical (could record an
+  unsearched field): no fsync before a reply, so a claim id could be reused for another field after a power
+  loss (b69a2771); a second coordinator started on the same state directory (249701e2); a body describing
+  another field accepted under any known claim id (9dee6006); records named fields by index only, so a changed
+  work list reinterpreted them (69112d8c). High: a failed write had already changed memory (d1736d2e).
+  Medium: a torn last line made every later start fail (ccdc000d); a full log disk cost replies to records
+  already on disk (9b358676). Low: malformed or oversized bodies got no reply (de863575); start-up memory about
+  2.3 GB at 262,144 fields, now 156 MB (66305ada).
+- **After the fixes** [M]: 0 failures in 4,950 randomized runs, each also checked by the audit tool (3,000 +
+  1,500 ordinary: kills, partial loss of unsynced bytes, torn writes, full disk, changed work lists, a second
+  coordinator, clients that die, duplicate, submit late, cross claims or send junk; 300 stress runs with 16–32
+  clients and reissue after 0.01–0.08 s; 150 in a per-commit table where the original fails 140); truncation of
+  each state file at every byte of its last record (881 offsets); a 262,144-field scale test.
+- **Client side, by reading** (`client/src/midout_route.rs`; nothing built): with the fixed coordinator no
+  failure records an unsearched field; a searched field's result is lost (search repeated) on any refused
+  submission, on a coordinator down for more than about 9 minutes, and claims are never retried. Four changes
+  proposed with file and line (`COORD/RESULTS.md` §5), not made.
+- **Not tested:** real power loss, a remote coordinator, the real client, clock jumps, days-long runs, I/O
+  errors other than a full disk. `just lint` not run (it builds Rust); the repository has no Python lint.
+
+## LEAN.6 A proved coverage check for a coordinator's record; each nice number reported once (2026-11-24 05:50–07:15 UTC, proof engineer, the fork's CI only; `LEAN-MO/BRIEF-COVERAGE.md`, `LEAN-MO/COVERAGE-NOTES.md`; fork `lean/midout` 05747baa → a37347c3 (CI run 45344607920, green))
+
+- **`Coord.coversB`** [M: `lake build --wfail` in CI; 246 theorems, standard axioms only, no `sorry`]: sorts the
+  fields, requires whole quanta, walks them without a gap from lo to vEnd (overlaps allowed); `coversB_sound`,
+  `coversB_complete`, `coversB_iff` (equivalent to whole quanta and `Covers`); `no_nice_of_coversB` and, on the
+  checker's own inputs, `no_nice_of_certOk`.
+- **`lake exe coverage BASE K0 K1 Q0 fields.txt`** with `scripts/coverage_fields.py` (accepted submissions
+  only; format read from `dev/mo-clean` eb9ef776): exits 0 only if the coordinate is accepted, the fields
+  cover the range and every field reports no nice number. Base 64 (4, 8, 5), 262,144 fields: 2.6 s in all
+  (the decision 0.2–0.4 s). 2,368 test checks on 113 small coordinates (gaps at the start, middle, end; fields
+  off the grid; duplicates; unsorted). A mutant that forgets the last gap fails its proof (scratch branch).
+- **Once** [M]: `searchField_nice_nodup`, `searchField_count_eq_one`: a nice number of a whole-quanta field
+  appears exactly once in the outcome (the audit's open note).
+- **What a "yes" means:** if each listed field's search really returned what is recorded, the base has no nice
+  number. Not checked: that the searches ran or ran correctly, or that the file is the coordinator's record.
+- Tested on synthetic coordinator records only (no real run exists).
+
+## LEAN.7 Scope for a Lean model of the GPU path's algorithmic differences (2026-11-24, read-only; `LEAN-MO/BRIEF-DEVICE-SCOPE.md`, `LEAN-MO/DEVICE-SCOPE.md`)
+
+- Fourteen differences at base 64 (G1 top hierarchy … G14 sampled slice) and seven more on the wide path, each
+  with code location, the object it computes and a proposed statement; about 1,500–2,500 Lean lines for base
+  64; the result would be `deviceSearchField = searchField` for a model of what each stage is meant to compute.
+- **Silent if wrong** [by reading]: the final check (G12: the sampled slice compares the list before the
+  check); the shared parent lists (G4: seen only through two counts, the sampled slice is rerun unshared); the
+  prefilter's limb forms in rare carry cases (G11); the top hierarchy (G1); a wrong child-list position
+  (G7/G8: one survivor swapped for another with every count equal); the top's digit layout (G3). A defect
+  confined to one slice is seen by the sampled check with probability 1/4,096 per field.
+- **Two device items independent of any proof:** compare the final check's verdicts with `unique_digits` on the
+  sampled slice; G3 has no handling for a top with an empty digit mask (none occurs at base 64 by hand
+  arithmetic: to become a lemma).
+- Recommended first: G1, then G4 with key independence, then G7 + G8.
+
 ## LEAN.5 Independent audit of the Lean proof, and its corrections applied: the whole-base theorem (2026-11-23 07:25–09:30 UTC; auditor `LEAN-MO/REVIEW-BRIEF.md` → `LEAN-MO/REVIEW.md`; then the author, `LEAN-MO/STEP2-NOTES-B.md` "After the audit"; fork `lean/midout` 5eb715f3 → 05747baa (CI run 45145903363, green); box 62104162, 3.72 h in all today, about $0.38)
 
 - **Audit verdict: accurate with stated corrections** [M, the auditor's own runs]: `IsNice` is the intended

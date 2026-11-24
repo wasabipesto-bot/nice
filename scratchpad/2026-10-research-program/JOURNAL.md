@@ -32,6 +32,22 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     the GPU path's algorithmic differences and a proof that it returns what the reference returns would
     consist of.
 
+- **06:00 UTC: the device scope is back** (EXPERIMENTS LEAN.7): fourteen algorithmic differences; two device
+  items worth doing whatever is proved (final-check verdicts on the sampled slice; the empty-mask top).
+- **07:15 UTC: the coverage certificate is back** (LEAN.6): `lean/midout` a37347c3, 246 theorems, built through
+  the fork's CI only; also "once".
+- **07:33 UTC: the coordinator test is back** (COORD.1): nine defects, four critical, all fixed (`dev/mo-clean`
+  66305ada); 4,950 randomized runs clean; an audit tool.
+- (My turn was cut before the report; the 10:45 fallback finished the bookkeeping: map references fixed (3 moved),
+  DESIGN.md §6.11, §7, §9, §10 and the map's coordinator panel updated, DECISIONS D3 and D18 updated.)
+- **Spend today:** none. Month $24.67 of $30. Agents: 3 Opus (283k, 331k, 322k tokens).
+- **For the 05:41 cycle of 11-25:** (1) what the user wrote; #271. (2) The client-side robustness changes need
+  Rust builds: try the fork's own CI for them (a temporary push-triggered workflow on a side branch that merges
+  `dev/mo-clean`, as earlier sessions did), with the route's loop made testable against the real coordinator
+  script and a stand-in search; if the fork's CI can do it, no rental is needed. (3) Nothing else is planned
+  that needs a card before 12-01; a soak with the real client and the two device items are queued for then.
+  (4) Reports stay short: the user has been away since 11-21.
+
 ## 2026-11-23 (cycle 14 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $24.12 invoiced of $30 (over 80 % of the cap; fleet

@@ -1,7 +1,7 @@
 # The middle-out join: design
 
 *A description of what is on the branch and why, for a reader who knows the project and today's overlap join and
-has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean`, kept current; head `eb9ef776` (worktree
+has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean`, kept current; head `66305ada` (worktree
 `~/projects/nice/.worktrees/midout-clean`) and from the measurements recorded beside it. The open decisions are
 not repeated here; they are in `~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md` (section A).*
 
@@ -500,6 +500,16 @@ said; counts come from an exact CPU prototype on real slices.
   "midout:K0,K1,Q0"` (`midout/wire.rs`); the client flag `--midout-coordinator URL` (hidden from `--help`)
   refuses the production API by name and submits nothing after a failed account, a failed sampled check or a
   panic on any thread. The route costs nothing measurable: 1.6935 against the library's 1.6914 fs [measured].
+  **The coordinator was then attacked on purpose (2026-11-24):** a harness of fake clients and injected
+  failures found nine defects in the 164-line script as first written, four of which could have recorded a
+  field as searched when it was not (no `fsync` before a reply, so a claim id could be reused after a power
+  loss; a second coordinator starting on the same state directory; a submission describing another field
+  accepted under a known claim id; records reinterpreted when the work list changed). All nine are fixed, one
+  commit each; the fixed script passed 4,950 randomized runs (kills at any point, torn and truncated state
+  files at every byte of the last record, full disks, concurrent and misbehaving clients) with no failure
+  [measured]. `scripts/midout_audit.py` checks a state directory against its work list. A Lean program on the
+  proof branch checks that a coordinator's accepted fields cover the base, with a proof that its "yes" is the
+  hypothesis of the whole-base theorem (§7).
 - **Why:** nothing on the server needs to change until base 62 is done (late December) and a server design is the
   maintainer's decision (`DECISIONS.md` D4).
 
@@ -552,15 +562,18 @@ said; counts come from an exact CPU prototype on real slices.
   compared with tables generated from this Rust code: 102,603 comparisons, all equal, no disagreement ever met
   (every survivor in order of 9,411 slices at bases 10–25 and of whole slices at bases 30, 40 and 50; the final
   check on 21,077 numbers; residue classes of bases 3–128; at bases 64 and 65 the components: coordinates,
-  fields, certificates, unit tops, parents, children, prefilter). Proved about those functions (208 theorems, no
+  fields, certificates, unit tops, parents, children, prefilter). Proved about those functions (246 theorems, no
   `sorry`, Lean's three standard axioms, accepted by Lean's independent checker; audited by a reviewer who did
   not write them): **for every base 3–128 with a range, every coordinate the constructor accepts and every set
   of whole-quanta fields covering the range, a number is nice exactly when some field's search returns it; so if
   every field's search returns nothing, the base has no nice number** (`no_nice_of_searched_withDigits`,
   `isNice_iff_mem_fields`, `searchField_complete_wq`, `searchField_sound`). **What that does not cover:** the Rust
   itself, its 384-bit arithmetic, the bit-sliced word (the model states its meaning), mask widths, the GPU
-  kernels and drivers, the coordinator's record of which fields were searched, and "each number is reported
-  once". No whole base-64 slice has been run through the Lean model (it would take hours).
+  kernels and drivers. Since 2026-11-24 also proved: each nice number of a field is reported exactly once; and a
+  checker program (`lake exe coverage`, 2.6 s for base 64's 262,144 fields) decides whether the fields a
+  coordinator accepted cover the base, with a proof that its "yes" is the theorem's hypothesis: so "if each
+  recorded search returned what is recorded, the base has no nice number". It does not check that the searches
+  ran. No whole base-64 slice has been run through the Lean model (it would take hours).
 - Device against CPU: 1,073 real base-64 slices equal n for n in an independent sweep (on the branch as it was on
   2026-11-18, before the accounts and the 5–7 coordinate) [measured]; since then, 100 of them again, the range's
   first and last slices, and every slice of one field under both coordinates [measured].
@@ -612,7 +625,7 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   as well:** by ablation on 2026-11-20 the prefilter's arithmetic was 1.88 of the expansion's 3.45 ms; the run
   without a prefilter cost the same only because it wrote 16.5M survivors instead of 0.5M [measured].
 - **The size of the branch** was reported as 6,500–7,000 lines; it was 13,525 insertions in 21 files against
-  `origin/main` at `5a048669` 13,939 at `c2152084`, 14,405 at `10ddbf17` and 14,573 at `eb9ef776` (the wide path about 4,600, tests about 2,800) [measured by `git diff --stat`].
+  `origin/main` at `5a048669` 13,939 at `c2152084`, 14,405 at `10ddbf17`, 14,573 at `eb9ef776` and 14,875 at `66305ada` (the wide path about 4,600, tests about 2,800) [measured by `git diff --stat`].
 
 ---
 
@@ -643,10 +656,14 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   threads (33 s on a 5-CPU box against a 57 s field; one thread 106 s). The threads cost base 65 +0.7 % of
   device time and base 64 nothing measurable; the check's device rerun costs about 1 s per base-65 field and
   0.2–0.4 s at base 64 [measured]. Thread priority is not lowered.
-- **No server design is chosen**; nothing on the server exists. The coordinator has served one client at a time
-  on the same machine; several clients, a remote coordinator and long runs are untested. A killed client leaves
-  its field claimed unless `--reissue-after` is given. The client claims the next field only after submitting the
-  last.
+- **No server design is chosen**; nothing on the server exists. The coordinator has been tested hard with
+  fake clients (§6.11) but **not with the real client under failure, not across machines, and not over days**.
+  By reading the client: with the fixed coordinator no failure records an unsearched field, but a searched
+  field's result can be lost and the search repeated (a refused submission makes the client exit with the
+  field still claimed; a coordinator down for more than the client's retry window of about 9 minutes; claims
+  are not retried). Four client changes are proposed for that (spool a result to disk before submitting; treat
+  "already accepted for my own claim" as success; retry claims; report abandoned claims); not built. Run the
+  coordinator with `--reissue-after` at a few field times, or a dead client's field stays claimed for good.
 - **Fault bits are a runtime kernel argument** (`fault: u32`, 0 in production), not compile-time; making them
   compile-time changes every faultable kernel's generated code and needs the same verification again. No test
   switch can reach a release build [measured by reading].
@@ -663,7 +680,7 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
 
 ## 10. Where the code is, and how to run it
 
-**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `eb9ef776`, 23 commits on the development
+**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `66305ada`, 33 commits on the development
 trunk `66259bb0`; worktree `~/projects/nice/.worktrees/midout-clean`. The development history before the cleanup
 stays on `dev/middle-out-join`. No pull request is open (`DECISIONS.md` D9).
 
@@ -686,7 +703,8 @@ stays on `dev/middle-out-join`. No pull request is open (`DECISIONS.md` D9).
 | `common/examples/midout_fields.rs` | 56 | a work list of fields for the coordinator |
 | `client/src/midout_route.rs` | 451 | the route: claim, search, submit; guards; Metal refusal; panic hook |
 | `client/src/main.rs`, `client/Cargo.toml` | +25, +3 | the hidden `--midout-coordinator` flag |
-| `scripts/midout_coordinator.py` | 164 | the local coordinator (standard library, 127.0.0.1) |
+| `scripts/midout_coordinator.py` | 295 | the local coordinator (standard library, 127.0.0.1; durable records, a lock, refusals) |
+| `scripts/midout_audit.py` | 171 | checks a coordinator's state directory against its work list |
 
 **Run it on one machine** (CUDA shown; for Vulkan use `--features cubecl-spirv` and `--gpu-backend cubecl`):
 
