@@ -4,6 +4,34 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-24 (cycle 15 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $24.67 invoiced of $30; **the wrapper holds $5 back
+  in the month's last 7 days, so $0.33 is rentable until 12-01** (the decision on the cap is unanswered): today
+  and the rest of the month run without rentals (ivory for reading and light Python; the fork's CI for Lean).
+  No day missed. Nothing from the user since 11-21. PR #271 open, mergeable, 25 checks pass, no comments;
+  Dependabot #272–#275 open; drafts parked. Upstream main 974d7194 unchanged; no release.
+- **Where the value is now (my reading):** base 62 ends in late December and base 64 starts then. If the
+  middle-out join cannot run for real by then, base 64 starts on the old join at 266 days instead of 55 on the
+  RX 9070 XT. Kernel speed is no longer the constraint; **being runnable and trustworthy without a server
+  change is** (the option the user was given as "a private coordinator for your own machines"). So today's
+  work is on that path, inside the branch, with no pull request.
+- **Plan, with kill criteria:**
+  - **COORD, the local coordinator under failure** (`COORD/BRIEF.md`, Opus, ivory only, Python only, to 10:30
+    UTC): a chaos harness with fake clients (random delays, deaths, duplicate and late submissions, coordinator
+    killed at any point and restarted, torn state lines), checked against written invariants (no field lost,
+    none accepted twice, state recoverable after a kill at any byte, final coverage exact); defects fixed on
+    `dev/mo-clean`. **Kill: none; a defect found is the result.**
+  - **LEAN-COV, a checked coverage certificate** (`LEAN-MO/BRIEF-COVERAGE.md`, Opus, the fork's CI only, to
+    10:30 UTC): a Lean program that reads a coordinator's submissions file and decides whether its fields cover
+    the base's range with every outcome empty, with a theorem that a "yes" implies the hypotheses of
+    `no_nice_of_searched_withDigits`. It closes at the model level the one link the audit named that is neither
+    Rust nor kernel: the record of which fields were searched. **Kill: if the check cannot be proved to imply
+    the theorem's hypotheses, it is not shipped as a certificate.**
+  - **LEAN-DEV, scope only** (`LEAN-MO/BRIEF-DEVICE-SCOPE.md`, Opus, read-only, to 08:30 UTC): what a model of
+    the GPU path's algorithmic differences and a proof that it returns what the reference returns would
+    consist of.
+
 ## 2026-11-23 (cycle 14 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $24.12 invoiced of $30 (over 80 % of the cap; fleet
