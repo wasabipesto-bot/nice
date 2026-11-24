@@ -199,7 +199,11 @@ def next_field(now):
 
 class H(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
-        sys.stderr.write("coordinator: %.3f %s\n" % (time.time(), fmt % args))
+        try:
+            sys.stderr.write("coordinator: %.3f %s\n" % (time.time(), fmt % args))
+            sys.stderr.flush()
+        except (OSError, ValueError):  # a full disk under the log must not cost a reply
+            pass
 
     def _send(self, code, obj=None):
         b = b"" if obj is None else json.dumps(obj).encode()
