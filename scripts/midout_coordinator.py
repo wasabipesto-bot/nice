@@ -86,6 +86,14 @@ def load(path):
     return recs
 
 
+def append(path, rec):
+    """Append one record and make it durable (flush + fsync) before anyone is told."""
+    with open(path, "a") as o:
+        o.write(json.dumps(rec) + "\n")
+        o.flush()
+        os.fsync(o.fileno())
+
+
 # resume
 for c in load(claims_path):
     claims[c["claim_id"]] = c
@@ -94,6 +102,12 @@ for c in load(claims_path):
 for s in load(subs_path):
     if s.get("accepted"):
         done[s["field"]] = s["claim_id"]
+for path in (claims_path, subs_path):
+    if not os.path.exists(path):
+        open(path, "a").close()
+dfd = os.open(a.state, os.O_RDONLY)
+os.fsync(dfd)  # the files' directory entries
+os.close(dfd)
 sys.stderr.write("coordinator: %d fields, %d claimed, %d done (resumed), port %d, reissue_after %s, legacy_path %s\n"
                  % (len(fields), len(last_claim), len(done), a.port, a.reissue_after, a.legacy_path))
 
@@ -133,8 +147,7 @@ class H(BaseHTTPRequestHandler):
             c = {"claim_id": cid, "field": i, "time": now}
             claims[cid] = c
             last_claim[i] = (cid, now)
-            with open(claims_path, "a") as o:
-                o.write(json.dumps(c) + "\n")
+            append(claims_path, c)
         f = fields[i]
         self._send(200, {"claim_id": cid, "base": f["base"], "range_start": f["range_start"],
                          "range_end": f["range_end"], "range_size": f["range_size"], "coordinate": f["coordinate"]})
@@ -178,8 +191,7 @@ class H(BaseHTTPRequestHandler):
             rec = {"recv": recv, "claim_id": cid, "field": None if c is None else c["field"],
                    "claim_time": None if c is None else c["time"], "accepted": reason is None, "reason": reason,
                    "work": None if c is None else fields[c["field"]], "submission": d}
-            with open(subs_path, "a") as o:
-                o.write(json.dumps(rec) + "\n")
+            append(subs_path, rec)
         self._send(code, "recorded" if reason is None else "rejected: " + reason)
 
 
