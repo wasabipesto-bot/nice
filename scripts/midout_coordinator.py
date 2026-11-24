@@ -25,7 +25,7 @@ once per field, only for a claim this coordinator issued, and only with telemetr
 
 usage: midout_coordinator.py --worklist W.json --state DIR [--port 8470] [--reissue-after S] [--legacy-path] [--coordinate ID]
 """
-import argparse, json, os, sys, threading, time
+import argparse, fcntl, json, os, sys, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlsplit, parse_qs
 
@@ -53,6 +53,12 @@ for i, f in enumerate(fields):
     if a.coordinate is not None and c != a.coordinate:
         sys.exit(f"work list entry {i}: coordinate {c!r}, not {a.coordinate!r}")
 os.makedirs(a.state, exist_ok=True)
+# one coordinator per state directory: the lock is held for the process's life (the kernel drops it when it dies)
+lock_file = open(os.path.join(a.state, "lock"), "a")
+try:
+    fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    sys.exit("%s is in use by another coordinator (%s/lock is held): refusing to start" % (a.state, a.state))
 claims_path = os.path.join(a.state, "claims.jsonl")
 subs_path = os.path.join(a.state, "submissions.jsonl")
 lock = threading.Lock()
