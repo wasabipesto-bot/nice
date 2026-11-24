@@ -60,18 +60,40 @@ claims = {}  # claim_id -> {"field": index, "time": t}
 last_claim = {}  # field index -> (claim_id, time) of its latest claim
 done = {}  # field index -> claim_id of the accepted submission
 next_id = 1000
+
+
+def load(path):
+    """The records of a state file. A last line without its newline is a write cut short (a kill, a full disk): it
+    was never acknowledged, so it is cut off, and the next record starts on a line of its own. Any other line that
+    does not read stops the coordinator."""
+    if not os.path.exists(path):
+        return []
+    data = open(path, "rb").read()
+    whole = data.rfind(b"\n") + 1
+    if whole < len(data):
+        sys.stderr.write("coordinator: %s: cutting off a torn last line (%d bytes, never acknowledged)\n"
+                         % (path, len(data) - whole))
+        with open(path, "r+b") as o:
+            o.truncate(whole)
+            o.flush()
+            os.fsync(o.fileno())
+    recs = []
+    for n, line in enumerate(data[:whole].splitlines(), 1):
+        try:
+            recs.append(json.loads(line))
+        except ValueError as e:
+            sys.exit("%s line %d does not read (%s): refusing to start" % (path, n, e))
+    return recs
+
+
 # resume
-if os.path.exists(claims_path):
-    for line in open(claims_path):
-        c = json.loads(line)
-        claims[c["claim_id"]] = c
-        last_claim[c["field"]] = (c["claim_id"], c["time"])
-        next_id = max(next_id, c["claim_id"] + 1)
-if os.path.exists(subs_path):
-    for line in open(subs_path):
-        s = json.loads(line)
-        if s.get("accepted"):
-            done[s["field"]] = s["claim_id"]
+for c in load(claims_path):
+    claims[c["claim_id"]] = c
+    last_claim[c["field"]] = (c["claim_id"], c["time"])
+    next_id = max(next_id, c["claim_id"] + 1)
+for s in load(subs_path):
+    if s.get("accepted"):
+        done[s["field"]] = s["claim_id"]
 sys.stderr.write("coordinator: %d fields, %d claimed, %d done (resumed), port %d, reissue_after %s, legacy_path %s\n"
                  % (len(fields), len(last_claim), len(done), a.port, a.reissue_after, a.legacy_path))
 
