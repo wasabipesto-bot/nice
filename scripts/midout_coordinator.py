@@ -86,12 +86,34 @@ def load(path):
     return recs
 
 
+broken = None  # set when a failed write could not be undone: nothing more is written until a restart
+
+
 def append(path, rec):
-    """Append one record and make it durable (flush + fsync) before anyone is told."""
-    with open(path, "a") as o:
-        o.write(json.dumps(rec) + "\n")
-        o.flush()
-        os.fsync(o.fileno())
+    """Append one record and make it durable (flush + fsync) before anyone is told. On failure (a full disk) the
+    file is cut back to where it was and the error returned, so memory and disk stay equal; None on success."""
+    global broken
+    if broken:
+        return broken
+    b = (json.dumps(rec) + "\n").encode()
+    fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try:
+        size = os.fstat(fd).st_size
+        try:
+            done_b = 0
+            while done_b < len(b):
+                done_b += os.write(fd, b[done_b:])
+            os.fsync(fd)
+            return None
+        except OSError as e:
+            try:
+                os.ftruncate(fd, size)
+                os.fsync(fd)
+            except OSError as e2:
+                broken = "a failed write to %s could not be undone (%s): restart the coordinator" % (path, e2)
+            return "%s: %s" % (path, e)
+    finally:
+        os.close(fd)
 
 
 # resume
@@ -143,11 +165,13 @@ class H(BaseHTTPRequestHandler):
             if i is None:
                 return self._send(204)
             cid = next_id
-            next_id += 1
             c = {"claim_id": cid, "field": i, "time": now}
+            err = append(claims_path, c)
+            if err:
+                return self._send(503, "claim not recorded: %s" % err)
+            next_id += 1
             claims[cid] = c
             last_claim[i] = (cid, now)
-            append(claims_path, c)
         f = fields[i]
         self._send(200, {"claim_id": cid, "base": f["base"], "range_start": f["range_start"],
                          "range_end": f["range_end"], "range_size": f["range_size"], "coordinate": f["coordinate"]})
@@ -187,11 +211,14 @@ class H(BaseHTTPRequestHandler):
                 reason, code = "telemetry pipeline.route is %r, not %r" % (route, ROUTE), 422
             else:
                 code = 200
-                done[c["field"]] = cid
             rec = {"recv": recv, "claim_id": cid, "field": None if c is None else c["field"],
                    "claim_time": None if c is None else c["time"], "accepted": reason is None, "reason": reason,
                    "work": None if c is None else fields[c["field"]], "submission": d}
-            append(subs_path, rec)
+            err = append(subs_path, rec)
+            if err:
+                return self._send(503, "submission not recorded: %s" % err)
+            if reason is None:
+                done[c["field"]] = cid
         self._send(code, "recorded" if reason is None else "rejected: " + reason)
 
 
