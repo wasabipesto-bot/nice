@@ -1,0 +1,12 @@
+repro_cross_claim.py         ok: other field's body: 422; string claim id: 400; other coordinate: 422
+repro_junk.py                ok: Content-Length -1 -> HTTP/1.0 400 Bad Request; Content-Length abc -> HTTP/1.0 400 Bad Request; Content-Length 1e13 -> HTTP/1.0 413 Content Too Large; telemetry a list -> HTTP/1.0 400 Bad Request; 2 MB body -> HTTP/1.0 413 Content Too Large; alive after: True
+repro_log_full.py            ok: log full (limit 1876): claim 200 (on disk: True), submit 200 (accepted on disk: True)
+repro_no_fsync.py            ok: after the replies: claims 223 of 223 bytes durable, submissions 893 of 893 (submit 200)
+repro_torn_tail.py           ok: claims [1000, 1001, 1002] on three distinct fields
+repro_two_instances.py       ok: the second coordinator refused to start (de/projects/nice/scratchpad/2026-10-research-program/G2/mode/run_all/two-pthdngbe/state/lock is held): refusing to start)
+repro_unsynced_record.py     ok: first reply 200; after the restart the resubmission got 200 {"submission_id": 1, "status": "already_recorded"} with 892 of 892 bytes durable
+repro_worklist_change.py     ok: restart with a reordered work list refused (9220093333313421312, "range_end": 37779364208521389277184, "range_size": 144115188075855872} there: refusing to start (a record must keep meaning its own field))
+repro_write_failure.py       ok: full disk: submit 503, status {"fields": 1, "claimed": 1, "searched": 0, "checked": 0, "submissions": 0}, partial line left False; after restart (up) resubmit 200
+60 runs (seeds 1..60) in 39 s: 0 failed
+1116 offsets tried; every one passed
+run_all exit 0

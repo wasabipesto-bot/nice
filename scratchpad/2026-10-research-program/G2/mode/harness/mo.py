@@ -160,12 +160,17 @@ def body(cid, w, nonce="h", survivors=1, checked=1, nice=(), shape=None, slices=
     c = coord(w["base"], w["coordinate"])
     v, z = w["range_start"], w["range_end"] - w["range_start"]
     sh = shape or default_shape(c)
+    if slices is None:
+        try:
+            slices = slice_count(c, sh, v, z)
+        except ValueError:  # a body for a range that is no field of this coordinate (a wrong-body test)
+            slices = 4096
     return {"claim_id": cid, "username": nonce, "client_version": "3.4.9-dev",
             "field": {"base": w["base"], "coordinate": w["coordinate"], "v_start": str(v), "v_size": str(z),
                       "range_size": str(w["range_size"])},
             "nice_numbers": [str(x) for x in nice], "shape": "%d,%d" % sh,
             "survivors": survivors, "checked": checked,
-            "slices": slice_count(c, sh, v, z) if slices is None else slices,
+            "slices": slices,
             "telemetry": {"build_sha": "0" * 40, "client_version": "3.4.9-dev", "device": "fake",
                           "processing_secs": 0.01, "pipeline": {"route": "midout", "coordinate": w["coordinate"],
                                                                 "join": {"path": "fake"}}}}

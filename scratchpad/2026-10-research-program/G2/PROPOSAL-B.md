@@ -295,3 +295,34 @@ PostgreSQL, so they run by hand.
 - How many cards will run midout (only the per-card rate is known). Field time and submission size come from
   development runs; row sizes are estimates from column widths.
 - Whether `coord.rs` merges as it stands; its header says no server stores it yet (`coord.rs:78–79`, dev).
+
+## 9. Questions raised by building the client against §3 (added 2026-11-25; each with what is built, a recommendation, and *the default if unanswered*)
+
+The client mode now exists on the fork branch `dev/mo-mode` and speaks §3 against a development server. Building
+it exposed thirteen points §3 leaves open (`G2/MODE-NOTES.md` §6 has all of them). The seven that change the wire:
+
+1. **Big integers.** §3 sends them as JSON numbers in the claim (as `/claim/niceonly` does today) and as decimal
+   strings in the submit. Numbers above 2^53 are read as doubles by JavaScript, `jq` and most tools. Built: as
+   written. Recommend strings in both directions for the new endpoints, the client accepting either. *Default: as
+   written.*
+2. **`nice_numbers`.** The element type is not given (the example is empty). Built: decimal strings (`["69"]`).
+   Recommend that. *Default: strings.*
+3. **Which shape counts the slices.** "`slices` equals the field's slice count" depends on the join's shape, which
+   the client sends. Built: the count under the submitted shape. Recommend one shape per base, stored in
+   `midout_bases`, and a 422 for any other: counters of a canon and its check are then always comparable, and a
+   change of shape is one row updated with a client release. *Default: as built (any valid shape).*
+4. **What "the same submission again" means.** Built: everything but the telemetry. Recommend that. *Default: as
+   built.*
+5. **A 404 on submit means two things:** an unknown claim, and a server without the endpoint. Recommend a JSON
+   error body with a short code on every 4xx (`{"error": "unknown_claim", "message": …}`), as the other endpoints'
+   `ApiErrorBody` does. *Default: plain 404, the client stops either way.*
+6. **A check that disagrees with its canon** is answered `check`, like one that agrees, so the client cannot say
+   so in its log. Recommend adding `"matches_canon": true | false` to the reply. *Default: not added.*
+7. **A 503 on the claim** is retried on the usual ladder (about nine minutes at the default) and then the client
+   exits, as the other modes do; a 204 waits for ever under `--repeat`. Should a `midout` client also wait out
+   a 503 for ever? Recommend yes under `--repeat` (an unattended card should survive a server restart).
+   *Default: as the other modes.*
+
+The other six (order of the checks, the request-size limit, whether telemetry is required, counters as JSON
+numbers, an endpoint to give a claim back, a reason with the 204) need no answer to proceed; the notes say what
+is built.

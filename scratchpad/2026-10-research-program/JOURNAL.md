@@ -44,12 +44,19 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     UTC): branch `dev/mo-mode` from 66305ada; the mode in `--help`; the proposal's wire; background claim and
     submit; the development coordinator serving the same shapes; an end-to-end test without a card; the
     bench examples brought to package standard. No server-side file changes; no pull request.
+- **08:18 UTC: the client mode is back** (MODE.1): `dev/mo-mode` f61cf79e, 9 commits; works end to end against
+  the development server (CPU reference on small bases); lint and the lavapipe tiers green in the fork's CI; the
+  adapted harness found and fixed one more coordinator defect (an unsynced record acknowledged after a restart);
+  seven wire questions added to `G2/PROPOSAL-B.md` §9. **The branch had never been through the full CI matrix:
+  three tests fail on 32-bit and emulated targets on `dev/mo-clean` too.** #276 fully green; #277 and #278 green
+  but for arm builds still running.
 - **Process notes:** dash on demoux rejects `kill -- -PGID` (write watchdogs with `kill -SIG -PGID` and test
   them before any card work); `bc` is not installed on ivory; the fork's workflows run on a branch only by
   `gh workflow run … --ref <branch>` (no push trigger off main).
 - **Spend today:** none on rentals. Agents: 5 on Opus (proposal, small PRs, window, review, mode).
-- **For the 05:41 cycle of 11-26:** (1) what the user wrote; #276 and the two small pull requests. (2) The
-  mode branch: read `G2/MODE-NOTES.md` critically, update `DESIGN.md` and the map to the new head, list the
+- **For the 05:41 cycle of 11-26:** (1) what the user wrote; #276–#278. (2) The mode branch: **make the
+  branch pass the full CI matrix (the three failing tests; diagnose the aarch64 kill, do not just skip it)**,
+  read the client loop critically (an independent review of `midout_route.rs` and the coordinator's changes), update `DESIGN.md` and the map to the new head, list the
   "questions the proposal must answer" in `DECISIONS.md` §1. (3) Base 65 on the RX 9070 XT is slower than on
   11-19 with the card at half clock: needs 45 minutes of the card (asked in the report; not urgent, base 65
   is months away). (4) The branch is 6–10 % slower when the desktop is in use: the field driver's host share

@@ -5,6 +5,49 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## MODE.1 The `midout` client mode against the proposed endpoints: built, end to end against a development server; no real field through it on a card yet (2026-11-25 06:00–08:18 UTC, engineer, ivory and the fork's CI; `G2/MODE-BRIEF.md`, `G2/MODE-NOTES.md`, `G2/mode/`; fork branch `dev/mo-mode` f61cf79e, 9 commits on `dev/mo-clean` 66305ada, 17 files, +2,974 −716)
+
+- **The mode:** `nice_client midout` in `--help` beside `detailed` and `niceonly`; the hidden
+  `--midout-coordinator` flag removed; `GET /claim/midout` and `POST /submit/midout` over `--api-base` in the
+  shapes of `G2/PROPOSAL-B.md` §3 (serde tests read the proposal's two examples verbatim). A claim 404 is one
+  error ("this server does not offer middle-out fields"); 409 and 422 stop the client with the server's message;
+  `already_recorded` is success; 5xx and network errors retried; under `--repeat` a 204 waits (1 s doubling to
+  256 s). No variant added to the shared `SearchMode`, **no server-side file changed** (a client-only `ClientMode`
+  maps the two old modes; where they merge later is in the notes §1). Options table in the notes §1 (`--validate`,
+  `--benchmark*`, `--gpu-backend cuda/hip`, a build without CubeCL: refused with a sentence; `--prefetch-*`
+  ignored with a warning).
+- **The card does not wait on HTTP:** the next field is claimed during the search (one held ahead), the
+  previous submission finishes in the background (one in flight); after a failed search, failed accounts, a
+  recorded panic or a refused submission nothing more is submitted and the exit is non-zero; a submission in
+  flight at exit is finished or reported.
+- **Tests:** 17 client tests incl. the real loop (generic over the search, CPU reference on bases 10 and 20)
+  against the real coordinator script on 127.0.0.1: a 30-field run with the audit exiting 0, a lost reply
+  (`already_recorded`), 409, 422, a failed search, a server without the endpoint. Tier (a) 285 + 41 pass on
+  ivory; tier (b) on lavapipe (WGSL and SPIR-V) and Metal green in the fork's CI twice (e8240ebb, bbbb4c7e);
+  `just lint` green in the fork's CI on bbbb4c7e. The real binary on lavapipe: device init, refusals, 404, 204.
+- **The development server** (`scripts/midout_coordinator.py`, 473 lines changed): the two paths, the proposal's eight
+  checks, expiring claims, the three reply statuses; its port of the coordinate arithmetic equals the Rust on
+  2,514 fields incl. padded edges. **The fault harness, adapted (`G2/mode/harness/`), found one real defect:
+  after a restart the coordinator trusted a record it had read but never fsynced and answered
+  `already_recorded`, so a power cut after that reply lost an acknowledged record (seed 1545); fixed in
+  a38c9f4d (both state files fsynced after reading), with a reproduction.** After the fix: `run_all` passes;
+  1,500 ordinary randomized runs 0 failures; 300 stress runs 1 failure (seed 50081: the harness expects a
+  reset where it got an empty read after a 413; passes on rerun; path unchanged from 66305ada). Four
+  deliberately broken coordinators all caught.
+- **Examples** (`midout_bench`, `midout_wide_bench`, `midout_fields`): `--help`, units explained, bad input
+  refused with reasons; **`midout_bench --tops-only` timed the wrong slices under the default coordinate
+  (4, 8, 5); fixed** (it took `t<<12 | i`, right only under (4, 9, 6)).
+- **Found in the old route while moving it:** `--gpu-wgpu-device` was ignored; the sampled check's threads
+  could not be set; any 4xx stopped the client incl. the resubmission after a lost reply.
+- **Not done / to check:** no base-64 field through the new binary on a card; **the middle-out branch had
+  never been through the full CI matrix, and three tests fail there on `dev/mo-clean` too** (fork run
+  45569796574): `coord::tests::b65_padded` overflows `usize` on 32-bit targets (test code, coord.rs:547);
+  `client_api_async::tests::ordinary_claims_refuse_a_coordinate_field` needs a loopback bind that the i686
+  emulator lacks; `cpu::tests::threaded_slice_join_equals_single_threaded` is killed under the aarch64
+  emulator. The full matrix on the head f61cf79e was still running at the report.
+- **Thirteen questions for the proposal** (notes §6); the seven that change the wire are now
+  `G2/PROPOSAL-B.md` §9 with recommendations and defaults.
+
 ## WIN3.1 Third window on the RX 9070 XT: the cleaned branch is exact at 64 lanes and ×4.5 at base 64; wider words are slower on this card (dropped); base 65 ran off the operating point (2026-11-25 03:48–05:53 UTC, engineer, under the user's 4-hour lease; `G2/WINDOW3-BRIEF.md`, `G2/WINDOW3-RESULTS.md`, `G2/window_1125/`; `dev/mo-clean` 66305ada, `exp/mo-word-width` b3967fb5)
 
 - **Exactness at 64 lanes, cleaned head (never run on this card before): everything passes.** Seven narrow

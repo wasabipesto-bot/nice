@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-25 06:15 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-25 08:30 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
@@ -14,8 +14,9 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
   join does not). ×4.1 on an RTX 3080. Branch `dev/mo-clean` on the fork. **No pull request from it until you
   have gone through the design** (`../2026-11-midout-design/DESIGN.md`).
 - **Your direction for it (2026-11-25):** a `midout` mode beside `detailed` and `niceonly`, visible in `--help`,
-  with a new claim endpoint and its own table on the server; the field definition not locked in yet. The
-  client half is being built on the fork branch `dev/mo-mode`; the server half is the proposal of §1.
+  with a new claim endpoint and its own table on the server; the field definition not locked in yet. **The
+  client half exists since 2026-11-25** on the fork branch `dev/mo-mode` (`nice_client midout`, tested end to
+  end against a development server; notes in `G2/MODE-NOTES.md`); the server half is the proposal of §1.
 - **Pull requests in general are allowed.** Open now: #276 (the crash at bases with no valid residue), #277
   (a `--gpu` client that finds only a software renderer), #278 (the CI check for the SPIR-V atomic-store trap).
 - **demoux:** the window of 2026-11-25 ended at 05:53 UTC, well inside the lease; nothing of mine is on the
@@ -27,13 +28,17 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
 
 - **What it is:** the written proposal you asked for by choosing "option B": the new tables, the claim and
   submit endpoints, what the database pays, the rollout, tests: `G2/PROPOSAL-B.md`. It contains its own short
-  list of sub-decisions (field size per row, how fields are inserted, double-checking, credit).
+  list of sub-decisions (§7: field size per row, how fields are inserted, double-checking, credit) and, since
+  the client was built against it, seven questions about the wire with a recommendation and a default each
+  (§9: big integers as strings, one shape per base, error bodies, whether a check reports disagreement, what a
+  client does on a 503).
 - **Why now:** base 62 ends in late December; base 64 on the new join needs this on the server before then, or
   base 64 starts on the old join (about 266 days on your RX 9070 XT against about 55–60).
-- **What I do meanwhile, without a yes:** nothing on the server. On the fork branch the client mode is built
-  against the endpoint shapes of the proposal, with a development coordinator serving the same shapes so it
-  can be tested; if you change the shapes, the client follows.
-- **If you do not answer:** the client mode exists on the branch; no server code is written.
+- **What I do meanwhile, without a yes:** nothing on the server. The client mode on the fork branch speaks
+  the endpoint shapes of the proposal, with a development server for the same shapes so it can be tested; if
+  you change the shapes, the client follows.
+- **If you do not answer:** the client mode stays on the branch with the defaults of §7 and §9; no server
+  code is written.
 
 ## 2. What should Lean (or a long mathematical effort) be pointed at?
 
@@ -87,5 +92,6 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
 ## What happens next if you say nothing
 
 1. #276, #277 and #278 wait for your merge.
-2. The `midout` client mode is finished on the fork branch `dev/mo-mode`; nothing is opened from it.
+2. The `midout` client mode on the fork branch `dev/mo-mode` is brought through the full CI matrix (three
+   tests of the branch fail on 32-bit and emulated targets) and reviewed; nothing is opened from it.
 3. No server code, no Lean work, no validation change, no use of demoux.

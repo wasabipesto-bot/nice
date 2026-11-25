@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Chaos harness for scripts/midout_coordinator.py (standard library; 127.0.0.1 only).
+"""Chaos harness for scripts/midout_coordinator.py (standard library; 127.0.0.1 only), adapted 2026-11-25 to the
+midout mode's wire (GET /claim/midout, POST /submit/midout with the typed body, replies canon / check /
+already_recorded) and to its semantics: a field has one canon, a later accepted search of it is a check (H2, H6), an
+identical resubmission under one claim is already_recorded and a different one 409, claims expire after
+--claim-duration (was --reissue-after).
 
 usage: chaos.py --script PATH [--runs N] [--seed S] [--jobs J] [--keep K] [--audit PATH] [--out DIR] [-v]
 
@@ -21,36 +25,29 @@ from concurrent.futures import ProcessPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WRAP = os.path.join(HERE, "trace_wrap.py")
+sys.path.insert(0, HERE)
+from mo import CLAIM, SUBMIT, C485, C496, field as _field, body as _body, t_of  # noqa: E402
+
 Q, START = 2 ** 57, 2 ** 75
-C485, C496 = "midout:4,8,5", "midout:4,9,6"
 OK_KINDS = ("honest", "dup", "late")
 
 
 def field(t, base=64, coord=C485):
-    v = START + t * Q
-    return {"base": base, "coordinate": coord, "range_start": v, "range_end": v + Q, "range_size": Q}
+    return _field(t, base, coord)
 
 
 def ident(w):
     return (w["base"], w["coordinate"], w["range_start"], w["range_end"], w["range_size"])
 
 
-def body(cid, work, nonce, route="midout"):
-    """A submission as the client builds it (client/src/midout_route.rs), for `work`, under claim id `cid`."""
-    v, z = work["range_start"], work["range_end"] - work["range_start"]
-    t0 = (v - START) // Q
-    tel = {"build_sha": "0" * 40, "client_version": "3.4.9-dev", "device": "fake", "processing_secs": 0.01,
-           "pipeline": {"route": route, "coordinate": work["coordinate"],
-                        "field": {"base": work["base"], "v_start": str(v), "v_size": str(z), "t0": str(t0),
-                                  "quanta": str(z // Q), "range_size": str(work["range_size"])},
-                        "join": {"path": "narrow", "survivors": 1, "checked": 1, "slices": 4096}, "test_fault": None}}
-    if route is None:
-        tel = None
-    d = {"claim_id": cid, "username": nonce, "client_version": "3.4.9-dev", "unique_distribution": None,
-         "nice_numbers": [], "telemetry": tel}
-    if tel is None:
-        del d["telemetry"]
-    return d
+def T(wk):
+    """t of a field identity (for messages)."""
+    return t_of({"base": wk[0], "coordinate": wk[1], "range_start": wk[2]})
+
+
+def body(cid, work, nonce, **kw):
+    """A submission as the client builds it (client/src/midout_route.rs: submission)."""
+    return _body(cid, work, nonce, **kw)
 
 
 def free_port():
@@ -214,7 +211,7 @@ class Run:
         self.wpath = os.path.join(self.dir, "work.json")
         json.dump(self.wl, open(self.wpath, "w"))
         self.reissue = r.choice([None, 0.01, 0.03, 0.08]) if self.stress else r.choice([None, None, None, 0.15, 0.3, 0.6])
-        self.extra = [] if self.reissue is None else ["--reissue-after", str(self.reissue)]
+        self.extra = [] if self.reissue is None else ["--claim-duration", str(self.reissue)]
         self.co = Coord(self, self.script)
         p, port, st = self.co.start(self.wpath, self.extra)
         if st[0] != "up":
@@ -250,7 +247,7 @@ class Run:
                 self.compare_status(json.loads(txt), "live, end of chaos")
         self.co.kill(self.cur["p"])
         # restart clean and drain with one honest client
-        p, port, st = self.co.start(self.wpath, ["--reissue-after", "0"])
+        p, port, st = self.co.start(self.wpath, ["--claim-duration", "1e-9"])
         if st[0] != "up":
             self.v("S1/S4", "restart for the drain failed: %s; log: %s" % (st, self.tail()))
             return self.finish(audit)
@@ -279,14 +276,14 @@ class Run:
                 self.v("S6", "a second coordinator started on the same state directory")
                 # use it as a careless operator would: two claims, honest submissions
                 for _ in range(2):
-                    s, t = req(port2, "GET", "/claim/niceonly?coordinate=midout")
+                    s, t = req(port2, "GET", CLAIM)
                     if s == 200:
                         c = json.loads(t)
                         w = {k: c[k] for k in ("base", "coordinate", "range_start", "range_end", "range_size")}
                         self.note(ev="claim", client=-1, cid=c["claim_id"], work=ident(w), gen=-1)
                         nn = self.next_nonce("honest", c["claim_id"], w, -1)
                         self.note(ev="send", client=-1, kind="honest", nonce=nn, cid=c["claim_id"], work=ident(w))
-                        s2, t2 = req(port2, "POST", "/submit", body(c["claim_id"], w, nn))
+                        s2, t2 = req(port2, "POST", SUBMIT, body(c["claim_id"], w, nn))
                         self.note(ev="reply", client=-1, nonce=nn, status=s2, text=t2[:200])
                 self.co.kill(p2)
             elif st[0] == "timeout":
@@ -350,7 +347,7 @@ class Run:
                 if how == "swap":
                     bad[a], bad[b] = bad[b], bad[a]
                 elif how == "edit":  # another range for a field with history
-                    bad[a] = field((bad[a]["range_start"] - START) // Q + 1 + r.randrange(1000) * 300)
+                    bad[a] = field(t_of(bad[a]) + 1 + r.randrange(1000) * 300)
                 else:  # the work list cut short before a field with history
                     bad = bad[:max(a, b)]
                 bp = os.path.join(self.dir, "work-changed.json")
@@ -405,7 +402,7 @@ class Run:
                 time.sleep(0.02)
                 continue
             t_req = time.time()
-            s, t = req(port, "GET", "/claim/niceonly?coordinate=midout", timeout=2)
+            s, t = req(port, "GET", CLAIM, timeout=2)
             if s == "noreply":
                 time.sleep(0.02)
                 continue
@@ -423,8 +420,9 @@ class Run:
             self.note(ev="claim", client=k, cid=cid, work=ident(w), gen=gen, t_req=t_req)
             with self.llock:
                 self.claimed_pool.append((cid, w))
-            kinds = ["honest", "die", "dup", "cross", "wrongbody", "route", "typeid", "junk", "unknown"]
-            wts = [50, 8, 8, 6, 6, 4, 4, 6, 2]
+            kinds = ["honest", "die", "dup", "cross", "wrongbody", "slices", "notnice", "redo", "typeid", "junk",
+                     "unknown"]
+            wts = [50, 8, 8, 6, 6, 3, 3, 4, 4, 6, 2]
             if self.reissue is not None:
                 kinds.append("late")
                 wts.append(10)
@@ -436,25 +434,31 @@ class Run:
                 time.sleep(self.reissue * r.uniform(1.2, 2.5))
                 self.submit(k, r, cid, w, "late")
                 continue
-            if kind in ("cross", "wrongbody", "route", "typeid", "unknown", "junk"):
+            if kind in ("cross", "wrongbody", "slices", "notnice", "typeid", "unknown", "junk"):
                 self.bad(k, r, kind, cid, w)
-            self.submit(k, r, cid, w, "honest")
+            s_h, t_h, d_h = self.submit(k, r, cid, w, "honest")
             if kind == "dup":
+                # the same body again (a reply the client did not get): already_recorded, never a second record
                 time.sleep(r.uniform(0, 0.05))
-                self.submit(k, r, cid, w, "dup")
+                self.submit(k, r, cid, w, "dup", b=d_h, keep_name=True)
+            if kind == "redo":
+                # the same claim with another result: 409 once the first is recorded, never accepted
+                d2 = dict(d_h, survivors=d_h["survivors"] + 1)
+                self.submit(k, r, cid, w, "redo", b=d2)
 
-    def submit(self, k, r, cid, w, kind, b=None, cid_sent=None):
-        nn = self.next_nonce(kind, cid, w, k)
+    def submit(self, k, r, cid, w, kind, b=None, cid_sent=None, keep_name=False):
+        """(status, text, body). keep_name: resend the body as it is (its username is the first send's nonce)."""
+        nn = b["username"] if keep_name else self.next_nonce(kind, cid, w, k)
         d = b if b is not None else body(cid, w, nn)
-        if b is not None:
-            d["username"] = nn
+        if b is not None and not keep_name:
+            d = dict(d, username=nn)
         self.note(ev="send", client=k, kind=kind, nonce=nn, cid=cid if cid_sent is None else cid_sent, work=ident(w))
         for attempt in range(60):  # like the client: retry while there is no reply
             port, gen = self.cur["port"], self.gen
             if self.cur["p"] is None:
                 time.sleep(0.03)
                 continue
-            s, t = req(port, "POST", "/submit", d, timeout=3)
+            s, t = req(port, "POST", SUBMIT, d, timeout=3)
             if s == "noreply":
                 self.note(ev="reply", client=k, nonce=nn, status="noreply", text=t[:120], gen=gen)
                 time.sleep(0.03)
@@ -463,8 +467,8 @@ class Run:
             if s >= 500 and attempt < 59:
                 time.sleep(0.03)
                 continue
-            return s, t
-        return "noreply", ""
+            return s, t, d
+        return "noreply", "", d
 
     def bad(self, k, r, kind, cid, w):
         if kind == "cross":
@@ -482,8 +486,12 @@ class Run:
             # a body for another field only (the base-65 field is already midout:4,9,6: that one is no change)
             w2 = r.choice([x for x in cands if ident(x) != ident(w)])
             self.submit(k, r, cid, w, "wrongbody", b=body(cid, w2, ""))
-        elif kind == "route":
-            self.submit(k, r, cid, w, "route", b=body(cid, w, "", route=r.choice(["overlap", "stride", None])))
+        elif kind == "slices":
+            good = body(cid, w, "")
+            self.submit(k, r, cid, w, "slices", b=body(cid, w, "", slices=good["slices"] + r.choice([1, -1, 4096])))
+        elif kind == "notnice":
+            c = w["range_start"]  # a number that is not nice (and in no field: v is not n)
+            self.submit(k, r, cid, w, "notnice", b=body(cid, w, "", nice=[r.choice([c, 69, 2 ** 75 + 1])]))
         elif kind == "typeid":
             self.submit(k, r, cid, w, "typeid", b=body(r.choice([str(cid), cid + 0.25, float(cid)]), w, ""))
         elif kind == "unknown":
@@ -495,38 +503,49 @@ class Run:
         port, gen = self.cur["port"], self.gen
         if self.cur["p"] is None:
             return
-        j = r.choice(["notjson", "list", "tellist", "negcl", "nancl", "hugecl", "oversize", "nocl", "deep"])
+        j = r.choice(["notjson", "list", "tellist", "negcl", "nancl", "hugecl", "oversize", "nocl", "deep", "bigtel",
+                      "numstr"])
         b = json.dumps(body(cid, w, "junk")).encode()
         if j == "notjson":
-            data = b"POST /submit HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\n\r\n{not "
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\n\r\n{not "
         elif j == "list":
             x = b"[1,2,3]"
-            data = b"POST /submit HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s" % (len(x), x)
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s" % (len(x), x)
         elif j == "tellist":
             d = body(cid, w, "junk")
             d["telemetry"] = [1]
             x = json.dumps(d).encode()
-            data = b"POST /submit HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s" % (len(x), x)
-        elif j == "deep":
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s" % (len(x), x)
+        elif j == "deep":  # the field as a list
             d = body(cid, w, "junk")
-            d["telemetry"]["pipeline"] = "midout"
+            d["field"] = [d["field"]]
             x = json.dumps(d).encode()
-            data = b"POST /submit HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s" % (len(x), x)
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s" % (len(x), x)
+        elif j == "numstr":  # v_start as a JSON number, not a decimal string
+            d = body(cid, w, "junk")
+            d["field"]["v_start"] = int(d["field"]["v_start"])
+            x = json.dumps(d).encode()
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s" % (len(x), x)
+        elif j == "bigtel":  # telemetry over 16 KiB in an otherwise honest body: refused (413), not dropped
+            d = body(cid, w, "junk")
+            d["telemetry"]["pad"] = "x" * 17000
+            x = json.dumps(d).encode()
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s" % (len(x), x)
         elif j == "negcl":
-            data = b"POST /submit HTTP/1.1\r\nHost: x\r\nContent-Length: -1\r\n\r\n" + b
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\nContent-Length: -1\r\n\r\n" + b
         elif j == "nancl":
-            data = b"POST /submit HTTP/1.1\r\nHost: x\r\nContent-Length: abc\r\n\r\n" + b
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\nContent-Length: abc\r\n\r\n" + b
         elif j == "hugecl":
-            data = b"POST /submit HTTP/1.1\r\nHost: x\r\nContent-Length: 10000000000000\r\n\r\n" + b
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\nContent-Length: 10000000000000\r\n\r\n" + b
         elif j == "nocl":
-            data = b"POST /submit HTTP/1.1\r\nHost: x\r\n\r\n" + b
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\n\r\n" + b
         else:  # oversize: an otherwise honest body of 2 MB
             nn = self.next_nonce("oversize", cid, w, k)
             d = body(cid, w, nn)
             d["telemetry"]["pad"] = "x" * 2_000_000
             x = json.dumps(d).encode()
             self.note(ev="send", client=k, kind="oversize", nonce=nn, cid=cid, work=ident(w))
-            data = b"POST /submit HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s" % (len(x), x)
+            data = b"POST /submit/midout HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n%s" % (len(x), x)
         s, line = raw_req(port, data, timeout=2.0)
         self.note(ev="junk", client=k, kind=j, status=s, text=line[:120], gen=gen)
         # a body refused by its Content-Length alone may be cut off by the server's close (reset) before the
@@ -542,7 +561,7 @@ class Run:
     def drain(self, port):
         for _ in range(4 * len(self.wl) + 20):
             t_req = time.time()
-            s, t = req(port, "GET", "/claim/niceonly?coordinate=midout")
+            s, t = req(port, "GET", CLAIM)
             if s == 204:
                 return
             if s != 200:
@@ -553,7 +572,7 @@ class Run:
             self.note(ev="claim", client=99, cid=c["claim_id"], work=ident(w), gen=self.gen, drain=True, t_req=t_req)
             nn = self.next_nonce("honest", c["claim_id"], w, 99)
             self.note(ev="send", client=99, kind="honest", nonce=nn, cid=c["claim_id"], work=ident(w))
-            s2, t2 = req(port, "POST", "/submit", body(c["claim_id"], w, nn))
+            s2, t2 = req(port, "POST", SUBMIT, body(c["claim_id"], w, nn))
             self.note(ev="reply", client=99, nonce=nn, status=s2, text=t2[:200], gen=self.gen)
         self.v("DRAIN", "did not end in 204")
 
@@ -562,8 +581,9 @@ class Run:
         claims, _, _ = read_jsonl(os.path.join(self.state, "claims.jsonl"))
         subs, _, _ = read_jsonl(os.path.join(self.state, "submissions.jsonl"))
         done = {ident(s["work"]) for s in subs if s.get("accepted") and isinstance(s.get("work"), dict)}
-        if st.get("done") != len(done):
-            self.v("S3/S4", "%s: /status done %s, files hold %d accepted fields" % (when, st.get("done"), len(done)))
+        if st.get("searched") != len(done):
+            self.v("S3/S4", "%s: /status searched %s, files hold %d searched fields" % (when, st.get("searched"),
+                                                                                     len(done)))
 
     def finish(self, audit):
         claims, p1, torn1 = read_jsonl(os.path.join(self.state, "claims.jsonl"))
@@ -606,12 +626,12 @@ class Run:
             ids = sorted({e["cid"] for e in es})
             if self.reissue is None and len(ids) > 1:
                 self.v("H1", "field t=%d handed out under %d claims without --reissue-after: %s"
-                       % ((wk[2] - START) // Q, len(ids), ids))
+                       % (T(wk), len(ids), ids))
             elif self.reissue is not None:
                 ts = sorted(e["t"] for e in es)
                 for a, b in zip(ts, ts[1:]):
                     if b - a < self.reissue - 0.05:
-                        self.v("H1", "field t=%d reissued after %.3f s < %s" % ((wk[2] - START) // Q, b - a, self.reissue))
+                        self.v("H1", "field t=%d reissued after %.3f s < %s" % (T(wk), b - a, self.reissue))
         # H1 again on the coordinator's own clock (claims.jsonl), exactly: a reissue only after reissue_after
         drain_ids = {e["cid"] for e in L if e["ev"] == "claim" and e.get("drain")}
         fb = {}
@@ -620,12 +640,12 @@ class Run:
                 fb.setdefault(ident(c["work"]), []).append(c.get("time", 0))
         for wk, ts in fb.items():
             if self.reissue is None and len(ts) > 1:
-                self.v("H1", "field t=%d has %d claims on disk without --reissue-after" % ((wk[2] - START) // Q, len(ts)))
+                self.v("H1", "field t=%d has %d claims on disk without --reissue-after" % (T(wk), len(ts)))
             elif self.reissue is not None:
                 for a, b in zip(ts, ts[1:]):
                     if b - a < self.reissue - 1e-9:
                         self.v("H1", "field t=%d reissued after %.4f s < %s on the coordinator's clock"
-                               % ((wk[2] - START) // Q, b - a, self.reissue))
+                               % (T(wk), b - a, self.reissue))
         accepted = {}
         acc_times = {}
         for s in subs:
@@ -641,20 +661,25 @@ class Run:
                 self.v("H4", "accepted submission %r for claim %s was never sent by a client" % (nn, s.get("claim_id")))
                 continue
             if snd["kind"] not in OK_KINDS:
-                self.v("H3/H4", "a '%s' submission (%s) was accepted for t=%d" % (snd["kind"], nn, (wk[2] - START) // Q))
+                self.v("H3/H4", "a '%s' submission (%s) was accepted for t=%d" % (snd["kind"], nn, T(wk)))
             if snd["work"] != wk:
                 self.v("H4", "field t=%d accepted from a submission for t=%d (%s)"
-                       % ((wk[2] - START) // Q, (snd["work"][2] - START) // Q, nn))
+                       % (T(wk), T(snd["work"]), nn))
             if told.get(s.get("claim_id")) != wk:
                 self.v("H3", "field t=%d accepted under claim %s, which clients were told is %s"
-                       % ((wk[2] - START) // Q, s.get("claim_id"), told.get(s.get("claim_id"))))
+                       % (T(wk), s.get("claim_id"), told.get(s.get("claim_id"))))
             fc = file_claims.get(s.get("claim_id"))
             if fc is None:
                 self.v("H3", "accepted claim %s is not in claims.jsonl" % s.get("claim_id"))
         for wk, ss in accepted.items():
-            if len(ss) > 1:
-                self.v("H2", "field t=%d accepted %d times (claims %s)"
-                       % ((wk[2] - START) // Q, len(ss), [x.get("claim_id") for x in ss]))
+            canons = [x for x in ss if x.get("status") == "canon"]
+            if len(canons) != 1 or ss[0].get("status") != "canon":
+                self.v("H2", "field t=%d has %d canons, first status %s (claims %s)"
+                       % (T(wk), len(canons), ss[0].get("status"), [x.get("claim_id") for x in ss]))
+            cids = [x.get("claim_id") for x in ss]
+            if len(set(cids)) != len(cids):
+                self.v("H2", "field t=%d: two accepted records under one claim (%s)" % (T(wk), cids))
+            self.checks = getattr(self, "checks", 0) + len(ss) - 1
         # H1: no claim of a field that was requested after a client had been told the field's submission was recorded
         told_rec = {}
         for nn, rs in replies.items():
@@ -665,7 +690,7 @@ class Run:
         for e in L:
             if e["ev"] == "claim" and e["work"] in told_rec and e.get("t_req", 0) > told_rec[e["work"]]:
                 self.v("H1", "field t=%d claimed (claim %s, requested %.3f s after its submission was told recorded)"
-                       % ((e["work"][2] - START) // Q, e["cid"], e["t_req"] - told_rec[e["work"]]))
+                       % (T(e["work"]), e["cid"], e["t_req"] - told_rec[e["work"]]))
         # H6 evidence: a field accepted from its first holder after it had been reissued to another client
         self.h6 = 0
         for wk, ss in accepted.items():
@@ -682,12 +707,13 @@ class Run:
                     self.v("H3/H4", "a '%s' submission got 200 (%s)" % (snd["kind"], nn))
                 if snd["cid"] not in acc_cids:
                     self.v("S2", "submission %s (claim %s, t=%d) was told 'recorded' but is not accepted on disk"
-                           % (nn, snd["cid"], (snd["work"][2] - START) // Q))
-        # E1/E2: after the drain, every field of the work list accepted exactly once, nothing else
+                           % (nn, snd["cid"], T(snd["work"])))
+        # E1/E2: after the drain, every field of the work list has exactly one canon, nothing else
         wset = {ident(w) for w in self.wl}
         for wk in wset:
-            if len(accepted.get(wk, [])) != 1:
-                self.v("E1", "field t=%d accepted %d times at the end" % ((wk[2] - START) // Q, len(accepted.get(wk, []))))
+            nc = sum(1 for x in accepted.get(wk, []) if x.get("status") == "canon")
+            if nc != 1:
+                self.v("E1", "field t=%d has %d canons at the end" % (T(wk), nc))
         for wk in accepted:
             if wk not in wset:
                 self.v("E2", "accepted field %s is not in the work list" % (wk,))
@@ -737,7 +763,12 @@ def file_verdict(wl, claims, subs, unreadable):
             out.append("accepted record without its field")
             continue
         wk = ident(w)
-        acc[wk] = acc.get(wk, 0) + 1
+        if s.get("status") == "canon":
+            acc[wk] = acc.get(wk, 0) + 1
+        elif s.get("status") != "check":
+            out.append("accepted record with status %r" % (s.get("status"),))
+        elif acc.get(wk, 0) == 0:
+            out.append("a check before its field's canon")
         cid = s.get("claim_id")
         if cl.get(cid) is None:
             out.append("accepted claim %s not in claims.jsonl" % cid)
@@ -749,19 +780,17 @@ def file_verdict(wl, claims, subs, unreadable):
             continue
         if type(d.get("claim_id")) is not int or d.get("claim_id") != cid:
             out.append("accepted body's claim id %r" % (d.get("claim_id"),))
-        tel = d.get("telemetry")
-        pl = tel.get("pipeline") if isinstance(tel, dict) else None
-        f = pl.get("field") if isinstance(pl, dict) else None
-        if not isinstance(f, dict) or pl.get("route") != "midout":
-            out.append("accepted body without the route or its field")
+        f = d.get("field")
+        if not isinstance(f, dict):
+            out.append("accepted body without its field")
             continue
-        if (pl.get("coordinate") != w["coordinate"] or _num(f.get("base")) != w["base"]
+        if (f.get("coordinate") != w["coordinate"] or f.get("base") != w["base"]
                 or _num(f.get("v_start")) != w["range_start"] or _num(f.get("v_size")) != w["range_end"] - w["range_start"]
                 or _num(f.get("range_size")) != w["range_size"]):
             out.append("accepted body describes another field than its claim")
     for wk in wid:
         if acc.get(wk, 0) != 1:
-            out.append("field %s accepted %d times" % (wk[2], acc.get(wk, 0)))
+            out.append("field %s has %d canons" % (wk[2], acc.get(wk, 0)))
     for wk in acc:
         if wk not in set(wid):
             out.append("accepted field not in the work list")
@@ -791,7 +820,7 @@ def one(args):
            "kinds": sorted({e["kind"] for e in run.ledger if e["ev"] in ("send", "junk")}),
            "statuses": sorted({str(e["status"]) for e in run.ledger if e["ev"] in ("reply", "junk")}),
            "ev_kinds": sorted({e[1] if isinstance(e[0], float) else e[0] for e in run.events}),
-           "audit_rc": getattr(run, "audit_rc", None), "h6": getattr(run, "h6", 0), "file_verdict_ok": not getattr(run, "fileviol", [1])}
+           "audit_rc": getattr(run, "audit_rc", None), "h6": getattr(run, "h6", 0), "checks": getattr(run, "checks", 0), "file_verdict_ok": not getattr(run, "fileviol", [1])}
     if viol:
         json.dump(run.ledger, open(os.path.join(run.dir, "ledger.json"), "w"), default=str)
         json.dump(res, open(os.path.join(run.dir, "result.json"), "w"), default=str, indent=1)
@@ -813,7 +842,8 @@ def main():
     ap.add_argument("--jobs", type=int, default=3)
     ap.add_argument("--keep", type=int, default=20)
     ap.add_argument("--audit", default=None)
-    ap.add_argument("--out", default=os.environ.get("COORD_OUT", "/tmp/coord-chaos"))
+    ap.add_argument("--out", default=os.environ.get("COORD_OUT", os.path.expanduser(
+        "~/projects/nice/scratchpad/2026-10-research-program/G2/mode/chaos")))
     ap.add_argument("--summary", default=None, help="write one JSON line per run here")
     ap.add_argument("--stress", action="store_true", help="16-32 clients, 50-200 fields, reissue 0.01-0.08 s or none")
     ap.add_argument("-v", action="store_true")
@@ -832,6 +862,8 @@ def main():
                 sm.write(json.dumps(res, default=str) + "\n")
             if res.get("h6"):
                 cov_ev["(H6: accepted from the first holder after a reissue)"] = cov_ev.get("(H6: accepted from the first holder after a reissue)", 0) + 1
+            if res.get("checks"):
+                cov_ev["(a check recorded)"] = cov_ev.get("(a check recorded)", 0) + 1
             if res.get("audit_rc") is not None:
                 cov_ev["(audit run)"] = cov_ev.get("(audit run)", 0) + 1
             for x in res["ev_kinds"]:
