@@ -1,72 +1,46 @@
 # The middle-out mode on the server: tables, endpoints, cost, rollout (proposal, 2026-11-25)
 
-References are file:line on `origin/main` at `fdbe07d3`, or *(dev)* for branch `dev/mo-clean` at `66305ada`. Nothing
-here has been built or run.
+References are file:line on `origin/main` at `fdbe07d3`, or *(dev)* for branch `dev/mo-clean` at `66305ada`.
+Nothing here has been built or run.
 
 ## Summary
 
-**Added:**
-- five tables (`midout_bases`, `midout_chunks`, `midout_fields`, `midout_claims`, `midout_submissions`), a one-row
-  cursor table (`midout_job_state`), their indexes and read grants;
-- two endpoints, `GET /claim/midout` and `POST /submit/midout`;
-- a midout pass in the scheduled jobs, a field-insertion script, and the client mode `nice_client midout`, listed
-  in `--help`.
-
-**Untouched:**
-- no existing table gets a column, constraint or index; the only new rows in an existing table are one `bases` row
-  per midout base;
-- `/claim/detailed`, `/claim/niceonly`, `/submit`, their queues, consensus, chunk statistics and
-  `insert_new_fields.rs`;
-- old clients never call the new paths, so they cannot reach a midout field.
-
-**Cost:**
-- about 55 MB of field rows and indexes per base, against a `fields` table of 130M rows whose primary key alone is
-  about 7 GB (`common/src/db_util/fields.rs:244, 290`), and about 0.45 GB of submissions per base, mostly telemetry;
-- per field, one index-bounded claim query and four primary-key writes, with no in-memory queue;
-- scheduled work reads only new midout submissions since a cursor, and the dirty midout chunks. It never scans
-  `fields` or `submissions` for midout.
-
-**Two existing paths must change:**
-- the jobs' per-base loop must skip midout bases, or a `--full` run writes zero progress and `minimum_cl = 255`
-  into their `bases` row (§4);
-- the site needs one fetch and a wider mode filter to show base 64.
-
-**The maintainer decides** (§7): field size, how fields are inserted, the double-check policy, how credit is shown,
-and the submit body. Each has a default.
+- **Added:** five tables (`midout_bases`, `midout_chunks`, `midout_fields`, `midout_claims`,
+  `midout_submissions`) and a one-row cursor table, with indexes and read grants; `GET /claim/midout` and
+  `POST /submit/midout`; a midout pass in the scheduled jobs; an insertion script; the client mode
+  `nice_client midout`, shown in `--help`.
+- **Untouched:** no existing table gains a column, constraint or index (the only new rows elsewhere: one `bases` row
+  per midout base); the detailed and nice-only claim paths, `/submit`, their queues, consensus and chunk statistics.
+  Old clients never call the new paths.
+- **Cost:** per base about 55 MB of fields and indexes and 0.45 GB of submissions, against a `fields` table of 130M
+  rows with a 7 GB primary key (`common/src/db_util/fields.rs:244, 290`). Per field, one index-bounded claim and four
+  primary-key writes, no queue in memory. Scheduled work reads only new midout submissions and dirty chunks.
+- **Two existing paths change:** the jobs' per-base loop must skip midout bases, or `--full` zeroes their `bases` row
+  (§4); the site needs one more fetch and a wider mode filter.
+- **To decide (§7):** field size, insertion, double-check policy, credit display, submit body. Each has a default.
 
 ## 1. Facts this rests on
 
-- **The nice-only claim has no base filter.** It takes the lowest-id claimable field at `check_level = 0`
-  (`api/src/main.rs:162–166`, `fields.rs:699–745`).
-  - So "niceonly will not be dispensed past b62" holds only while no base-64 row is in `fields`, which option B
-    gives by construction.
-  - `scripts/insert_new_fields.rs:119–121` panics on an existing base, so once base 64 has a `bases` row, nobody
-    can add n-fields for it by mistake.
-- **`/submit` trusts the claim id.** It looks the id up in `claims` (`main.rs:330–332`) and accepts a nice-only
-  body with no checks (`main.rs:346–370`). A midout claim id posted there would be recorded against whichever
-  nice-only field holds that id.
-  - Hence a separate submit path, and ids that cannot collide.
-  - It also drops telemetry over 16 KB silently and accepts the submission (`main.rs:29, 308–315`).
-- **Timeouts.** A claim lasts 1 h (`common/src/lib.rs:51`). API statements time out after 30 s
-  (`common/src/db_util/mod.rs:48–99`).
-- **`fields.check_level`:** 0 unsearched, 1 one nice-only submission (`main.rs:360–369`), 2 one detailed submission
-  (`main.rs:442–453`), k+1 for k agreeing detailed submissions (`common/src/consensus.rs:68`).
-- **Credit.** Every non-disqualified submission is credited its field's `range_size` per (day, mode, user)
-  (`common/src/db_util/cache.rs:29–37`). `--full` deletes the totals and rebuilds them from `submissions` alone
-  (`cache.rs:91–104`).
-- **The site** reads `chunks` (`range_start, range_end, range_size, minimum_cl`, `web/index.html:69–71`) and the two
-  cache tables, filtered to `detailed`/`niceonly` (`index.html:558, 595, 630–637`). It does not read `bases`.
-- **A field** *(dev)* is `(base, v_start, v_size)` in a coordinate named `midout:K0,K1,Q0`, in whole quanta
-  (`common/src/midout/coord.rs:48–61, 283–301`). Its count of n is `n_count` (`coord.rs:307–329`).
-  - The claim body is `CoordClaim` (`common/src/midout/wire.rs:41–52`), checked by the client's `field_of`
-    (`client/src/midout_route.rs:96–130`).
-  - The submission carries `telemetry.pipeline.{route, coordinate, field}` (`midout_route.rs:280–306`).
-- **Rows per base.** A one-quantum field fixes three digits, so a base has b³ fields:
-  - base 64: 262,144 fields of 2^57 n, unpadded;
-  - base 65: 274,625 fields, with the first and last h padded, so `n_count < v_size` on some (`coord.rs:37–44`).
-
-  Rows of k quanta divide these counts by k. A coordinate fixing four digits would give b⁴ rows (16.8M at base 64,
-  about 1.5 GB with indexes). Only then would the row count matter.
+- The nice-only claim takes the lowest-id claimable field at `check_level = 0` with no base filter
+  (`api/src/main.rs:162–166`, `fields.rs:699–745`): "niceonly will not be dispensed past b62" holds only while
+  `fields` has no base-64 row, which option B guarantees. `scripts/insert_new_fields.rs:119–121` refuses a base that
+  already exists, so once base 64 has its `bases` row no one can add n-fields for it by mistake.
+- `/submit` looks the claim id up in `claims` (`main.rs:330–332`) and takes a nice-only body unchecked
+  (`main.rs:346–370`); a midout claim id posted there would land on an unrelated field, hence a separate path and
+  disjoint ids. It also drops telemetry over 16 KB silently (`main.rs:29, 308–315`). Claims last 1 h
+  (`common/src/lib.rs:51`); API statements time out after 30 s (`common/src/db_util/mod.rs:48–99`).
+- `fields.check_level`: 0 unsearched, 1 nice-only (`main.rs:360–369`), 2 one detailed (`main.rs:442–453`), k+1 for
+  k agreeing detailed (`common/src/consensus.rs:68`). Credit: each non-disqualified submission earns its field's
+  `range_size` per (day, mode, user) (`common/src/db_util/cache.rs:29–37`); `--full` rebuilds those totals from
+  `submissions` alone (`cache.rs:91–104`). The site reads `chunks` (`web/index.html:69–71`) and the cache tables
+  filtered to `detailed`/`niceonly` (`index.html:558, 595, 630–637`), never `bases`.
+- A field (dev) is `(base, v_start, v_size)` in coordinate `midout:K0,K1,Q0`, in whole quanta, holding `n_count` n
+  (`common/src/midout/coord.rs:48–61, 283–301, 307–329`). The claim is `CoordClaim` (`common/src/midout/wire.rs:41–52`),
+  checked by `field_of` (`client/src/midout_route.rs:96–130`); the submission carries
+  `telemetry.pipeline.{route, coordinate, field}` (`midout_route.rs:280–306`).
+- A one-quantum field fixes three digits, so a base has b³ fields: base 64 has 262,144 of 2^57 n, unpadded; base 65
+  has 274,625, padded at the edges of h, so some have `n_count < v_size` (`coord.rs:37–44`). k quanta per row
+  divide this by k. Only a coordinate fixing four digits would make it matter (b⁴: 16.8M rows, ~1.5 GB at base 64).
 
 ## 2. Data model (one additive migration, `schema/migrations/2026-12-xx_midout.sql`)
 
@@ -104,8 +78,7 @@ CREATE TABLE midout_submissions (
     field_id BIGINT NOT NULL REFERENCES midout_fields(id),
     submit_time TIMESTAMPTZ NOT NULL DEFAULT NOW(), elapsed_secs REAL NOT NULL,
     username VARCHAR NOT NULL, user_ip VARCHAR NOT NULL, client_version VARCHAR NOT NULL,
-    disqualified BOOLEAN NOT NULL DEFAULT 'false',
-    numbers JSONB NOT NULL DEFAULT '[]',
+    disqualified BOOLEAN NOT NULL DEFAULT 'false', numbers JSONB NOT NULL DEFAULT '[]',
     shape VARCHAR NOT NULL,                      -- the join's shape, e.g. '4,10'
     survivors BIGINT NOT NULL, checked BIGINT NOT NULL, slices BIGINT NOT NULL,
     matches_canon BOOLEAN,                       -- NULL on the canon; false = a recorded disagreement
@@ -121,77 +94,62 @@ GRANT SELECT ON midout_bases, midout_chunks, midout_fields, midout_claims, midou
 COMMIT;
 ```
 
-**`midout_bases`** says that a base is searched this way, and in which coordinate. The coordinate is data, not
-schema, so the field definition is not locked in.
-- The composite foreign key from `midout_fields` makes the database refuse a coordinate change while any field of
-  the base exists.
-- Changing the coordinate later takes:
-  - before insertion: nothing;
-  - after insertion, before the first claim: deleting and re-inserting the base's chunks and fields (seconds);
-  - after the first accepted submission: deleting that work and redoing it, because fields cut along other digits
-    are not unions of searched fields (middle-out design document §3, item 1). The key makes this deliberate.
-- A new quantum or field size in the same coordinate is no schema change: unclaimed rows can be merged or split.
-- The `bases` row is still inserted, for the key and so the public `bases` endpoint lists the base.
+**`midout_bases`** marks a base as searched this way and holds its coordinate as data, not schema, so the field
+definition is not locked in. The composite foreign key from `midout_fields` makes the database refuse a coordinate
+change while the base has any field. Changing it later costs nothing before insertion; seconds before the first
+claim (delete and re-insert the base's rows); after the first accepted submission, redoing that work, because fields
+cut along other digits are not unions of searched fields (middle-out design document §3, item 1). Field size and
+quantum within one coordinate are not schema at all: unclaimed rows can be merged or split. The base keeps its
+`bases` row, for the key and for the public `bases` endpoint.
 
-**`midout_chunks`** is the progress unit. It keeps the column names of `chunks` (`schema/schema.sql:29–42`), so
-the site's completion chart draws it with the same code.
-- Its ranges are in v, so "searched up to n = X" is never claimed for a midout base.
-- `checked_twice` replaces `checked_detailed`, which has no meaning here.
-- It cannot live in `chunks`, which the jobs recompute from `fields` (`fields.rs:1162–1215`) and would zero.
+**`midout_chunks`** are the progress rows, with the column names of `chunks` (`schema/schema.sql:29–42`) so the
+completion chart draws them with the same code. Their ranges are in v, so they never claim "searched up to n = X";
+`checked_twice` replaces `checked_detailed`. They cannot live in `chunks`, which the jobs recompute from `fields`
+(`fields.rs:1162–1215`).
 
-**`midout_fields`** has one row per field.
-- **Identity:** `base_id, coordinate, v_start, v_size`, which is what a claim hands out and what a submission must
-  repeat. Copying `coordinate` onto the row lets every claim and submission name its field by value.
-- `UNIQUE (base_id, v_start)` refuses duplicate fields. No code updates the identity columns; a 10-line trigger
-  refusing such updates is an option.
-- `n_count` is what progress and credit sum. `chunk_id` makes progress incremental. `last_claim_time` gives claim
-  expiry as in `fields`, and `canon_submission_id` is the first accepted submission.
-- **`check_level`** keeps today's 0 (unsearched) and 1 (one accepted submission), and uses 2 for a second,
-  agreeing submission.
-  - This departs from `fields`, where 2 means one detailed search, because midout has no detailed form.
-  - The scale appears only in midout tables. The site's colours (`index.html:535–539`) still read: searched, then
-    checked.
+**`midout_fields`.** `base_id, coordinate, v_start, v_size` are the identity: what a claim hands out and a
+submission must repeat, so every record names its field by value. `UNIQUE (base_id, v_start)` refuses duplicates and
+the insertion script refuses overlaps; no code updates these columns (a 10-line trigger could enforce it). `n_count` is what progress and credit sum,
+`chunk_id` makes progress incremental, `last_claim_time` gives expiry as in `fields`, and `canon_submission_id` is
+the first accepted submission. **`check_level`** keeps today's 0 (unsearched) and 1 (searched once) and uses 2 for
+a second, agreeing submission. That departs from `fields`, where 2 means a detailed search, which midout does not
+have. The scale lives only in midout tables, and the site's colours (`index.html:535–539`) still read "searched",
+then "checked".
 
-**`midout_claims`** ids start at 10^15. Production's claim sequence, at about 58 submissions/s
-(`jobs/src/main.rs:47`), will not get there for centuries.
-- So a midout id posted to `/submit` fails with "Invalid claim_id" (`main.rs:330–332`) and is never recorded
-  against a nice-only field.
-- There is no `search_mode` column: the table is the mode.
+**`midout_claims`** ids start at 10^15. Production's claim ids grow with about 58 submissions/s
+(`jobs/src/main.rs:47`), so they will not get there for centuries, and a midout id posted to `/submit` fails
+"Invalid claim_id" (`main.rs:330–332`) instead of landing on a nice-only field.
 
-**`midout_submissions`** holds accepted submissions only. Refused ones get a 4xx and no row, as on `/submit` today.
-- `UNIQUE (claim_id)` makes a resubmission idempotent.
-- The counters and `shape` are columns, because they are a deterministic function of (shape, field). Two searches
-  of a field are then compared without parsing JSON.
-- `matches_canon` records a disagreement on the row itself, and a partial index lists the disagreements. The
-  `numbers` partial index makes "nice numbers found" cheap.
-- `midout_job_state` is its own table so that `job_state` is not altered.
+**`midout_submissions`** holds accepted submissions only; a refused one gets a 4xx and no row, as `/submit` does
+today. `UNIQUE (claim_id)` makes a resubmission idempotent. The counters and `shape` are columns: they are
+deterministic in (shape, field), so two searches compare without JSON. `matches_canon` records a disagreement.
+Partial indexes list disagreements and nice numbers cheaply.
+`midout_job_state` holds the jobs' cursor, in its own table so that `job_state` is not altered.
 
 ## 3. Endpoints
 
-**`GET /claim/midout`** answers with the dev branch's `CoordClaim`, unchanged, so `field_of` checks it as now.
-`range_*` are in v, and `range_size` is `n_count`:
+**`GET /claim/midout`** returns the dev branch's `CoordClaim` unchanged, so `field_of` checks it as it does now
+(`range_*` in v, `range_size` = `n_count`). It answers 200, 204 when nothing is claimable (the dev client reads
+that as "none left", `wire.rs:15–16`), or 503 when the database is unavailable (`main.rs:71–79`).
 
 ```json
 {"claim_id": 1000000000000417, "base": 64, "coordinate": "midout:4,8,5", "range_start": 37778931862957161709568,
  "range_end": 37779075978145237565440, "range_size": 144115188075855872}
 ```
 
-The status is 200, or 204 when nothing is claimable (the dev client already reads 204 as "none left",
-`wire.rs:15–16`), or 503 when the database is unavailable (`main.rs:71–79`). The claim is one transaction:
-
 ```sql
 WITH c AS (SELECT id FROM midout_fields
            WHERE check_level = 0 AND (last_claim_time IS NULL OR last_claim_time <= $1)  -- $1 = now - 1 h
            ORDER BY base_id, id FOR NO KEY UPDATE SKIP LOCKED LIMIT 1)
 UPDATE midout_fields f SET last_claim_time = NOW() FROM c WHERE f.id = c.id RETURNING f.*;
-INSERT INTO midout_claims (field_id, user_ip) VALUES ($field, 'unknown') RETURNING id;
+INSERT INTO midout_claims (field_id, user_ip) VALUES ($field, 'unknown') RETURNING id;   -- same transaction
 ```
 
-**Expiry and reissue.** After `CLAIM_DURATION_HOURS` the field is claimable again. A lost claim reply or a dead
-client delays one field by at most an hour; the development coordinator needed a manual `--reissue-after` for this.
-A base-64 field takes about 30 s on a 3080 (`route.rs:68–72`, dev).
+**Expiry and reissue:** after `CLAIM_DURATION_HOURS` the field is claimable again, so a lost reply or a dead client
+costs at most an hour on one field (the development coordinator needed a manual `--reissue-after`). A base-64
+field takes about 30 s on a 3080 (`route.rs:68–72`, dev).
 
-**`POST /submit/midout`** (big integers as decimal strings, as the dev client sends them):
+**`POST /submit/midout`.** Big integers go as decimal strings, as the dev client already sends them:
 
 ```json
 {"claim_id": 1000000000000417, "username": "...", "client_version": "3.5.0",
@@ -200,214 +158,140 @@ A base-64 field takes about 30 s on a 3080 (`route.rs:68–72`, dev).
  "nice_numbers": [], "shape": "4,10", "survivors": 0, "checked": 0, "slices": 4096, "telemetry": {}}
 ```
 
-The checks, in order. The right-hand column is what went wrong without each one when the development coordinator
-was tested under faults:
+The checks run in order. The last column is what went wrong without each one when the development coordinator was
+tested under faults:
 
 | check | status | without it |
 |---|---|---|
-| body parses, integer `claim_id`, within the size limit; telemetry over 16 KB **refused, not dropped** | 400 / 413 | junk bodies were accepted unseen |
-| claim id in `midout_claims` | 404 | a reused or foreign id records another field |
-| `field` equals the claim's row (base, coordinate, v_start, v_size, n_count) | 422 | another field's body under a known claim marks an unsearched field as searched |
-| every nice number lies in the field (`coord.rs` digits) and is nice (as `main.rs:420–428`) | 422 | never checked by the coordinator; detailed submissions get it today |
-| counters present and `slices` equals the field's slice count | 422 | an all-zero result is legal, so a body without evidence of the work would pass |
-| same claim again: identical body → 200 with the stored id; different body → 409 | 200 / 409 | a lost reply after acceptance stops the client, or records twice |
-| field at level 0 → canon, level 1, even if its claim expired (a late but real search) | 200 | a legitimate late result is thrown away |
-| field already searched → stored as a check. `matches_canon` = same nice numbers and, if the `shape` is the same, the same counters. Agreement → level 2 | 200 | two canons, or an unseen disagreement |
+| parses; integer `claim_id`; size limit; telemetry over 16 KB **refused, not dropped** | 400 / 413 | junk accepted unseen |
+| claim id is in `midout_claims` | 404 | a reused or foreign id records another field |
+| `field` equals the claim's row (base, coordinate, v_start, v_size, n_count) | 422 | another field's body marks an unsearched field done |
+| each nice number is in the field (`coord.rs`) and is nice (as `main.rs:420–428`) | 422 | the coordinator never checked; detailed gets this today |
+| counters present; `slices` = the field's slice count | 422 | an all-zero result is legal, so no evidence of work would pass |
+| same claim again: identical → 200 with the stored id; different → 409 | 200 / 409 | a lost reply stops the client, or records twice |
+| field at level 0 → canon, level 1, even after its claim expired | 200 | a late but real result is lost |
+| field already searched → stored as a check, `matches_canon` = same numbers (and counters, if same `shape`); agreeing → level 2 | 200 | two canons, or an unseen disagreement |
 
-The database covers the coordinator's remaining failure classes. The row and the field update commit before the
-reply, so an acknowledged record is never lost. A failed write rolls back and answers 503, so memory never runs
-ahead of disk. There are no state files to tear. Two instances share one database under `SKIP LOCKED`.
+Committing before replying covers the coordinator's remaining failure classes (lost acknowledged records, memory
+ahead of disk: a failed write rolls back and answers 503, two instances: one database under `SKIP LOCKED`). The
+reply is `{"submission_id": N, "status": "canon" | "check" | "already_recorded"}`.
 
-The reply is `{"submission_id": N, "status": "canon" | "check" | "already_recorded"}`. Double-checking exists in
-the schema from the start; whether the server ever reissues searched fields on purpose is decision 3.
-
-**The client:**
-- `SearchMode` gains `Midout` (`lib.rs:60–66`), so `nice_client midout` shows in `--help`
-  (`client/src/main.rs:236–238`). The compiler then flags each match on the mode: `client_api_async.rs:114–117`,
-  `main.rs:833–850`, `db_util/conversions.rs:115–128`, `estimator.rs:117–123`.
-- The new tables never store the mode as a string.
-- The mode runs the dev route's loop (`midout_route.rs:221–316`, dev) against the two paths, without the dev guard
-  against the production API (`wire.rs:136–154`, dev).
-- It treats `already_recorded` as success. The dev client exits on any 4xx (`client_api_async.rs:153–160`), and
-  answering checks with 200 keeps 4xx rare.
+**Client:** `SearchMode` gains `Midout` (`lib.rs:60–66`), which puts `nice_client midout` in `--help`
+(`client/src/main.rs:236–238`); the compiler then flags each match on the mode (`client_api_async.rs:114–117`,
+`main.rs:833–850`, `db_util/conversions.rs:115–128`, `estimator.rs:117–123`). The mode runs the dev route's loop
+(`midout_route.rs:221–316`, dev) against the new paths, without the dev guard that refuses the production API
+(`wire.rs:136–154`, dev), and treats `already_recorded` as success: the dev client exits on any 4xx
+(`client_api_async.rs:153–160`).
 
 ## 4. What the database pays
 
 | query | index | rows touched |
 |---|---|---|
-| claim: select + update (above) | `idx_midout_fields_cl0` (base_id, id) | live claims at the index front (about the number of cards) + 1 |
-| claim: insert | primary key | 1 |
-| submit: claim, field, existing submission | primary and unique keys | 3 |
-| submit: insert, field update | primary key | 2, plus 1 canon read for a check |
+| claim: select + update | `idx_midout_fields_cl0` (base_id, id) | the live claims at the index front (≈ cards) + 1 |
+| claim insert; submit reads (claim, field, prior submission) | primary or unique key | 1; 3 |
+| submit: insert, update field | primary key | 2, plus 1 canon read for a check |
 
-**Load.** About one claim and one submission per card every 30 s. 150 cards make about 10 requests/s, against
-about 58 submissions/s that the API takes today.
+**Load and storage.** About one claim and one submission per card every 30 s: 10 requests/s at 150 cards, against
+the 58 submissions/s the API takes today. Fields are about 120 B a row (32 MB heap + 25 MB indexes per base), claims
+about 60 B, submissions about 1.7 kB (0.45 GB per base; double that under full double-checking).
 
-**No pre-claim queue.**
-- The nice-only queue exists because a direct claim cost 90 ms against 130M rows (`CHANGELOG.md:225`). Here the
-  claim index holds at most b³ rows, it shrinks as fields complete, and the walk is bounded by the live claims.
-- Without a queue, #264's defect, a field outliving the claim window while queued and then handed out twice
-  (`CHANGELOG.md:29`, `api/src/field_queue.rs:341–365`), cannot occur.
-- #238's runaway direct claim, which ran 21 h and pinned the frontier (`CHANGELOG.md:30`), cannot recur either:
-  there is no frontier-chunk search, no sort beyond index order, and the 30 s timeout covers every API connection.
-- **Check before deploy:** EXPLAIN on a copy with base 64 inserted, half claimed and half done. It must be an index
-  scan on `idx_midout_fields_cl0` under `SKIP LOCKED`, under 1 ms.
+**No pre-claim queue.** The nice-only queue exists because a direct claim cost 90 ms against 130M rows
+(`CHANGELOG.md:225`); this claim's index holds at most b³ rows, shrinks as fields finish, and its walk is bounded by
+the live claims. Without a queue, #264's defect (a field outliving its claim while queued, then handed out twice;
+`CHANGELOG.md:29`, `api/src/field_queue.rs:341–365`) cannot happen, nor #238's runaway direct claim
+(`CHANGELOG.md:30`): no frontier search, no sort beyond index order, and the 30 s timeout applies. Before deploy,
+EXPLAIN it on a copy with base 64 half claimed and half done: an index scan, under 1 ms, is expected.
 
-**Storage.**
-- Fields are about 120 B a row: 32 MB of heap plus 25 MB of indexes per base. Claims are about 60 B.
-- Submissions are about 1.7 kB, the body being about 1.5 kB in development runs: about 0.45 GB per base, doubled
-  under full double-checking.
-- Each field row is updated twice and leaves the claim index once.
+**Scheduled jobs (`jobs/src/main.rs`).** The existing loop visits every base (`:126–133`) and under `--full`
+rewrites each base's progress from its `chunks` (`:317–337`), which for a chunkless base yields 0 and
+`minimum_cl = 255` (`db_util/chunks.rs:202–206`). One filter fixes it: skip bases with a `midout_bases` row
+(incremental runs already skip them, having no `submissions`). The new midout pass uses the window-and-cursor
+transaction of `cache.rs:58–84`:
+1. read midout submissions in (cursor, max − 10,000] by primary key (the margin of `WATERMARK_SAFETY_MARGIN`, `:53`;
+   windows of at most `MAX_CACHE_WINDOW`, `cache.rs:24`);
+2. recompute dirty chunks: one `GROUP BY` over each chunk's ≈ 2,622 fields via `idx_midout_fields_chunk`; claims go
+   in id order, so an hour dirties one or two chunks (about 5k rows);
+3. write each midout base's `bases.checked_niceonly` and `minimum_cl` from its ≈ 100 chunks;
+4. add the window to `cache_search_daily_totals` as mode `midout`, `total_range = n_count`, and advance the cursor.
 
-**Scheduled jobs (`jobs/src/main.rs`).**
-- **The fix.** The existing loop visits every base (`:126–133`). In `--full` mode it rewrites each base's progress
-  from its `chunks` (`:317–337`), which for a base with no chunks gives 0 and `minimum_cl = 255`
-  (`db_util/chunks.rs:202–206`).
-  - One filter, "skip bases with a `midout_bases` row", fixes it.
-  - Incremental runs already skip them, because they have no `submissions`.
-- **The new midout pass** runs after the existing work, in the same window-and-cursor transaction as
-  `cache.rs:58–84`:
-  1. Read midout submissions with ids in (cursor, max − 10,000] by primary key. The margin is
-     `WATERMARK_SAFETY_MARGIN` (`:53`); windows are at most `MAX_CACHE_WINDOW` (`cache.rs:24`).
-  2. Recompute the dirty `midout_chunks`: one `GROUP BY` over each dirty chunk's ≈ 2,622 fields via
-     `idx_midout_fields_chunk`. Claims run in id order, so an hour dirties one or two chunks, about 5k rows.
-  3. Write `bases.checked_niceonly` and `minimum_cl` for each midout base from its ≈ 100 chunks. Base 64's progress
-     is then on the public `bases` endpoint.
-  4. Add the window to `cache_search_daily_totals` as `search_mode = 'midout'`, `total_range = n_count`, and
-     advance `midout_job_state` in the same transaction.
-- **`--full`.** Its rebuild deletes every daily total (`cache.rs:96`), so it must also re-add the midout
-  submissions, or midout credit vanishes. It then recomputes all midout chunks. That is one read of
-  `midout_fields` (≈ 55 MB) and of `midout_submissions` (≈ 0.45 GB per base): the same kind of cost as today's
-  `--full`, run as rarely.
-- **No change:**
-  - the hourly `refresh_search_caches` (`cache.rs:110–138`) reads only the totals and `bases`, so midout costs it
-    nothing;
-  - notable numbers come from `bases.numbers`, which nice-only searches never feed (`jobs/src/main.rs:338`).
+`--full` deletes every daily total (`cache.rs:96`), so it must re-add midout submissions too, and it recomputes every
+midout chunk: one read of `midout_fields` (≈ 55 MB) and `midout_submissions` (≈ 0.45 GB), as rare as today's
+`--full`. The hourly `refresh_search_caches` (`cache.rs:110–138`) needs no change; notable numbers come from
+`bases.numbers`, which nice-only results never feed (`jobs/src/main.rs:338`).
 
-**Public data API and site, with no new views.**
-- **Progress:** `bases?id=eq.64` (`checked_niceonly` against `range_size`), and `midout_chunks` for the completion
-  chart. That is one fetch beside `index.html:69–71`, drawn by `buildCompletionChart` with the caption "base 64 is
-  searched by slices of digits 5–7, not in n order".
-- **Credit:** the cache tables carry mode `midout`, and the site's two mode filters (`:558, 595`) decide where it
-  shows (decision 4).
-- **Nice numbers:** `midout_submissions?numbers=neq.[]`, served by its partial index.
-- **Exposure:** PostgREST exposes the new tables exactly as it exposes `fields`, `claims` and `submissions`
-  (`schema.sql:101–107`). A full anonymous read of `midout_submissions` costs what one of `submissions` does today,
-  on about 1/500 the size.
+**Public data API and site, with no new views.** Progress: `bases?id=eq.64`, and `midout_chunks` for the completion
+chart (one fetch beside `index.html:69–71`, drawn by `buildCompletionChart`, captioned "base 64 is searched by
+slices of digits 5–7, not in n order"). Credit: the cache tables carry mode `midout`; the site's filters
+(`:558, 595`) choose where it shows. Nice numbers: `midout_submissions?numbers=neq.[]` on its partial index.
+PostgREST exposes the tables as it does `fields`, `claims` and `submissions` (`schema.sql:101–107`).
 
 ## 5. Rollout (each step with its undo)
 
-1. **Migration.** Only `CREATE TABLE`/`INDEX`/`GRANT`; the key to `bases` locks that tiny table for a moment. Apply
-   it between scheduled runs. *Undo:* drop the six tables and the sequence.
-2. **API with the two endpoints.** No current client calls them, and with no `midout_bases` rows the claim answers
-   204. *Undo:* redeploy the previous binary.
-3. **Jobs with the skip and the midout pass.** These are inert without midout rows. Deploy them before any
-   insertion, so the skip is in place before base 64 has a `bases` row. *Undo:* redeploy, then run `--full` once.
-4. **Insertion by a new `scripts/insert_midout_fields.rs`.**
-   - It writes the `bases` row, the `midout_bases` row, about 100 chunks and the fields, in batches of 10,000 as
-     `insert_fields` does (`fields.rs:88–105`). Each field is checked by `Coord::field_digits` and `n_count`.
-   - It needs `coord.rs` on main first; that is pure arithmetic, with no GPU dependency.
-   - *Undo before the first claim:* delete the rows.
-5. **First claims from the maintainer's own machine,** with a client built from the release branch.
-   - Until the release is published, no other client has the mode.
-   - Watch that every canon submission has counters and `slices = 4096`, the claim plan, and one hourly jobs run
-     (one dirty chunk, base 64's `bases` row, the totals).
-   - *Undo:* delete the base's midout rows; only the maintainer's own work is lost.
-6. **Client release.** The fleet controller then chooses a mode per box.
-   - Base 62's nice-only work continues through `/claim/niceonly`, unchanged. It shares no table, queue or claim id
-     with midout.
-   - Once base 62 runs out, that endpoint answers 500 "Could not find any niceonly field!" (`main.rs:216`), as it
-     would today.
+1. **Migration.** It only creates tables and grants access. The foreign key locks the small `bases` table
+   briefly, so apply it between scheduled runs. *Undo:* drop the tables and the sequence.
+2. **API.** No current client calls the new endpoints, and while no midout bases exist the claim answers 204.
+   *Undo:* redeploy the previous binary.
+3. **Jobs.** The skip and the midout pass are inert until midout rows exist. Deploy them before any insertion.
+   *Undo:* redeploy, then run `--full`.
+4. **`scripts/insert_midout_fields.rs`.** It writes the `bases`, `midout_bases`, chunk and field rows in batches of
+   10,000, like `insert_fields` (`fields.rs:88–105`). It checks each field with `Coord::field_digits` and `n_count`,
+   so `coord.rs` must reach main first. *Undo, before any claim:* delete the rows.
+5. **First claims, from the maintainer's own machine,** on a release-branch build. No other client has the mode
+   yet. Watch three things: that canons carry counters with `slices = 4096`, the claim plan, and one hourly jobs
+   run. *Undo:* delete the base's claims and submissions and reset its fields to level 0.
+6. **Client release.** The fleet controller picks a mode per box. Base 62's nice-only work continues through
+   `/claim/niceonly`, sharing no table, queue or claim id with midout; when it runs out, that endpoint answers 500
+   "Could not find any niceonly field!" (`main.rs:216`), as today.
 
-**Backfilling development-coordinator results is recommended against.**
-- What it holds so far is test runs. Some use the earlier coordinate (`midout:4,9,6`) or an earlier wire form that
-  its own audit tool flags.
-- Re-searching a field costs about 30 s.
-- If a production-quality coordinator run ever comes first:
-  - accept its state only if the audit tool exits 0;
-  - insert one claim and one submission per accepted record, with the original times and `client_version`, marked
-    `"backfilled": true` in telemetry;
-  - do this before anyone else can claim.
+**Backfill: recommended against.** The development coordinator holds test runs, some in the earlier coordinate
+(`midout:4,9,6`) or an earlier wire form its own audit tool flags, and redoing a field costs about 30 s. If a
+production-quality run ever comes first: accept it only if the audit tool exits 0, insert one claim and one
+submission per accepted record with the original times and `"backfilled": true` in telemetry, and do it before
+anyone else can claim.
 
 ## 6. Tests
 
-All of the following run against a real PostgreSQL, skipped unless `NICE_TEST_DATABASE_URL` is set, in the
-existing pattern (`common/tests/claim_queries.rs:1–25`), with 8-thread concurrency tests as in
-`api/src/field_queue.rs:499–512`. CI has no PostgreSQL, so they run by hand, as today.
-
-- **`common/tests/midout_queries.rs`:**
-  - claim order (lowest base, then lowest id);
-  - 8 threads × 100 claims never hand out a field twice;
-  - an aged claim frees its field, and a live claim holds it;
-  - the scan stays bounded when the base's front is all live claims;
-  - overlapping inserts are refused;
-  - a coordinate change fails while fields exist.
-- **Submit, one test per row of the §3 table:**
-  - cross-claim body, other coordinate, string id, unknown id, a midout id sent to `/submit`;
-  - oversized telemetry, a number outside the field, a non-nice number, missing counters;
-  - an identical resubmission (same id back) and a different one (409);
-  - a late submission after a reissue (becomes canon);
-  - an agreeing check (level 2) and a disagreeing one (`matches_canon = false`, level unchanged).
-- **Jobs:**
-  - an incremental run equals `--full` on the same data;
-  - each midout submission is counted once across windows;
-  - `--full` keeps midout credit and leaves base 64's `bases` row as the midout pass wrote it.
-- **Pure unit tests, no database:** the body-against-field validator, and nice-number membership via `Coord`.
-- **The client mode, as the maintainer set it:**
-  - lavapipe and CPU-reference runs against an ephemeral local API and database;
-  - owned or rented cards for key PRs and releases.
-- **Only testable on the real database or a copy:**
-  - the claim plan at production statistics;
-  - the migration's lock on `bases` under load;
-  - the jobs' window plans beside today's 130M-row tables;
-  - PostgREST's schema reload and grants on the live host.
+In the existing pattern: real PostgreSQL, skipped unless `NICE_TEST_DATABASE_URL` is set
+(`common/tests/claim_queries.rs:1–25`), concurrency at 8 threads as in `api/src/field_queue.rs:499–512`; CI has no
+PostgreSQL, so they run by hand.
+- `common/tests/midout_queries.rs`: claim order; 8 threads × 100 claims never share a field; aged claims freed,
+  live ones held; the scan stays bounded when the front is all live claims; overlapping inserts refused; a
+  coordinate change refused while fields exist.
+- Submit: one test per row of the §3 table, plus a midout id sent to `/submit`.
+- Jobs: incremental equals `--full`; each submission counted once across windows; `--full` keeps midout credit and
+  base 64's `bases` row. Unit tests: the body-against-field validator; nice-number membership via `Coord`.
+- Client mode, as the maintainer set it: lavapipe and CPU-reference runs against a local API and database, then
+  owned or rented cards for key PRs and releases.
+- Only on the real database or a copy: the claim plan at production statistics, the migration's lock under load,
+  the jobs' plans beside 130M-row tables, PostgREST's schema reload.
 
 ## 7. Open sub-decisions (options; recommendation; *default if unanswered*)
 
-1. **Field size: one quantum per row, or k quanta per row.**
-   - At one quantum a field is about 30 s on a 3080 (56 s at base 65).
-   - Recommendation: one quantum. Rows are cheap, a lost claim wastes less, and an audit samples finer.
-   - Changing it later is a data change on unclaimed rows, not a schema change.
-   - *Default: one quantum.*
-2. **Insertion: per base by script, or generated on demand from a cursor.**
-   - Recommendation: the script. Every query stays a plain indexed read, progress has a denominator, and it mirrors
-     `insert_new_fields.rs`.
-   - On demand saves 55 MB but still needs progress rows.
-   - *Default: script.*
-3. **Double-check policy.** Options:
-   - (a) record checks that arrive on their own (late submissions after a reissue), and never reissue on purpose;
-   - (b) serve a fraction of claims from level-1 fields that another user searched, like detailed's 5 % recheck
-     (`main.rs:175–176`);
-   - (c) refuse second submissions with 409, as the coordinator did.
-
-   Recommendation: (a) now, and (b) later as a server-only change once there is data. The client's sampled CPU
-   check already tests one slice of every field. *Default: (a).*
-4. **Credit.** Options:
-   - (i) `n_count` per accepted submission under mode `midout`, shown inside the site's nice-only rate chart and
-     leaderboard (filter `niceonly` or `midout`);
-   - (ii) the same, but in its own chart;
-   - (iii) credit the canon submission only.
-
-   Recommendation: (i). It credits every accepted submission as today (`cache.rs:29–37`), it is a nice-only
-   search, and users see one number. *Default: (i).*
-5. **Submit body.**
-   - Options: the typed body in §3 (`field`, counters and `shape` at top level), or the dev client's
-     `DataToServer` with the field inside `telemetry.pipeline`.
-   - Recommendation: typed. The field's identity then does not ride in a blob that `/submit` drops when large, and
-     the counters become columns. It costs about 20 lines in the client route.
-   - *Default: typed.*
+1. **Field size:** one quantum per row, or k quanta. Recommend one quantum (about 30 s on a 3080, 56 s at base 65):
+   rows are cheap, a lost claim wastes less, audits sample finer; it can change later on unclaimed rows. *Default:
+   one quantum.*
+2. **Insertion:** per base by script, or generated on demand from a cursor. Recommend the script: plain indexed
+   reads, a denominator for progress, mirrors `insert_new_fields.rs`; on demand saves 55 MB but still needs
+   progress rows. *Default: script.*
+3. **Double-checking:** (a) record checks that arrive on their own (late submissions); (b) also serve a share of
+   claims from level-1 fields searched by another user, like detailed's 5 % recheck (`main.rs:175–176`); (c) refuse
+   second submissions with 409. Recommend (a) now, (b) later as a server-only change; the client's sampled CPU check
+   already covers one slice of every field. *Default: (a).*
+4. **Credit:** `n_count` per accepted submission as mode `midout`, shown (i) inside the site's nice-only charts or
+   (ii) in its own; or (iii) canon only. Recommend (i): today's rule (`cache.rs:29–37`), a nice-only search, one
+   number for users. *Default: (i).*
+5. **Submit body:** typed (§3), or the dev client's `DataToServer` with the field in `telemetry.pipeline`.
+   Recommend typed: the field's identity never rides in a blob that is dropped when large, and the counters become
+   columns; about 20 client lines. *Default: typed.*
 
 ## 8. What could not be determined by reading
 
-- **Production numbers.** Table sizes, and the current maximum `claims.id` (10^15 is assumed far above it).
-- **Bases above 62.** Whether any base above 62 (63, say) already has rows in `fields`. If one does, old nice-only
-  clients would be handed them.
-- **Outside readers.** Whether anything outside the repository reads `bases.minimum_cl` or `checked_niceonly` for a
-  base without chunks.
-- **Deployed configuration.** PostgREST's row limits and whether its schema cache reloads itself. The API's request
-  size limit: there is no `Rocket.toml`, so Rocket's default is assumed.
-- **Fleet size.** How many cards will run midout, and so the real claim rate. Only the per-card rate is measured.
-- **Measured versus estimated.** Field time and submission size come from development runs, not production. Row
-  sizes are estimated from column widths, not measured with `pg_column_size`.
-- **Merge form.** Whether `coord.rs` merges in its present form. Its header says no server stores it yet
-  (`coord.rs:78–79`, dev).
+- Production table sizes beyond what the public data API shows. Read there on 2026-11-25 (four single-row
+  requests): the highest base with rows is 62, so no base above 62 is in `fields` and old nice-only clients
+  cannot be handed one; the highest `claims.id` is 302,505,123 (10^15 is far above it); the highest `fields.id` is
+  207,159,539 (the 130M-row figure above is the code comment's and is out of date).
+- Whether anything outside the repository reads `bases.minimum_cl`/`checked_niceonly` for a base with no chunks.
+- PostgREST's row limits and schema-cache reload; the API's request-size limit (no `Rocket.toml`: default assumed).
+- How many cards will run midout (only the per-card rate is known). Field time and submission size come from
+  development runs; row sizes are estimates from column widths.
+- Whether `coord.rs` merges as it stands; its header says no server stores it yet (`coord.rs:78–79`, dev).
