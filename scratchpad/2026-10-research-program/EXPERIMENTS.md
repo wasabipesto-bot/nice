@@ -44,7 +44,7 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
   45569796574): `coord::tests::b65_padded` overflows `usize` on 32-bit targets (test code, coord.rs:547);
   `client_api_async::tests::ordinary_claims_refuse_a_coordinate_field` needs a loopback bind that the i686
   emulator lacks; `cpu::tests::threaded_slice_join_equals_single_threaded` is killed under the aarch64
-  emulator. The full matrix on the head f61cf79e was still running at the report.
+  emulator. The full matrix finished at about 08:50 UTC on bbbb4c7e (fork run 45570638702; the head f61cf79e is one test-only commit later and has no run): the i686, armv7, arm-musl and aarch64 jobs fail, every other job passes.
 - **Thirteen questions for the proposal** (notes §6); the seven that change the wire are now
   `G2/PROPOSAL-B.md` §9 with recommendations and defaults.
 
