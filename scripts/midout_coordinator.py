@@ -370,8 +370,14 @@ for n, s in enumerate(load(subs_path), 1):
             sys.exit("%s line %d: recorded as %r, but the records before it make it %r: refusing to start" % (
                 subs_path, n, s.get("status"), st))
 for path in (claims_path, subs_path):
-    if not os.path.exists(path):
-        open(path, "a").close()
+    # what was read is made durable before anything is served: a complete record written just before a kill but not
+    # yet fsynced reads like any other, and it is now acknowledged (a resubmission of it is answered
+    # "already_recorded", a field it searched is never handed out again), so it must survive a power loss too
+    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 dfd = os.open(a.state, os.O_RDONLY)
 os.fsync(dfd)  # the files' directory entries
 os.close(dfd)
