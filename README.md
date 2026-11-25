@@ -33,6 +33,9 @@ docker run -it --init ghcr.io/wasabipesto/nice_client:3
 # Run forever
 ./nice_client --repeat
 
+# Search middle-out fields (base 64 and up): a GPU binary on a GPU, and a server that offers middle-out fields
+./nice_client midout --repeat
+
 # The docker image supports these options too!
 docker run -it --init ghcr.io/wasabipesto/nice_client:3 --repeat
 
@@ -73,6 +76,7 @@ Arguments:
           Possible values:
           - detailed: Get detailed stats on all numbers, important for long-term analytics
           - niceonly: Implements optimizations to speed up the search by many orders of magnitude. Does not keep statistics and cannot be quickly verified
+          - midout:   Search middle-out fields (base 64 and up) on a GPU. Needs a server that offers middle-out fields and a build with a `CubeCL` backend
 
           [env: NICE_MODE=]
           [default: detailed]
@@ -238,6 +242,8 @@ The `gpu` umbrella feature needs nothing installed to build on any platform, sin
 | `cuda` | NVIDIA | nothing | CUDA toolkit (NVRTC) |
 | `cubecl-spirv` (opt-in build) | Vulkan devices, via the `cubecl` backend | nothing on Linux/Windows; on macOS the Vulkan SDK, with `VULKAN_SDK` set | same as `cubecl` |
 | `cubecl-hip` (opt-in build) | AMD via ROCm | ROCm (`hipconfig` on `PATH`) | ROCm |
+
+The `midout` mode runs only on the `cubecl` and `cubecl-cuda` backends (it has no CPU form and refuses the others) and only against a server that offers middle-out fields (`GET /claim/midout`, `POST /submit/midout`). For development, `scripts/midout_coordinator.py` serves them on one machine from a work list made by the `midout_fields` example; the `midout_bench` and `midout_wide_bench` examples of `nice_common` (feature `midout-bench`) time the search without any server.
 
 ## Why are you writing this from scratch for like the tenth time
 

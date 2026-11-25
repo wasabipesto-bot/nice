@@ -1,21 +1,30 @@
 //! The middle-out join (development; a working name): a nice-only search
-//! whose work unit is a range of a per-base
-//! coordinate instead of a range of n. Additive: no production route reaches
-//! it, and nothing outside this module depends on it.
+//! whose work unit is a range of a per-base coordinate instead of a range of
+//! n. The client's `midout` mode (`nice_client midout`) is its only user;
+//! nothing outside this module depends on it, and no server stores its
+//! fields yet.
 //!
-//! - [`coord`]: the work unit. A field is `(base, v_start, v_size)`; it fixes
-//!   a few central digits of n (5–7 at base 64) and nothing else. This is the
-//!   only part that would ever touch the server, and it knows nothing of the
-//!   join.
+//! - [`coord`]: the work unit. A field is `(base, v_start, v_size)` of a
+//!   coordinate named in the claim; base 64's default fixes a few central
+//!   digits of n (5–7) and nothing else. This is the only part that would
+//!   ever touch the server, and it knows nothing of the join.
 //! - [`cpu`]: the join's exact CPU reference (any base 3–128, generic masks),
 //!   the oracle for the device path and for audits.
 //! - `gpu` (feature `cubecl`): the device path at base 64.
 //! - `gpu_wide` (feature `cubecl`): the device path with two-word masks,
 //!   bases 65–70 (and any base up to 70 in its tests).
-//! - `route` (feature `cubecl`): one entry point for a client route (the
+//! - `route` (feature `cubecl`): one entry point for the client's mode (the
 //!   path per base, telemetry).
-//! - [`wire`]: the claim and submit additions of the middle-out route, and
-//!   the guard every other route applies to a claim.
+//! - [`wire`]: the mode's endpoints (`GET /claim/midout`, `POST
+//!   /submit/midout`) with their types and statuses, and the guard every
+//!   other mode applies to a claim.
+//!
+//! The examples of `nice_common` that go with it: `midout_bench` (whole
+//! base-64 fields on one device, in fs per admissible n) and
+//! `midout_wide_bench` (the wide path, bases 64–70), both with the feature
+//! `midout-bench`; `midout_fields` (a work list for the development server
+//! `scripts/midout_coordinator.py`, which serves the mode's two endpoints on
+//! one machine). Each prints its options with `--help`.
 //!
 //! A search of a field returns its nice numbers and two exact counters,
 //! `survivors` and `checked` ([`cpu::FieldOutcome`]); both are properties of
@@ -28,6 +37,10 @@
 //!   CPU reference against brute force on small bases, the top certificate,
 //!   the wire and route logic, a sampled coordinate partition. They run in
 //!   every `cargo test` (the device modules' ones with `--features cubecl`).
+//!   The client's `midout_route` tests belong here too: the mode's options,
+//!   and its loop driven with the CPU reference on bases 10 and 20 against
+//!   the development server on 127.0.0.1 (they need `python3`, and say so
+//!   when they skip for want of it).
 //! - **(b) device, CI-sized** (`#[ignore]`, named `cubecl_midout_*`): one
 //!   base-64 slice's first batch against the CPU reference (with and without
 //!   shared parents), the check's rebuild of one class, every fault loud on
