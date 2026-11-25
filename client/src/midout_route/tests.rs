@@ -849,7 +849,14 @@ fn a_server_without_the_endpoint_is_one_clear_error() {
     let rt = runtime();
     // the development server answers 404 to every path but its own; a 404 on the claim path is what a server
     // without the endpoint answers
-    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    // (some emulated CI targets have no loopback sockets: bind answers ENOSYS there)
+    let l = match std::net::TcpListener::bind("127.0.0.1:0") {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("SKIPPED: no loopback socket on this machine ({e})");
+            return;
+        }
+    };
     let base = format!("http://{}", l.local_addr().unwrap());
     std::thread::spawn(move || {
         use std::io::{Read, Write};
