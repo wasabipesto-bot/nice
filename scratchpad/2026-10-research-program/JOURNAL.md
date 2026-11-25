@@ -4,6 +4,57 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-25 (cycle 16 of the new director; the user's answers at 03:41 UTC, the routine at 05:42 UTC)
+
+- **The user answered every open decision** (notes in the decisions document, kept as
+  `DECISIONS-2026-11-25-with-notes.md`; each answer verbatim with what follows in `DECIDED.md`) and granted a
+  4-hour lease on demoux. What changes: the middle-out join becomes a real `midout` mode beside `detailed` and
+  `niceonly` with its own claim endpoint and its own table on the server (option B); the field definition
+  is not locked; the hold on pull requests covers the middle-out work only; no Lean formalisation of what is
+  already believed (a high-value falsifiable statement instead, if there is one); known-answer counts belong
+  in validation, not the benchmark; the pre-#222 fields are tabled; decided items leave the decisions document.
+- **Reconcile:** no research instances; November research $24.67 invoiced of $30 (the wrapper's last-week
+  reserve leaves $0.33 until 12-01; budget unchanged by the user); credit $42.08. #271 merged by the user at
+  03:08 UTC (main fdbe07d3). Upstream open: #276 (mine, mergeable), Dependabot #272–#275, drafts parked.
+- **Done today (03:45–06:30 UTC):**
+  - `DECISIONS.md` rewritten to hold only open items; `DECIDED.md` started.
+  - Disk on ivory: 19 clean worktrees of merged pull requests and the uv cache removed (4.3 → 19 GB free).
+  - **#276 opened** (the stride table at bases with no valid residue; reviewed earlier, SE.1).
+  - **The server proposal for option B written** (`G2/PROPOSAL-B.md`, 295 lines, an engineer on Opus from the
+    code and the read-only API): tables, the two endpoints, what the database pays, rollout, tests, five
+    sub-decisions. No server code.
+  - **Window 3 on the RX 9070 XT** (WIN3.1): cleaned head exact at 64 lanes; ×4.51 at base 64 on the median
+    of five rounds (×4.71 by the 11-19 protocol; ×4.79 then); the word-width idea dropped by its rule (×0.73);
+    base 65 off the operating point, no result; the client route with the hardened coordinator works. Cleanup
+    proved at 05:53:41. **A follow-up inside the lease (trunk against head on the wide path, then a
+    bisection) was refused by the tooling at 05:57 ("Unauthorized Access") before anything ran; not retried,
+    not worked around. demoux holds nothing of ours.**
+  - **Two small pull requests** written by an engineer (who stalled after delivering), reviewed independently
+    (`SMALLPR/REVIEW.md`: both "open with fixes"), fixes applied by me (acdb7532: the refusal under `auto`
+    logged at warning, a host test of the name test, `Cpu` out of the help; dfc91b29: exit 2 on an unreadable
+    dump, the changelog line); lint and tests green in the fork's CI; **opened as #277 and #278** (06:03 and
+    06:09 UTC), each changelog line carrying its number.
+  - **CX.2, new research:** structured candidates across bases 17–329 (751 rows). Periodic n have squares
+    with no repeated digit (122 of 122 at base 305) and the mechanism is understood (five algebraic windows,
+    each distinct inside, independent between); the best structured n at bases 100–160 still miss 22 %.
+    The two-digit-period family (Q = b + 1) worked by hand: odds e^(−0.2b) per member, 2b members.
+  - **The one-page validation proposal** (`T2/VALIDATION-PROPOSAL.md`): `niceonly --validate` with built-in
+    fields and CPU-computed counts; no server change; waits for a yes.
+  - **The `midout` client mode** commissioned (`G2/MODE-BRIEF.md`, Opus, ivory and the fork's CI, to 10:30
+    UTC): branch `dev/mo-mode` from 66305ada; the mode in `--help`; the proposal's wire; background claim and
+    submit; the development coordinator serving the same shapes; an end-to-end test without a card; the
+    bench examples brought to package standard. No server-side file changes; no pull request.
+- **Process notes:** dash on demoux rejects `kill -- -PGID` (write watchdogs with `kill -SIG -PGID` and test
+  them before any card work); `bc` is not installed on ivory; the fork's workflows run on a branch only by
+  `gh workflow run … --ref <branch>` (no push trigger off main).
+- **Spend today:** none on rentals. Agents: 5 on Opus (proposal, small PRs, window, review, mode).
+- **For the 05:41 cycle of 11-26:** (1) what the user wrote; #276 and the two small pull requests. (2) The
+  mode branch: read `G2/MODE-NOTES.md` critically, update `DESIGN.md` and the map to the new head, list the
+  "questions the proposal must answer" in `DECISIONS.md` §1. (3) Base 65 on the RX 9070 XT is slower than on
+  11-19 with the card at half clock: needs 45 minutes of the card (asked in the report; not urgent, base 65
+  is months away). (4) The branch is 6–10 % slower when the desktop is in use: the field driver's host share
+  deserves a look on a box (after 12-01).
+
 ## 2026-11-24 (cycle 15 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $24.67 invoiced of $30; **the wrapper holds $5 back

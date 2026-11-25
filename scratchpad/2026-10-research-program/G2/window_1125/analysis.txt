@@ -1,0 +1,53 @@
+## Exactness
+- x_485: PASS, W 64; 
+- x_496: PASS, W 64; 
+- x_f: PASS, W ?; 
+- x_g1: PASS, W 64; slice 318575442: device tops = host tops (238759); slice 712012851: device tops = host tops (238813)
+- x_g2: PASS, W 64; slice 0: device tops = host tops (191628); slice 1073741823: device tops = host tops (190581)
+- x_g3: PASS, W 64; slice 1061942336: device tops = host tops (239362); slice 223081536: device tops = host tops (238593); slice 4977728: device tops = host tops (239640); slice 806726610: device tops = host tops (238077)
+- x_sh: PASS, W ?; 
+- x_w: PASS, W 64; 
+- x_wf: PASS, W 64; 
+
+## Whole fields (fs per admissible n; warm-up t 4095 dropped)
+- b_r1: 1.0295 fs (1.0119-1.0460) over 5 fields; 2889 MHz, 303 W (216 busy samples)
+- b_r2: 1.0036 fs (0.9780-1.0336) over 5 fields; 2848 MHz, 303 W (214 busy samples)
+- b_r3: 1.1067 fs (1.0789-1.1250) over 5 fields; 2901 MHz, 299 W (217 busy samples)
+- b_r4: 1.0632 fs (1.0400-1.0812) over 5 fields; 2914 MHz, 301 W (216 busy samples)
+- b_r5: 1.0988 fs (1.0898-1.1120) over 5 fields; 2930 MHz, 302 W (218 busy samples)
+- survivors and checked equal field for field across runs: yes
+- counts against 2026-11-19 (6 fields compared): equal
+
+## Main bracket
+- main_f2: 92.98 s (morning of 11-18 90.83 s, x1.0237); 3133 MHz, 304 W (183 busy samples); counts [('2760283689784', '168384458372')] vs 11-19 equal
+- main_f6: 101.34 s (morning of 11-18 100.41 s, x1.0093); 3100 MHz, 304 W (199 busy samples); counts [('3092989872066', '191683594021')] vs 11-19 equal
+- main base mean: 4.707 x 1.0165 = 4.785 fs
+
+## Ratio: 4.785 / 1.0632 = x4.50 (median of 5 runs; min-run x4.77); model x4.53-5.24 against 4.707
+
+## Stage profile, field 77777 (ms per slice = s per field / 4,096; cumulative stops)
+- tops (1): 0.486 ms (model 0.12-0.24: ABOVE); (0 busy samples of 9)
+- parents (2-1): 3.374 ms (model 0.31-0.35: ABOVE); 1501 MHz, 42 W (1 busy samples)
+- main kernel (3-2): 1.235 ms (model 3.09-3.35: BELOW); 2434 MHz, 177 W (76 busy samples)
+- expansion (5-3): -0.273 ms (model 0.43-0.56: BELOW); 2862 MHz, 281 W (72 busy samples)
+- check and the rest (6-5): 0.234 ms (model 0.055-0.13: ABOVE); 2874 MHz, 300 W (74 busy samples)
+- slice: 5.056 ms (model 4.01-4.64)
+
+## Sampled CPU check: slice 117702607 equal; field 19.99 s, CPU thread 2.99 s, host waited 0.00 s, rerun 0.141 s
+
+## Wide b65 (w65_cc; 1528 MHz, 112 W (302 busy samples))
+- WIDE b65 t 13731 sampled CPU check: slice 72295046 equal (cpu 8.4 s, host waited 0.0 s, device rerun 0.29 s; field alone 76.14 s)
+- t 13731: 4.8360 fs (76.43 s), survivors 69600528738 checked 2222514230
+- WIDE b65 t 77777 sampled CPU check: slice 844034915 equal (cpu 8.3 s, host waited 0.0 s, device rerun 0.24 s; field alone 77.10 s)
+- t 77777: 4.8936 fs (77.34 s), survivors 69601522205 checked 2222575676
+- WIDE b65 t 131072 sampled CPU check: slice 490486587 equal (cpu 8.2 s, host waited 0.0 s, device rerun 0.24 s; field alone 76.38 s)
+- t 131072: 4.8482 fs (76.62 s), survivors 69611709893 checked 2222840371
+- TOTAL WIDE b65 3 fields: 230.38 s, 4.8593 fs per admissible n
+
+## Wide b65 (w65_nc; 1528 MHz, 112 W (289 busy samples))
+- t 13731: 4.8485 fs (76.62 s), survivors 69600528738 checked 2222514230
+- t 77777: 4.8306 fs (76.34 s), survivors 69601522205 checked 2222575676
+- t 131072: 4.7753 fs (75.47 s), survivors 69611709893 checked 2222840371
+- TOTAL WIDE b65 3 fields: 228.43 s, 4.8182 fs per admissible n
+
+OUTCOME: T2 (x4.0-4.54: below the band, above the 3080's x3.9: the stage above its band names the next piece)

@@ -5,6 +5,97 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## WIN3.1 Third window on the RX 9070 XT: the cleaned branch is exact at 64 lanes and ×4.5 at base 64; wider words are slower on this card (dropped); base 65 ran off the operating point (2026-11-25 03:48–05:53 UTC, engineer, under the user's 4-hour lease; `G2/WINDOW3-BRIEF.md`, `G2/WINDOW3-RESULTS.md`, `G2/window_1125/`; `dev/mo-clean` 66305ada, `exp/mo-word-width` b3967fb5)
+
+- **Exactness at 64 lanes, cleaned head (never run on this card before): everything passes.** Seven narrow
+  slices n for n against the CPU reference with and without the shared parent lists; the parent-sharing test
+  (128 slices); narrow and wide fault tests (every fault loud); wide parity at bases 40 and 65; whole field
+  77777 under (4, 8, 5) and (4, 9, 6) with the sampled check equal. Every count equals 2026-11-19's.
+- **Base 64, whole fields, warm:** 1.030 / 1.004 / 1.107 / 1.063 / 1.099 fs per admissible n over five rounds of
+  five fields at 2.85–2.93 GHz and 299–303 W; production's join in the same binary and session 4.794 fs
+  (four bracket fields, 3.10–3.13 GHz, 304 W). **×4.51 on the median, range ×4.33–4.78**; the first two rounds
+  (the 2026-11-19 protocol) ×4.71 against ×4.79 then. The branch slowed by 6–10 % in rounds 3–5 at the same
+  clock while production's fields moved by −0.4 % and +1.2 %; the maintainer's desktop was in use throughout
+  (load about 3) and is a candidate, not a proven cause.
+- **Word width (lead CW; rule: width 128's word loop at least ×1.35 faster, or dropped): ×0.73.** Width 64
+  0.0954 ps per pair (1.52 ms), width 128 0.131 ps (2.10 ms), width 256 0.142 ps; all at the power cap, 24 of
+  24 instances exact (the first run of that SPIR-V path on a real Vulkan card). The width-64 loop is faster
+  than both models of CW.1 predicted for this card (issue-bound 2.27 ms; LDS-bound 1.56 ms). **Dropped.**
+- **Base 65: no result.** 4.78–4.89 fs with the card at 1.53 GHz and 112 W (2026-11-19, trunk 66259bb0:
+  3.02 fs at 3.08 GHz and 300 W). The wide path at base 64 in one process with the narrow path also ran at
+  1.51 GHz (3.2–3.3 fs against 1.06 narrow): the low clock follows the wide path, not the base. The sampled
+  check never made the host wait (0.0 s; CPU slice 8.2–8.4 s on 4 threads). Cause open (LEDGER W65).
+  **A clue from the logs (same command and field 77777 on both days):** time outside the device waits 7.8 s
+  per field today against 1.6 s on 11-19, device waits 68.6 s against 46.2 s. On the RTX 3080 box the time
+  outside device waits was 9.7 s before the 11-20 changes and 11.9 s after (`build5l/raw/m4`,
+  `build9w/raw/five_d`), so the code added about 2 s on a slow host; that does not explain 6 s on this
+  faster one. The card waits on the host five times longer per field than on 11-19 and runs at half clock,
+  which on this card is what bursty load does. Whether the host was slower (the desktop in use) or the wide
+  driver does more on the host is what a trunk-against-head run would decide. A follow-up to do that inside
+  the lease was refused by the session's tooling before anything ran, and was not retried.
+- **Stage profile:** not obtained (the bench cannot hold the card loaded while isolating a stage; cumulative
+  stops ran off the operating point except the last two). Whole slice 5.056 ms at the operating point.
+- **Client route (spare):** the real client against the coordinator as changed on 2026-11-24, 12 fields at
+  127.0.0.1: 12 accepted, `midout_audit.py` exit 0, card at 2.84 GHz and 303 W.
+- **Machine:** production client not running at the start; `/opt/nice` untouched; two process slips caught
+  before any card work (dash rejects `kill -- -PGID`: the first watchdog could not have killed; replaced at
+  03:50); cleanup proved at 05:53:41.
+
+## CX.2 Structured candidates across bases 17–329: periodic n make squares with no repeated digit, the cube never follows; no family comes within 20 % of nice above base 60 (2026-11-25 03:50–06:00 UTC, the director; `CX/families/fam.py`, `out_a.txt`, `out_b.txt`, `out_c.txt` (bases 281–400 still running at 329 when this was written))
+
+**Question.** Round 2 of "below exhaustive" judged, without measuring, that algebraically structured n cannot be
+nice. Do structured n come closer than random n at the bases where nice numbers are expected to exist?
+
+**Method.** For every base 17–329 with a range (b ≢ 3 mod 4), four families inside the range, each compared with
+random n of the same range (3,000 draws for mean and sd; the best of as many random draws as the family has
+members, up to 20,000): `rat` n = ⌊P·b^K/Q⌋ + c for Q among b∓1 and their powers, b²±1, b²±b+1 and 2…40 (n with
+periodic digits); `lin` n with digits α·i + β mod b; `sq` and `cb` the roots of squares and cubes whose digits
+are α·i + β. The score is the number of distinct digits among the b digits of n² and n³ (nice = b). 751
+(base, family) rows.
+
+| family | rows | mean (family best − best of equally many random n) | largest excess over the expected random best | smallest missing fraction, bases ≥ 60 |
+|---|---|---|---|---|
+| rat | 188 | **+2.06** digits (178 rows with equal counts) | **+13.1** (base 290: 220 of 290) | 0.200 (base 60) |
+| lin | 188 | +0.35 | +5.3 (base 134: 104 of 134) | — |
+| sq | 188 | +0.61 | +4.5 | 0.237 (base 173) |
+| cb | 187 | +0.83 | +3.0 | — |
+
+Random n miss 36.6–36.7 % of the digits on average at every base (e⁻¹ = 36.8 %). **No member of any family at
+any base misses fewer than 17.5 % (base 40); above base 60 the best is 20 %, and 21.9 % in bases 100–160 where
+a nice number is expected.** No member within 3 digits of nice anywhere (`near={}` on every row).
+
+**The one real effect, explained.** The `rat` outliers are n with periodic digits (base 290: period 5; base 305:
+46, 281, 164, 70, 117, 93, 258, 23, 140, 234, 187, 211, …). Their **squares have no repeated digit at all (122
+distinct of 122 at base 305; 114 of 116 at base 290)**, an event of probability 10⁻¹² for a random number.
+Reason: for n ≈ P·b^K/Q with Q | b^p − 1, the top and bottom halves of n² are expansions of rationals with
+denominator Q², whose digits in base b^p are arithmetic progressions; the three thirds of n³ are expansions with
+denominator Q³, quadratic progressions. So the b output digits fall into five windows (two for the square,
+three for the cube), each with nearly distinct digits inside. The cube shows it too (150 distinct of 183 at
+base 305 against 138 for random digits; the five-window model predicts 149).
+**But the five windows overlap each other like independent random sets.** In the Poisson count a family whose
+outputs split into c internally distinct classes gains a factor e^(b/(2c)) per member over a random n
+(c = 5: e^(0.1·b), 10⁶ at base 140, against the 10⁵⁹ needed), and a family with period p has about b^p
+members while its classes shrink to b/(5p) digits, so the gain per member falls as the family grows. The
+measured best follows the model: missing 0.8⁵ = 32.8 % on average for a five-window member against 36.8 %,
+and the best of 17,000 members reaches 24 %.
+
+**The best case worked by hand [model, not measured separately].** Q = b + 1 (n with two alternating digits):
+every pair of output digits is (t − 1, b − t) for a residue t mod b + 1, so n is nice exactly when the b/2
+residues used form a set with one member of each pair {t, −t}. The square's residues are −P²·j (two
+arithmetic windows, which can be placed), the cube's are P³·j(j − 1)/2 (three quadratic windows that wrap
+round the modulus b/100 times or more, which cannot). Counting the pair relations that remain gives odds of
+about e^(−0.2·b) per member, against e^(−b) for a random n, **but the family has about 2b members per base**:
+expected count 2b·e^(−0.2b), 10⁻¹⁰ at base 140. Larger Q lose the linkage between a block's digits (the
+exponent returns to the random one) faster than they add members. The measured family included all of these
+(every P for Q ≤ 400).
+
+**Verdict.** The judgement of round 2 (§4) is now measured: structure buys distinctness inside each algebraic
+window and nothing between windows; the best structured n at the bases that matter are 22–24 % from nice.
+Nothing here is a route to a second nice number. The exact statement that would have to fail for one to
+exist in such a family (five windows of digits of rationals with denominators Q² and Q³ partition the digit
+set) is a finite question per (b, Q) and is not pursued: the count of members is short of the odds by more
+than 10²⁰ at every base checked.
+
 ## MO.5 Accounts that prove the work ran (step 3A): every fault the audit showed silent is now loud; cost +2.5 % (2026-11-19 01:25–03:06 UTC, engineer; `G2/BUILD-BRIEF-3A.md`, `G2/BUILD-NOTES.md` §1 and §10, `G2/build3a/`; trunk `dev/middle-out-join` 91ac0761 → c0ad3f4a (merge of dev/mo-audit 7a9fd414, then 197c1e94, a7d3099a, 46c99784, c0ad3f4a; on the fork); box 61286074, RTX 3080 at 240 W)
 
 - **Now loud** [M, test `accounts_faults_are_loud`, on CUDA (two slice sets) and lavapipe at 8 lanes through

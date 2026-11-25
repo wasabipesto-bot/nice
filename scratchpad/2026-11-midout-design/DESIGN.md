@@ -3,7 +3,15 @@
 *A description of what is on the branch and why, for a reader who knows the project and today's overlap join and
 has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean`, kept current; head `66305ada` (worktree
 `~/projects/nice/.worktrees/midout-clean`) and from the measurements recorded beside it. The open decisions are
-not repeated here; they are in `~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md` (section A).*
+not repeated here; they are in `~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md`, and the
+answers already given in `DECIDED.md` beside it.*
+
+*How it reaches clients (your direction of 2026-11-25): as a mode `midout` beside `detailed` and `niceonly`,
+with its own claim endpoint and its own table on the server. The server side is a written proposal awaiting
+your yes (`…/2026-10-research-program/G2/PROPOSAL-B.md`); the client mode is being built on the fork branch
+`dev/mo-mode`, cut from the head described here. Where this document speaks of the hidden flag
+`--midout-coordinator` and the local coordinator script, read: the development tools the mode's tests are
+built on. The sections on the join itself are unaffected.*
 
 ![overview](static/midout-overview.png)
 
@@ -76,7 +84,12 @@ for v3.4.8's join, **×4.79**, exact at 64 lanes (on the development branch just
 On an RTX 3080 at a 240 W cap, 1.62 against 6.62 fs, **×4.09**; the cleanup changed it by +0.17 % (1.627 against
 1.624). Base 65, which production has no join for: 3.47 fs on the 3080 on 2026-11-19 and 10 % less since 2026-11-20 (3.29
 against 3.66 fs in one session on a slower box); 3.1 fs on the RX 9070 XT on 2026-11-19, before the wide kernel was
-fitted to that card offline (12 waves instead of 8; not re-run there).
+fitted to that card offline (12 waves instead of 8).
+**The cleaned head (`66305ada`) on the RX 9070 XT, 2026-11-25** [measured]: exact at 64 lanes in every test, all
+counts equal to 2026-11-19's; base 64 **×4.51** on the median of five rounds (×4.33–4.78; the first two rounds,
+the protocol of 11-19, ×4.71), with the maintainer's desktop in use and the branch 6–10 % slower in the later
+rounds while production's join did not move. Base 65 gave no result there: the wide path ran the card at half
+clock (4.8–4.9 fs at 1.53 GHz and 112 W); whether that is the code since 11-19 or the session is open (§9).
 (*fs per admissible n*: card time divided by the n whose residue mod b − 1 is one of the base's possible
 residues for a nice number; 8 of 63 at base 64.) §8 has the table and the conditions.
 
@@ -537,8 +550,9 @@ said; counts come from an exact CPU prototype on real slices.
 - **Why closed:** the best exact variant is ×1.18 against a bar of ×1.3 set in advance. Wider words per lane
   (128 or 256 children) were then measured with a microbenchmark of the word loop on 2026-11-21: ×1.09 on the
   whole kernel on an RTX 3080, where the loop is bound by shared-memory bandwidth; for the RX 9070 XT the offline
-  compile predicts ×1.10–1.16 or ×1.27–1.34 depending on that card's shared-memory speed, which only a run on
-  the card can tell. Parked. Sharing the loads of digits that neighbouring probes have in common was measured
+  compile predicted ×1.10–1.16 or ×1.27–1.34 depending on that card's shared-memory speed. **Run on the card
+  on 2026-11-25: ×0.73 for 128 children per word and ×0.67 for 256 (the 64-child loop is faster there than
+  either model assumed); dropped by the rule set beforehand (at least ×1.35).** Sharing the loads of digits that neighbouring probes have in common was measured
   the next day: every kernel that does it is slower than the present loop (best ×0.85 on the whole kernel on
   an RTX 3080, worse predicted for the RX 9070 XT); the loads saved change the time by under 1.5 %, the control
   that skips them costs more. Dropped.
@@ -594,6 +608,8 @@ and it) in the same session.
 |---|---|---|---|---|---|---|
 | RX 9070 XT, b64 | **0.99 fs** (runs 0.995, 1.005, 0.971; median) | 4.762 fs | **×4.79** (best ×4.90) | 2026-11-19 13:55–14:29; trunk `66259bb0` (before the cleanup), RADV 64 lanes, 2.82–2.88 GHz, 303 W; five fields per run after a warm-up | 7 slices n for n at 64 lanes (4 through shared lists), wide b40 and b65, fault test, one field with the sampled check; counters equal the 3080's | `G2/build4s/window_1119/` |
 | RX 9070 XT, b64, client route | 0.992 fs (12 fields, median 18.16 s each) | | | same session; local coordinator | 7 fields equal the bench's counts | `…/window_1119/route/` |
+| RX 9070 XT, b64, cleaned head | **1.063 fs** (five rounds of five fields: 1.030, 1.004, 1.107, 1.063, 1.099) | 4.794 fs (four bracket fields) | **×4.51** (×4.33–4.78; rounds 1–2 alone ×4.71) | 2026-11-25 03:56–05:52; head `66305ada`, RADV 64 lanes, 2.85–2.93 GHz, 299–303 W (production 3.10–3.13 GHz, 304 W); the desktop in use (load about 3), rounds 3–5 6–10 % slower at the same clock | 7 slices n for n with and without shared lists, parent-sharing test, narrow and wide fault tests, wide b40 and b65, whole field 77777 under (4, 8, 5) and (4, 9, 6) with the sampled check; every count equal to 2026-11-19's | `G2/window_1125/`, `G2/WINDOW3-RESULTS.md` |
+| RX 9070 XT, b65, cleaned head | 4.78–4.89 fs, **off the operating point** (1.53 GHz, 112 W): not a result | none | | 2026-11-25 04:16; the same command as 2026-11-19; time outside device waits 7.8 s per field against 1.6 s then | counts equal 2026-11-19's; the sampled check equal and never waited for | `G2/window_1125/out/w65_*.log` |
 | RTX 3080 240 W, b64 | **1.619 fs** | 6.615 fs | **×4.09** | 2026-11-19 09:20–09:42; trunk with parent sharing; ten fields at 0.05–0.95 of the base; sampled check on | counts equal with and without sharing, field for field; every sampled slice equal | `G2/build5l/raw/m2/` |
 | RTX 3080 240 W, b64, cleanup | head `5a048669` 1.6269 against trunk `66259bb0` 1.6242 (+0.17 %) | | | 2026-11-19 13:58–14:44; four alternating runs each | survivors, checked equal in all eight runs; 80 of 80 sampled checks | `G2/build6c/raw/ten_head`, `ten2_head` |
 | RTX 3080 240 W, b65 | **3.468 fs** (×2.17 of b64's 1.600 in the same session) | none (production has no join above 64) | | 2026-11-19 10:21–10:33; five warm fields; sampled check off | slices n for n against the CPU reference incl. both range ends; whole small bases against brute force | `G2/build5l/raw/m4/` |
@@ -636,7 +652,9 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   classes per batch; CI's 30-minute macOS job would gain about 2.5 minutes per step. Since 2026-11-19 evening the
   client route refuses a Metal device by its name (`is_metal`, `client/src/midout_route.rs:198`, unit-tested on
   device names) until the join has been checked on Apple hardware; **the refusal itself has not run on a Mac**.
-- **The cleaned branch has not run on the RX 9070 XT.** ×4.79 is the trunk just before the cleanup; on the 3080
+- **The cleaned branch ran on the RX 9070 XT on 2026-11-25: exact, ×4.51 (×4.71 by the earlier protocol).**
+  It is 6–10 % slower while the desktop is in use, which production's join is not: the field driver's share
+  of host work has not been profiled on that machine. Before that run the evidence was: ×4.79 is the trunk just before the cleanup; on the 3080
   the cleanup is +0.17 % and per-stage times are equal, and the main kernel's generated CUDA differs only by dead
   code removed [measured]; whether the same holds for RADV's code is not measured. The four commits after the
   cleanup (head `c2152084`) change no kernel: the generated CUDA of all 15 narrow and 14 wide kernels is identical
@@ -645,8 +663,11 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
 - **The wide path's fit to the RX 9070 XT is offline only.** Until 2026-11-20 its main kernel needed 192
   registers and 23.7 KB of shared memory: 8 waves per SIMD where the narrow kernel runs 12, and base 65 measured
   ×3.1–3.2 of base 64 there against ×2.17 on the 3080. It now compiles for that card at 120 registers, 21.4 KB
-  and 12 waves [measured with the driver's compiler, offline]. **It has not run on the card**: predicted
-  2.4–3.0 fs at base 65, from 3.02 [judged]. The wide expansion took 3.45 ms per slice, 1.88 of it the
+  and 12 waves [measured with the driver's compiler, offline]. Predicted 2.4–3.0 fs at base 65, from 3.02
+  [judged]. **On the card on 2026-11-25 it ran at half clock (1.53 GHz, 112 W; 4.8–4.9 fs), and so did the
+  wide path at base 64 in one process with the narrow path at full clock: the prediction is neither confirmed
+  nor refuted, and the cause is open** (the host's share per field was 7.8 s against 1.6 s on 2026-11-19; a
+  run of the old build against the new in one session would tell code from session). The wide expansion took 3.45 ms per slice, 1.88 of it the
   prefilter's arithmetic [measured by ablation]; two records per lane in one loop and the digit test as one
   mask brought it to 2.0–2.3 ms [measured, RTX 3080].
 - **Bases 66–70: partly.** Base 68 was exact on two slices before the paths were merged (2.13 fs on a 20 GB card)
