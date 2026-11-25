@@ -79,7 +79,8 @@ impl<R: Runtime> FieldJoin<R> {
 
     /// Search the field `[v_start, v_start + v_size)` of `coord` (which must
     /// be one of this join's base's known coordinates, `Coord::is_known`):
-    /// every account checked, the sampled CPU check if `cpu_check`.
+    /// every account checked, the sampled CPU check if `cpu_check`, its CPU
+    /// slice on `cpu_threads` threads (0: `gpu::sample_threads`' default).
     ///
     /// # Errors
     /// A field that is not whole quanta of the base, a failed account, or a
@@ -90,6 +91,7 @@ impl<R: Runtime> FieldJoin<R> {
         v_start: u128,
         v_size: u128,
         cpu_check: bool,
+        cpu_threads: usize,
     ) -> Result<(FieldOutcome, Value)> {
         // the device paths search the base's known coordinates (`Coord::is_known`) only
         ensure!(
@@ -105,7 +107,7 @@ impl<R: Runtime> FieldJoin<R> {
         let shape = Shape::for_coord(&coord);
         let (o, counts, tm, path, w) = match self {
             Self::Narrow(gj) => {
-                let opt = GpuOptions::new(GROUP, cpu_check);
+                let opt = GpuOptions::new(GROUP, cpu_check).with_cpu_threads(cpu_threads);
                 let (o, dc, tm) = search_field(gj, &coord, v_start, v_size, opt)?;
                 let c = json!({"tops": dc.tops, "children": dc.children, "chunks": dc.chunks,
                                "flat": dc.flat, "kept": dc.kept, "slices": dc.slices});
@@ -115,7 +117,7 @@ impl<R: Runtime> FieldJoin<R> {
                 let opt = WideOptions {
                     group: GROUP,
                     cpu_check,
-                    cpu_threads: 0,
+                    cpu_threads,
                 };
                 let (o, dc, tm) = search_field_wide(gj, &coord, v_start, v_size, opt)?;
                 let c = json!({"tops": dc.tops, "children": dc.children, "chunks": dc.chunks,

@@ -213,7 +213,7 @@ pub async fn run_benchmark_sweep(cli: &Arc<Cli>, gpu: &GpuCtx, client: &Client) 
     say!(
         cli,
         "Nice benchmark sweep: v{CLIENT_VERSION}, {} mode, {}, {:.1}s budget",
-        cli.mode,
+        cli.mode.search(),
         if cli.gpu {
             format!("GPU device {}", cli.gpu_device)
         } else {
@@ -281,7 +281,7 @@ fn run_sweep(cli: &Arc<Cli>, gpu: &GpuCtx) -> (Vec<ScenarioResult>, HashMap<u32,
     };
     // Single-thread scenarios decompose CPU scaling; they mean nothing for
     // the GPU pipeline.
-    let results = match cli.mode {
+    let results = match cli.mode.search() {
         SearchMode::Niceonly => {
             let defs: Vec<&FieldScenario> = NICEONLY_FIELDS
                 .iter()
@@ -680,7 +680,7 @@ fn run_windows(
     cache: &mut TableCache,
 ) -> Windows {
     // Build the stride table outside the timed windows.
-    let table = cache.get(cli.mode, base);
+    let table = cache.get(cli.mode.search(), base);
 
     // One untimed warmup so one-time costs (GPU kernel JIT for this base,
     // thread pool spin-up, cold caches) land outside the measurement. The
@@ -727,7 +727,8 @@ fn run_windows(
 /// rate by 3–15% either way on the GPUs measured.
 #[cfg(any(feature = "cuda", feature = "cubecl"))]
 fn msd_floor(cli: &Cli) -> Option<u128> {
-    (cli.gpu && cli.mode == SearchMode::Niceonly).then(nice_common::gpu_niceonly::msd_floor_in_use)
+    (cli.gpu && cli.mode.search() == SearchMode::Niceonly)
+        .then(nice_common::gpu_niceonly::msd_floor_in_use)
 }
 
 #[cfg(not(any(feature = "cuda", feature = "cubecl")))]
@@ -916,7 +917,7 @@ fn print_report(
     match score {
         Some(s) => println!(
             "\nNiceMark: {s:.0} (v{CLIENT_VERSION}, {} {})",
-            cli.mode,
+            cli.mode.search(),
             if cli.gpu { "gpu" } else { "cpu" }
         ),
         None => println!("\nNiceMark: n/a (no scored scenarios completed)"),
@@ -998,7 +999,7 @@ fn build_report_json(
             .duration_since(UNIX_EPOCH)
             .map_or(0, |d| d.as_secs()),
         "config": {
-            "mode": cli.mode.to_string(),
+            "mode": cli.mode.search().to_string(),
             "gpu": cli.gpu,
             "threads": cli.threads,
             "benchmark_secs": cli.benchmark_secs,

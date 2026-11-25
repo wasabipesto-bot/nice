@@ -39,7 +39,6 @@ const DEFAULT_PREFETCH_CONCURRENCY: usize = 4;
 const MAX_SUBMITS_IN_FLIGHT: usize = 8;
 
 mod bench;
-#[cfg(feature = "cubecl")]
 mod midout_route;
 mod progress;
 
@@ -230,6 +229,54 @@ impl From<LogLevel> for LevelFilter {
     }
 }
 
+/// The client's modes, as the command line names them.
+///
+/// The first two are the server's `SearchMode`s ([`ClientMode::search`]).
+/// `midout` is the client's alone for now: it claims from endpoints of its
+/// own (`nice_common::midout::wire`) and never reaches the code that matches
+/// on `SearchMode`. Once the server stores middle-out work, this type and
+/// `SearchMode` can become one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ClientMode {
+    /// Get detailed stats on all numbers, important for long-term analytics.
+    Detailed,
+    /// Implements optimizations to speed up the search by many orders of magnitude.
+    /// Does not keep statistics and cannot be quickly verified.
+    Niceonly,
+    /// Search middle-out fields (base 64 and up) on a GPU. Needs a server that
+    /// offers middle-out fields and a build with a `CubeCL` backend.
+    Midout,
+}
+
+impl ClientMode {
+    /// The server's search mode of an n-range mode.
+    ///
+    /// # Panics
+    /// On `midout`, which has none: `main` hands that mode to
+    /// `midout_route` before anything asks.
+    #[must_use]
+    pub fn search(self) -> SearchMode {
+        match self {
+            Self::Detailed => SearchMode::Detailed,
+            Self::Niceonly => SearchMode::Niceonly,
+            Self::Midout => {
+                unreachable!(
+                    "the midout mode has no SearchMode; main runs it before any n-range route"
+                )
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for ClientMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Midout => write!(f, "Middle-out"),
+            m => write!(f, "{}", m.search()),
+        }
+    }
+}
+
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
@@ -237,7 +284,7 @@ impl From<LogLevel> for LevelFilter {
 pub struct Cli {
     /// The checkout mode to use
     #[arg(value_enum, default_value = "detailed", env = "NICE_MODE")]
-    mode: SearchMode,
+    mode: ClientMode,
 
     /// The base API URL to connect to
     #[arg(
@@ -333,15 +380,6 @@ pub struct Cli {
     /// Set the log level (overrides `RUST_LOG` environment variable)
     #[arg(short, long, value_enum, env = "NICE_LOG_LEVEL")]
     log_level: Option<LogLevel>,
-
-    /// Development only (the middle-out join): claim fields of the
-    /// middle-out coordinate from the local coordinator at this address,
-    /// search them on the GPU and submit them there. Off unless given; the
-    /// production API is refused. Uses --repeat, --username,
-    /// --gpu-backend and --gpu-device; ignores the mode and --api-base.
-    /// Hidden from --help: a development flag, not a supported option.
-    #[arg(long, value_name = "URL", hide = true)]
-    midout_coordinator: Option<String>,
 }
 
 /// Which backends this build carries, for error messages.
@@ -684,7 +722,7 @@ fn init_gpu(cli: &Cli) -> GpuCtx {
                 // overlap join, which takes production-size fields; without
                 // it every field stays on hand-CUDA.
                 #[cfg(feature = "cubecl-cuda")]
-                if cuda_pairs_join(want, cli.mode) {
+                if cuda_pairs_join(want, cli.mode.search()) {
                     let attempt =
                         guarded_init("the CubeCL CUDA runtime could not be started", || {
                             CubeclContext::new_cuda(cli.gpu_device)
@@ -705,7 +743,7 @@ fn init_gpu(cli: &Cli) -> GpuCtx {
                     }
                 }
                 #[cfg(not(feature = "cubecl-cuda"))]
-                if cuda_pairs_join(want, cli.mode) {
+                if cuda_pairs_join(want, cli.mode.search()) {
                     warn!(
                         "  this build has no overlap join (it needs the cubecl-cuda feature, \
                          which the gpu feature includes): nice-only fields of 1e{} and up \
@@ -830,7 +868,7 @@ fn process_field_sync(
     gpu: &GpuCtx,
     stride_table: Option<&Arc<stride_filter::StrideTable>>,
 ) -> (Vec<FieldResults>, PipelineTelemetry) {
-    let mode = cli.mode;
+    let mode = cli.mode.search();
     if cli.gpu {
         // GPU processing path
         #[cfg(any(feature = "cuda", feature = "cubecl"))]
@@ -1081,7 +1119,7 @@ enum FieldStage {
 fn begin_field_sync(claim_data: &DataToClient, cli: &Cli, gpu: &GpuCtx) -> FieldStage {
     #[cfg(any(feature = "cuda", feature = "cubecl"))]
     if cli.gpu
-        && cli.mode == SearchMode::Niceonly
+        && cli.mode.search() == SearchMode::Niceonly
         && let Some(niceonly) = gpu.as_deref().map(GpuHandle::niceonly)
     {
         let range: FieldSize = claim_data.into();
@@ -1172,7 +1210,7 @@ async fn process_field(
 fn field_lookahead(cli: &Cli) -> usize {
     #[cfg(any(feature = "cuda", feature = "cubecl"))]
     {
-        if cli.gpu && cli.mode == SearchMode::Niceonly && cli.repeat {
+        if cli.gpu && cli.mode.search() == SearchMode::Niceonly && cli.repeat {
             return nice_common::gpu_niceonly::FIELDS_IN_FLIGHT.saturating_sub(1);
         }
     }
@@ -1324,9 +1362,10 @@ async fn run_validation(cli: &Arc<Cli>, client: &Client, gpu: &GpuCtx) -> Result
         let (claim_data, results, elapsed) = process_field(claim_data, cli, gpu).await;
         log_field_rate(&claim_data, elapsed);
 
-        let submit_data = compile_results(results, &claim_data, &cli.username, cli.mode, None);
+        let submit_data =
+            compile_results(results, &claim_data, &cli.username, cli.mode.search(), None);
 
-        if validate_results(&submit_data, &validation_data, cli.mode) {
+        if validate_results(&submit_data, &validation_data, cli.mode.search()) {
             println!();
             println!("Validation passed! Results match the canonical submission.");
         } else {
@@ -1400,7 +1439,7 @@ fn request_claims(
 ) {
     let concurrency = cli.prefetch_concurrency.max(1);
     while buffered + fetches.len() < target && fetches.len() < concurrency {
-        let mode = cli.mode;
+        let mode = cli.mode.search();
         let api_base = cli.api_base.clone();
         let api_num_retries = cli.api_max_retries;
         let client = client.clone();
@@ -1549,7 +1588,13 @@ async fn complete_field(
     // Compile results for submission
     let telemetry =
         telemetry_base.map(|base| bench::field_telemetry(base, elapsed_secs, pipeline.as_ref()));
-    let submit_data = compile_results(results, &claim_data, &cli.username, cli.mode, telemetry);
+    let submit_data = compile_results(
+        results,
+        &claim_data,
+        &cli.username,
+        cli.mode.search(),
+        telemetry,
+    );
 
     // Submit without blocking the next field on the round trip.
     //
@@ -1691,6 +1736,12 @@ async fn main() -> Result<()> {
     if threads_resolved {
         cli.threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
     }
+    // The midout mode holds one field ahead of its own; a prefetch option
+    // given for it is reported (`midout_route::Options`).
+    let prefetch_set = user_set(
+        &matches,
+        &["prefetch_seconds", "prefetch_max", "prefetch_concurrency"],
+    );
     let cli = Arc::new(cli);
 
     // Set up logger. The default filter quiets the wgpu stack's adapter and
@@ -1740,23 +1791,24 @@ async fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    if cli.validate && cli.mode == SearchMode::Niceonly {
-        error!("Configuration not supported: Validation && Niceonly");
-        std::process::exit(1);
-    }
-
-    // The middle-out route (development) runs alone, before any other
-    // backend or route is set up.
-    if let Some(url) = cli.midout_coordinator.clone() {
+    // The midout mode runs alone, before any other backend or route is set
+    // up, and before anything below asks for a `SearchMode`.
+    if cli.mode == ClientMode::Midout {
+        let options = midout_route::Options::from_cli(&cli, prefetch_set);
         #[cfg(feature = "cubecl")]
-        return midout_route::run(&cli, &url).await;
+        return midout_route::run(options).await;
         #[cfg(not(feature = "cubecl"))]
         {
-            error!(
-                "--midout-coordinator {url}: this build carries no CubeCL backend (build with --features cubecl-cuda)"
-            );
+            if let Err(e) = options.and_then(|_| midout_route::no_backend()) {
+                error!("{e:#}");
+            }
             std::process::exit(1);
         }
+    }
+
+    if cli.validate && cli.mode.search() == SearchMode::Niceonly {
+        error!("Configuration not supported: Validation && Niceonly");
+        std::process::exit(1);
     }
 
     #[allow(unused_mut)]

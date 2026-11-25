@@ -200,6 +200,67 @@ pub async fn get_validation_data_from_server_async(
     .await
 }
 
+/// Claim a middle-out field (`GET /claim/midout`, `midout::wire`): the
+/// claim, or [`ClaimAnswer::Empty`](crate::midout::wire::ClaimAnswer) when
+/// nothing is claimable. Retries 5xx and network errors.
+///
+/// # Errors
+/// After all retries; a 404 (the server offers no middle-out fields); any
+/// other refusal; a body that is not a claim.
+pub async fn claim_midout_async(
+    client: &reqwest::Client,
+    api_base: &str,
+    max_retries: u32,
+) -> Result<crate::midout::wire::ClaimAnswer> {
+    use crate::midout::wire;
+    let url = format!("{}{}", api_base.trim_end_matches('/'), wire::CLAIM_PATH);
+    retry_request_async(
+        || async { client.get(&url).send().await },
+        |response| async move {
+            let status = response.status().as_u16();
+            let body = response
+                .bytes()
+                .await
+                .context("middle-out: failed to read the claim")?;
+            wire::claim_answer(status, &body)
+        },
+        max_retries,
+    )
+    .await
+}
+
+/// Submit a middle-out field (`POST /submit/midout`, `midout::wire`): the
+/// server's reply (`already_recorded` included). Retries 5xx and network
+/// errors with the same body, so a reply lost after the server recorded it
+/// comes back `already_recorded`.
+///
+/// # Errors
+/// After all retries; any refusal (409 and 422 included, with the server's
+/// message); a reply that does not read.
+pub async fn submit_midout_async(
+    client: &reqwest::Client,
+    api_base: &str,
+    submission: &crate::midout::wire::Submission,
+    max_retries: u32,
+) -> Result<crate::midout::wire::Reply> {
+    use crate::midout::wire;
+    let url = format!("{}{}", api_base.trim_end_matches('/'), wire::SUBMIT_PATH);
+    let claim_id = submission.claim_id;
+    retry_request_async(
+        || async { client.post(&url).json(submission).send().await },
+        |response| async move {
+            let status = response.status().as_u16();
+            let body = response
+                .bytes()
+                .await
+                .context("middle-out: failed to read the submission reply")?;
+            wire::submit_answer(status, &body, claim_id)
+        },
+        max_retries,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
