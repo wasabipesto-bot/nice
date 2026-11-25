@@ -1,293 +1,71 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-24 11:00 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-25 04:10 UTC)
 
-This is the one document to read if you have ten minutes. It assumes you have read nothing else. Each
-decision says what I will do if you do not answer. **How the join works and why it is built this way is in a
-separate document:** `../2026-11-midout-design/DESIGN.md` (with a one-screen picture,
-`../2026-11-midout-design/static/midout-overview.png`, and a clickable process map,
-`../2026-11-midout-design/interactive/midout-map.html`). To answer, reply in the chat with the numbers, for
-example: `D2 a, D3 yes, D5 yes hidden, D14 45, D16 yes, D18 b`.
+Only what is still open is here. What you have already decided, with your words and what I did about each, is
+in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
+starting with `%%`), or reply in the chat.
 
-Paths below are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
+Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
 
-## 0. Where things stand, in fifteen lines
+## 0. Where things stand, in ten lines
 
-**The middle-out join** is the redesigned nice-only GPU join you approved on 2026-11-18. Idea: today's overlap
-join pairs top prefixes of n with bottoms inside a contiguous range of n. The redesign makes a unit of work
-("slice") the set of all n that share five *middle* digits (positions 4–8), so tops and bottoms are each built
-once for a far larger span and paired with a bit-sliced kernel.
+- **The middle-out join** (the redesigned nice-only GPU join): built, cleaned, measured ×4.1 (RTX 3080) to ×4.8
+  (RX 9070 XT) against v3.4.8's join at base 64; base 65 runs too. Branch `dev/mo-clean` on the fork. **No pull
+  request from it until you have gone through the design** (`../2026-11-midout-design/DESIGN.md`).
+- **Your direction for it (2026-11-25):** a `midout` mode beside `detailed` and `niceonly`, visible in `--help`,
+  with a new claim endpoint and its own table on the server; the field definition not locked in yet.
+- **Pull requests in general are allowed.** Open now: #276 (the crash at bases with no valid residue).
+- **Rented machines:** $30 a month, unchanged; about $0.33 is left for November under the wrapper's last-week
+  reserve, so until 12-01 builds run on ivory at low priority or in the fork's CI.
 
-| | state on 2026-11-19 |
-|---|---|
-| code | branch `dev/mo-clean` on the fork (`wasabipesto-bot/nice`): the development branch after a cleanup for review (done 2026-11-19: prototype leftovers removed, layouts documented, tests in tiers CI can run, the kernels also passing through WGSL); 14,875 inserted lines in 22 files (head `66305ada` since 2026-11-24), no PR (held at your word, see D9); the first two PRs (no GPU code) are cut, reviewed and waiting on the fork |
-| speed, base 64, RTX 3080, end to end against v3.4.8's join, same session | **×4.09** (1.62 fs against 6.62 fs per candidate) |
-| speed, base 64, RX 9070 XT (demoux), end to end against v3.4.8's join, same session | **×4.79** (0.99 fs against 4.76 fs per candidate), measured 2026-11-19 at 64 lanes on the branch just before its cleanup (the cleaned branch has not run on that card; on the 3080 the cleanup changed the time by +0.17 %); exact on every slice and field tried; the client route also ran there against a local coordinator (12 fields). The 4.76 fs baseline there is production's join throughput harness (ten fields on 2026-11-18, scaled ×1.012 by two fields re-measured in the same session), not the client's own ten-field run that the 3080 baseline uses. At that speed base 64 on that card alone is about 55 days instead of about 266 |
-| base 65 (needs masks wider than 64 bits; production has no join there at all) | exact on a GPU; 3.47 fs per candidate on 2026-11-19, about half an RTX-3080-year for the whole base; 10 % less since 2026-11-20 (3.29 against 3.66 fs in one session on a slower box). On your card it measured 3.1 fs on 2026-11-19; the wide kernel has since been fitted to that card offline (12 waves instead of 8), not re-run: predicted 2.4–3.0 fs |
-| exactness | **the algorithm is proved in Lean (2026-11-23, D18): if every field of a base returns nothing, the base has no nice number**, for a model that agrees with the Rust reference on 102,603 comparisons; CPU reference equals brute force on whole bases 10–25; GPU equals the CPU reference on 1,073 real base-64 slices (measured on 2026-11-18, before the execution checks and the digits-5–7 field were added; since then: 100 of them again, the first and last slice of the range, and every slice of one field under both field definitions); an independent audit found no loss path on a healthy card |
-| failure handling | every stage proves it ran (what ran = what was queued), two conservation checks, and one random slice per field recomputed on the CPU (at base 65 too since 2026-11-20: the CPU slice now runs on up to 4 threads); a dropped kernel, a failed allocation or a wrong prefilter stops the field instead of reporting it empty |
-| how it runs today | a local coordinator script plus an off-by-default client flag; **no server, schema or API change exists or is proposed yet** |
-| what a field is | all n sharing digits 5–7 (base 64: 262,144 fields of 2^57 n; in the fields table it would still be a range, of a renumbered coordinate) |
+## 1. The server side of the `midout` mode: a proposal to approve or correct
 
-What it is not yet: reviewed by you, run on Apple hardware, or connected to the real server.
+- **What it is:** the written proposal you asked for by choosing "option B": the new table, the claim and
+  submit endpoints, what the database pays, the rollout, tests: `G2/PROPOSAL-B.md`. It contains its own short
+  list of sub-decisions (field size per row, how fields are inserted, double-checking, credit).
+- **Why now:** base 62 ends in late December; base 64 on the new join needs this on the server before then, or
+  base 64 starts on the old join (about 266 days on your RX 9070 XT against about 55).
+- **What I do meanwhile, without a yes:** nothing on the server. On the fork branch I turn the hidden client
+  flag into the `midout` mode against the endpoint shapes of the proposal, with the development coordinator
+  serving the same shapes so it can be tested; if you change the shapes, the client follows.
+- **If you do not answer:** the client mode exists on the branch; no server code is written.
 
-Earlier ratios I reported (×4.6 to ×5.5) were kernel timings plus an assumption that was four times too low.
-×4.09 is the honest end-to-end number on NVIDIA.
+## 2. What should Lean (or a long mathematical effort) be pointed at?
 
-**How much more is in it (counted 2026-11-20):** the pairing kernel is 60 % of a slice. Exact counts on real
-slices show that no other order of the work and no extra skip test beats today's by more than ×1.18, and that a
-perfect skip test would give ×1.99 at most. So the join is near the end of what this kind of join can do; what
-is left is ordinary tuning for the card and the stages around the kernel. Wider words per lane were tested on
-2026-11-21: ×1.09 on an RTX 3080; for your card ×1.10–1.16 or ×1.27–1.34 is predicted, and only a short run there
-can tell (D17). Sharing memory loads between neighbouring probes was tested on 2026-11-22 and is slower than
-the present kernel on every measure: dropped. Three attempts in three days have failed to beat the present
-pairing loop. The argument and the counts: `CEIL/NOTES.md`, `CEIL/RESULTS.md`.
+- **Your note:** formalising what we already believe is low-value; you would rather see a falsifiable statement
+  of very high value posed and then proved or refuted.
+- **My honest reading: I do not have a statement of that kind that I think is reachable.** The candidates:
+  - **a. "A second nice number exists."** The prize, and almost surely true (the expected count passes 1 near
+    base 131). I know no route. Finding one needs a method that fixes about 90 % of the output digits before
+    gambling; every certificate there is fixes 40 %. Structured candidates (rational-type n, n with patterned
+    digits, roots of patterned squares and cubes) were tested on 2026-11-25 across bases 15–400: their best
+    members are within about one digit of the best of equally many random numbers, and none comes within 17 %
+    of a base's digits of being nice (`CX/families/`). A proof by counting would need the joint distribution of
+    all digits of n² and n³; what is known covers single digits.
+  - **b. "No end-certificate search can do better than the join by more than a stated factor."** A lower bound
+    in a precisely defined system (every discard is a set of n on which two output digits are provably equal).
+    An earlier exact computation at bases 20–33 put the join within ×1.03–1.11 of the best such search at
+    realistic costs; making that a theorem for base 64 is feasible. It would settle the local-optimum question
+    and nothing else.
+  - **c. "The digits of n² and n³ at fixed middle positions are jointly equidistributed."** Real analytic
+    number theory, the rigorous footing of the odds model for pairs of digits; not directly useful.
+  - **d. Something you have in mind.** Your note read as if you might; if so, name it.
+- **Recommendation:** none of a–c is worth weeks as it stands. I stop Lean work here (the finished proof stays
+  on its fork branch) and put the effort into making the `midout` mode real.
+- **If you do not answer:** that.
 
-## A. The middle-out join
+## 3. A known-answer check in validation (your note: validation, not the benchmark)
 
-### D1. How much goes into the first series of pull requests?
-
-- **Why it matters:** the branch is large. The independent plan (`G2/PR-PLAN.md`) cuts it into 12 stacked PRs.
-- **Options:**
-  - **a. Base 64 only first** (PRs 1–6: coordinate; CPU reference; device tops; one slice with its checks; a
-    whole field with the CPU spot-check; shared preparation): about 5,500 lines of code and 1,400 of tests. The
-    wide path (bases 65–70, 4,700 lines) follows once base 64 has run on the fleet.
-  - b. Everything, including the wide path.
-- **Recommendation: a.** Base 65 is at least months away; its code has had less scrutiny (its own check
-  kernel is unaudited).
-- **If you do not answer:** a.
-
-### D2. Which definition of a field?
-
-- **Background:** a field must fix some middle digits of n. An independent review (`G2/fs/REVIEW.md`, half a
-  page at the top) showed that the join's internals (its shape, kernels, slice size) stay free under any choice
-  within digits 4–8, that the choice can cost at most ×1.15 (base 64) to ×1.30 (base 65), and that today's
-  overlap join could still search such fields (about ×1.9 slower). **A correction (2026-11-19):** I told you
-  such fields "can be re-cut later without redoing any search". That holds only between bases, or if the
-  server tracked single slices: a field cut along other digits is not a union of finished fields, so re-cutting
-  a partly searched base would leave partly searched fields. Treat the definition as fixed for a base once its
-  first field is handed out; it remains a free choice per base. It recommended fixing
-  digits **5–7** rather than 6–8; that is built and measured (3.1 % faster, exact slice by slice against the
-  old definition).
-- **Options:** a. only 5–7 in the PRs (the old definition stays on the archive branch); b. keep both.
-- **Recommendation: a.** **If you do not answer:** a.
-
-### D3. The client flag and the coordinator script
-
-- **Background:** with no server change, the only way to run the join for real is a small local coordinator
-  (`scripts/midout_coordinator.py`, standard library, binds to 127.0.0.1) and a client flag
-  `--midout-coordinator URL`. The flag refuses the production API by name; nothing is submitted after a failed
-  check. Details and command lines: `G2/BUILD-NOTES-CLIENT.md` §2.
-- **Decide:** (i) is this new flag acceptable at all; (ii) hidden from `--help`; (iii) where the script lives.
-- **Recommendation:** yes; hidden; `scripts/`. It goes in its own PRs (7–10), after the first series.
-- **If you do not answer:** I prepare those PRs but do not open them.
-- **State (2026-11-24): the coordinator has been attacked on purpose and repaired.** A harness of fake clients
-  and injected failures found nine defects in the script as first written; four could have recorded a field as
-  searched when it was not (a reply sent before the record was safely on disk; a second coordinator on the same
-  state directory; a submission for another field accepted under a known claim; records reinterpreted after a
-  changed work list). All fixed on `dev/mo-clean`; the fixed script passed 4,950 randomized runs. New:
-  `scripts/midout_audit.py` (checks a state directory against its work list). Details: `COORD/RESULTS.md`.
-- **Why this matters for timing:** base 62 ends in late December. If you want base 64 to start on the new join
-  (about 55 days on your RX 9070 XT against about 266 on the old one) without any server change, this
-  coordinator on your machine is the path, and the decision is this one plus the "how base 64's fields reach
-  clients" one below (option C there).
-- **Still open before I would call it ready for a two-month run** (none built; all on the client side, which I
-  cannot build without a rented machine until 12-01): keep a finished field's result on disk until the
-  coordinator has acknowledged it; treat "already accepted for my own claim" as success; retry a failed claim;
-  and a soak with the real client on a rented card. Operating rule meanwhile: start the coordinator with
-  `--reissue-after` at a few field times.
-
-### D4. How base 64's fields reach clients (the server side)
-
-- **Not needed yet**; base 62 ends around late December. Three options were worked out (`G2/PROPOSAL.md` §2–4):
-  - **A.** Base 64 goes into today's `fields` table as ranges of a renumbered coordinate; the server needs a
-    claim filter so old clients are never handed such a field (about 150–250 lines, no new table).
-  - **B.** A separate table and endpoints (3–4 times the server work; buys nothing at base 64).
-  - **C.** No server change: a private coordinator for your own machines; results backfilled into the table
-    later.
-- **Recommendation:** C first (demoux alone is 86 % of the search), then A once the join has run for a while.
-- **If you do not answer:** nothing happens on the server; I keep to C in everything I build.
-
-### D5. The guard in the ordinary client
-
-- **Background:** one small edit to production's claim path makes every ordinary route refuse a field marked
-  as coordinate-space (otherwise an old route would search the wrong numbers and call the field done). It does
-  nothing unless a claim carries a `coordinate` key, which the real server never sends today.
-- **Options:** a. land it with the client-route PRs; b. only together with a server design.
-- **Recommendation: a.** **If you do not answer:** a (inside PRs that wait for D3 anyway).
-
-### D6. Tests in CI
-
-- **Background:** CI's GPU jobs run every ignored test. The branch's long tests need a real card or hours.
-- **Proposal:** three tiers: fast CPU tests (always); small device tests that the lavapipe jobs run with both
-  compilers; card-only and long tests behind a cargo feature that no default build enables.
-- **Also decide:** should the new device tests run on the macOS (Metal) job? The join has never run on Metal.
-- **Recommendation:** the three tiers; not on the Metal job for now, and the client flag should refuse to run
-  on Metal until someone has checked it on Apple hardware. (Built on the evening of 2026-11-19: the route refuses a
-  device whose name says Metal. The refusal itself has not been run on a Mac.)
-- **If you do not answer:** as recommended.
-
-### D7. A benchmark example in the repository?
-
-- The engineers timed the join through `common/examples/midout_bench.rs`; the repo has no examples today.
-- **Recommendation:** not in the first series; timing stays in ignored tests behind the feature of D6.
-- **If you do not answer:** as recommended.
-
-### D8. The name
-
-- Working name: **middle-out join**, module `midout`, a unit of work is a **slice**. Sober alternative:
-  "transversal join". Renaming is cheap until the first PR opens.
-- **If you do not answer:** middle-out / `midout`.
-
-### D9. When to open the pull requests
-
-- **Your answer (2026-11-19):** hold. No pull request is opened from the middle-out work until you say so; work
-  on the branch continues.
-- **What is ready when you do say so:** the first two (no GPU code), cut, independently reviewed including
-  mutation testing, and fixed: `pr/midout-field-coordinate` (the field coordinate, about 570 lines) and
-  `pr/midout-cpu-ref` (the exact CPU reference, about 1,300 lines), both on the fork, one commit each. Their
-  drafted descriptions: `G2/PR1-BODY.md`, `G2/PR2-BODY.md` (to be shortened before opening).
-- **To read the design** (written 2026-11-19, all under `../2026-11-midout-design/`): `DESIGN.md` (the idea,
-  the pipeline stage by stage with measured costs, what a field commits the project to, how the code knows the
-  work ran, each internal design decision with its alternatives and numbers, what is measured, what is not done,
-  a file map and the command lines); `static/midout-overview.png` (one screen); `interactive/midout-map.html`
-  (open in a browser: click any stage for why it exists, what it costs on both cards, which check guards it and
-  its file:line on `dev/mo-clean`; a column beside it shows today's overlap join stage for stage).
-
-## B. Production soundness
-
-### D10. Pull request #270 (merged by you on 2026-11-19) and one small follow-up
-
-- **What it was:** after a GPU memory allocation failure, the runtime silently skips later kernel launches; on
-  the nice-only *stride* path the v3.4.8 client then submitted unsearched fields as empty. The *join* path (all
-  of today's base-62 fields) already caught this. #270 adds the same check to the stride path.
-- **Effect on past results:** none known. A census of all 984,248 nice-only submissions since v3.4.0 found 451
-  that ran the exposed path (one fleet test on 2026-09-03), all on fields already searched on the CPU; the
-  hand-written CUDA backend was tested separately and is not exposed (`EXPERIMENTS.md` SRA.3, SRA.4).
-- **On your card (run after the merge, in the lease of 14:00 UTC):** #270's new test passes on all three stride
-  paths. One *older* test (from #263, mine) fails there: it forces a form of the survivor queue that production
-  never selects on a 64-lane card. Production's own form passes in every configuration, and the forced form
-  fails loudly, not silently. So: nothing is wrong with the client on demoux; the test is wrong on that card.
-- **Follow-up: pull request #271** (opened 2026-11-19 15:00 UTC): a 16-line, test-only fix, independently
-  reviewed, run on your card (both tests pass), on the software renderer with both compilers, and through
-  `just lint`. **Recommendation:** merge.
-
-### D11. A `--gpu` client whose CUDA runtime cannot start
-
-- Today it falls back silently to the CPU software renderer: correct results, hundreds of times slower.
-- **Recommendation:** make it an error. A behaviour change, so it needs your yes; a small PR.
-- **If you do not answer:** nothing.
-
-### D12. Three older items
-
-| | question | recommendation | if no answer |
-|---|---|---|---|
-| a | 153,748 fields of bases 58 and 60 were searched only by builds before #222, which could lose candidates on some devices (seen on the M4): accept the residual (expected loss about 4e-9 of those bases' candidates) or re-search? | accept | nothing |
-| b | Pin the CPU's survivor and check counts in NiceMark, so the benchmark is also a known-answer test on every device | yes, a small PR | nothing |
-| c | CubeCL 0.10's SPIR-V optimizer drops repeated atomic stores of one value: add a CI check for that pattern | yes, small | nothing |
-
-### D13. Report the CubeCL loop/break defect upstream?
-
-- A draft issue is ready (`G2/port/CUBECL-LOOP-BREAK-ISSUE-DRAFT.md`). The other two CubeCL defects found are
-  gone in 0.11 by reading its source; none of the three is a reason to upgrade.
-- **If you do not answer:** nothing is filed.
-
-### D16. A crash at bases where no number can be nice (found 2026-11-19; not part of the middle-out work)
-
-- **What it is:** at every base that leaves 3 when divided by 4 (43, 47, 63, 67, …) no number can be nice. The
-  CPU nice-only search builds an empty table for such a base and panics at its first lookup
-  (`stride_filter.rs:165`, "index out of bounds") unless the leading-digit filter has already rejected the whole
-  field. Shown with today's client against a local stub serving a real base-43 field (id 49999): exit 101,
-  nothing submitted. `--gpu` is not affected (it answers such bases before building a table). `niceonly
-  --validate` is not affected either (the client refuses that combination outright); **an earlier message of
-  mine said validate "may crash about half the time": that was wrong.**
-- **Can production hit it today? No.** The database's bases of this kind (15, 19, 23, 27, 35, 39, 43, 47) are
-  all fully checked, and none above 50 was ever inserted. It needs a nice-only field of such a base, which only
-  appears if one is inserted (the insert script does not refuse them).
-- **Fix ready:** branch `pr/stride-empty-residues` on the fork: one guard, two tests, a changelog line (about 60 lines).
-  The search then reports such a field searched with no numbers, which is the truth.
-- **Decide:** may I open it as a small pull request? I read your hold as covering the middle-out series only,
-  but you wrote "hold the PRs", so I am not opening anything new without your word.
-- **Recommendation:** yes. **If you do not answer:** it stays a branch.
-- **Review status (2026-11-19 20:45 UTC):** independently reviewed and the review's two small fixes applied
-  (branch head `82108efb`, two commits). The reviewer's findings: the guard is correct and can only turn a panic
-  into an empty result; no nice number exists at any base it covers (bases 4 and 5 are covered too: checked by
-  brute force); `just lint` and the suites CI runs pass. Description drafted: `G2/STRIDE-EMPTY-PR-BODY.md`.
-
-### D18. The machine-checked proof that the middle-out join misses no candidate: done; what to do with it
-
-- **State (2026-11-23):** proved, checked and independently audited, on the fork branch `lean/midout`
-  (directory `lean-midout/`, with its own README; it imports the library of your parked PR #160 at its commit
-  as a dependency and touches nothing of it; no pull request). I took this decision's stated default on
-  2026-11-22 and 23 because it was unanswered; it cost three sessions and about $0.50 of rented CPU.
-- **What is proved** (208 theorems, no `sorry`, Lean's three standard axioms, the fork's CI, Lean's independent
-  checker): for every base 3–128 with a range and every set of fields covering it, a number is nice exactly
-  when some field's search returns it; so if every field's search returns nothing, the base has no nice
-  number. The Lean functions it is proved about agree with tables generated from the Rust reference on 102,603
-  comparisons.
-- **What it does not say:** nothing about the Rust code itself, the GPU kernels, the hardware or the record of
-  which fields were searched; it does not prove that a number is reported only once; no whole base-64 slice
-  has been run through the Lean model.
-- **What the audit found** (`LEAN-MO/REVIEW.md`; a reviewer who did not write the proof): definitions right,
-  hypotheses satisfiable at bases 64 and 65, tested function = proved function, no corruption of the model got
-  past both the proofs and the tables; four corrections, all applied the same day (the whole-base statement;
-  soundness through a mirror of the Rust's digit check instead of by definition; end-to-end tables at bases
-  30–50; exact wording).
-- **A by-product already on `dev/mo-clean`:** two fast Rust tests for errors the Lean comparison exposed.
-- **Options now:** a. leave it on the fork branch as it is (nothing for you to do); b. when you lift the hold,
-  I propose it as a pull request of its own (its CI job runs in about 10 minutes and regenerates the tables
-  from the Rust, so a change to the reference that breaks agreement fails the job); c. remove it.
-- **Recommendation: a now, b when the join itself is under review.** **If you do not answer:** a.
-- **Added 2026-11-24** (same branch, now 246 theorems): each nice number of a field is proved to be reported
-  exactly once; and a checker program decides whether the fields a coordinator accepted cover the base (2.6 s
-  for base 64's 262,144 fields), with a proof that its "yes" is the theorem's hypothesis. So the chain a result
-  would rest on is: coordinator record → coverage check (proved) → "if each recorded search returned what is
-  recorded, the base has no nice number" (proved) → the searches themselves (tests and the execution checks,
-  not proof).
-- **Possible next step, scoped only (`LEAN-MO/DEVICE-SCOPE.md`):** the same treatment for the fourteen places
-  where the GPU path computes the reference's objects by another route. About 1,500–2,500 Lean lines; it would
-  cover what each stage is meant to compute, not the kernels. The scope recommends the top hierarchy and the
-  shared parent lists first (silent if wrong, cheap to prove). It also found two things worth doing in the
-  device path itself whatever is proved: compare the final check's verdicts on the sampled slice (today the
-  spot check compares the list before the final check), and prove that a top with no certified digit cannot
-  occur at base 64 (the kernel does not handle one). **If you do not answer:** nothing is started on the proof;
-  the two device items are queued for when a card can be rented.
-
-### D17. A short window on demoux, when convenient (new 2026-11-20; nothing waits on it)
-
-- **Why:** four things are predicted for your card and not measured there: (a) the cleaned branch at base 64
-  (×4.79 was measured just before the cleanup; on an RTX 3080 the cleanup and everything since changed nothing);
-  (b) base 65 with the wide kernel as fitted to the card on 2026-11-20 (3.02 fs measured before; 2.4–3.0
-  predicted); (c) the stage profile for tops and parents at the card's operating point (the one I have was taken
-  with the card idling and reads too high). Added 2026-11-21: (d) a five-minute microbenchmark that decides
-  whether wider words per lane in the pairing kernel are worth building (×1.09 on an RTX 3080; ×1.10–1.16 or
-  ×1.27–1.34 predicted for your card depending on how fast its shared memory is: `CW/RESULTS.md`).
-- **What it takes:** about 45 minutes with the production client stopped by you, as on 2026-11-19; I use the
-  window only for these and clean up.
-- **If you do not answer:** nothing runs there; the numbers stay labelled as predictions.
-
-## C. Operations
-
-### D14. Rented-card budget
-
-- My cap is $30 a month; November is at $22. The build uses $1–2.50 a day (builds and device tests cannot run
-  on ivory: 4 cores, nearly full disk).
-- **Recommendation:** $45 for November. **If you do not answer:** I stop renting at $30 (about four more days)
-  and continue offline only.
-
-### D15. Disk on ivory
-
-- 4–5 GB free. 7.7 GB is build output in two worktrees of other sessions whose PRs merged on 2026-11-18
-  (`gpu-probe-msg`, `nicemark-repin`); 4.9 GB is the uv cache. Not mine to clear without your word.
-- **If you do not answer:** I leave them and keep builds off ivory.
+- **Background:** `niceonly --validate` is refused by the client today ("Configuration not supported"), so
+  nice-only results have no validation path at all; detailed validation compares a distribution.
+- **Proposal to be written (one page) unless you say otherwise:** validation for nice-only (and later
+  `midout`) that compares the client's survivor and check counts for a field with values stored when the
+  field was first searched, so a device that drops candidates is caught by counts, not only by a missed nice
+  number.
+- **If you do not answer:** I write the one page and wait.
 
 ## What happens next if you say nothing
 
-1. Done on 2026-11-19: the first two pull requests (coordinate; CPU reference) cut from the cleaned tree,
-   independently reviewed (including mutation testing) and fixed: branches `pr/midout-field-coordinate` and
-   `pr/midout-cpu-ref` on the fork.
-2. **Nothing is opened from this work until you say so** (your hold of 2026-11-19). Meanwhile I keep working
-   on the branch. Done on the evening of 2026-11-19: the review's changes carried back into `dev/mo-clean`
-   (head `c2152084`; every test tier re-run; kernels' generated code and speed unchanged). Done on 2026-11-20
-   (head `10ddbf17`): the CPU spot check on several threads and on at base 65; the wide expansion a third
-   cheaper (base 65 −10 % on an RTX 3080); the wide kernel fitted to your card offline. Next: a test of wider
-   words per lane, bases 68–70.
-3. Nothing touches the server, the fleet, or the default client's behaviour.
+1. #276 waits for your merge; two more small pull requests follow as they are ready (the CUDA start-up
+   failure as an error with its reason logged; the CI check for the SPIR-V atomic-store trap).
+2. The `midout` client mode is built on the fork branch; nothing is opened from it.
+3. No Lean work.
