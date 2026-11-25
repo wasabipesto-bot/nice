@@ -57,6 +57,7 @@ fn options_that_do_not_apply_are_refused() {
         ])
         .unwrap(),
         false,
+        true,
     )
     .unwrap();
     assert_eq!(
@@ -82,16 +83,31 @@ fn options_that_do_not_apply_are_refused() {
     ] {
         let mut v = vec!["midout", "--api-base", NOWHERE];
         v.extend_from_slice(args);
-        let e = Options::from_cli(&parse(&v).unwrap(), false)
+        let e = Options::from_cli(&parse(&v).unwrap(), false, false)
             .unwrap_err()
             .to_string();
         assert!(e.contains(word), "{args:?}: {e}");
     }
     // a prefetch option is reported, not refused
-    assert!(Options::from_cli(&parse(&["midout", "--api-base", NOWHERE]).unwrap(), true).is_ok());
+    assert!(
+        Options::from_cli(
+            &parse(&["midout", "--api-base", NOWHERE]).unwrap(),
+            true,
+            false
+        )
+        .is_ok()
+    );
+    // without --threads, the sampled check takes the library's default
+    let o = Options::from_cli(
+        &parse(&["midout", "--api-base", NOWHERE]).unwrap(),
+        false,
+        false,
+    )
+    .unwrap();
+    assert_eq!(o.cpu_threads, 0);
     for ok in ["auto", "cubecl", "cubecl-cuda"] {
         let cli = parse(&["midout", "--api-base", NOWHERE, "--gpu-backend", ok]).unwrap();
-        assert!(Options::from_cli(&cli, false).is_ok(), "{ok}");
+        assert!(Options::from_cli(&cli, false, false).is_ok(), "{ok}");
     }
 }
 

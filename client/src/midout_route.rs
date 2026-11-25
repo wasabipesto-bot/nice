@@ -7,7 +7,7 @@
 //! The options ([`Options::from_cli`]): `--api-base`, `--username`,
 //! `--repeat`, `--api-max-retries`, `--gpu-backend` (auto, cubecl,
 //! cubecl-cuda), `--gpu-device`, `--gpu-wgpu-device` and `--threads` (the
-//! sampled CPU check's threads) apply; `--gpu` is implied (the join has no
+//! sampled CPU check's threads, when given) apply; `--gpu` is implied (the join has no
 //! CPU form for a real field); `--validate` and `--benchmark*` are refused;
 //! `--prefetch-*` are ignored with a warning (the mode holds exactly one
 //! field ahead); telemetry is always sent (it carries the sampled check).
@@ -86,13 +86,15 @@ pub struct Options {
 
 impl Options {
     /// The mode's options, or the refusal of one that does not apply.
-    /// `prefetch_set`: a `--prefetch-*` option was given (on the command
-    /// line or in the environment).
+    /// `prefetch_set`, `threads_set`: a `--prefetch-*` option, `--threads`
+    /// was given (on the command line or in the environment). Without
+    /// `--threads` the sampled check takes the library's default (the CPUs
+    /// less one, at most four), not the n-range modes' default of 4.
     ///
     /// # Errors
     /// `--validate`, `--benchmark*`, or a GPU backend without a middle-out
     /// path.
-    pub fn from_cli(cli: &Cli, prefetch_set: bool) -> Result<Self> {
+    pub fn from_cli(cli: &Cli, prefetch_set: bool, threads_set: bool) -> Result<Self> {
         if cli.validate {
             bail!(
                 "midout: --validate is not available in the midout mode (the server has no validation data for \
@@ -124,7 +126,7 @@ impl Options {
             username: cli.username.clone(),
             max_retries: cli.api_max_retries,
             repeat: cli.repeat,
-            cpu_threads: cli.threads,
+            cpu_threads: if threads_set { cli.threads } else { 0 },
             gpu_backend: cli.gpu_backend,
             gpu_device: cli.gpu_device,
             gpu_wgpu_device: cli.gpu_wgpu_device.clone(),

@@ -1742,6 +1742,7 @@ async fn main() -> Result<()> {
         &matches,
         &["prefetch_seconds", "prefetch_max", "prefetch_concurrency"],
     );
+    let threads_set = user_set(&matches, &["threads"]);
     let cli = Arc::new(cli);
 
     // Set up logger. The default filter quiets the wgpu stack's adapter and
@@ -1794,7 +1795,7 @@ async fn main() -> Result<()> {
     // The midout mode runs alone, before any other backend or route is set
     // up, and before anything below asks for a `SearchMode`.
     if cli.mode == ClientMode::Midout {
-        let options = midout_route::Options::from_cli(&cli, prefetch_set);
+        let options = midout_route::Options::from_cli(&cli, prefetch_set, threads_set);
         #[cfg(feature = "cubecl")]
         return midout_route::run(options).await;
         #[cfg(not(feature = "cubecl"))]
