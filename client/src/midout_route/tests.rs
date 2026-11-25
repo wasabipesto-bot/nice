@@ -580,11 +580,16 @@ fn submissions_carry_the_field_and_small_telemetry() {
 }
 
 // ------------------------------------------- end to end: the development server
+//
+// Unix only: the development server takes its state directory's lock with
+// `fcntl`, which Windows' Python does not have.
 
+#[cfg(unix)]
 fn repo(path: &str) -> String {
     format!("{}/../{path}", env!("CARGO_MANIFEST_DIR"))
 }
 
+#[cfg(unix)]
 /// A development server on 127.0.0.1 with its own state directory, stopped
 /// (by its PID) and removed on drop.
 struct Server {
@@ -593,14 +598,14 @@ struct Server {
     dir: std::path::PathBuf,
 }
 
+#[cfg(unix)]
 impl Server {
     /// `None` if this machine has no `python3` (the test is then skipped, loudly).
     fn start(name: &str, work: &[CoordClaim], extra: &[&str]) -> Option<Self> {
-        if std::process::Command::new("python3")
+        let python = std::process::Command::new("python3")
             .arg("--version")
-            .output()
-            .is_err()
-        {
+            .output();
+        if !python.is_ok_and(|o| o.status.success()) {
             eprintln!("SKIPPED: no python3 for the development server");
             return None;
         }
@@ -675,6 +680,7 @@ impl Server {
     }
 }
 
+#[cfg(unix)]
 impl Drop for Server {
     fn drop(&mut self) {
         let _ = self.child.kill();
@@ -683,6 +689,7 @@ impl Drop for Server {
     }
 }
 
+#[cfg(unix)]
 /// Every field of base 10 under (0, 1, 0) and of base 20 under (2, 3, 2).
 fn e2e_work() -> Vec<CoordClaim> {
     let mut w = small_claims(10, (0, 1, 0), &(0..10).collect::<Vec<_>>());
@@ -690,6 +697,7 @@ fn e2e_work() -> Vec<CoordClaim> {
     w
 }
 
+#[cfg(unix)]
 #[test]
 fn end_to_end_against_the_development_server() {
     let rt = runtime();
@@ -746,6 +754,7 @@ fn end_to_end_against_the_development_server() {
     assert_eq!(sum, Summary::default());
 }
 
+#[cfg(unix)]
 #[test]
 fn end_to_end_a_lost_reply_is_already_recorded() {
     let rt = runtime();
@@ -771,6 +780,7 @@ fn end_to_end_a_lost_reply_is_already_recorded() {
     assert!(srv.audit().status.success());
 }
 
+#[cfg(unix)]
 #[test]
 fn end_to_end_a_422_stops_the_client() {
     let rt = runtime();
@@ -793,6 +803,7 @@ fn end_to_end_a_422_stops_the_client() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn end_to_end_a_failed_search_submits_nothing() {
     let rt = runtime();
