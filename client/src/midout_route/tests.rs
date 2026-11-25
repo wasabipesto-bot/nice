@@ -71,8 +71,14 @@ fn options_that_do_not_apply_are_refused() {
     for (args, word) in [
         (&["--validate"][..], "--validate"),
         (&["-b"][..], "--benchmark"),
-        (&["--gpu-backend", "cuda"][..], "no middle-out path"),
-        (&["--gpu-backend", "cubecl-hip"][..], "no middle-out path"),
+        (
+            &["--gpu-backend", "cuda"][..],
+            "--gpu-backend cuda has no middle-out path",
+        ),
+        (
+            &["--gpu-backend", "cubecl-hip"][..],
+            "--gpu-backend cubecl-hip has no",
+        ),
     ] {
         let mut v = vec!["midout", "--api-base", NOWHERE];
         v.extend_from_slice(args);

@@ -106,9 +106,12 @@ impl Options {
             );
         }
         if matches!(cli.gpu_backend, GpuBackend::Cuda | GpuBackend::CubeclHip) {
+            let name = clap::ValueEnum::to_possible_value(&cli.gpu_backend).map_or_else(
+                || format!("{:?}", cli.gpu_backend),
+                |v| v.get_name().to_string(),
+            );
             bail!(
-                "midout: --gpu-backend {:?} has no middle-out path (use auto, cubecl or cubecl-cuda)",
-                cli.gpu_backend
+                "midout: --gpu-backend {name} has no middle-out path (use auto, cubecl or cubecl-cuda)"
             );
         }
         if prefetch_set {
