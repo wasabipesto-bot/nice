@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""Audit the state of a middle-out coordinator (scripts/midout_coordinator.py) against its work list (read only;
-standard library). It may run while the coordinator runs.
+"""Audit the state of a middle-out development server (scripts/midout_coordinator.py) against its work list (read
+only; standard library). It may run while the server runs.
 
 usage: midout_audit.py --worklist W.json --state DIR [--stale SECONDS] [--quiet]
 
-Prints the fields accepted, open (never claimed), claimed (latest claim younger than --stale, default 3600 s) and
-claimed-and-stale; every problem: a field accepted more than once, an accepted submission whose claim is not on
-record or is another field's, whose body is not the route's or describes another field than its claim, a record
-whose field is not the work list's field at that index, a claim id recorded twice, an accepted field outside the
-work list; whether the accepted fields cover the work list; and the nice numbers reported (accepted submissions,
-and refused ones separately). A torn last line (a write cut short, never acknowledged) is ignored with a note.
+Prints the fields searched (one canon each; further accepted submissions are checks, agreeing or not), open (never
+claimed), claimed (latest claim younger than --stale, default 3600 s) and claimed-and-stale; every problem: a field
+with more than one canon, a check recorded before its field's canon, an accepted submission whose claim is not on
+record or is another field's, two accepted submissions under one claim, a body that describes another field than its
+claim (the typed body's `field`, or in records of the earlier wire, the route's telemetry `pipeline.field`), a record
+whose field is not the work list's field at that index, a claim id recorded twice; whether the canons cover the work
+list; the checks that disagree with their canon; and the nice numbers reported (accepted submissions, and refused ones
+separately). Records of the earlier wire (no `status`: POST /submit with the field in telemetry) are read as canons,
+with a note. A torn last line (a write cut short, never acknowledged) is ignored with a note.
 
-Exit status: 0 only if every field of the work list is accepted exactly once and there is no problem; 1 otherwise;
+Exit status: 0 only if every field of the work list has exactly one canon and there is no problem; 1 otherwise;
 2 if a state file has an unreadable line other than a torn last one.
 """
 import argparse, json, os, sys, time
@@ -70,11 +73,18 @@ def field_of(name, n, rec):
 
 
 def describes(d, f):
-    """None if the body is the route's and describes field f; else why not."""
+    """None if the body describes field f; else why not."""
     if not isinstance(d, dict):
         return "no body"
     if type(d.get("claim_id")) is not int:
         return "claim_id %r is not an integer" % (d.get("claim_id"),)
+    want = (f.get("coordinate"), f.get("base"), f.get("range_start"), f.get("range_end", 0) - f.get("range_start", 0),
+            f.get("range_size"))
+    if isinstance(d.get("field"), dict):  # the typed body of POST /submit/midout
+        fd = d["field"]
+        got = (fd.get("coordinate"), fd.get("base"), num(fd.get("v_start")), num(fd.get("v_size")),
+               num(fd.get("range_size")))
+        return None if got == want else "describes %s, the claim's field is %s" % (got, want)
     tel = d.get("telemetry")
     pl = tel.get("pipeline") if isinstance(tel, dict) else None
     fd = pl.get("field") if isinstance(pl, dict) else None
@@ -82,11 +92,19 @@ def describes(d, f):
         return "route %r, not 'midout'" % (pl.get("route") if isinstance(pl, dict) else None,)
     if not isinstance(fd, dict):
         return "no pipeline.field"
-    want = (f.get("coordinate"), f.get("base"), f.get("range_start"), f.get("range_end", 0) - f.get("range_start", 0),
-            f.get("range_size"))
     got = (pl.get("coordinate"), num(fd.get("base")), num(fd.get("v_start")), num(fd.get("v_size")),
            num(fd.get("range_size")))
     return None if got == want else "describes %s, the claim's field is %s" % (got, want)
+
+
+def numbers(d):
+    """The nice numbers of a body, as integers (typed: decimal strings; earlier wire: {"number": n} objects)."""
+    out = []
+    raw = d.get("nice_numbers") if isinstance(d, dict) else None
+    for x in raw if isinstance(raw, list) else []:
+        v = x.get("number") if isinstance(x, dict) else x
+        out.append(num(v) if num(v) is not None else v)
+    return out
 
 
 claims = {}       # claim_id -> (field index, time)
@@ -101,22 +119,48 @@ for n, c in load("claims.jsonl"):
     if i is not None:
         latest[i] = max(latest.get(i, 0), c.get("time", 0))
 
-accepted = {}     # field index -> [claim ids]
+accepted = {}     # field index -> [claim ids] of its canons
+checks = {}       # field index -> number of checks
+disagree = []     # (line, field, claim) of checks that differ from the canon
+canon_result = {} # field index -> the canon's (numbers, shape, counters)
+by_claim = set()
+older = 0
 nice_acc, nice_ref, refused = [], [], {}
 for n, s in load("submissions.jsonl"):
     d = s.get("submission")
-    nums = d.get("nice_numbers") if isinstance(d, dict) else None
+    nums = numbers(d)
     if not s.get("accepted"):
         r = str(s.get("reason")).split(" (")[0]
         refused[r] = refused.get(r, 0) + 1
-        if isinstance(nums, list) and nums:
+        if nums:
             nice_ref.append((n, s.get("claim_id"), nums))
         continue
     i = field_of("submissions.jsonl", n, s)
     if i is None:
         continue
     cid = s.get("claim_id")
-    accepted.setdefault(i, []).append(cid)
+    status = s.get("status")
+    if status is None:
+        older += 1
+        status = "canon"
+    if cid in by_claim:
+        problems.append("submissions.jsonl line %d: a second accepted submission under claim %r" % (n, cid))
+    by_claim.add(cid)
+    result = (nums, d.get("shape"), d.get("survivors"), d.get("checked"), d.get("slices")) \
+        if isinstance(d, dict) else None
+    if status == "canon":
+        accepted.setdefault(i, []).append(cid)
+        canon_result.setdefault(i, result)
+    elif status == "check":
+        if i not in accepted:
+            problems.append("submissions.jsonl line %d: field %d recorded as a check before its canon" % (n, i))
+        checks[i] = checks.get(i, 0) + 1
+        c = canon_result.get(i)
+        if c is not None and result is not None and (
+                c[0] != result[0] or (c[1] == result[1] and c[2:] != result[2:])):
+            disagree.append((n, i, cid))
+    else:
+        problems.append("submissions.jsonl line %d: status %r" % (n, status))
     if cid not in claims:
         problems.append("submissions.jsonl line %d: field %d accepted under claim %r, which is not on record" % (n, i, cid))
     elif claims[cid][0] != i:
@@ -127,16 +171,18 @@ for n, s in load("submissions.jsonl"):
         why = "body's claim_id %r is not the record's %r" % (d.get("claim_id"), cid)
     if why:
         problems.append("submissions.jsonl line %d: field %d accepted, but the submission %s" % (n, i, why))
-    if isinstance(nums, list):
+    if status == "canon":
         for x in nums:
             nice_acc.append((i, cid, x))
+if older:
+    notes.append("%d accepted records of the earlier wire (POST /submit, no status), read as canons" % older)
 
 now = time.time()
 open_, live, stale = [], [], []
 for i in range(len(fields)):
     if i in accepted:
         if len(accepted[i]) > 1:
-            problems.append("field %d accepted %d times (claims %s)" % (i, len(accepted[i]), accepted[i]))
+            problems.append("field %d has %d canons (claims %s)" % (i, len(accepted[i]), accepted[i]))
         continue
     if i not in latest:
         open_.append(i)
@@ -146,19 +192,21 @@ for i in range(len(fields)):
         live.append(i)
 
 say("work list: %d fields (%s)" % (len(fields), a.worklist))
-say("accepted:  %d" % len(accepted))
+say("searched:  %d (one canon each); checks: %d, of which %d disagree with the canon%s"
+    % (len(accepted), sum(checks.values()), len(disagree),
+       (": " + "; ".join("line %d field %d claim %s" % x for x in disagree)) if disagree else ""))
 say("open:      %d (never claimed)" % len(open_))
-say("claimed:   %d (latest claim younger than %g s, no accepted submission)" % (len(live), a.stale))
-say("stale:     %d (latest claim %g s or older, no accepted submission)%s"
+say("claimed:   %d (latest claim younger than %g s, not searched)" % (len(live), a.stale))
+say("stale:     %d (latest claim %g s or older, not searched)%s"
     % (len(stale), a.stale, (": fields " + ", ".join(map(str, stale[:20])) + (" ..." if len(stale) > 20 else ""))
        if stale else ""))
 say("claims on record: %d; refused submissions: %s" % (len(claims), refused or 0))
 covered = len(accepted) == len(fields) and all(len(v) == 1 for v in accepted.values())
 say("coverage: %s" % ("INCOMPLETE: %d of %d fields accepted" % (len(accepted), len(fields)) if not covered else
-                      "every field of the work list accepted exactly once" + (", but see the problems below"
+                      "every field of the work list searched, one canon each" + (", but see the problems below"
                                                                                if problems else "")))
 say("nice numbers reported (accepted): %s" % (", ".join("%s (field %d, claim %s)" % (
-    x.get("number") if isinstance(x, dict) else x, i, cid) for i, cid, x in nice_acc) or "none"))
+    x, i, cid) for i, cid, x in nice_acc) or "none"))
 if nice_ref:
     say("nice numbers in REFUSED submissions: %s" % "; ".join("line %d claim %s: %s" % r for r in nice_ref))
 for x in notes:
