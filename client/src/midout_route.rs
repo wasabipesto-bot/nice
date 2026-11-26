@@ -773,6 +773,10 @@ fn run_blocking(o: &Options) -> Result<()> {
         GpuBackend::Cubecl => wgpu_context(o)?,
         #[cfg(not(feature = "cubecl-cuda"))]
         GpuBackend::Auto => wgpu_context(o)?,
+        #[cfg(not(feature = "cubecl-cuda"))]
+        GpuBackend::CubeclCuda => {
+            bail!("middle-out: this build has no cubecl-cuda backend (use auto or cubecl)")
+        }
         other => bail!("middle-out: backend {other:?} has no middle-out path"),
     };
     let device = ctx.device_name();
