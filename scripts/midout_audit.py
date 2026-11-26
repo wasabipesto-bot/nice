@@ -9,9 +9,9 @@ claimed), claimed (latest claim younger than --stale, default 3600 s) and claime
 with more than one canon, a check recorded before its field's canon, an accepted submission whose claim is not on
 record or is another field's, two accepted submissions under one claim, a body that describes another field than its
 claim (the typed body's `field`, or in records of the earlier wire, the route's telemetry `pipeline.field`), a record
-whose field is not the work list's field at that index, a claim id recorded twice; whether the canons cover the work
-list; the checks that disagree with their canon; and the nice numbers reported (accepted submissions, and refused ones
-separately). Records of the earlier wire (no `status`: POST /submit with the field in telemetry) are read as canons,
+whose field is not the work list's field at that index, a claim id recorded twice, a check that disagrees with its
+canon; whether the canons cover the work list; and the nice numbers reported (every accepted submission, canon or
+check, those of a check missing from its canon marked; refused ones separately). Records of the earlier wire (no `status`: POST /submit with the field in telemetry) are read as canons,
 with a note. A torn last line (a write cut short, never acknowledged) is ignored with a note.
 
 Exit status: 0 only if every field of the work list has exactly one canon and there is no problem; 1 otherwise;
@@ -159,6 +159,11 @@ for n, s in load("submissions.jsonl"):
         if c is not None and result is not None and (
                 c[0] != result[0] or (c[1] == result[1] and c[2:] != result[2:])):
             disagree.append((n, i, cid))
+            # a check that differs from its canon means one of the two searches is wrong: the canon may record a
+            # field as searched that was not
+            problems.append("submissions.jsonl line %d: field %d: the check under claim %r disagrees with the canon"
+                            " (nice %s vs the canon's %s; counts %s vs %s)"
+                            % (n, i, cid, result[0], c[0], list(result[2:]), list(c[2:])))
     else:
         problems.append("submissions.jsonl line %d: status %r" % (n, status))
     if cid not in claims:
@@ -171,9 +176,10 @@ for n, s in load("submissions.jsonl"):
         why = "body's claim_id %r is not the record's %r" % (d.get("claim_id"), cid)
     if why:
         problems.append("submissions.jsonl line %d: field %d accepted, but the submission %s" % (n, i, why))
-    if status == "canon":
+    if status in ("canon", "check"):
+        canon_nums = (canon_result.get(i) or (None,))[0] or []
         for x in nums:
-            nice_acc.append((i, cid, x))
+            nice_acc.append((i, cid, x, status, status == "check" and x not in canon_nums))
 if older:
     notes.append("%d accepted records of the earlier wire (POST /submit, no status), read as canons" % older)
 
@@ -205,8 +211,8 @@ covered = len(accepted) == len(fields) and all(len(v) == 1 for v in accepted.val
 say("coverage: %s" % ("INCOMPLETE: %d of %d fields accepted" % (len(accepted), len(fields)) if not covered else
                       "every field of the work list searched, one canon each" + (", but see the problems below"
                                                                                if problems else "")))
-say("nice numbers reported (accepted): %s" % (", ".join("%s (field %d, claim %s)" % (
-    x, i, cid) for i, cid, x in nice_acc) or "none"))
+say("nice numbers reported (every accepted submission): %s" % (", ".join("%s (field %d, claim %s, %s%s)" % (
+    x, i, cid, st, ", NOT IN THE CANON" if missing else "") for i, cid, x, st, missing in nice_acc) or "none"))
 if nice_ref:
     say("nice numbers in REFUSED submissions: %s" % "; ".join("line %d claim %s: %s" % r for r in nice_ref))
 for x in notes:

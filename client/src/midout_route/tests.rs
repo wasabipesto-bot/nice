@@ -747,10 +747,15 @@ impl Server {
     }
 
     fn audit(&self) -> std::process::Output {
+        self.audit_of(&self.dir.join("state"))
+    }
+
+    /// The audit of a state directory against this server's work list.
+    fn audit_of(&self, state: &std::path::Path) -> std::process::Output {
         std::process::Command::new("python3")
             .arg(repo("scripts/midout_audit.py"))
             .args(["--worklist", self.dir.join("work.json").to_str().unwrap()])
-            .args(["--state", self.dir.join("state").to_str().unwrap()])
+            .args(["--state", state.to_str().unwrap()])
             .output()
             .unwrap()
     }
@@ -799,6 +804,7 @@ fn end_to_end_against_the_development_server() {
         String::from_utf8_lossy(&audit.stdout),
         String::from_utf8_lossy(&audit.stderr)
     );
+    audit_flags_a_check_that_disagrees(&srv);
     // the same submission again: already recorded, under its first id
     let claims = std::fs::read_to_string(srv.dir.join("state/claims.jsonl")).unwrap();
     let first: Value = serde_json::from_str(claims.lines().next().unwrap()).unwrap();
@@ -828,6 +834,44 @@ fn end_to_end_against_the_development_server() {
     )
     .unwrap();
     assert_eq!(sum, Summary::default());
+}
+
+/// A copy of the server's state with one more accepted submission of its
+/// first field, a check under a claim of its own that reports a nice number
+/// the canon does not have: the audit must fail on it and list the number.
+#[cfg(unix)]
+fn audit_flags_a_check_that_disagrees(srv: &Server) {
+    let (state, copy) = (srv.dir.join("state"), srv.dir.join("state-check"));
+    std::fs::create_dir_all(&copy).unwrap();
+    let mut claims = std::fs::read_to_string(state.join("claims.jsonl")).unwrap();
+    let mut subs = std::fs::read_to_string(state.join("submissions.jsonl")).unwrap();
+    let mut claim: Value = serde_json::from_str(claims.lines().next().unwrap()).unwrap();
+    let mut rec: Value = serde_json::from_str(subs.lines().next().unwrap()).unwrap();
+    let cid = 1_000_000_u64;
+    claim["claim_id"] = json!(cid);
+    claim["field"] = rec["field"].clone();
+    claim["work"] = rec["work"].clone();
+    rec["claim_id"] = json!(cid);
+    rec["status"] = json!("check");
+    rec["submission"]["claim_id"] = json!(cid);
+    rec["submission"]["nice_numbers"] = json!(["12345"]);
+    claims.push_str(&claim.to_string());
+    claims.push('\n');
+    subs.push_str(&rec.to_string());
+    subs.push('\n');
+    std::fs::write(copy.join("claims.jsonl"), claims).unwrap();
+    std::fs::write(copy.join("submissions.jsonl"), subs).unwrap();
+    let audit = srv.audit_of(&copy);
+    let out = String::from_utf8_lossy(&audit.stdout);
+    assert_eq!(audit.status.code(), Some(1), "{out}");
+    // the one problem is the disagreement
+    let problems: Vec<&str> = out.lines().filter(|l| l.starts_with("PROBLEM")).collect();
+    assert_eq!(problems.len(), 1, "{out}");
+    assert!(problems[0].contains("disagrees with the canon"), "{out}");
+    assert!(
+        out.contains("claim 1000000, check, NOT IN THE CANON)"),
+        "{out}"
+    );
 }
 
 #[cfg(unix)]
