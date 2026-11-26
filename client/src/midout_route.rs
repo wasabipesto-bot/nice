@@ -608,46 +608,44 @@ static PANICKED: AtomicBool = AtomicBool::new(false);
 /// Set once a stop signal has arrived (SIGTERM, SIGINT).
 static STOPPING: AtomicBool = AtomicBool::new(false);
 
+/// The stop signal that arrived (`SIGTERM` 15, `SIGINT` 2), 0 while none.
+/// Set by a signal handler, which does nothing else.
+static STOP_SIGNAL: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+
 /// On SIGTERM or SIGINT: no new submission, wait for the one in flight
 /// (finished, or reported if it fails), then exit with 128 + the signal.
 /// The field being searched and the claim held ahead are left to expire on
-/// the server, as before.
+/// the server, as before. (Unix only; elsewhere the process ends at once.)
 #[cfg(feature = "cubecl")]
 fn stop_on_signal(rt: &Handle, gate: SubmitGate) {
+    #[cfg(unix)]
+    for sig in [15, 2] {
+        // SIGTERM and SIGINT have these numbers on every Unix
+        // Safety: the action only stores into an atomic, which is async-signal-safe
+        let r = unsafe {
+            signal_hook_registry::register(sig, move || {
+                let _ = STOP_SIGNAL.compare_exchange(0, sig, Ordering::SeqCst, Ordering::SeqCst);
+            })
+        };
+        if let Err(e) = r {
+            warn!("middle-out: no handler for signal {sig} ({e}): a stop ends the process at once");
+        }
+    }
     rt.spawn(async move {
-        let code = wait_for_stop_signal().await;
+        let sig = loop {
+            match STOP_SIGNAL.load(Ordering::SeqCst) {
+                0 => tokio::time::sleep(Duration::from_millis(100)).await,
+                s => break s,
+            }
+        };
         STOPPING.store(true, Ordering::SeqCst);
-        warn!("middle-out: stop signal; finishing the submission in flight, then exiting");
+        warn!("middle-out: stop signal {sig}; finishing the submission in flight, then exiting");
         gate.close().await;
         info!("middle-out: no submission in flight; exiting");
-        std::process::exit(code);
+        std::process::exit(128 + sig);
     });
 }
 
-/// The exit status of the first stop signal: 143 (SIGTERM) or 130 (SIGINT).
-#[cfg(feature = "cubecl")]
-async fn wait_for_stop_signal() -> i32 {
-    #[cfg(unix)]
-    {
-        use tokio::signal::unix::{SignalKind, signal};
-        match signal(SignalKind::terminate()) {
-            Ok(mut term) => tokio::select! {
-                _ = term.recv() => 143,
-                _ = tokio::signal::ctrl_c() => 130,
-            },
-            Err(e) => {
-                warn!("middle-out: no SIGTERM handler ({e}); SIGINT only");
-                let _ = tokio::signal::ctrl_c().await;
-                130
-            }
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = tokio::signal::ctrl_c().await;
-        130
-    }
-}
 static PANICS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// Record every panic of the process (then run the previous hook, which

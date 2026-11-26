@@ -21,7 +21,7 @@ cuda = ["nice_common/cuda", "dep:cudarc"]
 # dlopens its driver at runtime — and that is the contract: a feature that
 # needs an SDK to compile does not belong in the umbrella.
 gpu = ["cuda", "cubecl", "cubecl-cuda"]
-cubecl = ["nice_common/cubecl"]
+cubecl = ["nice_common/cubecl", "dep:signal-hook-registry"]
 # Must also enable this crate's own cubecl gate: feature cfgs do not
 # propagate upward from nice_common.
 cubecl-cuda = ["cubecl", "nice_common/cubecl-cuda"]
@@ -50,4 +50,10 @@ indicatif = "0.18"
 # (tensor-map) but our kernels never launch them — parity-verified on a
 # CUDA 12.x driver. Raising this further is safe by the same argument.
 cudarc = { version = "0.19", features = ["cuda-12080"], optional = true }
-tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "signal"] }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+
+# The midout mode's stop on SIGTERM/SIGINT: a handler that only sets a flag (tokio's
+# signal driver would be built into every mode's runtime, and needs a socketpair some
+# CI containers refuse).
+[target.'cfg(unix)'.dependencies]
+signal-hook-registry = { version = "1.4", optional = true }
