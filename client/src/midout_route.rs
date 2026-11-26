@@ -503,9 +503,20 @@ pub fn run_loop<S: FieldSearcher, A: Api>(
                 t0 + v_size / q
             );
             let began = Instant::now();
-            let outcome = searcher
-                .search(&c, &coord, v_start, v_size)
-                .and_then(|s| healthy().map(|()| s));
+            // a panic on this thread (in the library or the runtime's setup) is a failed search: the tail below
+            // still finishes the submission in flight
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                searcher.search(&c, &coord, v_start, v_size)
+            }))
+            .unwrap_or_else(|p| {
+                let msg = p
+                    .downcast_ref::<String>()
+                    .cloned()
+                    .or_else(|| p.downcast_ref::<&str>().map(|s| (*s).to_string()))
+                    .unwrap_or_default();
+                Err(anyhow!("middle-out: the search panicked: {msg}"))
+            })
+            .and_then(|s| healthy().map(|()| s));
             let wall = began.elapsed().as_secs_f64();
             let s = match outcome {
                 Ok(s) => s,

@@ -341,6 +341,7 @@ fn small_claims(b: u32, d: (u32, u32, u32), ts: &[u128]) -> Vec<CoordClaim> {
 #[derive(Default)]
 struct CpuSearch {
     fail_on: Option<u64>,
+    panic_on: Option<u64>,
     tamper: bool,
     done: u64,
     /// The claims asked of the stand-in API when each search began.
@@ -370,6 +371,10 @@ impl FieldSearcher for CpuSearch {
         if self.fail_on == Some(self.done) {
             bail!("stand-in search failure (an account that does not close)");
         }
+        assert!(
+            self.panic_on != Some(self.done),
+            "stand-in search panic on the loop's thread"
+        );
         let shape = Shape::for_coord(coord);
         let (mut outcome, _) = cpu::search_field::<u64>(coord, shape, v_start, v_size, 1)?;
         if self.tamper {
@@ -541,6 +546,27 @@ fn a_failed_search_stops_and_the_submission_in_flight_finishes() {
     let e = run_loop(rt.handle(), &api, &mut s, &cfg(true), &ok).unwrap_err();
     assert!(format!("{e:#}").contains("claim 3 not submitted"), "{e:#}");
     // fields 1 and 2 recorded (2 was in flight when 3 failed), nothing after
+    assert_eq!(api.submitted(), vec![1, 2]);
+    assert_eq!(s.done, 3);
+}
+
+/// A panic in the search on the loop's own thread is a failed search: the
+/// field is not submitted, and the one in flight still finishes.
+#[test]
+fn a_search_that_panics_stops_and_the_submission_in_flight_finishes() {
+    let rt = runtime();
+    let mut api = StandIn::new(small_claims(10, (0, 1, 0), &[0, 1, 2, 3, 4]), canon);
+    api.delay = Duration::from_millis(300);
+    let mut s = CpuSearch {
+        panic_on: Some(3),
+        ..Default::default()
+    };
+    let e = run_loop(rt.handle(), &api, &mut s, &cfg(true), &ok).unwrap_err();
+    let msg = format!("{e:#}");
+    assert!(
+        msg.contains("claim 3 not submitted") && msg.contains("panicked"),
+        "{msg}"
+    );
     assert_eq!(api.submitted(), vec![1, 2]);
     assert_eq!(s.done, 3);
 }
