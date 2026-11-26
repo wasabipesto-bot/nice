@@ -150,6 +150,109 @@ fn the_stop_waits_for_the_submission_in_flight() {
     assert!(e.to_string().contains("stopping"), "{e:#}");
 }
 
+/// A submission whose reply is lost mid-body, then answered 503, is sent
+/// again until it is answered (here within a budget of 20 s, though only
+/// one attempt is allowed by count), with the same body each time.
+#[test]
+fn a_submission_lost_mid_body_or_refused_by_5xx_is_retried() {
+    use std::io::{Read, Write};
+    let rt = runtime();
+    // the point is the HTTP path (a body cut short by the connection closing); some CI targets have no
+    // loopback sockets (bind answers ENOSYS there), and this test skips
+    let l = match std::net::TcpListener::bind("127.0.0.1:0") {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("SKIPPED: no loopback socket on this machine ({e})");
+            return;
+        }
+    };
+    let base = format!("http://{}", l.local_addr().unwrap());
+    let server = std::thread::spawn(move || {
+        let reply = r#"{"submission_id":5,"status":"canon"}"#;
+        let answers = [
+            // a 200 whose body stops short of its length
+            "HTTP/1.1 200 OK\r\nContent-Length: 100\r\nConnection: close\r\n\r\n{\"submission_id\":".to_string(),
+            "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 4\r\nConnection: close\r\n\r\nbusy".to_string(),
+            format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reply}",
+                reply.len()
+            ),
+        ];
+        let mut bodies = Vec::new();
+        for a in answers {
+            let (mut s, _) = l.accept().unwrap();
+            s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            let mut req = Vec::new();
+            let mut buf = [0u8; 8192];
+            // the request: headers, then the body of its Content-Length
+            while let Ok(n) = s.read(&mut buf) {
+                if n == 0 {
+                    break;
+                }
+                req.extend_from_slice(&buf[..n]);
+                let text = String::from_utf8_lossy(&req);
+                if let Some(h) = text.find("\r\n\r\n") {
+                    let len = text[..h]
+                        .lines()
+                        .find_map(|l| {
+                            l.to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                                .map(|v| v.trim().parse::<usize>().unwrap())
+                        })
+                        .unwrap_or(0);
+                    if req.len() >= h + 4 + len {
+                        bodies.push(req[h + 4..h + 4 + len].to_vec());
+                        break;
+                    }
+                }
+            }
+            s.write_all(a.as_bytes()).unwrap();
+        }
+        bodies
+    });
+    let c = small_claims(10, (0, 1, 0), &[9]).remove(0);
+    let body = Submission {
+        claim_id: c.claim_id,
+        username: "test".into(),
+        client_version: "test".into(),
+        field: FieldId::of_claim(&c).unwrap(),
+        nice_numbers: vec![69],
+        shape: "1,2".into(),
+        survivors: 3,
+        checked: 2,
+        slices: 1,
+        telemetry: json!({}),
+    };
+    let http = Client::new();
+    let t0 = Instant::now();
+    let r = rt
+        .block_on(submit_midout_async(
+            &http,
+            &base,
+            &body,
+            1,
+            Duration::from_secs(20),
+        ))
+        .unwrap();
+    assert_eq!((r.submission_id, r.status), (5, ReplyStatus::Canon));
+    assert!(
+        t0.elapsed() >= Duration::from_secs(3),
+        "waits of 1 s and 2 s"
+    );
+    let bodies = server.join().unwrap();
+    assert_eq!(bodies.len(), 3);
+    assert!(
+        bodies.iter().all(|b| *b == bodies[0]),
+        "the same body each time"
+    );
+    assert_eq!(
+        serde_json::from_slice::<Submission>(&bodies[0])
+            .unwrap()
+            .claim_id,
+        c.claim_id
+    );
+}
+
 /// The addresses a `midout-fault` build may talk to: this machine only.
 #[test]
 fn loopback_bases() {
@@ -878,7 +981,13 @@ fn end_to_end_against_the_development_server() {
     assert_eq!(rec["claim_id"], first["claim_id"]);
     let body: Submission = serde_json::from_value(rec["submission"].clone()).unwrap();
     let again = rt
-        .block_on(submit_midout_async(&api.http, &api.api_base, &body, 1))
+        .block_on(submit_midout_async(
+            &api.http,
+            &api.api_base,
+            &body,
+            1,
+            Duration::ZERO,
+        ))
         .unwrap();
     assert_eq!(again.status, ReplyStatus::AlreadyRecorded);
     assert_eq!(Some(again.submission_id), rec["submission_id"].as_u64());
@@ -886,7 +995,13 @@ fn end_to_end_against_the_development_server() {
     let mut other = body.clone();
     other.survivors += 1;
     let e = rt
-        .block_on(submit_midout_async(&api.http, &api.api_base, &other, 1))
+        .block_on(submit_midout_async(
+            &api.http,
+            &api.api_base,
+            &other,
+            1,
+            Duration::ZERO,
+        ))
         .unwrap_err();
     assert!(e.to_string().contains("409"), "{e:#}");
     // nothing claimable: a run without --repeat says so and succeeds

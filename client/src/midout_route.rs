@@ -5,7 +5,8 @@
 //! backend (feature `cubecl`), and a build without one refuses the mode.
 //!
 //! The options ([`Options::from_cli`]): `--api-base`, `--username`,
-//! `--repeat`, `--api-max-retries`, `--gpu-backend` (auto, cubecl,
+//! `--repeat`, `--api-max-retries` (the claim's attempts; a submission is
+//! retried for an hour, `MIDOUT_SUBMIT_RETRY`), `--gpu-backend` (auto, cubecl,
 //! cubecl-cuda; `auto` as in the other modes: the `CubeCL` CUDA runtime
 //! where it starts, else the wgpu device), `--gpu-device`, `--gpu-wgpu-device` and `--threads` (the
 //! sampled CPU check's threads, when given) apply; `--gpu` is implied (the join has no
@@ -54,7 +55,9 @@
 use crate::{Cli, GpuBackend};
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use log::{error, info, warn};
-use nice_common::client_api_async::{Client, claim_midout_async, submit_midout_async};
+use nice_common::client_api_async::{
+    Client, MIDOUT_SUBMIT_RETRY, claim_midout_async, submit_midout_async,
+};
 use nice_common::midout::coord::coord_digits;
 use nice_common::midout::wire::{
     self, ClaimAnswer, CoordClaim, FieldId, Reply, ReplyStatus, Submission,
@@ -287,6 +290,8 @@ pub struct HttpApi {
     pub http: Client,
     pub api_base: String,
     pub max_retries: u32,
+    /// How long a submission keeps being retried ([`MIDOUT_SUBMIT_RETRY`]).
+    pub submit_budget: Duration,
     pub gate: SubmitGate,
 }
 
@@ -303,6 +308,7 @@ impl HttpApi {
             http,
             api_base: api_base.trim_end_matches('/').to_string(),
             max_retries,
+            submit_budget: MIDOUT_SUBMIT_RETRY,
             gate: SubmitGate::default(),
         })
     }
@@ -325,7 +331,9 @@ impl Api for HttpApi {
             });
         };
         Box::pin(async move {
-            let r = submit_midout_async(&me.http, &me.api_base, &s, me.max_retries).await;
+            let r =
+                submit_midout_async(&me.http, &me.api_base, &s, me.max_retries, me.submit_budget)
+                    .await;
             if STOPPING.load(Ordering::SeqCst) {
                 // a stop waits on this pass and the loop may not log the reply: say it here
                 match &r {

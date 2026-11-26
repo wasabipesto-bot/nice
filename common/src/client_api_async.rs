@@ -1,7 +1,7 @@
 //! Asynchronous client-server connection utilities with proper error handling.
 
 use crate::{DataToClient, DataToServer, SearchMode, ValidationData};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use log::warn;
 use std::time::Duration;
 
@@ -204,9 +204,69 @@ pub async fn get_validation_data_from_server_async(
     .await
 }
 
+/// How long a middle-out submission keeps being retried (5xx, network
+/// errors, a reply lost mid-body) after its first attempt: the claim's
+/// lifetime on the server. A submission is idempotent (a retry of one the
+/// server recorded comes back `already_recorded`) and carries a searched
+/// field, so it is retried far longer than a claim.
+pub const MIDOUT_SUBMIT_RETRY: Duration = Duration::from_secs(3600);
+
+/// The retries of the two middle-out calls: `request` is sent again on a
+/// network error, a 5xx, or a body that cannot be read (a reply lost
+/// mid-body), waiting 1, 2, 4, ... s (at most 256 s between attempts),
+/// while fewer than `max_retries` attempts were made or `budget` has not
+/// passed since the first. Anything else goes to `answer(status, body)`.
+async fn retry_midout<F, Fut, T>(
+    what: &str,
+    request: F,
+    answer: impl Fn(u16, &[u8]) -> Result<T>,
+    max_retries: u32,
+    budget: Duration,
+) -> Result<T>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<reqwest::Response, reqwest::Error>>,
+{
+    let t0 = std::time::Instant::now();
+    let mut attempts = 0u32;
+    loop {
+        attempts += 1;
+        let why = match request().await {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                match response.bytes().await {
+                    Ok(_) if (500..600).contains(&status) => format!("server error {status}"),
+                    Ok(body) => return answer(status, &body),
+                    Err(e) => format!("the reply (status {status}) was lost mid-body: {e}"),
+                }
+            }
+            Err(e) if is_retryable_error(&e) => {
+                format!("network error ({}): {e}", error_type_str(&e))
+            }
+            Err(e) => bail!(
+                "middle-out: {what}: network error ({}): {e}",
+                error_type_str(&e)
+            ),
+        };
+        if attempts >= max_retries && t0.elapsed() >= budget {
+            bail!(
+                "middle-out: {what}: {why}, after {attempts} attempts in {:.0} s",
+                t0.elapsed().as_secs_f64()
+            );
+        }
+        let wait = Duration::from_secs(2_u64.pow(attempts.saturating_sub(1).min(8)));
+        warn!(
+            "middle-out: {what}: {why}; retrying in {} s (attempt {attempts})",
+            wait.as_secs()
+        );
+        tokio::time::sleep(wait).await;
+    }
+}
+
 /// Claim a middle-out field (`GET /claim/midout`, `midout::wire`): the
 /// claim, or [`ClaimAnswer::Empty`](crate::midout::wire::ClaimAnswer) when
-/// nothing is claimable. Retries 5xx and network errors.
+/// nothing is claimable. Retries 5xx, network errors and a reply lost
+/// mid-body, `max_retries` attempts in all.
 ///
 /// # Errors
 /// After all retries; a 404 (the server offers no middle-out fields); any
@@ -218,25 +278,22 @@ pub async fn claim_midout_async(
 ) -> Result<crate::midout::wire::ClaimAnswer> {
     use crate::midout::wire;
     let url = format!("{}{}", api_base.trim_end_matches('/'), wire::CLAIM_PATH);
-    retry_request_async(
-        || async { client.get(&url).send().await },
-        |response| async move {
-            let status = response.status().as_u16();
-            let body = response
-                .bytes()
-                .await
-                .context("middle-out: failed to read the claim")?;
-            wire::claim_answer(status, &body)
-        },
+    retry_midout(
+        "the claim",
+        || client.get(&url).send(),
+        wire::claim_answer,
         max_retries,
+        Duration::ZERO,
     )
     .await
 }
 
 /// Submit a middle-out field (`POST /submit/midout`, `midout::wire`): the
-/// server's reply (`already_recorded` included). Retries 5xx and network
-/// errors with the same body, so a reply lost after the server recorded it
-/// comes back `already_recorded`.
+/// server's reply (`already_recorded` included). Retries 5xx, network errors
+/// and a reply lost mid-body with the same body, so a reply lost after the
+/// server recorded it comes back `already_recorded`: at least `max_retries`
+/// attempts, and until `budget` ([`MIDOUT_SUBMIT_RETRY`] in the client) has
+/// passed.
 ///
 /// # Errors
 /// After all retries; any refusal (409 and 422 included, with the server's
@@ -246,21 +303,17 @@ pub async fn submit_midout_async(
     api_base: &str,
     submission: &crate::midout::wire::Submission,
     max_retries: u32,
+    budget: Duration,
 ) -> Result<crate::midout::wire::Reply> {
     use crate::midout::wire;
     let url = format!("{}{}", api_base.trim_end_matches('/'), wire::SUBMIT_PATH);
     let claim_id = submission.claim_id;
-    retry_request_async(
-        || async { client.post(&url).json(submission).send().await },
-        |response| async move {
-            let status = response.status().as_u16();
-            let body = response
-                .bytes()
-                .await
-                .context("middle-out: failed to read the submission reply")?;
-            wire::submit_answer(status, &body, claim_id)
-        },
+    retry_midout(
+        &format!("submission of claim {claim_id}"),
+        || client.post(&url).json(submission).send(),
+        |status, body| wire::submit_answer(status, body, claim_id),
         max_retries,
+        budget,
     )
     .await
 }
