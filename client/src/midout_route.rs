@@ -19,7 +19,9 @@
 //! expires on the server) and the previous one's submission finishes in the
 //! background (at most one in flight). Without `--repeat`: one field, and
 //! "nothing claimable" (204) ends the run with success. With it, 204 waits
-//! and asks again ([`Idle`]).
+//! and asks again ([`Idle`]). SIGTERM or SIGINT stops the client after the
+//! submission in flight is finished or reported ([`SubmitGate`]); the field
+//! being searched and the claim held ahead expire on the server.
 //!
 //! On an Apple Metal device the mode runs and logs one warning at start
 //! ([`METAL_WARNING`]): the join has been checked on an Apple M4 under macOS
@@ -252,12 +254,40 @@ pub trait Api {
     fn submit(&self, s: Submission) -> BoxFut<Reply>;
 }
 
+/// The gate of the submissions in flight: each submission holds a pass for
+/// as long as it runs; [`SubmitGate::close`] stops new passes and waits for
+/// the ones out. A stopped client (SIGTERM, SIGINT) closes it before it
+/// exits, so the submission in flight is finished or reported, not dropped.
+#[derive(Clone, Default)]
+pub struct SubmitGate(std::sync::Arc<tokio::sync::RwLock<()>>);
+
+/// A submission's pass through the [`SubmitGate`].
+pub type SubmitPass = tokio::sync::OwnedRwLockReadGuard<()>;
+
+impl SubmitGate {
+    /// A pass, or `None` once the gate is closing (taken on the calling
+    /// thread when the submission is handed over, so a submission already
+    /// handed over is always waited for).
+    #[must_use]
+    pub fn enter(&self) -> Option<SubmitPass> {
+        self.0.clone().try_read_owned().ok()
+    }
+
+    /// Close the gate: no new pass, and wait until every pass is back.
+    pub async fn close(&self) {
+        let closed = self.0.clone().write_owned().await;
+        // closed for good: a submission handed over later is refused
+        std::mem::forget(closed);
+    }
+}
+
 /// The HTTP API at `api_base` (`midout::wire`), with the client's retries.
 #[derive(Clone)]
 pub struct HttpApi {
     pub http: Client,
     pub api_base: String,
     pub max_retries: u32,
+    pub gate: SubmitGate,
 }
 
 impl HttpApi {
@@ -273,6 +303,7 @@ impl HttpApi {
             http,
             api_base: api_base.trim_end_matches('/').to_string(),
             max_retries,
+            gate: SubmitGate::default(),
         })
     }
 }
@@ -285,9 +316,29 @@ impl Api for HttpApi {
 
     fn submit(&self, s: Submission) -> BoxFut<Reply> {
         let me = self.clone();
-        Box::pin(
-            async move { submit_midout_async(&me.http, &me.api_base, &s, me.max_retries).await },
-        )
+        let Some(pass) = self.gate.enter() else {
+            let claim_id = s.claim_id;
+            return Box::pin(async move {
+                Err(anyhow!(
+                    "middle-out: claim {claim_id} not submitted: the client is stopping"
+                ))
+            });
+        };
+        Box::pin(async move {
+            let r = submit_midout_async(&me.http, &me.api_base, &s, me.max_retries).await;
+            if STOPPING.load(Ordering::SeqCst) {
+                // a stop waits on this pass and the loop may not log the reply: say it here
+                match &r {
+                    Ok(reply) => info!(
+                        "middle-out: claim {} recorded ({:?}, submission {}) before the stop",
+                        s.claim_id, reply.status, reply.submission_id
+                    ),
+                    Err(e) => error!("middle-out: claim {} not recorded: {e:#}", s.claim_id),
+                }
+            }
+            drop(pass);
+            r
+        })
     }
 }
 
@@ -502,6 +553,49 @@ pub fn run_loop<S: FieldSearcher, A: Api>(
 // ---------------------------------------------------------- the device path
 
 static PANICKED: AtomicBool = AtomicBool::new(false);
+/// Set once a stop signal has arrived (SIGTERM, SIGINT).
+static STOPPING: AtomicBool = AtomicBool::new(false);
+
+/// On SIGTERM or SIGINT: no new submission, wait for the one in flight
+/// (finished, or reported if it fails), then exit with 128 + the signal.
+/// The field being searched and the claim held ahead are left to expire on
+/// the server, as before.
+#[cfg(feature = "cubecl")]
+fn stop_on_signal(rt: &Handle, gate: SubmitGate) {
+    rt.spawn(async move {
+        let code = wait_for_stop_signal().await;
+        STOPPING.store(true, Ordering::SeqCst);
+        warn!("middle-out: stop signal; finishing the submission in flight, then exiting");
+        gate.close().await;
+        info!("middle-out: no submission in flight; exiting");
+        std::process::exit(code);
+    });
+}
+
+/// The exit status of the first stop signal: 143 (SIGTERM) or 130 (SIGINT).
+#[cfg(feature = "cubecl")]
+async fn wait_for_stop_signal() -> i32 {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        match signal(SignalKind::terminate()) {
+            Ok(mut term) => tokio::select! {
+                _ = term.recv() => 143,
+                _ = tokio::signal::ctrl_c() => 130,
+            },
+            Err(e) => {
+                warn!("middle-out: no SIGTERM handler ({e}); SIGINT only");
+                let _ = tokio::signal::ctrl_c().await;
+                130
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+        130
+    }
+}
 static PANICS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// Record every panic of the process (then run the previous hook, which
@@ -779,6 +873,7 @@ fn drive<R: nice_common::midout::route::DeviceRuntime>(
         cpu_threads: o.cpu_threads,
     };
     let api = HttpApi::new(&o.api_base, o.max_retries)?;
+    stop_on_signal(&rt, api.gate.clone());
     let cfg = LoopConfig {
         repeat: o.repeat,
         idle: Idle::Wait {

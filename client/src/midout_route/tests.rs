@@ -111,6 +111,45 @@ fn options_that_do_not_apply_are_refused() {
     }
 }
 
+/// The stop's gate waits for a submission handed over before it, and
+/// refuses one handed over after it.
+#[test]
+fn the_stop_waits_for_the_submission_in_flight() {
+    let rt = runtime();
+    let gate = SubmitGate::default();
+    let done = Arc::new(AtomicBool::new(false));
+    let pass = gate.enter().expect("an open gate gives a pass");
+    let d = Arc::clone(&done);
+    rt.spawn(async move {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        d.store(true, Ordering::SeqCst);
+        drop(pass);
+    });
+    let t0 = Instant::now();
+    rt.block_on(gate.close());
+    assert!(done.load(Ordering::SeqCst), "the stop did not wait");
+    assert!(t0.elapsed() >= Duration::from_millis(250));
+    assert!(gate.enter().is_none(), "a closed gate gives no pass");
+    // through the API: a submission handed over after the stop is refused, not sent
+    let api = HttpApi::new(NOWHERE, 1).unwrap();
+    rt.block_on(api.gate.close());
+    let c = small_claims(10, (0, 1, 0), &[9]).remove(0);
+    let body = Submission {
+        claim_id: c.claim_id,
+        username: "test".into(),
+        client_version: "test".into(),
+        field: FieldId::of_claim(&c).unwrap(),
+        nice_numbers: vec![],
+        shape: "1,2".into(),
+        survivors: 0,
+        checked: 0,
+        slices: 1,
+        telemetry: json!({}),
+    };
+    let e = rt.block_on(api.submit(body)).unwrap_err();
+    assert!(e.to_string().contains("stopping"), "{e:#}");
+}
+
 /// The addresses a `midout-fault` build may talk to: this machine only.
 #[test]
 fn loopback_bases() {
