@@ -553,8 +553,9 @@ pub fn run_loop<S: FieldSearcher, A: Api>(
                 s.outcome.nice
             );
             let body = submission(&c, field, &s, &cfg.username, wall);
-            // at most one submission in flight
+            // at most one submission in flight; the wait for it can be long, so ask again before submitting
             finish(rt, &mut in_flight, &mut sum)?;
+            healthy()?;
             in_flight = Some((c.claim_id, rt.spawn(api.submit(body))));
             sum.searched += 1;
             if !cfg.repeat {

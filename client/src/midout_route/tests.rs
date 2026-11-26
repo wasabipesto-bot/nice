@@ -679,9 +679,9 @@ fn an_unhealthy_process_submits_nothing_more() {
     let rt = runtime();
     let api = StandIn::new(small_claims(10, (0, 1, 0), &[0, 1, 2]), canon);
     let calls = AtomicUsize::new(0);
-    // healthy for the first claim and its search, then a panic is "recorded"
+    // healthy for the first claim, its search and its submission, then a panic is "recorded"
     let healthy = || -> Result<()> {
-        if calls.fetch_add(1, Ordering::SeqCst) >= 2 {
+        if calls.fetch_add(1, Ordering::SeqCst) >= 3 {
             bail!("a thread of this process panicked");
         }
         Ok(())
@@ -701,6 +701,26 @@ fn an_unhealthy_process_submits_nothing_more() {
     let calls = AtomicUsize::new(0);
     let healthy = || -> Result<()> {
         if calls.fetch_add(1, Ordering::SeqCst) >= 1 {
+            bail!("a thread of this process panicked");
+        }
+        Ok(())
+    };
+    assert!(
+        run_loop(
+            rt.handle(),
+            &api,
+            &mut CpuSearch::default(),
+            &cfg(true),
+            &healthy
+        )
+        .is_err()
+    );
+    assert_eq!(api.submitted(), Vec::<u128>::new());
+    // a panic recorded after the search was seen healthy, before the submission: not submitted either
+    let api = StandIn::new(small_claims(10, (0, 1, 0), &[0, 1, 2]), canon);
+    let calls = AtomicUsize::new(0);
+    let healthy = || -> Result<()> {
+        if calls.fetch_add(1, Ordering::SeqCst) >= 2 {
             bail!("a thread of this process panicked");
         }
         Ok(())
