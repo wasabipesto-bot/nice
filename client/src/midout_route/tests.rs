@@ -836,11 +836,22 @@ fn submissions_carry_the_field_and_small_telemetry() {
     // telemetry over the server's limit loses its join part, not the field
     let big = Searched {
         join: json!({"blob": "x".repeat(wire::TELEMETRY_MAX_BYTES)}),
-        ..s
+        ..s.clone()
     };
     let b = submission(&c, FieldId::of_claim(&c).unwrap(), &big, "me", 1.5);
     assert!(serde_json::to_vec(&b.telemetry).unwrap().len() <= wire::TELEMETRY_MAX_BYTES);
     assert_eq!(b.telemetry["pipeline"]["join"]["trimmed"], true);
+    assert_eq!(b.telemetry["device"], "x");
+    // still over without the join part (the searcher's keys, in non-ASCII UTF-8): those go too, the route stays
+    let wide = Searched {
+        extra: json!({"device": "é".repeat(wire::TELEMETRY_MAX_BYTES)}),
+        ..s
+    };
+    let b = submission(&c, FieldId::of_claim(&c).unwrap(), &wide, "me", 1.5);
+    assert!(serde_json::to_vec(&b.telemetry).unwrap().len() <= wire::TELEMETRY_MAX_BYTES);
+    assert_eq!(b.telemetry["pipeline"]["route"], "midout");
+    assert!(b.telemetry.get("device").is_none());
+    assert_eq!(b.telemetry["trimmed"], true);
 }
 
 // ------------------------------------------- end to end: the development server

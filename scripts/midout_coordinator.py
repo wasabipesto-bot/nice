@@ -522,7 +522,8 @@ class H(BaseHTTPRequestHandler):
         why = body_problem(d)
         if why:
             return self._send(400, "malformed submission: %s" % why)
-        tel = len(json.dumps(d.get("telemetry"), separators=(",", ":")))
+        # UTF-8 bytes, as the client measures it (json.dumps would escape every non-ASCII character to 6-12 bytes)
+        tel = len(json.dumps(d.get("telemetry"), separators=(",", ":"), ensure_ascii=False).encode())
         if tel > MAX_TELEMETRY:
             return self._send(413, "telemetry of %d bytes: at most %d" % (tel, MAX_TELEMETRY))
         cid = d["claim_id"]

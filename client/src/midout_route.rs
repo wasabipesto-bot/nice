@@ -395,13 +395,29 @@ pub fn submission(
             t.insert(k.clone(), v.clone());
         }
     }
-    if serde_json::to_vec(&telemetry).map_or(0, |v| v.len()) > wire::TELEMETRY_MAX_BYTES {
+    let size = |t: &Value| serde_json::to_vec(t).map_or(0, |v| v.len());
+    if size(&telemetry) > wire::TELEMETRY_MAX_BYTES {
         warn!(
             "middle-out: claim {}: telemetry over {} bytes, sent without its join part",
             c.claim_id,
             wire::TELEMETRY_MAX_BYTES
         );
         telemetry["pipeline"]["join"] = json!({"trimmed": true});
+    }
+    if size(&telemetry) > wire::TELEMETRY_MAX_BYTES {
+        // still over (the searcher's keys): only the client's own keys and the route are sent
+        warn!(
+            "middle-out: claim {}: telemetry still over {} bytes, sent without the searcher's keys",
+            c.claim_id,
+            wire::TELEMETRY_MAX_BYTES
+        );
+        telemetry = json!({
+            "build_sha": BUILD_SHA,
+            "client_version": CLIENT_VERSION,
+            "processing_secs": wall,
+            "pipeline": {"route": wire::ROUTE, "coordinate": c.coordinate, "join": {"trimmed": true}},
+            "trimmed": true,
+        });
     }
     Submission {
         claim_id: c.claim_id,
