@@ -240,6 +240,10 @@ for i in sorted(range(len(fields)), key=lambda i: (fields[i]["base"], fields[i][
         sys.exit("work list entries %d and %d overlap" % (prev[k], i))
     prev[k] = i
 os.makedirs(a.state, exist_ok=True)
+# the state directory's own entry, in case it was just created
+_pfd = os.open(os.path.dirname(os.path.abspath(a.state)), os.O_RDONLY)
+os.fsync(_pfd)
+os.close(_pfd)
 # one coordinator per state directory: the lock is held for the process's life (the kernel drops it when it dies)
 lock_file = open(os.path.join(a.state, "lock"), "a")
 try:
@@ -311,7 +315,10 @@ def append(path, rec):
                 broken = "a failed write to %s could not be undone (%s): restart the coordinator" % (path, e2)
             return "%s: %s" % (path, e)
     finally:
-        os.close(fd)
+        try:
+            os.close(fd)
+        except OSError:
+            pass  # after a good fsync the record is durable whatever close says; after a failed one, that is reported
 
 
 def same_field(path, n, rec):
