@@ -99,7 +99,8 @@ user service under `claude` that the director may stop and resume. The owner may
 │                         # remote `fork` = wasabipesto-bot/nice (https); worktrees under projects/nice/.worktrees/
 ├── research/             # the nice research program's root on this box (2026-11-26)
 │   ├── scripts/          # env.sh (sourced by every script: closed-port NICE_API_BASE, CUDA_DEVICE_ORDER=PCI_BUS_ID),
-│   │                     # build_mo.sh BRANCH TAG, run_mo.sh TAG GPU RUN PHASES, off_if_idle.sh, vkprobe.py
+│   │                     # build_mo.sh BRANCH TAG, run_mo.sh TAG GPU RUN PHASES, off_if_idle.sh, env_vulkan.sh, vkprobe.py
+│   ├── vk/               # unpacked libegl-nvidia0 + 10_nvidia.json: the Vulkan workaround (see the GPU table)
 │   ├── bin/TAG/          # built binaries by tag      ├── t/     cargo target dirs (safe to delete)
 │   ├── logs/TAG/         # build logs                 └── runs/  run outputs by name
 ├── nice-build.log        # first source build log (2026-11-25)
@@ -126,7 +127,8 @@ Store project work under `~/projects/`.
 - `git`, `gcc`/`make`/`pkg-config`, `tmux`, `screen`, `htop`, `btop`, `rsync`, `sshfs`, `curl`, `wget`, `python3`, `sensors`.
 - Added by the owner 2026-11-25: `jq`, `perf` (6.12.118), `nvtop`, `nvidia-vulkan-icd`.
 - **`just` 1.59.0** is in `~/.cargo/bin` (cargo-installed 2026-11-26; `just lint` is the project lint bar).
-- **Missing**: `cmake`, `clang`, `sqlite3`, `psql`, `strace`, `vulkaninfo` (`vulkan-tools`). They need the owner or a container.
+- `strace` and `vulkan-tools` (`vulkaninfo`): installed by the owner 2026-11-26.
+- **Missing**: `cmake`, `clang`, `sqlite3`, `psql`. They need the owner or a container.
 
 ### PATH gotcha
 Non-interactive `ssh eventeo 'cmd'` gets only `/usr/local/bin:/usr/bin:/bin`: cargo, uv, node and claude are **not** on PATH. Use `ssh eventeo 'bash -lc "…"'`, or run a script with `bash -l script.sh`. For nvm, also `source ~/.nvm/nvm.sh`. When you pipe a script over ssh's stdin, any inner command that reads stdin eats the rest of it, so copy the script over with `scp` and run it with `</dev/null`.
@@ -142,7 +144,7 @@ The GPUs' job here is the **nice** client. Run it **natively, not in a container
 | CUDA driver API + NVRTC 12.4 | Works. The nice release binary dlopens the system `libnvrtc.so.12`. PTX from NVRTC 12.4 loads on driver 550. |
 | `--gpu-backend cubecl-cuda` (`auto` picks it) | Works natively and is the **fastest** backend. |
 | `--gpu-backend cuda` (hand CUDA) | Works, about 7.7× slower than cubecl-cuda in detailed mode on this card. |
-| `--gpu-backend cubecl` (wgpu/Vulkan) | **Still falls back to llvmpipe (CPU)**. `nvidia-vulkan-icd` 550.163.01 was installed 2026-11-25 and `nvidia_icd.json` is found, but `vk_icdGetInstanceProcAddr` returns NULL for `vkCreateInstance` (`VK_LOADER_DEBUG=driver` shows it). All the libraries resolve (`LD_DEBUG=files` is clean). Cause unknown. It still failed after the 2026-11-26 reboot on kernel 6.12.118. Low priority, since cubecl-cuda is the fast path. |
+| `--gpu-backend cubecl` (wgpu/Vulkan) | **Works with a per-user workaround (2026-11-26); without it wgpu falls back to llvmpipe.** Cause: with no display attached, NVIDIA's Vulkan driver (`libGLX_nvidia.so.0`) initialises through EGL, and Debian's `libegl-nvidia0` (libEGL_nvidia.so.0) and its glvnd vendor file are not installed, so glvnd finds only Mesa's EGL and the driver returns NULL for `vkCreateInstance` (strace: it reads `/usr/share/glvnd/egl_vendor.d`, loads Mesa, never opens `/dev/nvidia*`). Workaround, no root: the package is unpacked under `~/research/vk` (`apt download libegl-nvidia0 && dpkg-deb -x`) with a hand-written vendor file; `. ~/research/scripts/env_vulkan.sh` sets `__EGL_VENDOR_LIBRARY_FILENAMES` to it (and refuses if the unpacked library's version differs from the loaded driver's: then download and unpack again). With it `vulkaninfo --summary` lists both cards (Vulkan 1.3.277) and wgpu adapters are `DiscreteGpu(0)` = GTX 1060, `DiscreteGpu(1)` = RTX 3060 (`CUBECL_WGPU_DEFAULT_DEVICE` or the client's `--gpu-wgpu-device`). System-wide fix, if the owner prefers it: `apt install libegl-nvidia0 nvidia-egl-common` (not done: it could change which EGL the GNOME session uses). |
 | nice `-gpu` container image | **Won't run**: it's built on CUDA 12.8, which needs driver ≥ 570. The fleet's `min_cuda_version` rule exists for the same reason. |
 | Rootless podman + GPU | Partly works without nvidia-container-toolkit or CDI (neither is installed). `--device /dev/nvidia0 --device /dev/nvidiactl --device /dev/nvidia-uvm`, plus bind-mounting `libcuda.so.1`, `libnvidia-ptxjitcompiler.so.1` (without it: `CUDA_ERROR_JIT_COMPILER_NOT_FOUND`), `libnvrtc.so.12`, `libnvrtc-builtins.so.12.4`, `/etc/ssl/certs`, `/usr/lib/cuda` and `/usr/include` (with `CUDA_PATH=/usr/lib/cuda`), runs nvidia-smi and the hand-CUDA backend. CubeCL CUDA's kernel compile still failed inside the container, so it dropped to hand CUDA. |
 
@@ -215,3 +217,4 @@ If you need one of these, stop and say so rather than working around it.
 - 2026-11-26: The owner installed an RTX 3060 12GB (05:00.0, x4 link) next to the 1060. Detection, driver and benchmarks are OK (it matches the public 3060 median) and wall power was measured. WoL fails after AC loss (manual boot needed), and was verified working from mayalaran after a clean shutdown.
 - 2026-11-26: Research director's first session under the primary lease: WoL from ivory (ssh up in 42 s), created `~/research` (scripts, binaries, runs), added the git remote `fork` and the worktree `projects/nice/.worktrees/mo-mode`, built and ran the middle-out branch on both cards, added the PSU to the hardware table, wrote `off_if_idle.sh`, powered off at the end. Vulkan on the NVIDIA cards still fails before the driver touches `/dev/nvidia*` (traced with cuda-gdb; `strace` and `vulkan-tools` would help).
 - 2026-11-26: Installed `just` 1.59.0 with cargo (`~/.cargo/bin/just`). Recorded wall power under sustained base-64 load.
+- 2026-11-26: The owner installed `strace` and `vulkan-tools`. Vulkan on the NVIDIA cards diagnosed (missing `libegl-nvidia0`; see the GPU table) and made to work per user from `~/research/vk`; the middle-out join's device tests pass through Vulkan on the RTX 3060 (`NVIDIA GeForce RTX 3060 (Vulkan, wgpu<wgsl>)`), whole base-64 fields at 3.30 fs per admissible n against 3.23 through CUDA.

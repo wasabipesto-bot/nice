@@ -27,3 +27,15 @@ The decisions document as it stood with their notes on 2026-11-25 is kept as `DE
 | The crash at bases where no number can be nice | "Proceed with this PR. PRs are allowed in general, I meant to hold the midout PRs." | Opened as #276 on 2026-11-25. Ordinary pull requests go ahead under the usual bar. |
 | A short window on demoux | "I will notify when this is available." (granted the same day, 4 hours) | Used 2026-11-25, 03:48–05:53 UTC; results in `G2/WINDOW3-RESULTS.md`. Base 65 gave no result (open decision 4 in `DECISIONS.md`). |
 | The Lean proof of the join, and extending it to the GPU path | "I'm not opposed to lean verifications, I think they're good but formalizing something we already have every reason to believe is correct seems low-value comapred to working on proving something new and directly useful. I would be more interested in utilizing lean to e.g. pose some falsifiable statement that would be very high-value and then working to prove/disprove it (like in the GRH case), something else along those lines." | The existing proof stays on its fork branch, unextended. No formalisation of the GPU path. Candidates for a statement worth proving or refuting are the first open decision. |
+
+## 2026-11-26 (in the chat)
+
+| what was asked | answer (verbatim) | what follows |
+|---|---|---|
+| Use of mayalaran and eventeo | "You now have primary lease on mayalaran and eventeo. … You may create a new folder within the home directory for persistence. … you have primary lease on that box as well and can boot or shutdown whenever you need it, and you can persist whatever you need inside your claude home directory." | Both are used without asking (`README.md`, "Machines"): `~/claude` on mayalaran, `~/research` on eventeo. demoux is still asked for each time. |
+| The rented-card budget | "Budget: Agreed to drop to $10/mo" | `vast.py`: cap $10 a month from 2026-11-26, $2 held back in the last week. |
+| Hours on eventeo | "any hours are fine, noise/heat from your tests was not noticeable in this room and I was in here the whole time" | No time-of-day limit. It still runs only while a job needs it. |
+| If the owner is logged in on eventeo when a job ends, leave it on | "That sounds appropriate, thank you." | `off_if_idle.sh` keeps doing that. |
+| Long GPU runs on mayalaran | "Totally fine" | No limit on run length there. |
+| `strace` and `vulkan-tools` on eventeo | "Just booted and installed, please log in and see if that gives you enough info to diagnose. The shut down when done." | Diagnosed the same hour: the NVIDIA EGL library is not installed; worked around inside `~/research/vk` without root; shut down. |
+

@@ -35,9 +35,16 @@ Apple M4. Both were set up for the program today (`README.md`, "Machines").
 - **Operations checked:** wake over the LAN from ivory twice (ssh up after 42 s both times); shutdown through a
   guarded helper (`off_if_idle.sh`: stays up if the owner is logged in or anything runs), ssh gone in 4 s, plug
   at standby within 30 s; the network card stayed armed after my shutdown (second wake).
-- **Not working on eventeo:** Vulkan on the NVIDIA cards. Traced without root (cuda-gdb catchpoints): the
-  driver's entry point returns NULL before it opens any `/dev/nvidia*` node; libraries load. Needs `strace`
-  and `vulkan-tools` at least (asked, optional).
+- **Vulkan on eventeo's NVIDIA cards: diagnosed and working (03:51–03:58 UTC, after the owner installed
+  `strace` and `vulkan-tools`).** With no display attached NVIDIA's Vulkan driver initialises through EGL;
+  Debian's `libegl-nvidia0` and its glvnd vendor file are not installed, so glvnd finds only Mesa's EGL and
+  the driver returns NULL (strace: it lists `/usr/share/glvnd/egl_vendor.d`, loads Mesa, never opens
+  `/dev/nvidia*`). Without root: the package unpacked under `~/research/vk` and a hand-written vendor file
+  named by `__EGL_VENDOR_LIBRARY_FILENAMES` (`scripts/env_vulkan.sh`, which refuses a version mismatch).
+  Result: `vulkaninfo` lists both cards; **the middle-out tier (b) passes on `NVIDIA GeForce RTX 3060 (Vulkan,
+  wgpu<wgsl>)` and whole base-64 fields run at 3.30 fs per admissible n (60.3 s) against 3.23 through CUDA**,
+  sampled check equal (`EVENTEO/runs/r2-vulkan/`). So the WGSL/Vulkan path can now be tested on NVIDIA
+  hardware at home.
 - **What this changes:** (1) the Metal question of the design document is answered on real hardware, so the
   client's refusal of Metal can be reconsidered; (2) base-64 numbers now exist for four device families
   (RDNA4 ×4.5–4.8, Ampere ×4.1 twice, Apple ×3.9, Pascal runs); (3) card work no longer needs a rental unless
