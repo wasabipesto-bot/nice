@@ -115,8 +115,15 @@ impl Options {
         }
         if cli.benchmark {
             bail!(
-                "midout: --benchmark measures the n-range modes; the middle-out join's benchmark is the \
-                 midout_bench example of nice_common"
+                "midout: --benchmark (also implied by --benchmark-secs, --benchmark-upload, --benchmark-json or \
+                 their NICE_BENCHMARK_* variables) measures the n-range modes; the middle-out join's benchmark is \
+                 the midout_bench example of nice_common"
+            );
+        }
+        if cli.telemetry {
+            warn!(
+                "midout: --telemetry has no effect: the midout mode always sends its telemetry (it carries the \
+                 sampled check)"
             );
         }
         if matches!(cli.gpu_backend, GpuBackend::Cuda | GpuBackend::CubeclHip) {
