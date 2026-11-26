@@ -299,11 +299,19 @@ impl HttpApi {
     /// # Errors
     /// The HTTP client cannot be built.
     pub fn new(api_base: &str, max_retries: u32) -> Result<Self> {
-        let http = Client::builder()
-            .timeout(Duration::from_secs(
-                nice_common::CLIENT_REQUEST_TIMEOUT_SECS,
-            ))
-            .build()?;
+        Self::with_timeout(
+            api_base,
+            max_retries,
+            Duration::from_secs(nice_common::CLIENT_REQUEST_TIMEOUT_SECS),
+        )
+    }
+
+    /// [`HttpApi::new`] with another request timeout than the client's.
+    ///
+    /// # Errors
+    /// The HTTP client cannot be built.
+    pub fn with_timeout(api_base: &str, max_retries: u32, timeout: Duration) -> Result<Self> {
+        let http = Client::builder().timeout(timeout).build()?;
         Ok(Self {
             http,
             api_base: api_base.trim_end_matches('/').to_string(),

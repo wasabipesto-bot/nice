@@ -865,31 +865,27 @@ impl Server {
             .collect();
         let wl = dir.join("work.json");
         std::fs::write(&wl, serde_json::to_string(&list).unwrap()).unwrap();
-        let port = std::net::TcpListener::bind("127.0.0.1:0")
-            .unwrap()
-            .local_addr()
-            .unwrap()
-            .port();
+        // the server binds a port of the system's choice and says which: no other test can take it in between
         let child = std::process::Command::new("python3")
             .arg(repo("scripts/midout_coordinator.py"))
-            .args([
-                "--worklist",
-                wl.to_str().unwrap(),
-                "--port",
-                &port.to_string(),
-            ])
+            .args(["--worklist", wl.to_str().unwrap(), "--port", "0"])
             .args(["--state", dir.join("state").to_str().unwrap()])
             .args(extra)
             .stderr(std::fs::File::create(dir.join("server.log")).unwrap())
             .spawn()
             .unwrap();
-        let s = Self {
+        let mut s = Self {
             child,
-            base: format!("http://127.0.0.1:{port}"),
+            base: String::new(),
             dir,
         };
         for _ in 0..200 {
-            if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+            let log = std::fs::read_to_string(s.dir.join("server.log")).unwrap_or_default();
+            if let Some(port) = log
+                .lines()
+                .find_map(|l| l.strip_prefix("coordinator: listening on 127.0.0.1:"))
+            {
+                s.base = format!("http://127.0.0.1:{}", port.trim());
                 return Some(s);
             }
             std::thread::sleep(Duration::from_millis(50));
@@ -898,6 +894,13 @@ impl Server {
             "the development server did not start: {}",
             std::fs::read_to_string(s.dir.join("server.log")).unwrap_or_default()
         );
+    }
+
+    /// The client's API on this server, with a request timeout of 60 s instead of the client's 5 s: on a loaded
+    /// machine (fsync under the server's one lock) a reply slower than 5 s is retried and comes back
+    /// `already_recorded`, which the tests that expect `canon` would read as a failure.
+    fn api(&self) -> HttpApi {
+        HttpApi::with_timeout(&self.base, 3, Duration::from_secs(60)).unwrap()
     }
 
     fn status(&self, rt: &tokio::runtime::Runtime) -> Value {
@@ -954,7 +957,7 @@ fn end_to_end_against_the_development_server() {
     let Some(srv) = Server::start("normal", &work, &[]) else {
         return;
     };
-    let api = HttpApi::new(&srv.base, 3).unwrap();
+    let api = srv.api();
     let mut s = CpuSearch::default();
     let sum = run_loop(rt.handle(), &api, &mut s, &cfg(true), &ok).unwrap();
     assert_eq!(sum.searched, 30);
@@ -1062,7 +1065,7 @@ fn end_to_end_a_lost_reply_is_already_recorded() {
     let Some(srv) = Server::start("lost", &work, &["--drop-replies", "1"]) else {
         return;
     };
-    let api = HttpApi::new(&srv.base, 3).unwrap();
+    let api = srv.api();
     let sum = run_loop(
         rt.handle(),
         &api,
@@ -1088,7 +1091,7 @@ fn end_to_end_a_422_stops_the_client() {
     let Some(srv) = Server::start("422", &work, &[]) else {
         return;
     };
-    let api = HttpApi::new(&srv.base, 3).unwrap();
+    let api = srv.api();
     let mut s = CpuSearch {
         tamper: true,
         ..Default::default()
@@ -1111,7 +1114,7 @@ fn end_to_end_a_failed_search_submits_nothing() {
     let Some(srv) = Server::start("fail", &work, &[]) else {
         return;
     };
-    let api = HttpApi::new(&srv.base, 3).unwrap();
+    let api = srv.api();
     let mut s = CpuSearch {
         fail_on: Some(1),
         ..Default::default()

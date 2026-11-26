@@ -563,4 +563,8 @@ class H(BaseHTTPRequestHandler):
         self._send(200, {"submission_id": sid, "status": status})
 
 
-ThreadingHTTPServer(("127.0.0.1", a.port), H).serve_forever()
+server = ThreadingHTTPServer(("127.0.0.1", a.port), H)
+# the port bound (the one asked for, or the system's choice under --port 0), once the socket listens
+sys.stderr.write("coordinator: listening on 127.0.0.1:%d\n" % server.server_address[1])
+sys.stderr.flush()
+server.serve_forever()
