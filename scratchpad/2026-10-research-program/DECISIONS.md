@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-26 08:20 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-26 09:25 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
@@ -96,8 +96,9 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
   build, through CUDA and through Vulkan). What reproduces it is a busy host CPU: through Vulkan, six busy
   threads make base 65 2.3 times slower with the card a quarter busy, while base 64 loses 5 %. Cause: the
   base-65 path collects its results in about 29,600 small blocking reads per field, each of which stalls when
-  the CPU is contended; the base-64 path batches them. Your desktop was in use that day. The fix (batching the
-  reads) is being built today on the branch `dev/mo-wide-reads`.
+  the CPU is contended; the base-64 path batches them. Your desktop was in use that day. **The fix (one batched read per
+  group; 45 lines of host code) is on the branch since 2026-11-26: on the RTX 3060 base 65 under six busy
+  threads went from 14.25 to 6.35 fs through Vulkan, and 3 % faster on a quiet host** (`B65/READS-RESULTS.md`).
 - **What I need from you, when convenient: one hour of demoux**, to confirm on the card itself that the fixed
   build holds base 65 near 3 fs while the desktop is in use, and to measure the next levers there. Until then
   the base-65 numbers I report are from the RTX 3060.

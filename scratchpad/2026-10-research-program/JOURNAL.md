@@ -50,6 +50,11 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   ported to the wide `finish_group` on `dev/mo-wide-reads`; kill criterion: still more than 30 % lost under six
   busy threads through Vulkan. B65.2 closed on paper (the top hierarchy is already in the wide path; the shape
   was settled by the bases study).
+- **09:04 UTC: the branch fixes are back** (MODE.3): `dev/mo-mode` 4fff25e7, the whole CI matrix green (16 of
+  16), Metal a warning, the client on the M4, the review's findings fixed.
+- **09:19 UTC: the read fix is back** (B65.3): 14.25 → 6.35 fs under load through Vulkan, −3 % quiet, exact; I
+  read the diff and fast-forwarded `dev/mo-mode` to 0b6e22e1 (fork CI dispatched: runs 45790967510,
+  45790972346). mayalaran's build output cleared (`~/claude` 0.8 GB). The 10:15 reminder deleted.
 - **Report sent about 08:20 UTC** (`REPORTS/2026-11-26.md`); the branch's CI matrix (three emulated arm jobs)
   and B65.3 follow as short notes. The 10:15 reminder stays as the fallback.
 - **For the cycle of 11-27:** merge `dev/mo-wide-reads` into `dev/mo-mode` if exact and effective; next base-65

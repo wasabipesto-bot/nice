@@ -693,8 +693,10 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   result buffers one blocking read at a time (about 29,600 per base-65 field; the narrow driver batches them, about
   260); through Vulkan each read stalls when the CPU is contended: six busy threads make base 65 ×2.3 slower with
   the card 24 % busy, base 64 loses 5 %, and through CUDA neither moves. The current head is 10–13 % faster than
-  the 2026-11-19 trunk on that card through both runtimes, so it is not a regression. Batching the wide reads is
-  in progress (branch `dev/mo-wide-reads`). The wide expansion took 3.45 ms per slice, 1.88 of it the
+  the 2026-11-19 trunk on that card through both runtimes, so it is not a regression. **Fixed on 2026-11-26** (`dev/mo-mode` `0b6e22e1`: the wide
+  `finish_group` reads a group's buffers in one read, as the narrow one does): base 65 under six busy threads
+  through Vulkan 14.25 → 6.35 fs, 3 % faster quiet, exact, every fault as loud as before [measured, RTX 3060;
+  not yet on the RX 9070 XT]. The wide expansion took 3.45 ms per slice, 1.88 of it the
   prefilter's arithmetic [measured by ablation]; two records per lane in one loop and the digit test as one
   mask brought it to 2.0–2.3 ms [measured, RTX 3080].
 - **Bases 66–70: partly.** Base 68 was exact on two slices before the paths were merged (2.13 fs on a 20 GB card)

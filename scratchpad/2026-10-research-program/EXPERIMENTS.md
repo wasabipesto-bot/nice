@@ -5,6 +5,34 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## B65.3 The wide driver's result reads batched: base 65 through Vulkan under a busy host goes from 14.25 to 6.35 fs; 3 % faster quiet; exact and every fault as loud as before (2026-11-26 08:03–09:19 UTC, the same engineer, eventeo's RTX 3060; `B65/BRIEF-READS.md`, `B65/READS-RESULTS.md`, `B65/runs/reads-*`; fork `dev/mo-wide-reads` 457ad99a, 0b6e22e1 on `dev/mo-mode` 4fff25e7, fast-forwarded into `dev/mo-mode` by me at 09:20 UTC; 0.254 kWh)
+
+- **Change:** `common/src/midout/gpu_wide.rs` only, +45 −12, no kernel change: `finish_group` collects the
+  group's `cnt` and each ticket's `scount`, `ran`, `tstat`, `stat`, `est` and each slice's `acc`, `l5n`, reads
+  them with one `read_async` (the narrow path's shape), then runs the same checks in the same order with the
+  same error texts. Read by me before merging: collection and consumption orders agree; only a slice's first
+  ticket carries the per-slice buffers.
+- **Base 65, field 77777, fs per admissible n, counts equal to the morning's:**
+
+| runtime, host | before | after |
+|---|---|---|
+| **Vulkan/SPIR-V, six busy threads** | **14.25** | **6.35** (×2.24; +2.6 % over its own quiet run) |
+| Vulkan/SPIR-V, quiet | 6.381 | 6.191, 6.172 (−3.1 %); the card ≥ 90 % busy in 99 % of samples (77 % before) |
+| CUDA, quiet / six busy | | −0.5 % / −2.5 % |
+| base 64 through the wide path, CUDA | 3.591 | 3.566 |
+
+  The kill criterion (more than 30 % still lost under load) is far from met: the serial reads were the mechanism.
+- **Tests on the card, at the branch point and at the change, through CUDA, Vulkan/WGSL and Vulkan/SPIR-V:** the
+  wide ordinary tier, `wide_slices_equal_cpu`, `wide_faults_are_loud` pass; all six fault messages byte-identical
+  to the branch point's on every runtime; the narrow tests once through CUDA. `just lint` passes on 0b6e22e1.
+- **The next step, written up and not built:** queueing group k + 1 before the reads of group k. Worth at most
+  0.6 % quiet and about 3 % under load on the wide path, 4.9 % on the narrow path under load; needs `sync()`
+  out of `finish_group`, an error path that waits for the queued group (the join is reused), and two groups of
+  buffers alive at once (to be checked on the 3 GB card). Not small and safe: left.
+- **To confirm on the RX 9070 XT:** that base 65 holds about 3 fs there with the desktop in use (the 11-25 run
+  was 4.8–4.9 fs). A few Vulkan processes segfault at exit after printing their results (not investigated).
+- eventeo off at 09:18:18; the plug at standby.
+
 ## MODE.3 The client-mode branch through the whole CI matrix; Metal as a warning and the real client on the M4; the review's findings fixed (2026-11-26 05:50–09:04 UTC, engineer, mayalaran and the fork's CI; `MODE2/BRIEF-FIX.md`, `MODE2/FIX-NOTES.md`, `MODE2/qemu-probe/`, `MODE2/m4-runs/`; fork `dev/mo-mode` f61cf79e → 4fff25e7, 21 commits)
 
 - **CI:** the fork's full matrix on 4fff25e7 passes all 16 jobs (run 45777405453: i686, armv7, arm-musl, aarch64,
