@@ -3541,12 +3541,11 @@ impl<R: Runtime> WideJoin<R> {
             let (a, l5) = accs
                 .next()
                 .ok_or_else(|| anyhow!("middle-out wide: {nh} buffers read, fewer returned"))?;
-            let l5 = match l5 {
-                Some(l) => l,
-                None => bail!(
+            let Some(l5) = l5 else {
+                bail!(
                     "middle-out wide: slice {} without its top-hierarchy count",
                     head.pip
-                ),
+                )
             };
             self.check_slice(head, &a, &l5, jobs, ntops, per[i].0)?;
             if let Some(ps) = per_slice.as_deref_mut() {
