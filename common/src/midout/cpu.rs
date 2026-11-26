@@ -1164,12 +1164,12 @@ mod tests {
         check_whole_base(25, (2, 4, 3), &[(2, 5)]);
     }
 
-    /// The slice join on several threads equals it on one: the same counts
-    /// and the same survivors in the same order, on every slice of three
-    /// small bases (with survivors, more classes than threads and fewer),
-    /// in `u64` and `u128` masks.
-    #[test]
-    fn threaded_slice_join_equals_single_threaded() {
+    /// The slice join of every slice of three small bases (with survivors,
+    /// more classes than threads and fewer) on one thread, and on 2, 3, 7
+    /// and 64 threads in `u64` masks and on 3 in `u128` masks on the slices
+    /// `threaded(slice index, survivors, slices compared so far)` (per base)
+    /// picks: the same counts and the same survivors in the same order.
+    fn threaded_equals_single(threaded: impl Fn(usize, u64, usize) -> bool) {
         for (b, (k0, k1, q0), (f0, k)) in [
             (20, (2, 3, 2), (2, 4)),
             (24, (1, 3, 2), (1, 4)),
@@ -1179,7 +1179,7 @@ mod tests {
             let base = Base::new(&coord);
             let sh = Shape { f0, k };
             let nq = (coord.v_end() - coord.start()) / coord.quantum();
-            let mut total = 0u64;
+            let (mut total, mut compared, mut i, mut slices) = (0u64, 0u64, 0usize, 0usize);
             for t in 0..nq {
                 for pip in sh.slices_of(&coord, t) {
                     let mut one = Vec::new();
@@ -1187,6 +1187,12 @@ mod tests {
                         one.push((d, n, p));
                     });
                     total += c1.survivors;
+                    i += 1;
+                    if !threaded(i - 1, c1.survivors, slices) {
+                        continue;
+                    }
+                    slices += 1;
+                    compared += c1.survivors;
                     for threads in [2, 3, 7, 64] {
                         let mut many = Vec::new();
                         let cm = slice_join_threads::<u64>(&base, sh, pip, threads, |d, n, p| {
@@ -1202,8 +1208,28 @@ mod tests {
                     assert_eq!((cw, &wide), (c1, &one), "b{b} slice {pip}, u128, 3 threads");
                 }
             }
-            assert!(total > 0, "b{b}: no survivors to compare");
+            assert!(total > 0 && compared > 0, "b{b}: no survivors to compare");
         }
+    }
+
+    /// [`threaded_equals_single`] on four slices of each base (the first and
+    /// the first three after it with survivors). Each threaded join starts
+    /// its threads afresh (about 150 to 190 per slice), and an emulator for
+    /// another architecture (qemu-user, as the cross-compiled CI targets run
+    /// their tests) keeps a few hundred KiB of every thread that ever ran
+    /// until the process ends: the form on every slice
+    /// (`threaded_slice_join_every_slice`, the card tier) starts 231,506
+    /// threads, 2 s natively but out of memory there.
+    #[test]
+    fn threaded_slice_join_equals_single_threaded() {
+        threaded_equals_single(|i, survivors, slices| i == 0 || (survivors > 0 && slices < 4));
+    }
+
+    /// [`threaded_equals_single`] on every slice of the three bases.
+    #[cfg(feature = "midout-box-tests")]
+    #[test]
+    fn threaded_slice_join_every_slice() {
+        threaded_equals_single(|_, _, _| true);
     }
 
     /// The sampled check's CPU slice at bases 64 and 65 on each thread count
