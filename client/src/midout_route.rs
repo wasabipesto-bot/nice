@@ -502,13 +502,14 @@ pub fn run_loop<S: FieldSearcher, A: Api>(
             }
             let (coord, v_start, v_size) = searcher.accept(&c)?;
             let field = FieldId::of_claim(&c)?;
+            // a submission refused meanwhile stops the run before more work (and before a claim ahead is asked
+            // for, which would idle on the server until it expires)
+            if in_flight.as_ref().is_some_and(|(_, h)| h.is_finished()) {
+                finish(rt, &mut in_flight, &mut sum)?;
+            }
             // one field ahead: the next claim runs while this one is searched
             if cfg.repeat {
                 ahead = Some(rt.spawn(api.claim()));
-            }
-            // a submission refused meanwhile stops the run before more work
-            if in_flight.as_ref().is_some_and(|(_, h)| h.is_finished()) {
-                finish(rt, &mut in_flight, &mut sum)?;
             }
             let q = coord.quantum();
             let t0 = (v_start - coord.start()) / q;
