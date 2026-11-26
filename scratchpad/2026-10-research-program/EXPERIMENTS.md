@@ -5,6 +5,52 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## B65.1 Base 65 on an RTX 3060: the head is faster than the trunk on both runtimes; host CPU load through Vulkan more than halves the wide path's speed (thousands of small blocking reads), which matches the slow run on the RX 9070 XT; stage profile (2026-11-26 05:49–08:00 UTC, engineer, eventeo; `B65/BRIEF.md`, `B65/RESULTS.md`, `B65/runs/`, `B65/scripts/`; head `f61cf79e`, trunk `66259bb0`; 0.545 kWh)
+
+All: field 77777 after a warm-up field, sampled check off, fs per admissible n, counts equal in every run and
+equal to the RX 9070 XT's of 2026-11-25.
+
+| base 65, wide path | trunk `66259bb0` | head `f61cf79e` | head / trunk |
+|---|---|---|---|
+| CUDA | 6.98, 7.12 | 6.30, 6.44 | 0.903 |
+| Vulkan, direct SPIR-V | 7.33, 7.25 | 6.32, 6.36 | 0.869 |
+| Vulkan, WGSL | — | 6.56 | — |
+
+- **Not a regression:** the head is 10–13 % faster than the trunk through CUDA and through Vulkan. No bisection.
+- **Host load (six busy loops, every core of the FX-6300):**
+
+| path, runtime | quiet | 6 busy threads | card under load |
+|---|---|---|---|
+| base 65 wide, CUDA | 6.36 | 6.57 (+3.4 %) | 97 % busy, 162 W |
+| base 64 narrow, CUDA | 3.24 | 3.31 (+2.2 %) | 98 %, 159 W |
+| **base 65 wide, Vulkan/SPIR-V** | 6.34 | **14.62 (×2.31)** | **24 % busy, 87 W** |
+| base 64 narrow, Vulkan/SPIR-V | 3.19 | 3.34 (+4.9 %) | 92 %, 154 W |
+| base 65 wide, Vulkan, every kernel but no result reads (`MIDOUT_STOP=5`) | 6.106 | 6.108 (+0.0 %) | |
+
+  Also: 3 busy threads +2.7 %; busy threads at nice 19 still ×1.38; groups of 64 slices instead of 16 still
+  ×2.18. Quiet, the reads and the check cost 3.7 % through Vulkan and 0.6 % through CUDA.
+- **Mechanism [read in the code; the per-read wait inferred from timings, not traced]:** both drivers queue 16
+  slices, sync, read the accounts, then queue the next group. The narrow `finish_group` reads a group's small
+  buffers in one `read_async` (about 260 reads per field); the wide one calls `read_one` once per buffer (7 per
+  slice, about 29,600 per base-65 field) with the card idle. Through cubecl-wgpu every read hands off to a poll
+  thread and back; under contention that is about 4.4 ms per read (131 s per field). Through CUDA a read is a
+  copy on the calling thread. **The same pattern as the RX 9070 XT on 2026-11-25** (wide 3.02 → 4.8–4.9 fs,
+  narrow −6 to −10 %, the owner's desktop in use; time outside device waits 1.6 → 7.8 s, sync+reads 46 → 68 s):
+  the likely explanation there, not tested on that card. The code is shared by trunk and head, so what differed
+  between 11-19 and 11-25 was the host's load.
+- **Stage profile at the head, base 65 through CUDA, ms per slice (share):** tops 2.57 (10.8 %), parents 2.82
+  (11.9 %), main kernel 13.87 (58.3 %), expansion 4.40 (18.5 %), check and reads 0.15 (0.6 %); total 23.81 ms =
+  6.37 fs. Base 64 narrow: 0.38 / 0.90 / 11.22 / 2.00 / 0.12 = 14.62 ms (3.27 fs); base 64 through the wide path
+  16.14 ms (+10.4 %: parents 1.58 against 0.90, expansion 2.58 against 2.00). No stage is host-bound through
+  CUDA; tops and parents run below the card's power cap (latency-bound), the main kernel and the expansion at it.
+- **Ranked gains for base 65:** (1) batch the wide driver's reads (host code): up to 3 % quiet through Vulkan,
+  and it removes the ×1.4–2.3 loss on a loaded host → built the same day (B65.3); (2) the main kernel (58 %);
+  (3) the wide expansion to the narrow one's cost per record (about 4 %); (4) the shared depth-8 parent lists
+  ported to the wide path (about 5 %); (5) tops queued several slices at a time (up to 10 %, more on bigger
+  cards); then, for both paths, queueing the next group before reading the last.
+- Both SPIR-V binaries sometimes segfault at exit after printing their results (rc 139); not investigated.
+- eventeo off at 08:00:28, plug at 2.1 W.
+
 ## MODE.2 Independent review of the `midout` client mode and its development server: sound to build on; two findings that could let a wrong record through (a fault-test build pointed at a real server; an audit that passes a disagreeing check), seven robustness items (2026-11-26 05:48–06:00 UTC, reviewer, read-only; `MODE2/BRIEF-REVIEW.md`, `MODE2/REVIEW.md`; commits `66305ada..f61cf79e` of `dev/mo-mode`)
 
 - **Holds (checked):** claim and result cannot cross (one thread, one local claim); the stop rule on every

@@ -688,8 +688,13 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   and 12 waves [measured with the driver's compiler, offline]. Predicted 2.4–3.0 fs at base 65, from 3.02
   [judged]. **On the card on 2026-11-25 it ran at half clock (1.53 GHz, 112 W; 4.8–4.9 fs), and so did the
   wide path at base 64 in one process with the narrow path at full clock: the prediction is neither confirmed
-  nor refuted, and the cause is open** (the host's share per field was 7.8 s against 1.6 s on 2026-11-19; a
-  run of the old build against the new in one session would tell code from session). The wide expansion took 3.45 ms per slice, 1.88 of it the
+  nor refuted** (the host's share per field was 7.8 s against 1.6 s on 2026-11-19). **The likely cause, found on an
+  RTX 3060 on 2026-11-26 [measured there, inferred for the RX 9070 XT]: host CPU load.** The wide driver reads its
+  result buffers one blocking read at a time (about 29,600 per base-65 field; the narrow driver batches them, about
+  260); through Vulkan each read stalls when the CPU is contended: six busy threads make base 65 ×2.3 slower with
+  the card 24 % busy, base 64 loses 5 %, and through CUDA neither moves. The current head is 10–13 % faster than
+  the 2026-11-19 trunk on that card through both runtimes, so it is not a regression. Batching the wide reads is
+  in progress (branch `dev/mo-wide-reads`). The wide expansion took 3.45 ms per slice, 1.88 of it the
   prefilter's arithmetic [measured by ablation]; two records per lane in one loop and the digit test as one
   mask brought it to 2.0–2.3 ms [measured, RTX 3080].
 - **Bases 66–70: partly.** Base 68 was exact on two slices before the paths were merged (2.13 fs on a 20 GB card)

@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-26 06:20 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-26 08:20 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
@@ -91,11 +91,16 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
   and its known levers (a top hierarchy that tests about a fifth of today's 13.4 million top prefixes per
   slice, the shared bottom lists that base 64 already has, the prefilter's arithmetic) become the main
   optimisation work, developed on eventeo.
-- **What I need from you, when convenient: one hour of demoux.** On 2026-11-25 base 65 ran there at 4.8–4.9 fs
-  with the card at half clock, against 3.02 fs on 11-19 with an older build. Today's run on eventeo will say
-  whether the code changed for the worse through Vulkan on an NVIDIA card; if it did not, only your card can
-  say why it was slow, and every later gain has to be confirmed there anyway. One window of an hour would
-  cover the old build against the new and the first of the levers.
+- **Why your card ran base 65 slowly on 2026-11-25, as far as eventeo can tell** (`EXPERIMENTS.md` B65.1,
+  `B65/RESULTS.md`): not a regression (on the RTX 3060 the current branch is 10–13 % faster than the older
+  build, through CUDA and through Vulkan). What reproduces it is a busy host CPU: through Vulkan, six busy
+  threads make base 65 2.3 times slower with the card a quarter busy, while base 64 loses 5 %. Cause: the
+  base-65 path collects its results in about 29,600 small blocking reads per field, each of which stalls when
+  the CPU is contended; the base-64 path batches them. Your desktop was in use that day. The fix (batching the
+  reads) is being built today on the branch `dev/mo-wide-reads`.
+- **What I need from you, when convenient: one hour of demoux**, to confirm on the card itself that the fixed
+  build holds base 65 near 3 fs while the desktop is in use, and to measure the next levers there. Until then
+  the base-65 numbers I report are from the RTX 3060.
 - **A decision for later, not now: which base is handed out first.** At today's speeds the two bases tie in
   expected yield per day; with any gain on base 65's path it goes ahead of base 64. The server proposal now
   carries this as a small question (`G2/PROPOSAL-B.md` §9, item 8: a rank per base instead of the base number).
