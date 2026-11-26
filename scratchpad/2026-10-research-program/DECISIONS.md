@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-26 03:40 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-26 06:20 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
@@ -77,19 +77,30 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
   change, about 150 lines, one pull request.
 - **If you do not answer:** nothing is built.
 
-## 4. Forty-five minutes more of demoux, some time (not urgent)
+## 4. Base 65 matters more than I said: an hour of demoux for it, and which base goes first
 
-- **Why:** base 65 gave no result in the window. The wide kernel (bases 65 and up) ran at 4.8–4.9 fs per
-  number with the card at half clock (1.53 GHz, 112 W); on 2026-11-19 an earlier build ran 3.02 fs at
-  3.08 GHz. Either the changes since then (which gained 10 % on an RTX 3080) hurt this card, or it was the
-  session (your desktop was in use, and the host's share of each field was five times what it was on 11-19).
-  One run of the old build against the new one settles which, and a bisection names the commit if it is the
-  code.
-- **What it does not affect:** base 64 (a different kernel, measured and exact). Base 65 is months away.
-- **I tried to do it inside the lease** after the main window had cleaned up; the session's tooling refused
-  the set-up, nothing ran, and I did not work around it.
-- **If you do not answer:** I do not use the machine. The item stays in `LEDGER.md` (W65) until a card is
-  available; a rented card cannot answer it (it is specific to this card and driver).
+- **What changed (2026-11-26, `EXPERIMENTS.md` YIELD.1, table in `YIELD/yield.txt`):** I priced each base by
+  expected nice numbers per unit of search work under the new join. Base 65 has about the same amount of work
+  as base 64 (only one residue class in 64 can hold a nice number there) and 2.7 times its expected count.
+  The base after it, 68, costs 12 times more per unit of probability, so **bases 64 and 65 are the whole
+  realistic horizon, and base 65 is 73 % of it, in probability and in machine time** (about 150 days of your
+  RX 9070 XT at the speed measured on 2026-11-19, against 56 for base 64). I had been calling base 65 "months
+  away, not urgent". That was wrong: a gain on base 65's kernel path is worth 2.7 times the same gain at
+  base 64.
+- **What I am doing about it:** the path that base 65 uses (the "wide" kernels) is profiled on eventeo today,
+  and its known levers (a top hierarchy that tests about a fifth of today's 13.4 million top prefixes per
+  slice, the shared bottom lists that base 64 already has, the prefilter's arithmetic) become the main
+  optimisation work, developed on eventeo.
+- **What I need from you, when convenient: one hour of demoux.** On 2026-11-25 base 65 ran there at 4.8–4.9 fs
+  with the card at half clock, against 3.02 fs on 11-19 with an older build. Today's run on eventeo will say
+  whether the code changed for the worse through Vulkan on an NVIDIA card; if it did not, only your card can
+  say why it was slow, and every later gain has to be confirmed there anyway. One window of an hour would
+  cover the old build against the new and the first of the levers.
+- **A decision for later, not now: which base is handed out first.** At today's speeds the two bases tie in
+  expected yield per day; with any gain on base 65's path it goes ahead of base 64. The server proposal now
+  carries this as a small question (`G2/PROPOSAL-B.md` §9, item 8: a rank per base instead of the base number).
+- **If you do not answer:** I develop on eventeo, do not use demoux, and report base 65's numbers from the
+  RTX 3060 only (which says what CUDA does, not what your card does).
 
 ## What happens next if you say nothing
 

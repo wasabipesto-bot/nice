@@ -1,0 +1,39 @@
+diff --git a/common/src/midout/cpu.rs b/common/src/midout/cpu.rs
+index 97adc9bd..8124d746 100644
+--- a/common/src/midout/cpu.rs
++++ b/common/src/midout/cpu.rs
+@@ -408,11 +408,15 @@ fn bot_children<M: Mask>(
+ ///
+ /// # Panics
+ /// If `f` panics.
++pub static DIAG_SPAWNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
++pub static DIAG_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+ fn par_map<T: Send>(threads: usize, n: usize, f: impl Fn(usize) -> T + Sync) -> Vec<T> {
+     if threads <= 1 || n <= 1 {
+         return (0..n).map(f).collect();
+     }
+     let next = std::sync::atomic::AtomicUsize::new(0);
++    DIAG_SPAWNS.fetch_add(threads.min(n), Ordering::Relaxed);
++    DIAG_CALLS.fetch_add(1, Ordering::Relaxed);
+     let parts: Vec<Vec<(usize, T)>> = std::thread::scope(|s| {
+         let hs: Vec<_> = (0..threads.min(n))
+             .map(|_| {
+@@ -1180,8 +1184,10 @@ mod tests {
+             let sh = Shape { f0, k };
+             let nq = (coord.v_end() - coord.start()) / coord.quantum();
+             let mut total = 0u64;
++            let (mut nslices, t0) = (0u64, std::time::Instant::now());
+             for t in 0..nq {
+                 for pip in sh.slices_of(&coord, t) {
++                    nslices += 1;
+                     let mut one = Vec::new();
+                     let c1 = slice_join::<u64>(&base, sh, pip, |d, n, p| {
+                         one.push((d, n, p));
+@@ -1203,6 +1209,7 @@ mod tests {
+                 }
+             }
+             assert!(total > 0, "b{b}: no survivors to compare");
++            eprintln!("DIAG b{b} nq {nq} slices {nslices} survivors {total} par_map calls {} threads spawned {} elapsed {:?}", DIAG_CALLS.load(Ordering::Relaxed), DIAG_SPAWNS.load(Ordering::Relaxed), t0.elapsed());
+         }
+     }
+ 

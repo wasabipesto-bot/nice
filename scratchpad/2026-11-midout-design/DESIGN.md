@@ -623,6 +623,17 @@ and it) in the same session.
 | RTX 3080 240 W, b64, a day later | 1.769 fs against 1.807 fs for `c2152084` (−2.1 %: device time equal; the threaded check no longer makes the host wait on this box) | | | 2026-11-20, same session | counts equal | `G2/build9w/raw/` |
 | RX 9070 XT, b65 | **3.12 fs** (two fields incl. warm-up; 3.02 the warm one) | none | | 2026-11-19 14:16; wide path untuned for this card (since fitted to it offline, not re-run: predicted 2.4–3.0 fs [judged]) | b40 and b65 slices at 64 lanes | `…/window_1119/w_65.log` |
 
+**What the numbers mean for the choice of base** [judged from measured rates and the uniform odds model; table
+in `~/projects/nice/scratchpad/2026-10-research-program/YIELD/yield.txt`, 2026-11-26]. Base 65 has about the same
+admissible work as base 64 (4.34e21 against 4.80e21 n: only one residue class in 64 can hold a nice number) and
+2.7 times its expected count of nice numbers (3.3e-4 against 1.2e-4), so three times the yield per admissible
+n. It runs on the wide path at about three times the time per admissible n on the RX 9070 XT (twice on an RTX
+3080), so today the two bases tie in yield per day there, and **base 65 is about 73 % of both the probability
+still within reach and the remaining machine time** (about 150 days of the RX 9070 XT against 56). Base 68 is
+12 times worse than base 64 and nothing after it is within reach. Consequences: the wide path is where a gain
+is worth most; on CUDA cards base 65 is already the better buy (×1.5 per card-day), so a fleet of NVIDIA cards
+would best take base 65 while the RX 9070 XT takes either.
+
 How the baselines were measured: on the 3080, production's client against a local stub, the same ten 1e17 fields
 three times in one day (6.615 fs each time, to 0.1 s). On the RX 9070 XT, production's join throughput harness:
 the ten-field mean of 2026-11-18 (4.707 fs, from `7e0113fc`) scaled by two bracket fields measured in the same

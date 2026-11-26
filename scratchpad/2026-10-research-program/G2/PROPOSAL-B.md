@@ -323,6 +323,15 @@ it exposed thirteen points §3 leaves open (`G2/MODE-NOTES.md` §6 has all of th
    a 503 for ever? Recommend yes under `--repeat` (an unattended card should survive a server restart).
    *Default: as the other modes.*
 
+8. **Which base is handed out first** (added 2026-11-26). §3's claim orders by `base_id, id`, so base 64 would
+   be finished before base 65 starts. Base 65 has about the same amount of work as base 64 and 2.7 times its
+   expected count of nice numbers (`YIELD/yield.txt`; EXPERIMENTS YIELD.1), so the order should be a choice, not
+   the base number. Recommend a small `rank` column on `midout_bases` that the claim orders by (two bases may
+   share a rank and then alternate by field id), and an optional `?base=N` on the claim so that a machine can
+   ask for the base it is relatively best at (CUDA cards run base 65 at twice their base-64 time per number, the
+   RX 9070 XT at three times: the NVIDIA fleet is the better home for base 65). *Default: order by base number,
+   no preference parameter.*
+
 The other six (order of the checks, the request-size limit, whether telemetry is required, counters as JSON
 numbers, an endpoint to give a claim back, a reason with the 204) need no answer to proceed; the notes say what
 is built.

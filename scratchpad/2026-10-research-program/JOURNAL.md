@@ -4,6 +4,46 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-26 (cycle 17 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $24.67 invoiced (cap now $10, so no rental this
+  month); credit $40.13. #276, #277, #278 open, mergeable, 25 checks pass each, no comments. Upstream main
+  fdbe07d3 unchanged; no release; no notes in `DECISIONS.md`. The user's messages of 02:25 and 03:50 UTC
+  (machines, budget, hours) were applied before the cycle (entry below). No day missed.
+- **A correction of my own framing (YIELD.1, `YIELD/yield.py`).** Expected nice numbers per unit of search
+  work, by base, under the middle-out join: base 64 needs 4.80e21 admissible n for 1.22e-4; **base 65 needs
+  4.34e21 for 3.32e-4 (one residue class in 64): three times base 64's yield per admissible n**; base 68 is 12
+  times worse than base 64 and everything after it is out of reach. At today's speeds on the RX 9070 XT
+  (1.0 fs at base 64, 3.0 at base 65) the two bases tie per day, base 64 takes about 56 days and base 65 about
+  150. **So base 65 is 73 % of the probability still within reach and 73 % of the remaining machine time: it
+  is the long pole, and the wide path (the less tuned one, with an unexplained slow run on the RX 9070 XT) is
+  where a gain is worth most.** I had filed base 65 as "months away, not urgent". The price rule in the
+  routine ("base 64 … is the long pole") is out of date.
+- **Plan, with kill criteria:**
+  - **B65.1, base 65 at home** (`B65/BRIEF.md`, Opus, eventeo's RTX 3060, to 10:00 UTC): head against trunk
+    through CUDA and through Vulkan (direct SPIR-V, the AMD card's compiler) at base 65, a bisection if the head
+    is slower through Vulkan, and a stage profile at today's head. **Kill for the reproduction: head and trunk
+    within 10 % on both runtimes → the AMD card's slow run is specific to that card or session and only it can
+    answer.**
+  - **B65.2, the structure at base 65** (me, on paper and with exact counts): 13.4M top prefixes per slice
+    against 2.1M at base 64 for the same admissible n; is there a cut of base 65 (which digits a slice fixes,
+    which side carries the extra leading digits) with a lower forced cost? **Kill: no variant under ×0.85 of
+    today's counted work per admissible n → closed.**
+  - **Branch for the final package** (`MODE2/BRIEF-FIX.md`, Opus, mayalaran and the fork's CI, to 10:00): the
+    three tests that fail on 32-bit and emulated targets (the aarch64 kill diagnosed, not skipped); the Metal
+    refusal replaced by a warning now that the M4 passed; the real client on the M4.
+  - **Independent review of the client mode** (`MODE2/BRIEF-REVIEW.md`, Opus, read-only, to 08:30).
+
+- **06:00 UTC: the review of the client mode is back** (MODE.2): sound to build on; A1, A2 and seven robustness
+  items, all passed to the fix engineer at once.
+- **06:50 UTC, interim:** on eventeo's RTX 3060 base 65 runs at 6.3–6.4 fs at the head and 7.0–7.3 at the trunk,
+  **through CUDA and through Vulkan (direct SPIR-V) alike: the head is 10–13 % faster on both, so the slow run on
+  the RX 9070 XT is not a regression in the code**; six busy host threads cost 3 % through CUDA (Vulkan cells
+  asked for). The fix engineer has the CI failures diagnosed (the emulators keep every guest thread's memory
+  and one test started 231,506 threads), the Metal refusal replaced by a warning, three fields through the real
+  client on the M4 with a clean audit, and the review's findings fixed; the hour-long CI matrix is running. A
+  reminder at 10:15 UTC finishes the report if the hand-backs do not.
+
 ## 2026-11-26 (before the cycle: the user's message at about 02:25 UTC)
 
 - **The user (verbatim, the parts that change the rails):** "You now have primary lease on mayalaran and eventeo.

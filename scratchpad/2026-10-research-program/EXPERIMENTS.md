@@ -5,6 +5,58 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## MODE.2 Independent review of the `midout` client mode and its development server: sound to build on; two findings that could let a wrong record through (a fault-test build pointed at a real server; an audit that passes a disagreeing check), seven robustness items (2026-11-26 05:48–06:00 UTC, reviewer, read-only; `MODE2/BRIEF-REVIEW.md`, `MODE2/REVIEW.md`; commits `66305ada..f61cf79e` of `dev/mo-mode`)
+
+- **Holds (checked):** claim and result cannot cross (one thread, one local claim); the stop rule on every
+  returning path; a retry resends identical bytes; no non-200 is treated as success; big integers exact; the
+  claim is checked before work; the development server's eight checks in the proposal's order and no
+  acknowledgement before the record is fsynced; its coordinate arithmetic equals the Rust; the other modes are
+  unchanged.
+- **Rank A:** (A1) with the refusal of the production address gone, a `midout-fault` build with the `sample`
+  fault could submit a field with dropped survivors to any server that serves the endpoint (the sampled check
+  sees one slice in 4,096); fix: fault builds refuse a non-loopback address. (A2) `midout_audit.py` exits OK
+  when a check disagrees with its canon and lists only the canons' nice numbers; fix: a disagreement is a
+  problem, and every accepted submission's numbers are listed.
+- **Rank B:** a panic on the loop's own thread drops the submission in flight (B1); **`--gpu-backend auto` tries
+  CUDA only and panics on a machine without it, so the README's command would die on the RX 9070 XT and the M4
+  (B2)**; an 8.5-minute server outage stops every client and loses each one's last searched field (B3); a reply
+  lost mid-body is not retried (B4); SIGTERM drops the submission in flight (B5); the development server
+  counts telemetry bytes more strictly than the client (B6); two sources of flaky end-to-end tests (B7).
+- **Not covered by any test:** the panic hook, a claim refused mid-run, a change of base, submit retries
+  running out.
+- All findings went to the engineer fixing the branch the same hour (`MODE2/FIX-NOTES.md` when done).
+
+## YIELD.1 Expected nice numbers per unit of search work by base, under the middle-out join: base 65 is three times the buy base 64 is, and after it nothing is within reach (2026-11-26, the director; `YIELD/yield.py`, `yield.txt`)
+
+Uniform model (as `CX/ecount.py`: E_b = N_b · b!/b^b; the residue filter moves candidates between classes, not
+the total), exact ranges, R_b = residues mod b − 1 that a nice number can have, work = admissible n =
+N_b · R_b/(b − 1).
+
+| base | R/(b−1) | n in range | admissible n | E(nice) | E per admissible n (b64 = 1) | days at 1.0 fs | days at 3.0 fs |
+|---|---|---|---|---|---|---|---|
+| 62 | 2/61 | 9.54e21 | 3.13e20 | 2.24e-4 | 28 | 4 | 11 |
+| 64 | 8/63 | 3.78e22 | 4.80e21 | 1.22e-4 | 1 | 56 | 167 |
+| **65** | **1/64** | 2.78e23 | 4.34e21 | **3.32e-4** | **3.01** | 50 | 151 |
+| 68 | 2/67 | 2.77e24 | 8.26e22 | 1.68e-4 | 0.08 | 956 | 2,869 |
+| 69 | 2/68 | 6.84e24 | 2.01e23 | 1.54e-4 | 0.03 | 2,330 | 6,989 |
+| 70 | 4/69 | 5.14e25 | 2.98e24 | 4.29e-4 | 0.006 | 34,464 | — |
+
+(Bases 63 and 67 have no admissible residue; 61 and 66 have no range.)
+
+- **Base 65 has the same admissible work as base 64 and 2.7 times its expected count**: its range is 7.4 times
+  larger but only one residue class in 64 is admissible (x²(x + 1) ≡ 32 mod 64 has the single root x = 31).
+- At measured speeds on the RX 9070 XT (base 64 0.99–1.06 fs; base 65 3.02 fs on 2026-11-19) the two bases
+  tie in yield per day (2.1e-6 and 2.2e-6), and base 65 takes 150 days against 56: **73 % of the reachable
+  probability (4.5e-4 in all, before the measured ×0.7–0.85 correction of BX.2) and 73 % of the remaining time
+  are base 65.** A given ratio gained on the wide path is worth 2.7 times the same ratio on the narrow path.
+- After base 65 the next base costs 12 times more per unit of probability (base 68: 2.6 card-years of the
+  RX 9070 XT at 1 fs, which the wide path does not reach). **The search's realistic horizon under this join is
+  bases 64 and 65.**
+- What it changes: the wide path (4,713 lines, fewer rounds of tuning: no parent sharing, a costlier prefilter,
+  13.4M top prefixes per slice against 2.1M) is where optimisation is worth most; the slow run of 2026-11-25
+  on the RX 9070 XT (LEDGER W65) matters; the order of the two bases is free today and tips to base 65 first
+  with any gain on the wide path.
+
 ## OWN.1 First session on the two machines now under primary lease: the middle-out join is exact on an RTX 3060, a GTX 1060 3 GB and an Apple M4 (its first run on Metal); ×4.1 and ×3.9 against production's join; the real `midout` client searched real base-64 fields (2026-11-26 02:29–03:35 UTC, the director; `EVENTEO/` and `MAYALARAN/` (scripts, `runs/`, logs); `dev/mo-mode` f61cf79e built on each machine)
 
 The user, 2026-11-26: "You now have primary lease on mayalaran and eventeo." eventeo is an FX-6300 with an
