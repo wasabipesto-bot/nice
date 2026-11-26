@@ -125,7 +125,7 @@ middle-out kernels to the lint's dump is left open (§5).
 
 | run | head | result |
 |---|---|---|
-| matrix 45777405453 | `4fff25e7` | ARM_RESULT |
+| matrix 45777405453 | `4fff25e7` | **success, all 16 jobs** (Release skipped): Linux x86-64/musl/i686/aarch64/aarch64-musl/armv7/arm-musl/riscv64, FreeBSD, Windows ×2, macOS ×2, CUDA host code, Format and clippy, Test workspace; finished 09:04 UTC |
 | GPU Device Parity 45777409152 | `4fff25e7` | success: lavapipe (Linux) and Metal (macOS runner) |
 | matrix 45766057560 | `f61694b0` (part 1 + Metal only) | everything success except armv7 and arm-musl, which I cancelled at 77 min (still in their tests) so the next head's run could start; by then armv7 had passed `b65_padded` and `threaded_slice_join_equals_single_threaded` (40 s), aarch64 had passed the whole lib (242 passed, the threaded test 7 s), i686 passed |
 | matrix 45769103003 | `74591fd8` | i686 failed (tokio's signal driver, B5 note) and macOS ×2 failed (two e2e servers not ready in 10 s, B7 note); fixed in `a194aa9f`, `4fff25e7`; cancelled for the final head |

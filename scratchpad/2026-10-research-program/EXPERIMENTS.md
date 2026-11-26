@@ -5,6 +5,37 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## MODE.3 The client-mode branch through the whole CI matrix; Metal as a warning and the real client on the M4; the review's findings fixed (2026-11-26 05:50–09:04 UTC, engineer, mayalaran and the fork's CI; `MODE2/BRIEF-FIX.md`, `MODE2/FIX-NOTES.md`, `MODE2/qemu-probe/`, `MODE2/m4-runs/`; fork `dev/mo-mode` f61cf79e → 4fff25e7, 21 commits)
+
+- **CI:** the fork's full matrix on 4fff25e7 passes all 16 jobs (run 45777405453: i686, armv7, arm-musl, aarch64,
+  both macOS jobs among them) and the device-parity run passes on lavapipe and Metal (45777409152).
+  - `coord::tests::b65_padded` sampled with a `usize` step that does not fit 32 bits: now u128.
+  - The ordinary-claim refusal is tested as a plain function (no socket); the 404 test keeps its socket and
+    skips, with the reason, where the 32-bit container refuses `bind`.
+  - **The kills under emulation (aarch64, armv7, arm-musl): qemu-user keeps the memory of every guest thread
+    that ever ran** (229 KiB per thread on the aarch64 image, 665 KiB on armv7, measured with a probe in the CI's
+    own images), and `cpu::tests::threaded_slice_join_equals_single_threaded` started 231,506 threads (2.3 s and
+    9 MB natively, about 53 GB under emulation). Not a library defect. The test now runs 4 slices per base;
+    the every-slice form moved to the card tier.
+- **Metal:** the refusal is a warning at start (checked on an M4 under macOS 27.2 through WGSL; other Apple
+  GPUs, older macOS and CubeCL's MSL compiler not checked; the per-field sampled check stays on). **A gap found
+  on the way: the project's WGSL lint for the Apple division defect does not dump the middle-out kernels**
+  (they were linted once by hand on 2026-11-19); read by eye today, none has the miscompiled form; adding them
+  to the lint's dump is open.
+- **The real client on the M4:** plain `nice_client midout --api-base http://127.0.0.1:8471 --repeat` (the
+  macOS GPU feature set) fell back from CUDA to Metal and searched three base-64 fields in 235.4, 236.9 and
+  234.6 s; all `canon`; audit exit 0. A SIGTERM during a submission in flight: the client finished it
+  (`already_recorded`) and exited within 1 s; audit clean.
+- **Review findings (MODE.2):** A1, A2, B1–B7, C1–C4, C6 fixed, one commit each with a test or an M4 run
+  (table in the notes §4). Submissions are retried for an hour (the claim's lifetime); claims keep
+  `--api-max-retries`. Open: C5 (a question for the proposal), a disagreement count in the development
+  server's `/status`, the refusal of a software renderer (it arrives with upstream #277).
+- Two regressions of the fixes themselves, caught by the matrix and fixed: tokio's signal support broke the
+  client tests on i686 (now a small flag-setting handler); two end-to-end tests timed out on the macOS runners
+  waiting for the development server (it no longer does a reverse DNS lookup at start).
+- Noted, not changed: clippy on macOS fails in `common/src/cpu_join.rs` (existing code on a path only
+  aarch64-apple compiles; CI's lint runs on Linux).
+
 ## B65.1 Base 65 on an RTX 3060: the head is faster than the trunk on both runtimes; host CPU load through Vulkan more than halves the wide path's speed (thousands of small blocking reads), which matches the slow run on the RX 9070 XT; stage profile (2026-11-26 05:49–08:00 UTC, engineer, eventeo; `B65/BRIEF.md`, `B65/RESULTS.md`, `B65/runs/`, `B65/scripts/`; head `f61cf79e`, trunk `66259bb0`; 0.545 kWh)
 
 All: field 77777 after a warm-up field, sampled check off, fs per admissible n, counts equal in every run and
