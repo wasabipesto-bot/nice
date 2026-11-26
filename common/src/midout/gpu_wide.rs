@@ -3390,7 +3390,32 @@ impl<R: Runtime> WideJoin<R> {
         if self.stop != 6 {
             return Ok(WCounts::default());
         }
-        let v = self.rd(cnt)?;
+        // every small buffer of the group in one read (in this order: cnt; per ticket scount, ran, its tstat, stat,
+        // est, its slice's acc and l5n)
+        let mut hs = vec![cnt.clone()];
+        for t in tickets {
+            hs.extend([t.scount.clone(), t.ran.clone()]);
+            if let Some(ts) = &t.tstat {
+                hs.push(ts.clone());
+            }
+            hs.extend([t.stat.clone(), t.est.clone()]);
+            if let Some(h) = &t.head {
+                hs.push(h.acc.clone());
+                if let Some(l) = &h.l5n {
+                    hs.push(l.clone());
+                }
+            }
+        }
+        let nh = hs.len();
+        let mut rv = cubecl::future::block_on(self.client.read_async(hs))
+            .map_err(|e| anyhow!("read: {e:?}"))?
+            .into_iter()
+            .map(|b| u32::from_bytes(&b).to_vec());
+        let mut next = || {
+            rv.next()
+                .ok_or_else(|| anyhow!("middle-out wide: {nh} buffers read, fewer returned"))
+        };
+        let v = next()?;
         ensure!(
             v[C_ERR_PLANE] == 0
                 && v[C_ERR_PMAX] == 0
@@ -3422,14 +3447,15 @@ impl<R: Runtime> WideJoin<R> {
         let mut clipped = 0u64;
         // per ticket: (parents listed, its slice's tops if first, survivors in range)
         let mut per: Vec<(u32, Option<u32>, u64)> = Vec::with_capacity(tickets.len());
+        let mut accs = Vec::new();
         for t in tickets {
-            let n = self.rd(&t.scount)?[0];
+            let n = next()?[0];
             ensure!(
                 n <= self.scap,
                 "middle-out wide: survivor list overflow {n} > {}",
                 self.scap
             );
-            let ran = self.rd(&t.ran)?;
+            let ran = next()?;
             let want_sum = (u64::from(n) * u64::from(n.saturating_sub(1)) / 2 % (1 << 32)) as u32;
             ensure!(
                 ran[0] == n && ran[1] == want_sum,
@@ -3438,8 +3464,8 @@ impl<R: Runtime> WideJoin<R> {
                 ran[1]
             );
             let mut ntops = None;
-            if let Some(ts) = &t.tstat {
-                let s = self.rd(ts)?;
+            if t.tstat.is_some() {
+                let s = next()?;
                 ensure!(
                     s[0] <= self.caps.tops,
                     "middle-out wide: {} tops > cap {}",
@@ -3455,7 +3481,13 @@ impl<R: Runtime> WideJoin<R> {
                 dc.tops += u64::from(s[0]);
                 ntops = Some(s[0]);
             }
-            let st = self.rd(&t.stat)?;
+            let st = next()?;
+            let es = next()?;
+            if let Some(h) = &t.head {
+                let a = next()?;
+                let l = if h.l5n.is_some() { Some(next()?) } else { None };
+                accs.push((a, l));
+            }
             ensure!(
                 st[0] <= self.caps.parents,
                 "middle-out wide: {} parents > cap {}",
@@ -3469,7 +3501,6 @@ impl<R: Runtime> WideJoin<R> {
                 self.nslab_cap
             );
             // the expansion ran: every cube to its end, every used slab walked
-            let es = self.rd(&t.est)?;
             ensure!(
                 es[0] == EXPAND_CUBES && es[1] == st[1].min(self.nslab_cap),
                 "middle-out wide: expansion ran {} of {EXPAND_CUBES} cubes, walked {} of {} slabs",
@@ -3492,6 +3523,7 @@ impl<R: Runtime> WideJoin<R> {
         dc.survivors -= clipped;
         // per slice: its tickets are consecutive, the first carries its head
         let mut heads = 0u64;
+        let mut accs = accs.into_iter();
         let mut i = 0;
         while i < tickets.len() {
             let head = tickets[i]
@@ -3506,9 +3538,11 @@ impl<R: Runtime> WideJoin<R> {
             let ntops = per[i].1.ok_or_else(|| {
                 anyhow!("middle-out wide: slice {} without a top count", head.pip)
             })?;
-            let a = self.rd(&head.acc)?;
-            let l5 = match &head.l5n {
-                Some(h) => self.rd(h)?,
+            let (a, l5) = accs
+                .next()
+                .ok_or_else(|| anyhow!("middle-out wide: {nh} buffers read, fewer returned"))?;
+            let l5 = match l5 {
+                Some(l) => l,
                 None => bail!(
                     "middle-out wide: slice {} without its top-hierarchy count",
                     head.pip
