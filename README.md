@@ -243,7 +243,7 @@ The `gpu` umbrella feature needs nothing installed to build on any platform, sin
 | `cubecl-spirv` (opt-in build) | Vulkan devices, via the `cubecl` backend | nothing on Linux/Windows; on macOS the Vulkan SDK, with `VULKAN_SDK` set | same as `cubecl` |
 | `cubecl-hip` (opt-in build) | AMD via ROCm | ROCm (`hipconfig` on `PATH`) | ROCm |
 
-The `midout` mode runs only on the `cubecl` and `cubecl-cuda` backends (it has no CPU form and refuses the others) and only against a server that offers middle-out fields (`GET /claim/midout`, `POST /submit/midout`). For development, `scripts/midout_coordinator.py` serves them on one machine from a work list made by the `midout_fields` example; the `midout_bench` and `midout_wide_bench` examples of `nice_common` (feature `midout-bench`) time the search without any server.
+The `midout` mode runs only on the `cubecl` and `cubecl-cuda` backends (it has no CPU form and refuses the others) and only against a server that offers middle-out fields (`GET /claim/midout`, `POST /submit/midout`). On an Apple Metal device it runs with a warning at start: the join has been checked there only on an Apple M4 under macOS 27.2 (older macOS releases miscompiled some divisions by a constant in GPU kernels), and every field is still checked on a sampled slice against the CPU. For development, `scripts/midout_coordinator.py` serves them on one machine from a work list made by the `midout_fields` example; the `midout_bench` and `midout_wide_bench` examples of `nice_common` (feature `midout-bench`) time the search without any server.
 
 ## Why are you writing this from scratch for like the tenth time
 

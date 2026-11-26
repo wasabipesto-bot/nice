@@ -111,10 +111,11 @@ fn options_that_do_not_apply_are_refused() {
     }
 }
 
-/// Apple Metal devices are told apart by the names the client's device
-/// contexts give them; Vulkan, DX12, CUDA and HIP devices are not refused.
+/// Apple Metal devices (which get the warning at start, and run) are told
+/// apart by the names the client's device contexts give them; Vulkan, DX12,
+/// CUDA and HIP devices get no warning.
 #[test]
-fn metal_devices_are_refused() {
+fn metal_devices_are_told_apart() {
     for metal in [
         "Apple M4 (Metal, wgpu<wgsl>)",
         "Apple Paravirtual device (Metal, wgpu<wgsl>)",
@@ -130,6 +131,10 @@ fn metal_devices_are_refused() {
         "AMD Radeon RX 7900 XTX",
     ] {
         assert!(!is_metal(other), "{other}");
+    }
+    // the warning says what was checked, on what, and that the sampled check stays on
+    for part in ["Apple M4", "macOS 27.2", "26.7.2", "sampled slice"] {
+        assert!(METAL_WARNING.contains(part), "{part}");
     }
 }
 

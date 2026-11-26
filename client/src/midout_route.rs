@@ -20,10 +20,13 @@
 //! "nothing claimable" (204) ends the run with success. With it, 204 waits
 //! and asks again ([`Idle`]).
 //!
+//! On an Apple Metal device the mode runs and logs one warning at start
+//! ([`METAL_WARNING`]): the join has been checked on an Apple M4 under macOS
+//! 27.2 (the device tests and whole base-64 fields); older macOS releases
+//! miscompiled some divisions by a constant in GPU kernels.
+//!
 //! Guards (each refuses with a reason and a non-zero exit, and submits
 //! nothing for the field at hand):
-//! - an Apple Metal device is refused: the join has never been checked on
-//!   one;
 //! - a claim must name a middle-out coordinate this build knows
 //!   (`"coordinate": "midout:K0,K1,Q0"`, one of the base's known
 //!   coordinates, `Coord::is_known`), of a base with a device path, whole
@@ -541,10 +544,18 @@ pub fn field_in(coord: &Coord, c: &CoordClaim) -> Result<(Coord, u128, u128)> {
 /// Whether a device, by the name `CubeclContext::device_name` gives it, is
 /// an Apple Metal device: a wgpu adapter on the Metal graphics API (the name
 /// ends in `(Metal, <compiler>)`), or `CubeCL`'s own Metal compiler
-/// (`wgpu<msl>`). The middle-out kernels have never run on one.
+/// (`wgpu<msl>`). Such a device gets [`METAL_WARNING`] at start.
 fn is_metal(device: &str) -> bool {
     device.contains("(Metal, ") || device.contains("wgpu<msl>")
 }
+
+/// What has and has not been checked on Apple Metal, logged once at start
+/// on such a device (after its name).
+const METAL_WARNING: &str = "the middle-out join has been checked on Apple Metal only on an Apple M4 under \
+macOS 27.2, through WGSL (the device tests and whole base-64 fields); other Apple GPUs, macOS releases and \
+CubeCL's MSL compiler (cubecl-metal) have not been checked. Older macOS releases miscompiled some divisions by a constant in GPU kernels (fixed by 26.7.2 and \
+27.2): keep macOS up to date. Every field is still checked on a sampled slice against the CPU before it is \
+submitted.";
 
 /// The test switch (`midout-fault` builds only): `NICE_MIDOUT_FAULT` =
 /// `accounts` | `sample` (library fault bits) | `panic` (a thread of this
@@ -595,9 +606,7 @@ fn run_blocking(o: &Options) -> Result<()> {
     let device = ctx.device_name();
     no_panic_so_far()?;
     if is_metal(&device) {
-        bail!(
-            "middle-out: the join has never been checked on an Apple Metal device ({device}), so this mode refuses it"
-        );
+        warn!("middle-out on an Apple Metal device ({device}): {METAL_WARNING}");
     }
     info!(
         "Nice Client v{CLIENT_VERSION} started in midout mode: API {}, device {device}",
