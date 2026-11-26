@@ -910,7 +910,8 @@ impl Server {
             base: String::new(),
             dir,
         };
-        for _ in 0..200 {
+        // up to 60 s: four servers start at once, and a hosted runner can be slow
+        for _ in 0..1200 {
             let log = std::fs::read_to_string(s.dir.join("server.log")).unwrap_or_default();
             if let Some(port) = log
                 .lines()

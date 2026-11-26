@@ -54,7 +54,7 @@ submissions has been recorded (a lost reply: the client must resubmit and get "a
 usage: midout_coordinator.py --worklist W.json --state DIR [--port 8470] [--claim-duration S] [--coordinate ID]
                              [--legacy-path] [--drop-replies N]
 """
-import argparse, fcntl, json, os, re, sys, threading, time
+import argparse, fcntl, json, os, re, socketserver, sys, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlsplit
 
@@ -571,7 +571,15 @@ class H(BaseHTTPRequestHandler):
         self._send(200, {"submission_id": sid, "status": status})
 
 
-server = ThreadingHTTPServer(("127.0.0.1", a.port), H)
+class Server(ThreadingHTTPServer):
+    def server_bind(self):
+        # HTTPServer.server_bind also looks the address up (socket.getfqdn), which can take seconds on some
+        # machines; the name is only used in CGI environments
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
+server = Server(("127.0.0.1", a.port), H)
 # the port bound (the one asked for, or the system's choice under --port 0), once the socket listens
 sys.stderr.write("coordinator: listening on 127.0.0.1:%d\n" % server.server_address[1])
 sys.stderr.flush()
