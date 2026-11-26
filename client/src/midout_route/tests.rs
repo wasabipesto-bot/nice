@@ -111,6 +111,55 @@ fn options_that_do_not_apply_are_refused() {
     }
 }
 
+/// The addresses a `midout-fault` build may talk to: this machine only.
+#[test]
+fn loopback_bases() {
+    for yes in [
+        "http://127.0.0.1:8080",
+        "http://127.0.0.1",
+        "https://localhost:9/",
+        "http://LOCALHOST:1234/api",
+        "http://127.1.2.3:5",
+        "http://[::1]:8080/",
+        "http://[::1]",
+    ] {
+        assert!(is_loopback_base(yes), "{yes}");
+    }
+    for no in [
+        "https://api.nicenumbers.net",
+        "http://127.0.0.1.example.com:80",
+        "http://localhost.example.com",
+        "http://user@127.0.0.1:80@example.com",
+        "http://10.0.0.1:8080",
+        "http://[::2]:80",
+        "http://[::1]x",
+        "127.0.0.1:8080",
+        "ftp://127.0.0.1",
+        "",
+    ] {
+        assert!(!is_loopback_base(no), "{no}");
+    }
+}
+
+/// A `midout-fault` build refuses every server that is not on this machine,
+/// before any device or request; an ordinary build does not.
+#[test]
+fn fault_builds_talk_only_to_this_machine() {
+    let far = parse(&["midout", "--api-base", "https://api.nicenumbers.net"]).unwrap();
+    let r = Options::from_cli(&far, false, false);
+    if cfg!(feature = "midout-fault") {
+        let e = r.unwrap_err().to_string();
+        assert!(
+            e.contains("test build") && e.contains("nicenumbers.net"),
+            "{e}"
+        );
+    } else {
+        assert!(r.is_ok());
+    }
+    let near = parse(&["midout", "--api-base", NOWHERE]).unwrap();
+    assert!(Options::from_cli(&near, false, false).is_ok());
+}
+
 /// Apple Metal devices (which get the warning at start, and run) are told
 /// apart by the names the client's device contexts give them; Vulkan, DX12,
 /// CUDA and HIP devices get no warning.

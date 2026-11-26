@@ -27,6 +27,9 @@
 //!
 //! Guards (each refuses with a reason and a non-zero exit, and submits
 //! nothing for the field at hand):
+//! - a test build (feature `midout-fault`, which can break its own search
+//!   on purpose) refuses any `--api-base` not on this machine
+//!   ([`is_loopback_base`]);
 //! - a claim must name a middle-out coordinate this build knows
 //!   (`"coordinate": "midout:K0,K1,Q0"`, one of the base's known
 //!   coordinates, `Coord::is_known`), of a base with a device path, whole
@@ -119,6 +122,13 @@ impl Options {
                 "midout: --gpu-backend {name} has no middle-out path (use auto, cubecl or cubecl-cuda)"
             );
         }
+        if cfg!(feature = "midout-fault") && !is_loopback_base(&cli.api_base) {
+            bail!(
+                "midout: this is a test build (feature midout-fault), which can break its own search on purpose: \
+                 it talks only to a server on this machine (127.0.0.1, ::1 or localhost), not {}",
+                cli.api_base
+            );
+        }
         if prefetch_set {
             warn!(
                 "midout: --prefetch-* options are ignored: the midout mode holds exactly one field ahead"
@@ -135,6 +145,35 @@ impl Options {
             gpu_wgpu_device: cli.gpu_wgpu_device.clone(),
         })
     }
+}
+
+/// Whether an API base address names this machine: its host is
+/// `localhost` or a loopback address (`127.0.0.0/8`, `::1`). A `midout-fault`
+/// build talks to nothing else.
+#[must_use]
+pub fn is_loopback_base(api_base: &str) -> bool {
+    let Some((scheme, rest)) = api_base.split_once("://") else {
+        return false;
+    };
+    if !matches!(scheme.to_ascii_lowercase().as_str(), "http" | "https") {
+        return false;
+    }
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    if authority.contains('@') {
+        return false;
+    }
+    let host = if let Some(v6) = authority.strip_prefix('[') {
+        match v6.split_once(']') {
+            Some((h, tail)) if tail.is_empty() || tail.starts_with(':') => h,
+            _ => return false,
+        }
+    } else {
+        authority.split(':').next().unwrap_or("")
+    };
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
 }
 
 /// The refusal of a build without a `CubeCL` backend.
