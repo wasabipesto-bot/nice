@@ -849,7 +849,9 @@ fn a_server_without_the_endpoint_is_one_clear_error() {
     let rt = runtime();
     // the development server answers 404 to every path but its own; a 404 on the claim path is what a server
     // without the endpoint answers
-    // (some emulated CI targets have no loopback sockets: bind answers ENOSYS there)
+    // the point here is the real HTTP path (a 404 through `HttpApi` stops the loop); the status's sentence alone is
+    // `wire::claim_answer`'s test, which needs no socket. Some CI targets (i686, a 32-bit binary in cross's container)
+    // have no loopback sockets: bind answers ENOSYS there, and this test skips.
     let l = match std::net::TcpListener::bind("127.0.0.1:0") {
         Ok(l) => l,
         Err(e) => {

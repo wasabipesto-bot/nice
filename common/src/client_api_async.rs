@@ -123,15 +123,19 @@ pub async fn get_field_from_server_async(
                 .bytes()
                 .await
                 .context("Failed to read server response")?;
-            // A field of a coordinate space (the middle-out route's) is not a
-            // range of n: no route that claims here may search it.
-            crate::midout::wire::refuse_coordinate_space(&body)?;
-            serde_json::from_slice::<DataToClient>(&body)
-                .context("Failed to deserialize server response")
+            field_of_claim_body(&body)
         },
         max_retries,
     )
     .await
+}
+
+/// The field of an ordinary claim's answer (both modes). A field of a
+/// coordinate space (the middle-out route's) is not a range of n: no route
+/// that claims here may search it, so it is refused.
+fn field_of_claim_body(body: &[u8]) -> Result<DataToClient> {
+    crate::midout::wire::refuse_coordinate_space(body)?;
+    serde_json::from_slice::<DataToClient>(body).context("Failed to deserialize server response")
 }
 
 /// Async version: Submit field results to the server. Returns an error if there is a problem.
@@ -264,42 +268,19 @@ pub async fn submit_midout_async(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{Read, Write};
 
-    /// Serve `body` once on a loopback port (HTTP/1.1, 200); returns the address.
-    fn serve_once(body: &'static str) -> String {
-        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = format!("http://{}", l.local_addr().unwrap());
-        std::thread::spawn(move || {
-            let (mut s, _) = l.accept().unwrap();
-            let mut buf = [0u8; 4096];
-            let _ = s.read(&mut buf);
-            let r = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                body.len()
-            );
-            s.write_all(r.as_bytes()).unwrap();
-        });
-        addr
-    }
-
-    /// The ordinary claim (every route but the middle-out one) refuses a field
-    /// marked as a coordinate space, in both modes, and still takes a plain one.
-    #[tokio::test]
-    async fn ordinary_claims_refuse_a_coordinate_field() {
-        let client = Client::new();
-        let marked = r#"{"claim_id":7,"base":64,"range_start":37778931862957161709568,"range_end":37779075978145237565440,"range_size":144115188075855872,"coordinate":"midout"}"#;
-        for mode in [SearchMode::Niceonly, SearchMode::Detailed] {
-            let e = get_field_from_server_async(&client, &mode, &serve_once(marked), 1)
-                .await
-                .expect_err("a coordinate field must be refused");
-            assert!(e.to_string().contains("coordinate"), "{e}");
-        }
+    /// The ordinary claim (every route but the middle-out one; both modes read
+    /// the answer with [`field_of_claim_body`]) refuses a field marked as a
+    /// coordinate space, and still takes a plain one. No socket is needed: the
+    /// refusal is in how the answer is read, not in the request.
+    #[test]
+    fn ordinary_claims_refuse_a_coordinate_field() {
+        let marked = br#"{"claim_id":7,"base":64,"range_start":37778931862957161709568,"range_end":37779075978145237565440,"range_size":144115188075855872,"coordinate":"midout"}"#;
+        let e = field_of_claim_body(marked).expect_err("a coordinate field must be refused");
+        assert!(e.to_string().contains("coordinate"), "{e}");
         let plain =
-            r#"{"claim_id":8,"base":40,"range_start":100,"range_end":200,"range_size":100}"#;
-        let d = get_field_from_server_async(&client, &SearchMode::Niceonly, &serve_once(plain), 1)
-            .await
-            .unwrap();
+            br#"{"claim_id":8,"base":40,"range_start":100,"range_end":200,"range_size":100}"#;
+        let d = field_of_claim_body(plain).unwrap();
         assert_eq!((d.claim_id, d.base, d.range_size), (8, 40, 100));
     }
 }
