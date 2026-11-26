@@ -44,6 +44,20 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   client on the M4 with a clean audit, and the review's findings fixed; the hour-long CI matrix is running. A
   reminder at 10:15 UTC finishes the report if the hand-backs do not.
 
+- **08:00 UTC: B65.1 is back** (EXPERIMENTS): not a regression; through Vulkan a busy host makes the wide path
+  ×2.3 slower (29,600 blocking reads per field), the narrow path 5 %; stage profile at the head. **B65.3
+  commissioned at 08:10** (`B65/BRIEF-READS.md`, the same engineer, to 11:30 UTC): the narrow path's batched read
+  ported to the wide `finish_group` on `dev/mo-wide-reads`; kill criterion: still more than 30 % lost under six
+  busy threads through Vulkan. B65.2 closed on paper (the top hierarchy is already in the wide path; the shape
+  was settled by the bases study).
+- **Report sent about 08:20 UTC** (`REPORTS/2026-11-26.md`); the branch's CI matrix (three emulated arm jobs)
+  and B65.3 follow as short notes. The 10:15 reminder stays as the fallback.
+- **For the cycle of 11-27:** merge `dev/mo-wide-reads` into `dev/mo-mode` if exact and effective; next base-65
+  levers on eventeo in this order: parent sharing ported to the wide path, the expansion's cost per record,
+  tops queued several slices at a time, then queueing a group ahead of the reads for both paths; the
+  middle-out kernels into the WGSL lint's dump (the lint does not cover them today); DESIGN.md and the map to
+  the new head; #277's refusal of a software renderer into the midout mode once #277 is on main.
+
 ## 2026-11-26 (before the cycle: the user's message at about 02:25 UTC)
 
 - **The user (verbatim, the parts that change the rails):** "You now have primary lease on mayalaran and eventeo.

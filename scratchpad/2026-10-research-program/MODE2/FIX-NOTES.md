@@ -120,3 +120,27 @@ middle-out kernels to the lint's dump is left open (§5).
 - `par_map` starting threads per call (§1) left as is.
 
 ## 6. Final head and CI
+
+**Final head `4fff25e7`** (`dev/mo-mode` on the fork; 21 commits on `f61cf79e`, listed by `git log f61cf79e..4fff25e7`).
+
+| run | head | result |
+|---|---|---|
+| matrix 45777405453 | `4fff25e7` | ARM_RESULT |
+| GPU Device Parity 45777409152 | `4fff25e7` | success: lavapipe (Linux) and Metal (macOS runner) |
+| matrix 45766057560 | `f61694b0` (part 1 + Metal only) | everything success except armv7 and arm-musl, which I cancelled at 77 min (still in their tests) so the next head's run could start; by then armv7 had passed `b65_padded` and `threaded_slice_join_equals_single_threaded` (40 s), aarch64 had passed the whole lib (242 passed, the threaded test 7 s), i686 passed |
+| matrix 45769103003 | `74591fd8` | i686 failed (tokio's signal driver, B5 note) and macOS ×2 failed (two e2e servers not ready in 10 s, B7 note); fixed in `a194aa9f`, `4fff25e7`; cancelled for the final head |
+
+The arm jobs are slow on this branch: upstream main's armv7/arm-musl jobs take 72/84 min; here the lib tests alone
+reached the middle-out tests only after ~70 min under qemu-arm (the slowest tests under emulation are the existing
+`cpu_join` ones, e.g. `the_skip_walk_finds_every_top_on_production_fields` 746 s on qemu-aarch64; the middle-out ones
+add ~2 min there).
+
+Locally (mayalaran, at `4fff25e7`): `cargo fmt --check`; `nice_client` tests default and `cubecl,midout-fault`
+(46 passed each, the e2e tests against the real dev server included); `cargo clippy --no-deps -p nice_client
+--all-targets -D warnings` default and `cubecl,midout-fault,cubecl-cuda`. `nice_common` lib tests (default) passed there at the
+tree of `f61694b0`; at the final head they are CI's ("Test workspace (native Linux-x86_64)" passed). The CI "Format and clippy" job (= `just lint`) passed at every
+pushed head.
+
+Left on machines: mayalaran `~/claude/{src,t,bin,runs,xfer,scripts}` (worktrees `src/{diag,fixtest,fixhead}`, binaries
+`bin/fix-gpu`, `bin/fix-head`; nothing outside `~/claude`, no process left running); ivory: the two cross images and
+the two rustup targets used for the probe were removed.
