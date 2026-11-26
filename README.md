@@ -33,7 +33,7 @@ docker run -it --init ghcr.io/wasabipesto/nice_client:3
 # Run forever
 ./nice_client --repeat
 
-# Search middle-out fields (base 64 and up): a GPU binary on a GPU, and a server that offers middle-out fields
+# Search middle-out fields (bases 64 and 65): a GPU binary on a GPU, and a server that offers middle-out fields
 ./nice_client midout --repeat
 
 # The docker image supports these options too!
@@ -76,7 +76,7 @@ Arguments:
           Possible values:
           - detailed: Get detailed stats on all numbers, important for long-term analytics
           - niceonly: Implements optimizations to speed up the search by many orders of magnitude. Does not keep statistics and cannot be quickly verified
-          - midout:   Search middle-out fields (base 64 and up) on a GPU. Needs a server that offers middle-out fields and a build with a `CubeCL` backend
+          - midout:   Search middle-out fields (bases 64 and 65) on a GPU. Needs a server that offers middle-out fields and a build with a `CubeCL` backend
 
           [env: NICE_MODE=]
           [default: detailed]

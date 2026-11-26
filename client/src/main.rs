@@ -243,7 +243,7 @@ pub enum ClientMode {
     /// Implements optimizations to speed up the search by many orders of magnitude.
     /// Does not keep statistics and cannot be quickly verified.
     Niceonly,
-    /// Search middle-out fields (base 64 and up) on a GPU. Needs a server that
+    /// Search middle-out fields (bases 64 and 65) on a GPU. Needs a server that
     /// offers middle-out fields and a build with a `CubeCL` backend.
     Midout,
 }
