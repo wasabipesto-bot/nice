@@ -1742,7 +1742,9 @@ async fn main() -> Result<()> {
         &matches,
         &["prefetch_seconds", "prefetch_max", "prefetch_concurrency"],
     );
-    let threads_set = user_set(&matches, &["threads"]);
+    // `--threads 0` (every CPU) is a fleet-wide default, not a choice for the
+    // midout mode's sampled check: there it counts as not given
+    let threads_set = user_set(&matches, &["threads"]) && !threads_resolved;
     let cli = Arc::new(cli);
 
     // Set up logger. The default filter quiets the wgpu stack's adapter and
