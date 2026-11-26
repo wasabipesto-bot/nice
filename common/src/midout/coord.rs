@@ -542,9 +542,11 @@ mod tests {
             }
             // the first and last quantum, where the padding is: their v that are n
             for t in [0, nq - 1] {
-                let vs = c.start + t * q;
-                let n_in = (vs..vs + q)
-                    .step_by(usize::try_from(q / 4099).unwrap())
+                // every (q / 4099)-th v, in u128: the step does not fit a 32-bit usize
+                let (vs, step) = (c.start + t * q, q / 4099);
+                let n_in = (0u128..)
+                    .map(|i| vs + i * step)
+                    .take_while(|&v| v < vs + q)
                     .filter_map(|v| c.n_of_v(v));
                 for n in n_in {
                     assert_eq!((n / c.pw(q0)) % c.pw(k1 - q0), t);
