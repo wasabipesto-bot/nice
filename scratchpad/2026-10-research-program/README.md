@@ -67,6 +67,23 @@ Never without asking: live fleet (config, crontab, `~/fleet-run`), server, schem
 data corrections, deploys, merges, upstream `main`, destructive git, spend above the
 cap, rentals below the credit floor, the user's machines.
 
+## Machines the program may use (the user, 2026-11-26)
+
+"You now have primary lease on mayalaran and eventeo." Details and gotchas: memory entries
+`reference_eventeo_host.md`, `reference_user_test_machines.md`; on eventeo itself `~/SYSTEM_STATE.md` (keep it
+current: a section edit and a dated changelog line after any change of state).
+
+| machine | what | access | rules |
+|---|---|---|---|
+| **eventeo** | FX-6300 (6 old cores, no AVX2), 16 GB, **RTX 3060 12 GB (nvidia-smi index 1) + GTX 1060 3 GB (index 0)**, CUDA 12.4 on driver 550; Vulkan on the NVIDIA cards does not work there (wgpu lands on llvmpipe) | `ssh claude@eventeo` (our own user, no sudo); **off by default**: `~/.local/bin/wake-eventeo` on ivory (about 45 s), `systemctl poweroff` when done | primary lease: boot and shut down whenever needed; everything under `/home/claude` (research root `~/research`: `scripts/env.sh`, `build_mo.sh`, `run_mo.sh`; binaries by tag in `bin/`, runs in `runs/`); always `CUDA_DEVICE_ORDER=PCI_BUS_ID` and pick the card with `CUDA_VISIBLE_DEVICES`; wall power from the smart plug in Prometheus (`hassio_sensor_power_w{entity="sensor.0x282c02bfffec51b1_power"}`); **power it off after every job unless the owner is logged in**; after an AC power cut WoL does not work (tell the user) |
+| **mayalaran** | Apple M4, 10 cores, 16 GB, macOS 27.2, Metal through wgpu; Rust 1.100.0 present | `ssh justin@mayalaran` (the owner's account) | primary lease since it no longer runs a client: use whenever needed; **write only inside `~/claude`** (created 2026-11-26 with a README; `scripts/env.sh` redirects cargo's registry there); no services, launch agents or cron |
+| **demoux** | RX 9070 XT (RADV), the production client's machine | `ssh justin@demoux` | **unchanged: ask for a window each time**; used only for what was asked; once the cleanup is done the lease is over |
+| ivory | this machine: 4 cores, the state of record | local | builds at `nice -n 19 -j 2`; prefer eventeo or mayalaran for builds and device tests now |
+| Vast | rented cards | `vast.py create` only; **cap $10 a month since 2026-11-26** (was $30) | for what the owned machines cannot do: a card with more than 12 GB, a fast card for absolute numbers, several boxes at once |
+
+Never contact the production API from any of them in tests: every script sources an `env.sh` that sets
+`NICE_API_BASE` to a closed local port, and passes `--api-base` explicitly as well.
+
 ## Where the search runs (2026-11-11, EXPERIMENTS T2.1)
 
 demoux (the user's RX 9070 XT, wgpu on Vulkan, built from main) does ≈ 81 % of the nice-only

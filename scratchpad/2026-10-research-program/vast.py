@@ -28,8 +28,8 @@ import argparse, csv, datetime as dt, json, os, subprocess, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 LEDGER = os.path.join(HERE, "vast-ledger.csv")
 PREFIX = "nice-research-"
-CAP_USD = 30.0
-RESERVE_USD = 5.0          # untouchable in the last 7 days of the month
+CAP_USD = 10.0             # lowered from 30 on 2026-11-26: eventeo and mayalaran carry the card work now
+RESERVE_USD = 2.0          # untouchable in the last 7 days of the month (5 while the cap was 30)
 CREDIT_FLOOR = 10.0        # protects the fleet, which shares the account
 DEFAULT_TTL_H = 2.0
 GRACE_MIN = 15

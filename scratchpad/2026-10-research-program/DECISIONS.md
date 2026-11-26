@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-25 08:30 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-26 03:40 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
@@ -11,7 +11,8 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
 - **The middle-out join** (the redesigned nice-only GPU join): built, cleaned, exact on your RX 9070 XT at the
   cleaned head, and measured there on 2026-11-25 at ×4.5 against v3.4.8's join at base 64 (×4.7 by the
   protocol of 11-19, when it was ×4.8; it runs 6–10 % slower while the desktop is in use, which production's
-  join does not). ×4.1 on an RTX 3080. Branch `dev/mo-clean` on the fork. **No pull request from it until you
+  join does not). ×4.1 on an RTX 3080 and on your RTX 3060; ×3.9 on the M4 through Metal, where it ran for
+  the first time on 2026-11-26 and is exact. Branch `dev/mo-clean` on the fork. **No pull request from it until you
   have gone through the design** (`../2026-11-midout-design/DESIGN.md`).
 - **Your direction for it (2026-11-25):** a `midout` mode beside `detailed` and `niceonly`, visible in `--help`,
   with a new claim endpoint and its own table on the server; the field definition not locked in yet. **The
@@ -21,8 +22,9 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
   (a `--gpu` client that finds only a software renderer), #278 (the CI check for the SPIR-V atomic-store trap).
 - **demoux:** the window of 2026-11-25 ended at 05:53 UTC, well inside the lease; nothing of mine is on the
   machine (`G2/WINDOW3-RESULTS.md`, cleanup proof at the end).
-- **Rented machines:** $30 a month, unchanged; about $0.33 is left for November under the wrapper's last-week
-  reserve, so until 12-01 builds run on ivory at low priority or in the fork's CI.
+- **Machines (your message of 2026-11-26):** eventeo and mayalaran are set up and in use (`README.md`,
+  "Machines"); eventeo is powered off after every job. The rented-card cap in the wrapper is $10 a month from
+  2026-11-26; demoux is still asked for each time.
 
 ## 1. The server side of the `midout` mode: a proposal to approve or correct
 

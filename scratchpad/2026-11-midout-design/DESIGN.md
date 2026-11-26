@@ -88,7 +88,9 @@ fitted to that card offline (12 waves instead of 8).
 **The cleaned head (`66305ada`) on the RX 9070 XT, 2026-11-25** [measured]: exact at 64 lanes in every test, all
 counts equal to 2026-11-19's; base 64 **×4.51** on the median of five rounds (×4.33–4.78; the first two rounds,
 the protocol of 11-19, ×4.71), with the maintainer's desktop in use and the branch 6–10 % slower in the later
-rounds while production's join did not move. Base 65 gave no result there: the wide path ran the card at half
+rounds while production's join did not move. **On 2026-11-26 it ran on three more devices, exact on each:
+RTX 3060 3.23 fs (×4.1), GTX 1060 3 GB 8.77 fs, Apple M4 through Metal 12.9 fs (×3.9), and the real `midout`
+client searched six real fields on the RTX 3060 against the development server.** Base 65 gave no result on the RX 9070 XT: the wide path ran the card at half
 clock (4.8–4.9 fs at 1.53 GHz and 112 W); whether that is the code since 11-19 or the session is open (§9).
 (*fs per admissible n*: card time divided by the n whose residue mod b − 1 is one of the base's possible
 residues for a nice number; 8 of 63 at base 64.) §8 has the table and the conditions.
@@ -610,6 +612,9 @@ and it) in the same session.
 | RX 9070 XT, b64, client route | 0.992 fs (12 fields, median 18.16 s each) | | | same session; local coordinator | 7 fields equal the bench's counts | `…/window_1119/route/` |
 | RX 9070 XT, b64, cleaned head | **1.063 fs** (five rounds of five fields: 1.030, 1.004, 1.107, 1.063, 1.099) | 4.794 fs (four bracket fields) | **×4.51** (×4.33–4.78; rounds 1–2 alone ×4.71) | 2026-11-25 03:56–05:52; head `66305ada`, RADV 64 lanes, 2.85–2.93 GHz, 299–303 W (production 3.10–3.13 GHz, 304 W); the desktop in use (load about 3), rounds 3–5 6–10 % slower at the same clock | 7 slices n for n with and without shared lists, parent-sharing test, narrow and wide fault tests, wide b40 and b65, whole field 77777 under (4, 8, 5) and (4, 9, 6) with the sampled check; every count equal to 2026-11-19's | `G2/window_1125/`, `G2/WINDOW3-RESULTS.md` |
 | RX 9070 XT, b65, cleaned head | 4.78–4.89 fs, **off the operating point** (1.53 GHz, 112 W): not a result | none | | 2026-11-25 04:16; the same command as 2026-11-19; time outside device waits 7.8 s per field against 1.6 s then | counts equal 2026-11-19's; the sampled check equal and never waited for | `G2/window_1125/out/w65_*.log` |
+| RTX 3060 (CUDA), b64 | **3.231 fs** (10 warm fields, 3.206–3.239) | 13.33 fs [two bracket fields, 254.45 s and 287.37 s, scaled by the RX 9070 XT's base mean] | **×4.12** | 2026-11-26 02:47–03:26; head `f61cf79e` (`dev/mo-mode`), an FX-6300 host with five host threads; card 98 % busy, 157 W | the whole card tier on CUDA; counts equal the other devices'; six fields through the real `midout` client with a clean audit | `…/2026-10-research-program/EVENTEO/runs/r1-3060/` |
+| GTX 1060 3 GB (CUDA), b64 | 8.774 fs (one field) | not measured | | 2026-11-26; the same head; fits in 3 GB | the field's sampled check equal; counts equal | `…/EVENTEO/runs/r1-1060/` |
+| Apple M4 (Metal), b64 | **12.94 fs** (one warm field) | 50.2 fs [one bracket field, 968.92 s, scaled] | **×3.88** | 2026-11-26 02:38–03:05; the same head; macOS 27.2, W 32 | the same six test groups as on CUDA, all pass | `…/MAYALARAN/runs/` |
 | RTX 3080 240 W, b64 | **1.619 fs** | 6.615 fs | **×4.09** | 2026-11-19 09:20–09:42; trunk with parent sharing; ten fields at 0.05–0.95 of the base; sampled check on | counts equal with and without sharing, field for field; every sampled slice equal | `G2/build5l/raw/m2/` |
 | RTX 3080 240 W, b64, cleanup | head `5a048669` 1.6269 against trunk `66259bb0` 1.6242 (+0.17 %) | | | 2026-11-19 13:58–14:44; four alternating runs each | survivors, checked equal in all eight runs; 80 of 80 sampled checks | `G2/build6c/raw/ten_head`, `ten2_head` |
 | RTX 3080 240 W, b65 | **3.468 fs** (×2.17 of b64's 1.600 in the same session) | none (production has no join above 64) | | 2026-11-19 10:21–10:33; five warm fields; sampled check off | slices n for n against the CPU reference incl. both range ends; whole small bases against brute force | `G2/build5l/raw/m4/` |
@@ -647,7 +652,12 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
 
 ## 9. What is not done, or not known
 
-- **Metal: never run.** The kernels pass production's Apple-miscompile lint (one site found and fixed); the
+- **Metal: run on a real Apple M4 on 2026-11-26, and exact** (macOS 27.2, `Apple M4 (Metal, wgpu<wgsl>)`, plane
+  width 32): the lavapipe tier, two base-64 slices n for n, the fault tests, parent sharing, wide parity at
+  bases 40 and 65 all pass; whole fields at 12.94 fs per admissible n, about ×3.9 against production's join on
+  the same machine [measured; the ratio from one bracket field]. **The client still refuses a Metal device by
+  name; that refusal can now be reconsidered.** Not run: older macOS versions (the Metal compiler defect of
+  2026 was fixed in the OS; the kernels avoid its pattern by the lint). Before that run the position was: the kernels pass production's Apple-miscompile lint (one site found and fixed); the
   paravirtual device on CI hangs above about 1 GiB of footprint and the join allocates several hundred MB with 4
   classes per batch; CI's 30-minute macOS job would gain about 2.5 minutes per step. Since 2026-11-19 evening the
   client route refuses a Metal device by its name (`is_metal`, `client/src/midout_route.rs:198`, unit-tested on

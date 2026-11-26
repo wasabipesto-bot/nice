@@ -4,6 +4,35 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-26 (before the cycle: the user's message at about 02:25 UTC)
+
+- **The user (verbatim, the parts that change the rails):** "You now have primary lease on mayalaran and eventeo.
+  Mayalaran is no longer running a client 24/7 … I am giving you access to utilize it whenever necessary. You may
+  create a new folder within the home directory for persistence. Eventeo is an older server I got running again
+  today … Idle power draw is high so it is off by default, use the provided scripts to manage the WOL process. It
+  has two GPUs which you can use at your leisure for development and tests. I do not plan to utilize them for a
+  24/7 client for now, but that may change in the future. If it does, it will likely be a service under the
+  claude user you manage and can stop or resume yourself. For now you have primary lease on that box as well and
+  can boot or shutdown whenever you need it, and you can persist whatever you need inside your claude home
+  directory. I may have times where I log in to use a machine between your autonomous runs but they should not
+  affect your usage, I will notify you if I think something will impact you." And on money: "I expect this will
+  probably allow me to reduce the vast budget for research down from $30/mo to $10/mo, let me know if you agree
+  or if you would still argue for the sustained budget."
+- **Done 02:29–03:35 UTC (OWN.1):** eventeo woken over the LAN (42 s), explored (its `~/SYSTEM_STATE.md` is
+  thorough; another session set the box up), `~/research` created there, `~/claude` on mayalaran; the
+  middle-out branch built on both; exact on the RTX 3060, the GTX 1060 3 GB and the M4 (first Metal run);
+  ×4.12 and ×3.88 against production's join; six real fields through `nice_client midout` on the 3060 with a
+  clean audit; wall power read from the smart plug; shutdown and a second wake tested; `just` installed on
+  eventeo; its state document updated. README has a "Machines" section; memory entries updated.
+- **Decided by me inside what the user said:** the rented-card cap in `vast.py` is $10 from today (reserve $2
+  in the last week); I agreed with the reduction and said what rentals remain for. demoux stays ask-first.
+- **Rules I set for myself on the owned machines:** eventeo is on only while a job runs and every job ends
+  with `off_if_idle.sh` (never powers off while the owner is logged in); nothing outside `/home/claude` there
+  and nothing outside `~/claude` on mayalaran; every script sources an `env.sh` with a closed-port API address.
+- **For the cycle:** the Metal refusal in the client can be lifted now (decide and do on the branch); the CI
+  matrix fixes can be built and linted on eventeo or mayalaran instead of ivory; base 65's question still
+  needs demoux.
+
 ## 2026-11-25 (cycle 16 of the new director; the user's answers at 03:41 UTC, the routine at 05:42 UTC)
 
 - **The user answered every open decision** (notes in the decisions document, kept as

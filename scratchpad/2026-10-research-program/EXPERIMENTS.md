@@ -5,6 +5,44 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## OWN.1 First session on the two machines now under primary lease: the middle-out join is exact on an RTX 3060, a GTX 1060 3 GB and an Apple M4 (its first run on Metal); ×4.1 and ×3.9 against production's join; the real `midout` client searched real base-64 fields (2026-11-26 02:29–03:35 UTC, the director; `EVENTEO/` and `MAYALARAN/` (scripts, `runs/`, logs); `dev/mo-mode` f61cf79e built on each machine)
+
+The user, 2026-11-26: "You now have primary lease on mayalaran and eventeo." eventeo is an FX-6300 with an
+RTX 3060 12 GB and a GTX 1060 3 GB (CUDA 12.4, driver 550), kept off and woken over the LAN; mayalaran is the
+Apple M4. Both were set up for the program today (`README.md`, "Machines").
+
+| machine, device | exactness | middle-out, base 64, warm | production's join (v3.4.8 code in the same test binary) | ratio |
+|---|---|---|---|---|
+| eventeo, **RTX 3060** (CUDA, W 32) | tier (b) 8 tests; two slices n for n; faults; parent sharing; wide b40 and b65; wide faults: **all pass** | **3.231 fs** per admissible n (10 warm fields in two rounds, 3.206–3.239; 3.222 without the sampled check); card 98 % busy, 157 W, 1,828 MHz | bracket fields 254.45 s and 287.37 s (×2.801 and ×2.862 of the RX 9070 XT's 90.83 s and 100.41 s) → base 13.33 fs [scaled from the 9070 XT's base mean 4.707 fs] | **×4.12** |
+| eventeo, **GTX 1060 3 GB** (CUDA) | one whole field with the sampled check: equal | 8.774 fs (one field, 160.6 s); fits in 3 GB | not measured | — |
+| mayalaran, **Apple M4** (Metal through wgpu, WGSL, W 32) | the same six test groups: **all pass** (the join's first run on Apple hardware) | **12.94 fs** (one warm field after a warm-up, 236.9 s) | bracket field 968.92 s (×10.667) → base 50.2 fs [one field, scaled] | **×3.88** |
+
+- Counts are identical across the three devices and equal the RX 9070 XT's of 2026-11-25 (field 77777:
+  48,216,914,309 survivors, 1,384,731,444 checked; production's two fields 2,760,283,689,784 / 168,384,458,372
+  and 3,092,989,872,066 / 191,683,594,021).
+- **The real client mode on a card (the item open since MODE.1):** `nice_client midout --api-base
+  http://127.0.0.1:8471 --repeat` on the RTX 3060 against `scripts/midout_coordinator.py`, six base-64 fields:
+  6 claimed, 6 accepted as canon, none refused, `midout_audit.py` "every field of the work list searched, one
+  canon each", 366 s in all (61 s a field against 59 s in the bench: the HTTP does not hold the card).
+- The sampled CPU check never made the host wait, even on the FX-6300 (0.25–0.5 s host wait per field; a
+  slice's CPU thread 9.2 s on that machine).
+- **Builds:** eventeo cold 225 s (test binary with the card tier), 318 s (the three examples, LTO), 378 s (the
+  client); mayalaran 76 s and 96 s. Both replace rented build boxes for this work.
+- **Wall power on eventeo's smart plug** (Prometheus, averaged over whole runs): production's join 250–265 W,
+  the middle-out join 272–278 W (five host threads), the GTX 1060 alone 217 W; standby 2 W; the hour's work
+  0.21 kWh ($0.04). The figure in eventeo's cost table (187 W for the 3060 on nice-only) is a benchmark average;
+  **a sustained base-64 client would draw about 265 W: $0.047 an hour, 1.17× the buy model's hurdle, not 0.83×.**
+- **Operations checked:** wake over the LAN from ivory twice (ssh up after 42 s both times); shutdown through a
+  guarded helper (`off_if_idle.sh`: stays up if the owner is logged in or anything runs), ssh gone in 4 s, plug
+  at standby within 30 s; the network card stayed armed after my shutdown (second wake).
+- **Not working on eventeo:** Vulkan on the NVIDIA cards. Traced without root (cuda-gdb catchpoints): the
+  driver's entry point returns NULL before it opens any `/dev/nvidia*` node; libraries load. Needs `strace`
+  and `vulkan-tools` at least (asked, optional).
+- **What this changes:** (1) the Metal question of the design document is answered on real hardware, so the
+  client's refusal of Metal can be reconsidered; (2) base-64 numbers now exist for four device families
+  (RDNA4 ×4.5–4.8, Ampere ×4.1 twice, Apple ×3.9, Pascal runs); (3) card work no longer needs a rental unless
+  it needs more than 12 GB, a faster card, or several boxes at once.
+
 ## MODE.1 The `midout` client mode against the proposed endpoints: built, end to end against a development server; no real field through it on a card yet (2026-11-25 06:00–08:18 UTC, engineer, ivory and the fork's CI; `G2/MODE-BRIEF.md`, `G2/MODE-NOTES.md`, `G2/mode/`; fork branch `dev/mo-mode` f61cf79e, 9 commits on `dev/mo-clean` 66305ada, 17 files, +2,974 −716)
 
 - **The mode:** `nice_client midout` in `--help` beside `detailed` and `niceonly`; the hidden
