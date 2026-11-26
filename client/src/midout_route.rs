@@ -6,7 +6,8 @@
 //!
 //! The options ([`Options::from_cli`]): `--api-base`, `--username`,
 //! `--repeat`, `--api-max-retries`, `--gpu-backend` (auto, cubecl,
-//! cubecl-cuda), `--gpu-device`, `--gpu-wgpu-device` and `--threads` (the
+//! cubecl-cuda; `auto` as in the other modes: the `CubeCL` CUDA runtime
+//! where it starts, else the wgpu device), `--gpu-device`, `--gpu-wgpu-device` and `--threads` (the
 //! sampled CPU check's threads, when given) apply; `--gpu` is implied (the join has no
 //! CPU form for a real field); `--validate` and `--benchmark*` are refused;
 //! `--prefetch-*` are ignored with a warning (the mode holds exactly one
@@ -636,7 +637,18 @@ fn run_blocking(o: &Options) -> Result<()> {
     }
     let ctx = match o.gpu_backend {
         #[cfg(feature = "cubecl-cuda")]
-        GpuBackend::Auto | GpuBackend::CubeclCuda => CubeclContext::new_cuda(o.gpu_device)?,
+        GpuBackend::CubeclCuda => cuda_context(o)?,
+        // as in the other modes: the CubeCL CUDA runtime where it starts, else the wgpu device
+        #[cfg(feature = "cubecl-cuda")]
+        GpuBackend::Auto => match cuda_context(o) {
+            Ok(ctx) => ctx,
+            Err(e) => {
+                crate::log_cuda_fallthrough("CubeCL CUDA", &e);
+                wgpu_context(o).with_context(|| {
+                    format!("middle-out: no GPU backend started (cubecl-cuda: {e:#}; cubecl)")
+                })?
+            }
+        },
         GpuBackend::Cubecl => wgpu_context(o)?,
         #[cfg(not(feature = "cubecl-cuda"))]
         GpuBackend::Auto => wgpu_context(o)?,
@@ -660,7 +672,19 @@ fn run_blocking(o: &Options) -> Result<()> {
     }
 }
 
+/// The `CubeCL` CUDA context on `--gpu-device`. A failure, also a panic while
+/// it is made (cudarc's on a machine without the NVIDIA driver), is an
+/// error, as in the other modes' setup (`guarded_init`).
+#[cfg(feature = "cubecl-cuda")]
+fn cuda_context(o: &Options) -> Result<nice_common::cubecl_backend::CubeclContext> {
+    let device = o.gpu_device;
+    crate::guarded_init("the CubeCL CUDA runtime could not be started", move || {
+        nice_common::cubecl_backend::CubeclContext::new_cuda(device)
+    })
+}
+
 /// The wgpu context (`--gpu-wgpu-device` picks its adapter, not `--gpu-device`).
+/// A failure, also a panic while it is made, is an error.
 #[cfg(feature = "cubecl")]
 fn wgpu_context(o: &Options) -> Result<nice_common::cubecl_backend::CubeclContext> {
     if o.gpu_device != 0 {
@@ -669,7 +693,10 @@ fn wgpu_context(o: &Options) -> Result<nice_common::cubecl_backend::CubeclContex
             o.gpu_device
         );
     }
-    nice_common::cubecl_backend::CubeclContext::new_default()
+    crate::guarded_init(
+        "no adapter available for the requested wgpu backend",
+        nice_common::cubecl_backend::CubeclContext::new_default,
+    )
 }
 
 /// The device path as a [`FieldSearcher`].
