@@ -4743,4 +4743,42 @@ mod tests {
             _ => panic!("unsupported runtime"),
         }
     }
+
+    /// The WGSL of every base-65 kernel for CI's Apple-division lint (`scripts/wgsl-lint.py`, beside
+    /// `cubecl_backend::tests::wgsl_dump_for_lint`); does nothing unless `CUBECL_DEBUG_LOG` is set. The client
+    /// route's join (`WideCaps::for_base(65)`, the base's coordinate and shape), 4 classes per batch, one slice's
+    /// first batch, compiled for the device's plane width and for widths 32 and 64 (the compile-only path where
+    /// the device's differs). Nothing is checked: only the batch runs, so the slice's accounts fail (and under a
+    /// forced width the plane checks too), which the output shows.
+    #[test]
+    #[ignore = "requires a wgpu device"]
+    fn wgsl_dump_for_lint() {
+        if std::env::var_os("CUBECL_DEBUG_LOG").is_none() {
+            println!("CUBECL_DEBUG_LOG is not set; no shaders to dump");
+            return;
+        }
+        let client = match crate::cubecl_backend::CubeclContext::new_default().expect("CubeCL init")
+        {
+            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => client,
+            #[allow(unreachable_patterns)]
+            _ => panic!("not a wgpu device"),
+        };
+        let coord = Coord::for_base(65).unwrap();
+        let sh = Shape::for_coord(&coord);
+        let pip = 717_171_717u64;
+        let dev_w = client.properties().hardware.plane_size_max;
+        let mut widths = vec![None];
+        widths.extend([32u32, 64].into_iter().filter(|&w| w != dev_w).map(Some));
+        for force_w in widths {
+            let mut caps = WideCaps::for_base(65);
+            caps.classes = 4;
+            let mut gj = WideJoin::with_width(client.clone(), caps, &coord, sh, force_w).unwrap();
+            gj.batches.truncate(1);
+            let r = gj
+                .rank_of(pip)
+                .and_then(|rank| gj.run_slice(pip, &rank))
+                .map(|x| x.0);
+            println!("W {} base 65 slice {pip}: {:?}", gj.w, r.err());
+        }
+    }
 }

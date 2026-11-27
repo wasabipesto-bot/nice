@@ -4878,4 +4878,52 @@ mod tests {
             },
         });
     }
+
+    /// The WGSL of every base-64 kernel for CI's Apple-division lint (`scripts/wgsl-lint.py`, beside
+    /// `cubecl_backend::tests::wgsl_dump_for_lint`); does nothing unless `CUBECL_DEBUG_LOG` is set. One slice's
+    /// first batch of 4 classes, compiled for the device's plane width and for widths 32 and 64 (the compile-only
+    /// path where the device's differs): the parents with and without the shared depth-8 list, the tops on the
+    /// device and on the host, each prefilter form, production's check. Nothing is checked: only the batch runs,
+    /// so the slice's accounts fail (and under a forced width the plane checks too), which the output shows.
+    #[test]
+    #[ignore = "requires a wgpu device"]
+    fn wgsl_dump_for_lint() {
+        if std::env::var_os("CUBECL_DEBUG_LOG").is_none() {
+            println!("CUBECL_DEBUG_LOG is not set; no shaders to dump");
+            return;
+        }
+        let client = match crate::cubecl_backend::CubeclContext::new_default().expect("CubeCL init")
+        {
+            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => client,
+            #[allow(unreachable_patterns)]
+            _ => panic!("not a wgpu device"),
+        };
+        let pip = 712_012_851u64;
+        let dev_w = client.properties().hardware.plane_size_max;
+        let mut widths = vec![None];
+        widths.extend([32u32, 64].into_iter().filter(|&w| w != dev_w).map(Some));
+        for force_w in widths {
+            for form in [PrefilterForm::Limbs24, PrefilterForm::Limbs32] {
+                let caps = Caps {
+                    prefilter: Some(form),
+                    ..Caps::b64(4)
+                };
+                let mut gj = GpuJoin::with_width(client.clone(), caps, force_w).unwrap();
+                gj.batches.truncate(1);
+                let st = slice_tops(pip, gj.roots());
+                let anc = gj.build_anc(&[(pip & 0xFF_FFFF) as u32]);
+                let dev = gj.run_slice_dev_with(pip, &st.rank, 1, false).map(|x| x.0);
+                let shared = gj.run_slice_dev_with(pip, &st.rank, 1, true).map(|x| x.0);
+                let host = gj.run_slice(&st).map(|x| x.0);
+                println!(
+                    "W {} prefilter {form:?}: anc8 {:?}, device tops {:?}, shared {:?}, host tops {:?}",
+                    gj.w,
+                    anc.err(),
+                    dev.err(),
+                    shared.err(),
+                    host.err()
+                );
+            }
+        }
+    }
 }
