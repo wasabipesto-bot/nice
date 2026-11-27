@@ -4372,6 +4372,7 @@ fn run_field_wide<R: Runtime>(
             r.push((pips[k0..done].to_vec(), g));
         }
     }
+    gj.anc.lock().expect("anc").keys.clear();
     let field = t0.elapsed().as_secs_f64();
     let mut tm = FieldTiming {
         wall: field,
