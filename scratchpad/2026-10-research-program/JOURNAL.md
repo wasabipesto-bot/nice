@@ -44,8 +44,12 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   ballot append in both paths, the lint dump for the new kernels and the merge commissioned
   (`B65/BRIEF-FIXES.md`, Opus, to 13:30 UTC; reminder at 13:45).
 - **Report sent about 09:30 UTC** (`REPORTS/2026-11-27.md`).
-- **For the cycle of 11-28:** if not done by the reminder, merge `dev/mo-wide-b65b` after reading its audit
-  table; then the wide expansion's lookups (≤ 4 %), a design note on queueing a group ahead of the reads for
+- **12:03 UTC: B65.5 back**: the review's fixes; nine appends in the two paths given per-lane counts (the narrow
+  path's four among them); cost +1.5 % from the new fault hooks, the counts under 0.2 %; CI green on f503a13c;
+  **`dev/mo-mode` fast-forwarded to f503a13c at 12:10 UTC** after I read the audit table. The 13:45 reminder
+  deleted; mayalaran's build output cleared.
+- **For the cycle of 11-28:** compile the split-fault hooks out of production kernels (gives 1.5 % back; a full
+  test round); then the wide expansion's lookups (≤ 4 %), a design note on queueing a group ahead of the reads for
   both paths (worth most on the RX 9070 XT, whose clock follows load), `ncu` counters for `wtops1` only if the
   owner enables them (`RmProfilingAdminOnly`); DESIGN.md §4 (accounts) after the hardening.
 

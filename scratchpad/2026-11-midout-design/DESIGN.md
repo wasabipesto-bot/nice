@@ -2,7 +2,7 @@
 
 *A description of what is on the branch and why, for a reader who knows the project and today's overlap join and
 has seen none of this work. Written 2026-11-19, kept current; it describes the fork branch `dev/mo-mode` at head
-`0b6e22e1` (since then only test and CI additions: the head is `c16d48e9`) (worktree `~/projects/nice/.worktrees/mo-mode`; every file:line below is at that head) and the
+`0b6e22e1` (every file:line below is at that head) and the
 measurements recorded beside it. The open decisions are not repeated here; they are in
 `~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md`, and the answers already given in `DECIDED.md`
 beside it.*
@@ -10,6 +10,16 @@ beside it.*
 *How it reaches clients (your direction of 2026-11-25): as a client mode `nice_client midout` beside `detailed`
 and `niceonly`, with its own endpoints and tables on the server. The mode is built (§6.11); the server side is a
 written proposal awaiting your yes (`…/2026-10-research-program/G2/PROPOSAL-B.md`), and no server code exists.*
+
+*Since the commit this text describes, the branch has moved to `f503a13c` (2026-11-27). What changed, with the
+evidence in `…/2026-10-research-program/EXPERIMENTS.md` (entries LINT.1, B65.4, B65.5): (1) the middle-out kernels are
+under the WGSL lint in CI; (2) on the wide path, the bottom side's parent lists are shared across a slice digit as
+on the narrow path, and the tops stage keeps a compact list: base 65 is 5–6 % faster on an RTX 3060, exact on
+CUDA, Vulkan and Metal; (3) after an independent review, **every list that a kernel appends by a subgroup ballot
+or plane scan, on both paths, now has a second count kept lane by lane, which the host compares with the list's
+own** (before, a driver that split a plane after a branch could have dropped an entry from five such lists with
+consistent counts; no driver in use is known to do that). Line numbers below are still those of `0b6e22e1`; the
+document is re-based when this series of changes to the wide path is finished.*
 
 ![overview](static/midout-overview.png)
 

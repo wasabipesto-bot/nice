@@ -5,6 +5,38 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## B65.5 Every list appended by ballot or plane scan in the middle-out kernels now has a count its lanes keep apart from the ballot; the review's fixes; base-65 gains merged (2026-11-27 09:07–12:03 UTC, engineer, eventeo, the M4, the fork's CI; `B65/BRIEF-FIXES.md`, `B65/FIXES-NOTES.md`, `B65/runs/fixes/`; fork `dev/mo-wide-b65b` f503a13c = merge 73bc0065 of `dev/mo-wide-b65` into c16d48e9 plus 7 commits; fast-forwarded into `dev/mo-mode` by me at 12:10 UTC; 0.59 kWh)
+
+- **The audit** (table in the notes): appends whose only count came from the ballot or plane scan itself:
+  wide `wtops5` (the review's finding), `wanc`, `whist`, the main kernel's slab appends, `wexpand`; **and their
+  narrow twins on base 64's path: `anc8`, `hist2`, `g2_kernel`'s slab appends, `expand_kernel`.** Each now
+  keeps a per-lane count in shared memory that the host compares with the list's own count. Already
+  independent: `wtops1` (scan of per-lane segment counts), the main kernels' child lists. Not appends: narrow
+  `tops5` (plain atomics; the review's suspicion did not hold). **Left as it was:** the main kernels' phase-2
+  ballot transposes are data, not appends; a lane lost there changes survivor sets and is covered by the
+  sampled check only.
+- **Faults:** five new ones that model a split plane (`F_T5_SPLIT`, `F_ANC_SPLIT`, `F_EXP_SPLIT`, `F_SLAB_SPLIT`,
+  and `F_DROP_PARENT` now failing on the per-lane count); for three of them the old counts would have passed.
+  Every existing fault message byte-identical on every runtime.
+- **The review's findings:** the compact list's own count read back; the shared parents against brute force n
+  for n and through the field path, clipped range ends included (empty lists made legal: base 13 has two);
+  `F_ANC_DROP`, a wrong shared list with consistent counts, caught by the sampled check's field-run comparison
+  on all three runtimes; the forced-width-64 compile path and the lint's dump cover `wanc` and the per-width
+  `wtops1`; a failed list allocation fails the field loudly.
+- **Tests on f503a13c:** all wide and narrow tests through CUDA and Vulkan/SPIR-V (RTX 3060; brute force on the
+  GTX 1060), the wide tests and brute force through Metal (M4); counts of base-65 fields 13731 and 77777 and
+  base-64 fields equal to all earlier runs. Fork CI: device parity 45979920949 (lavapipe WGSL and SPIR-V, lint
+  step 63 shaders 0 flagged, Metal) and the full matrix 45979925310 green.
+- **Cost:** +1.5 % of a field through CUDA (base 65 22.55 → 22.88 ms per slice; base 64 narrow +1.3 to 2.0 %),
+  +0.8 % through Vulkan. **The counts themselves cost under 0.2 %: the same head without the five split
+  faults' emulation code times equal to before. The 1.5 % is the fault hooks in the main kernel's slab loop.**
+  Follow-up: compile those hooks out of production kernels (a full test round on three runtimes).
+- **Two failures on the way, both loud:** two atomic stores of one value in one block (the CubeCL SPIR-V
+  merge trap again: every slice failed on lavapipe's SPIR-V run; cleared in separate blocks now); a fault that
+  never reached `wtops5` because its list is cached per group (first Metal run; `set_fault` drops the cache).
+- **Net at base 65 on the RTX 3060 against the morning's head:** CUDA 6.43 → 6.12 fs (−4.8 %), Vulkan 6.20 →
+  5.81 (−6.3 %), with the hooks' 1.5 % still to come back.
+
 ## B65.4 Base 65 on the wide path: parents shared across a slice digit (−1.1 ms per slice) and a compact tops list (−0.35 to −0.65 ms): the field 6.3 % faster through CUDA, 7.2 % through Vulkan; the tops stage is compute-bound, not launch-bound (2026-11-27 05:48–08:53 UTC, engineer, eventeo's RTX 3060; `B65/BRIEF-LEVERS.md`, `B65/LEVERS-RESULTS.md`, `B65/runs/levers/`; fork `dev/mo-wide-b65` 8f8ab3c1, 19be987c, a7ea3890 on 0b6e22e1; 0.556 kWh)
 
 | RTX 3060, base 65, field 77777, two alternating rounds | baseline 0b6e22e1 | a7ea3890 |

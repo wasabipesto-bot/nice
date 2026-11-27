@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Check every file:line reference in the interactive map: the line must contain the named identifier.
-Middle-out refs are read from the dev/mo-mode worktree (the head the map names in its sub-title); refs marked 'main' from
+Middle-out refs are read with `git show` at the commit the document describes (DOC_HEAD below, which the map names in
+its sub-title; the branch itself may be ahead of it); refs marked 'main' from
 `git show origin/main:<path>` (974d7194). Read-only. Usage: python3 tools/check_refs.py interactive/midout-map.html"""
 import re, subprocess, sys, os
 html = open(sys.argv[1]).read()
 WT = os.path.expanduser('~/projects/nice/.worktrees/mo-mode')
+DOC_HEAD = '0b6e22e1'  # the commit the document and map describe; the worktree may be ahead of it
 REPO = os.path.expanduser('~/projects/nice')
-head = subprocess.run(['git', '-C', WT, 'rev-parse', '--short=8', 'HEAD'], capture_output=True, text=True).stdout.strip()
+head = DOC_HEAD
 main = subprocess.run(['git', '-C', REPO, 'rev-parse', '--short=8', 'origin/main'], capture_output=True, text=True).stdout.strip()
-print('worktree head', head, '| origin/main', main)
+print('documented commit', head, '| origin/main', main)
 consts = dict(re.findall(r"\b([A-Z]{1,2})='([^']+)'", html.split('const X1')[0]))
 pat = re.compile(r"\[(?:([A-Z]{1,2})|'([^']+)'),(\d+),'((?:[^'\\]|\\.)*)'(?:,'(main)')?\]")
 cache = {}
@@ -18,7 +20,7 @@ def lines(path, repo):
         if repo == 'main':
             out = subprocess.run(['git', '-C', REPO, 'show', 'origin/main:' + path], capture_output=True, text=True).stdout
         else:
-            out = open(os.path.join(WT, path)).read()
+            out = subprocess.run(['git', '-C', REPO, 'show', DOC_HEAD + ':' + path], capture_output=True, text=True).stdout
         cache[key] = out.split('\n')
     return cache[key]
 bad = n = 0

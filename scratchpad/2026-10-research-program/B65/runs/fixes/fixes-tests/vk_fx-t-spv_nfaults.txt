@@ -1,0 +1,17 @@
+
+running 1 test
+test midout::gpu::audit::accounts_faults_are_loud ... W 32 classes 63 slices [502136830, 0]
+fault 0: accounts pass: DevCounts { children: 59052463, chunks: 926604, flat: 407563303, kept: 123181024, survivors: 11756699, checked: 338191, slices: 2, tops: 430485, tested: 764113, slabs_max: 56610, list_max: 338191, flat_d_max: 7763890, surv_d_max: 282041 }
+F_SKIP_MAIN (2): accounts LOUD: middle-out: slice 502136830: main-kernel job instances done: 0, want 8064 (account [405593, 238857, 1, 238857, 238857, 238857, 36323, 1040898, 1, 1040898, 33654175, 16128, 0, 0, 0, 1, 0, 0, 0, 0])
+F_SKIP_TOPS (4096): accounts LOUD: middle-out: slice 502136830: tops1 valid parents examined: 0, want 405593 (account [0, 0, 1, 219134, 0, 0, 36323, 1040898, 1, 1040898, 33654175, 16128, 8064, 0, 33654175, 1, 0, 0, 0, 0])
+F_DROP_PROBE (8): accounts LOUD: middle-out: slice 502136830: probes run = 8 x tops: 1906740, want 1910856 (account [405593, 238857, 1, 238857, 238857, 238857, 36323, 1040898, 1, 1040898, 33654175, 16128, 8064, 1906740, 33654175, 1, 0, 0, 0, 0])
+F_DROP_PARENT (8192): accounts LOUD: middle-out: slice 502136830: parents certified (hist2) = listed: 1040898, want 1039848 (account [405593, 238857, 1, 238857, 238857, 238857, 36323, 1040898, 1, 1039848, 33620316, 16128, 8064, 1910856, 33620316, 1, 0, 0, 0, 0])
+F_EXP_SPLIT (65536): accounts LOUD: middle-out: expansion appended 291544 survivors, its lanes counted 338191
+F_SLAB_SPLIT (131072): accounts LOUD: middle-out: 372881 survivors read by the prefilter, the kernel counted 11756699
+F_PF_DROP (1024): accounts pass: survivors 11756699 vs 11756699, checked 337845 vs 338191
+sampled check, no fault: slice 502136830 equal (survivors 11756699 checked 338191)
+F_PF_DROP: sampled check LOUD: middle-out: sampled CPU check of slice 502136830 differs: device survivors 11756699 checked 337845 list 337845, CPU survivors 11756699 checked 338191 list 338191
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 349 filtered out; finished in 11.43s
+
