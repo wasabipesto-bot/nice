@@ -36,6 +36,19 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   of yesterday's runs passed. The upstream clippy fix reviewed (open as is), verified on the M4 with fresh
   target directories, **opened as #279**.
 
+- **08:53 UTC: B65.4 back**: base 65 −6.3 % (CUDA) / −7.2 % (Vulkan) on the RTX 3060; the tops stage is
+  compute-bound (my launch-bound premise was wrong); parents shared. Tests on the M4 through Metal pass (run by
+  me, `MAYALARAN`-side run `r3-wide-metal`).
+- **09:10 UTC: the independent review of B65.4 is back** (`B65/LEVERS-REVIEW.md`): merge with two fixes; no loss
+  path in the diff; **an older ballot append (`wtops5`) has no independent count**. Fixes, an audit of every
+  ballot append in both paths, the lint dump for the new kernels and the merge commissioned
+  (`B65/BRIEF-FIXES.md`, Opus, to 13:30 UTC; reminder at 13:45).
+- **Report sent about 09:30 UTC** (`REPORTS/2026-11-27.md`).
+- **For the cycle of 11-28:** if not done by the reminder, merge `dev/mo-wide-b65b` after reading its audit
+  table; then the wide expansion's lookups (≤ 4 %), a design note on queueing a group ahead of the reads for
+  both paths (worth most on the RX 9070 XT, whose clock follows load), `ncu` counters for `wtops1` only if the
+  owner enables them (`RmProfilingAdminOnly`); DESIGN.md §4 (accounts) after the hardening.
+
 ## 2026-11-26 (cycle 17 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $24.67 invoiced (cap now $10, so no rental this
