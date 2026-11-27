@@ -1766,17 +1766,16 @@ mod wp {
         }
     }
 
-    /// Tops: thread i = d·nlead + (h − hlo) tests the prefix p = (h·b + d)·b^(k−1−f0) + pip (if in the range's
-    /// prefixes [plo, phi]; the range's ends clip the first and last); certificate of n² and n³ at positions ≥ k;
-    /// a count per segment d·m + h mod m.
+    /// Tops: entry i = d·nlead + (h − hlo) of the valid parents' list (`wtops5`) tests the prefix p = (h·b +
+    /// d)·b^(k−1−f0) + pip (if in the range's prefixes [plo, phi]; the range's ends clip the first and last);
+    /// certificate of n² and n³ at positions ≥ k; a count per segment d·m + h mod m; each certified top appended to
+    /// the compact list `tc` (two words per top: [i, mask lo (2 words), mask hi], [mhi lo (2 words), mhi hi,
+    /// segment]; one atomic per plane on `tstat[2]`, order arbitrary; past `cap` not written, the scan's total then
+    /// exceeds the cap and the host fails the slice). Grid-stride over the list, one round for a whole cube at a
+    /// time (the ballot's lanes all active).
     #[cube(launch_unchecked)]
     pub fn wtops1_kernel(
-        tm: &mut Array<u64>,
-        th: &mut Array<u32>,
-        // the certificate's digits at positions >= k + 2 (the prefilter's), per prefix
-        tq: &mut Array<u64>,
-        tqh: &mut Array<u32>,
-        tv: &mut Array<u32>,
+        tc: &mut Array<Vector<u32, Const<4>>>,
         segc: &mut Array<Atomic<u32>>,
         tstat: &mut Array<Atomic<u32>>,
         pipd: &Array<u32>,
@@ -1792,6 +1791,8 @@ mod wp {
         plo_hi: u32,
         phi_lo: u32,
         phi_hi: u32,
+        cap: u32,
+        #[comptime] w: u32,
         #[comptime] b: u32,
         #[comptime] f0: u32,
         #[comptime] k: u32,
@@ -1804,90 +1805,129 @@ mod wp {
         let bb = comptime!(b * b);
         let na = comptime!((l + 1) / 2);
         let nl = min(l5n[0usize], ntest);
-        let mut jj = ABSOLUTE_POS_X;
+        let stride = CUBE_COUNT_X * NT;
+        // the cube's first entry of the round (uniform in the cube)
+        let mut j0 = CUBE_POS_X * NT;
         let mut exam = 0u32;
         let mut cert = 0u32;
-        while jj < nl {
-            let i = list[jj as usize];
-            jj += CUBE_COUNT_X * NT;
-            exam += 1u32;
-            let d = i / nlead;
-            let h = hlo + i % nlead;
-            let bw = comptime!(b as u64);
-            let mut p = u64::cast_from(h * b + d);
-            #[unroll]
-            for j in 0..comptime!(k - 1 - f0) {
-                p = p * bw + u64::cast_from(pipd[comptime!(k - 2 - f0 - j) as usize]);
-            }
-            let plo = u64::cast_from(plo_lo) | (u64::cast_from(plo_hi) << 32u64);
-            let phi = u64::cast_from(phi_lo) | (u64::cast_from(phi_hi) << 32u64);
+        let lane = UNIT_POS_PLANE;
+        let lm = select(
+            lane >= 32u32,
+            0xFFFF_FFFFu32,
+            (1u32 << min(lane, 31u32)) - 1u32,
+        );
+        while j0 < nl {
+            let jj = j0 + UNIT_POS_X;
+            j0 += stride;
             let mut ok = false;
+            let mut i = 0u32;
             let mut lo = 0u64;
             let mut hi = 0u32;
             let mut mq = 0u64;
             let mut mqh = 0u32;
-            if p >= plo && p <= phi {
-                let mut ad = Array::<u32>::new(comptime!(l as usize));
-                let mut cd = Array::<u32>::new(comptime!(l as usize));
-                #[unroll]
-                for j in 0..f0 {
-                    ad[j as usize] = select(p == plo, ends[j as usize], 0u32);
-                    cd[j as usize] =
-                        select(p == phi, ends[comptime!(l + j) as usize], comptime!(b - 1));
-                }
+            let mut seg = 0u32;
+            if jj < nl {
+                i = list[jj as usize];
+                exam += 1u32;
+                let d = i / nlead;
+                let h = hlo + i % nlead;
+                let bw = comptime!(b as u64);
+                let mut p = u64::cast_from(h * b + d);
                 #[unroll]
                 for j in 0..comptime!(k - 1 - f0) {
-                    let v = pipd[j as usize];
-                    ad[comptime!(f0 + j) as usize] = v;
-                    cd[comptime!(f0 + j) as usize] = v;
+                    p = p * bw + u64::cast_from(pipd[comptime!(k - 2 - f0 - j) as usize]);
                 }
-                ad[comptime!(k - 1) as usize] = d;
-                cd[comptime!(k - 1) as usize] = d;
-                let mut hh = h;
-                #[unroll]
-                for j in 0..comptime!(l - k) {
-                    let q = hh / b;
-                    let v = hh - q * b;
-                    ad[comptime!(k + j) as usize] = v;
-                    cd[comptime!(k + j) as usize] = v;
-                    hh = q;
+                let plo = u64::cast_from(plo_lo) | (u64::cast_from(plo_hi) << 32u64);
+                let phi = u64::cast_from(phi_lo) | (u64::cast_from(phi_hi) << 32u64);
+                if p >= plo && p <= phi {
+                    let mut ad = Array::<u32>::new(comptime!(l as usize));
+                    let mut cd = Array::<u32>::new(comptime!(l as usize));
+                    #[unroll]
+                    for j in 0..f0 {
+                        ad[j as usize] = select(p == plo, ends[j as usize], 0u32);
+                        cd[j as usize] =
+                            select(p == phi, ends[comptime!(l + j) as usize], comptime!(b - 1));
+                    }
+                    #[unroll]
+                    for j in 0..comptime!(k - 1 - f0) {
+                        let v = pipd[j as usize];
+                        ad[comptime!(f0 + j) as usize] = v;
+                        cd[comptime!(f0 + j) as usize] = v;
+                    }
+                    ad[comptime!(k - 1) as usize] = d;
+                    cd[comptime!(k - 1) as usize] = d;
+                    let mut hh = h;
+                    #[unroll]
+                    for j in 0..comptime!(l - k) {
+                        let q = hh / b;
+                        let v = hh - q * b;
+                        ad[comptime!(k + j) as usize] = v;
+                        cd[comptime!(k + j) as usize] = v;
+                        hh = q;
+                    }
+                    let mut an = Array::<u32>::new(comptime!(na as usize));
+                    let mut cn = Array::<u32>::new(comptime!(na as usize));
+                    limbs(&ad, &mut an, l, b);
+                    limbs(&cd, &mut cn, l, b);
+                    let mut a2 = Array::<u32>::new(comptime!((2 * na) as usize));
+                    let mut c2 = Array::<u32>::new(comptime!((2 * na) as usize));
+                    mul_l(&an, &an, &mut a2, na, na, bb);
+                    mul_l(&cn, &cn, &mut c2, na, na, bb);
+                    let mut a3 = Array::<u32>::new(comptime!((3 * na) as usize));
+                    let mut c3 = Array::<u32>::new(comptime!((3 * na) as usize));
+                    mul_l(&a2, &an, &mut a3, comptime!(2 * na), na, bb);
+                    mul_l(&c2, &cn, &mut c3, comptime!(2 * na), na, bb);
+                    let (l1, h1, q1, qh1, bad1) =
+                        cert_split_w(&a2, &c2, 0u64, 0u32, 0u64, 0u32, b, s2, k, comptime!(k + 2));
+                    let (l2, h2, q2, qh2, bad2) =
+                        cert_split_w(&a3, &c3, l1, h1, q1, qh1, b, s3, k, comptime!(k + 2));
+                    ok = !bad1 && !bad2;
+                    lo = l2;
+                    hi = h2;
+                    mq = q2;
+                    mqh = qh2;
                 }
-                let mut an = Array::<u32>::new(comptime!(na as usize));
-                let mut cn = Array::<u32>::new(comptime!(na as usize));
-                limbs(&ad, &mut an, l, b);
-                limbs(&cd, &mut cn, l, b);
-                let mut a2 = Array::<u32>::new(comptime!((2 * na) as usize));
-                let mut c2 = Array::<u32>::new(comptime!((2 * na) as usize));
-                mul_l(&an, &an, &mut a2, na, na, bb);
-                mul_l(&cn, &cn, &mut c2, na, na, bb);
-                let mut a3 = Array::<u32>::new(comptime!((3 * na) as usize));
-                let mut c3 = Array::<u32>::new(comptime!((3 * na) as usize));
-                mul_l(&a2, &an, &mut a3, comptime!(2 * na), na, bb);
-                mul_l(&c2, &cn, &mut c3, comptime!(2 * na), na, bb);
-                let (l1, h1, q1, qh1, bad1) =
-                    cert_split_w(&a2, &c2, 0u64, 0u32, 0u64, 0u32, b, s2, k, comptime!(k + 2));
-                let (l2, h2, q2, qh2, bad2) =
-                    cert_split_w(&a3, &c3, l1, h1, q1, qh1, b, s3, k, comptime!(k + 2));
-                ok = !bad1 && !bad2;
-                lo = l2;
-                hi = h2;
-                mq = q2;
-                mqh = qh2;
+                seg = d * m + h % m;
+                if ok {
+                    cert += 1u32;
+                    segc[seg as usize].fetch_add(1u32);
+                    if lo.count_ones() + hi.count_ones() > maxpop {
+                        tstat[1usize].fetch_add(1u32);
+                    }
+                }
             }
-            tm[i as usize] = lo;
-            th[i as usize] = hi;
-            tq[i as usize] = mq;
-            tqh[i as usize] = mqh;
-            tv[i as usize] = select(ok, 1u32, 0u32);
+            let bl = plane_ballot(ok);
+            let mut r = (bl[0usize] & lm).count_ones();
+            let mut n = bl[0usize].count_ones();
+            if comptime!(w > 32) {
+                let hm = select(lane >= 32u32, (1u32 << (lane & 31u32)) - 1u32, 0u32);
+                r += (bl[1usize] & hm).count_ones();
+                n += bl[1usize].count_ones();
+            }
+            let mut base0 = 0u32;
+            if lane == 0u32 && n > 0u32 {
+                base0 = tstat[2usize].fetch_add(n);
+            }
+            let base = plane_sum(base0);
             if ok {
-                cert += 1u32;
-                segc[(d * m + h % m) as usize].fetch_add(1u32);
-                if lo.count_ones() + hi.count_ones() > maxpop {
-                    tstat[1usize].fetch_add(1u32);
+                let slot = base + r;
+                if slot < cap {
+                    let mut v0 = Vector::<u32, Const<4>>::empty();
+                    v0[0usize] = i;
+                    v0[1usize] = u32::cast_from(lo & 0xFFFF_FFFFu64);
+                    v0[2usize] = u32::cast_from(lo >> 32u64);
+                    v0[3usize] = hi;
+                    let mut v1 = Vector::<u32, Const<4>>::empty();
+                    v1[0usize] = u32::cast_from(mq & 0xFFFF_FFFFu64);
+                    v1[1usize] = u32::cast_from(mq >> 32u64);
+                    v1[2usize] = mqh;
+                    v1[3usize] = seg;
+                    tc[(2u32 * slot) as usize] = v0;
+                    tc[(2u32 * slot + 1u32) as usize] = v1;
                 }
             }
         }
-        // valid parents examined, tops certified (plane sums, lane 0 adds: a partly filled plane under-counts)
+        // valid parents examined, tops certified (plane sums, lane 0 adds)
         let ex = plane_sum(exam);
         let ce = plane_sum(cert);
         if UNIT_POS_PLANE == 0u32 {
@@ -1896,48 +1936,29 @@ mod wp {
         }
     }
 
-    /// Each certified prefix into its segment: masks (lo, hi) and the thread index.
+    /// Each listed top (`wtops1`'s compact list, `min(tstat[2], cap)` of them) into its segment: its record as
+    /// listed (two words) to the segment's next slot of `tps` (one 32-byte write per top; `wtdigz` unpacks it).
     #[cube(launch_unchecked)]
     pub fn wtops2_kernel(
-        tm: &Array<u64>,
-        th: &Array<u32>,
-        tv: &Array<u32>,
+        tc: &Array<Vector<u32, Const<4>>>,
+        tstat: &Array<u32>,
         cur: &mut Array<Atomic<u32>>,
-        tmask: &mut Array<u64>,
-        tmh: &mut Array<u32>,
-        thd: &mut Array<u32>,
-        tq: &Array<u64>,
-        tqh: &Array<u32>,
-        ttq: &mut Array<u64>,
-        ttqh: &mut Array<u32>,
+        tps: &mut Array<Vector<u32, Const<4>>>,
         acc: &mut Array<Atomic<u32>>,
-        list: &Array<u32>,
-        l5n: &Array<u32>,
-        ntest: u32,
-        nlead: u32,
-        hlo: u32,
         cap: u32,
-        #[comptime] b: u32,
     ) {
-        let m = comptime!(b - 1);
-        let nl = min(l5n[0usize], ntest);
+        let nl = min(tstat[2usize], cap);
         let mut jj = ABSOLUTE_POS_X;
         let mut placed = 0u32;
         while jj < nl {
-            let i = list[jj as usize];
+            let v0 = tc[(2u32 * jj) as usize];
+            let v1 = tc[(2u32 * jj + 1u32) as usize];
             jj += CUBE_COUNT_X * NT;
-            if tv[i as usize] == 1u32 {
-                placed += 1u32;
-                let d = i / nlead;
-                let h = hlo + i % nlead;
-                let slot = cur[(d * m + h % m) as usize].fetch_add(1u32);
-                if slot < cap {
-                    tmask[slot as usize] = tm[i as usize];
-                    tmh[slot as usize] = th[i as usize];
-                    thd[slot as usize] = i;
-                    ttq[slot as usize] = tq[i as usize];
-                    ttqh[slot as usize] = tqh[i as usize];
-                }
+            placed += 1u32;
+            let slot = cur[v1[3usize] as usize].fetch_add(1u32);
+            if slot < cap {
+                tps[(2u32 * slot) as usize] = v0;
+                tps[(2u32 * slot + 1u32) as usize] = v1;
             }
         }
         let pp = plane_sum(placed);
@@ -1946,12 +1967,17 @@ mod wp {
         }
     }
 
-    /// The tops' digit table (7-bit fields, 4 per word, padded with the first digit), and the zeroing of the
-    /// histogram and the list count for the slice's preparation.
+    /// The placed tops (`tps`, in slot order) into their arrays: masks (lo, hi), the prefix index, the
+    /// prefilter's digits, and the digit table (7-bit fields, 4 per word, padded with the first digit); and the
+    /// zeroing of the histogram and the list count for the slice's preparation.
     #[cube(launch_unchecked)]
     pub fn wtdigz_kernel(
-        tmask: &Array<u64>,
-        tmh: &Array<u32>,
+        tps: &Array<Vector<u32, Const<4>>>,
+        tmask: &mut Array<u64>,
+        tmh: &mut Array<u32>,
+        thd: &mut Array<u32>,
+        ttq: &mut Array<u64>,
+        ttqh: &mut Array<u32>,
         tdig: &mut Array<u32>,
         hist: &mut Array<u32>,
         lcnt: &mut Array<u32>,
@@ -1976,8 +2002,15 @@ mod wp {
             acc[A_TDIG].fetch_add(rows);
         }
         if row {
-            let mut x = tmask[i as usize];
-            let mut y = tmh[i as usize];
+            let v0 = tps[(2u32 * i) as usize];
+            let v1 = tps[(2u32 * i + 1u32) as usize];
+            let mut x = u64::cast_from(v0[1usize]) | (u64::cast_from(v0[2usize]) << 32u64);
+            let mut y = v0[3usize];
+            tmask[i as usize] = x;
+            tmh[i as usize] = y;
+            thd[i as usize] = v0[0usize];
+            ttq[i as usize] = u64::cast_from(v1[0usize]) | (u64::cast_from(v1[1usize]) << 32u64);
+            ttqh[i as usize] = v1[2usize];
             let first = select(
                 x != 0u64,
                 x.trailing_zeros(),
@@ -2784,12 +2817,10 @@ pub struct WideJoin<R: Runtime> {
     pr: Handle,
     nice_out: Handle,
     nice_count: Handle,
-    tm: Handle,
-    th: Handle,
-    tv: Handle,
-    /// Per prefix: the certificate's digits >= k + 2 (the prefilter's `mhi`, lo and hi).
-    tq: Handle,
-    tqh: Handle,
+    /// The certified tops of a slice, compact (`wtops1`; two `Vector<u32, 4>` per top, `caps.tops` of them).
+    tc: Handle,
+    /// The same records placed in segment order (`wtops2`), unpacked by `wtdigz`.
+    tps: Handle,
     /// The top hierarchy's list of valid parent prefixes (shared by b consecutive slices), and which slice group
     /// (pip div b) it holds with that group's `l5n` (count, cubes done).
     t5list: Handle,
@@ -2926,11 +2957,8 @@ impl<R: Runtime> WideJoin<R> {
             pr: e(if caps.probe { scap as usize * 4 } else { 4 }),
             nice_out: mk(vec![0u32; caps.nice as usize * NICE_STRIDE]),
             nice_count: mk(vec![0u32; 1]),
-            tm: e(ntest * 8),
-            th: e(ntest * 4),
-            tv: e(ntest * 4),
-            tq: e(ntest * 8),
-            tqh: e(ntest * 4),
+            tc: e(nt * 32),
+            tps: e(nt * 32),
             t5list: e(ntest * 4),
             t5state: std::sync::Mutex::new(None),
             stop: 6,
@@ -3002,7 +3030,7 @@ impl<R: Runtime> WideJoin<R> {
         let pipd = self.mk(if pd.is_empty() { vec![0] } else { pd });
         let nseg = self.nseg as usize;
         let segc = self.mk(vec![0u32; nseg]);
-        let tstat = self.mk(vec![0u32; 2]);
+        let tstat = self.mk(vec![0u32; 3]);
         let acc = self.mk(vec![0u32; ACC_WORDS]);
         let tsegh = self.client.empty(nseg * 2 * 4);
         let tmh = self.client.empty(nt * 8);
@@ -3055,13 +3083,9 @@ impl<R: Runtime> WideJoin<R> {
                         c,
                         CubeCount::Static(tgrid, 1, 1),
                         CubeDim::new_1d(NT),
-                        a(&self.tm, ntest as usize),
-                        a(&self.th, ntest as usize),
-                        a(&self.tq, ntest as usize),
-                        a(&self.tqh, ntest as usize),
-                        a(&self.tv, ntest as usize),
+                        a(&self.tc, 2 * nt),
                         a(&segc, nseg),
-                        a(&tstat, 2),
+                        a(&tstat, 3),
                         a(&pipd, npd),
                         a(&self.ends_h, 2 * l as usize),
                         a(&acc, ACC_WORDS),
@@ -3074,6 +3098,8 @@ impl<R: Runtime> WideJoin<R> {
                         (wb.plo >> 32) as u32,
                         wb.phi as u32,
                         (wb.phi >> 32) as u32,
+                        nt as u32,
+                        self.w,
                         b,
                         f0,
                         k,
@@ -3091,7 +3117,7 @@ impl<R: Runtime> WideJoin<R> {
                     a(&tsegh, 2 * nseg),
                     a(&cur, nseg),
                     a(&dummy, 1),
-                    a(&tstat, 2),
+                    a(&tstat, 3),
                     a(&acc, ACC_WORDS),
                     A_TSCAN as u32,
                     self.nseg,
@@ -3102,36 +3128,27 @@ impl<R: Runtime> WideJoin<R> {
                     c,
                     CubeCount::Static(tgrid, 1, 1),
                     CubeDim::new_1d(NT),
-                    a(&self.tm, ntest as usize),
-                    a(&self.th, ntest as usize),
-                    a(&self.tv, ntest as usize),
+                    a(&self.tc, 2 * nt),
+                    a(&tstat, 3),
                     a(&cur, nseg),
-                    a(&tmh, nt),
-                    a(&tmhh, nt),
-                    a(&thdh, nt),
-                    a(&self.tq, ntest as usize),
-                    a(&self.tqh, ntest as usize),
-                    a(&ttq, nt),
-                    a(&ttqh, nt),
+                    a(&self.tps, 2 * nt),
                     a(&acc, ACC_WORDS),
-                    a(&self.t5list, ntest as usize),
-                    a(&l5h, 2),
-                    ntest,
-                    wb.nlead,
-                    wb.hlo,
                     nt as u32,
-                    b,
                 );
                 wp::wtdigz_kernel::launch_unchecked::<R>(
                     c,
                     CubeCount::Static((nt as u32).max(self.nbk).div_ceil(NT), 1, 1),
                     CubeDim::new_1d(NT),
+                    a(&self.tps, 2 * nt),
                     a(&tmh, nt),
                     a(&tmhh, nt),
+                    a(&thdh, nt),
+                    a(&ttq, nt),
+                    a(&ttqh, nt),
                     a(&self.g_tdig, nt * TDW as usize),
                     a(&self.histh, self.nbk as usize),
                     a(&self.lcnt, 1),
-                    a(&tstat, 2),
+                    a(&tstat, 3),
                     a(&acc, ACC_WORDS),
                     self.nbk,
                     nt as u32,
