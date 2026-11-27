@@ -3708,8 +3708,8 @@ impl<R: Runtime> WideJoin<R> {
         );
         let mut listed = 0u64;
         let mut clipped = 0u64;
-        // per ticket: (parents listed, its slice's tops if first, survivors in range)
-        let mut per: Vec<(u32, Option<u32>, u64)> = Vec::with_capacity(tickets.len());
+        // per ticket: (parents listed, its slice's tops (certified, listed) if first, survivors in range)
+        let mut per: Vec<(u32, Option<(u32, u32)>, u64)> = Vec::with_capacity(tickets.len());
         let mut accs = Vec::new();
         for t in tickets {
             let n = next()?[0];
@@ -3742,7 +3742,7 @@ impl<R: Runtime> WideJoin<R> {
                     self.caps.maxpop
                 );
                 dc.tops += u64::from(s[0]);
-                ntops = Some(s[0]);
+                ntops = Some((s[0], s[2]));
             }
             let st = next()?;
             let es = next()?;
@@ -3828,15 +3828,15 @@ impl<R: Runtime> WideJoin<R> {
     }
 
     /// One slice's account `a` (`A_*`) against what the host queued: `jobs` main-kernel instances, `ntops` tops
-    /// (`tstat[0]`, the scan's sum of the segment counts), `lcnt` parents (the expansion's copy of the list
-    /// length).
+    /// (`tstat[0]`, the scan's sum of the segment counts, and `tstat[2]`, the compact list's own count), `lcnt`
+    /// parents (the expansion's copy of the list length).
     fn check_slice(
         &self,
         h: &WHead,
         a: &[u32],
         l5n: &[u32],
         jobs: u64,
-        ntops: u32,
+        ntops: (u32, u32),
         lcnt: u32,
     ) -> Result<()> {
         let pip = h.pip;
@@ -3847,7 +3847,7 @@ impl<R: Runtime> WideJoin<R> {
             );
             Ok(())
         };
-        let (ntops, lcnt) = (u64::from(ntops), u64::from(lcnt));
+        let (ntops, tlisted, lcnt) = (u64::from(ntops.0), u64::from(ntops.1), u64::from(lcnt));
         fail("plane errors", u64::from(a[A_ERR_PLANE]), 0)?;
         fail("slice done", u64::from(a[A_DONE]), 1)?;
         fail(
@@ -3863,6 +3863,7 @@ impl<R: Runtime> WideJoin<R> {
         fail("wtops1 tops certified", u64::from(a[A_T1_CERT]), ntops)?;
         fail("wscan (tops) ran", u64::from(a[A_TSCAN]), 1)?;
         fail("wtops2 tops placed", u64::from(a[A_T2_PLACED]), ntops)?;
+        fail("wtops1 tops listed", tlisted, ntops)?;
         fail("wtdigz rows", u64::from(a[A_TDIG]), ntops)?;
         fail(
             "whist cubes done",
