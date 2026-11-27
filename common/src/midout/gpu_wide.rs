@@ -5335,6 +5335,69 @@ mod tests {
         }
     }
 
+    /// On the wide path's field driver with the shared parent lists: a failed device allocation (`AUDIT_FILL_MB`
+    /// filled first, in process, after the join's own buffers) must not return the field's slices as searched.
+    /// The first `MIDOUT_SHARE_SLICES` (130) slices of base-65 field 77777 (`MIDOUT_485_T`) with the card filled,
+    /// then again after the fill is freed: an `Ok` under the fill must equal the clean run.
+    #[cfg(feature = "midout-box-tests")]
+    #[test]
+    #[ignore = "needs CUDA; fills the card's memory"]
+    #[cfg(feature = "cubecl-cuda")]
+    fn wide_field_oom_is_loud() {
+        let client = wcuda_client();
+        let fill_mb: u64 = std::env::var("AUDIT_FILL_MB").map_or(0, |x| x.parse().unwrap());
+        let tn: u128 = std::env::var("MIDOUT_485_T")
+            .ok()
+            .map_or(77_777, |s| s.parse().unwrap());
+        let nsl: usize = std::env::var("MIDOUT_SHARE_SLICES")
+            .ok()
+            .map_or(130, |s| s.parse().unwrap());
+        let cn = Coord::with_digits(65, 4, 8, 5).unwrap();
+        let sh = Shape::for_coord(&cn);
+        let (q, vs) = (cn.quantum(), cn.start() + tn * cn.quantum());
+        let gj = match WideJoin::new(client.clone(), WideCaps::for_base(65), &cn, sh) {
+            Ok(g) => g,
+            Err(e) => {
+                println!("WideJoin::new failed (loud): {e}");
+                return;
+            }
+        };
+        let mut hold = Vec::new();
+        for _ in 0..fill_mb / 64 {
+            hold.push(client.empty(64 << 20));
+        }
+        let _ = cubecl::future::block_on(client.sync());
+        println!(
+            "WideJoin::new returned Ok; then filled {} MiB",
+            64 * hold.len()
+        );
+        let opt = WideOptions {
+            group: 16,
+            cpu_check: false,
+            cpu_threads: 0,
+        };
+        let r = search_field_wide_groups(&gj, &cn, vs, q, opt, 0..nsl);
+        let built = gj.parent_sharing_last();
+        drop(hold);
+        let _ = cubecl::future::block_on(client.sync());
+        match r {
+            Ok((o, _)) => {
+                println!(
+                    "field path returned Ok under the fill ({} lists built): {o:?}",
+                    built.0
+                );
+                let (oc, _) = search_field_wide_groups(&gj, &cn, vs, q, opt, 0..nsl).unwrap();
+                assert_eq!(
+                    (o.survivors, o.checked, o.slices),
+                    (oc.survivors, oc.checked, oc.slices),
+                    "an allocation failure returned slices as searched"
+                );
+                println!("equal to the clean run after the fill was freed");
+            }
+            Err(e) => println!("field path LOUD: {e:#}"),
+        }
+    }
+
     /// On the wide path: a join with a timing stop is refused by `search_field_wide` before any work (base 40,
     /// shape (3, 6), 4 classes per batch: small enough for any device).
     #[test]
@@ -5465,6 +5528,9 @@ mod tests {
             (caps.classes, caps.survivors, caps.parents) = (4, 20_000_000, 2_000_000);
             let mut gj = WideJoin::with_width(client.clone(), caps, &coord, sh, force_w).unwrap();
             gj.batches.truncate(1);
+            // the shared parent lists' kernel (`wanc`; one key)
+            let ra = gj.build_anc(&[gj.anc_key(pip)]);
+            println!("W {} base 65 slice {pip}: wanc {:?}", gj.w, ra.err());
             let r = gj
                 .rank_of(pip)
                 .and_then(|rank| gj.run_slice(pip, &rank))
