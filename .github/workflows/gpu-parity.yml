@@ -65,16 +65,23 @@ jobs:
               # Apple's GPU compiler gets a division or remainder by a constant
               # that is not a power of two wrong when the dividend is a right
               # shift by half the word (x >> 16, or a u64's high word), and no
-              # runner here has that compiler. wgsl_dump_for_lint compiles the
-              # browser kernel, the native detailed kernels and the stride and
-              # join kernels at a few bases, CubeCL logs their WGSL, and the
-              # script fails on the pattern; its header says what it cannot
-              # see. Reuses the test binary the step above built.
+              # runner here has that compiler. The three wgsl_dump_for_lint
+              # tests compile the browser kernel, the native detailed kernels
+              # and the stride and join kernels at a few bases, and the
+              # middle-out join's kernels at bases 64 and 65 (at the device's
+              # plane width and at widths 32 and 64); CubeCL logs their WGSL,
+              # and the script fails on the pattern; its header says what it
+              # cannot see. The --require-present kernels have no constant
+              # division by a literal today, so only their presence is
+              # checked. Reuses the test binary the step above built.
               run: |
                   export VK_ICD_FILENAMES="$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)"
                   export CUBECL_DEBUG_LOG="$RUNNER_TEMP/wgsl.log"
                   cargo test --release --features cubecl -p nice_common --lib -- \
-                      --ignored --exact cubecl_backend::tests::wgsl_dump_for_lint --nocapture
+                      --ignored --exact --nocapture --test-threads 1 \
+                      cubecl_backend::tests::wgsl_dump_for_lint \
+                      midout::gpu::tests::wgsl_dump_for_lint \
+                      midout::gpu_wide::tests::wgsl_dump_for_lint
                   python3 scripts/wgsl-lint.py "$CUBECL_DEBUG_LOG" \
                       --require DetailedKernelU32@80 --require DetailedFdKernelU32@40 \
                       --require DetailedFdKernelU32@50 \
@@ -82,7 +89,28 @@ jobs:
                       --require DetailedFdKernel@50 --require DetailedFdKernel@62 \
                       --require DetailedKernel@80 --require NiceonlyKernel@40 \
                       --require BucketKernel@57 --require JoinKernel@57 \
-                      --require TopKernel@57
+                      --require TopKernel@57 \
+                      --require G2Kernel:w=32 --require G2Kernel:w=64 \
+                      --require Hist2Kernel:w=32 --require Hist2Kernel:w=64 \
+                      --require HsortKernel --require Scan16Kernel \
+                      --require Tops1Kernel --require Tops2Kernel \
+                      --require-present Anc8Kernel:w=32 --require-present Anc8Kernel:w=64 \
+                      --require-present ExpandKernel:oh64=true \
+                      --require-present ExpandKernel:oh64=false \
+                      --require-present CheckKernel@64:ballot=true \
+                      --require-present CheckKernel@64:ballot=false \
+                      --require-present Scatter3Kernel --require-present DoneKernel \
+                      --require-present TdigzKernel --require-present ToprecKernel \
+                      --require-present Tops5Kernel --require-present TscanKernel \
+                      --require-present Tdigz2Kernel --require-present Toprec2Kernel \
+                      --require WideKernel@65:w=32 --require WideKernel@65:w=64 \
+                      --require WhistKernel@65:w=32 --require WhistKernel@65:w=64 \
+                      --require Wtops5Kernel@65:w=32 --require Wtops5Kernel@65:w=64 \
+                      --require Wtops1Kernel@65 --require Wtops2Kernel@65 \
+                      --require WscatterKernel@65 --require WexpandKernel@65 \
+                      --require WcheckKernel@65 --require WscanKernel:seg=false \
+                      --require WsortKernel --require-present WscanKernel:seg=true \
+                      --require-present WtdigzKernel@65 --require-present WdoneKernel
 
             - name: Keep the WGSL the lint read
               if: failure()
