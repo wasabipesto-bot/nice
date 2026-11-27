@@ -25,7 +25,12 @@ interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %
 - **Upstream code, found on the way:** on any target other than x86-64 `cargo clippy -- -D warnings` fails on
   main fdbe07d3 (`unused_self` at `cpu_join.rs:986`, `unused_mut` at `:2093`: both used only on the AVX paths).
   A one-commit fix is on the fork branch `pr/macos-clippy-cpu-join` (ebba000e; clippy clean on the M4, fork CI
-  45949549267 green); independent review commissioned before any pull request.
+  45949549267 green). Independent review (`LINT/REVIEW-CLIPPY.md`): open as is; no other site of the
+  pattern found by reading the 26 `target_arch` sites. I re-ran the recipe's workspace clippy on the M4 with
+  fresh target directories: main fails with exactly the two errors, the fix passes (my first comparison shared
+  one target directory and reported main as clean in 0 s: the stale-artifact trap again). The recipe's third
+  command (`cubecl-spirv`) cannot build on macOS at all (`cubecl-wgpu`'s build script wants the Vulkan SDK).
+  **Opened as #279 on 2026-11-27.**
 
 ## DOC.1 The design document and map re-based on `dev/mo-mode` 0b6e22e1 (2026-11-27 05:47–05:58 UTC, technical writer, documents only; `DOC/BRIEF.md`, `DOC/NOTES.md`; `../2026-11-midout-design/DESIGN.md` 790 → 810 lines, `interactive/midout-map.html`)
 

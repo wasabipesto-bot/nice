@@ -29,6 +29,13 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     failure in upstream `cpu_join.rs` confirmed on main and a fix branch prepared (not opened).
   - A reminder at 12:15 UTC finishes the report if the hand-backs do not.
 
+- **05:58 UTC: DOC.1 back**: the design document and map describe `dev/mo-mode`; 89 references, 0 bad; three
+  stale decision numbers replaced by me.
+- **07:35 UTC: LINT.1 back**: the middle-out kernels under the WGSL lint in CI, nothing flagged; `/status` counts
+  disagreements; merged by fast-forward (`dev/mo-mode` c16d48e9, CI green on that head). The re-run macOS jobs
+  of yesterday's runs passed. The upstream clippy fix reviewed (open as is), verified on the M4 with fresh
+  target directories, **opened as #279**.
+
 ## 2026-11-26 (cycle 17 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $24.67 invoiced (cap now $10, so no rental this
