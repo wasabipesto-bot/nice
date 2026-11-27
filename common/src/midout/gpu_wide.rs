@@ -377,6 +377,12 @@ mod wk {
         if PLANE_DIM != w || t % w != lane {
             cnt[C_ERR_PLANE].fetch_add(1u32);
         }
+        // s_nl[1]: the instance's survivor bits, counted by each lane apart from the ballots that place its
+        // records. Cleared in a block of its own: the SPIR-V compiler's expression merge keeps only the first of
+        // two atomic stores of one value in a block (CubeCL 0.10), which left it uncleared beside s_nl[0]
+        if t == 1u32 {
+            s_nl[1usize].store(0u32);
+        }
         let pb = pseg[c as usize];
         let pe = pseg[(c + 1u32) as usize];
         if t == 0u32 {
@@ -388,8 +394,6 @@ mod wk {
             }
             s_np[0usize] = n;
             s_nl[0usize].store(0u32);
-            // [1]: the instance's survivor bits, counted by each lane apart from the ballots that place its records
-            s_nl[1usize].store(0u32);
             if poff == plast && n > poff + PMAX {
                 cnt[C_ERR_PMAX].fetch_add(1u32);
             }
