@@ -4216,8 +4216,8 @@ mod tests {
         (cn, v, pv)
     }
 
-    /// The wide device path against the CPU reference on whole slices `cases` (`(b, f0, k, pip)`): tops count,
-    /// survivor sets n for n, children, chunks, flat, kept (the key is the reference's rule), survivors = checked,
+    /// The wide device path against the CPU reference on whole slices `cases` (`(b, f0, k, pip)`): tops count and
+    /// the tops themselves (unit, lead, mask), survivor sets n for n, children, chunks, flat, kept (the key is the reference's rule), survivors = checked,
     /// and the check's distinct digits of every survivor = the reference's. `classes` the batch width.
     /// `MIDOUT_NINST`, `MIDOUT_MAXPOP`, `MIDOUT_NOPF=1` and `MIDOUT_FORCE_W` (the compile-only path) change the
     /// run when set.
@@ -4274,6 +4274,42 @@ mod tests {
                     );
                     assert_eq!(tops.len() as u64, cn.tops, "tops");
                     assert_eq!(gj.wb.tested(pip), cn.tops_tested, "tops tested");
+                    // the tops themselves: (unit, lead, mask) of the device's against the reference's
+                    let mut dt: Vec<(u32, u128, u128)> = tops
+                        .iter()
+                        .map(|&(ix, lo, hi)| {
+                            (
+                                ix / gj.wb.nlead,
+                                u128::from(gj.wb.hlo + ix % gj.wb.nlead),
+                                u128::from(lo) | u128::from(hi) << 64,
+                            )
+                        })
+                        .collect();
+                    let cb = Base::new(&coord);
+                    let step = cb.pw[(k - 1 - f0) as usize];
+                    let nth = std::thread::available_parallelism().map_or(4, |x| x.get()) as u32;
+                    let mut ct: Vec<(u32, u128, u128)> = std::thread::scope(|s| {
+                        let hs: Vec<_> = (0..nth)
+                            .map(|j| {
+                                let cb = &cb;
+                                s.spawn(move || {
+                                    let mut v = Vec::new();
+                                    for d in (j..b).step_by(nth as usize) {
+                                        let mut tested = 0u64;
+                                        let u = u128::from(pip) + u128::from(d) * step;
+                                        for t in crate::midout::cpu::unit_tops::<u128>(cb, sh, u, &mut tested) {
+                                            v.push((d, t.h, t.mask));
+                                        }
+                                    }
+                                    v
+                                })
+                            })
+                            .collect();
+                        hs.into_iter().flat_map(|h| h.join().unwrap()).collect()
+                    });
+                    dt.sort_unstable();
+                    ct.sort_unstable();
+                    assert!(dt == ct, "tops differ from the reference's");
                     got.sort_unstable();
                     let gn: Vec<u128> = got.iter().map(|x| x.0).collect();
                     assert_eq!(gn.len(), want.len(), "listed count");
