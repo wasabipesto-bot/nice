@@ -2869,13 +2869,16 @@ struct WAnc {
     lists: Vec<Handle>,
     /// The last build: lists and roots listed (tests, benches).
     last: (usize, u64),
+    /// Slices that took a shared list, and of them those whose list is shorter than the roots (tests).
+    used: (u64, u64),
 }
 
 /// Most shared lists held at once (one per value of digit f0 of a `(4, 8, 5)` field: b of them).
 const ANC_LISTS: usize = MAXB as usize;
 
 /// The wide device path for one base and shape: kernels compiled for one
-/// plane width, buffers allocated once.
+/// plane width, buffers allocated once. One field at a time: the tops lists,
+/// the top hierarchy's list and the shared parent lists are the join's own.
 pub struct WideJoin<R: Runtime> {
     client: ComputeClient<R>,
     pub w: u32,
@@ -3199,7 +3202,7 @@ impl<R: Runtime> WideJoin<R> {
                 a[2]
             );
             ensure!(
-                n > 0 && n <= self.anc_cap,
+                n <= self.anc_cap,
                 "middle-out wide: wanc (key {key}): {n} roots listed (capacity {})",
                 self.anc_cap
             );
@@ -3214,11 +3217,17 @@ impl<R: Runtime> WideJoin<R> {
     /// The shared list for a slice, if one is built: (handle, length).
     fn anc_for(&self, pip: u64) -> Option<(Handle, u32)> {
         let k = self.anc_key(pip);
-        let st = self.anc.lock().expect("anc");
-        st.keys
+        let mut st = self.anc.lock().expect("anc");
+        let r = st
+            .keys
             .iter()
             .position(|&x| x == k)
-            .map(|j| (st.lists[j].clone(), st.lens[j]))
+            .map(|j| (st.lists[j].clone(), st.lens[j]));
+        if let Some((_, n)) = &r {
+            st.used.0 += 1;
+            st.used.1 += u64::from(*n < self.nrf);
+        }
+        r
     }
 
     /// Timing and bisection only (benches, feature `midout-bench`): run the stages up to `stop` (1 tops, 2
@@ -3955,9 +3964,22 @@ impl<R: Runtime> WideJoin<R> {
         pip: u64,
         rank: &[u32; 8],
     ) -> Result<(WCounts, Vec<(u128, u32)>, Vec<(u32, u64, u32)>)> {
+        self.run_slice_with(pip, rank, false)
+    }
+
+    /// [`WideJoin::run_slice`], with `shared` the parents from the slice's shared list when one is built (tests).
+    ///
+    /// # Errors
+    /// Device errors or a failed account.
+    fn run_slice_with(
+        &self,
+        pip: u64,
+        rank: &[u32; 8],
+        shared: bool,
+    ) -> Result<(WCounts, Vec<(u128, u32)>, Vec<(u32, u64, u32)>)> {
         let cnt = self.mk(vec![0u32; NCNT]);
         let rankh = self.mk(rank.to_vec());
-        let ws = self.queue_prep(pip, &rankh, false);
+        let ws = self.queue_prep(pip, &rankh, shared);
         self.sync()?;
         let ntops = (self.rd(&ws.tstat)?[0] as usize).min(self.caps.tops as usize);
         let thd = self.rd(&ws.thdh)?;
@@ -4526,10 +4548,20 @@ mod tests {
                     let force_w: Option<u32> = std::env::var("MIDOUT_FORCE_W").ok().map(|x| x.parse().unwrap());
                     let mut gj = WideJoin::with_width($client, caps, &coord, sh, force_w).unwrap();
                     if force_w.is_some() {
+                        // also the shared lists' kernel (`wanc`); its plane check fails under a forced width
+                        if k - 2 > f0 {
+                            let ra = gj.build_anc(&[gj.anc_key(pip)]);
+                            println!("COMPILE-ONLY W {} base {b} slice {pip}: wanc {ra:?}", gj.w);
+                        }
                         let rank = gj.rank_of(pip).unwrap();
                         let r = gj.run_slice(pip, &rank).map(|x| x.0);
                         println!("COMPILE-ONLY W {} base {b} slice {pip}: {r:?}", gj.w);
                         continue;
+                    }
+                    // MIDOUT_WIDE_SHARE=1: the slice's parents from its shared list (`wanc`, digits [f0, k - 2))
+                    let share = k - 2 > f0 && std::env::var("MIDOUT_WIDE_SHARE").is_ok_and(|x| x == "1");
+                    if share {
+                        gj.build_anc(&[gj.anc_key(pip)]).unwrap();
                     }
                     // MIDOUT_NOPF=1: no prefilter, whole survivor sets
                     let nopf = std::env::var("MIDOUT_NOPF").is_ok_and(|x| x == "1");
@@ -4544,7 +4576,12 @@ mod tests {
                     );
                     let t0 = Instant::now();
                     let rank = gj.rank_of(pip).unwrap();
-                    let (dc, mut got, tops) = gj.run_slice(pip, &rank).unwrap();
+                    let (dc, mut got, tops) = gj.run_slice_with(pip, &rank, share).unwrap();
+                    if share {
+                        let used = gj.anc.lock().expect("anc").used;
+                        println!("slice {pip}: parents from the shared list ({} of {} roots)", gj.anc_for(pip).unwrap().1, gj.nrf);
+                        assert_eq!(used, (1, 1), "slice {pip}: the shared list was not used");
+                    }
                     let tdev = t0.elapsed().as_secs_f64();
                     let t1 = Instant::now();
                     let (cn, all, pass) = cpu_slice(&coord, sh, u128::from(pip));
@@ -4746,6 +4783,9 @@ mod tests {
                             want.len(),
                             nice_brute
                         );
+                        if k - 2 > f0 {
+                            shared_vs_brute(&gj, b, sh, npip, &want, nsurv, &nice_brute);
+                        }
                     }
                 }
             }};
@@ -4757,6 +4797,107 @@ mod tests {
             #[allow(unreachable_patterns)]
             _ => panic!("unsupported runtime"),
         }
+    }
+
+    /// [`wide_whole_small_bases_vs_brute_force`] with the parents shared across the slice's top digit (`wanc`):
+    /// (1) every slice through its key's shared list, survivors n for n against brute force (`want`, `nsurv`),
+    /// every slice's list used; (2) the field path with sharing on (production's driver, its sampled check on), one
+    /// field per value of digit f0, b slices per key: survivors, checked and nice numbers against brute force.
+    #[cfg(feature = "midout-box-tests")]
+    fn shared_vs_brute<R: Runtime>(
+        gj: &WideJoin<R>,
+        b: u32,
+        sh: Shape,
+        npip: u64,
+        want: &std::collections::HashSet<u128>,
+        nsurv: u64,
+        nice_brute: &[u128],
+    ) {
+        use std::collections::HashSet;
+        let (f0, k) = (sh.f0, sh.k);
+        let mut keys: Vec<u64> = (0..npip).map(|p| gj.anc_key(p)).collect();
+        keys.sort_unstable();
+        keys.dedup();
+        let u0 = gj.anc.lock().expect("anc").used;
+        let mut got = HashSet::new();
+        let mut surv = 0u64;
+        let mut empty = 0usize;
+        for ch in keys.chunks(ANC_LISTS) {
+            gj.build_anc(ch).unwrap();
+            empty += gj
+                .anc
+                .lock()
+                .expect("anc")
+                .lens
+                .iter()
+                .filter(|&&n| n == 0)
+                .count();
+            for pip in (0..npip).filter(|&p| ch.contains(&gj.anc_key(p))) {
+                let rank = gj.rank_of(pip).unwrap();
+                let (dc, v, _) = gj.run_slice_with(pip, &rank, true).unwrap();
+                assert_eq!(dc.checked, v.len() as u64);
+                surv += dc.survivors;
+                for (n, u) in v {
+                    assert!(got.insert(n), "b{b} {sh:?} shared: n {n} twice");
+                    assert_eq!(
+                        unique_digits(n, b).0,
+                        u,
+                        "b{b} shared: distinct digits of {n}"
+                    );
+                }
+            }
+        }
+        let u1 = gj.anc.lock().expect("anc").used;
+        assert_eq!(
+            u1.0 - u0.0,
+            npip,
+            "b{b} {sh:?}: slices through a shared list"
+        );
+        assert!(
+            &got == want,
+            "b{b} shape {sh:?}: shared: checked n differ from brute force"
+        );
+        assert_eq!(surv, nsurv, "b{b} shape {sh:?}: shared: survivors");
+        println!(
+            "b{b} shape ({f0}, {k}) shared: {} lists ({empty} empty), {npip} slices through them ({} with a list shorter than the {} roots), n for n = brute force: PASS",
+            keys.len(),
+            u1.1 - u0.1,
+            gj.nrf
+        );
+        let cf = Coord::with_digits(b, f0, f0 + 1, f0).unwrap();
+        let q = cf.quantum();
+        let opt = WideOptions {
+            group: 16,
+            cpu_check: true,
+            cpu_threads: 2,
+        };
+        let (mut fs, mut fc, mut nice) = (0u64, 0u64, Vec::new());
+        let u0 = gj.anc.lock().expect("anc").used;
+        let mut lists = 0usize;
+        for t in 0..u128::from(b) {
+            let (o, _, tm) = search_field_wide(gj, &cf, cf.start() + t * q, q, opt).unwrap();
+            assert!(tm.sampled.is_some(), "b{b} field {t}: no sampled check");
+            lists += gj.parent_sharing_last().0;
+            fs += o.survivors;
+            fc += o.checked;
+            nice.extend(o.nice);
+        }
+        nice.sort_unstable();
+        let u1 = gj.anc.lock().expect("anc").used;
+        assert_eq!(
+            u1.0 - u0.0,
+            npip,
+            "b{b} {sh:?}: field slices through a shared list"
+        );
+        assert_eq!(
+            (fs, fc),
+            (nsurv, want.len() as u64),
+            "b{b} {sh:?}: field path, shared"
+        );
+        assert_eq!(nice, nice_brute, "b{b} {sh:?}: field path, shared: nice");
+        println!(
+            "b{b} shape ({f0}, {k}) field path shared: {b} fields, {lists} lists, {npip} slices, survivors {fs}, checked {fc}, nice = brute force, sampled checks equal: PASS"
+        );
     }
 
     #[cfg(feature = "cubecl-cuda")]
@@ -4964,7 +5105,15 @@ mod tests {
             gj.set_parent_sharing(false);
             let (o0, r0) = search_field_wide_groups(&gj, &cn, vs, q, opt1, 0..nsl).unwrap();
             gj.set_parent_sharing(true);
+            let u0 = gj.anc.lock().expect("anc").used;
             let (o1, r1) = search_field_wide_groups(&gj, &cn, vs, q, opt1, 0..nsl).unwrap();
+            let u1 = gj.anc.lock().expect("anc").used;
+            // used, not only built: every slice's whist ran over its key's list, shorter than the roots
+            assert_eq!(
+                (u1.0 - u0.0, u1.1 - u0.1),
+                (nsl as u64, nsl as u64),
+                "slices through a shared list shorter than the roots"
+            );
             let (nl, listed) = gj.parent_sharing_last();
             let lmax = gj
                 .anc
