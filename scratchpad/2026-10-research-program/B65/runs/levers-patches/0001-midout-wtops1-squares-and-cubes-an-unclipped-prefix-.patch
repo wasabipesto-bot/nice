@@ -1,0 +1,187 @@
+From 1f05c253aa4603923c101459278bec79e81784d7 Mon Sep 17 00:00:00 2001
+From: Claude <claude@example.com>
+Date: Fri, 27 Nov 2026 07:10:21 +0000
+Subject: [PATCH] midout: wtops1 squares and cubes an unclipped prefix's limbs,
+ not its interval's ends
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+For a prefix p that the range does not clip and f0 even, the interval's
+ends are a = p·B and c = (p + 1)·B - 1 with B = b^f0 = (b^2)^(f0/2), so
+a^2, a^3, c^2 and c^3 follow from p^2, p^3, q^2 and q^3 (q = p + 1) on
+na - f0/2 limbs, shifted by whole limbs, with c's corrections (2qB, 3qB,
+3q^2B^2 and the units) added and subtracted limb by limb. At base 65 that
+is 5 limbs instead of 7: about half the limb products of the certificate.
+The numbers, and so the certificates, are the same limb for limb; clipped
+prefixes and odd f0 keep the general form.
+
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+---
+ common/src/midout/gpu_wide.rs | 146 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 138 insertions(+), 8 deletions(-)
+
+diff --git a/common/src/midout/gpu_wide.rs b/common/src/midout/gpu_wide.rs
+index 938cc240..6e661eb5 100644
+--- a/common/src/midout/gpu_wide.rs
++++ b/common/src/midout/gpu_wide.rs
+@@ -1940,18 +1940,148 @@ mod wp {
+                         cd[comptime!(k + j) as usize] = v;
+                         hh = q;
+                     }
+-                    let mut an = Array::<u32>::new(comptime!(na as usize));
+-                    let mut cn = Array::<u32>::new(comptime!(na as usize));
+-                    limbs(&ad, &mut an, l, b);
+-                    limbs(&cd, &mut cn, l, b);
+                     let mut a2 = Array::<u32>::new(comptime!((2 * na) as usize));
+                     let mut c2 = Array::<u32>::new(comptime!((2 * na) as usize));
+-                    mul_l(&an, &an, &mut a2, na, na, bb);
+-                    mul_l(&cn, &cn, &mut c2, na, na, bb);
+                     let mut a3 = Array::<u32>::new(comptime!((3 * na) as usize));
+                     let mut c3 = Array::<u32>::new(comptime!((3 * na) as usize));
+-                    mul_l(&a2, &an, &mut a3, comptime!(2 * na), na, bb);
+-                    mul_l(&c2, &cn, &mut c3, comptime!(2 * na), na, bb);
++                    let mut general = true;
++                    // an unclipped prefix with f0 even: a = p·B and c = (p + 1)·B − 1 with B = b^f0 = (b²)^(f0/2),
++                    // so a² = p²B², a³ = p³B³, c² = q²B² − 2qB + 1 and c³ = q³B³ − 3q²B² + 3qB − 1 (q = p + 1):
++                    // products of the prefix's np = na − f0/2 limbs instead of the interval ends' na (the same
++                    // numbers, limb for limb)
++                    if comptime!(f0 >= 2 && f0 % 2 == 0) {
++                        if p != plo && p != phi {
++                            general = false;
++                            let ff = comptime!(f0 / 2);
++                            let np = comptime!(na - f0 / 2);
++                            let mut pn = Array::<u32>::new(comptime!(np as usize));
++                            let mut qn = Array::<u32>::new(comptime!(np as usize));
++                            #[unroll]
++                            for i in 0..np {
++                                let mut v = ad[comptime!(f0 + 2 * i) as usize];
++                                if comptime!(f0 + 2 * i + 1 < l) {
++                                    v += ad[comptime!(f0 + 2 * i + 1) as usize] * b;
++                                }
++                                pn[i as usize] = v;
++                            }
++                            // q = p + 1 <= phi < b^(l − f0) <= bb^np (p is not the last prefix): no carry out of the top limb
++                            let mut cy = 1u32;
++                            #[unroll]
++                            for i in 0..np {
++                                let v = pn[i as usize] + cy;
++                                let o = select(v >= bb, 1u32, 0u32);
++                                qn[i as usize] = v - o * bb;
++                                cy = o;
++                            }
++                            let mut p2 = Array::<u32>::new(comptime!((2 * np) as usize));
++                            let mut q2 = Array::<u32>::new(comptime!((2 * np) as usize));
++                            mul_l(&pn, &pn, &mut p2, np, np, bb);
++                            mul_l(&qn, &qn, &mut q2, np, np, bb);
++                            let mut p3 = Array::<u32>::new(comptime!((3 * np) as usize));
++                            let mut q3 = Array::<u32>::new(comptime!((3 * np) as usize));
++                            mul_l(&p2, &pn, &mut p3, comptime!(2 * np), np, bb);
++                            mul_l(&q2, &qn, &mut q3, comptime!(2 * np), np, bb);
++                            // a² and a³: shifted by 2·ff and 3·ff limbs
++                            #[unroll]
++                            for j in 0..comptime!(2 * na) {
++                                if comptime!(j >= 2 * ff) {
++                                    a2[j as usize] = p2[comptime!(j - 2 * ff) as usize];
++                                } else {
++                                    a2[j as usize] = 0u32;
++                                }
++                            }
++                            #[unroll]
++                            for j in 0..comptime!(3 * na) {
++                                if comptime!(j >= 3 * ff) {
++                                    a3[j as usize] = p3[comptime!(j - 3 * ff) as usize];
++                                } else {
++                                    a3[j as usize] = 0u32;
++                                }
++                            }
++                            // 2q and 3q (np + 1 limbs), 3q² (2np + 1 limbs)
++                            let mut q1x2 = Array::<u32>::new(comptime!((np + 1) as usize));
++                            let mut q1x3 = Array::<u32>::new(comptime!((np + 1) as usize));
++                            let mut c2c = 0u32;
++                            let mut c3c = 0u32;
++                            #[unroll]
++                            for i in 0..np {
++                                let v2 = 2u32 * qn[i as usize] + c2c;
++                                c2c = v2 / bb;
++                                q1x2[i as usize] = v2 - c2c * bb;
++                                let v3 = 3u32 * qn[i as usize] + c3c;
++                                c3c = v3 / bb;
++                                q1x3[i as usize] = v3 - c3c * bb;
++                            }
++                            q1x2[np as usize] = c2c;
++                            q1x3[np as usize] = c3c;
++                            let mut q2x3 = Array::<u32>::new(comptime!((2 * np + 1) as usize));
++                            let mut cq = 0u32;
++                            #[unroll]
++                            for i in 0..comptime!(2 * np) {
++                                let v = 3u32 * q2[i as usize] + cq;
++                                cq = v / bb;
++                                q2x3[i as usize] = v - cq * bb;
++                            }
++                            q2x3[comptime!(2 * np) as usize] = cq;
++                            // c² = (q²B² + 1) − 2qB
++                            let mut bo = 0u32;
++                            #[unroll]
++                            for j in 0..comptime!(2 * na) {
++                                let mut x = 0u32;
++                                if comptime!(j >= 2 * ff) {
++                                    x = q2[comptime!(j - 2 * ff) as usize];
++                                }
++                                if comptime!(j == 0) {
++                                    x += 1u32;
++                                }
++                                let mut y = 0u32;
++                                if comptime!(j >= ff && j <= ff + np) {
++                                    y = q1x2[comptime!(j - ff) as usize];
++                                }
++                                let t = x + bb - y - bo;
++                                let ge = t >= bb;
++                                c2[j as usize] = select(ge, t - bb, t);
++                                bo = select(ge, 0u32, 1u32);
++                            }
++                            // c³ = (q³B³ + 3qB) − (3q²B² + 1)
++                            let mut cy3 = 0u32;
++                            let mut bo3 = 0u32;
++                            #[unroll]
++                            for j in 0..comptime!(3 * na) {
++                                let mut x = cy3;
++                                if comptime!(j >= 3 * ff) {
++                                    x += q3[comptime!(j - 3 * ff) as usize];
++                                }
++                                if comptime!(j >= ff && j <= ff + np) {
++                                    x += q1x3[comptime!(j - ff) as usize];
++                                }
++                                let o = select(x >= bb, 1u32, 0u32);
++                                x -= o * bb;
++                                cy3 = o;
++                                let mut y = 0u32;
++                                if comptime!(j >= 2 * ff && j <= 2 * ff + 2 * np) {
++                                    y = q2x3[comptime!(j - 2 * ff) as usize];
++                                }
++                                if comptime!(j == 0) {
++                                    y += 1u32;
++                                }
++                                let t = x + bb - y - bo3;
++                                let ge = t >= bb;
++                                c3[j as usize] = select(ge, t - bb, t);
++                                bo3 = select(ge, 0u32, 1u32);
++                            }
++                        }
++                    }
++                    if general {
++                        let mut an = Array::<u32>::new(comptime!(na as usize));
++                        let mut cn = Array::<u32>::new(comptime!(na as usize));
++                        limbs(&ad, &mut an, l, b);
++                        limbs(&cd, &mut cn, l, b);
++                        mul_l(&an, &an, &mut a2, na, na, bb);
++                        mul_l(&cn, &cn, &mut c2, na, na, bb);
++                        mul_l(&a2, &an, &mut a3, comptime!(2 * na), na, bb);
++                        mul_l(&c2, &cn, &mut c3, comptime!(2 * na), na, bb);
++                    }
+                     let (l1, h1, q1, qh1, bad1) =
+                         cert_split_w(&a2, &c2, 0u64, 0u32, 0u64, 0u32, b, s2, k, comptime!(k + 2));
+                     let (l2, h2, q2, qh2, bad2) =
+-- 
+2.47.3
+

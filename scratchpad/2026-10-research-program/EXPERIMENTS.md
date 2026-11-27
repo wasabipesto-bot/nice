@@ -5,6 +5,41 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## B65.4 Base 65 on the wide path: parents shared across a slice digit (−1.1 ms per slice) and a compact tops list (−0.35 to −0.65 ms): the field 6.3 % faster through CUDA, 7.2 % through Vulkan; the tops stage is compute-bound, not launch-bound (2026-11-27 05:48–08:53 UTC, engineer, eventeo's RTX 3060; `B65/BRIEF-LEVERS.md`, `B65/LEVERS-RESULTS.md`, `B65/runs/levers/`; fork `dev/mo-wide-b65` 8f8ab3c1, 19be987c, a7ea3890 on 0b6e22e1; 0.556 kWh)
+
+| RTX 3060, base 65, field 77777, two alternating rounds | baseline 0b6e22e1 | a7ea3890 |
+|---|---|---|
+| CUDA: whole field, fs per admissible n | 6.427, 6.424 | **6.017, 6.023 (−6.3 %)** |
+| CUDA: tops / parents, ms per slice | 2.57 / 2.83 | 2.22 / 1.73 |
+| Vulkan/SPIR-V: whole field | 6.201, 6.202 | **5.751, 5.758 (−7.2 %)** |
+| Vulkan/SPIR-V: tops / parents | 3.04 / 2.82 | 2.39 / 1.80 |
+| CUDA: base 64 through the wide path | 3.596 | 3.413 (−5.1 %) |
+
+- **My premise about the tops stage was wrong.** I had read "the same 2.6 ms on a 3080 and on the 3060" as a
+  stage that does not scale with the card (too few threads or launch latency). Measured split at base 65:
+  `wtops1` 1.04 ms (compute-bound: the certificate arithmetic of 2.84M valid-parent prefixes, card 98 % busy),
+  `wtops2` 1.04 ms (bound by five scattered writes per top), `wtdigz` 0.31, host 0.12, `wtops5` 0.05. Capping the
+  grids only hurt (2.35–2.96 ms); no serial step. The 11-19 "same time on a 3080" was first code and is not
+  reproduced as a latency bound. The change: a compact list of certified tops and one 32-byte record per top
+  (2.57 → 2.22 ms CUDA, 3.04 → 2.39 Vulkan): above the 2.0 ms kill line on CUDA, so the step stopped. A fast path
+  for `wtops1` (5 limbs instead of 7) was exact and slower: dropped. The next step there needs profiler counters
+  (`ncu` is admin-only on eventeo).
+- **Parents:** the narrow path's sharing ported (`wanc_kernel`, the field driver, fault `F_SKIP_ANC`, test
+  `wide_field_parent_sharing_is_exact_and_loud`): 2.83 → 1.73 ms per slice. Memory at base 65: 65 lists at 3/8
+  of 10.9M roots = 1.06 GB; peak 4.9 → 5.9 GB (CUDA). A whole base-65 field does not fit the 3 GB GTX 1060
+  before or after (fails loudly), so the sharing excludes no card that could run it.
+- **Exactness:** counts of both base-65 fields and the base-64 field equal 2026-11-26's; the wide tier, slice
+  (now also comparing the tops themselves with the CPU reference's), fault and sharing tests pass through CUDA
+  and Vulkan/SPIR-V; brute force on small bases through CUDA and (on the GTX 1060) Vulkan. Fault messages
+  identical except one account word under `F_SKIP_TOPS` (the old `wtops2` placed stale flags of the previous
+  slice; the new list is empty there). `just lint` passes on a7ea3890.
+- **The wide expansion's extra 29 % per record** (note): it looks up each record's top through dependent loads,
+  divides by a runtime value and recomputes per-top values per bit; closing it is about a day and worth at
+  most 4 % of the field.
+- **Not merged yet:** independent review commissioned (`B65/BRIEF-REVIEW.md`) and the tests run through Metal
+  on the M4 first; the lint's dump must gain the new kernel when the branch is merged with `dev/mo-mode` c16d48e9.
+- eventeo off at 08:52:31; plug at standby.
+
 ## LINT.1 The middle-out kernels under the WGSL lint for the old Apple division defect: 28 kernels dumped at widths 32 and 64, nothing flagged; CI now fails if one drops out (2026-11-27 05:48–07:35 UTC, engineer, mayalaran and the fork's CI; `LINT/BRIEF.md`, `LINT/NOTES.md`; fork `dev/mo-lint` c16d48e9, 6 commits on 0b6e22e1, fast-forwarded into `dev/mo-mode` by me at 07:36 UTC)
 
 - **Dump:** two tests (`midout::gpu::tests::wgsl_dump_for_lint`, `midout::gpu_wide::tests::wgsl_dump_for_lint`)
