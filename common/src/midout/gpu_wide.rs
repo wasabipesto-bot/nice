@@ -5256,6 +5256,37 @@ mod tests {
                     "{name}: clean rerun"
                 );
             }
+            // a wrong shared list whose own counts are consistent (F_ANC_DROP) passes every account; the sampled
+            // check's comparison of the field run's survivors with the CPU's must catch it (its device rerun is
+            // unshared, so it would not)
+            let optc = WideOptions {
+                cpu_check: true,
+                ..opt16
+            };
+            gj.set_fault(F_ANC_DROP);
+            let r = search_field_wide_groups(&gj, &cn, vs, q, optc, 0..nsl);
+            gj.set_fault(0);
+            match r {
+                Ok((o, _)) => panic!(
+                    "F_ANC_DROP: silent (survivors {}, checked {})",
+                    o.survivors, o.checked
+                ),
+                Err(e) => {
+                    let m = format!("{e:#}");
+                    println!("F_ANC_DROP: loud: {m}");
+                    assert!(
+                        m.contains("the field run counted survivors"),
+                        "F_ANC_DROP: loud, but not by the sampled check's field-run comparison"
+                    );
+                }
+            }
+            let (oc, _) = search_field_wide_groups(&gj, &cn, vs, q, optc, 0..nsl).unwrap();
+            assert_eq!(
+                (oc.survivors, oc.checked),
+                (o1.survivors, o1.checked),
+                "F_ANC_DROP: clean rerun with the sampled check"
+            );
+            println!("clean rerun with the sampled check: equal");
         }
         on_wide_device!(|c| go(c, b, tn, nsl, classes));
     }
