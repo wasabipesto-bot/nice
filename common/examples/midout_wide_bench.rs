@@ -97,6 +97,11 @@ const OPTS: &[Opt] = &[
         help: "base 64: only the 64-bit path",
     },
     Opt {
+        name: "--no-share-parents",
+        value: None,
+        help: "do not share the parents' root pass across the slice's top digit (on by default)",
+    },
+    Opt {
         name: "--pf-digits",
         value: None,
         help: "the expansion's prefilter digit by digit (pf_w, the earlier form), not in base b^2",
@@ -207,6 +212,8 @@ fn main() -> Result<()> {
                 // --pf-digits: the prefilter digit by digit (the earlier form), for A/B timing
                 g.set_prefilter_b2(!flag("--pf-digits"));
                 println!("prefilter {}", if flag("--pf-digits") { "digits (pf_w)" } else { "base b^2 (pf_w2)" });
+                g.set_parent_sharing(!flag("--no-share-parents"));
+                println!("parent sharing {}", !flag("--no-share-parents"));
                 Some(g)
             };
             let nj = if narrow { Some(GpuJoin::new($client, Caps::b64(63))?) } else { None };
@@ -252,6 +259,8 @@ fn main() -> Result<()> {
                         tm.host_wait,
                         tm.sync
                     );
+                    let (nl, listed) = gj.parent_sharing_last();
+                    println!("WIDE SHARE t {t}: {nl} shared lists, {listed} roots listed");
                 }
                 if let Some(gn) = &nj {
                     let (o, dc, tm) = search_field(gn, &coord, vs, q, GpuOptions::new(group, flag("--cpu-check")).with_cpu_threads(cpu_threads))?;
