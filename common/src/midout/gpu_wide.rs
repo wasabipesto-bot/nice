@@ -4772,7 +4772,8 @@ mod tests {
         widths.extend([32u32, 64].into_iter().filter(|&w| w != dev_w).map(Some));
         for force_w in widths {
             let mut caps = WideCaps::for_base(65);
-            caps.classes = 4;
+            // runtime sizes only (no comptime value), cut so that every binding fits lavapipe's 128 MiB at W 8
+            (caps.classes, caps.survivors, caps.parents) = (4, 20_000_000, 2_000_000);
             let mut gj = WideJoin::with_width(client.clone(), caps, &coord, sh, force_w).unwrap();
             gj.batches.truncate(1);
             let r = gj
