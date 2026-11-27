@@ -13,7 +13,8 @@ mode can be run and tested end to end on one machine. Nothing in production call
                           checked, slices, telemetry; big integers as decimal strings); 200
                           {"submission_id": N, "status": "canon" | "check" | "already_recorded"}, or 4xx/503 with a
                           reason
-  GET  /status         -> counts
+  GET  /status         -> counts: fields, claimed, searched, checked (twice, agreeing), submissions, disagreed (checks
+                          whose result differs from their field's canon; scripts/midout_audit.py fails on any)
 
 Every other path is 404, so a client in another mode pointed here gets no work. `--legacy-path` (a test switch)
 instead hands the same marked fields to /claim/niceonly and /claim/detailed, to show that the client's other modes
@@ -258,6 +259,7 @@ last_claim = {}  # field index -> (claim_id, time) of its latest claim
 level = {}  # field index -> 1 searched once, 2 checked by an agreeing second search
 canon = {}  # field index -> the canon's result (see result_of)
 by_claim = {}  # claim_id -> (submission_id, result) of its accepted submission
+disagreed = 0  # accepted checks that differ from their field's canon (`agrees`)
 next_id = 1000
 next_sub = 1
 dropped = 0
@@ -347,11 +349,14 @@ def agrees(r, c):
 
 def accept(i, cid, sid, r):
     """Apply an accepted submission to memory; its status."""
+    global disagreed
     by_claim[cid] = (sid, r)
     if i not in level:
         level[i], canon[i] = 1, r
         return "canon"
-    if level[i] == 1 and agrees(r, canon[i]):
+    if not agrees(r, canon[i]):
+        disagreed += 1
+    elif level[i] == 1:
         level[i] = 2
     return "check"
 
@@ -509,7 +514,7 @@ class H(BaseHTTPRequestHandler):
             with lock:
                 return self._send(200, {"fields": len(fields), "claimed": len(last_claim), "searched": len(level),
                                         "checked": sum(1 for v in level.values() if v >= 2),
-                                        "submissions": len(by_claim)})
+                                        "submissions": len(by_claim), "disagreed": disagreed})
         self._send(404, "this server offers only middle-out fields: GET /claim/midout, POST /submit/midout")
 
     def do_POST(self):

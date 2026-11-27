@@ -996,8 +996,12 @@ fn end_to_end_against_the_development_server() {
     assert_eq!(sum.replies, vec![ReplyStatus::Canon; 30]);
     let st = srv.status(&rt);
     assert_eq!(
-        (st["searched"].as_u64(), st["claimed"].as_u64()),
-        (Some(30), Some(30)),
+        (
+            st["searched"].as_u64(),
+            st["claimed"].as_u64(),
+            st["disagreed"].as_u64()
+        ),
+        (Some(30), Some(30), Some(0)),
         "{st}"
     );
     let audit = srv.audit();
@@ -1053,7 +1057,8 @@ fn end_to_end_against_the_development_server() {
 
 /// A copy of the server's state with one more accepted submission of its
 /// first field, a check under a claim of its own that reports a nice number
-/// the canon does not have: the audit must fail on it and list the number.
+/// the canon does not have: the audit must fail on it and list the number,
+/// and a server started on the copy must count it in `/status`.
 #[cfg(unix)]
 fn audit_flags_a_check_that_disagrees(srv: &Server) {
     let (state, copy) = (srv.dir.join("state"), srv.dir.join("state-check"));
@@ -1086,6 +1091,20 @@ fn audit_flags_a_check_that_disagrees(srv: &Server) {
     assert!(
         out.contains("claim 1000000, check, NOT IN THE CANON)"),
         "{out}"
+    );
+    let Some(again) = Server::start("check", &e2e_work(), &["--state", copy.to_str().unwrap()])
+    else {
+        return;
+    };
+    let st = again.status(&runtime());
+    assert_eq!(
+        (
+            st["disagreed"].as_u64(),
+            st["checked"].as_u64(),
+            st["submissions"].as_u64()
+        ),
+        (Some(1), Some(0), Some(31)),
+        "{st}"
     );
 }
 
