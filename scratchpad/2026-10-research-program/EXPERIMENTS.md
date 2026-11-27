@@ -5,6 +5,28 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## LINT.1 The middle-out kernels under the WGSL lint for the old Apple division defect: 28 kernels dumped at widths 32 and 64, nothing flagged; CI now fails if one drops out (2026-11-27 05:48–07:35 UTC, engineer, mayalaran and the fork's CI; `LINT/BRIEF.md`, `LINT/NOTES.md`; fork `dev/mo-lint` c16d48e9, 6 commits on 0b6e22e1, fast-forwarded into `dev/mo-mode` by me at 07:36 UTC)
+
+- **Dump:** two tests (`midout::gpu::tests::wgsl_dump_for_lint`, `midout::gpu_wide::tests::wgsl_dump_for_lint`)
+  compile narrow base 64 (16 kernels and production's check) and wide base 65 (12 kernels) at the device's plane
+  width and at forced widths 32 and 64, both prefilter forms, shared and unshared parents, tops on the device and
+  on the host. **The lint flags nothing in them; no kernel changed.** That the lint can see them: a scratch build
+  with the old miscompiled form put back into `hist2` was flagged at both widths.
+- **CI:** `scripts/wgsl-lint.py` reads a kernel's base from a `b:` field too, takes comptime values in
+  `--require` (`G2Kernel:w=64`) and has `--require-present` for kernels with no constant division; the lavapipe
+  job's lint step runs the three dump tests with 21 new `--require` and 17 `--require-present` entries. Nothing
+  weakened (diff of the script read by me). Fork CI on c16d48e9: device parity 45949807997 (58 shaders, 0
+  flagged, nothing missing) and the full matrix 45949810962 (16 of 16) pass. On the M4: tier (b) 8 of 8, the
+  client's 22 tests, the dump and lint clean.
+- **Not covered:** plane width 16, the test-only probe modes, the bench-only `pf2=false`, the wide path at base 64
+  and at 66–70, and anything after the WGSL (naga's MSL, CubeCL's own MSL compiler).
+- **Development server:** `/status` has a `disagreed` count (accepted checks that differ from their canon); the
+  end-to-end test checks 0 after a clean run and 1 on a state with a disagreeing check.
+- **Upstream code, found on the way:** on any target other than x86-64 `cargo clippy -- -D warnings` fails on
+  main fdbe07d3 (`unused_self` at `cpu_join.rs:986`, `unused_mut` at `:2093`: both used only on the AVX paths).
+  A one-commit fix is on the fork branch `pr/macos-clippy-cpu-join` (ebba000e; clippy clean on the M4, fork CI
+  45949549267 green); independent review commissioned before any pull request.
+
 ## DOC.1 The design document and map re-based on `dev/mo-mode` 0b6e22e1 (2026-11-27 05:47–05:58 UTC, technical writer, documents only; `DOC/BRIEF.md`, `DOC/NOTES.md`; `../2026-11-midout-design/DESIGN.md` 790 → 810 lines, `interactive/midout-map.html`)
 
 - `tools/check_refs.py` now reads the `mo-mode` worktree: **89 references, 0 bad** (14 bad at the start, all in

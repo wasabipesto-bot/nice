@@ -2,7 +2,7 @@
 
 *A description of what is on the branch and why, for a reader who knows the project and today's overlap join and
 has seen none of this work. Written 2026-11-19, kept current; it describes the fork branch `dev/mo-mode` at head
-`0b6e22e1` (worktree `~/projects/nice/.worktrees/mo-mode`; every file:line below is at that head) and the
+`0b6e22e1` (since then only test and CI additions: the head is `c16d48e9`) (worktree `~/projects/nice/.worktrees/mo-mode`; every file:line below is at that head) and the
 measurements recorded beside it. The open decisions are not repeated here; they are in
 `~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md`, and the answers already given in `DECIDED.md`
 beside it.*
@@ -717,10 +717,11 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   fs, about ×3.9 against production's join on the same machine [measured; the ratio from one bracket field]. The
   mode's refusal of Metal is now a warning at start. Not checked: other Apple GPUs, older macOS releases (the
   Metal compiler defect of 2026 miscompiled some divisions by a constant; fixed in the OS), and CubeCL's own MSL
-  compiler. **The project's WGSL lint for that defect does not cover the middle-out kernels** (found 2026-11-26:
-  the lint's dump, `cubecl_backend::tests::wgsl_dump_for_lint`, holds the other GPU kernels only). They were
-  linted once by hand on 2026-11-19, and their `>> 16` sites were read by eye on 2026-11-26 with none of the
-  miscompiled form [judged by reading]; adding them to the dump is open.
+  compiler. The project's WGSL lint for that defect did not cover the middle-out kernels until 2026-11-27; since
+  `c16d48e9` two dump tests (`wgsl_dump_for_lint` in `gpu.rs` and `gpu_wide.rs`) put the base-64 and base-65
+  kernels through it at plane widths 32 and 64, the CI step fails if one drops out, and **nothing is flagged**
+  [measured: fork CI run 45949807997, 58 shaders; a scratch build with the old miscompiled form was flagged]. Not
+  under the lint: plane width 16, the wide path at bases 66–70, and what happens after the WGSL (naga's MSL).
 - **The sampled check at base 65 depends on free CPUs.** The CPU slice runs on up to 4 threads (33 s on a 5-CPU
   box against a 57 s field; one thread 106 s). The threads cost base 65 +0.7 % of device time and base 64 nothing
   measurable; the check's device rerun costs about 1 s per base-65 field and 0.2–0.4 s at base 64 [measured].
