@@ -22,15 +22,21 @@ remainder by a literal non-power-of-two constant whose dividend is:
     HI32 >> 16, which is a HALF of a HI32
 
 usage:
-    wgsl-lint.py [--require KERNEL[@BASE]]... [--verbose] [FILE...]
+    wgsl-lint.py [--require SPEC]... [--require-present SPEC]... [--verbose] [FILE...]
+    SPEC = KERNEL[@BASE][:FIELD=VALUE]...
 
 A FILE holding `[START_KERNEL_COMPILATION]` blocks is a CubeCL debug log
-(one kernel per block, named and based from the block's header); any other
-file is one shader. `--require` fails the run unless that kernel (at that
-base) was found and had at least one constant division recognised, which
-catches a dump that quietly stopped covering a kernel, and a change in
-CubeCL's output format that these patterns no longer match. The built-in
-cases (`--self-test`) run before every scan.
+(one kernel per block, named and based from the block's header: its
+first `base:` field, or else its first `b:`); any other file is one
+shader. `--require` fails the run unless that kernel (at that base, and
+with those comptime values in its header's kernel info, e.g. `:w=64`) was
+found and had at least one constant division recognised, which catches a
+dump that quietly stopped covering a kernel, and a change in CubeCL's
+output format that these patterns no longer match. `--require-present` asks
+only that the kernel was found: for a kernel with no constant division by a
+literal today (nothing for the scan to recognise), so that it cannot drop
+out of the dump unnoticed either. The built-in cases (`--self-test`) run
+before every scan.
 
 Exit status: 0 clean, 1 flagged sites, 2 a requirement or self-test failed.
 
@@ -182,18 +188,22 @@ def analyse(src):
 
 
 def shaders(path):
-    """(kernel, base, source) for each shader in the file."""
+    """(kernel, base, comptime fields, source) for each shader in the file."""
     opener = gzip.open if path.endswith(".gz") else open
     with opener(path, "rt", errors="replace") as f:
         text = f.read()
     if "[START_KERNEL_COMPILATION]" not in text:
-        yield path, None, text
+        yield path, None, {}, text
         return
     for blk in re.findall(r"\[START_KERNEL_COMPILATION\](.*?)\[END_KERNEL_COMPILATION\]", text, re.S):
         name = re.search(r"^name: \S+?::(\w+)<", blk, re.M)
-        base = re.search(r"^\s+base: (\d+),", blk, re.M)
-        src = blk.split("\nsource:", 1)[-1]
-        yield (name.group(1) if name else "?"), (int(base.group(1)) if base else None), src
+        head, _, src = blk.partition("\nsource:")
+        # the kernel info's scalar comptime values (`w: 64,`, `oh64: true,`), one level deep
+        info = re.search(r"^    info: \w+ \{\n(.*?)^    \}", head, re.M | re.S)
+        fields = dict(re.findall(r"^        (\w+): (\d+|true|false),$", info.group(1), re.M)) if info else {}
+        base = re.search(r"^\s+base: (\d+),", head, re.M) or re.search(r"^\s+b: (\d+),", head, re.M)
+        base = int(base.group(1)) if base else None
+        yield (name.group(1) if name else "?"), base, fields, src
 
 
 SELF_TEST = [
@@ -242,6 +252,7 @@ def self_test():
 
 def main(argv):
     require = []
+    present = []
     verbose = False
     files = []
     it = iter(argv)
@@ -250,6 +261,10 @@ def main(argv):
             require.append(next(it))
         elif a.startswith("--require="):
             require.append(a.split("=", 1)[1])
+        elif a == "--require-present":
+            present.append(next(it))
+        elif a.startswith("--require-present="):
+            present.append(a.split("=", 1)[1])
         elif a == "--verbose":
             verbose = True
         elif a == "--self-test":
@@ -265,30 +280,41 @@ def main(argv):
     if not files:
         return 0
 
-    seen = {}  # (kernel, base) -> constant divisions recognised
+    seen = []  # (kernel, base, comptime fields, constant divisions recognised)
     flagged = 0
     for path in files:
-        for kernel, base, src in shaders(path):
+        for kernel, base, fields, src in shaders(path):
             sites, ndiv = analyse(src)
-            key = (kernel, base)
-            seen[key] = max(seen.get(key, 0), ndiv)
+            seen.append((kernel, base, fields, ndiv))
             tag = kernel.rsplit("/", 1)[-1] + (f" b{base}" if base is not None else "")
+            if verbose and fields:
+                tag += " " + ",".join(f"{k}={v}" for k, v in fields.items() if k != "b")
             if sites or verbose:
                 print(f"{tag}: {ndiv} constant divisions, {len(sites)} flagged")
             for ln, text, ds, k in sites:
                 print(f"  {path}:{ln} [{tag}] divides a {ds} dividend by {k}: {text}")
             flagged += len(sites)
 
-    kernels = sorted({k.rsplit("/", 1)[-1] for k, _ in seen})
+    kernels = sorted({k.rsplit("/", 1)[-1] for k, *_ in seen})
     print(f"wgsl-lint: {len(seen)} shaders ({', '.join(kernels)}), {flagged} flagged sites")
+
+    def matching(spec):
+        head, *want = spec.split(":")
+        name, _, b = head.partition("@")
+        want = [w.partition("=")[::2] for w in want]
+        return [n for k, kb, f, n in seen
+                if k == name and (not b or kb == int(b)) and all(f.get(x) == v for x, v in want)]
+
     missing = []
     for r in require:
-        name, _, b = r.partition("@")
-        hits = [n for (k, kb), n in seen.items() if k == name and (not b or kb == int(b))]
+        hits = matching(r)
         if not hits:
             missing.append(f"{r}: not in the dump")
         elif max(hits) == 0:
             missing.append(f"{r}: no constant division recognised (has the shader format changed?)")
+    for r in present:
+        if not matching(r):
+            missing.append(f"{r}: not in the dump")
     for m in missing:
         print(f"REQUIRED SHADER MISSING: {m}")
     if flagged:
