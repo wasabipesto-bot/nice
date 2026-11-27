@@ -4757,11 +4757,12 @@ mod tests {
             println!("CUBECL_DEBUG_LOG is not set; no shaders to dump");
             return;
         }
-        let client = match crate::cubecl_backend::CubeclContext::new_default().expect("CubeCL init")
-        {
-            crate::cubecl_backend::CubeclContext::Wgpu { client, .. } => client,
-            #[allow(unreachable_patterns)]
-            _ => panic!("not a wgpu device"),
+        // irrefutable without the CUDA or HIP runtime
+        #[allow(irrefutable_let_patterns)]
+        let crate::cubecl_backend::CubeclContext::Wgpu { client, .. } =
+            crate::cubecl_backend::CubeclContext::new_default().expect("CubeCL init")
+        else {
+            panic!("not a wgpu device");
         };
         let coord = Coord::for_base(65).unwrap();
         let sh = Shape::for_coord(&coord);
