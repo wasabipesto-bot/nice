@@ -7,8 +7,9 @@
 //! 64-bit kernels byte for byte (no tax by construction); what the narrow
 //! path gains must be ported here by hand. Ported so far: the
 //! accounts, guards and sampled CPU check, the top hierarchy
-//! (`wtops5`) and the prefilter before the check (in `wexpand_kernel`,
-//! mirroring `cpu::prefilter`). The main kernel here is the base-64 kernel (`gpu::kernels::g2_kernel`:
+//! (`wtops5`), the prefilter before the check (in `wexpand_kernel`,
+//! mirroring `cpu::prefilter`) and the parents' root pass shared across the
+//! slice's top digit (`wanc_kernel`). The main kernel here is the base-64 kernel (`gpu::kernels::g2_kernel`:
 //! shuffle transpose, two entries per step,
 //! ballot ranks, common masks from registers, top digits from a table) with
 //! these widenings:
@@ -62,8 +63,8 @@
 //!
 //! # Correspondence with the base-64 path
 //!
-//! What the narrow path gains must be ported here by hand; this is the map (base-64 item → wide item). Parent
-//! sharing across digit 8 (`anc8_kernel`) and the host-tops path have no wide counterpart.
+//! What the narrow path gains must be ported here by hand; this is the map (base-64 item → wide item). The
+//! host-tops path has no wide counterpart.
 //!
 //! | base 64 ([`super::gpu`]) | wide (this module) |
 //! |---|---|
@@ -72,6 +73,7 @@
 //! | `tops5`, `tops1`, `tscan`, `tops2`, `tdigz2` | `wtops5`, `wtops1`, `wscan`, `wtops2`, `wtdigz` |
 //! | `toprec2` (production's top records) | — (`wcheck_kernel` reads the tops itself) |
 //! | `hist2`, `scan16`, `scatter3`, `hsort` | `whist`, `wscan`, `wscatter`, `wsort` |
+//! | `anc8_kernel`, `build_anc`, `set_parent_sharing`, `F_SKIP_ANC` (digit 8 of a `(4, 8, 5)` field) | `wanc_kernel`, `build_anc`, `set_parent_sharing`, `F_SKIP_ANC` (digit k − 2) |
 //! | `expand_kernel` with `keep_bits2`, `put_bits`, `pf` / `pf24` | `wexpand_kernel` with `wrec_top`, `wtop_ctx`, `put_bits_w`, `pf_w2` (`pf_w`: the earlier form) |
 //! | production's `check_kernel` | `wcheck_kernel` |
 //! | `done_kernel` | `wdone_kernel` |
@@ -1398,6 +1400,79 @@ mod wp {
         if UNIT_POS_X == 0u32 {
             acc[A_H_CERT].fetch_add(shc[0usize].load());
             acc[A_H_CUBES].fetch_add(1u32);
+        }
+    }
+
+    /// The parents' shared pass across the slice's top digit (the base-64 path's `anc8_kernel`, wide form): the
+    /// roots r_f whose depth-(k − 2) ancestor r = r_f + key·b^f0 (key = the slice's digits [f0, k − 2), `pipd8`,
+    /// the same for the b slices that differ only in digit k − 2) has 2(k − 2) distinct digits 0..k − 3 of r² and
+    /// r³ (`parent_w` one digit shallower), appended to `out` (one atomic per plane; order arbitrary). Those
+    /// digits depend only on r mod b^(k−2), so every root whose parent passes `parent_w` for some top digit is
+    /// listed: `whist` over this list instead of every root is exact, for each slice of the key. Account `acc8`:
+    /// [cubes done, roots examined, roots listed (by a ballot, apart from the list's own count `cnt[0]`), plane
+    /// errors].
+    #[cube(launch_unchecked)]
+    pub fn wanc_kernel(
+        rfs: &Array<u32>,
+        pipd8: &Array<u32>,
+        out: &mut Array<u32>,
+        cnt: &mut Array<Atomic<u32>>,
+        nroots: u32,
+        cap: u32,
+        acc8: &mut Array<Atomic<u32>>,
+        #[comptime] w: u32,
+        #[comptime] b: u32,
+        #[comptime] f0: u32,
+        #[comptime] k: u32,
+    ) {
+        let sh = SharedMemory::<Atomic<u32>>::new(2usize);
+        if UNIT_POS_X < 2u32 {
+            sh[UNIT_POS_X as usize].store(0u32);
+        }
+        if PLANE_DIM != w || UNIT_POS_X % w != UNIT_POS_PLANE {
+            acc8[3usize].fetch_add(1u32);
+        }
+        sync_cube();
+        let i = ABSOLUTE_POS_X;
+        let live = i < nroots;
+        let mut ok = false;
+        let mut rf = 0u32;
+        if live {
+            rf = rfs[i as usize];
+            let (lo, hi, _cacc) = parent_w(rf, pipd8, b, f0, comptime!(k - 1));
+            ok = lo != 0u64 || hi != 0u32;
+        }
+        let bl = plane_ballot(ok);
+        let l = UNIT_POS_PLANE;
+        let lm = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
+        let mut r = (bl[0usize] & lm).count_ones();
+        let mut n = bl[0usize].count_ones();
+        if comptime!(w > 32) {
+            let hm = select(l >= 32u32, (1u32 << (l & 31u32)) - 1u32, 0u32);
+            r += (bl[1usize] & hm).count_ones();
+            n += bl[1usize].count_ones();
+        }
+        let mut base0 = 0u32;
+        if l == 0u32 && n > 0u32 {
+            base0 = cnt[0usize].fetch_add(n);
+        }
+        let base = plane_sum(base0);
+        if ok {
+            let slot = base + r;
+            if slot < cap {
+                out[slot as usize] = rf;
+            }
+        }
+        let ex = plane_sum(select(live, 1u32, 0u32));
+        if UNIT_POS_PLANE == 0u32 {
+            sh[0usize].fetch_add(ex);
+            sh[1usize].fetch_add(n);
+        }
+        sync_cube();
+        if UNIT_POS_X == 0u32 {
+            acc8[0usize].fetch_add(1u32);
+            acc8[1usize].fetch_add(sh[0usize].load());
+            acc8[2usize].fetch_add(sh[1usize].load());
         }
     }
 
@@ -2731,6 +2806,8 @@ struct WSlice {
     acc: Handle,
     /// Its top-hierarchy group's `l5n` (parents listed, cubes done).
     l5n: Option<Handle>,
+    /// The roots `whist` examined: every root, or a shared list's length.
+    hn: u32,
 }
 
 /// What the host knows of a slice when its first launch batch is finished (the base-64 path's `SliceHead`).
@@ -2738,6 +2815,8 @@ struct WHead {
     pip: u64,
     acc: Handle,
     l5n: Option<Handle>,
+    /// The roots `whist` examined (its grid's cubes are the account's).
+    hn: u32,
     /// Every launch batch of the slice was queued (the probe and children laws apply).
     full: bool,
 }
@@ -2777,6 +2856,23 @@ pub(crate) const F_DROP_PARENT: u32 = 8192;
 /// 1 parent in 997 computed wrongly (no mask): conservation holds, only the sampled CPU check sees it.
 #[allow(dead_code)] // the tests only
 pub(crate) const F_BAD_PARENT: u32 = 16384;
+/// The shared pass across the slice's top digit (`wanc_kernel`) not launched.
+#[allow(dead_code)] // the tests only
+pub(crate) const F_SKIP_ANC: u32 = 32768;
+
+/// The parents' shared lists of a field: one per value of the slices' digits [f0, k − 2) (`keys`), the roots
+/// whose depth-(k − 2) ancestor is valid (`wanc_kernel`), with their lengths (read once per field).
+#[derive(Default)]
+struct WAnc {
+    keys: Vec<u64>,
+    lens: Vec<u32>,
+    lists: Vec<Handle>,
+    /// The last build: lists and roots listed (tests, benches).
+    last: (usize, u64),
+}
+
+/// Most shared lists held at once (one per value of digit f0 of a `(4, 8, 5)` field: b of them).
+const ANC_LISTS: usize = MAXB as usize;
 
 /// The wide device path for one base and shape: kernels compiled for one
 /// plane width, buffers allocated once.
@@ -2832,6 +2928,12 @@ pub struct WideJoin<R: Runtime> {
     pub(crate) fault: u32,
     /// The expansion's prefilter in base b² (`pf_w2`; on unless [`WideJoin::set_prefilter_b2`]).
     pf2: bool,
+    /// Share the parents' root pass across the slice's top digit inside a field ([`WideJoin::set_parent_sharing`],
+    /// on).
+    share: bool,
+    anc: std::sync::Mutex<WAnc>,
+    /// A shared list's capacity in roots (a longer list is an error of the field).
+    anc_cap: u32,
 }
 
 impl<R: Runtime> WideJoin<R> {
@@ -2964,6 +3066,14 @@ impl<R: Runtime> WideJoin<R> {
             stop: 6,
             fault: 0,
             pf2: true,
+            share: true,
+            anc: std::sync::Mutex::new(WAnc::default()),
+            // ~21 % of the roots at base 65 (24 % at 70); small bases' tests hold every root
+            anc_cap: if nrf <= 1 << 20 {
+                nrf.max(1)
+            } else {
+                nrf / 8 * 3 + 4096
+            },
             caps,
             wb,
             client,
@@ -2978,6 +3088,137 @@ impl<R: Runtime> WideJoin<R> {
     /// kept for A/B timing). The same predicate either way.
     pub fn set_prefilter_b2(&mut self, on: bool) {
         self.pf2 = on;
+    }
+
+    /// Share the parents' root pass across the slice's top digit (k − 2) inside a field: when a field's slices take
+    /// at most [`ANC_LISTS`] values of their digits [f0, k − 2), each of them several times (a `(4, 8, 5)` field: b
+    /// values of digit 4, b slices each), the roots whose depth-(k − 2) ancestor is valid are listed once per value
+    /// (`wanc_kernel`, at the field's start, one synchronisation) and each slice's `whist` runs over its list
+    /// instead of every root. Exact by containment (see `wanc_kernel`). On by default.
+    pub fn set_parent_sharing(&mut self, on: bool) {
+        self.share = on;
+    }
+
+    /// The last build of shared lists: (lists, roots listed in all).
+    pub fn parent_sharing_last(&self) -> (usize, u64) {
+        self.anc.lock().expect("anc").last
+    }
+
+    /// The key of a slice's shared list: its digits [f0, k − 2) (pip mod b^(k−2−f0)).
+    fn anc_key(&self, pip: u64) -> u64 {
+        pip % u64::from(self.wb.b).pow(self.wb.k - 2 - self.wb.f0)
+    }
+
+    /// Build the shared lists for `keys`, synchronise, and check their accounts.
+    fn build_anc(&self, keys: &[u64]) -> Result<()> {
+        ensure!(
+            keys.len() <= ANC_LISTS,
+            "middle-out wide: {} shared parent lists",
+            keys.len()
+        );
+        let wb = &self.wb;
+        let nd8 = (wb.k - 2 - wb.f0) as usize;
+        let mut st = self.anc.lock().expect("anc");
+        st.keys.clear();
+        st.lens.clear();
+        while st.lists.len() < keys.len() {
+            let h = self.client.empty(self.anc_cap as usize * 4);
+            st.lists.push(h);
+        }
+        let nroots = self.nrf;
+        let grid = nroots.div_ceil(NT).max(1);
+        let mut hs = Vec::new();
+        for (j, &key) in keys.iter().enumerate() {
+            let cnt = self.mk(vec![0u32]);
+            let acc8 = self.mk(vec![0u32; 4]);
+            let mut x = key;
+            let mut d8: Vec<u32> = (0..nd8)
+                .map(|_| {
+                    let v = (x % u64::from(wb.b)) as u32;
+                    x /= u64::from(wb.b);
+                    v
+                })
+                .collect();
+            if d8.is_empty() {
+                d8.push(0);
+            }
+            let pd8 = self.mk(d8);
+            if self.fault & F_SKIP_ANC == 0 {
+                unsafe {
+                    wp::wanc_kernel::launch_unchecked::<R>(
+                        &self.client,
+                        CubeCount::Static(grid, 1, 1),
+                        CubeDim::new_1d(NT),
+                        ArrayArg::from_raw_parts(self.rfh.clone(), nroots.max(1) as usize),
+                        ArrayArg::from_raw_parts(pd8.clone(), nd8.max(1)),
+                        ArrayArg::from_raw_parts(st.lists[j].clone(), self.anc_cap as usize),
+                        ArrayArg::from_raw_parts(cnt.clone(), 1),
+                        nroots,
+                        self.anc_cap,
+                        ArrayArg::from_raw_parts(acc8.clone(), 4),
+                        self.w,
+                        wb.b,
+                        wb.f0,
+                        wb.k,
+                    );
+                }
+            }
+            hs.push(cnt);
+            hs.push(acc8);
+        }
+        self.sync()?;
+        let nh = hs.len();
+        let mut rv = cubecl::future::block_on(self.client.read_async(hs))
+            .map_err(|e| anyhow!("read: {e:?}"))?
+            .into_iter()
+            .map(|b| u32::from_bytes(&b).to_vec());
+        let mut lens = Vec::new();
+        for &key in keys {
+            let (Some(c), Some(a)) = (rv.next(), rv.next()) else {
+                bail!("middle-out wide: {nh} buffers read, fewer returned");
+            };
+            let n = c[0];
+            ensure!(
+                a[3] == 0,
+                "middle-out wide: wanc (key {key}): plane errors {}",
+                a[3]
+            );
+            ensure!(
+                a[0] == grid,
+                "middle-out wide: wanc (key {key}): cubes done: {}, want {grid} (account {a:?})",
+                a[0]
+            );
+            ensure!(
+                a[1] == nroots,
+                "middle-out wide: wanc (key {key}): roots examined: {}, want {nroots}",
+                a[1]
+            );
+            ensure!(
+                a[2] == n,
+                "middle-out wide: wanc (key {key}): roots certified {} = listed {n}",
+                a[2]
+            );
+            ensure!(
+                n > 0 && n <= self.anc_cap,
+                "middle-out wide: wanc (key {key}): {n} roots listed (capacity {})",
+                self.anc_cap
+            );
+            lens.push(n);
+        }
+        st.last = (keys.len(), lens.iter().map(|&x| u64::from(x)).sum());
+        st.keys = keys.to_vec();
+        st.lens = lens;
+        Ok(())
+    }
+
+    /// The shared list for a slice, if one is built: (handle, length).
+    fn anc_for(&self, pip: u64) -> Option<(Handle, u32)> {
+        let k = self.anc_key(pip);
+        let st = self.anc.lock().expect("anc");
+        st.keys
+            .iter()
+            .position(|&x| x == k)
+            .map(|j| (st.lists[j].clone(), st.lens[j]))
     }
 
     /// Timing and bisection only (benches, feature `midout-bench`): run the stages up to `stop` (1 tops, 2
@@ -3018,8 +3259,8 @@ impl<R: Runtime> WideJoin<R> {
         cubecl::future::block_on(self.client.sync()).map_err(|e| anyhow!("sync: {e:?}"))
     }
 
-    /// Queue a slice's tops and parents.
-    fn queue_prep(&self, pip: u64, rankh: &Handle) -> WSlice {
+    /// Queue a slice's tops and parents; with `shared`, `whist` over the slice's shared list when one is built.
+    fn queue_prep(&self, pip: u64, rankh: &Handle, shared: bool) -> WSlice {
         let wb = &self.wb;
         let c = &self.client;
         let nt = self.caps.tops as usize;
@@ -3044,6 +3285,8 @@ impl<R: Runtime> WideJoin<R> {
         let (b, f0, k, l) = (wb.b, wb.f0, wb.k, wb.l);
         let grp = pip / u64::from(b);
         let mut l5n = None;
+        let src = if shared { self.anc_for(pip) } else { None };
+        let hn = src.as_ref().map_or(self.nrf, |x| x.1);
         unsafe {
             if self.upto(1) {
                 let mut st = self.t5state.lock().expect("t5state");
@@ -3157,18 +3400,19 @@ impl<R: Runtime> WideJoin<R> {
             }
             if self.upto(2) {
                 let nbk = self.nbk as usize;
+                let (rh, nr) = src.clone().unwrap_or_else(|| (self.rfh.clone(), self.nrf));
                 wp::whist_kernel::launch_unchecked::<R>(
                     c,
-                    CubeCount::Static(self.nrf.div_ceil(NT).max(1), 1, 1),
+                    CubeCount::Static(nr.div_ceil(NT).max(1), 1, 1),
                     CubeDim::new_1d(NT),
-                    a(&self.rfh, self.nrf as usize),
+                    a(&rh, nr as usize),
                     a(&pipd, npd),
                     a(rankh, 8),
                     a(&self.histh, nbk),
                     a(&self.g_lst, np),
                     a(&self.g_lkey, np),
                     a(&self.lcnt, 1),
-                    self.nrf,
+                    nr,
                     (pip % u64::from(wb.m())) as u32,
                     np as u32,
                     self.fault,
@@ -3230,6 +3474,7 @@ impl<R: Runtime> WideJoin<R> {
             tstat,
             acc,
             l5n,
+            hn,
         }
     }
 
@@ -3378,7 +3623,7 @@ impl<R: Runtime> WideJoin<R> {
 
     /// Queue a whole slice into the group's counters.
     fn queue_slice(&self, pip: u64, rankh: &Handle, cnt: &Handle, out: &mut Vec<WTicket>) {
-        let ws = self.queue_prep(pip, rankh);
+        let ws = self.queue_prep(pip, rankh, true);
         for bi in 0..self.batches.len() {
             let mut t = self.queue_batch(&ws, bi, cnt);
             if bi == 0 {
@@ -3387,6 +3632,7 @@ impl<R: Runtime> WideJoin<R> {
                     pip,
                     acc: ws.acc.clone(),
                     l5n: ws.l5n.clone(),
+                    hn: ws.hn,
                     full: true,
                 });
             }
@@ -3621,7 +3867,7 @@ impl<R: Runtime> WideJoin<R> {
         fail(
             "whist cubes done",
             u64::from(a[A_H_CUBES]),
-            u64::from(self.nrf.div_ceil(NT).max(1)),
+            u64::from(h.hn.div_ceil(NT).max(1)),
         )?;
         fail(
             "parents certified (whist) = listed",
@@ -3659,7 +3905,7 @@ impl<R: Runtime> WideJoin<R> {
     pub fn rank_of(&self, pip: u64) -> Result<[u32; 8]> {
         let b = self.wb.b;
         let rankh = self.mk((0..8).map(|i| i % b).collect());
-        let ws = self.queue_prep(pip, &rankh);
+        let ws = self.queue_prep(pip, &rankh, false);
         self.sync()?;
         let ntops = (self.rd(&ws.tstat)?[0] as usize).min(self.caps.tops as usize);
         let tm = self.rd(&ws.tmh)?;
@@ -3710,7 +3956,7 @@ impl<R: Runtime> WideJoin<R> {
     ) -> Result<(WCounts, Vec<(u128, u32)>, Vec<(u32, u64, u32)>)> {
         let cnt = self.mk(vec![0u32; NCNT]);
         let rankh = self.mk(rank.to_vec());
-        let ws = self.queue_prep(pip, &rankh);
+        let ws = self.queue_prep(pip, &rankh, false);
         self.sync()?;
         let ntops = (self.rd(&ws.tstat)?[0] as usize).min(self.caps.tops as usize);
         let thd = self.rd(&ws.thdh)?;
@@ -3735,6 +3981,7 @@ impl<R: Runtime> WideJoin<R> {
                     pip,
                     acc: ws.acc.clone(),
                     l5n: ws.l5n.clone(),
+                    hn: ws.hn,
                     full: true,
                 });
             }
@@ -3983,6 +4230,23 @@ fn run_field_wide<R: Runtime>(
         None
     };
     let rank = gj.rank_of(pips[0])?;
+    // the parents' shared lists, when the field's slices repeat their digits [f0, k - 2)
+    gj.anc.lock().expect("anc").keys.clear();
+    if gj.share && gj.upto(2) && gj.wb.k - 2 > gj.wb.f0 {
+        let mut keys: Vec<u64> = Vec::new();
+        for &p in &pips {
+            let k = gj.anc_key(p);
+            if !keys.contains(&k) {
+                keys.push(k);
+                if keys.len() > ANC_LISTS {
+                    break;
+                }
+            }
+        }
+        if keys.len() <= ANC_LISTS && keys.len() < pips.len() {
+            gj.build_anc(&keys)?;
+        }
+    }
     let host_wait = t0.elapsed().as_secs_f64();
     let rankh = gj.mk(rank.to_vec());
     let mut total = WCounts::default();
@@ -4653,6 +4917,112 @@ mod tests {
             .map(|c| c.parse().unwrap());
         let again = std::env::var("AUDIT_AGAIN").map_or(true, |x| x != "0");
         on_wide_device!(|c| wide_faults(c, b, &pips, sh, classes, again));
+    }
+
+    /// The parents' root pass shared across the slice's top digit (`set_parent_sharing`): the first
+    /// `MIDOUT_SHARE_SLICES` (130) slices of a base-65 `(4, 8, 5)` field (65 values of digit 4 × 2 of digit 8:
+    /// every shared list serves two slices), one slice per group, give every slice's counts (kept included: same
+    /// key) equal with and without sharing; with sharing on, each fault is loud (`F_SKIP_ANC` new; `F_SKIP_MAIN`,
+    /// `F_SKIP_TOPS`, `F_DROP_PROBE`, `F_DROP_PARENT` as without sharing), and a clean run after each gives the
+    /// clean counts. `MIDOUT_485_T` the field (77777), `MIDOUT_CLASSES` the batch width.
+    #[cfg(feature = "midout-box-tests")]
+    #[test]
+    #[ignore = "needs a GPU (MIDOUT_CUDA=1 for the CUDA runtime)"]
+    fn wide_field_parent_sharing_is_exact_and_loud() {
+        let b = 65u32;
+        let tn: u128 = std::env::var("MIDOUT_485_T")
+            .ok()
+            .map_or(77_777, |s| s.parse().unwrap());
+        let nsl: usize = std::env::var("MIDOUT_SHARE_SLICES")
+            .ok()
+            .map_or(130, |s| s.parse().unwrap());
+        let classes: Option<u32> = std::env::var("MIDOUT_CLASSES")
+            .ok()
+            .map(|s| s.parse().unwrap());
+        fn go<R: Runtime>(
+            client: ComputeClient<R>,
+            b: u32,
+            tn: u128,
+            nsl: usize,
+            classes: Option<u32>,
+        ) {
+            let cn = Coord::with_digits(b, 4, 8, 5).unwrap();
+            let sh = Shape::for_coord(&cn);
+            let (q, vs) = (cn.quantum(), cn.start() + tn * cn.quantum());
+            let mut caps = WideCaps::for_base(b);
+            if let Some(c) = classes {
+                caps.classes = c.min(b - 1);
+            }
+            let mut gj = WideJoin::new(client, caps, &cn, sh).unwrap();
+            let opt1 = WideOptions {
+                group: 1,
+                cpu_check: false,
+                cpu_threads: 0,
+            };
+            let opt16 = WideOptions { group: 16, ..opt1 };
+            gj.set_parent_sharing(false);
+            let (o0, r0) = search_field_wide_groups(&gj, &cn, vs, q, opt1, 0..nsl).unwrap();
+            gj.set_parent_sharing(true);
+            let (o1, r1) = search_field_wide_groups(&gj, &cn, vs, q, opt1, 0..nsl).unwrap();
+            let (nl, listed) = gj.parent_sharing_last();
+            let lmax = gj
+                .anc
+                .lock()
+                .expect("anc")
+                .lens
+                .iter()
+                .copied()
+                .max()
+                .unwrap_or(0);
+            println!(
+                "{nsl} slices of base-{b} (4, 8, 5) field {tn}: {nl} shared lists, {listed} roots listed ({:.1} % of {} per list, longest {lmax}, capacity {})",
+                100.0 * listed as f64 / (nl as f64 * f64::from(gj.nrf)),
+                gj.nrf,
+                gj.anc_cap
+            );
+            assert!(nl >= 1 && nl < nsl);
+            assert_eq!(r0.len(), r1.len());
+            for ((p0, c0), (p1, c1)) in r0.iter().zip(&r1) {
+                assert_eq!(p0, p1);
+                assert_eq!(
+                    c0, c1,
+                    "slice {p0:?}: shared parents differ: {c0:?} vs {c1:?}"
+                );
+            }
+            assert_eq!(
+                (o0.survivors, o0.checked, o0.slices, &o0.nice),
+                (o1.survivors, o1.checked, o1.slices, &o1.nice)
+            );
+            println!(
+                "equal slice by slice with and without sharing: survivors {}, checked {}",
+                o1.survivors, o1.checked
+            );
+            for (name, f) in [
+                ("F_SKIP_ANC", F_SKIP_ANC),
+                ("F_SKIP_MAIN", F_SKIP_MAIN),
+                ("F_SKIP_TOPS", F_SKIP_TOPS),
+                ("F_DROP_PROBE", F_DROP_PROBE),
+                ("F_DROP_PARENT", F_DROP_PARENT),
+            ] {
+                gj.set_fault(f);
+                let r = search_field_wide_groups(&gj, &cn, vs, q, opt16, 0..nsl);
+                gj.set_fault(0);
+                match r {
+                    Ok((o, _)) => panic!(
+                        "{name}: silent (survivors {}, checked {})",
+                        o.survivors, o.checked
+                    ),
+                    Err(e) => println!("{name}: loud: {e:#}"),
+                }
+                let (oc, _) = search_field_wide_groups(&gj, &cn, vs, q, opt16, 0..nsl).unwrap();
+                assert_eq!(
+                    (oc.survivors, oc.checked),
+                    (o1.survivors, o1.checked),
+                    "{name}: clean rerun"
+                );
+            }
+        }
+        on_wide_device!(|c| go(c, b, tn, nsl, classes));
     }
 
     /// On the wide path: a failed device allocation (`AUDIT_FILL_MB` filled first, in
