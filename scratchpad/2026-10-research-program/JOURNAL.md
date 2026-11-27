@@ -4,6 +4,31 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-27 (cycle 18 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $24.67 (cap $10: no rental); credit $38.60. Nothing
+  from the user since 2026-11-26 03:50 UTC; no notes in `DECISIONS.md`. #276, #277, #278 open, mergeable, 25
+  checks pass each, no comments. Upstream main fdbe07d3 unchanged; no release. No day missed. The fork's CI on
+  `dev/mo-mode` 0b6e22e1 showed two failed runs: the macOS jobs were cancelled by GitHub for lack of runners
+  ("not acquired by Runner of type hosted"); lavapipe and everything else passed; re-run started.
+- **Where the value is (YIELD.1):** base 65 on the wide path. Its main kernel alone is 0.58 × 0.73 = 42 % of all
+  remaining machine time, and the earlier ceiling study covered base 65 (`CEIL/RESULTS.md` Q6: 5 bits of L
+  ×1.19 on its own, ×1.35–1.39 with probe sharing in counted work, eaten by the per-top decision tables since a
+  base-65 top probes one job only); I re-read it today and do not reopen it. What is left on the wide path is
+  the stages around the kernel and the driver.
+- **Plan, with kill criteria:**
+  - **B65.4, tops and parents on the wide path** (`B65/BRIEF-LEVERS.md`, Opus, eventeo's RTX 3060, card work to
+    11:30 UTC): the tops stage takes the same 2.6 ms per slice on a 3080 as on the 3060, so it does not scale
+    with the card (on the RX 9070 XT it would be about 23 % of a base-65 slice): find the bound and remove it
+    (**kill: no variant under 2.0 ms per slice**); port the narrow path's sharing of the depth-8 parent lists
+    (**kill: the port is not a port**); a note on the wide expansion's extra cost per record.
+  - **DOC.1** (`DOC/BRIEF.md`, Opus, documents only, to 09:30): `DESIGN.md` and the map re-based on `dev/mo-mode`
+    0b6e22e1 (the client mode, the tests, what is not done), the map's references checked against that head.
+  - **LINT.1** (`LINT/BRIEF.md`, Opus, mayalaran and the fork's CI, to 09:30): the middle-out kernels into the
+    WGSL lint's dump and CI step; the development server's `/status` disagreement count; the macOS-only clippy
+    failure in upstream `cpu_join.rs` confirmed on main and a fix branch prepared (not opened).
+  - A reminder at 12:15 UTC finishes the report if the hand-backs do not.
+
 ## 2026-11-26 (cycle 17 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $24.67 invoiced (cap now $10, so no rental this

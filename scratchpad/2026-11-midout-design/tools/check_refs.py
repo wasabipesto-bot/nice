@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Check every file:line reference in the interactive map: the line must contain the named identifier.
-Middle-out refs are read from the dev/mo-clean worktree (the head the map names in its sub-title); refs marked 'main' from
+Middle-out refs are read from the dev/mo-mode worktree (the head the map names in its sub-title); refs marked 'main' from
 `git show origin/main:<path>` (974d7194). Read-only. Usage: python3 tools/check_refs.py interactive/midout-map.html"""
 import re, subprocess, sys, os
 html = open(sys.argv[1]).read()
-WT = os.path.expanduser('~/projects/nice/.worktrees/midout-clean')
+WT = os.path.expanduser('~/projects/nice/.worktrees/mo-mode')
 REPO = os.path.expanduser('~/projects/nice')
 head = subprocess.run(['git', '-C', WT, 'rev-parse', '--short=8', 'HEAD'], capture_output=True, text=True).stdout.strip()
 main = subprocess.run(['git', '-C', REPO, 'rev-parse', '--short=8', 'origin/main'], capture_output=True, text=True).stdout.strip()

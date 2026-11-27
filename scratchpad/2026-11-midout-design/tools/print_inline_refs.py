@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Print the target line of every inline `file.rs:N` / `:N` / `file.rs:N–M` reference in a text file, so each can be
-read against its claim (refs are into the dev/mo-clean worktree). Usage: print_inline_refs.py FILE"""
+read against its claim (refs are into the dev/mo-mode worktree). Usage: print_inline_refs.py FILE"""
 import re, sys, os
-WT = os.path.expanduser('~/projects/nice/.worktrees/midout-clean')
+WT = os.path.expanduser('~/projects/nice/.worktrees/mo-mode')
 FILES = {'gpu.rs': 'common/src/midout/gpu.rs', 'gpu_wide.rs': 'common/src/midout/gpu_wide.rs', 'cpu.rs': 'common/src/midout/cpu.rs',
          'coord.rs': 'common/src/midout/coord.rs', 'route.rs': 'common/src/midout/route.rs', 'mod.rs': 'common/src/midout/mod.rs',
          'wire.rs': 'common/src/midout/wire.rs', 'midout_route.rs': 'client/src/midout_route.rs'}
