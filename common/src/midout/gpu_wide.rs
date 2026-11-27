@@ -183,8 +183,9 @@ const A_DONE: usize = 14;
 /// `whist` ran with planes of another width than compiled for, or partly filled.
 const A_ERR_PLANE: usize = 15;
 const ACC_WORDS: usize = 16;
-/// The expansion's own account (`est`): cubes done, slabs walked (once per plane).
-const EST_WORDS: usize = 4;
+/// The expansion's own account (`est`): cubes done, slabs walked (once per plane), survivor bits read, bits of a
+/// clipped top, survivors appended counted per lane (= the list's count).
+const EST_WORDS: usize = 5;
 /// The check's grid.
 const CHECK_CUBES: u32 = 2048;
 const CHECK_WG: u32 = 256;
@@ -387,6 +388,8 @@ mod wk {
             }
             s_np[0usize] = n;
             s_nl[0usize].store(0u32);
+            // [1]: the instance's survivor bits, counted by each lane apart from the ballots that place its records
+            s_nl[1usize].store(0u32);
             if poff == plast && n > poff + PMAX {
                 cnt[C_ERR_PMAX].fetch_add(1u32);
             }
@@ -810,14 +813,17 @@ mod wk {
                             }
                         }
                         let sbase = slab_id * SLAB + slab_used;
+                        // F_SLAB_SPLIT (1048576): the records of lanes other than lane 0 are lost (written empty),
+                        // as when lanes split from lane 0's after a branch append apart from it
+                        let lost = (fault & 1048576u32) != 0u32 && lane != 0u32;
                         if slab_id < nslab_cap {
                             if nza {
                                 let mut rv = Vector::<u32, Const<4>>::empty();
                                 rv[0usize] =
                                     ((pk[0usize] >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
                                 rv[1usize] = cpos;
-                                rv[2usize] = wlo[0usize];
-                                rv[3usize] = whi[0usize];
+                                rv[2usize] = select(lost, 0u32, wlo[0usize]);
+                                rv[3usize] = select(lost, 0u32, whi[0usize]);
                                 out[(sbase + ra) as usize] = rv;
                             }
                             if nzb {
@@ -825,8 +831,8 @@ mod wk {
                                 rv[0usize] =
                                     ((pk[1usize] >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
                                 rv[1usize] = cpos;
-                                rv[2usize] = wlo[1usize];
-                                rv[3usize] = whi[1usize];
+                                rv[2usize] = select(lost, 0u32, wlo[1usize]);
+                                rv[3usize] = select(lost, 0u32, whi[1usize]);
                                 out[(sbase + na + rb) as usize] = rv;
                             }
                         }
@@ -871,11 +877,15 @@ mod wk {
             slabcnt[slab_id as usize] = slab_used;
         }
         let sk = plane_sum(my_kept);
-        let ss = plane_sum(my_surv);
-        if lane == 0u32 {
-            if sk > 0u32 {
-                cnt[(d * 5u32 + 3u32) as usize].fetch_add(sk);
-            }
+        if lane == 0u32 && sk > 0u32 {
+            cnt[(d * 5u32 + 3u32) as usize].fetch_add(sk);
+        }
+        if my_surv > 0u32 {
+            s_nl[1usize].fetch_add(my_surv);
+        }
+        sync_cube();
+        if t == 0u32 {
+            let ss = s_nl[1usize].load();
             if ss > 0u32 {
                 cnt[(d * 5u32 + 4u32) as usize].fetch_add(ss);
             }
@@ -1321,7 +1331,8 @@ mod wp {
         #[comptime] f0: u32,
         #[comptime] k: u32,
     ) {
-        // the cube's certified parents, counted apart from the list (account `A_H_CERT`)
+        // the cube's certified parents, counted by each lane apart from the ballot and the list (account
+        // `A_H_CERT`): a lane left out of the plane's ballot (a plane split after a branch) still counts
         let shc = SharedMemory::<Atomic<u32>>::new(1usize);
         if UNIT_POS_X == 0u32 {
             shc[0usize].store(0u32);
@@ -1360,11 +1371,6 @@ mod wp {
         }
         let cert = lo != 0u64 || hi != 0u32;
         let flag = cert && !((fault & 8192u32) != 0u32 && rf % 997u32 == 0u32);
-        let bm = plane_ballot(cert);
-        let mut nm = bm[0usize].count_ones();
-        if comptime!(w > 32) {
-            nm += bm[1usize].count_ones();
-        }
         let bl = plane_ballot(flag);
         let l = UNIT_POS_PLANE;
         let lm = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
@@ -1393,8 +1399,8 @@ mod wp {
             }
             hist[key as usize].fetch_add(1u32);
         }
-        if UNIT_POS_PLANE == 0u32 && nm > 0u32 {
-            shc[0usize].fetch_add(nm);
+        if cert {
+            shc[0usize].fetch_add(1u32);
         }
         sync_cube();
         if UNIT_POS_X == 0u32 {
@@ -1409,8 +1415,8 @@ mod wp {
     /// r³ (`parent_w` one digit shallower), appended to `out` (one atomic per plane; order arbitrary). Those
     /// digits depend only on r mod b^(k−2), so every root whose parent passes `parent_w` for some top digit is
     /// listed: `whist` over this list instead of every root is exact, for each slice of the key. Account `acc8`:
-    /// [cubes done, roots examined, roots listed (by a ballot, apart from the list's own count `cnt[0]`), plane
-    /// errors].
+    /// [cubes done, roots examined, roots certified (counted by each lane, apart from the ballot that gives the
+    /// list's own count `cnt[0]`), plane errors].
     #[cube(launch_unchecked)]
     pub fn wanc_kernel(
         rfs: &Array<u32>,
@@ -1419,6 +1425,10 @@ mod wp {
         cnt: &mut Array<Atomic<u32>>,
         nroots: u32,
         cap: u32,
+        // F_ANC_DROP (65536): roots r_f = 0 mod 997 taken as uncertified (a wrong list, its counts consistent:
+        // only the sampled check sees it); F_ANC_SPLIT (131072): certified roots outside lane 0 leave the plane's
+        // ballot (as lanes split from lane 0's after a branch would): their entries are lost
+        fault: u32,
         acc8: &mut Array<Atomic<u32>>,
         #[comptime] w: u32,
         #[comptime] b: u32,
@@ -1440,9 +1450,10 @@ mod wp {
         if live {
             rf = rfs[i as usize];
             let (lo, hi, _cacc) = parent_w(rf, pipd8, b, f0, comptime!(k - 1));
-            ok = lo != 0u64 || hi != 0u32;
+            ok = (lo != 0u64 || hi != 0u32) && !((fault & 65536u32) != 0u32 && rf % 997u32 == 0u32);
         }
-        let bl = plane_ballot(ok);
+        let split = (fault & 131072u32) != 0u32 && ok && UNIT_POS_PLANE != 0u32;
+        let bl = plane_ballot(ok && !split);
         let l = UNIT_POS_PLANE;
         let lm = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
         let mut r = (bl[0usize] & lm).count_ones();
@@ -1457,16 +1468,18 @@ mod wp {
             base0 = cnt[0usize].fetch_add(n);
         }
         let base = plane_sum(base0);
-        if ok {
+        if ok && !split {
             let slot = base + r;
             if slot < cap {
                 out[slot as usize] = rf;
             }
         }
+        if ok {
+            sh[1usize].fetch_add(1u32);
+        }
         let ex = plane_sum(select(live, 1u32, 0u32));
         if UNIT_POS_PLANE == 0u32 {
             sh[0usize].fetch_add(ex);
-            sh[1usize].fetch_add(n);
         }
         sync_cube();
         if UNIT_POS_X == 0u32 {
@@ -1733,7 +1746,8 @@ mod wp {
     /// digits [f0 + 1, k − 1)), thread i = d·nlead + (h − hlo) certifies the parent prefix p5 = (h·b + d)·b^(k−2−f0)
     /// + pip div b over its b^(f0+1) n (clipped to the range) and lists i if valid. A slice's prefix i is tested
     /// only under a valid parent i: a sub-interval's certificate holds its parent's digits, so a parent with a
-    /// repeated digit has no valid child (exact by containment). `l5n`: [0] parents listed, [1] cubes done.
+    /// repeated digit has no valid child (exact by containment). `l5n`: [0] parents listed (the ballot's count),
+    /// [1] cubes done, [2] valid parents counted by each lane apart from the ballot (= [0]).
     #[cube(launch_unchecked)]
     pub fn wtops5_kernel(
         list: &mut Array<u32>,
@@ -1747,6 +1761,9 @@ mod wp {
         plo_hi: u32,
         phi_lo: u32,
         phi_hi: u32,
+        // F_T5_SPLIT (262144): valid parents outside lane 0 leave the plane's ballot (as lanes split from lane 0's
+        // after a branch would): their entries are lost
+        fault: u32,
         #[comptime] w: u32,
         #[comptime] b: u32,
         #[comptime] f0: u32,
@@ -1757,6 +1774,11 @@ mod wp {
     ) {
         let bb = comptime!(b * b);
         let na = comptime!((l + 1) / 2);
+        let sh = SharedMemory::<Atomic<u32>>::new(1usize);
+        if UNIT_POS_X == 0u32 {
+            sh[0usize].store(0u32);
+        }
+        sync_cube();
         let i = ABSOLUTE_POS_X;
         let mut ok = false;
         if i < ntest {
@@ -1814,7 +1836,8 @@ mod wp {
                 ok = !bad1 && !bad2;
             }
         }
-        let bl = plane_ballot(ok);
+        let split = (fault & 262144u32) != 0u32 && ok && UNIT_POS_PLANE != 0u32;
+        let bl = plane_ballot(ok && !split);
         let lane = UNIT_POS_PLANE;
         let lm = select(
             lane >= 32u32,
@@ -1833,11 +1856,16 @@ mod wp {
             base0 = l5n[0usize].fetch_add(n);
         }
         let base = plane_sum(base0);
-        if ok {
+        if ok && !split {
             list[(base + r) as usize] = i;
         }
+        if ok {
+            sh[0usize].fetch_add(1u32);
+        }
+        sync_cube();
         if UNIT_POS_X == 0u32 {
             l5n[1usize].fetch_add(1u32);
+            l5n[2usize].fetch_add(sh[0usize].load());
         }
     }
 
@@ -2241,12 +2269,15 @@ mod wp {
         scount: &mut Array<Atomic<u32>>,
         stat: &mut Array<u32>,
         // the expansion's account: cubes done, slabs walked, survivor bits read, bits of a clipped top outside the
-        // range (not survivors; never listed)
+        // range (not survivors; never listed), survivors appended counted by each lane apart from the plane scan
+        // that gives the list's own count `scount` (= it)
         est: &mut Array<Atomic<u32>>,
         // the prefilter: the tops' thread indices and certified digits >= k + 2, the slice's digits, the range's
         // clip (as the check's), the small-n bound (n < b^ceil((k+2)/2) iff h < hsmall and the slice's digits
         // >= ceil((k+2)/2) are zero), the fault bits (F_NOPF 1: no prefilter; F_PF_DROP 1024: the prefilter
-        // wrongly drops n whose r_f has bits 10-19 zero, as on the base-64 path)
+        // wrongly drops n whose r_f has bits 10-19 zero, as on the base-64 path; F_EXP_SPLIT 524288: lanes other
+        // than lane 0 with survivors in slabs s = 0 mod 7 leave the plane's scan, as lanes split from lane 0's
+        // after a branch would: their entries are lost)
         thd: &Array<u32>,
         ttq: &Array<u64>,
         ttqh: &Array<u32>,
@@ -2268,6 +2299,13 @@ mod wp {
     ) {
         let nopf = (fault & 1u32) != 0u32;
         let pfdrop = (fault & 1024u32) != 0u32;
+        let fsplit = (fault & 524288u32) != 0u32;
+        let shp = SharedMemory::<Atomic<u32>>::new(1usize);
+        if UNIT_POS_X == 0u32 {
+            shp[0usize].store(0u32);
+        }
+        sync_cube();
+        let mut nput = 0u32;
         let bw = comptime!(b as u64);
         // n < b^ceil((k+2)/2) needs every slice digit at positions >= ceil((k+2)/2) zero
         let tsm = comptime!((k + 3) / 2);
@@ -2411,15 +2449,20 @@ mod wp {
                     }
                 }
                 let nb = k0.count_ones() + k1.count_ones() + k2.count_ones() + k3.count_ones();
-                let excl = plane_exclusive_sum(nb);
-                let tot = plane_sum(nb);
+                nput += nb;
+                let split = fsplit && nb > 0u32 && UNIT_POS_PLANE != 0u32 && s % 7u32 == 0u32;
+                let nbs = select(split, 0u32, nb);
+                let excl = plane_exclusive_sum(nbs);
+                let tot = plane_sum(nbs);
                 let mut bs = 0u32;
                 if UNIT_POS_PLANE == 0u32 && tot > 0u32 {
                     bs = scount[0usize].fetch_add(tot);
                 }
                 let slot = plane_sum(bs) + excl;
-                let sb = put_bits_w(tia, posa, k0, k1, lst, surv, slot, scap);
-                put_bits_w(tib, posb, k2, k3, lst, surv, sb, scap);
+                if !split {
+                    let sb = put_bits_w(tia, posa, k0, k1, lst, surv, slot, scap);
+                    put_bits_w(tib, posb, k2, k3, lst, surv, sb, scap);
+                }
                 r0 += 2u32 * PLANE_DIM;
             }
             s += pstride;
@@ -2433,8 +2476,13 @@ mod wp {
             est[2usize].fetch_add(pr);
             est[3usize].fetch_add(pc);
         }
+        if nput > 0u32 {
+            shp[0usize].fetch_add(nput);
+        }
+        sync_cube();
         if UNIT_POS_X == 0u32 {
             est[0usize].fetch_add(1u32);
+            est[4usize].fetch_add(shp[0usize].load());
         }
     }
 
@@ -2859,6 +2907,25 @@ pub(crate) const F_BAD_PARENT: u32 = 16384;
 /// The shared pass across the slice's top digit (`wanc_kernel`) not launched.
 #[allow(dead_code)] // the tests only
 pub(crate) const F_SKIP_ANC: u32 = 32768;
+/// `wanc` lists a wrong set: roots r_f = 0 mod 997 left out as if uncertified, every count of the list consistent
+/// (only the sampled check's field-run comparison sees it).
+#[allow(dead_code)] // the tests only
+pub(crate) const F_ANC_DROP: u32 = 65536;
+/// `wanc`: certified roots outside lane 0 leave the plane's ballot, as lanes split from lane 0's after a branch
+/// would (their entries lost, the ballot's counts consistent).
+#[allow(dead_code)] // the tests only
+pub(crate) const F_ANC_SPLIT: u32 = 131_072;
+/// `wtops5`: the same for valid parents.
+#[allow(dead_code)] // the tests only
+pub(crate) const F_T5_SPLIT: u32 = 262_144;
+/// `wexpand`: the same for lanes other than lane 0 with survivors in slabs s = 0 mod 7 (left out of the plane's
+/// scan).
+#[allow(dead_code)] // the tests only
+pub(crate) const F_EXP_SPLIT: u32 = 524_288;
+/// The main kernel: the records of lanes other than lane 0 lost (written empty), as when lanes split from lane
+/// 0's after a branch append apart from it (the slab's count consistent).
+#[allow(dead_code)] // the tests only
+pub(crate) const F_SLAB_SPLIT: u32 = 1_048_576;
 
 /// The parents' shared lists of a field: one per value of the slices' digits [f0, k − 2) (`keys`), the roots
 /// whose depth-(k − 2) ancestor is valid (`wanc_kernel`), with their lengths (read once per field).
@@ -3158,6 +3225,7 @@ impl<R: Runtime> WideJoin<R> {
                         ArrayArg::from_raw_parts(cnt.clone(), 1),
                         nroots,
                         self.anc_cap,
+                        self.fault,
                         ArrayArg::from_raw_parts(acc8.clone(), 4),
                         self.w,
                         wb.b,
@@ -3244,10 +3312,11 @@ impl<R: Runtime> WideJoin<R> {
         self.stop != 6
     }
 
-    /// Set the fault bits.
+    /// Set the fault bits (and forget the top hierarchy's list, so that the next slice makes it under them).
     #[allow(dead_code)] // the tests only
     pub(crate) fn set_fault(&mut self, f: u32) {
         self.fault = f;
+        *self.t5state.lock().expect("t5state") = None;
     }
 
     pub fn mk(&self, v: Vec<u32>) -> Handle {
@@ -3300,13 +3369,13 @@ impl<R: Runtime> WideJoin<R> {
             if self.upto(1) {
                 let mut st = self.t5state.lock().expect("t5state");
                 if st.as_ref().map(|x| x.0) != Some(grp) {
-                    let h = self.mk(vec![0u32; 2]);
+                    let h = self.mk(vec![0u32; 3]);
                     wp::wtops5_kernel::launch_unchecked::<R>(
                         c,
                         CubeCount::Static(ntest.div_ceil(NT), 1, 1),
                         CubeDim::new_1d(NT),
                         a(&self.t5list, ntest as usize),
-                        a(&h, 2),
+                        a(&h, 3),
                         a(&pipd, npd),
                         a(&self.ends_h, 2 * l as usize),
                         ntest,
@@ -3316,6 +3385,7 @@ impl<R: Runtime> WideJoin<R> {
                         (wb.plo5 >> 32) as u32,
                         wb.phi5 as u32,
                         (wb.phi5 >> 32) as u32,
+                        self.fault,
                         self.w,
                         b,
                         f0,
@@ -3342,7 +3412,7 @@ impl<R: Runtime> WideJoin<R> {
                         a(&self.ends_h, 2 * l as usize),
                         a(&acc, ACC_WORDS),
                         a(&self.t5list, ntest as usize),
-                        a(&l5h, 2),
+                        a(&l5h, 3),
                         ntest,
                         wb.nlead,
                         wb.hlo,
@@ -3780,6 +3850,11 @@ impl<R: Runtime> WideJoin<R> {
                 es[1],
                 st[1]
             );
+            ensure!(
+                es[4] == n,
+                "middle-out wide: expansion appended {n} survivors, its lanes counted {}",
+                es[4]
+            );
             // survivor bits the expansion read (before the prefilter), and those of a clipped top outside the range
             listed += u64::from(es[2]);
             clipped += u64::from(es[3]) + u64::from(ran[2]);
@@ -3863,6 +3938,11 @@ impl<R: Runtime> WideJoin<R> {
             "wtops5 cubes done",
             u64::from(l5n[1]),
             u64::from(self.wb.ntest().div_ceil(NT)),
+        )?;
+        fail(
+            "wtops5 valid parents listed = counted by its lanes",
+            u64::from(l5n[0]),
+            u64::from(l5n[2]),
         )?;
         fail(
             "wtops1 valid parents examined",
@@ -4933,7 +5013,8 @@ mod tests {
 
     /// The base-64 path's fault acceptance on the wide path, base `b` shape `sh` on `pips`: the faults that apply
     /// are loud through the accounts of the production group path (`F_SKIP_MAIN`, `F_SKIP_TOPS`, `F_DROP_PROBE`,
-    /// `F_DROP_PARENT`), a clean run passes before each (and after it, with `again`) with the unfaulted counts, and
+    /// `F_DROP_PARENT`; `F_T5_SPLIT`, `F_EXP_SPLIT`, `F_SLAB_SPLIT`: entries lost from a ballot or plane scan,
+    /// loud through the counts the lanes keep apart from it), a clean run passes before each (and after it, with `again`) with the unfaulted counts, and
     /// `F_BAD_PARENT` (a parent computed wrongly: every conservation law still holds) is loud through the sampled
     /// CPU check.
     #[allow(clippy::match_wildcard_for_single_variants)]
@@ -4969,6 +5050,9 @@ mod tests {
             ("F_SKIP_TOPS", F_SKIP_TOPS),
             ("F_DROP_PROBE", F_DROP_PROBE),
             ("F_DROP_PARENT", F_DROP_PARENT),
+            ("F_T5_SPLIT", F_T5_SPLIT),
+            ("F_EXP_SPLIT", F_EXP_SPLIT),
+            ("F_SLAB_SPLIT", F_SLAB_SPLIT),
             ("F_BAD_PARENT", F_BAD_PARENT),
             ("F_PF_DROP", F_PF_DROP),
         ] {
@@ -5149,6 +5233,7 @@ mod tests {
             );
             for (name, f) in [
                 ("F_SKIP_ANC", F_SKIP_ANC),
+                ("F_ANC_SPLIT", F_ANC_SPLIT),
                 ("F_SKIP_MAIN", F_SKIP_MAIN),
                 ("F_SKIP_TOPS", F_SKIP_TOPS),
                 ("F_DROP_PROBE", F_DROP_PROBE),

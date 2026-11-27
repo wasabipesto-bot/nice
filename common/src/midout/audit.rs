@@ -480,7 +480,8 @@ fn cubecl_midout_timing_stop_is_refused() {
 }
 
 /// Every fault that once went unseen fails loudly, on the slices `pips` with `classes` classes per batch:
-/// `F_SKIP_MAIN`, `F_SKIP_TOPS`, `F_DROP_PROBE` and `F_DROP_PARENT` through the accounts of the production group
+/// `F_SKIP_MAIN`, `F_SKIP_TOPS`, `F_DROP_PROBE`, `F_DROP_PARENT`, `F_EXP_SPLIT` and `F_SLAB_SPLIT` (entries lost
+/// from the expansion's plane scan or the main kernel's slab appends) through the accounts of the production group
 /// path; `F_PF_DROP` (the prefilter rejecting too much, which no account can see) through the sampled CPU check. A
 /// clean run passes before each fault (and after it, with `again`).
 fn faults_are_loud<R: Runtime>(client: ComputeClient<R>, pips: &[u64], classes: u32, again: bool) {
@@ -501,6 +502,8 @@ fn faults_are_loud<R: Runtime>(client: ComputeClient<R>, pips: &[u64], classes: 
         ("F_SKIP_TOPS", F_SKIP_TOPS),
         ("F_DROP_PROBE", F_DROP_PROBE),
         ("F_DROP_PARENT", F_DROP_PARENT),
+        ("F_EXP_SPLIT", F_EXP_SPLIT),
+        ("F_SLAB_SPLIT", F_SLAB_SPLIT),
         ("F_PF_DROP", F_PF_DROP),
     ] {
         gj.set_fault(f);
