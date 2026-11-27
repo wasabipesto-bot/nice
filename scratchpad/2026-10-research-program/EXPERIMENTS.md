@@ -5,6 +5,21 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## DOC.1 The design document and map re-based on `dev/mo-mode` 0b6e22e1 (2026-11-27 05:47–05:58 UTC, technical writer, documents only; `DOC/BRIEF.md`, `DOC/NOTES.md`; `../2026-11-midout-design/DESIGN.md` 790 → 810 lines, `interactive/midout-map.html`)
+
+- `tools/check_refs.py` now reads the `mo-mode` worktree: **89 references, 0 bad** (14 bad at the start, all in
+  the client and coordinator nodes). **All 21 inline `gpu_wide.rs:N` references in the map's wide notes had been
+  wrong since `66305ada`** (the checker never read that text); fixed and checked by script
+  (`tools/print_inline_refs.py`). Two wide notes saying the sampled check was "off by default at 65" were stale.
+- DESIGN.md: header and §10 at the new head; §6.11 rewritten for the mode, the development server, the review
+  and the runs on real cards (the hidden-flag text is gone); §7 with the client's tests and the CI matrix; §8
+  with the RTX 3060 base-65 rows; §9 made true (no real server, the proposal's open points, base 65 on the RX
+  9070 XT unconfirmed, Metal a warning, the lint gap); §1 says base 65 is about 73 % of what is within reach.
+- Disagreements the writer listed instead of resolving (`DOC/NOTES.md`): base 65 under load 14.62 fs (B65.1) and
+  14.25 fs (B65.3) are two heads; "the HTTP does not hold the card" rests on 61 s against 59 s, so the document
+  quotes the numbers only. Read and spot-checked by me; three references to retired decision numbers replaced.
+- Not done: the static overview image still says "local coordinator" (not regenerated); screenshots not re-taken.
+
 ## B65.3 The wide driver's result reads batched: base 65 through Vulkan under a busy host goes from 14.25 to 6.35 fs; 3 % faster quiet; exact and every fault as loud as before (2026-11-26 08:03–09:19 UTC, the same engineer, eventeo's RTX 3060; `B65/BRIEF-READS.md`, `B65/READS-RESULTS.md`, `B65/runs/reads-*`; fork `dev/mo-wide-reads` 457ad99a, 0b6e22e1 on `dev/mo-mode` 4fff25e7, fast-forwarded into `dev/mo-mode` by me at 09:20 UTC; 0.254 kWh)
 
 - **Change:** `common/src/midout/gpu_wide.rs` only, +45 −12, no kernel change: `finish_group` collects the

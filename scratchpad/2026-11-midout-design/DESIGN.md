@@ -1,17 +1,15 @@
 # The middle-out join: design
 
 *A description of what is on the branch and why, for a reader who knows the project and today's overlap join and
-has seen none of this work. Written 2026-11-19 from the code at `dev/mo-clean`, kept current; head `66305ada` (worktree
-`~/projects/nice/.worktrees/midout-clean`) and from the measurements recorded beside it. The open decisions are
-not repeated here; they are in `~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md`, and the
-answers already given in `DECIDED.md` beside it.*
+has seen none of this work. Written 2026-11-19, kept current; it describes the fork branch `dev/mo-mode` at head
+`0b6e22e1` (worktree `~/projects/nice/.worktrees/mo-mode`; every file:line below is at that head) and the
+measurements recorded beside it. The open decisions are not repeated here; they are in
+`~/projects/nice/scratchpad/2026-10-research-program/DECISIONS.md`, and the answers already given in `DECIDED.md`
+beside it.*
 
-*How it reaches clients (your direction of 2026-11-25): as a mode `midout` beside `detailed` and `niceonly`,
-with its own claim endpoint and its own table on the server. The server side is a written proposal awaiting
-your yes (`…/2026-10-research-program/G2/PROPOSAL-B.md`); the client mode is being built on the fork branch
-`dev/mo-mode`, cut from the head described here. Where this document speaks of the hidden flag
-`--midout-coordinator` and the local coordinator script, read: the development tools the mode's tests are
-built on. The sections on the join itself are unaffected.*
+*How it reaches clients (your direction of 2026-11-25): as a client mode `nice_client midout` beside `detailed`
+and `niceonly`, with its own endpoints and tables on the server. The mode is built (§6.11); the server side is a
+written proposal awaiting your yes (`…/2026-10-research-program/G2/PROPOSAL-B.md`), and no server code exists.*
 
 ![overview](static/midout-overview.png)
 
@@ -63,6 +61,11 @@ walk, and because the per-n work around the pairs (bottoms, tops, survivors) is 
 instead of a 1e17 range. Fewer survivors reach the check: 11.8M per slice of 4.47e12 admissible n, and 2.87 % of
 those pass the prefilter [measured, slice 712012851].
 
+**Why the wide path matters as much as the narrow one** [judged, §8]: base 65, which only the wide path (two-word
+masks) searches, holds about 73 % of the probability of a nice number still within reach of this join, and about
+73 % of the remaining machine time; nothing after it is within reach. A gain on the wide path is worth about 2.7
+times the same gain on the base-64 path.
+
 **The digits of n at base 64, in one picture:**
 
 ```
@@ -79,19 +82,14 @@ field (coordinate 4,8,5) fixes digits 5-7: 4,096 slices (digit 4 x digit 8)
 today's overlap join at base 64: top = digits 3..12, bottom = digits 0..5, field = a 1e17 range of n
 ```
 
-**Where it stands** [measured, 2026-11-19]: on the RX 9070 XT, base 64, 0.99 fs per admissible n against 4.76 fs
-for v3.4.8's join, **×4.79**, exact at 64 lanes (on the development branch just before the cleanup, `66259bb0`).
-On an RTX 3080 at a 240 W cap, 1.62 against 6.62 fs, **×4.09**; the cleanup changed it by +0.17 % (1.627 against
-1.624). Base 65, which production has no join for: 3.47 fs on the 3080 on 2026-11-19 and 10 % less since 2026-11-20 (3.29
-against 3.66 fs in one session on a slower box); 3.1 fs on the RX 9070 XT on 2026-11-19, before the wide kernel was
-fitted to that card offline (12 waves instead of 8).
-**The cleaned head (`66305ada`) on the RX 9070 XT, 2026-11-25** [measured]: exact at 64 lanes in every test, all
-counts equal to 2026-11-19's; base 64 **×4.51** on the median of five rounds (×4.33–4.78; the first two rounds,
-the protocol of 11-19, ×4.71), with the maintainer's desktop in use and the branch 6–10 % slower in the later
-rounds while production's join did not move. **On 2026-11-26 it ran on three more devices, exact on each:
-RTX 3060 3.23 fs (×4.1), GTX 1060 3 GB 8.77 fs, Apple M4 through Metal 12.9 fs (×3.9), and the real `midout`
-client searched six real fields on the RTX 3060 against the development server.** Base 65 gave no result on the RX 9070 XT: the wide path ran the card at half
-clock (4.8–4.9 fs at 1.53 GHz and 112 W); whether that is the code since 11-19 or the session is open (§9).
+**Where it stands** [measured]: base 64 on the RX 9070 XT, 0.99 fs per admissible n against 4.76 fs for v3.4.8's
+join, **×4.79** (2026-11-19, on the trunk just before the cleanup, `66259bb0`); the cleaned code on 2026-11-25,
+**×4.51** on the median of five rounds (×4.33–4.78), with the maintainer's desktop in use. RTX 3080 at 240 W ×4.09
+(1.62 against 6.62 fs); RTX 3060 3.23 fs (×4.1) and Apple M4 through Metal 12.9 fs (×3.9), both against scaled
+baselines; GTX 1060 3 GB 8.77 fs. Exact on every device. Base 65, which production has no join for: 3.29 fs on the
+3080 (2026-11-20) and 3.12 fs on the RX 9070 XT (2026-11-19); a second run on the RX 9070 XT ran the card at half
+clock, for a reason now likely found and fixed but not confirmed on that card (§9). The real `midout` client has
+searched real base-64 fields on the RTX 3060 and the M4 against the development server (§6.11).
 (*fs per admissible n*: card time divided by the n whose residue mod b − 1 is one of the base's possible
 residues for a nice number; 8 of 63 at base 64.) §8 has the table and the conditions.
 
@@ -267,7 +265,7 @@ v_size only at padded bases. The first coordinate, (4, 9, 6), fixing digits 6–
    fields cut along other digits are not unions of finished fields, so re-cutting a partly searched base leaves
    partly searched fields. The choice stays free per base, and between bases. [proven] (An earlier review and an
    earlier description said fields "can be re-cut later without redoing any search"; that is false as stated
-   and is corrected in `DECISIONS.md` D2.)
+   and is corrected by this paragraph. Which definition of a field is used stays open until closer to merging, as you asked on 2026-11-25: `DECIDED.md`.)
 2. **Fields are no longer intervals of n.** Anything that assumes they are breaks for base 64: "searched up to
    n = X", interval queries over the fields table, the stride path, today's join as a route. Every ordinary claim
    path must refuse such a field; the branch adds that refusal to the client (`wire::refuse_coordinate_space`,
@@ -351,9 +349,6 @@ f = 1/1,000 is seen with 63 % probability after 1,000 fields, 0.4 % of the base 
   before that they rested on the reference against brute force at bases 10–25 only;
 - production's check kernel judging a nice n not nice (production's own exposure, unchanged);
 - a defect in slices the sample has not yet drawn;
-- at base 65 the sampled check was off until 2026-11-20 (one thread took 70–106 s against a 55–57 s field); it
-  is on now, on 4 threads (29–35 s per slice on a 5-CPU box [measured]); with fewer free CPUs the slice outlasts
-  the field and the route waits for it;
 - the host-tops path (benchmarks only, feature `midout-bench`) has no tops accounts.
 
 Guards on widths (`C_ERR_IDX`: a class of more than 65,536 parents; a top index above 2^20; child-list positions
@@ -505,28 +500,50 @@ said; counts come from an exact CPU prototype on real slices.
   A retry would add a second path to verify. Buffer read-back was not built: the accounts catch the same failure
   at the first group [measured].
 
-### 6.11 A local coordinator instead of a server change
+### 6.11 The client mode `midout`, and a development server until there is a real one
 
-- **Alternatives** (priced in `G2/PROPOSAL.md` §2–4): A, base-64 fields in today's `fields` table as ranges of v,
-  with a claim filter for old clients (about 150–250 lines); B, a separate table and endpoints (3–4× the work);
-  C, no server change, a private coordinator.
-- **What is built:** C. `scripts/midout_coordinator.py` (standard library, binds 127.0.0.1, state in files,
-  never hands a field out twice) serves production's claim and submit format plus one key, `"coordinate":
-  "midout:K0,K1,Q0"` (`midout/wire.rs`); the client flag `--midout-coordinator URL` (hidden from `--help`)
-  refuses the production API by name and submits nothing after a failed account, a failed sampled check or a
-  panic on any thread. The route costs nothing measurable: 1.6935 against the library's 1.6914 fs [measured].
-  **The coordinator was then attacked on purpose (2026-11-24):** a harness of fake clients and injected
-  failures found nine defects in the 164-line script as first written, four of which could have recorded a
-  field as searched when it was not (no `fsync` before a reply, so a claim id could be reused after a power
-  loss; a second coordinator starting on the same state directory; a submission describing another field
-  accepted under a known claim id; records reinterpreted when the work list changed). All nine are fixed, one
-  commit each; the fixed script passed 4,950 randomized runs (kills at any point, torn and truncated state
-  files at every byte of the last record, full disks, concurrent and misbehaving clients) with no failure
-  [measured]. `scripts/midout_audit.py` checks a state directory against its work list. A Lean program on the
-  proof branch checks that a coordinator's accepted fields cover the base, with a proof that its "yes" is the
-  hypothesis of the whole-base theorem (§7).
-- **Why:** nothing on the server needs to change until base 62 is done (late December) and a server design is the
-  maintainer's decision (`DECISIONS.md` D4).
+- **Alternatives** (priced in `G2/PROPOSAL.md` §2–4): A, base-64 fields in today's `fields` table as ranges of v;
+  B, separate tables and endpoints; C, no server change, a private coordinator. C was built first, behind a hidden
+  client flag; since your direction of 2026-11-25 the client follows B (`G2/PROPOSAL-B.md`; not approved).
+- **The mode** (`client/src/midout_route.rs`, the wire in `midout/wire.rs`): `nice_client midout` claims `GET
+  /claim/midout` and submits `POST /submit/midout` under `--api-base`, in the proposal's §3 shapes (the tests read
+  its two JSON examples verbatim; big integers exact). Under `--repeat` the next field is claimed while one is
+  searched and the previous submission finishes in the background, so the card does not wait on HTTP; a 204
+  ("nothing claimable") waits, 1 s doubling to 256 s. `--gpu-backend auto` takes CUDA where it starts, else the
+  wgpu device; `--threads` sets the sampled check's threads; options that do not apply are refused with a sentence
+  or ignored with a warning (table: `G2/MODE-NOTES.md` §1). No server-side file changed, and the shared
+  `SearchMode` gained no variant: a client-only `ClientMode` carries the mode until the server change lands.
+- **The stop rule:** after a failed search, failed accounts, a differing sampled check, a panic (on any thread,
+  or in the search) or a refused submission, nothing more is submitted, the submission in flight is finished or
+  reported, and the exit is non-zero. A submission is retried with identical bytes for an hour (the claim's
+  lifetime) on 5xx, network errors or a reply cut short; `already_recorded` (a lost reply) is success; 409 and 422
+  stop the client with the server's message; a claim 404 is one error ("this server does not offer middle-out
+  fields"). SIGTERM and SIGINT finish the submission in flight, then exit. A test build (`midout-fault`) refuses
+  any address not on the machine. On Apple Metal the mode runs with one warning at start.
+- **The development server** (`scripts/midout_coordinator.py`: standard library, 127.0.0.1, a work list and state
+  files; not the API) serves the two endpoints with the proposal's eight submission checks in its order, claims
+  that expire after `--claim-duration` (default 3600 s), every acknowledgement after an `fsync`; its port of the
+  coordinate arithmetic equals the Rust on 2,514 fields. `scripts/midout_audit.py` checks its state against the
+  work list. Its predecessor was attacked with fake clients and injected failures on 2026-11-24 (nine defects, four
+  of which could have recorded an unsearched field; all fixed; then 4,950 randomized runs without a failure).
+  Adapted to the new wire, the harness found one more on 2026-11-25: after a restart, a record read but never
+  fsynced was answered `already_recorded`, so a power cut after that reply lost it (fixed, `a38c9f4d`); then 1,500
+  randomized runs without a failure, and 300 stress runs with one, a tolerance of the harness under load
+  [measured, `G2/MODE-NOTES.md` §5].
+- **An independent review** (2026-11-26, `MODE2/REVIEW.md`) found the loop sound (claim and result cannot cross;
+  the stop rule holds on every returning path; a retry resends identical bytes), two ways a wrong record could get
+  through (a fault-test build could submit to any server; the audit passed a check that disagreed with its canon)
+  and seven robustness defects (among them: `auto` had no fallback from CUDA, so the README's command died on the
+  M4; a panic on the loop's thread or a SIGTERM dropped the submission in flight; a server outage of about 8.5
+  minutes lost each client's last field). All rank-A and rank-B findings and five of seven smaller ones are fixed,
+  one commit each with a test or a run on the M4; left: a question for the proposal (the reply's forward
+  compatibility) and a test of a temporary `unreachable!` (`MODE2/FIX-NOTES.md` §4).
+- **On real cards** [measured, 2026-11-26]: on the RTX 3060, six base-64 fields through the mode, all accepted,
+  audit clean, 61 s a field against 59 s in the bench (`EVENTEO/runs/r1-3060/route/`); on the M4, three fields at
+  235–237 s with `auto` falling back to Metal, audit clean, and a SIGTERM during a submission in flight finished it
+  and exited within 1 s (`MODE2/m4-runs/`).
+- **Why:** the server is the maintainer's decision (`DECISIONS.md`, the entry on the server proposal); the mode lets it be made against a client
+  that exists, and the development server tests the client's every path without one.
 
 ### 6.12 Smaller decisions
 
@@ -550,14 +567,10 @@ said; counts come from an exact CPU prototype on real slices.
   perfect skip at any price would gain ×1.99 (91 % of kept visits yield a zero word). At base 65 the best
   combination reaches ×1.35 in counted work and loses once its tables are paid for [judged].
 - **Why closed:** the best exact variant is ×1.18 against a bar of ×1.3 set in advance. Wider words per lane
-  (128 or 256 children) were then measured with a microbenchmark of the word loop on 2026-11-21: ×1.09 on the
-  whole kernel on an RTX 3080, where the loop is bound by shared-memory bandwidth; for the RX 9070 XT the offline
-  compile predicted ×1.10–1.16 or ×1.27–1.34 depending on that card's shared-memory speed. **Run on the card
-  on 2026-11-25: ×0.73 for 128 children per word and ×0.67 for 256 (the 64-child loop is faster there than
-  either model assumed); dropped by the rule set beforehand (at least ×1.35).** Sharing the loads of digits that neighbouring probes have in common was measured
-  the next day: every kernel that does it is slower than the present loop (best ×0.85 on the whole kernel on
-  an RTX 3080, worse predicted for the RX 9070 XT); the loads saved change the time by under 1.5 %, the control
-  that skips them costs more. Dropped.
+  (128 or 256 children): ×1.09 on the whole kernel on an RTX 3080 by a microbenchmark of the word loop (2026-11-21),
+  ×1.10–1.34 predicted for the RX 9070 XT, **×0.73 and ×0.67 measured on that card on 2026-11-25**: dropped by the
+  rule set beforehand (at least ×1.35). Sharing the loads of digits that neighbouring probes have in common was
+  slower in every form (best ×0.85 on the whole kernel on an RTX 3080): dropped.
 - **Long version:** `~/projects/nice/scratchpad/2026-10-research-program/CEIL/NOTES.md` (the argument, with two
   restructurings that fail on paper), `CEIL/RESULTS.md` beside it (the counts), `CW/RESULTS.md` (word width) and `PS/RESULTS.md` (shared loads).
 
@@ -587,16 +600,25 @@ said; counts come from an exact CPU prototype on real slices.
   itself, its 384-bit arithmetic, the bit-sliced word (the model states its meaning), mask widths, the GPU
   kernels and drivers. Since 2026-11-24 also proved: each nice number of a field is reported exactly once; and a
   checker program (`lake exe coverage`, 2.6 s for base 64's 262,144 fields) decides whether the fields a
-  coordinator accepted cover the base, with a proof that its "yes" is the theorem's hypothesis: so "if each
+  server accepted cover the base, with a proof that its "yes" is the theorem's hypothesis: so "if each
   recorded search returned what is recorded, the base has no nice number". It does not check that the searches
   ran. No whole base-64 slice has been run through the Lean model (it would take hours).
 - Device against CPU: 1,073 real base-64 slices equal n for n in an independent sweep (on the branch as it was on
   2026-11-18, before the accounts and the 5–7 coordinate) [measured]; since then, 100 of them again, the range's
   first and last slices, and every slice of one field under both coordinates [measured].
-- Three test tiers (`mod.rs:25–47`): ordinary CPU tests in every `cargo test`; eight device tests named
-  `cubecl_midout_*` that CI's lavapipe jobs select (both compilers, WGSL and SPIR-V; 3.1–3.7 minutes each on a
-  5-CPU box, not timed on a GitHub runner); card-only and long tests behind the feature `midout-box-tests`, which
-  CI never builds.
+- Three test tiers (`mod.rs:34–60`): (a) ordinary CPU tests in every `cargo test`, among them the client mode's
+  22 tests (`client/src/midout_route/tests.rs`: options and refusals, the loop with stand-ins, and four end to end:
+  the real loop and HTTP client against the development server on 127.0.0.1, searching with the CPU reference on
+  bases 10 and 20, on Unix with `python3`); (b) eight device tests named `cubecl_midout_*` that CI's lavapipe jobs
+  select (both compilers, WGSL and SPIR-V; 3.1–3.7 minutes each on a 5-CPU box, not timed on a GitHub runner),
+  also run on the cards of §8; (c) card-only and long tests behind the feature `midout-box-tests`, which CI never
+  builds.
+- **CI** [measured, fork runs]: the whole matrix passed on `4fff25e7` (16 jobs, among them i686, armv7, arm-musl,
+  aarch64 and both macOS jobs; run 45777405453), and the device run on lavapipe and on the macOS runner's Metal
+  (45777409152). Three tests had failed on 32-bit and emulated targets, on `dev/mo-clean` too, all in test code
+  (`MODE2/FIX-NOTES.md` §1: among them a test that started 231,506 threads, whose memory qemu-user never returns). The two commits after `4fff25e7` (§9, the wide path's
+  reads) have not been through CI; `just lint` passes on `0b6e22e1`, and the wide tests pass on an RTX 3060
+  through CUDA, Vulkan/WGSL and Vulkan/SPIR-V.
 
 ---
 
@@ -609,7 +631,6 @@ and it) in the same session.
 | card, base | middle-out | v3.4.8's join | ratio | date, conditions | exactness evidence | raw data |
 |---|---|---|---|---|---|---|
 | RX 9070 XT, b64 | **0.99 fs** (runs 0.995, 1.005, 0.971; median) | 4.762 fs | **×4.79** (best ×4.90) | 2026-11-19 13:55–14:29; trunk `66259bb0` (before the cleanup), RADV 64 lanes, 2.82–2.88 GHz, 303 W; five fields per run after a warm-up | 7 slices n for n at 64 lanes (4 through shared lists), wide b40 and b65, fault test, one field with the sampled check; counters equal the 3080's | `G2/build4s/window_1119/` |
-| RX 9070 XT, b64, client route | 0.992 fs (12 fields, median 18.16 s each) | | | same session; local coordinator | 7 fields equal the bench's counts | `…/window_1119/route/` |
 | RX 9070 XT, b64, cleaned head | **1.063 fs** (five rounds of five fields: 1.030, 1.004, 1.107, 1.063, 1.099) | 4.794 fs (four bracket fields) | **×4.51** (×4.33–4.78; rounds 1–2 alone ×4.71) | 2026-11-25 03:56–05:52; head `66305ada`, RADV 64 lanes, 2.85–2.93 GHz, 299–303 W (production 3.10–3.13 GHz, 304 W); the desktop in use (load about 3), rounds 3–5 6–10 % slower at the same clock | 7 slices n for n with and without shared lists, parent-sharing test, narrow and wide fault tests, wide b40 and b65, whole field 77777 under (4, 8, 5) and (4, 9, 6) with the sampled check; every count equal to 2026-11-19's | `G2/window_1125/`, `G2/WINDOW3-RESULTS.md` |
 | RX 9070 XT, b65, cleaned head | 4.78–4.89 fs, **off the operating point** (1.53 GHz, 112 W): not a result | none | | 2026-11-25 04:16; the same command as 2026-11-19; time outside device waits 7.8 s per field against 1.6 s then | counts equal 2026-11-19's; the sampled check equal and never waited for | `G2/window_1125/out/w65_*.log` |
 | RTX 3060 (CUDA), b64 | **3.231 fs** (10 warm fields, 3.206–3.239) | 13.33 fs [two bracket fields, 254.45 s and 287.37 s, scaled by the RX 9070 XT's base mean] | **×4.12** | 2026-11-26 02:47–03:26; head `f61cf79e` (`dev/mo-mode`), an FX-6300 host with five host threads; card 98 % busy, 157 W | the whole card tier on CUDA; counts equal the other devices'; six fields through the real `midout` client with a clean audit | `…/2026-10-research-program/EVENTEO/runs/r1-3060/` |
@@ -622,6 +643,8 @@ and it) in the same session.
 | RTX 3080 240 W, b65, a day later | **3.290 fs** against 3.655 fs for the head of the day before (−10.0 %) | none | | 2026-11-20 09:41–09:57; head `10ddbf17` against `c2152084`, five warm fields, alternating, on a box 5 % slower than the one above; sampled check on (4 threads) | counts equal in every run; slices n for n incl. both range ends; wide fault test | `G2/build9w/raw/five_d/` |
 | RTX 3080 240 W, b64, a day later | 1.769 fs against 1.807 fs for `c2152084` (−2.1 %: device time equal; the threaded check no longer makes the host wait on this box) | | | 2026-11-20, same session | counts equal | `G2/build9w/raw/` |
 | RX 9070 XT, b65 | **3.12 fs** (two fields incl. warm-up; 3.02 the warm one) | none | | 2026-11-19 14:16; wide path untuned for this card (since fitted to it offline, not re-run: predicted 2.4–3.0 fs [judged]) | b40 and b65 slices at 64 lanes | `…/window_1119/w_65.log` |
+| RTX 3060, b65 | CUDA 6.30, 6.44 fs; Vulkan (SPIR-V) 6.32, 6.36 (trunk `66259bb0`: 6.98, 7.12 and 7.33, 7.25) | none | | 2026-11-26 05:49–08:00; head `f61cf79e`; field 77777 after a warm-up; sampled check off; quiet host | counts equal in every run and to the RX 9070 XT's of 2026-11-25 | `…/B65/runs/`, `B65/RESULTS.md` |
+| RTX 3060, b65, reads batched | Vulkan (SPIR-V) quiet 6.191, 6.172 fs (6.381 before); six busy host threads **6.35** (14.25 before) | none | | 2026-11-26 08:03–09:19; `0b6e22e1` against `4fff25e7` | counts equal; wide tests and fault messages identical through CUDA, WGSL, SPIR-V | `…/B65/runs/reads-*`, `B65/READS-RESULTS.md` |
 
 **What the numbers mean for the choice of base** [judged from measured rates and the uniform odds model; table
 in `~/projects/nice/scratchpad/2026-10-research-program/YIELD/yield.txt`, 2026-11-26]. Base 65 has about the same
@@ -652,68 +675,59 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   that part measured 0.45 fs (tops 0.10, turning 10.9M records into checkable entries 0.22, the unprefiltered
   check 0.13): about four times the assumption. The first end-to-end number was ×3.78 on the 3080; the
   expansion, the prefilter, the top hierarchy and parent sharing brought it to ×4.09 there. [measured]
-- **"The prefilter adds 2.6 ms to the wide expansion"** was a difference against a different kernel on another
-  card; with no prefilter at all the wide expansion takes 3.64 ms against 3.37 ms with it [measured]. **The
-  conclusion I drew from that pair on 2026-11-19, that the wide expansion's time was not the prefilter, was wrong
-  as well:** by ablation on 2026-11-20 the prefilter's arithmetic was 1.88 of the expansion's 3.45 ms; the run
-  without a prefilter cost the same only because it wrote 16.5M survivors instead of 0.5M [measured].
-- **The size of the branch** was reported as 6,500–7,000 lines; it was 13,525 insertions in 21 files against
-  `origin/main` at `5a048669` 13,939 at `c2152084`, 14,405 at `10ddbf17`, 14,573 at `eb9ef776` and 14,875 at `66305ada` (the wide path about 4,600, tests about 2,800) [measured by `git diff --stat`].
+- **"The prefilter adds 2.6 ms to the wide expansion"** compared two different kernels on two cards, and the
+  conclusion drawn on 2026-11-19 from a second pair (3.64 ms without a prefilter, 3.37 with), that the time was not
+  the prefilter, was wrong too: by ablation on 2026-11-20 the prefilter's arithmetic was 1.88 of the expansion's
+  3.45 ms; the run without it cost the same only because it wrote 16.5M survivors instead of 0.5M [measured].
+- **The size of the branch** was reported as 6,500–7,000 lines; it was 13,525 insertions in 21 files at
+  `5a048669` against v3.4.8's `be9cc923`, its merge base with `origin/main`; 14,875 in 22 files at `66305ada` (the
+  wide path about 4,600, tests about 2,800) and 17,822 in 27 at `0b6e22e1` [measured by `git diff --stat`].
 
 ---
 
 ## 9. What is not done, or not known
 
-- **Metal: run on a real Apple M4 on 2026-11-26, and exact** (macOS 27.2, `Apple M4 (Metal, wgpu<wgsl>)`, plane
-  width 32): the lavapipe tier, two base-64 slices n for n, the fault tests, parent sharing, wide parity at
-  bases 40 and 65 all pass; whole fields at 12.94 fs per admissible n, about ×3.9 against production's join on
-  the same machine [measured; the ratio from one bracket field]. **The client still refuses a Metal device by
-  name; that refusal can now be reconsidered.** Not run: older macOS versions (the Metal compiler defect of
-  2026 was fixed in the OS; the kernels avoid its pattern by the lint). Before that run the position was: the kernels pass production's Apple-miscompile lint (one site found and fixed); the
-  paravirtual device on CI hangs above about 1 GiB of footprint and the join allocates several hundred MB with 4
-  classes per batch; CI's 30-minute macOS job would gain about 2.5 minutes per step. Since 2026-11-19 evening the
-  client route refuses a Metal device by its name (`is_metal`, `client/src/midout_route.rs:198`, unit-tested on
-  device names) until the join has been checked on Apple hardware; **the refusal itself has not run on a Mac**.
-- **The cleaned branch ran on the RX 9070 XT on 2026-11-25: exact, ×4.51 (×4.71 by the earlier protocol).**
-  It is 6–10 % slower while the desktop is in use, which production's join is not: the field driver's share
-  of host work has not been profiled on that machine. Before that run the evidence was: ×4.79 is the trunk just before the cleanup; on the 3080
-  the cleanup is +0.17 % and per-stage times are equal, and the main kernel's generated CUDA differs only by dead
-  code removed [measured]; whether the same holds for RADV's code is not measured. The four commits after the
-  cleanup (head `c2152084`) change no kernel: the generated CUDA of all 15 narrow and 14 wide kernels is identical
-  to `5a048669`'s, and five warm fields timed 1.7162 against 1.7187 fs on a 3080 in one session [measured]. Byte-identical generated code
-  cannot be shown on CubeCL 0.10 (two runs of one binary give different SPIR-V) [measured].
-- **The wide path's fit to the RX 9070 XT is offline only.** Until 2026-11-20 its main kernel needed 192
-  registers and 23.7 KB of shared memory: 8 waves per SIMD where the narrow kernel runs 12, and base 65 measured
-  ×3.1–3.2 of base 64 there against ×2.17 on the 3080. It now compiles for that card at 120 registers, 21.4 KB
-  and 12 waves [measured with the driver's compiler, offline]. Predicted 2.4–3.0 fs at base 65, from 3.02
-  [judged]. **On the card on 2026-11-25 it ran at half clock (1.53 GHz, 112 W; 4.8–4.9 fs), and so did the
-  wide path at base 64 in one process with the narrow path at full clock: the prediction is neither confirmed
-  nor refuted** (the host's share per field was 7.8 s against 1.6 s on 2026-11-19). **The likely cause, found on an
-  RTX 3060 on 2026-11-26 [measured there, inferred for the RX 9070 XT]: host CPU load.** The wide driver reads its
-  result buffers one blocking read at a time (about 29,600 per base-65 field; the narrow driver batches them, about
-  260); through Vulkan each read stalls when the CPU is contended: six busy threads make base 65 ×2.3 slower with
-  the card 24 % busy, base 64 loses 5 %, and through CUDA neither moves. The current head is 10–13 % faster than
-  the 2026-11-19 trunk on that card through both runtimes, so it is not a regression. **Fixed on 2026-11-26** (`dev/mo-mode` `0b6e22e1`: the wide
-  `finish_group` reads a group's buffers in one read, as the narrow one does): base 65 under six busy threads
-  through Vulkan 14.25 → 6.35 fs, 3 % faster quiet, exact, every fault as loud as before [measured, RTX 3060;
-  not yet on the RX 9070 XT]. The wide expansion took 3.45 ms per slice, 1.88 of it the
-  prefilter's arithmetic [measured by ablation]; two records per lane in one loop and the digit test as one
-  mask brought it to 2.0–2.3 ms [measured, RTX 3080].
+- **No field has gone through a real server, because there is none.** The mode has run only against the
+  development server, on one machine (127.0.0.1). The server proposal is not approved, and it leaves open its five
+  sub-decisions (`G2/PROPOSAL-B.md` §7: field size, insertion, double-checking, credit, submit body; each with a
+  default) and eight questions that building the client raised (§9 there: big integers as strings in the claim
+  too, the type of `nice_numbers`, one shape per base, what counts as the same submission, a 404 that tells an
+  unknown claim from a missing endpoint, `matches_canon` in the reply, whether a 503 is waited out, which base is
+  handed out first); the review adds one (`MODE2/REVIEW.md` C5: the proposed table's `elapsed_secs` has no field
+  in the typed body). Not tested, as only a real server can test them: many clients on many machines, runs of
+  days, a database restart. By reading the client [judged]: a searched field's result is held in memory only, so
+  a crash, or a server down for more than an hour, loses it, and the field is searched again once its claim
+  expires; nothing wrong is recorded.
+- **Base 65 on the RX 9070 XT has no result since the wide path was fitted to that card** (2026-11-20, offline
+  with the driver's compiler: 120 registers, 21.4 KB of shared memory and 12 waves per SIMD instead of 192, 23.7 KB
+  and 8; predicted 2.4–3.0 fs from 3.02 [judged]). On 2026-11-25, with the desktop in use, it ran the card at half
+  clock (1.53 GHz, 112 W; 4.8–4.9 fs). **Likely cause** [measured on an RTX 3060 on 2026-11-26; inferred for the
+  RX 9070 XT]: the wide driver read its result buffers one blocking read at a time (about 29,600 per base-65 field,
+  against about 260 on the narrow path), and through Vulkan each read stalls when the host's CPUs are busy: six
+  busy threads made base 65 ×2.3 slower with the card 24 % busy, against +3 % through CUDA. It is not a
+  regression (the head is 10–13 % faster than the trunk there). **Fixed in `0b6e22e1`** (one read per group, as on
+  the narrow path): under the same load 14.25 → 6.35 fs, 3 % faster on a quiet host, exact, every fault message
+  unchanged [measured, RTX 3060, `B65/READS-RESULTS.md`]; **not yet run on the RX 9070 XT.** The narrow path's 6–10
+  % slowdown there on 2026-11-25 may share the cause (it lost 5 % under load through Vulkan on the 3060) [judged].
+  Further base-65 gains, ranked from a stage profile (`B65/RESULTS.md` §4–5) [judged]: the main kernel (58 % of a
+  slice), the wide expansion at the narrow one's cost per record (about 4 %), the shared parent lists ported (about
+  5 %), tops queued several slices at a time (up to 10 %); none built.
+- **Metal: exact on an Apple M4** (macOS 27.2, through WGSL, plane width 32; 2026-11-26): the device tier, two
+  base-64 slices n for n, the fault tests, parent sharing, wide parity at bases 40 and 65; whole fields at 12.94
+  fs, about ×3.9 against production's join on the same machine [measured; the ratio from one bracket field]. The
+  mode's refusal of Metal is now a warning at start. Not checked: other Apple GPUs, older macOS releases (the
+  Metal compiler defect of 2026 miscompiled some divisions by a constant; fixed in the OS), and CubeCL's own MSL
+  compiler. **The project's WGSL lint for that defect does not cover the middle-out kernels** (found 2026-11-26:
+  the lint's dump, `cubecl_backend::tests::wgsl_dump_for_lint`, holds the other GPU kernels only). They were
+  linted once by hand on 2026-11-19, and their `>> 16` sites were read by eye on 2026-11-26 with none of the
+  miscompiled form [judged by reading]; adding them to the dump is open.
+- **The sampled check at base 65 depends on free CPUs.** The CPU slice runs on up to 4 threads (33 s on a 5-CPU
+  box against a 57 s field; one thread 106 s). The threads cost base 65 +0.7 % of device time and base 64 nothing
+  measurable; the check's device rerun costs about 1 s per base-65 field and 0.2–0.4 s at base 64 [measured].
+  Thread priority is not lowered.
 - **Bases 66–70: partly.** Base 68 was exact on two slices before the paths were merged (2.13 fs on a 20 GB card)
   and has not run since; it needs a 2D tops grid to launch on Vulkan. Bases 69 and 70 have never run; base 70
-  needs the (4, 11) shape and a 64-bit slice key. The route refuses 66–70 (`route.rs:36–58`).
-- **The sampled check at base 65 depends on free CPUs.** On since 2026-11-20: the CPU slice runs on up to 4
-  threads (33 s on a 5-CPU box against a 57 s field; one thread 106 s). The threads cost base 65 +0.7 % of
-  device time and base 64 nothing measurable; the check's device rerun costs about 1 s per base-65 field and
-  0.2–0.4 s at base 64 [measured]. Thread priority is not lowered.
-- **No server design is chosen**; nothing on the server exists. The coordinator has been tested hard with
-  fake clients (§6.11) but **not with the real client under failure, not across machines, and not over days**.
-  By reading the client: with the fixed coordinator no failure records an unsearched field, but a searched
-  field's result can be lost and the search repeated (a refused submission makes the client exit with the
-  field still claimed; a coordinator down for more than the client's retry window of about 9 minutes; claims
-  are not retried). Four client changes are proposed for that (spool a result to disk before submitting; treat
-  "already accepted for my own claim" as success; retry claims; report abandoned claims); not built. Run the
-  coordinator with `--reissue-after` at a few field times, or a dead client's field stays claimed for good.
+  needs the (4, 11) shape and a 64-bit slice key. The mode refuses 66–70 (`route.rs:33–56`).
 - **Fault bits are a runtime kernel argument** (`fault: u32`, 0 in production), not compile-time; making them
   compile-time changes every faultable kernel's generated code and needs the same verification again. No test
   switch can reach a release build [measured by reading].
@@ -721,49 +735,54 @@ Base 64 on the RX 9070 XT alone at 0.99 fs: about 55 days, against about 266 at 
   this branch since 2026-11-19 evening (private `Coord` fields with getters, three independent tests, the fixed
   brute-force test, true docs for the default coordinate). What the branch keeps beyond those cut branches: the
   older coordinate (4, 9, 6) as "also known" at bases 64 and 65, and the coordinates of bases 65 and 68–70, which
-  the wide path and its tests use. Whether the older one is dropped is `DECISIONS.md` D2.
+  the wide path and its tests use. Whether the older one is dropped waits for the choice of the field's definition, which you asked on 2026-11-25 to leave open until closer to merging (`DECIDED.md`).
 - **Smaller:** `run_slice` and `run_slice_dev` are public and return one slice, not a field; lavapipe at 16 lanes
   aborts in lavapipe itself; the 3080's unexplained 0.6 ms in the expansion (§6.7); the shared lists are sized
-  for 3.4M roots each (an overrun is an error; the longest seen is 1.89M).
+  for 3.4M roots each (an overrun is an error; the longest seen is 1.89M); the mode does not refuse a software
+  renderer (that refusal comes with upstream #277, which this branch predates); a few Vulkan processes segfault at exit
+  after printing their results (not investigated).
 
 ---
 
 ## 10. Where the code is, and how to run it
 
-**Branch** `dev/mo-clean` on the fork `wasabipesto-bot/nice`, head `66305ada`, 33 commits on the development
-trunk `66259bb0`; worktree `~/projects/nice/.worktrees/midout-clean`. The development history before the cleanup
-stays on `dev/middle-out-join`. No pull request is open (`DECISIONS.md` D9).
+**Branch** `dev/mo-mode` on the fork `wasabipesto-bot/nice`, head `0b6e22e1`: 32 commits on `dev/mo-clean`
+`66305ada` (the cleanup, 33 commits on the development trunk `66259bb0`); worktree
+`~/projects/nice/.worktrees/mo-mode`. Against v3.4.8's `be9cc923`, its merge base: 27 files, 17,822 lines added, 24
+removed. The history before the cleanup stays on `dev/middle-out-join`. No pull request is open from this work, by your instruction of 2026-11-19 and 2026-11-25 (`DECIDED.md`).
 
 | file | lines | what |
 |---|---|---|
-| `common/src/midout/mod.rs` | 62 | module map; the three test tiers |
-| `common/src/midout/coord.rs` | 634 | the work unit: coordinate, quantum, field ↔ fixed digits, `n_count` |
-| `common/src/midout/cpu.rs` | 1,628 | the exact CPU reference: shape, certificates, parents, slice join, prefilter, brute-force predicates |
+| `common/src/midout/mod.rs` | 75 | module map; the three test tiers |
+| `common/src/midout/coord.rs` | 636 | the work unit: coordinate, quantum, field ↔ fixed digits, `n_count` |
+| `common/src/midout/cpu.rs` | 1,654 | the exact CPU reference: shape, certificates, parents, slice join, prefilter, brute-force predicates |
 | `common/src/midout/arith.rs` | 138 | 384-bit arithmetic and nice-ness for the reference (re-implemented on purpose) |
 | `common/src/midout/mask.rs` | 75 | digit masks generic over `u64` / `u128` |
 | `common/src/midout/gpu.rs` | 4,881 | base-64 device path: kernels (`kernels`, `prep`, `post`, `dtops`), driver `GpuJoin`, `search_field`, tests |
-| `common/src/midout/gpu_wide.rs` | 4,713 | two-word-mask device path for bases 65–70 (and small bases in tests), its own check kernel |
+| `common/src/midout/gpu_wide.rs` | 4,746 | two-word-mask device path for bases 65–70 (and small bases in tests), its own check kernel |
 | `common/src/midout/audit.rs` | 872 | parity sweep and fault injection (tests only) |
-| `common/src/midout/route.rs` | 173 | one entry point per base for a client route, with telemetry |
-| `common/src/midout/wire.rs` | 238 | the claim key, the route name, the production-host refusal, the ordinary-route guard |
+| `common/src/midout/route.rs` | 175 | one entry point per base for the client mode, with telemetry |
+| `common/src/midout/wire.rs` | 490 | the mode's endpoints, typed claim, submission and reply, their answers; the ordinary-route guard |
 | `common/src/cubecl_join.rs` | +2/−2 | two constants (`CHECK_CUBES`, `RAN_WORDS`) made `pub(crate)` so the check's grid and account are shared, not copied |
-| `common/src/client_api_async.rs` | +50/−2 | the ordinary claim refuses a coordinate-space field (and its test) |
+| `common/src/client_api_async.rs` | +147/−4 | the mode's claim and submit with their retries; the ordinary claim refuses a coordinate-space field |
 | `common/src/lib.rs`, `Cargo.toml` | +1, +19 | `pub mod midout`; features `midout-bench`, `midout-box-tests`, `midout-fault` |
-| `common/examples/midout_bench.rs`, `midout_wide_bench.rs` | 203, 180 | whole-field timing (feature `midout-bench`) |
-| `common/examples/midout_fields.rs` | 56 | a work list of fields for the coordinator |
-| `client/src/midout_route.rs` | 451 | the route: claim, search, submit; guards; Metal refusal; panic hook |
-| `client/src/main.rs`, `client/Cargo.toml` | +25, +3 | the hidden `--midout-coordinator` flag |
-| `scripts/midout_coordinator.py` | 295 | the local coordinator (standard library, 127.0.0.1; durable records, a lock, refusals) |
-| `scripts/midout_audit.py` | 171 | checks a coordinator's state directory against its work list |
+| `common/examples/midout_bench.rs`, `midout_wide_bench.rs`, `support/args.rs` | 314, 291, 146 | whole-field timing (feature `midout-bench`); one option reader for the three examples |
+| `common/examples/midout_fields.rs` | 88 | a work list of fields for the development server |
+| `client/src/midout_route.rs`, `midout_route/tests.rs` | 948, 1,198 | the mode: options, the loop, guards, stop on a signal, panic hook; its tests |
+| `client/src/main.rs`, `bench.rs`, `Cargo.toml`; `README.md` | +91/−11, +7/−6, +10/−1; +6 | the mode on the command line (`ClientMode`); the README's lines on it |
+| `scripts/midout_coordinator.py` | 586 | the development server (standard library, 127.0.0.1; durable records, a lock, the eight checks) |
+| `scripts/midout_audit.py` | 225 | checks a development server's state directory against its work list |
 
-**Run it on one machine** (CUDA shown; for Vulkan use `--features cubecl-spirv` and `--gpu-backend cubecl`):
+**Run it on one machine** (the `gpu` feature set, as a GPU release; `auto` takes CUDA where it starts, else the
+wgpu device):
 
 ```sh
-cargo build --release -p nice_client --features cubecl-cuda
+cargo build --release -p nice_client --features gpu
 cargo build --release -p nice_common --example midout_fields
 target/release/examples/midout_fields --base 64 --spread 12 > work.json
 python3 scripts/midout_coordinator.py --worklist work.json --state ./mo-state --port 8471
-target/release/nice_client niceonly --midout-coordinator http://127.0.0.1:8471 --repeat --username NAME
+target/release/nice_client midout --api-base http://127.0.0.1:8471 --repeat --username NAME
+python3 scripts/midout_audit.py --worklist work.json --state ./mo-state
 ```
 
 Records land in `mo-state/claims.jsonl` and `mo-state/submissions.jsonl`; `GET /status` gives counts. The timing
@@ -782,8 +801,10 @@ residue mod b − 1 can be a nice number's.
 **For the long version** (all under `~/projects/nice/scratchpad/2026-10-research-program/G2/`): `RESULTS.md` (the
 original design and its cost tables), `REVIEW.md` (the first review of it), `BUILD-NOTES.md` (the build: §2 the
 field, §3 decisions, §9–§14 the measured steps), `AUDIT-MO.md` (the soundness audit), `fs/REVIEW.md` (the field
-structure), `BUILD-NOTES-CLIENT.md` (coordinator and route), `BUILD-NOTES-WIDE.md` (bases above 64),
+structure), `BUILD-NOTES-CLIENT.md` (the earlier coordinator and route), `MODE-NOTES.md` (the client mode), `BUILD-NOTES-WIDE.md` (bases above 64),
 `CLEAN-NOTES.md` (the cleanup), `MAINTAINABILITY.md` and `PR-PLAN.md` (the proposed series of pull requests),
 `PR12-REVIEW.md` (the review of the first two), `CARRYBACK-NOTES.md` (that review's fixes brought onto this
 branch, with every test tier re-run), `WIDE2-NOTES.md` (the wide path's check, expansion and shared memory,
-2026-11-20), and `../EXPERIMENTS.md` for every number with its raw data.
+2026-11-20); beside `G2/`: `MODE2/REVIEW.md` and `MODE2/FIX-NOTES.md` (the mode's review, its fixes and the CI
+matrix), `B65/RESULTS.md` and `B65/READS-RESULTS.md` (base 65 on the RTX 3060, the batched reads), and
+`EXPERIMENTS.md` for every number with its raw data.

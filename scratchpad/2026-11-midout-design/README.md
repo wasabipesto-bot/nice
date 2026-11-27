@@ -1,7 +1,8 @@
 # The middle-out join: design document and process maps (2026-11-19)
 
-For the maintainer, before reading the code of the redesigned nice-only GPU join on the fork branch `dev/mo-clean`
-(head `66305ada` since 2026-11-20, worktree `~/projects/nice/.worktrees/midout-clean`). Nothing here changes any repository.
+For the maintainer, before reading the code of the redesigned nice-only GPU join on the fork branch `dev/mo-mode`
+(head `0b6e22e1` since 2026-11-26, worktree `~/projects/nice/.worktrees/mo-mode`; before 2026-11-27 the documents
+described `dev/mo-clean` at `66305ada`). Nothing here changes any repository.
 
 ## Contents
 
@@ -11,20 +12,19 @@ For the maintainer, before reading the code of the redesigned nice-only GPU join
   and where, what is not done or not known, the file map and how to run it. Every claim is labelled measured,
   proven or judged.
 - `interactive/midout-map.html`: one self-contained file; open it in a browser. The whole path of one base-64
-  field from claim to submit, in the format of the #178 process map: host and coordinator lane, device lane for
+  field from claim to submit, in the format of the #178 process map: host lane (the client mode and the development server), device lane for
   one slice, and a lane for v3.4.8's overlap join beside the stage each corresponds to. Colour = where it runs;
   shape = role; gold REUSED badge = production code used unchanged; frequency badges (PROC, FIELD, /64, SLICE,
   BATCH, GROUP); time-share bars (RX 9070 XT; the 3080 in the panel; the overlap lane's shares are derived and
   hatched). Click a shape for why it exists, how it connects, cost, the check that guards it, file:line (into
-  `dev/mo-clean` at `66305ada`, or `origin/main` at `974d7194` for the overlap lane), its wide-path counterpart and
+  `dev/mo-mode` at `0b6e22e1`, or `origin/main` at `974d7194` for the overlap lane), its wide-path counterpart and
   its overlap-join counterpart. Spotlights: by frequency; where each execution check is made and compared (draws
   the account edges); base-64 path against the wide path (teal = has a counterpart, orange dashed = none); what a
   field fixes; what is reused from production.
 - `static/midout-overview.svg` and `.png` (2×): the simplified one-screen picture, no line numbers; it heads
   `DESIGN.md`.
 - `screenshots/`: renders used to check the map (full page light, each spotlight, 2× panel views light and dark).
-- `tools/`: `check_refs.py` (every file:line in the map must contain its named identifier; 87 refs, 0 bad at the
-  time of writing), `print_inline_refs.py` (prints the target line of each inline ref in `DESIGN.md` for reading),
+- `tools/`: `check_refs.py` (every file:line in the map must contain its named identifier; 89 refs, 0 bad at `0b6e22e1`), `print_inline_refs.py` (prints the target line of each inline ref in `DESIGN.md` for reading),
   `shot_map.cjs` (clicks every node and checks its panel, tries each spotlight and toggle, checks phone width,
   takes the screenshots), `svgshot.cjs` (SVG → PNG), `../static/make.py` (writes the SVG).
 
