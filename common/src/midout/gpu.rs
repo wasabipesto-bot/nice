@@ -2677,6 +2677,8 @@ const ANC_CAP: u32 = 3_400_000;
 
 /// The device side: kernels compiled for one plane width, buffers allocated
 /// once and reused by every slice.
+// independent switches (the check's ballot, the prefilter form, parent sharing, the tests' split emulation)
+#[allow(clippy::struct_excessive_bools)]
 pub struct GpuJoin<R: Runtime> {
     client: ComputeClient<R>,
     pub w: u32,
