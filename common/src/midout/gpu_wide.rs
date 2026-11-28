@@ -700,7 +700,6 @@ mod wk {
                     let s16 = ntake + t;
                     keep = (pq[(s16 >> 1u32) as usize] >> ((s16 & 1u32) << 4u32)) & 0xFFFFu32;
                 }
-                let cpos = cdone + (t % 16u32) * 64u32;
                 sync_cube();
                 if comptime!(w < 32) {
                     let mut z = t;
@@ -750,46 +749,63 @@ mod wk {
                 }
                 sync_cube();
                 let nlist = s_nl[0usize].load();
-                // phase 3b: lane = chunk (q = t % 16), 16 probe streams, two list entries per unit per step
-                let q = t % 16u32;
-                let st = t / 16u32;
-                let nq = select(q < nch, min(64u32, ntake - min(ntake, q * 64u32)), 0u32);
-                let vlo = select(nq >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nq % 32u32)) - 1u32);
-                let vhi = select(
-                    nq == 64u32,
-                    0xFFFF_FFFFu32,
-                    select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32),
-                );
+                // phase 3b: two chunks per lane (q = t % 8 and q + 8), 32 probe streams (st = t / 8), one list entry
+                // per unit per step: a lane reads its probe's digits once for both chunks (the second chunk's rows
+                // are a constant offset away), the same 32 entries x 16 chunks per cube step as before
+                let q = t % 8u32;
+                let st = t / 8u32;
+                let mut vlo = Array::<u32>::new(2usize);
+                let mut vhi = Array::<u32>::new(2usize);
+                #[unroll]
+                for h in 0..2u32 {
+                    let qh = q + comptime!(8 * h);
+                    let nq = select(qh < nch, min(64u32, ntake - min(ntake, qh * 64u32)), 0u32);
+                    vlo[h as usize] = select(nq >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nq % 32u32)) - 1u32);
+                    vhi[h as usize] = select(
+                        nq == 64u32,
+                        0xFFFF_FFFFu32,
+                        select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32),
+                    );
+                }
                 let qr = q * srow;
                 let qs = 16u32 + q;
+                let cpos0 = cdone + q * 64u32;
                 let mut e0 = 0u32;
                 while e0 < nlist {
                     let mut wlo = Array::<u32>::new(2usize);
                     let mut whi = Array::<u32>::new(2usize);
-                    let mut pk = Array::<u32>::new(2usize);
+                    let e = e0 + st;
+                    let ent = select(e < nlist, pq[e as usize], 0u32);
+                    let p16 = ent & 0xFFFFu32;
+                    let dws = prob_d[(p16 >> 4u32) as usize];
+                    let mut de = 0u32;
+                    if comptime!(maxpop > 18) {
+                        de = prob_e[(p16 >> 4u32) as usize];
+                    }
+                    let mut alo0 = 0u32;
+                    let mut ahi0 = 0u32;
+                    let mut alo1 = 0u32;
+                    let mut ahi1 = 0u32;
+                    #[unroll]
+                    for k in 0..maxpop {
+                        let dg = probe_digit(dws, de, k, maxpop);
+                        let row = (dg + qr) * 2u32;
+                        alo0 |= sl[row as usize];
+                        ahi0 |= sl[(row + 1u32) as usize];
+                        alo1 |= sl[(row + comptime!(16 * srow)) as usize];
+                        ahi1 |= sl[(row + comptime!(16 * srow + 1)) as usize];
+                    }
                     #[unroll]
                     for h in 0..2u32 {
-                        let e = e0 + st + comptime!(16 * h);
-                        let ent = select(e < nlist, pq[e as usize], 0u32);
-                        let p16 = ent & 0xFFFFu32;
-                        pk[h as usize] = p16;
-                        let kmask = 0u32 - ((ent >> qs) & 1u32);
-                        let mut alo = 0u32;
-                        let mut ahi = 0u32;
-                        let dws = prob_d[(p16 >> 4u32) as usize];
-                        let mut de = 0u32;
-                        if comptime!(maxpop > 18) {
-                            de = prob_e[(p16 >> 4u32) as usize];
+                        let kmask = 0u32 - ((ent >> (qs + comptime!(8 * h))) & 1u32);
+                        let mut al = alo0;
+                        let mut ah = ahi0;
+                        if comptime!(h == 1) {
+                            al = alo1;
+                            ah = ahi1;
                         }
-                        #[unroll]
-                        for k in 0..maxpop {
-                            let dg = probe_digit(dws, de, k, maxpop);
-                            let row = (dg + qr) * 2u32;
-                            alo |= sl[row as usize];
-                            ahi |= sl[(row + 1u32) as usize];
-                        }
-                        wlo[h as usize] = !alo & vlo & kmask;
-                        whi[h as usize] = !ahi & vhi & kmask;
+                        wlo[h as usize] = !al & vlo[h as usize] & kmask;
+                        whi[h as usize] = !ah & vhi[h as usize] & kmask;
                     }
                     if t == 0u32 {
                         my_lslots += min(32u32, nlist - e0) * nch;
@@ -823,18 +839,16 @@ mod wk {
                         if slab_id < nslab_cap {
                             if nza {
                                 let mut rv = Vector::<u32, Const<4>>::empty();
-                                rv[0usize] =
-                                    ((pk[0usize] >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
-                                rv[1usize] = cpos;
+                                rv[0usize] = ((p16 >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
+                                rv[1usize] = cpos0;
                                 rv[2usize] = select(lost, 0u32, wlo[0usize]);
                                 rv[3usize] = select(lost, 0u32, whi[0usize]);
                                 out[(sbase + ra) as usize] = rv;
                             }
                             if nzb {
                                 let mut rv = Vector::<u32, Const<4>>::empty();
-                                rv[0usize] =
-                                    ((pk[1usize] >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
-                                rv[1usize] = cpos;
+                                rv[0usize] = ((p16 >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
+                                rv[1usize] = cpos0 + 512u32;
                                 rv[2usize] = select(lost, 0u32, wlo[1usize]);
                                 rv[3usize] = select(lost, 0u32, whi[1usize]);
                                 out[(sbase + na + rb) as usize] = rv;
