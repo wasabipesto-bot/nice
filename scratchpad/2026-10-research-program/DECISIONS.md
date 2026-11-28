@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-28 06:00 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-28 10:15 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
@@ -17,7 +17,8 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
 - **Your direction for it (2026-11-25):** a `midout` mode beside `detailed` and `niceonly`, visible in `--help`,
   with a new claim endpoint and its own table on the server; the field definition not locked in yet. **The
   client half exists since 2026-11-25** on the fork branch `dev/mo-mode` (`nice_client midout`, tested end to
-  end against a development server; notes in `G2/MODE-NOTES.md`); the server half is the proposal of §1.
+  end against a development server; notes in `G2/MODE-NOTES.md`; head `87620a18` on 2026-11-28, full CI matrix
+  green); the server half is the proposal of §1.
 - **Pull requests in general are allowed.** Open now, all green and mergeable: #276 (the crash at bases with
   no valid residue), #277 (a `--gpu` client that finds only a software renderer), #278 (the CI check for the
   SPIR-V atomic-store trap), #279 (`just lint` fails on machines that are not x86-64, your M4 among them).
@@ -103,10 +104,15 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
   ran slower on your card while the desktop was in use (2026-11-25). The base-65 work of the last three days
   keeps its measured gains (about 11 % of base 65's 150 days, and base 65 is still 73 % of the time to finish
   both bases), but I had ranked it above base 64 on a wrong number.
-- **What I ask, when convenient: one hour of demoux.** First for base 64: the same field at group sizes 16,
-  64 and 256 with the desktop in use and the card's clock logged; it tells whether that 6–10 % is the pause
-  between groups of slices, which can be closed (`B65/AHEAD-DESIGN.md`; the same sweep runs on eventeo today).
-  Then base 65 at the current head, to confirm on the card that the read fix of 2026-11-26 holds it near 3 fs.
+- **What I ask, when convenient: one hour of demoux**, for three measurements nothing else can make:
+  1. **Base 64 with the desktop in use, at 16, 128 and 256 slices per group** (ten minutes, an argument of the
+     benchmark, no new code). On eventeo today a busy host cost base 64 4.6 % at 16 slices per group and 0.4 %
+     at 256 (`EXPERIMENTS.md` B65.8): the card idles once per group while the host reads results. Your card's
+     slices are three times shorter, so the same pause is three times the share: very likely the 6–10 %.
+  2. **A new memory layout for the main kernel** (`B65/ACO-RESULTS.md`): offline it removes 17 % (base 64) and
+     21 % (base 65) of the inner loop's modelled cycles for your card's compiler. A model only; part of it
+     runs only on 64-lane hardware, which among the machines I can reach is your card alone.
+  3. Base 65 at the current head, to confirm on the card that the read fix of 2026-11-26 holds it near 3 fs.
 - **If you do not answer:** I develop on eventeo, do not use demoux, and report numbers from the RTX 3060 only.
 
 ## What happens next if you say nothing

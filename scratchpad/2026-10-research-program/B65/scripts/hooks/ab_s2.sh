@@ -22,4 +22,12 @@ for st in 3 5; do for t in hk1 $NEW; do
   [ -e $R/b65h/stop ] && { echo stopped >> $O/rc.txt; exit 0; }
   bash $S/run_b65.sh $RUN cuda65s${st}_$t $t-bench-cuda/midout_wide_bench cuda MIDOUT_STOP=$st -- $W65
 done; done
+# step 1's base-64 narrow check, again: fx-base (73bc0065) against hk1, alternating, 2 rounds per runtime
+for rt in cuda vk; do
+  [ $rt = cuda ] && sfx=cuda || sfx=spv
+  for r in 3 4; do
+    if [ $r = 3 ]; then L="hk1 fx-base"; else L="fx-base hk1"; fi
+    for t in $L; do c ${rt}64n_${t}_$r $t-bench-$sfx $rt midout_bench $N64; done
+  done
+done
 echo done > $O/done

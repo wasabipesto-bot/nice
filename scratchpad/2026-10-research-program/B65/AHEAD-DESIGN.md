@@ -1,5 +1,12 @@
 # Keeping the card fed between groups of slices: design note (the director, 2026-11-28)
 
+**Outcome, 10:10 UTC the same day (`EXPERIMENTS.md` B65.8): the sweep says the pause between groups is the cause
+of the loss under a busy host, and a larger group removes it without the look-ahead.** RTX 3060 through Vulkan,
+base 64: +4.6 % under six busy threads at 16 slices per group, +2.0 % at 64, +0.4 % at 256; base 65: +3.1 % at
+16, +1.1 % at 64; nothing changes on a quiet host; 12–18 MiB more card memory. So the change described below
+("The change, if the sweep says yes") is **not built**: the production constant `GROUP` (16 today) is raised
+instead (B65.10). The rest of this note is kept for the reading of the runtime.
+
 Not built. A plan, its price, and a cheaper measurement to make first. It extends the engineer's note of
 2026-11-26 (`B65/READS-RESULTS.md`, "Step 2"). Sources: the drivers at `dev/mo-mode` `f503a13c` (`run_field_wide`,
 `finish_group`, `queue_slice` in `common/src/midout/gpu_wide.rs`; `search_field_groups`, `finish_group`,

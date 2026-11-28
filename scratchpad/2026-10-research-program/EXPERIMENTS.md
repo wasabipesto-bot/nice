@@ -5,6 +5,69 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## B65.8 The loss under a busy host is the pause between groups of slices: group 256 removes it at base 64 (4.6 % → 0.1–0.4 %), group 64 removes about two thirds at both bases; no code (2026-11-28 09:34–10:05 UTC, the director's script run by the hooks engineer; eventeo's RTX 3060 through Vulkan/SPIR-V; `B65/AHEAD-DESIGN.md`, `B65/scripts/runs_group.sh`, `B65/runs/group/`; build `hk1-bench-spv` = `6abf5743`)
+
+Each cell: a warm-up field then the timed field (base 64: t 77777 on the narrow path, `--threads 5 --no-cpu-check`;
+base 65: t 77777 on the wide path), the benches' `--group` argument only; "busy" = six shell loops on the six
+cores. fs per admissible n of the timed field; counts equal in every cell.
+
+| slices per group | base 64 quiet | base 64 busy | loss | base 65 quiet | base 65 busy | loss | card memory |
+|---|---|---|---|---|---|---|---|
+| 16 (today's default) | 3.2621, 3.2774 (first and last cell) | 3.4216 | **+4.6 %** | 5.7653, 5.7712 | 5.9444 | **+3.1 %** | 3,752 / 6,379 MiB |
+| 64 | 3.2557 | 3.3197 | +2.0 % (+1.5 % against group 16 quiet) | 5.7579 | 5.8224 | +1.1 % (+0.9 %) | 3,764 / 6,391 |
+| 256 | 3.2586 | 3.2716 | **+0.4 % (+0.1 %)** | not run | not run | | 3,770 |
+
+- **Rule written beforehand** (group 64 recovers at least half of the loss at base 64 → the pause is the cause):
+  met. Group 64 recovers 58–67 % at base 64 and 63–69 % at base 65; group 256 recovers 91–99 % at base 64.
+- **Quiet host:** no measurable change (−0.2 to −0.4 %, inside the 0.5 % between the two group-16 cells).
+- **Memory:** +12 to +18 MiB. My worry that a larger group keeps every slice's lists alive was wrong.
+- **Consistent with the runtime's source** (`B65/AHEAD-DESIGN.md`): at group 256 the host's time in `sync` and
+  reads falls from 55.5 s to 14.1 s per field; the rest of its waiting is the runtime's throttle after 512 launches.
+- **Consequence:** the look-ahead design is not needed: one constant gets over 90 % of it. Production's route
+  uses `GROUP = 16` (`common/src/midout/route.rs`, "the benches' default"). The drivers accept up to 256; the
+  limit is the per-unit u32 counters of a group (the largest observed count wraps after about 900 slices, so
+  256 leaves ×3.5 and 128 leaves ×7). Next (B65.10): groups 128 and 256 at both bases and on the 3 GB card,
+  then the constant on the dev branch.
+- **For the RX 9070 XT:** its slices are 3.3 times shorter, so the same pause is 3.3 times the share. This is
+  the likely cause of the 6–10 % it lost with the desktop in use on 2026-11-25 (WIN3.1), and a ten-minute
+  check there needs no new code (`--group 256` on the bench).
+
+## B65.6 The five split-fault hooks compiled out of production kernels; `dev/mo-mode` → `87620a18`; the wide expansion's lookups killed on Vulkan (2026-11-28 05:46–10:06 UTC, engineer; eventeo, the M4, the fork's CI; `B65/BRIEF-HOOKS.md`, `B65/HOOKS-NOTES.md`, `B65/runs/hooks/`; fork `dev/mo-hooks` 6abf5743 + 87620a18)
+
+- **Step 1.** The fault emulation of the seven kernels that carried it (`wide_kernel`, `wanc`, `wtops5`,
+  `wexpand`; `g2_kernel`, `anc8`, `expand_kernel`) is a comptime value `emul`, false from the constructor in
+  every production path, set only by tests (`set_split_emulation`, crate-private); `set_fault` panics on a
+  split fault without it. The per-lane counts stay in production's kernels.
+- **What the fault tests prove now:** the host's checks fire on the kernels built with the emulation;
+  production's kernels are the same source with those blocks compiled out. Evidence that the two builds agree:
+  equal counts without a fault (asserted in the fault and sharing tests, slice by slice over 128–130 slices,
+  and the sampled slice against the CPU n for n); on the M4's WGSL the two builds differ only by the emulation
+  blocks (structure, names abstracted). I read both drivers' diffs: the code outside the blocks is the code
+  before the hooks, and the independent counts are taken before the emulation zeroes anything.
+
+| RTX 3060, fs per admissible n | before the hooks `73bc0065` | with hooks `f503a13c` | compiled out `6abf5743` | out against before |
+|---|---|---|---|---|
+| CUDA, base 65 | 6.0135 | 6.1069, 6.1125 | 6.0190, 6.0214 | +0.1 % |
+| Vulkan, base 65 | 5.7653, 5.7563 | 5.8196, 5.8171 | 5.7588, 5.7587 | −0.04 % |
+| CUDA, base 64 narrow (9 runs) | 3.2797 | 3.3411, 3.3325 | 3.2939 | +0.4 % |
+| Vulkan, base 64 narrow (9 runs) | 3.2556 | 3.2741, 3.2661 | 3.2647 | +0.3 % |
+
+  The 0.3 % line is met at base 65 and on Vulkan at base 64, and missed by 0.1 % through CUDA at base 64: what
+  is left is the per-lane counts (which stay) and noise.
+- **Tests on `6abf5743`:** the full device set through CUDA and Vulkan (RTX 3060), brute force on the GTX 1060
+  through both, the M4 through Metal incl. a base-65 field with the sampled check; counts equal to
+  yesterday's; fault messages unchanged. Fork CI on `87620a18` (a clippy attribute on top): device parity
+  46115059232 and the full matrix 46115061293 green; the lint step now covers both variants (71 shaders, 0
+  flagged). **Merged: `dev/mo-mode` fast-forwarded to `87620a18` (10:08 UTC).**
+- **Step 2, the wide expansion's lookups** (one 16-byte context per top slot; the prefilter's fixed
+  super-digits once per record): exact on all three runtimes incl. brute force; base 65 −2.3 % through CUDA
+  (the expansion itself 4.40 → 3.85 ms per slice), **−0.26 % through Vulkan, 0 on Metal: under the 1.5 % line,
+  not pushed** (patch `B65/scripts/hooks/step2-v1.patch`). The SPIR-V and WGSL compilers already hoist what
+  NVRTC recomputes. Available for the CUDA fleet alone if ever wanted.
+- **Deviation:** the engineer's two commits carry the trailer of the model that wrote them (Opus), not the
+  one the brief named. They are pushed, so they stay as they are.
+- eventeo 05:52–09:34: 0.82 kWh.
+
 ## B65.7 The main kernels' word loop under the RX 9070 XT's compiler, offline: a layout that reads each probe's digits once for four chunks removes 21 % (base 65) and 17 % (base 64) of the loop's modelled cycles; not yet run on any card (2026-11-28 05:46–07:10 UTC, engineer, ivory offline; `B65/BRIEF-ACO.md`, `B65/ACO-RESULTS.md`, `B65/aco/`; fork scratch branch `exp/mo-wide-aco`, V5 for both kernels = `a4fb3543`)
 
 Mesa 26.0.8 RADV/ACO for GFX1201 on the drm-shim (container `g2mesa`); instruction counts are measured compiler

@@ -65,6 +65,24 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     find it; within 2 % of the base at both bases = it can be the common path and the RX 9070 XT decides its
     value; slower by more than 2 % at base 64 = it would have to be a 64-lane-only variant, and its bar on the
     RX 9070 XT rises to ×1.05 of a base-64 field.
+- **10:08 UTC, B65.6 back and merged** (`B65/HOOKS-NOTES.md`; EXPERIMENTS B65.6): the split-fault emulation is a
+  comptime choice, off in every production path; timings back to the pre-hooks head within 0.1 % (base 65) and
+  0.3–0.4 % (base 64 narrow: the counts themselves and noise); full device set green on CUDA, Vulkan, Metal;
+  fork CI green on `87620a18`. I read both drivers' diffs (the code outside the emulation blocks is the code
+  before the hooks; the independent counts are taken before the emulation zeroes anything) and fast-forwarded
+  **`dev/mo-mode` → `87620a18`**. Step 2 (the wide expansion's lookups) −2.3 % CUDA but −0.26 % Vulkan: killed
+  by its line, patch kept. The engineer's commits carry the trailer of the model that wrote them; pushed, so
+  they stay.
+- **10:10 UTC, B65.8 back: the rule says yes, and more simply than I planned.** Loss under six busy threads at
+  base 64: +4.6 % at group 16, +2.0 % at 64, +0.4 % at 256; base 65: +3.1 % → +1.1 % at 64. Quiet host
+  unchanged; +12–18 MiB. So the pause between groups is the cause and a constant removes it: **the look-ahead
+  design is dropped** (note kept). Production's route has `GROUP = 16`.
+  - **B65.10, queued 10:12 UTC** (`B65/scripts/runs_group2.sh` on eventeo, behind the V5 chain, own hold file
+    `keep-up.g2`; `off_if_idle.sh` now honours one hold file per job): base 64 at group 128, base 65 at 128 and
+    256, quiet and busy, with a group-16 pair in the same session; the GTX 1060 3 GB at 16 and 256 (does it
+    still fit). Then the constant on the dev branch: **128 unless the 3 GB card or base 65 says otherwise**
+    (the per-unit counters of a group are u32: the largest count observed wraps after about 900 slices, so 128
+    leaves ×7 and 256 ×3.5; I take the margin over the last 0.3–0.5 % under load).
 
 ## 2026-11-27 (cycle 18 of the new director; routine fired 05:41 UTC)
 
