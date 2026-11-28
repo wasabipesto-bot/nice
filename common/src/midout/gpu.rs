@@ -319,8 +319,8 @@ mod kernels {
                 PMAX + 64
             }) as usize
         ));
-        // slices [(v + 65 q)*2 + half] (SROW = 65: the 3b address is one add and one shift of the digit, and a 16-lane group's
-        // reads still fall on 16 distinct 8-byte bank pairs, (v + q) mod 16)
+        // slices digit-major [(v * 16 + q)*2 + half] (64 rows of SLW's 65 used): a 3b read's 8-byte bank pair is its
+        // chunk q mod 16, so a 16-lane group reading 16 distinct chunks is conflict-free whatever its digits
         let mut sl = SharedMemory::<u32>::new(comptime!((SLW) as usize));
         // every shared array a multiple of 128 bytes, so that every array starts 128-byte aligned whatever order
         // CubeCL places them in (its placement changed per build, and the full kernel's time with it)
@@ -523,6 +523,17 @@ mod kernels {
                     sync_cube();
                 }
                 // phase 2: transpose by ballots. Plane task i covers chunk q, segment s (members s*W .. s*W+W-1).
+                // At W 64 a task's slice words are kept and stored after the four tasks (chunks pl + 4i), each lane
+                // taking them in a rotated order, so that a store's lanes write four chunks, not one: in the
+                // digit-major layout a chunk is a bank pair
+                let mut kl = Array::<u32>::new(4usize);
+                let mut kh = Array::<u32>::new(4usize);
+                #[unroll]
+                for i in 0..4u32 {
+                    kl[i as usize] = 0u32;
+                    kh[i as usize] = 0u32;
+                }
+                #[unroll]
                 for i in 0..4u32 {
                     let task = pl + npl * i;
                     let q = task / segs;
@@ -623,14 +634,14 @@ mod kernels {
                         #[unroll]
                         for sb in 0..segs {
                             let v = comptime!(sb * w) + lane;
-                            let row = (v + 65u32 * q) * 2u32;
+                            let row = (v * 16u32 + q) * 2u32;
                             let mut hv = xh;
                             if comptime!(sb * w < 32) {
                                 hv = xl;
                             }
                             if comptime!(w == 64) {
-                                sl[row as usize] = xl;
-                                sl[(row + 1u32) as usize] = xh;
+                                kl[i as usize] = xl;
+                                kh[i as usize] = xh;
                             } else if comptime!(w == 32) {
                                 sl[(row + sg) as usize] = hv;
                             } else {
@@ -639,6 +650,20 @@ mod kernels {
                                     (hv >> comptime!((sb * w) % 32)) & comptime!((1u32 << w) - 1);
                                 slt[(row + bit / 32u32) as usize].fetch_or(piece << (bit % 32u32));
                             }
+                        }
+                    }
+                }
+                if comptime!(w == 64) {
+                    #[unroll]
+                    for j in 0..4u32 {
+                        let ii = (lane + j) & 3u32;
+                        let xl = select(ii == 0u32, kl[0usize], select(ii == 1u32, kl[1usize], select(ii == 2u32, kl[2usize], kl[3usize])));
+                        let xh = select(ii == 0u32, kh[0usize], select(ii == 1u32, kh[1usize], select(ii == 2u32, kh[2usize], kh[3usize])));
+                        let qq = pl + npl * ii;
+                        if qq < nch {
+                            let row = (lane * 16u32 + qq) * 2u32;
+                            sl[row as usize] = xl;
+                            sl[(row + 1u32) as usize] = xh;
                         }
                     }
                 }
@@ -702,16 +727,20 @@ mod kernels {
                     }
                     sync_cube();
                     let nlist = s_nl[0usize].load();
-                    // phase 3b: two chunks per lane (q = t % 8 and q + 8), 32 probe streams (st = t / 8), one list
-                    // entry per unit per step: a lane reads its probe's digits once for both chunks (the second
-                    // chunk's rows are a constant offset away), the same 32 entries x 16 chunks per cube step as before
-                    let q = t % 8u32;
-                    let st = t / 8u32;
-                    let mut vlo = Array::<u32>::new(2usize);
-                    let mut vhi = Array::<u32>::new(2usize);
+                    // phase 3b: four chunks per lane, 64 probe streams (st = t / 4), one list entry per unit per
+                    // step; 64 entries x 16 chunks per cube step. Lane t covers chunks c_k = (t % 16) ^ 4k (k < 4): a
+                    // stream's four lanes cover all 16, and in each read the 16 lanes of a group read 16 distinct
+                    // chunks. The slices are digit-major, [(v * 16 + c) * 2 + half], so a read's bank pair is its
+                    // chunk whatever the digits: conflict-free. The probe's digits are read once for four chunks.
+                    let i16 = t % 16u32;
+                    let st = t / 4u32;
+                    let mut vlo = Array::<u32>::new(4usize);
+                    let mut vhi = Array::<u32>::new(4usize);
+                    let mut dq = Array::<u32>::new(4usize);
                     #[unroll]
-                    for h in 0..2u32 {
-                        let qh = q + comptime!(8 * h);
+                    for h in 0..4u32 {
+                        let qh = i16 ^ comptime!(4 * h);
+                        dq[h as usize] = qh * 2u32;
                         let nq = select(qh < nch, min(64u32, ntake - min(ntake, qh * 64u32)), 0u32);
                         vlo[h as usize] = select(nq >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nq % 32u32)) - 1u32);
                         vhi[h as usize] = select(
@@ -720,102 +749,96 @@ mod kernels {
                             select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32),
                         );
                     }
-                    let q65 = 65u32 * q;
-                    let qs = 16u32 + q;
-                    let cpos0 = cdone + q * 64u32;
                     let mut e0 = 0u32;
                     while e0 < nlist {
-                        let mut wlo = Array::<u32>::new(2usize);
-                        let mut whi = Array::<u32>::new(2usize);
+                        let mut wlo = Array::<u32>::new(4usize);
+                        let mut whi = Array::<u32>::new(4usize);
                         // branch-free: an entry past the list reads as 0 (probe 0, no chunk kept), and a lane whose
-                        // chunk is not kept computes its word and masks it. e < nlist + 31 <= pq's size.
+                        // chunk is not kept computes its word and masks it. e < nlist + 63 <= PMAX + 63 < pq's size.
                         let e = e0 + st;
                         let ent = select(e < nlist, pq[e as usize], 0u32);
                         let p16 = ent & 0xFFFFu32;
                         let dws = prob_d[(p16 >> 4u32) as usize];
                         // the record names its top, not its probe slot
                         let ptop = dws[3usize] >> 12u32;
-                        let mut alo0 = 0u32;
-                        let mut ahi0 = 0u32;
-                        let mut alo1 = 0u32;
-                        let mut ahi1 = 0u32;
+                        let mut alo = Array::<u32>::new(4usize);
+                        let mut ahi = Array::<u32>::new(4usize);
+                        #[unroll]
+                        for h in 0..4u32 {
+                            alo[h as usize] = 0u32;
+                            ahi[h as usize] = 0u32;
+                        }
                         #[unroll]
                         for k in 0..MAXPOP {
-                            let dg = (dws[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5))) & 63u32;
-                            let row = (dg + q65) * 2u32;
-                            alo0 |= sl[row as usize];
-                            ahi0 |= sl[(row + 1u32) as usize];
-                            alo1 |= sl[(row + 1040u32) as usize];
-                            ahi1 |= sl[(row + 1041u32) as usize];
-                        }
-                        #[unroll]
-                        for h in 0..2u32 {
-                            let kmask = 0u32 - ((ent >> (qs + comptime!(8 * h))) & 1u32);
-                            let mut al = alo0;
-                            let mut ah = ahi0;
-                            if comptime!(h == 1) {
-                                al = alo1;
-                                ah = ahi1;
+                            let row = ((dws[comptime!(k / 5) as usize] >> comptime!(6 * (k % 5))) & 63u32) * 32u32;
+                            #[unroll]
+                            for h in 0..4u32 {
+                                let rh = row + dq[h as usize];
+                                alo[h as usize] = alo[h as usize] | sl[rh as usize];
+                                ahi[h as usize] = ahi[h as usize] | sl[(rh + 1u32) as usize];
                             }
-                            wlo[h as usize] = !al & vlo[h as usize] & kmask;
-                            whi[h as usize] = !ah & vhi[h as usize] & kmask;
+                        }
+                        let mut nsl = Array::<u32>::new(4usize);
+                        let mut rk = Array::<u32>::new(4usize);
+                        let mut nn = 0u32;
+                        #[unroll]
+                        for h in 0..4u32 {
+                            let kmask = 0u32 - ((ent >> (16u32 + (i16 ^ comptime!(4 * h)))) & 1u32);
+                            wlo[h as usize] = !alo[h as usize] & vlo[h as usize] & kmask;
+                            whi[h as usize] = !ahi[h as usize] & vhi[h as usize] & kmask;
+                            let nz = (wlo[h as usize] | whi[h as usize]) != 0u32;
+                            nsl[h as usize] = nn;
+                            rk[h as usize] = plane_rank_m(nz, rlo, rhi, w);
+                            nn += plane_count(nz, w);
                         }
                         if t == 0u32 {
-                            my_lslots += min(32u32, nlist - e0) * nch;
+                            my_lslots += min(64u32, nlist - e0) * nch;
                         }
-                        let nza = (wlo[0usize] | whi[0usize]) != 0u32;
-                        let nzb = (wlo[1usize] | whi[1usize]) != 0u32;
-                        {
-                            let na = plane_count(nza, w);
-                            let nn = na + plane_count(nzb, w);
-                            let ra = plane_rank_m(nza, rlo, rhi, w);
-                            let rb = plane_rank_m(nzb, rlo, rhi, w);
-                            if nn > 0u32 {
-                                if slab_used + nn > SLAB {
-                                    if lane == 0u32 && have_slab {
-                                        slabcnt[slab_id as usize] = slab_used;
-                                    }
-                                    let mut sid = 0u32;
-                                    if lane == 0u32 {
-                                        sid = slabn[0usize].fetch_add(1u32);
-                                    }
-                                    slab_id = plane_sum(sid); // only lane 0 holds it
-                                    slab_used = 0u32;
-                                    have_slab = true;
-                                    if slab_id >= nslab_cap && lane == 0u32 {
-                                        cnt[C_ERR_SLAB].fetch_add(1u32);
-                                    }
+                        if nn > 0u32 {
+                            if slab_used + nn > SLAB {
+                                if lane == 0u32 && have_slab {
+                                    slabcnt[slab_id as usize] = slab_used;
                                 }
-                                let sbase = slab_id * SLAB + slab_used;
-                                // F_SLAB_SPLIT (131072): the records of lanes other than lane 0 are lost (written
-                                // empty), as when lanes split from lane 0's after a branch append apart from it
-                                let lost = (fault & 131072u32) != 0u32 && lane != 0u32;
-                                if slab_id < nslab_cap {
-                                    if nza {
-                                        let mut rv = Vector::<u32, Const<4>>::empty();
-                                        rv[0usize] = ptop;
-                                        rv[1usize] = lb + cpos0;
-                                        rv[2usize] = select(lost, 0u32, wlo[0usize]);
-                                        rv[3usize] = select(lost, 0u32, whi[0usize]);
-                                        out[(sbase + ra) as usize] = rv;
-                                    }
-                                    if nzb && !((fault & 32u32) != 0u32 && CUBE_POS_X == 0u32) {
-                                        let mut rv = Vector::<u32, Const<4>>::empty();
-                                        rv[0usize] = ptop;
-                                        rv[1usize] = lb + cpos0 + 512u32;
-                                        rv[2usize] = select(lost, 0u32, wlo[1usize]);
-                                        rv[3usize] = select(lost, 0u32, whi[1usize]);
-                                        out[(sbase + na + rb) as usize] = rv;
-                                    }
+                                let mut sid = 0u32;
+                                if lane == 0u32 {
+                                    sid = slabn[0usize].fetch_add(1u32);
                                 }
-                                my_surv += wlo[0usize].count_ones()
-                                    + whi[0usize].count_ones()
-                                    + wlo[1usize].count_ones()
-                                    + whi[1usize].count_ones();
-                                slab_used += nn;
+                                slab_id = plane_sum(sid); // only lane 0 holds it
+                                slab_used = 0u32;
+                                have_slab = true;
+                                if slab_id >= nslab_cap && lane == 0u32 {
+                                    cnt[C_ERR_SLAB].fetch_add(1u32);
+                                }
                             }
+                            let sbase = slab_id * SLAB + slab_used;
+                            // F_SLAB_SPLIT (131072): the records of lanes other than lane 0 are lost (written
+                            // empty), as when lanes split from lane 0's after a branch append apart from it
+                            let lost = (fault & 131072u32) != 0u32 && lane != 0u32;
+                            if slab_id < nslab_cap {
+                                #[unroll]
+                                for h in 0..4u32 {
+                                    // F_DROP_REC (32): cube 0's second-chunk records are not written
+                                    let mut drop = false;
+                                    if comptime!(h == 1) {
+                                        drop = (fault & 32u32) != 0u32 && CUBE_POS_X == 0u32;
+                                    }
+                                    if (wlo[h as usize] | whi[h as usize]) != 0u32 && !drop {
+                                        let mut rv = Vector::<u32, Const<4>>::empty();
+                                        rv[0usize] = ptop;
+                                        rv[1usize] = lb + cdone + (i16 ^ comptime!(4 * h)) * 64u32;
+                                        rv[2usize] = select(lost, 0u32, wlo[h as usize]);
+                                        rv[3usize] = select(lost, 0u32, whi[h as usize]);
+                                        out[(sbase + nsl[h as usize] + rk[h as usize]) as usize] = rv;
+                                    }
+                                }
+                            }
+                            #[unroll]
+                            for h in 0..4u32 {
+                                my_surv += wlo[h as usize].count_ones() + whi[h as usize].count_ones();
+                            }
+                            slab_used += nn;
                         }
-                        e0 += 32u32;
+                        e0 += 64u32;
                     }
                     if t == 0u32 {
                         my_flat += nprobe * nch;
