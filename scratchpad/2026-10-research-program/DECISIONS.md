@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-28 07:00 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-28 06:00 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
