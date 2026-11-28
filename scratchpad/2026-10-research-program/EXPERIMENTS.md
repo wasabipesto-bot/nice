@@ -5,6 +5,35 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## B65.10 Production's route synchronises every 128 slices instead of 16: fork `dev/mo-group` `23823929`; groups 128 and 256 measured at both bases and on the 3 GB card (2026-11-28 11:23–11:56 UTC, the director; eventeo; `B65/scripts/runs_group2.sh`, `runs_1060.sh`, `B65/runs/group2/`; build `hk1-bench-spv` / `hk1-bench-cuda` = `6abf5743`)
+
+Same cells as B65.8 (RTX 3060 through Vulkan/SPIR-V, the timed field after a warm-up, six busy loops for "busy"),
+with a group-16 pair in the same session. fs per admissible n; counts equal in every cell.
+
+| slices per group | base 64 quiet | base 64 busy | base 65 quiet | base 65 busy | card memory |
+|---|---|---|---|---|---|
+| 16 | 3.2221 (B65.8: 3.2621, 3.2774) | 3.4308 (3.4216) | (B65.8: 5.7653, 5.7712) | (5.9444) | 3,752 / 6,379 MiB |
+| 64 (B65.8) | 3.2557 | 3.3197 | 5.7579 | 5.8224 | 3,764 / 6,391 |
+| **128** | 3.2491 | **3.2902** | 5.7479 | **5.7720** | 3,770 / 6,397 |
+| 256 | (B65.8: 3.2586) | (3.2716) | 5.7615 | 5.7630 | 3,770 / 6,397 |
+
+- **Under a busy host the time falls with every step:** base 64 3.42–3.43 → 3.32 → 3.29 → 3.27; base 65 5.94 →
+  5.82 → 5.77 → 5.76. Against a quiet host (3.22–3.28 and 5.75–5.77 over the two sessions) the loss is 4.6–6.5 %
+  at 16, about 2 % at 64, 1.3 % at 128 and 0.4 % at 256 for base 64; 3.1 %, 1.1 %, 0.4 % and 0.0 % for base 65.
+- **Quiet host:** no difference that exceeds the 0.9 % spread between sessions.
+- **GTX 1060 3 GB through CUDA** (one field each): group 16 8.976 fs, group 256 9.144 fs (the second run on a
+  warmer card; one run each, so no conclusion on speed), 2,751 MiB at both: the larger group fits. **Through
+  Vulkan the bench's allocation fails at start on this card at any group size** ("Memory page 0 doesn't exist",
+  loud, 2,822 MiB): a base-64 field does not fit 3 GB through wgpu with today's capacities. Noted, not pursued:
+  no 3 GB card runs the search through Vulkan.
+- **The change:** `GROUP` 16 → 128 in `common/src/midout/route.rs`, one commit on `dev/mo-group`. 128 and not
+  the drivers' limit of 256: a group's per-unit counters are u32 and the largest (the pairs before the keep
+  mask, a telemetry count) is within a factor 3.5 of wrapping at 256, a factor 7 at 128; I give up 0.2–0.6 %
+  under heavy load on this card for the margin. Which of 128 and 256 is right for the RX 9070 XT, whose
+  slices are 3.3 times shorter, is for a demoux window to say (an argument of the bench).
+- Fork CI on `23823929`: device parity 46141878365 and the full matrix 46141880493 started 11:52 UTC;
+  `dev/mo-mode` is fast-forwarded when both are green.
+
 ## B65.9 The ACO study's layout (V5) on the RTX 3060: exact at 32 lanes, and 4–14 % slower there; parked (2026-11-28 10:05–11:24 UTC, the director; eventeo; `B65/scripts/v5/`, `B65/runs/v5-ab/`, `B65/runs/v5-tests/`; `exp/mo-wide-aco` `a4fb3543` against its base `f503a13c`)
 
 Two alternating rounds, the timed field t 77777 after a warm-up field, fs per admissible n; counts equal in all

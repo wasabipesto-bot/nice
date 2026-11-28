@@ -87,6 +87,20 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
   base 65 +4.0 %; CUDA +11.0 %, +9.3 %; counts equal in 16 runs; all device tests pass on both runtimes).
   By the rule: not a common path; as a 64-lane-only variant its own model (about 3 % of a base-64 field) is
   under the ×1.05 bar. **Parked** on `exp/mo-wide-aco`; third and optional in the demoux ask.
+- **11:56 UTC, B65.10 done** (EXPERIMENTS B65.10): group 128 leaves 1.3 % (base 64) and 0.4 % (base 65) of
+  loss under six busy threads, 256 leaves 0.4 % and 0.0 %; 18 MiB; the GTX 1060 3 GB holds group 256 through
+  CUDA (through Vulkan a base-64 field does not fit that card at all: loud allocation failure, noted).
+  `GROUP` 16 → 128 committed on fork `dev/mo-group` `23823929` (the choice written beforehand: margin on the
+  u32 counters over the last half percent); fork CI started 11:52 UTC. eventeo powered off 11:56:38.
+  - My waiter missed the second sweep's end (the job powers the box off one second after its done file) and I
+    had to wake the box to fetch the logs: next time the job copies its results to ivory before powering off.
+- **12:00 UTC, end of the working part.** eventeo off (ssh fails, plug 2.0 W), 1.35 kWh today; the M4's build
+  output cleared, nothing running there; no container on ivory. PRs #276–#279 unchanged (green, mergeable, no
+  comments); upstream main fdbe07d3. Report `REPORTS/2026-11-28.md`. Open at the end: fork CI on
+  `dev/mo-group` `23823929` (46141878365, 46141880493), then the fast-forward of `dev/mo-mode`.
+- **Tomorrow:** the design document and map to the new head; a written plan of how the middle-out work is
+  cut into pull requests once the hold lifts (nothing opened); literature sweep (due about 11-30); with base
+  64 first again, look once more for anything on its path that the kernel studies did not cover.
 
 ## 2026-11-27 (cycle 18 of the new director; routine fired 05:41 UTC)
 

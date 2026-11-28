@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-28 11:30 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-28 12:00 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
@@ -106,9 +106,11 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
   both bases), but I had ranked it above base 64 on a wrong number.
 - **What I ask, when convenient: one hour of demoux**, for three measurements nothing else can make:
   1. **Base 64 with the desktop in use, at 16, 128 and 256 slices per group** (ten minutes, an argument of the
-     benchmark, no new code). On eventeo today a busy host cost base 64 4.6 % at 16 slices per group and 0.4 %
-     at 256 (`EXPERIMENTS.md` B65.8): the card idles once per group while the host reads results. Your card's
-     slices are three times shorter, so the same pause is three times the share: very likely the 6–10 %.
+     benchmark, no new code). On eventeo today a busy host cost base 64 4.6–6.5 % at 16 slices per group,
+     1.3 % at 128 and 0.4 % at 256 (`EXPERIMENTS.md` B65.8, B65.10): the card idles once per group while the
+     host reads results. Your card's slices are three times shorter, so the same pause is three times the
+     share: very likely the 6–10 %. The fork branch now uses 128 (it was 16); your card says whether 256 is
+     worth its thinner margin on a counter.
   2. Base 65 at the current head, to confirm on the card that the read fix of 2026-11-26 holds it near 3 fs.
   3. If minutes remain: **a new memory layout for the main kernel** at 64 lanes (`B65/ACO-RESULTS.md`).
      Offline it removes 17 % (base 64) and 21 % (base 65) of the inner loop's modelled cycles for your card's
