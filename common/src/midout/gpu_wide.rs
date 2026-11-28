@@ -785,20 +785,27 @@ mod wk {
                     }
                     let mut alo = Array::<u32>::new(4usize);
                     let mut ahi = Array::<u32>::new(4usize);
-                    #[unroll]
-                    for h in 0..4u32 {
-                        alo[h as usize] = 0u32;
-                        ahi[h as usize] = 0u32;
-                    }
+                    let mut rows = Array::<u32>::new(comptime!(maxpop as usize));
                     #[unroll]
                     for k in 0..maxpop {
-                        let dg = probe_digit(dws, de, k, maxpop);
-                        let row = (dg + qr) * 2u32;
-                        #[unroll]
-                        for h in 0..4u32 {
-                            alo[h as usize] = alo[h as usize] | sl[(row + comptime!(8 * srow * h)) as usize];
-                            ahi[h as usize] = ahi[h as usize] | sl[(row + comptime!(8 * srow * h + 1)) as usize];
+                        rows[k as usize] = (probe_digit(dws, de, k, maxpop) + qr) * 2u32;
+                    }
+                    // a chunk the entry does not keep (or past nch) gives a zero word whatever its rows hold: the
+                    // reads of chunks 1-3 are skipped for it (lanes masked off; the whole branch when no lane of the
+                    // plane keeps it); chunk 0 reads always, so that the row addresses are formed once, outside
+                    #[unroll]
+                    for h in 0..4u32 {
+                        let mut xl = 0u32;
+                        let mut xh = 0u32;
+                        if comptime!(h == 0) || (((ent >> (qs + comptime!(4 * h))) & 1u32) != 0u32 && vlo[h as usize] != 0u32) {
+                            #[unroll]
+                            for k in 0..maxpop {
+                                xl |= sl[(rows[k as usize] + comptime!(8 * srow * h)) as usize];
+                                xh |= sl[(rows[k as usize] + comptime!(8 * srow * h + 1)) as usize];
+                            }
                         }
+                        alo[h as usize] = xl;
+                        ahi[h as usize] = xh;
                     }
                     let mut nsl = Array::<u32>::new(4usize);
                     let mut rk = Array::<u32>::new(4usize);
