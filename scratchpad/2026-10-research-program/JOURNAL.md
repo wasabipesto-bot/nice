@@ -53,6 +53,18 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     granted, goes to base 64 with the desktop in use. Today's two engineers keep their tasks: the hooks are
     on both paths (base 64's narrow path lost 1.3–2.0 % to them), and the ACO study of the wide kernel is
     already running and still prices 73 % of the machine time.
+- **07:10 UTC, B65.7 back** (`B65/ACO-RESULTS.md`; EXPERIMENTS B65.7): a layout that reads each probe's digits
+  once for four chunks (V5, `exp/mo-wide-aco` `a4fb3543`) removes 21 % (base 65) and 17 % (base 64) of the word
+  loop's modelled cycles under ACO; exact on lavapipe's 8-lane planes; its 64-lane transpose stores have run
+  nowhere. I read the base-64 diff and found no fault. The model has mispredicted this card's shared memory
+  twice (CW, PS), so this is a reason to measure.
+  - **B65.9, started 07:16 UTC** (`B65/scripts/v5/chain_v5.sh` waiting on eventeo, PID 24163; starts when the
+    sweep's done file appears): V5 against `f503a13c` on the RTX 3060, base 64 narrow and base 65 wide,
+    Vulkan and CUDA, two alternating rounds, counts compared; then every device test through both runtimes.
+    **Rule written beforehand:** any count that differs or any failing test = a defect at 32 lanes, stop and
+    find it; within 2 % of the base at both bases = it can be the common path and the RX 9070 XT decides its
+    value; slower by more than 2 % at base 64 = it would have to be a 64-lane-only variant, and its bar on the
+    RX 9070 XT rises to ×1.05 of a base-64 field.
 
 ## 2026-11-27 (cycle 18 of the new director; routine fired 05:41 UTC)
 

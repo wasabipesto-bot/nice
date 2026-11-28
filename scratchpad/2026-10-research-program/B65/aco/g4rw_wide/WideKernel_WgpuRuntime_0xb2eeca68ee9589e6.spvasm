@@ -1,0 +1,3270 @@
+; SPIR-V
+; Version: 1.6
+; Generator: Google rspirv; 0
+; Bound: 2798
+; Schema: 0
+               OpCapability Shader
+               OpCapability VulkanMemoryModel
+               OpCapability VulkanMemoryModelDeviceScope
+               OpCapability GroupNonUniform
+               OpCapability GroupNonUniformArithmetic
+               OpCapability Int64
+               OpCapability GroupNonUniformShuffle
+               OpCapability WorkgroupMemoryExplicitLayoutKHR
+               OpCapability GroupNonUniformBallot
+               OpExtension "SPV_KHR_workgroup_memory_explicit_layout"
+         %81 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical Vulkan
+               OpEntryPoint GLCompute %61 "wide_kernel" %SubgroupLocalInvocationId %gl_WorkGroupID %gl_LocalInvocationID %SubgroupSize %6 %10 %13 %16 %19 %22 %25 %28 %31 %34 %37 %40 %47 %54 %55 %56 %50 %53 %52 %58 %57 %51
+               OpExecutionMode %61 LocalSize 256 1 1
+               OpDecorate %_runtimearr_v4uint ArrayStride 16
+               OpDecorate %6 NonWritable
+               OpDecorate %6 DescriptorSet 0
+               OpDecorate %6 Binding 0
+               OpDecorate %_struct_4 Block
+               OpMemberDecorate %_struct_4 0 Offset 0
+               OpDecorate %_runtimearr_uint ArrayStride 4
+               OpDecorate %10 NonWritable
+               OpDecorate %10 DescriptorSet 0
+               OpDecorate %10 Binding 1
+               OpDecorate %_struct_8 Block
+               OpMemberDecorate %_struct_8 0 Offset 0
+               OpDecorate %13 NonWritable
+               OpDecorate %13 DescriptorSet 0
+               OpDecorate %13 Binding 2
+               OpDecorate %_struct_11 Block
+               OpMemberDecorate %_struct_11 0 Offset 0
+               OpDecorate %16 NonWritable
+               OpDecorate %16 DescriptorSet 0
+               OpDecorate %16 Binding 3
+               OpDecorate %_struct_14 Block
+               OpMemberDecorate %_struct_14 0 Offset 0
+               OpDecorate %19 NonWritable
+               OpDecorate %19 DescriptorSet 0
+               OpDecorate %19 Binding 4
+               OpDecorate %_struct_17 Block
+               OpMemberDecorate %_struct_17 0 Offset 0
+               OpDecorate %22 NonWritable
+               OpDecorate %22 DescriptorSet 0
+               OpDecorate %22 Binding 5
+               OpDecorate %_struct_20 Block
+               OpMemberDecorate %_struct_20 0 Offset 0
+               OpDecorate %25 DescriptorSet 0
+               OpDecorate %25 Binding 6
+               OpDecorate %_struct_23 Block
+               OpMemberDecorate %_struct_23 0 Offset 0
+               OpDecorate %28 DescriptorSet 0
+               OpDecorate %28 Binding 7
+               OpDecorate %_struct_26 Block
+               OpMemberDecorate %_struct_26 0 Offset 0
+               OpDecorate %31 DescriptorSet 0
+               OpDecorate %31 Binding 8
+               OpDecorate %_struct_29 Block
+               OpMemberDecorate %_struct_29 0 Offset 0
+               OpDecorate %34 DescriptorSet 0
+               OpDecorate %34 Binding 9
+               OpDecorate %_struct_32 Block
+               OpMemberDecorate %_struct_32 0 Offset 0
+               OpDecorate %37 DescriptorSet 0
+               OpDecorate %37 Binding 10
+               OpDecorate %_struct_35 Block
+               OpMemberDecorate %_struct_35 0 Offset 0
+               OpDecorate %40 DescriptorSet 0
+               OpDecorate %40 Binding 11
+               OpDecorate %_struct_38 Block
+               OpMemberDecorate %_struct_38 0 Offset 0
+               OpDecorate %_arr_uint_uint_6 ArrayStride 4
+               OpMemberDecorate %_struct_41 0 Offset 0
+               OpDecorate %_arr_uint_uint_24 ArrayStride 4
+               OpMemberDecorate %_struct_41 1 Offset 24
+               OpDecorate %47 NonWritable
+               OpDecorate %47 DescriptorSet 0
+               OpDecorate %47 Binding 12
+               OpDecorate %_struct_41 Block
+               OpDecorate %76 Uniform
+               OpDecorate %93 Uniform
+               OpDecorate %96 Uniform
+               OpDecorate %97 Uniform
+               OpDecorate %99 Uniform
+               OpDecorate %101 Uniform
+               OpDecorate %103 Uniform
+               OpDecorate %104 Uniform
+               OpDecorate %106 Uniform
+               OpDecorate %110 Uniform
+               OpDecorate %128 Uniform
+               OpDecorate %129 Uniform
+               OpDecorate %131 Uniform
+               OpDecorate %188 Uniform
+               OpDecorate %189 Uniform
+               OpDecorate %190 Uniform
+               OpDecorate %191 Uniform
+               OpDecorate %192 Uniform
+               OpDecorate %193 Uniform
+               OpDecorate %194 Uniform
+               OpDecorate %196 Uniform
+               OpDecorate %197 Uniform
+               OpDecorate %199 Uniform
+               OpDecorate %_arr_uint_uint_32 ArrayStride 4
+               OpDecorate %_struct_2772 Block
+               OpMemberDecorate %_struct_2772 0 Offset 18688
+               OpDecorate %54 Aliased
+               OpDecorate %_arr_uint_uint_640 ArrayStride 4
+               OpDecorate %_struct_2776 Block
+               OpMemberDecorate %_struct_2776 0 Offset 18816
+               OpDecorate %55 Aliased
+               OpDecorate %_arr_uint_uint_96 ArrayStride 4
+               OpDecorate %_struct_2779 Block
+               OpMemberDecorate %_struct_2779 0 Offset 128
+               OpDecorate %56 Aliased
+               OpDecorate %_arr_uint_uint_2144 ArrayStride 4
+               OpDecorate %_struct_2783 Block
+               OpMemberDecorate %_struct_2783 0 Offset 9728
+               OpDecorate %50 Aliased
+               OpDecorate %_struct_2785 Block
+               OpMemberDecorate %_struct_2785 0 Offset 18304
+               OpDecorate %53 Aliased
+               OpDecorate %_struct_2787 Block
+               OpMemberDecorate %_struct_2787 0 Offset 18560
+               OpDecorate %52 Aliased
+               OpDecorate %_struct_2789 Block
+               OpMemberDecorate %_struct_2789 0 Offset 0
+               OpDecorate %58 Aliased
+               OpDecorate %_arr_v4uint_uint_576 ArrayStride 16
+               OpDecorate %_struct_2792 Block
+               OpMemberDecorate %_struct_2792 0 Offset 512
+               OpDecorate %57 Aliased
+               OpDecorate %_struct_2794 Block
+               OpMemberDecorate %_struct_2794 0 Offset 18432
+               OpDecorate %51 Aliased
+               OpDecorate %SubgroupLocalInvocationId BuiltIn SubgroupLocalInvocationId
+               OpDecorate %gl_WorkGroupID BuiltIn WorkgroupId
+               OpDecorate %gl_LocalInvocationID BuiltIn LocalInvocationId
+               OpDecorate %SubgroupSize BuiltIn SubgroupSize
+       %uint = OpTypeInt 32 0
+     %v4uint = OpTypeVector %uint 4
+%_runtimearr_v4uint = OpTypeRuntimeArray %v4uint
+  %_struct_4 = OpTypeStruct %_runtimearr_v4uint
+%_ptr_StorageBuffer__struct_4 = OpTypePointer StorageBuffer %_struct_4
+          %6 = OpVariable %_ptr_StorageBuffer__struct_4 StorageBuffer
+%_runtimearr_uint = OpTypeRuntimeArray %uint
+  %_struct_8 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_8 = OpTypePointer StorageBuffer %_struct_8
+         %10 = OpVariable %_ptr_StorageBuffer__struct_8 StorageBuffer
+ %_struct_11 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_11 = OpTypePointer StorageBuffer %_struct_11
+         %13 = OpVariable %_ptr_StorageBuffer__struct_11 StorageBuffer
+ %_struct_14 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_14 = OpTypePointer StorageBuffer %_struct_14
+         %16 = OpVariable %_ptr_StorageBuffer__struct_14 StorageBuffer
+ %_struct_17 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_17 = OpTypePointer StorageBuffer %_struct_17
+         %19 = OpVariable %_ptr_StorageBuffer__struct_17 StorageBuffer
+ %_struct_20 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_20 = OpTypePointer StorageBuffer %_struct_20
+         %22 = OpVariable %_ptr_StorageBuffer__struct_20 StorageBuffer
+ %_struct_23 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_23 = OpTypePointer StorageBuffer %_struct_23
+         %25 = OpVariable %_ptr_StorageBuffer__struct_23 StorageBuffer
+ %_struct_26 = OpTypeStruct %_runtimearr_v4uint
+%_ptr_StorageBuffer__struct_26 = OpTypePointer StorageBuffer %_struct_26
+         %28 = OpVariable %_ptr_StorageBuffer__struct_26 StorageBuffer
+ %_struct_29 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_29 = OpTypePointer StorageBuffer %_struct_29
+         %31 = OpVariable %_ptr_StorageBuffer__struct_29 StorageBuffer
+ %_struct_32 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_32 = OpTypePointer StorageBuffer %_struct_32
+         %34 = OpVariable %_ptr_StorageBuffer__struct_32 StorageBuffer
+ %_struct_35 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_35 = OpTypePointer StorageBuffer %_struct_35
+         %37 = OpVariable %_ptr_StorageBuffer__struct_35 StorageBuffer
+ %_struct_38 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_38 = OpTypePointer StorageBuffer %_struct_38
+         %40 = OpVariable %_ptr_StorageBuffer__struct_38 StorageBuffer
+     %uint_6 = OpConstant %uint 6
+%_arr_uint_uint_6 = OpTypeArray %uint %uint_6
+    %uint_24 = OpConstant %uint 24
+%_arr_uint_uint_24 = OpTypeArray %uint %uint_24
+ %_struct_41 = OpTypeStruct %_arr_uint_uint_6 %_arr_uint_uint_24
+%_ptr_Uniform__struct_41 = OpTypePointer Uniform %_struct_41
+         %47 = OpVariable %_ptr_Uniform__struct_41 Uniform
+   %uint_256 = OpConstant %uint 256
+     %uint_1 = OpConstant %uint 1
+       %void = OpTypeVoid
+         %60 = OpTypeFunction %void
+     %uint_0 = OpConstant %uint 0
+       %bool = OpTypeBool
+     %v3uint = OpTypeVector %uint 3
+     %uint_3 = OpConstant %uint 3
+    %uint_32 = OpConstant %uint 32
+    %uint_31 = OpConstant %uint 31
+%uint_4294967295 = OpConstant %uint 4294967295
+%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+   %uint_255 = OpConstant %uint 255
+     %uint_8 = OpConstant %uint 8
+    %uint_63 = OpConstant %uint 63
+    %uint_64 = OpConstant %uint 64
+   %uint_361 = OpConstant %uint 361
+    %uint_72 = OpConstant %uint 72
+%_ptr_Workgroup_uint = OpTypePointer Workgroup %uint
+     %uint_2 = OpConstant %uint 2
+   %uint_260 = OpConstant %uint 260
+%_ptr_Uniform_uint = OpTypePointer Uniform %uint
+   %uint_576 = OpConstant %uint 576
+   %uint_362 = OpConstant %uint 362
+ %uint_65536 = OpConstant %uint 65536
+   %uint_364 = OpConstant %uint 364
+  %uint_2080 = OpConstant %uint 2080
+    %uint_65 = OpConstant %uint 65
+   %uint_264 = OpConstant %uint 264
+    %uint_12 = OpConstant %uint 12
+     %uint_4 = OpConstant %uint 4
+   %uint_366 = OpConstant %uint 366
+   %uint_258 = OpConstant %uint 258
+    %uint_13 = OpConstant %uint 13
+   %uint_360 = OpConstant %uint 360
+   %uint_365 = OpConstant %uint 365
+    %uint_11 = OpConstant %uint 11
+  %uint_1024 = OpConstant %uint 1024
+    %uint_16 = OpConstant %uint 16
+      %false = OpConstantFalse %bool
+ %uint_65535 = OpConstant %uint 65535
+%_ptr_StorageBuffer_v4uint = OpTypePointer StorageBuffer %v4uint
+      %ulong = OpTypeInt 64 0
+   %ulong_32 = OpConstant %ulong 32
+    %uint_25 = OpConstant %uint 25
+    %ulong_1 = OpConstant %ulong 1
+    %ulong_0 = OpConstant %ulong 0
+%ulong_4294967295 = OpConstant %ulong 4294967295
+%uint_4294901760 = OpConstant %uint 4294901760
+%uint_4278255360 = OpConstant %uint 4278255360
+%uint_16711935 = OpConstant %uint 16711935
+%uint_4042322160 = OpConstant %uint 4042322160
+%uint_252645135 = OpConstant %uint 252645135
+    %uint_28 = OpConstant %uint 28
+%uint_3435973836 = OpConstant %uint 3435973836
+%uint_858993459 = OpConstant %uint 858993459
+    %uint_30 = OpConstant %uint 30
+%uint_2863311530 = OpConstant %uint 2863311530
+%uint_1431655765 = OpConstant %uint 1431655765
+%uint_4294967294 = OpConstant %uint 4294967294
+     %uint_5 = OpConstant %uint 5
+    %uint_15 = OpConstant %uint 15
+    %uint_96 = OpConstant %uint 96
+    %false_0 = OpConstantFalse %bool
+%_ptr_Workgroup_v4uint = OpTypePointer Workgroup %v4uint
+   %uint_127 = OpConstant %uint 127
+     %uint_7 = OpConstant %uint 7
+    %uint_14 = OpConstant %uint 14
+    %uint_21 = OpConstant %uint 21
+   %uint_112 = OpConstant %uint 112
+   %uint_363 = OpConstant %uint 363
+%uint_1048576 = OpConstant %uint 1048576
+       %2370 = OpConstantComposite %v4uint %uint_0 %uint_0 %uint_0 %uint_0
+%_ptr_Function_v4uint = OpTypePointer Function %v4uint
+       %true = OpConstantTrue %bool
+%uint_33554431 = OpConstant %uint 33554431
+%_ptr_Function_uint = OpTypePointer Function %uint
+%_arr_uint_uint_32 = OpTypeArray %uint %uint_32
+%_struct_2772 = OpTypeStruct %_arr_uint_uint_32
+%_ptr_Workgroup__struct_2772 = OpTypePointer Workgroup %_struct_2772
+         %54 = OpVariable %_ptr_Workgroup__struct_2772 Workgroup
+   %uint_640 = OpConstant %uint 640
+%_arr_uint_uint_640 = OpTypeArray %uint %uint_640
+%_struct_2776 = OpTypeStruct %_arr_uint_uint_640
+%_ptr_Workgroup__struct_2776 = OpTypePointer Workgroup %_struct_2776
+         %55 = OpVariable %_ptr_Workgroup__struct_2776 Workgroup
+%_arr_uint_uint_96 = OpTypeArray %uint %uint_96
+%_struct_2779 = OpTypeStruct %_arr_uint_uint_96
+%_ptr_Workgroup__struct_2779 = OpTypePointer Workgroup %_struct_2779
+         %56 = OpVariable %_ptr_Workgroup__struct_2779 Workgroup
+  %uint_2144 = OpConstant %uint 2144
+%_arr_uint_uint_2144 = OpTypeArray %uint %uint_2144
+%_struct_2783 = OpTypeStruct %_arr_uint_uint_2144
+%_ptr_Workgroup__struct_2783 = OpTypePointer Workgroup %_struct_2783
+         %50 = OpVariable %_ptr_Workgroup__struct_2783 Workgroup
+%_struct_2785 = OpTypeStruct %_arr_uint_uint_32
+%_ptr_Workgroup__struct_2785 = OpTypePointer Workgroup %_struct_2785
+         %53 = OpVariable %_ptr_Workgroup__struct_2785 Workgroup
+%_struct_2787 = OpTypeStruct %_arr_uint_uint_32
+%_ptr_Workgroup__struct_2787 = OpTypePointer Workgroup %_struct_2787
+         %52 = OpVariable %_ptr_Workgroup__struct_2787 Workgroup
+%_struct_2789 = OpTypeStruct %_arr_uint_uint_32
+%_ptr_Workgroup__struct_2789 = OpTypePointer Workgroup %_struct_2789
+         %58 = OpVariable %_ptr_Workgroup__struct_2789 Workgroup
+%_arr_v4uint_uint_576 = OpTypeArray %v4uint %uint_576
+%_struct_2792 = OpTypeStruct %_arr_v4uint_uint_576
+%_ptr_Workgroup__struct_2792 = OpTypePointer Workgroup %_struct_2792
+         %57 = OpVariable %_ptr_Workgroup__struct_2792 Workgroup
+%_struct_2794 = OpTypeStruct %_arr_uint_uint_32
+%_ptr_Workgroup__struct_2794 = OpTypePointer Workgroup %_struct_2794
+         %51 = OpVariable %_ptr_Workgroup__struct_2794 Workgroup
+%_ptr_Input_uint = OpTypePointer Input %uint
+%SubgroupLocalInvocationId = OpVariable %_ptr_Input_uint Input
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%gl_WorkGroupID = OpVariable %_ptr_Input_v3uint Input
+%gl_LocalInvocationID = OpVariable %_ptr_Input_v3uint Input
+%SubgroupSize = OpVariable %_ptr_Input_uint Input
+         %61 = OpFunction %void None %60
+         %62 = OpLabel
+       %2372 = OpVariable %_ptr_Function_v4uint Function
+         %65 = OpLoad %uint %SubgroupLocalInvocationId
+         %71 = OpLoad %v3uint %gl_LocalInvocationID
+         %72 = OpCompositeExtract %uint %71 0
+         %91 = OpLoad %v3uint %gl_WorkGroupID
+         %92 = OpCompositeExtract %uint %91 0
+        %108 = OpLoad %uint %SubgroupSize
+        %152 = OpAccessChain %_ptr_Uniform_uint %47 %uint_0 %uint_2
+        %153 = OpLoad %uint %152
+        %216 = OpAccessChain %_ptr_Uniform_uint %47 %uint_0 %uint_3
+        %217 = OpLoad %uint %216
+        %230 = OpAccessChain %_ptr_Uniform_uint %47 %uint_0 %uint_1
+        %231 = OpLoad %uint %230
+        %248 = OpAccessChain %_ptr_Uniform_uint %47 %uint_0 %uint_4
+        %249 = OpLoad %uint %248
+        %265 = OpAccessChain %_ptr_Uniform_uint %47 %uint_0 %uint_0
+        %266 = OpLoad %uint %265
+               OpBranch %63
+         %63 = OpLabel
+         %67 = OpIEqual %bool %65 %uint_0
+         %73 = OpShiftRightLogical %uint %72 %uint_6
+         %74 = OpSelect %uint %67 %73 %uint_0
+         %76 = OpGroupNonUniformIAdd %uint %uint_3 Reduce %74
+         %78 = OpUGreaterThanEqual %bool %65 %uint_32
+         %80 = OpExtInst %uint %81 UMin %65 %uint_31
+         %82 = OpShiftLeftLogical %uint %uint_1 %80
+         %83 = OpISub %uint %82 %uint_1
+         %85 = OpSelect %uint %78 %uint_4294967295 %83
+         %86 = OpBitwiseAnd %uint %65 %uint_31
+         %87 = OpShiftLeftLogical %uint %uint_1 %86
+         %88 = OpISub %uint %87 %uint_1
+         %89 = OpSelect %uint %78 %88 %uint_0
+         %93 = OpShiftLeftLogical %uint %92 %uint_1
+         %95 = OpAccessChain %_ptr_StorageBuffer_uint %22 %uint_0 %93
+         %96 = OpLoad %uint %95
+         %97 = OpIAdd %uint %93 %uint_1
+         %98 = OpAccessChain %_ptr_StorageBuffer_uint %22 %uint_0 %97
+         %99 = OpLoad %uint %98
+        %101 = OpBitwiseAnd %uint %99 %uint_255
+        %103 = OpShiftRightLogical %uint %99 %uint_8
+        %104 = OpIAdd %uint %96 %101
+        %106 = OpBitwiseAnd %uint %104 %uint_63
+        %110 = OpINotEqual %bool %108 %uint_64
+        %111 = OpBitwiseAnd %uint %72 %uint_63
+        %112 = OpINotEqual %bool %111 %65
+        %113 = OpLogicalOr %bool %110 %112
+               OpSelectionMerge %115 None
+               OpBranchConditional %113 %114 %115
+        %114 = OpLabel
+        %117 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %uint_361
+        %118 = OpAtomicIAdd %uint %117 %uint_1 %uint_72 %uint_1
+               OpBranch %115
+        %115 = OpLabel
+        %120 = OpIEqual %bool %72 %uint_1
+               OpSelectionMerge %122 None
+               OpBranchConditional %120 %121 %122
+        %121 = OpLabel
+        %124 = OpInBoundsAccessChain %_ptr_Workgroup_uint %58 %uint_0 %uint_1
+               OpAtomicStore %124 %uint_2 %uint_260 %uint_0
+               OpBranch %122
+        %122 = OpLabel
+        %127 = OpAccessChain %_ptr_StorageBuffer_uint %10 %uint_0 %96
+        %128 = OpLoad %uint %127
+        %129 = OpIAdd %uint %96 %uint_1
+        %130 = OpAccessChain %_ptr_StorageBuffer_uint %10 %uint_0 %129
+        %131 = OpLoad %uint %130
+        %132 = OpIEqual %bool %72 %uint_0
+               OpSelectionMerge %134 None
+               OpBranchConditional %132 %133 %134
+        %133 = OpLabel
+        %135 = OpAccessChain %_ptr_StorageBuffer_uint %19 %uint_0 %uint_0
+        %136 = OpLoad %uint %135
+        %137 = OpIAdd %uint %136 %uint_64
+        %138 = OpISub %uint %137 %106
+        %139 = OpBitwiseAnd %uint %138 %uint_63
+        %140 = OpShiftLeftLogical %uint %101 %uint_6
+        %141 = OpIAdd %uint %140 %139
+        %142 = OpShiftLeftLogical %uint %141 %uint_1
+        %143 = OpIAdd %uint %142 %uint_1
+        %144 = OpAccessChain %_ptr_StorageBuffer_uint %16 %uint_0 %143
+        %145 = OpLoad %uint %144
+        %146 = OpAccessChain %_ptr_StorageBuffer_uint %16 %uint_0 %142
+        %147 = OpLoad %uint %146
+        %148 = OpISub %uint %145 %147
+        %149 = OpInBoundsAccessChain %_ptr_Workgroup_uint %53 %uint_0 %uint_0
+               OpStore %149 %148
+        %150 = OpInBoundsAccessChain %_ptr_Workgroup_uint %58 %uint_0 %uint_0
+               OpAtomicStore %150 %uint_2 %uint_260 %uint_0
+        %154 = OpIEqual %bool %103 %153
+        %156 = OpIAdd %uint %103 %uint_576
+        %157 = OpUGreaterThan %bool %148 %156
+        %158 = OpLogicalAnd %bool %154 %157
+               OpSelectionMerge %160 None
+               OpBranchConditional %158 %159 %160
+        %159 = OpLabel
+        %162 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %uint_362
+        %163 = OpAtomicIAdd %uint %162 %uint_1 %uint_72 %uint_1
+               OpBranch %160
+        %160 = OpLabel
+        %164 = OpISub %uint %131 %128
+        %166 = OpUGreaterThan %bool %164 %uint_65536
+        %167 = OpIEqual %bool %103 %uint_0
+        %168 = OpLogicalAnd %bool %166 %167
+               OpSelectionMerge %170 None
+               OpBranchConditional %168 %169 %170
+        %169 = OpLabel
+        %172 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %uint_364
+        %173 = OpAtomicIAdd %uint %172 %uint_1 %uint_72 %uint_1
+               OpBranch %170
+        %170 = OpLabel
+               OpBranch %134
+        %134 = OpLabel
+        %174 = OpULessThan %bool %72 %uint_32
+               OpSelectionMerge %176 None
+               OpBranchConditional %174 %175 %176
+        %175 = OpLabel
+        %177 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %72
+               OpAtomicStore %177 %uint_2 %uint_260 %uint_4294967295
+        %179 = OpIAdd %uint %uint_2080 %72
+        %180 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %179
+               OpStore %180 %uint_0
+               OpBranch %176
+        %176 = OpLabel
+        %181 = OpIEqual %bool %72 %uint_32
+               OpSelectionMerge %183 None
+               OpBranchConditional %181 %182 %183
+        %182 = OpLabel
+        %185 = OpInBoundsAccessChain %_ptr_Workgroup_uint %56 %uint_0 %uint_65
+               OpStore %185 %uint_0
+               OpBranch %183
+        %183 = OpLabel
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+        %187 = OpAccessChain %_ptr_StorageBuffer_uint %19 %uint_0 %uint_0
+        %188 = OpLoad %uint %187
+        %189 = OpIAdd %uint %188 %uint_64
+        %190 = OpISub %uint %189 %106
+        %191 = OpBitwiseAnd %uint %190 %uint_63
+        %192 = OpShiftLeftLogical %uint %101 %uint_6
+        %193 = OpIAdd %uint %192 %191
+        %194 = OpShiftLeftLogical %uint %193 %uint_1
+        %195 = OpAccessChain %_ptr_StorageBuffer_uint %16 %uint_0 %194
+        %196 = OpLoad %uint %195
+        %197 = OpIAdd %uint %194 %uint_1
+        %198 = OpAccessChain %_ptr_StorageBuffer_uint %16 %uint_0 %197
+        %199 = OpLoad %uint %198
+               OpBranch %200
+        %200 = OpLabel
+        %205 = OpPhi %uint %2770 %202 %72 %183
+               OpLoopMerge %203 %202 None
+               OpBranch %201
+        %201 = OpLabel
+        %204 = OpISub %uint %199 %196
+        %206 = OpULessThan %bool %205 %204
+        %207 = OpLogicalNot %bool %206
+               OpBranchConditional %207 %203 %208
+        %203 = OpLabel
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+        %209 = OpInBoundsAccessChain %_ptr_Workgroup_uint %53 %uint_0 %uint_0
+        %210 = OpLoad %uint %209
+        %211 = OpInBoundsAccessChain %_ptr_Workgroup_uint %53 %uint_0 %uint_0
+        %212 = OpLoad %uint %211
+        %213 = OpExtInst %uint %81 UMin %212 %103
+        %214 = OpISub %uint %210 %213
+        %215 = OpExtInst %uint %81 UMin %214 %uint_576
+        %218 = OpBitwiseAnd %uint %217 %uint_8
+        %219 = OpINotEqual %bool %218 %uint_0
+        %220 = OpUGreaterThan %bool %215 %uint_0
+        %221 = OpLogicalAnd %bool %219 %220
+               OpSelectionMerge %224 None
+               OpBranchConditional %221 %222 %223
+        %222 = OpLabel
+        %225 = OpISub %uint %215 %uint_1
+        %226 = OpULessThan %bool %uint_0 %225
+               OpBranch %224
+        %224 = OpLabel
+        %228 = OpPhi %bool %220 %223 %226 %222
+        %244 = OpPhi %uint %215 %223 %225 %222
+        %227 = OpIEqual %bool %103 %uint_0
+        %229 = OpLogicalOr %bool %228 %227
+        %232 = OpAccessChain %_ptr_StorageBuffer_uint %10 %uint_0 %231
+        %233 = OpLoad %uint %232
+        %234 = OpISub %uint %128 %233
+        %235 = OpShiftLeftLogical %uint %234 %uint_6
+        %236 = OpIAdd %uint %235 %234
+        %237 = OpISub %uint %131 %128
+        %238 = OpIMul %uint %101 %237
+        %239 = OpIAdd %uint %236 %238
+               OpSelectionMerge %241 None
+               OpBranchConditional %132 %240 %241
+        %240 = OpLabel
+        %243 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %40 %uint_0 %uint_12
+        %245 = OpAtomicIAdd %uint %243 %uint_1 %uint_72 %244
+        %246 = OpIAdd %uint %239 %237
+        %250 = OpUGreaterThan %bool %246 %249
+               OpSelectionMerge %252 None
+               OpBranchConditional %250 %251 %252
+        %251 = OpLabel
+        %254 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %uint_366
+        %255 = OpAtomicIAdd %uint %254 %uint_1 %uint_72 %uint_1
+               OpBranch %252
+        %252 = OpLabel
+               OpBranch %241
+        %241 = OpLabel
+               OpBranch %256
+        %256 = OpLabel
+        %272 = OpPhi %uint %395 %258 %uint_256 %241
+        %274 = OpPhi %uint %393 %258 %uint_0 %241
+        %263 = OpPhi %bool %391 %258 %false %241
+       %2713 = OpPhi %uint %353 %258 %uint_0 %241
+       %2712 = OpPhi %uint %357 %258 %uint_0 %241
+       %2711 = OpPhi %uint %2649 %258 %uint_0 %241
+        %325 = OpPhi %uint %389 %258 %uint_0 %241
+        %267 = OpPhi %uint %387 %258 %uint_0 %241
+        %386 = OpPhi %uint %384 %258 %uint_0 %241
+       %2710 = OpPhi %uint %382 %258 %uint_0 %241
+       %2709 = OpPhi %uint %344 %258 %128 %241
+        %310 = OpPhi %uint %380 %258 %uint_0 %241
+        %260 = OpPhi %bool %377 %258 %229 %241
+        %329 = OpPhi %uint %375 %258 %uint_0 %241
+        %314 = OpPhi %uint %373 %258 %uint_0 %241
+        %285 = OpPhi %uint %370 %258 %uint_0 %241
+       %2708 = OpPhi %bool %2569 %258 %false %241
+               OpLoopMerge %259 %258 None
+               OpBranch %257
+        %257 = OpLabel
+        %261 = OpLogicalNot %bool %260
+               OpBranchConditional %261 %259 %262
+        %259 = OpLabel
+        %264 = OpLogicalAnd %bool %67 %263
+        %268 = OpULessThan %bool %267 %266
+        %269 = OpLogicalAnd %bool %264 %268
+               OpSelectionMerge %271 None
+               OpBranchConditional %269 %270 %271
+        %270 = OpLabel
+        %273 = OpAccessChain %_ptr_StorageBuffer_uint %34 %uint_0 %267
+               OpStore %273 %272
+               OpBranch %271
+        %271 = OpLabel
+        %275 = OpGroupNonUniformIAdd %uint %uint_3 Reduce %274
+        %276 = OpUGreaterThan %bool %275 %uint_0
+        %277 = OpLogicalAnd %bool %67 %276
+               OpSelectionMerge %279 None
+               OpBranchConditional %277 %278 %279
+        %278 = OpLabel
+        %280 = OpShiftLeftLogical %uint %101 %uint_2
+        %281 = OpIAdd %uint %280 %101
+        %282 = OpIAdd %uint %281 %uint_3
+        %283 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %282
+        %284 = OpAtomicIAdd %uint %283 %uint_1 %uint_72 %275
+               OpBranch %279
+        %279 = OpLabel
+        %286 = OpUGreaterThan %bool %285 %uint_0
+               OpSelectionMerge %288 None
+               OpBranchConditional %286 %287 %288
+        %287 = OpLabel
+        %289 = OpInBoundsAccessChain %_ptr_Workgroup_uint %58 %uint_0 %uint_1
+        %290 = OpAtomicIAdd %uint %289 %uint_2 %uint_264 %285
+               OpBranch %288
+        %288 = OpLabel
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+               OpSelectionMerge %292 None
+               OpBranchConditional %132 %291 %292
+        %291 = OpLabel
+        %293 = OpInBoundsAccessChain %_ptr_Workgroup_uint %58 %uint_0 %uint_1
+        %294 = OpAtomicLoad %uint %293 %uint_2 %uint_258
+        %296 = OpUGreaterThan %bool %294 %uint_0
+               OpSelectionMerge %298 None
+               OpBranchConditional %296 %297 %298
+        %297 = OpLabel
+        %299 = OpShiftLeftLogical %uint %101 %uint_2
+        %300 = OpIAdd %uint %299 %101
+        %301 = OpIAdd %uint %300 %uint_4
+        %302 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %301
+        %303 = OpAtomicIAdd %uint %302 %uint_1 %uint_72 %294
+               OpBranch %298
+        %298 = OpLabel
+               OpBranch %292
+        %292 = OpLabel
+        %304 = OpLogicalAnd %bool %132 %227
+               OpSelectionMerge %306 None
+               OpBranchConditional %304 %305 %306
+        %305 = OpLabel
+        %307 = OpShiftLeftLogical %uint %101 %uint_2
+        %308 = OpIAdd %uint %307 %101
+        %309 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %308
+        %311 = OpAtomicIAdd %uint %309 %uint_1 %uint_72 %310
+        %312 = OpIAdd %uint %308 %uint_1
+        %313 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %312
+        %315 = OpAtomicIAdd %uint %313 %uint_1 %uint_72 %314
+        %317 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %40 %uint_0 %uint_13
+        %318 = OpAtomicIAdd %uint %317 %uint_1 %uint_72 %310
+               OpBranch %306
+        %306 = OpLabel
+               OpSelectionMerge %320 None
+               OpBranchConditional %132 %319 %320
+        %319 = OpLabel
+        %321 = OpShiftLeftLogical %uint %101 %uint_2
+        %322 = OpIAdd %uint %321 %101
+        %323 = OpIAdd %uint %322 %uint_2
+        %324 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %323
+        %326 = OpAtomicIAdd %uint %324 %uint_1 %uint_72 %325
+        %328 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %uint_360
+        %330 = OpAtomicIAdd %uint %328 %uint_1 %uint_72 %329
+        %332 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %uint_365
+        %333 = OpAtomicIAdd %uint %332 %uint_1 %uint_72 %uint_1
+        %335 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %40 %uint_0 %uint_11
+        %336 = OpAtomicIAdd %uint %335 %uint_1 %uint_72 %uint_1
+               OpBranch %320
+        %320 = OpLabel
+               OpReturn
+        %262 = OpLabel
+               OpBranch %337
+        %337 = OpLabel
+        %353 = OpPhi %uint %2704 %339 %2713 %262
+        %357 = OpPhi %uint %2702 %339 %2712 %262
+       %2649 = OpPhi %uint %2697 %339 %2711 %262
+        %342 = OpPhi %uint %2696 %339 %2710 %262
+        %344 = OpPhi %uint %2698 %339 %2709 %262
+        %351 = OpPhi %bool %2699 %339 %2708 %262
+               OpLoopMerge %340 %339 None
+               OpBranch %338
+        %338 = OpLabel
+        %343 = OpULessThan %bool %342 %uint_1024
+        %345 = OpULessThan %bool %344 %131
+        %346 = OpLogicalAnd %bool %343 %345
+        %347 = OpLogicalNot %bool %346
+               OpBranchConditional %347 %340 %348
+        %340 = OpLabel
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+               OpSelectionMerge %352 None
+               OpBranchConditional %351 %349 %350
+        %349 = OpLabel
+        %354 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %353
+        %355 = OpLoad %uint %354
+        %358 = OpShiftLeftLogical %uint %357 %uint_16
+        %359 = OpBitwiseOr %uint %355 %358
+        %360 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %353
+               OpStore %360 %359
+               OpBranch %352
+        %352 = OpLabel
+       %2569 = OpPhi %bool %351 %350 %false %349
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+        %361 = OpUGreaterThanEqual %bool %344 %131
+        %362 = OpIAdd %uint %342 %uint_63
+        %363 = OpShiftRightLogical %uint %362 %uint_6
+        %364 = OpSelect %uint %361 %363 %uint_64
+        %365 = OpExtInst %uint %81 UMin %uint_16 %364
+        %366 = OpIEqual %bool %365 %uint_0
+               OpSelectionMerge %369 None
+               OpBranchConditional %366 %367 %368
+        %367 = OpLabel
+               OpBranch %369
+        %369 = OpLabel
+        %395 = OpPhi %uint %396 %371 %272 %367
+        %393 = OpPhi %uint %394 %371 %274 %367
+        %391 = OpPhi %bool %392 %371 %263 %367
+        %389 = OpPhi %uint %390 %371 %325 %367
+        %387 = OpPhi %uint %388 %371 %267 %367
+        %384 = OpPhi %uint %385 %371 %386 %367
+        %382 = OpPhi %uint %383 %371 %342 %367
+        %380 = OpPhi %uint %381 %371 %310 %367
+        %377 = OpPhi %bool %378 %371 %false %367
+        %375 = OpPhi %uint %376 %371 %329 %367
+        %373 = OpPhi %uint %374 %371 %314 %367
+        %370 = OpPhi %uint %372 %371 %285 %367
+               OpBranch %258
+        %258 = OpLabel
+               OpBranch %256
+        %368 = OpLabel
+        %397 = OpShiftLeftLogical %uint %365 %uint_6
+        %398 = OpExtInst %uint %81 UMin %342 %397
+        %399 = OpShiftLeftLogical %uint %76 %uint_6
+        %400 = OpIAdd %uint %399 %65
+        %401 = OpULessThan %bool %76 %365
+        %402 = OpULessThan %bool %400 %398
+        %403 = OpLogicalAnd %bool %401 %402
+               OpSelectionMerge %406 None
+               OpBranchConditional %403 %404 %405
+        %404 = OpLabel
+        %407 = OpShiftRightLogical %uint %400 %uint_1
+        %408 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %407
+        %409 = OpLoad %uint %408
+        %410 = OpBitwiseAnd %uint %400 %uint_1
+        %411 = OpShiftLeftLogical %uint %410 %uint_4
+        %412 = OpShiftRightLogical %uint %409 %411
+        %414 = OpBitwiseAnd %uint %412 %uint_65535
+        %415 = OpIAdd %uint %128 %414
+        %417 = OpAccessChain %_ptr_StorageBuffer_v4uint %6 %uint_0 %415
+        %418 = OpLoad %v4uint %417
+        %419 = OpCompositeExtract %uint %418 0
+        %421 = OpUConvert %ulong %419
+        %422 = OpCompositeExtract %uint %418 1
+        %423 = OpUConvert %ulong %422
+        %425 = OpShiftLeftLogical %ulong %423 %ulong_32
+        %426 = OpBitwiseOr %ulong %421 %425
+        %427 = OpCompositeExtract %uint %418 3
+        %429 = OpShiftRightLogical %uint %427 %uint_25
+        %430 = OpCompositeExtract %uint %418 2
+        %431 = OpBitwiseAnd %uint %430 %uint_255
+        %432 = OpShiftRightLogical %uint %430 %uint_16
+        %433 = OpBitwiseAnd %uint %432 %uint_255
+        %434 = OpIMul %uint %433 %101
+        %435 = OpIAdd %uint %431 %434
+        %436 = OpUMod %uint %435 %uint_65
+        %437 = OpShiftRightLogical %uint %430 %uint_8
+        %438 = OpBitwiseAnd %uint %437 %uint_255
+        %439 = OpShiftRightLogical %uint %430 %uint_24
+        %440 = OpBitwiseAnd %uint %439 %uint_255
+        %441 = OpIMul %uint %440 %101
+        %442 = OpIAdd %uint %438 %441
+        %443 = OpUMod %uint %442 %uint_65
+        %444 = OpULessThan %bool %436 %uint_64
+        %445 = OpBitwiseAnd %uint %436 %uint_63
+        %446 = OpUConvert %ulong %445
+        %448 = OpShiftLeftLogical %ulong %ulong_1 %446
+        %450 = OpSelect %ulong %444 %448 %ulong_0
+        %451 = OpUGreaterThanEqual %bool %436 %uint_64
+        %452 = OpBitwiseAnd %uint %436 %uint_31
+        %453 = OpShiftLeftLogical %uint %uint_1 %452
+        %454 = OpSelect %uint %451 %453 %uint_0
+        %455 = OpULessThan %bool %443 %uint_64
+        %456 = OpBitwiseAnd %uint %443 %uint_63
+        %457 = OpUConvert %ulong %456
+        %458 = OpShiftLeftLogical %ulong %ulong_1 %457
+        %459 = OpSelect %ulong %455 %458 %ulong_0
+        %460 = OpUGreaterThanEqual %bool %443 %uint_64
+        %461 = OpBitwiseAnd %uint %443 %uint_31
+        %462 = OpShiftLeftLogical %uint %uint_1 %461
+        %463 = OpSelect %uint %460 %462 %uint_0
+        %464 = OpBitwiseOr %ulong %450 %459
+        %465 = OpBitwiseOr %uint %454 %463
+        %466 = OpBitwiseOr %ulong %426 %464
+        %467 = OpBitwiseOr %uint %429 %465
+        %468 = OpIEqual %bool %436 %443
+        %469 = OpBitwiseAnd %ulong %426 %464
+        %470 = OpINotEqual %bool %469 %ulong_0
+        %471 = OpLogicalOr %bool %468 %470
+        %472 = OpBitwiseAnd %uint %429 %465
+        %473 = OpINotEqual %bool %472 %uint_0
+        %474 = OpLogicalOr %bool %471 %473
+        %475 = OpSelect %ulong %474 %ulong_0 %466
+        %476 = OpSelect %uint %474 %uint_0 %467
+               OpBranch %406
+        %406 = OpLabel
+        %634 = OpPhi %uint %uint_0 %405 %476 %404
+        %478 = OpPhi %ulong %ulong_0 %405 %475 %404
+        %479 = OpBitwiseAnd %ulong %478 %ulong_4294967295
+        %480 = OpUConvert %uint %479
+        %481 = OpShiftRightLogical %ulong %478 %ulong_32
+        %482 = OpUConvert %uint %481
+        %483 = OpGroupNonUniformShuffleXor %uint %uint_3 %480 %uint_32
+        %484 = OpGroupNonUniformShuffleXor %uint %uint_3 %482 %uint_32
+        %485 = OpBitwiseAnd %uint %65 %uint_32
+        %486 = OpINotEqual %bool %485 %uint_0
+        %487 = OpSelect %uint %486 %484 %480
+        %488 = OpSelect %uint %486 %482 %483
+        %489 = OpGroupNonUniformShuffleXor %uint %uint_3 %487 %uint_16
+        %490 = OpGroupNonUniformShuffleXor %uint %uint_3 %488 %uint_16
+        %491 = OpBitwiseAnd %uint %65 %uint_16
+        %492 = OpINotEqual %bool %491 %uint_0
+        %494 = OpSelect %uint %492 %uint_4294901760 %uint_65535
+        %495 = OpSelect %uint %492 %uint_16 %uint_16
+        %496 = OpShiftRightLogical %uint %489 %495
+        %497 = OpISub %uint %uint_32 %495
+        %498 = OpShiftLeftLogical %uint %489 %497
+        %499 = OpBitwiseOr %uint %496 %498
+        %500 = OpShiftRightLogical %uint %490 %495
+        %501 = OpShiftLeftLogical %uint %490 %497
+        %502 = OpBitwiseOr %uint %500 %501
+        %503 = OpBitwiseAnd %uint %487 %494
+        %504 = OpNot %uint %494
+        %505 = OpBitwiseAnd %uint %499 %504
+        %506 = OpBitwiseOr %uint %503 %505
+        %507 = OpBitwiseAnd %uint %488 %494
+        %508 = OpBitwiseAnd %uint %502 %504
+        %509 = OpBitwiseOr %uint %507 %508
+        %510 = OpGroupNonUniformShuffleXor %uint %uint_3 %506 %uint_8
+        %511 = OpGroupNonUniformShuffleXor %uint %uint_3 %509 %uint_8
+        %512 = OpBitwiseAnd %uint %65 %uint_8
+        %513 = OpINotEqual %bool %512 %uint_0
+        %516 = OpSelect %uint %513 %uint_4278255360 %uint_16711935
+        %517 = OpSelect %uint %513 %uint_8 %uint_24
+        %518 = OpShiftRightLogical %uint %510 %517
+        %519 = OpISub %uint %uint_32 %517
+        %520 = OpShiftLeftLogical %uint %510 %519
+        %521 = OpBitwiseOr %uint %518 %520
+        %522 = OpShiftRightLogical %uint %511 %517
+        %523 = OpShiftLeftLogical %uint %511 %519
+        %524 = OpBitwiseOr %uint %522 %523
+        %525 = OpBitwiseAnd %uint %506 %516
+        %526 = OpNot %uint %516
+        %527 = OpBitwiseAnd %uint %521 %526
+        %528 = OpBitwiseOr %uint %525 %527
+        %529 = OpBitwiseAnd %uint %509 %516
+        %530 = OpBitwiseAnd %uint %524 %526
+        %531 = OpBitwiseOr %uint %529 %530
+        %532 = OpGroupNonUniformShuffleXor %uint %uint_3 %528 %uint_4
+        %533 = OpGroupNonUniformShuffleXor %uint %uint_3 %531 %uint_4
+        %534 = OpBitwiseAnd %uint %65 %uint_4
+        %535 = OpINotEqual %bool %534 %uint_0
+        %538 = OpSelect %uint %535 %uint_4042322160 %uint_252645135
+        %540 = OpSelect %uint %535 %uint_4 %uint_28
+        %541 = OpShiftRightLogical %uint %532 %540
+        %542 = OpISub %uint %uint_32 %540
+        %543 = OpShiftLeftLogical %uint %532 %542
+        %544 = OpBitwiseOr %uint %541 %543
+        %545 = OpShiftRightLogical %uint %533 %540
+        %546 = OpShiftLeftLogical %uint %533 %542
+        %547 = OpBitwiseOr %uint %545 %546
+        %548 = OpBitwiseAnd %uint %528 %538
+        %549 = OpNot %uint %538
+        %550 = OpBitwiseAnd %uint %544 %549
+        %551 = OpBitwiseOr %uint %548 %550
+        %552 = OpBitwiseAnd %uint %531 %538
+        %553 = OpBitwiseAnd %uint %547 %549
+        %554 = OpBitwiseOr %uint %552 %553
+        %555 = OpGroupNonUniformShuffleXor %uint %uint_3 %551 %uint_2
+        %556 = OpGroupNonUniformShuffleXor %uint %uint_3 %554 %uint_2
+        %557 = OpBitwiseAnd %uint %65 %uint_2
+        %558 = OpINotEqual %bool %557 %uint_0
+        %561 = OpSelect %uint %558 %uint_3435973836 %uint_858993459
+        %563 = OpSelect %uint %558 %uint_2 %uint_30
+        %564 = OpShiftRightLogical %uint %555 %563
+        %565 = OpISub %uint %uint_32 %563
+        %566 = OpShiftLeftLogical %uint %555 %565
+        %567 = OpBitwiseOr %uint %564 %566
+        %568 = OpShiftRightLogical %uint %556 %563
+        %569 = OpShiftLeftLogical %uint %556 %565
+        %570 = OpBitwiseOr %uint %568 %569
+        %571 = OpBitwiseAnd %uint %551 %561
+        %572 = OpNot %uint %561
+        %573 = OpBitwiseAnd %uint %567 %572
+        %574 = OpBitwiseOr %uint %571 %573
+        %575 = OpBitwiseAnd %uint %554 %561
+        %576 = OpBitwiseAnd %uint %570 %572
+        %577 = OpBitwiseOr %uint %575 %576
+        %578 = OpGroupNonUniformShuffleXor %uint %uint_3 %574 %uint_1
+        %579 = OpGroupNonUniformShuffleXor %uint %uint_3 %577 %uint_1
+        %580 = OpBitwiseAnd %uint %65 %uint_1
+        %581 = OpINotEqual %bool %580 %uint_0
+        %584 = OpSelect %uint %581 %uint_2863311530 %uint_1431655765
+        %585 = OpSelect %uint %581 %uint_1 %uint_31
+        %586 = OpShiftRightLogical %uint %578 %585
+        %587 = OpISub %uint %uint_32 %585
+        %588 = OpShiftLeftLogical %uint %578 %587
+        %589 = OpBitwiseOr %uint %586 %588
+        %590 = OpShiftRightLogical %uint %579 %585
+        %591 = OpShiftLeftLogical %uint %579 %587
+        %592 = OpBitwiseOr %uint %590 %591
+        %593 = OpBitwiseAnd %uint %574 %584
+        %594 = OpNot %uint %584
+        %595 = OpBitwiseAnd %uint %589 %594
+        %596 = OpBitwiseOr %uint %593 %595
+        %597 = OpBitwiseAnd %uint %577 %584
+        %598 = OpBitwiseAnd %uint %592 %594
+        %599 = OpBitwiseOr %uint %597 %598
+        %600 = OpExtInst %uint %81 UMin %398 %399
+        %601 = OpISub %uint %398 %600
+        %602 = OpExtInst %uint %81 UMin %uint_64 %601
+        %603 = OpUGreaterThanEqual %bool %602 %uint_32
+        %604 = OpExtInst %uint %81 UMin %602 %uint_31
+        %605 = OpShiftLeftLogical %uint %uint_1 %604
+        %606 = OpISub %uint %605 %uint_1
+        %607 = OpSelect %uint %603 %uint_4294967295 %606
+        %608 = OpUGreaterThanEqual %bool %602 %uint_64
+        %609 = OpUGreaterThan %bool %602 %uint_32
+        %610 = OpExtInst %uint %81 UMin %602 %uint_32
+        %611 = OpISub %uint %602 %610
+        %612 = OpBitwiseAnd %uint %611 %uint_31
+        %613 = OpShiftLeftLogical %uint %uint_1 %612
+        %614 = OpISub %uint %613 %uint_1
+        %615 = OpSelect %uint %609 %614 %uint_0
+        %616 = OpSelect %uint %608 %uint_4294967295 %615
+               OpSelectionMerge %619 None
+               OpBranchConditional %401 %617 %618
+        %617 = OpLabel
+        %620 = OpIEqual %bool %596 %607
+        %621 = OpIEqual %bool %599 %616
+        %622 = OpLogicalAnd %bool %620 %621
+        %623 = OpGroupNonUniformBallot %v4uint %uint_3 %622
+               OpSelectionMerge %625 None
+               OpBranchConditional %67 %624 %625
+        %624 = OpLabel
+        %626 = OpCompositeExtract %uint %623 0
+        %627 = OpShiftLeftLogical %uint %76 %uint_1
+        %628 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %627
+        %629 = OpAtomicAnd %uint %628 %uint_2 %uint_264 %626
+        %630 = OpCompositeExtract %uint %623 1
+        %631 = OpIAdd %uint %627 %uint_1
+        %632 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %631
+        %633 = OpAtomicAnd %uint %632 %uint_2 %uint_264 %630
+               OpBranch %625
+        %625 = OpLabel
+               OpBranch %619
+        %619 = OpLabel
+       %1298 = OpPhi %uint %uint_0 %618 %599 %625
+       %1291 = OpPhi %uint %uint_0 %618 %596 %625
+        %635 = OpShiftRightLogical %uint %634 %uint_0
+        %636 = OpBitwiseAnd %uint %635 %uint_1
+        %637 = OpINotEqual %bool %636 %uint_0
+        %638 = OpGroupNonUniformBallot %v4uint %uint_3 %637
+        %639 = OpLogicalAnd %bool %401 %67
+               OpSelectionMerge %641 None
+               OpBranchConditional %639 %640 %641
+        %640 = OpLabel
+        %642 = OpIAdd %uint %uint_1024 %76
+        %643 = OpShiftLeftLogical %uint %642 %uint_1
+        %644 = OpCompositeExtract %uint %638 0
+        %645 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %643
+               OpStore %645 %644
+        %646 = OpIAdd %uint %643 %uint_1
+        %647 = OpCompositeExtract %uint %638 1
+        %648 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %646
+               OpStore %648 %647
+        %649 = OpIEqual %bool %644 %607
+        %650 = OpIEqual %bool %647 %616
+        %651 = OpLogicalAnd %bool %649 %650
+        %652 = OpLogicalNot %bool %651
+               OpSelectionMerge %654 None
+               OpBranchConditional %652 %653 %654
+        %653 = OpLabel
+        %655 = OpInBoundsAccessChain %_ptr_Workgroup_uint %52 %uint_0 %76
+        %657 = OpAtomicAnd %uint %655 %uint_2 %uint_264 %uint_4294967294
+               OpBranch %654
+        %654 = OpLabel
+               OpBranch %641
+        %641 = OpLabel
+        %658 = OpIAdd %uint %76 %uint_4
+        %659 = OpShiftLeftLogical %uint %658 %uint_6
+        %660 = OpIAdd %uint %659 %65
+        %661 = OpULessThan %bool %658 %365
+        %662 = OpULessThan %bool %660 %398
+        %663 = OpLogicalAnd %bool %661 %662
+               OpSelectionMerge %666 None
+               OpBranchConditional %663 %664 %665
+        %664 = OpLabel
+        %667 = OpShiftRightLogical %uint %660 %uint_1
+        %668 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %667
+        %669 = OpLoad %uint %668
+        %670 = OpBitwiseAnd %uint %660 %uint_1
+        %671 = OpShiftLeftLogical %uint %670 %uint_4
+        %672 = OpShiftRightLogical %uint %669 %671
+        %673 = OpBitwiseAnd %uint %672 %uint_65535
+        %674 = OpIAdd %uint %128 %673
+        %675 = OpAccessChain %_ptr_StorageBuffer_v4uint %6 %uint_0 %674
+        %676 = OpLoad %v4uint %675
+        %677 = OpCompositeExtract %uint %676 0
+        %678 = OpUConvert %ulong %677
+        %679 = OpCompositeExtract %uint %676 1
+        %680 = OpUConvert %ulong %679
+        %681 = OpShiftLeftLogical %ulong %680 %ulong_32
+        %682 = OpBitwiseOr %ulong %678 %681
+        %683 = OpCompositeExtract %uint %676 3
+        %684 = OpShiftRightLogical %uint %683 %uint_25
+        %685 = OpCompositeExtract %uint %676 2
+        %686 = OpBitwiseAnd %uint %685 %uint_255
+        %687 = OpShiftRightLogical %uint %685 %uint_16
+        %688 = OpBitwiseAnd %uint %687 %uint_255
+        %689 = OpIMul %uint %688 %101
+        %690 = OpIAdd %uint %686 %689
+        %691 = OpUMod %uint %690 %uint_65
+        %692 = OpShiftRightLogical %uint %685 %uint_8
+        %693 = OpBitwiseAnd %uint %692 %uint_255
+        %694 = OpShiftRightLogical %uint %685 %uint_24
+        %695 = OpBitwiseAnd %uint %694 %uint_255
+        %696 = OpIMul %uint %695 %101
+        %697 = OpIAdd %uint %693 %696
+        %698 = OpUMod %uint %697 %uint_65
+        %699 = OpULessThan %bool %691 %uint_64
+        %700 = OpBitwiseAnd %uint %691 %uint_63
+        %701 = OpUConvert %ulong %700
+        %702 = OpShiftLeftLogical %ulong %ulong_1 %701
+        %703 = OpSelect %ulong %699 %702 %ulong_0
+        %704 = OpUGreaterThanEqual %bool %691 %uint_64
+        %705 = OpBitwiseAnd %uint %691 %uint_31
+        %706 = OpShiftLeftLogical %uint %uint_1 %705
+        %707 = OpSelect %uint %704 %706 %uint_0
+        %708 = OpULessThan %bool %698 %uint_64
+        %709 = OpBitwiseAnd %uint %698 %uint_63
+        %710 = OpUConvert %ulong %709
+        %711 = OpShiftLeftLogical %ulong %ulong_1 %710
+        %712 = OpSelect %ulong %708 %711 %ulong_0
+        %713 = OpUGreaterThanEqual %bool %698 %uint_64
+        %714 = OpBitwiseAnd %uint %698 %uint_31
+        %715 = OpShiftLeftLogical %uint %uint_1 %714
+        %716 = OpSelect %uint %713 %715 %uint_0
+        %717 = OpBitwiseOr %ulong %703 %712
+        %718 = OpBitwiseOr %uint %707 %716
+        %719 = OpBitwiseOr %ulong %682 %717
+        %720 = OpBitwiseOr %uint %684 %718
+        %721 = OpIEqual %bool %691 %698
+        %722 = OpBitwiseAnd %ulong %682 %717
+        %723 = OpINotEqual %bool %722 %ulong_0
+        %724 = OpLogicalOr %bool %721 %723
+        %725 = OpBitwiseAnd %uint %684 %718
+        %726 = OpINotEqual %bool %725 %uint_0
+        %727 = OpLogicalOr %bool %724 %726
+        %728 = OpSelect %ulong %727 %ulong_0 %719
+        %729 = OpSelect %uint %727 %uint_0 %720
+               OpBranch %666
+        %666 = OpLabel
+        %843 = OpPhi %uint %uint_0 %665 %729 %664
+        %730 = OpPhi %ulong %ulong_0 %665 %728 %664
+        %731 = OpBitwiseAnd %ulong %730 %ulong_4294967295
+        %732 = OpUConvert %uint %731
+        %733 = OpShiftRightLogical %ulong %730 %ulong_32
+        %734 = OpUConvert %uint %733
+        %735 = OpGroupNonUniformShuffleXor %uint %uint_3 %732 %uint_32
+        %736 = OpGroupNonUniformShuffleXor %uint %uint_3 %734 %uint_32
+        %737 = OpSelect %uint %486 %736 %732
+        %738 = OpSelect %uint %486 %734 %735
+        %739 = OpGroupNonUniformShuffleXor %uint %uint_3 %737 %uint_16
+        %740 = OpGroupNonUniformShuffleXor %uint %uint_3 %738 %uint_16
+        %741 = OpShiftRightLogical %uint %739 %495
+        %742 = OpShiftLeftLogical %uint %739 %497
+        %743 = OpBitwiseOr %uint %741 %742
+        %744 = OpShiftRightLogical %uint %740 %495
+        %745 = OpShiftLeftLogical %uint %740 %497
+        %746 = OpBitwiseOr %uint %744 %745
+        %747 = OpBitwiseAnd %uint %737 %494
+        %748 = OpBitwiseAnd %uint %743 %504
+        %749 = OpBitwiseOr %uint %747 %748
+        %750 = OpBitwiseAnd %uint %738 %494
+        %751 = OpBitwiseAnd %uint %746 %504
+        %752 = OpBitwiseOr %uint %750 %751
+        %753 = OpGroupNonUniformShuffleXor %uint %uint_3 %749 %uint_8
+        %754 = OpGroupNonUniformShuffleXor %uint %uint_3 %752 %uint_8
+        %755 = OpShiftRightLogical %uint %753 %517
+        %756 = OpShiftLeftLogical %uint %753 %519
+        %757 = OpBitwiseOr %uint %755 %756
+        %758 = OpShiftRightLogical %uint %754 %517
+        %759 = OpShiftLeftLogical %uint %754 %519
+        %760 = OpBitwiseOr %uint %758 %759
+        %761 = OpBitwiseAnd %uint %749 %516
+        %762 = OpBitwiseAnd %uint %757 %526
+        %763 = OpBitwiseOr %uint %761 %762
+        %764 = OpBitwiseAnd %uint %752 %516
+        %765 = OpBitwiseAnd %uint %760 %526
+        %766 = OpBitwiseOr %uint %764 %765
+        %767 = OpGroupNonUniformShuffleXor %uint %uint_3 %763 %uint_4
+        %768 = OpGroupNonUniformShuffleXor %uint %uint_3 %766 %uint_4
+        %769 = OpShiftRightLogical %uint %767 %540
+        %770 = OpShiftLeftLogical %uint %767 %542
+        %771 = OpBitwiseOr %uint %769 %770
+        %772 = OpShiftRightLogical %uint %768 %540
+        %773 = OpShiftLeftLogical %uint %768 %542
+        %774 = OpBitwiseOr %uint %772 %773
+        %775 = OpBitwiseAnd %uint %763 %538
+        %776 = OpBitwiseAnd %uint %771 %549
+        %777 = OpBitwiseOr %uint %775 %776
+        %778 = OpBitwiseAnd %uint %766 %538
+        %779 = OpBitwiseAnd %uint %774 %549
+        %780 = OpBitwiseOr %uint %778 %779
+        %781 = OpGroupNonUniformShuffleXor %uint %uint_3 %777 %uint_2
+        %782 = OpGroupNonUniformShuffleXor %uint %uint_3 %780 %uint_2
+        %783 = OpShiftRightLogical %uint %781 %563
+        %784 = OpShiftLeftLogical %uint %781 %565
+        %785 = OpBitwiseOr %uint %783 %784
+        %786 = OpShiftRightLogical %uint %782 %563
+        %787 = OpShiftLeftLogical %uint %782 %565
+        %788 = OpBitwiseOr %uint %786 %787
+        %789 = OpBitwiseAnd %uint %777 %561
+        %790 = OpBitwiseAnd %uint %785 %572
+        %791 = OpBitwiseOr %uint %789 %790
+        %792 = OpBitwiseAnd %uint %780 %561
+        %793 = OpBitwiseAnd %uint %788 %572
+        %794 = OpBitwiseOr %uint %792 %793
+        %795 = OpGroupNonUniformShuffleXor %uint %uint_3 %791 %uint_1
+        %796 = OpGroupNonUniformShuffleXor %uint %uint_3 %794 %uint_1
+        %797 = OpShiftRightLogical %uint %795 %585
+        %798 = OpShiftLeftLogical %uint %795 %587
+        %799 = OpBitwiseOr %uint %797 %798
+        %800 = OpShiftRightLogical %uint %796 %585
+        %801 = OpShiftLeftLogical %uint %796 %587
+        %802 = OpBitwiseOr %uint %800 %801
+        %803 = OpBitwiseAnd %uint %791 %584
+        %804 = OpBitwiseAnd %uint %799 %594
+        %805 = OpBitwiseOr %uint %803 %804
+        %806 = OpBitwiseAnd %uint %794 %584
+        %807 = OpBitwiseAnd %uint %802 %594
+        %808 = OpBitwiseOr %uint %806 %807
+        %809 = OpExtInst %uint %81 UMin %398 %659
+        %810 = OpISub %uint %398 %809
+        %811 = OpExtInst %uint %81 UMin %uint_64 %810
+        %812 = OpUGreaterThanEqual %bool %811 %uint_32
+        %813 = OpExtInst %uint %81 UMin %811 %uint_31
+        %814 = OpShiftLeftLogical %uint %uint_1 %813
+        %815 = OpISub %uint %814 %uint_1
+        %816 = OpSelect %uint %812 %uint_4294967295 %815
+        %817 = OpUGreaterThanEqual %bool %811 %uint_64
+        %818 = OpUGreaterThan %bool %811 %uint_32
+        %819 = OpExtInst %uint %81 UMin %811 %uint_32
+        %820 = OpISub %uint %811 %819
+        %821 = OpBitwiseAnd %uint %820 %uint_31
+        %822 = OpShiftLeftLogical %uint %uint_1 %821
+        %823 = OpISub %uint %822 %uint_1
+        %824 = OpSelect %uint %818 %823 %uint_0
+        %825 = OpSelect %uint %817 %uint_4294967295 %824
+               OpSelectionMerge %828 None
+               OpBranchConditional %661 %826 %827
+        %826 = OpLabel
+        %829 = OpIEqual %bool %805 %816
+        %830 = OpIEqual %bool %808 %825
+        %831 = OpLogicalAnd %bool %829 %830
+        %832 = OpGroupNonUniformBallot %v4uint %uint_3 %831
+               OpSelectionMerge %834 None
+               OpBranchConditional %67 %833 %834
+        %833 = OpLabel
+        %835 = OpCompositeExtract %uint %832 0
+        %836 = OpShiftLeftLogical %uint %658 %uint_1
+        %837 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %836
+        %838 = OpAtomicAnd %uint %837 %uint_2 %uint_264 %835
+        %839 = OpCompositeExtract %uint %832 1
+        %840 = OpIAdd %uint %836 %uint_1
+        %841 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %840
+        %842 = OpAtomicAnd %uint %841 %uint_2 %uint_264 %839
+               OpBranch %834
+        %834 = OpLabel
+               OpBranch %828
+        %828 = OpLabel
+       %1289 = OpPhi %uint %uint_0 %827 %805 %834
+       %1296 = OpPhi %uint %uint_0 %827 %808 %834
+        %844 = OpShiftRightLogical %uint %843 %uint_0
+        %845 = OpBitwiseAnd %uint %844 %uint_1
+        %846 = OpINotEqual %bool %845 %uint_0
+        %847 = OpGroupNonUniformBallot %v4uint %uint_3 %846
+        %848 = OpLogicalAnd %bool %661 %67
+               OpSelectionMerge %850 None
+               OpBranchConditional %848 %849 %850
+        %849 = OpLabel
+        %851 = OpIAdd %uint %uint_1024 %658
+        %852 = OpShiftLeftLogical %uint %851 %uint_1
+        %853 = OpCompositeExtract %uint %847 0
+        %854 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %852
+               OpStore %854 %853
+        %855 = OpIAdd %uint %852 %uint_1
+        %856 = OpCompositeExtract %uint %847 1
+        %857 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %855
+               OpStore %857 %856
+        %858 = OpIEqual %bool %853 %816
+        %859 = OpIEqual %bool %856 %825
+        %860 = OpLogicalAnd %bool %858 %859
+        %861 = OpLogicalNot %bool %860
+               OpSelectionMerge %863 None
+               OpBranchConditional %861 %862 %863
+        %862 = OpLabel
+        %864 = OpInBoundsAccessChain %_ptr_Workgroup_uint %52 %uint_0 %658
+        %865 = OpAtomicAnd %uint %864 %uint_2 %uint_264 %uint_4294967294
+               OpBranch %863
+        %863 = OpLabel
+               OpBranch %850
+        %850 = OpLabel
+        %866 = OpIAdd %uint %76 %uint_8
+        %867 = OpShiftLeftLogical %uint %866 %uint_6
+        %868 = OpIAdd %uint %867 %65
+        %869 = OpULessThan %bool %866 %365
+        %870 = OpULessThan %bool %868 %398
+        %871 = OpLogicalAnd %bool %869 %870
+               OpSelectionMerge %874 None
+               OpBranchConditional %871 %872 %873
+        %872 = OpLabel
+        %875 = OpShiftRightLogical %uint %868 %uint_1
+        %876 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %875
+        %877 = OpLoad %uint %876
+        %878 = OpBitwiseAnd %uint %868 %uint_1
+        %879 = OpShiftLeftLogical %uint %878 %uint_4
+        %880 = OpShiftRightLogical %uint %877 %879
+        %881 = OpBitwiseAnd %uint %880 %uint_65535
+        %882 = OpIAdd %uint %128 %881
+        %883 = OpAccessChain %_ptr_StorageBuffer_v4uint %6 %uint_0 %882
+        %884 = OpLoad %v4uint %883
+        %885 = OpCompositeExtract %uint %884 0
+        %886 = OpUConvert %ulong %885
+        %887 = OpCompositeExtract %uint %884 1
+        %888 = OpUConvert %ulong %887
+        %889 = OpShiftLeftLogical %ulong %888 %ulong_32
+        %890 = OpBitwiseOr %ulong %886 %889
+        %891 = OpCompositeExtract %uint %884 3
+        %892 = OpShiftRightLogical %uint %891 %uint_25
+        %893 = OpCompositeExtract %uint %884 2
+        %894 = OpBitwiseAnd %uint %893 %uint_255
+        %895 = OpShiftRightLogical %uint %893 %uint_16
+        %896 = OpBitwiseAnd %uint %895 %uint_255
+        %897 = OpIMul %uint %896 %101
+        %898 = OpIAdd %uint %894 %897
+        %899 = OpUMod %uint %898 %uint_65
+        %900 = OpShiftRightLogical %uint %893 %uint_8
+        %901 = OpBitwiseAnd %uint %900 %uint_255
+        %902 = OpShiftRightLogical %uint %893 %uint_24
+        %903 = OpBitwiseAnd %uint %902 %uint_255
+        %904 = OpIMul %uint %903 %101
+        %905 = OpIAdd %uint %901 %904
+        %906 = OpUMod %uint %905 %uint_65
+        %907 = OpULessThan %bool %899 %uint_64
+        %908 = OpBitwiseAnd %uint %899 %uint_63
+        %909 = OpUConvert %ulong %908
+        %910 = OpShiftLeftLogical %ulong %ulong_1 %909
+        %911 = OpSelect %ulong %907 %910 %ulong_0
+        %912 = OpUGreaterThanEqual %bool %899 %uint_64
+        %913 = OpBitwiseAnd %uint %899 %uint_31
+        %914 = OpShiftLeftLogical %uint %uint_1 %913
+        %915 = OpSelect %uint %912 %914 %uint_0
+        %916 = OpULessThan %bool %906 %uint_64
+        %917 = OpBitwiseAnd %uint %906 %uint_63
+        %918 = OpUConvert %ulong %917
+        %919 = OpShiftLeftLogical %ulong %ulong_1 %918
+        %920 = OpSelect %ulong %916 %919 %ulong_0
+        %921 = OpUGreaterThanEqual %bool %906 %uint_64
+        %922 = OpBitwiseAnd %uint %906 %uint_31
+        %923 = OpShiftLeftLogical %uint %uint_1 %922
+        %924 = OpSelect %uint %921 %923 %uint_0
+        %925 = OpBitwiseOr %ulong %911 %920
+        %926 = OpBitwiseOr %uint %915 %924
+        %927 = OpBitwiseOr %ulong %890 %925
+        %928 = OpBitwiseOr %uint %892 %926
+        %929 = OpIEqual %bool %899 %906
+        %930 = OpBitwiseAnd %ulong %890 %925
+        %931 = OpINotEqual %bool %930 %ulong_0
+        %932 = OpLogicalOr %bool %929 %931
+        %933 = OpBitwiseAnd %uint %892 %926
+        %934 = OpINotEqual %bool %933 %uint_0
+        %935 = OpLogicalOr %bool %932 %934
+        %936 = OpSelect %ulong %935 %ulong_0 %927
+        %937 = OpSelect %uint %935 %uint_0 %928
+               OpBranch %874
+        %874 = OpLabel
+       %1051 = OpPhi %uint %uint_0 %873 %937 %872
+        %938 = OpPhi %ulong %ulong_0 %873 %936 %872
+        %939 = OpBitwiseAnd %ulong %938 %ulong_4294967295
+        %940 = OpUConvert %uint %939
+        %941 = OpShiftRightLogical %ulong %938 %ulong_32
+        %942 = OpUConvert %uint %941
+        %943 = OpGroupNonUniformShuffleXor %uint %uint_3 %940 %uint_32
+        %944 = OpGroupNonUniformShuffleXor %uint %uint_3 %942 %uint_32
+        %945 = OpSelect %uint %486 %944 %940
+        %946 = OpSelect %uint %486 %942 %943
+        %947 = OpGroupNonUniformShuffleXor %uint %uint_3 %945 %uint_16
+        %948 = OpGroupNonUniformShuffleXor %uint %uint_3 %946 %uint_16
+        %949 = OpShiftRightLogical %uint %947 %495
+        %950 = OpShiftLeftLogical %uint %947 %497
+        %951 = OpBitwiseOr %uint %949 %950
+        %952 = OpShiftRightLogical %uint %948 %495
+        %953 = OpShiftLeftLogical %uint %948 %497
+        %954 = OpBitwiseOr %uint %952 %953
+        %955 = OpBitwiseAnd %uint %945 %494
+        %956 = OpBitwiseAnd %uint %951 %504
+        %957 = OpBitwiseOr %uint %955 %956
+        %958 = OpBitwiseAnd %uint %946 %494
+        %959 = OpBitwiseAnd %uint %954 %504
+        %960 = OpBitwiseOr %uint %958 %959
+        %961 = OpGroupNonUniformShuffleXor %uint %uint_3 %957 %uint_8
+        %962 = OpGroupNonUniformShuffleXor %uint %uint_3 %960 %uint_8
+        %963 = OpShiftRightLogical %uint %961 %517
+        %964 = OpShiftLeftLogical %uint %961 %519
+        %965 = OpBitwiseOr %uint %963 %964
+        %966 = OpShiftRightLogical %uint %962 %517
+        %967 = OpShiftLeftLogical %uint %962 %519
+        %968 = OpBitwiseOr %uint %966 %967
+        %969 = OpBitwiseAnd %uint %957 %516
+        %970 = OpBitwiseAnd %uint %965 %526
+        %971 = OpBitwiseOr %uint %969 %970
+        %972 = OpBitwiseAnd %uint %960 %516
+        %973 = OpBitwiseAnd %uint %968 %526
+        %974 = OpBitwiseOr %uint %972 %973
+        %975 = OpGroupNonUniformShuffleXor %uint %uint_3 %971 %uint_4
+        %976 = OpGroupNonUniformShuffleXor %uint %uint_3 %974 %uint_4
+        %977 = OpShiftRightLogical %uint %975 %540
+        %978 = OpShiftLeftLogical %uint %975 %542
+        %979 = OpBitwiseOr %uint %977 %978
+        %980 = OpShiftRightLogical %uint %976 %540
+        %981 = OpShiftLeftLogical %uint %976 %542
+        %982 = OpBitwiseOr %uint %980 %981
+        %983 = OpBitwiseAnd %uint %971 %538
+        %984 = OpBitwiseAnd %uint %979 %549
+        %985 = OpBitwiseOr %uint %983 %984
+        %986 = OpBitwiseAnd %uint %974 %538
+        %987 = OpBitwiseAnd %uint %982 %549
+        %988 = OpBitwiseOr %uint %986 %987
+        %989 = OpGroupNonUniformShuffleXor %uint %uint_3 %985 %uint_2
+        %990 = OpGroupNonUniformShuffleXor %uint %uint_3 %988 %uint_2
+        %991 = OpShiftRightLogical %uint %989 %563
+        %992 = OpShiftLeftLogical %uint %989 %565
+        %993 = OpBitwiseOr %uint %991 %992
+        %994 = OpShiftRightLogical %uint %990 %563
+        %995 = OpShiftLeftLogical %uint %990 %565
+        %996 = OpBitwiseOr %uint %994 %995
+        %997 = OpBitwiseAnd %uint %985 %561
+        %998 = OpBitwiseAnd %uint %993 %572
+        %999 = OpBitwiseOr %uint %997 %998
+       %1000 = OpBitwiseAnd %uint %988 %561
+       %1001 = OpBitwiseAnd %uint %996 %572
+       %1002 = OpBitwiseOr %uint %1000 %1001
+       %1003 = OpGroupNonUniformShuffleXor %uint %uint_3 %999 %uint_1
+       %1004 = OpGroupNonUniformShuffleXor %uint %uint_3 %1002 %uint_1
+       %1005 = OpShiftRightLogical %uint %1003 %585
+       %1006 = OpShiftLeftLogical %uint %1003 %587
+       %1007 = OpBitwiseOr %uint %1005 %1006
+       %1008 = OpShiftRightLogical %uint %1004 %585
+       %1009 = OpShiftLeftLogical %uint %1004 %587
+       %1010 = OpBitwiseOr %uint %1008 %1009
+       %1011 = OpBitwiseAnd %uint %999 %584
+       %1012 = OpBitwiseAnd %uint %1007 %594
+       %1013 = OpBitwiseOr %uint %1011 %1012
+       %1014 = OpBitwiseAnd %uint %1002 %584
+       %1015 = OpBitwiseAnd %uint %1010 %594
+       %1016 = OpBitwiseOr %uint %1014 %1015
+       %1017 = OpExtInst %uint %81 UMin %398 %867
+       %1018 = OpISub %uint %398 %1017
+       %1019 = OpExtInst %uint %81 UMin %uint_64 %1018
+       %1020 = OpUGreaterThanEqual %bool %1019 %uint_32
+       %1021 = OpExtInst %uint %81 UMin %1019 %uint_31
+       %1022 = OpShiftLeftLogical %uint %uint_1 %1021
+       %1023 = OpISub %uint %1022 %uint_1
+       %1024 = OpSelect %uint %1020 %uint_4294967295 %1023
+       %1025 = OpUGreaterThanEqual %bool %1019 %uint_64
+       %1026 = OpUGreaterThan %bool %1019 %uint_32
+       %1027 = OpExtInst %uint %81 UMin %1019 %uint_32
+       %1028 = OpISub %uint %1019 %1027
+       %1029 = OpBitwiseAnd %uint %1028 %uint_31
+       %1030 = OpShiftLeftLogical %uint %uint_1 %1029
+       %1031 = OpISub %uint %1030 %uint_1
+       %1032 = OpSelect %uint %1026 %1031 %uint_0
+       %1033 = OpSelect %uint %1025 %uint_4294967295 %1032
+               OpSelectionMerge %1036 None
+               OpBranchConditional %869 %1034 %1035
+       %1034 = OpLabel
+       %1037 = OpIEqual %bool %1013 %1024
+       %1038 = OpIEqual %bool %1016 %1033
+       %1039 = OpLogicalAnd %bool %1037 %1038
+       %1040 = OpGroupNonUniformBallot %v4uint %uint_3 %1039
+               OpSelectionMerge %1042 None
+               OpBranchConditional %67 %1041 %1042
+       %1041 = OpLabel
+       %1043 = OpCompositeExtract %uint %1040 0
+       %1044 = OpShiftLeftLogical %uint %866 %uint_1
+       %1045 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %1044
+       %1046 = OpAtomicAnd %uint %1045 %uint_2 %uint_264 %1043
+       %1047 = OpCompositeExtract %uint %1040 1
+       %1048 = OpIAdd %uint %1044 %uint_1
+       %1049 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %1048
+       %1050 = OpAtomicAnd %uint %1049 %uint_2 %uint_264 %1047
+               OpBranch %1042
+       %1042 = OpLabel
+               OpBranch %1036
+       %1036 = OpLabel
+       %1293 = OpPhi %uint %uint_0 %1035 %1016 %1042
+       %1286 = OpPhi %uint %uint_0 %1035 %1013 %1042
+       %1052 = OpShiftRightLogical %uint %1051 %uint_0
+       %1053 = OpBitwiseAnd %uint %1052 %uint_1
+       %1054 = OpINotEqual %bool %1053 %uint_0
+       %1055 = OpGroupNonUniformBallot %v4uint %uint_3 %1054
+       %1056 = OpLogicalAnd %bool %869 %67
+               OpSelectionMerge %1058 None
+               OpBranchConditional %1056 %1057 %1058
+       %1057 = OpLabel
+       %1059 = OpIAdd %uint %uint_1024 %866
+       %1060 = OpShiftLeftLogical %uint %1059 %uint_1
+       %1061 = OpCompositeExtract %uint %1055 0
+       %1062 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1060
+               OpStore %1062 %1061
+       %1063 = OpIAdd %uint %1060 %uint_1
+       %1064 = OpCompositeExtract %uint %1055 1
+       %1065 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1063
+               OpStore %1065 %1064
+       %1066 = OpIEqual %bool %1061 %1024
+       %1067 = OpIEqual %bool %1064 %1033
+       %1068 = OpLogicalAnd %bool %1066 %1067
+       %1069 = OpLogicalNot %bool %1068
+               OpSelectionMerge %1071 None
+               OpBranchConditional %1069 %1070 %1071
+       %1070 = OpLabel
+       %1072 = OpInBoundsAccessChain %_ptr_Workgroup_uint %52 %uint_0 %866
+       %1073 = OpAtomicAnd %uint %1072 %uint_2 %uint_264 %uint_4294967294
+               OpBranch %1071
+       %1071 = OpLabel
+               OpBranch %1058
+       %1058 = OpLabel
+       %1074 = OpIAdd %uint %76 %uint_12
+       %1075 = OpShiftLeftLogical %uint %1074 %uint_6
+       %1076 = OpIAdd %uint %1075 %65
+       %1077 = OpULessThan %bool %1074 %365
+       %1078 = OpULessThan %bool %1076 %398
+       %1079 = OpLogicalAnd %bool %1077 %1078
+               OpSelectionMerge %1082 None
+               OpBranchConditional %1079 %1080 %1081
+       %1080 = OpLabel
+       %1083 = OpShiftRightLogical %uint %1076 %uint_1
+       %1084 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %1083
+       %1085 = OpLoad %uint %1084
+       %1086 = OpBitwiseAnd %uint %1076 %uint_1
+       %1087 = OpShiftLeftLogical %uint %1086 %uint_4
+       %1088 = OpShiftRightLogical %uint %1085 %1087
+       %1089 = OpBitwiseAnd %uint %1088 %uint_65535
+       %1090 = OpIAdd %uint %128 %1089
+       %1091 = OpAccessChain %_ptr_StorageBuffer_v4uint %6 %uint_0 %1090
+       %1092 = OpLoad %v4uint %1091
+       %1093 = OpCompositeExtract %uint %1092 0
+       %1094 = OpUConvert %ulong %1093
+       %1095 = OpCompositeExtract %uint %1092 1
+       %1096 = OpUConvert %ulong %1095
+       %1097 = OpShiftLeftLogical %ulong %1096 %ulong_32
+       %1098 = OpBitwiseOr %ulong %1094 %1097
+       %1099 = OpCompositeExtract %uint %1092 3
+       %1100 = OpShiftRightLogical %uint %1099 %uint_25
+       %1101 = OpCompositeExtract %uint %1092 2
+       %1102 = OpBitwiseAnd %uint %1101 %uint_255
+       %1103 = OpShiftRightLogical %uint %1101 %uint_16
+       %1104 = OpBitwiseAnd %uint %1103 %uint_255
+       %1105 = OpIMul %uint %1104 %101
+       %1106 = OpIAdd %uint %1102 %1105
+       %1107 = OpUMod %uint %1106 %uint_65
+       %1108 = OpShiftRightLogical %uint %1101 %uint_8
+       %1109 = OpBitwiseAnd %uint %1108 %uint_255
+       %1110 = OpShiftRightLogical %uint %1101 %uint_24
+       %1111 = OpBitwiseAnd %uint %1110 %uint_255
+       %1112 = OpIMul %uint %1111 %101
+       %1113 = OpIAdd %uint %1109 %1112
+       %1114 = OpUMod %uint %1113 %uint_65
+       %1115 = OpULessThan %bool %1107 %uint_64
+       %1116 = OpBitwiseAnd %uint %1107 %uint_63
+       %1117 = OpUConvert %ulong %1116
+       %1118 = OpShiftLeftLogical %ulong %ulong_1 %1117
+       %1119 = OpSelect %ulong %1115 %1118 %ulong_0
+       %1120 = OpUGreaterThanEqual %bool %1107 %uint_64
+       %1121 = OpBitwiseAnd %uint %1107 %uint_31
+       %1122 = OpShiftLeftLogical %uint %uint_1 %1121
+       %1123 = OpSelect %uint %1120 %1122 %uint_0
+       %1124 = OpULessThan %bool %1114 %uint_64
+       %1125 = OpBitwiseAnd %uint %1114 %uint_63
+       %1126 = OpUConvert %ulong %1125
+       %1127 = OpShiftLeftLogical %ulong %ulong_1 %1126
+       %1128 = OpSelect %ulong %1124 %1127 %ulong_0
+       %1129 = OpUGreaterThanEqual %bool %1114 %uint_64
+       %1130 = OpBitwiseAnd %uint %1114 %uint_31
+       %1131 = OpShiftLeftLogical %uint %uint_1 %1130
+       %1132 = OpSelect %uint %1129 %1131 %uint_0
+       %1133 = OpBitwiseOr %ulong %1119 %1128
+       %1134 = OpBitwiseOr %uint %1123 %1132
+       %1135 = OpBitwiseOr %ulong %1098 %1133
+       %1136 = OpBitwiseOr %uint %1100 %1134
+       %1137 = OpIEqual %bool %1107 %1114
+       %1138 = OpBitwiseAnd %ulong %1098 %1133
+       %1139 = OpINotEqual %bool %1138 %ulong_0
+       %1140 = OpLogicalOr %bool %1137 %1139
+       %1141 = OpBitwiseAnd %uint %1100 %1134
+       %1142 = OpINotEqual %bool %1141 %uint_0
+       %1143 = OpLogicalOr %bool %1140 %1142
+       %1144 = OpSelect %ulong %1143 %ulong_0 %1135
+       %1145 = OpSelect %uint %1143 %uint_0 %1136
+               OpBranch %1082
+       %1082 = OpLabel
+       %1259 = OpPhi %uint %uint_0 %1081 %1145 %1080
+       %1146 = OpPhi %ulong %ulong_0 %1081 %1144 %1080
+       %1147 = OpBitwiseAnd %ulong %1146 %ulong_4294967295
+       %1148 = OpUConvert %uint %1147
+       %1149 = OpShiftRightLogical %ulong %1146 %ulong_32
+       %1150 = OpUConvert %uint %1149
+       %1151 = OpGroupNonUniformShuffleXor %uint %uint_3 %1148 %uint_32
+       %1152 = OpGroupNonUniformShuffleXor %uint %uint_3 %1150 %uint_32
+       %1153 = OpSelect %uint %486 %1152 %1148
+       %1154 = OpSelect %uint %486 %1150 %1151
+       %1155 = OpGroupNonUniformShuffleXor %uint %uint_3 %1153 %uint_16
+       %1156 = OpGroupNonUniformShuffleXor %uint %uint_3 %1154 %uint_16
+       %1157 = OpShiftRightLogical %uint %1155 %495
+       %1158 = OpShiftLeftLogical %uint %1155 %497
+       %1159 = OpBitwiseOr %uint %1157 %1158
+       %1160 = OpShiftRightLogical %uint %1156 %495
+       %1161 = OpShiftLeftLogical %uint %1156 %497
+       %1162 = OpBitwiseOr %uint %1160 %1161
+       %1163 = OpBitwiseAnd %uint %1153 %494
+       %1164 = OpBitwiseAnd %uint %1159 %504
+       %1165 = OpBitwiseOr %uint %1163 %1164
+       %1166 = OpBitwiseAnd %uint %1154 %494
+       %1167 = OpBitwiseAnd %uint %1162 %504
+       %1168 = OpBitwiseOr %uint %1166 %1167
+       %1169 = OpGroupNonUniformShuffleXor %uint %uint_3 %1165 %uint_8
+       %1170 = OpGroupNonUniformShuffleXor %uint %uint_3 %1168 %uint_8
+       %1171 = OpShiftRightLogical %uint %1169 %517
+       %1172 = OpShiftLeftLogical %uint %1169 %519
+       %1173 = OpBitwiseOr %uint %1171 %1172
+       %1174 = OpShiftRightLogical %uint %1170 %517
+       %1175 = OpShiftLeftLogical %uint %1170 %519
+       %1176 = OpBitwiseOr %uint %1174 %1175
+       %1177 = OpBitwiseAnd %uint %1165 %516
+       %1178 = OpBitwiseAnd %uint %1173 %526
+       %1179 = OpBitwiseOr %uint %1177 %1178
+       %1180 = OpBitwiseAnd %uint %1168 %516
+       %1181 = OpBitwiseAnd %uint %1176 %526
+       %1182 = OpBitwiseOr %uint %1180 %1181
+       %1183 = OpGroupNonUniformShuffleXor %uint %uint_3 %1179 %uint_4
+       %1184 = OpGroupNonUniformShuffleXor %uint %uint_3 %1182 %uint_4
+       %1185 = OpShiftRightLogical %uint %1183 %540
+       %1186 = OpShiftLeftLogical %uint %1183 %542
+       %1187 = OpBitwiseOr %uint %1185 %1186
+       %1188 = OpShiftRightLogical %uint %1184 %540
+       %1189 = OpShiftLeftLogical %uint %1184 %542
+       %1190 = OpBitwiseOr %uint %1188 %1189
+       %1191 = OpBitwiseAnd %uint %1179 %538
+       %1192 = OpBitwiseAnd %uint %1187 %549
+       %1193 = OpBitwiseOr %uint %1191 %1192
+       %1194 = OpBitwiseAnd %uint %1182 %538
+       %1195 = OpBitwiseAnd %uint %1190 %549
+       %1196 = OpBitwiseOr %uint %1194 %1195
+       %1197 = OpGroupNonUniformShuffleXor %uint %uint_3 %1193 %uint_2
+       %1198 = OpGroupNonUniformShuffleXor %uint %uint_3 %1196 %uint_2
+       %1199 = OpShiftRightLogical %uint %1197 %563
+       %1200 = OpShiftLeftLogical %uint %1197 %565
+       %1201 = OpBitwiseOr %uint %1199 %1200
+       %1202 = OpShiftRightLogical %uint %1198 %563
+       %1203 = OpShiftLeftLogical %uint %1198 %565
+       %1204 = OpBitwiseOr %uint %1202 %1203
+       %1205 = OpBitwiseAnd %uint %1193 %561
+       %1206 = OpBitwiseAnd %uint %1201 %572
+       %1207 = OpBitwiseOr %uint %1205 %1206
+       %1208 = OpBitwiseAnd %uint %1196 %561
+       %1209 = OpBitwiseAnd %uint %1204 %572
+       %1210 = OpBitwiseOr %uint %1208 %1209
+       %1211 = OpGroupNonUniformShuffleXor %uint %uint_3 %1207 %uint_1
+       %1212 = OpGroupNonUniformShuffleXor %uint %uint_3 %1210 %uint_1
+       %1213 = OpShiftRightLogical %uint %1211 %585
+       %1214 = OpShiftLeftLogical %uint %1211 %587
+       %1215 = OpBitwiseOr %uint %1213 %1214
+       %1216 = OpShiftRightLogical %uint %1212 %585
+       %1217 = OpShiftLeftLogical %uint %1212 %587
+       %1218 = OpBitwiseOr %uint %1216 %1217
+       %1219 = OpBitwiseAnd %uint %1207 %584
+       %1220 = OpBitwiseAnd %uint %1215 %594
+       %1221 = OpBitwiseOr %uint %1219 %1220
+       %1222 = OpBitwiseAnd %uint %1210 %584
+       %1223 = OpBitwiseAnd %uint %1218 %594
+       %1224 = OpBitwiseOr %uint %1222 %1223
+       %1225 = OpExtInst %uint %81 UMin %398 %1075
+       %1226 = OpISub %uint %398 %1225
+       %1227 = OpExtInst %uint %81 UMin %uint_64 %1226
+       %1228 = OpUGreaterThanEqual %bool %1227 %uint_32
+       %1229 = OpExtInst %uint %81 UMin %1227 %uint_31
+       %1230 = OpShiftLeftLogical %uint %uint_1 %1229
+       %1231 = OpISub %uint %1230 %uint_1
+       %1232 = OpSelect %uint %1228 %uint_4294967295 %1231
+       %1233 = OpUGreaterThanEqual %bool %1227 %uint_64
+       %1234 = OpUGreaterThan %bool %1227 %uint_32
+       %1235 = OpExtInst %uint %81 UMin %1227 %uint_32
+       %1236 = OpISub %uint %1227 %1235
+       %1237 = OpBitwiseAnd %uint %1236 %uint_31
+       %1238 = OpShiftLeftLogical %uint %uint_1 %1237
+       %1239 = OpISub %uint %1238 %uint_1
+       %1240 = OpSelect %uint %1234 %1239 %uint_0
+       %1241 = OpSelect %uint %1233 %uint_4294967295 %1240
+               OpSelectionMerge %1244 None
+               OpBranchConditional %1077 %1242 %1243
+       %1242 = OpLabel
+       %1245 = OpIEqual %bool %1221 %1232
+       %1246 = OpIEqual %bool %1224 %1241
+       %1247 = OpLogicalAnd %bool %1245 %1246
+       %1248 = OpGroupNonUniformBallot %v4uint %uint_3 %1247
+               OpSelectionMerge %1250 None
+               OpBranchConditional %67 %1249 %1250
+       %1249 = OpLabel
+       %1251 = OpCompositeExtract %uint %1248 0
+       %1252 = OpShiftLeftLogical %uint %1074 %uint_1
+       %1253 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %1252
+       %1254 = OpAtomicAnd %uint %1253 %uint_2 %uint_264 %1251
+       %1255 = OpCompositeExtract %uint %1248 1
+       %1256 = OpIAdd %uint %1252 %uint_1
+       %1257 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %1256
+       %1258 = OpAtomicAnd %uint %1257 %uint_2 %uint_264 %1255
+               OpBranch %1250
+       %1250 = OpLabel
+               OpBranch %1244
+       %1244 = OpLabel
+       %1294 = OpPhi %uint %uint_0 %1243 %1224 %1250
+       %1287 = OpPhi %uint %uint_0 %1243 %1221 %1250
+       %1260 = OpShiftRightLogical %uint %1259 %uint_0
+       %1261 = OpBitwiseAnd %uint %1260 %uint_1
+       %1262 = OpINotEqual %bool %1261 %uint_0
+       %1263 = OpGroupNonUniformBallot %v4uint %uint_3 %1262
+       %1264 = OpLogicalAnd %bool %1077 %67
+               OpSelectionMerge %1266 None
+               OpBranchConditional %1264 %1265 %1266
+       %1265 = OpLabel
+       %1267 = OpIAdd %uint %uint_1024 %1074
+       %1268 = OpShiftLeftLogical %uint %1267 %uint_1
+       %1269 = OpCompositeExtract %uint %1263 0
+       %1270 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1268
+               OpStore %1270 %1269
+       %1271 = OpIAdd %uint %1268 %uint_1
+       %1272 = OpCompositeExtract %uint %1263 1
+       %1273 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1271
+               OpStore %1273 %1272
+       %1274 = OpIEqual %bool %1269 %1232
+       %1275 = OpIEqual %bool %1272 %1241
+       %1276 = OpLogicalAnd %bool %1274 %1275
+       %1277 = OpLogicalNot %bool %1276
+               OpSelectionMerge %1279 None
+               OpBranchConditional %1277 %1278 %1279
+       %1278 = OpLabel
+       %1280 = OpInBoundsAccessChain %_ptr_Workgroup_uint %52 %uint_0 %1074
+       %1281 = OpAtomicAnd %uint %1280 %uint_2 %uint_264 %uint_4294967294
+               OpBranch %1279
+       %1279 = OpLabel
+               OpBranch %1266
+       %1266 = OpLabel
+       %1282 = OpBitwiseAnd %uint %65 %uint_3
+       %1283 = OpIEqual %bool %1282 %uint_0
+       %1284 = OpIEqual %bool %1282 %uint_1
+       %1285 = OpIEqual %bool %1282 %uint_2
+       %1288 = OpSelect %uint %1285 %1286 %1287
+       %1290 = OpSelect %uint %1284 %1289 %1288
+       %1292 = OpSelect %uint %1283 %1291 %1290
+       %1295 = OpSelect %uint %1285 %1293 %1294
+       %1297 = OpSelect %uint %1284 %1296 %1295
+       %1299 = OpSelect %uint %1283 %1298 %1297
+       %1300 = OpShiftLeftLogical %uint %1282 %uint_2
+       %1301 = OpIAdd %uint %76 %1300
+       %1302 = OpULessThan %bool %1301 %365
+               OpSelectionMerge %1304 None
+               OpBranchConditional %1302 %1303 %1304
+       %1303 = OpLabel
+       %1305 = OpShiftLeftLogical %uint %65 %uint_4
+       %1306 = OpIAdd %uint %1305 %1301
+       %1307 = OpShiftLeftLogical %uint %1306 %uint_1
+       %1308 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1307
+               OpStore %1308 %1292
+       %1309 = OpIAdd %uint %1307 %uint_1
+       %1310 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1309
+               OpStore %1310 %1299
+               OpBranch %1304
+       %1304 = OpLabel
+       %1311 = OpIAdd %uint %65 %uint_1
+       %1312 = OpBitwiseAnd %uint %1311 %uint_3
+       %1313 = OpIEqual %bool %1312 %uint_0
+       %1314 = OpIEqual %bool %1312 %uint_1
+       %1315 = OpIEqual %bool %1312 %uint_2
+       %1316 = OpSelect %uint %1315 %1286 %1287
+       %1317 = OpSelect %uint %1314 %1289 %1316
+       %1318 = OpSelect %uint %1313 %1291 %1317
+       %1319 = OpSelect %uint %1315 %1293 %1294
+       %1320 = OpSelect %uint %1314 %1296 %1319
+       %1321 = OpSelect %uint %1313 %1298 %1320
+       %1322 = OpShiftLeftLogical %uint %1312 %uint_2
+       %1323 = OpIAdd %uint %76 %1322
+       %1324 = OpULessThan %bool %1323 %365
+               OpSelectionMerge %1326 None
+               OpBranchConditional %1324 %1325 %1326
+       %1325 = OpLabel
+       %1327 = OpShiftLeftLogical %uint %65 %uint_4
+       %1328 = OpIAdd %uint %1327 %1323
+       %1329 = OpShiftLeftLogical %uint %1328 %uint_1
+       %1330 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1329
+               OpStore %1330 %1318
+       %1331 = OpIAdd %uint %1329 %uint_1
+       %1332 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1331
+               OpStore %1332 %1321
+               OpBranch %1326
+       %1326 = OpLabel
+       %1333 = OpIAdd %uint %65 %uint_2
+       %1334 = OpBitwiseAnd %uint %1333 %uint_3
+       %1335 = OpIEqual %bool %1334 %uint_0
+       %1336 = OpIEqual %bool %1334 %uint_1
+       %1337 = OpIEqual %bool %1334 %uint_2
+       %1338 = OpSelect %uint %1337 %1286 %1287
+       %1339 = OpSelect %uint %1336 %1289 %1338
+       %1340 = OpSelect %uint %1335 %1291 %1339
+       %1341 = OpSelect %uint %1337 %1293 %1294
+       %1342 = OpSelect %uint %1336 %1296 %1341
+       %1343 = OpSelect %uint %1335 %1298 %1342
+       %1344 = OpShiftLeftLogical %uint %1334 %uint_2
+       %1345 = OpIAdd %uint %76 %1344
+       %1346 = OpULessThan %bool %1345 %365
+               OpSelectionMerge %1348 None
+               OpBranchConditional %1346 %1347 %1348
+       %1347 = OpLabel
+       %1349 = OpShiftLeftLogical %uint %65 %uint_4
+       %1350 = OpIAdd %uint %1349 %1345
+       %1351 = OpShiftLeftLogical %uint %1350 %uint_1
+       %1352 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1351
+               OpStore %1352 %1340
+       %1353 = OpIAdd %uint %1351 %uint_1
+       %1354 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1353
+               OpStore %1354 %1343
+               OpBranch %1348
+       %1348 = OpLabel
+       %1355 = OpIAdd %uint %65 %uint_3
+       %1356 = OpBitwiseAnd %uint %1355 %uint_3
+       %1357 = OpIEqual %bool %1356 %uint_0
+       %1358 = OpIEqual %bool %1356 %uint_1
+       %1359 = OpIEqual %bool %1356 %uint_2
+       %1360 = OpSelect %uint %1359 %1286 %1287
+       %1361 = OpSelect %uint %1358 %1289 %1360
+       %1362 = OpSelect %uint %1357 %1291 %1361
+       %1363 = OpSelect %uint %1359 %1293 %1294
+       %1364 = OpSelect %uint %1358 %1296 %1363
+       %1365 = OpSelect %uint %1357 %1298 %1364
+       %1366 = OpShiftLeftLogical %uint %1356 %uint_2
+       %1367 = OpIAdd %uint %76 %1366
+       %1368 = OpULessThan %bool %1367 %365
+               OpSelectionMerge %1370 None
+               OpBranchConditional %1368 %1369 %1370
+       %1369 = OpLabel
+       %1371 = OpShiftLeftLogical %uint %65 %uint_4
+       %1372 = OpIAdd %uint %1371 %1367
+       %1373 = OpShiftLeftLogical %uint %1372 %uint_1
+       %1374 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1373
+               OpStore %1374 %1362
+       %1375 = OpIAdd %uint %1373 %uint_1
+       %1376 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1375
+               OpStore %1376 %1365
+               OpBranch %1370
+       %1370 = OpLabel
+        %383 = OpISub %uint %342 %398
+       %1377 = OpULessThan %bool %72 %383
+               OpSelectionMerge %1380 None
+               OpBranchConditional %1377 %1378 %1379
+       %1378 = OpLabel
+       %1381 = OpIAdd %uint %398 %72
+       %1382 = OpShiftRightLogical %uint %1381 %uint_1
+       %1383 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %1382
+       %1384 = OpLoad %uint %1383
+       %1385 = OpBitwiseAnd %uint %1381 %uint_1
+       %1386 = OpShiftLeftLogical %uint %1385 %uint_4
+       %1387 = OpShiftRightLogical %uint %1384 %1386
+       %1388 = OpBitwiseAnd %uint %1387 %uint_65535
+               OpBranch %1380
+       %1380 = OpLabel
+       %1522 = OpPhi %uint %uint_0 %1379 %1388 %1378
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+       %1389 = OpULessThan %bool %72 %uint_65
+               OpSelectionMerge %1391 None
+               OpBranchConditional %1389 %1390 %1391
+       %1390 = OpLabel
+               OpBranch %1392
+       %1392 = OpLabel
+       %1393 = OpPhi %uint %1415 %1396 %uint_0 %1390
+       %1413 = OpPhi %uint %1414 %1396 %uint_0 %1390
+       %1394 = OpULessThan %bool %1393 %365
+               OpLoopMerge %1397 %1396 None
+               OpBranchConditional %1394 %1395 %1397
+       %1395 = OpLabel
+       %1398 = OpULessThan %bool %72 %uint_64
+               OpSelectionMerge %1401 None
+               OpBranchConditional %1398 %1399 %1400
+       %1399 = OpLabel
+       %1402 = OpShiftLeftLogical %uint %1393 %uint_1
+       %1404 = OpShiftRightLogical %uint %72 %uint_5
+       %1405 = OpIAdd %uint %1402 %1404
+       %1406 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %1405
+       %1407 = OpAtomicLoad %uint %1406 %uint_2 %uint_258
+               OpBranch %1401
+       %1401 = OpLabel
+       %1409 = OpPhi %uint %1416 %1400 %1407 %1399
+       %1408 = OpBitwiseAnd %uint %72 %uint_31
+       %1410 = OpShiftRightLogical %uint %1409 %1408
+       %1411 = OpBitwiseAnd %uint %1410 %uint_1
+       %1412 = OpShiftLeftLogical %uint %1411 %1393
+       %1414 = OpBitwiseOr %uint %1413 %1412
+       %1415 = OpIAdd %uint %1393 %uint_1
+               OpBranch %1396
+       %1396 = OpLabel
+               OpBranch %1392
+       %1400 = OpLabel
+       %1417 = OpInBoundsAccessChain %_ptr_Workgroup_uint %52 %uint_0 %1393
+       %1416 = OpAtomicLoad %uint %1417 %uint_2 %uint_258
+               OpBranch %1401
+       %1397 = OpLabel
+       %1418 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %72
+               OpStore %1418 %1413
+               OpBranch %1391
+       %1391 = OpLabel
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+       %1419 = OpShiftLeftLogical %uint %uint_1 %365
+       %1420 = OpISub %uint %1419 %uint_1
+               OpBranch %1421
+       %1421 = OpLabel
+        %394 = OpPhi %uint %2558 %1423 %274 %1391
+       %1425 = OpPhi %uint %2568 %1423 %72 %1391
+               OpLoopMerge %1424 %1423 None
+               OpBranch %1422
+       %1422 = OpLabel
+       %1426 = OpULessThan %bool %1425 %244
+       %1427 = OpLogicalNot %bool %1426
+               OpBranchConditional %1427 %1424 %1428
+       %1424 = OpLabel
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+       %1429 = OpInBoundsAccessChain %_ptr_Workgroup_uint %58 %uint_0 %uint_0
+       %1430 = OpAtomicLoad %uint %1429 %uint_2 %uint_258
+       %1432 = OpBitwiseAnd %uint %72 %uint_15
+       %1433 = OpShiftRightLogical %uint %72 %uint_2
+       %1434 = OpBitwiseXor %uint %1432 %uint_0
+       %1435 = OpULessThan %bool %1434 %365
+       %1436 = OpShiftLeftLogical %uint %1434 %uint_6
+       %1437 = OpExtInst %uint %81 UMin %398 %1436
+       %1438 = OpISub %uint %398 %1437
+       %1439 = OpExtInst %uint %81 UMin %uint_64 %1438
+       %1440 = OpSelect %uint %1435 %1439 %uint_0
+       %1441 = OpUGreaterThanEqual %bool %1440 %uint_32
+       %1442 = OpBitwiseAnd %uint %1440 %uint_31
+       %1443 = OpShiftLeftLogical %uint %uint_1 %1442
+       %1444 = OpISub %uint %1443 %uint_1
+       %1445 = OpSelect %uint %1441 %uint_4294967295 %1444
+       %1446 = OpIEqual %bool %1440 %uint_64
+       %1447 = OpUGreaterThan %bool %1440 %uint_32
+       %1448 = OpSelect %uint %1447 %1444 %uint_0
+       %1449 = OpSelect %uint %1446 %uint_4294967295 %1448
+       %1450 = OpBitwiseXor %uint %1432 %uint_4
+       %1451 = OpULessThan %bool %1450 %365
+       %1452 = OpShiftLeftLogical %uint %1450 %uint_6
+       %1453 = OpExtInst %uint %81 UMin %398 %1452
+       %1454 = OpISub %uint %398 %1453
+       %1455 = OpExtInst %uint %81 UMin %uint_64 %1454
+       %1456 = OpSelect %uint %1451 %1455 %uint_0
+       %1457 = OpUGreaterThanEqual %bool %1456 %uint_32
+       %1458 = OpBitwiseAnd %uint %1456 %uint_31
+       %1459 = OpShiftLeftLogical %uint %uint_1 %1458
+       %1460 = OpISub %uint %1459 %uint_1
+       %1461 = OpSelect %uint %1457 %uint_4294967295 %1460
+       %1462 = OpIEqual %bool %1456 %uint_64
+       %1463 = OpUGreaterThan %bool %1456 %uint_32
+       %1464 = OpSelect %uint %1463 %1460 %uint_0
+       %1465 = OpSelect %uint %1462 %uint_4294967295 %1464
+       %1466 = OpBitwiseXor %uint %1432 %uint_8
+       %1467 = OpULessThan %bool %1466 %365
+       %1468 = OpShiftLeftLogical %uint %1466 %uint_6
+       %1469 = OpExtInst %uint %81 UMin %398 %1468
+       %1470 = OpISub %uint %398 %1469
+       %1471 = OpExtInst %uint %81 UMin %uint_64 %1470
+       %1472 = OpSelect %uint %1467 %1471 %uint_0
+       %1473 = OpUGreaterThanEqual %bool %1472 %uint_32
+       %1474 = OpBitwiseAnd %uint %1472 %uint_31
+       %1475 = OpShiftLeftLogical %uint %uint_1 %1474
+       %1476 = OpISub %uint %1475 %uint_1
+       %1477 = OpSelect %uint %1473 %uint_4294967295 %1476
+       %1478 = OpIEqual %bool %1472 %uint_64
+       %1479 = OpUGreaterThan %bool %1472 %uint_32
+       %1480 = OpSelect %uint %1479 %1476 %uint_0
+       %1481 = OpSelect %uint %1478 %uint_4294967295 %1480
+       %1482 = OpBitwiseXor %uint %1432 %uint_12
+       %1483 = OpULessThan %bool %1482 %365
+       %1484 = OpShiftLeftLogical %uint %1482 %uint_6
+       %1485 = OpExtInst %uint %81 UMin %398 %1484
+       %1486 = OpISub %uint %398 %1485
+       %1487 = OpExtInst %uint %81 UMin %uint_64 %1486
+       %1488 = OpSelect %uint %1483 %1487 %uint_0
+       %1489 = OpUGreaterThanEqual %bool %1488 %uint_32
+       %1490 = OpBitwiseAnd %uint %1488 %uint_31
+       %1491 = OpShiftLeftLogical %uint %uint_1 %1490
+       %1492 = OpISub %uint %1491 %uint_1
+       %1493 = OpSelect %uint %1489 %uint_4294967295 %1492
+       %1494 = OpIEqual %bool %1488 %uint_64
+       %1495 = OpUGreaterThan %bool %1488 %uint_32
+       %1496 = OpSelect %uint %1495 %1492 %uint_0
+       %1497 = OpSelect %uint %1494 %uint_4294967295 %1496
+       %1498 = OpShiftLeftLogical %uint %1432 %uint_1
+       %1499 = OpShiftLeftLogical %uint %1434 %uint_1
+       %1500 = OpISub %uint %1499 %1498
+       %1501 = OpShiftLeftLogical %uint %1450 %uint_1
+       %1502 = OpISub %uint %1501 %1498
+       %1503 = OpShiftLeftLogical %uint %1466 %uint_1
+       %1504 = OpISub %uint %1503 %1498
+       %1505 = OpShiftLeftLogical %uint %1482 %uint_1
+       %1506 = OpISub %uint %1505 %1498
+               OpBranch %1507
+       %1507 = OpLabel
+        %396 = OpPhi %uint %2452 %1509 %272 %1424
+       %1511 = OpPhi %uint %2447 %1509 %uint_0 %1424
+        %392 = OpPhi %bool %2450 %1509 %263 %1424
+        %388 = OpPhi %uint %2449 %1509 %267 %1424
+        %376 = OpPhi %uint %2454 %1509 %329 %1424
+        %372 = OpPhi %uint %2448 %1509 %285 %1424
+               OpLoopMerge %1510 %1509 None
+               OpBranch %1508
+       %1508 = OpLabel
+       %1512 = OpULessThan %bool %1511 %1430
+       %1513 = OpLogicalNot %bool %1512
+               OpBranchConditional %1513 %1510 %1514
+       %1510 = OpLabel
+               OpSelectionMerge %1517 None
+               OpBranchConditional %132 %1515 %1516
+       %1515 = OpLabel
+       %1518 = OpIMul %uint %244 %365
+       %1519 = OpIAdd %uint %325 %1518
+       %1520 = OpIAdd %uint %314 %365
+       %1521 = OpIAdd %uint %310 %398
+               OpBranch %1517
+       %1517 = OpLabel
+        %390 = OpPhi %uint %325 %1516 %1519 %1515
+        %381 = OpPhi %uint %310 %1516 %1521 %1515
+        %374 = OpPhi %uint %314 %1516 %1520 %1515
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+       %1523 = OpGroupNonUniformShuffleXor %uint %uint_3 %1522 %uint_1
+       %1524 = OpBitwiseAnd %uint %72 %uint_1
+       %1525 = OpIEqual %bool %1524 %uint_0
+       %1526 = OpLogicalAnd %bool %1377 %1525
+               OpSelectionMerge %1528 None
+               OpBranchConditional %1526 %1527 %1528
+       %1527 = OpLabel
+       %1529 = OpShiftRightLogical %uint %72 %uint_1
+       %1530 = OpIAdd %uint %72 %uint_1
+       %1531 = OpULessThan %bool %1530 %383
+       %1532 = OpShiftLeftLogical %uint %1523 %uint_16
+       %1533 = OpSelect %uint %1531 %1532 %uint_0
+       %1534 = OpBitwiseOr %uint %1522 %1533
+       %1535 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %1529
+               OpStore %1535 %1534
+               OpBranch %1528
+       %1528 = OpLabel
+               OpSelectionMerge %1537 None
+               OpBranchConditional %132 %1536 %1537
+       %1536 = OpLabel
+       %1538 = OpInBoundsAccessChain %_ptr_Workgroup_uint %58 %uint_0 %uint_0
+               OpAtomicStore %1538 %uint_2 %uint_260 %uint_0
+               OpBranch %1537
+       %1537 = OpLabel
+       %1539 = OpUGreaterThanEqual %bool %72 %uint_32
+       %1540 = OpULessThan %bool %72 %uint_64
+       %1541 = OpLogicalAnd %bool %1539 %1540
+               OpSelectionMerge %1543 None
+               OpBranchConditional %1541 %1542 %1543
+       %1542 = OpLabel
+       %1544 = OpISub %uint %72 %uint_32
+       %1545 = OpInBoundsAccessChain %_ptr_Workgroup_uint %51 %uint_0 %1544
+               OpAtomicStore %1545 %uint_2 %uint_260 %uint_4294967295
+               OpBranch %1543
+       %1543 = OpLabel
+       %1546 = OpUGreaterThanEqual %bool %72 %uint_64
+       %1548 = OpULessThan %bool %72 %uint_96
+       %1549 = OpLogicalAnd %bool %1546 %1548
+               OpSelectionMerge %371 None
+               OpBranchConditional %1549 %1550 %371
+       %1550 = OpLabel
+       %1551 = OpISub %uint %72 %uint_64
+       %1552 = OpInBoundsAccessChain %_ptr_Workgroup_uint %52 %uint_0 %1551
+               OpAtomicStore %1552 %uint_2 %uint_260 %uint_4294967295
+               OpBranch %371
+        %371 = OpLabel
+        %385 = OpIAdd %uint %386 %398
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+       %1553 = OpIEqual %bool %383 %uint_0
+       %1554 = OpLogicalAnd %bool %361 %1553
+        %378 = OpSelect %bool %1554 %false_0 %260
+               OpBranch %369
+       %1516 = OpLabel
+               OpBranch %1517
+       %1514 = OpLabel
+       %1556 = OpIAdd %uint %1511 %1433
+       %1557 = OpULessThan %bool %1556 %1430
+       %1558 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %1556
+       %1559 = OpLoad %uint %1558
+       %1560 = OpSelect %uint %1557 %1559 %uint_0
+       %1561 = OpBitwiseAnd %uint %1560 %uint_65535
+       %1562 = OpShiftRightLogical %uint %1561 %uint_4
+       %1564 = OpAccessChain %_ptr_Workgroup_v4uint %57 %uint_0 %1562
+       %1565 = OpLoad %v4uint %1564
+       %1566 = OpCompositeExtract %uint %1565 0
+       %1567 = OpShiftRightLogical %uint %1566 %uint_0
+       %1569 = OpBitwiseAnd %uint %1567 %uint_127
+       %1570 = OpShiftLeftLogical %uint %1569 %uint_5
+       %1571 = OpIAdd %uint %1570 %1498
+       %1572 = OpIAdd %uint %1571 %1500
+       %1573 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1572
+       %1574 = OpLoad %uint %1573
+       %1575 = OpBitwiseOr %uint %uint_0 %1574
+       %1576 = OpIAdd %uint %1572 %uint_1
+       %1577 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1576
+       %1578 = OpLoad %uint %1577
+       %1579 = OpBitwiseOr %uint %uint_0 %1578
+       %1580 = OpIAdd %uint %1571 %1502
+       %1581 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1580
+       %1582 = OpLoad %uint %1581
+       %1583 = OpBitwiseOr %uint %uint_0 %1582
+       %1584 = OpIAdd %uint %1580 %uint_1
+       %1585 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1584
+       %1586 = OpLoad %uint %1585
+       %1587 = OpBitwiseOr %uint %uint_0 %1586
+       %1588 = OpIAdd %uint %1571 %1504
+       %1589 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1588
+       %1590 = OpLoad %uint %1589
+       %1591 = OpBitwiseOr %uint %uint_0 %1590
+       %1592 = OpIAdd %uint %1588 %uint_1
+       %1593 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1592
+       %1594 = OpLoad %uint %1593
+       %1595 = OpBitwiseOr %uint %uint_0 %1594
+       %1596 = OpIAdd %uint %1571 %1506
+       %1597 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1596
+       %1598 = OpLoad %uint %1597
+       %1599 = OpBitwiseOr %uint %uint_0 %1598
+       %1600 = OpIAdd %uint %1596 %uint_1
+       %1601 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1600
+       %1602 = OpLoad %uint %1601
+       %1603 = OpBitwiseOr %uint %uint_0 %1602
+       %1605 = OpShiftRightLogical %uint %1566 %uint_7
+       %1606 = OpBitwiseAnd %uint %1605 %uint_127
+       %1607 = OpShiftLeftLogical %uint %1606 %uint_5
+       %1608 = OpIAdd %uint %1607 %1498
+       %1609 = OpIAdd %uint %1608 %1500
+       %1610 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1609
+       %1611 = OpLoad %uint %1610
+       %1612 = OpBitwiseOr %uint %1575 %1611
+       %1613 = OpIAdd %uint %1609 %uint_1
+       %1614 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1613
+       %1615 = OpLoad %uint %1614
+       %1616 = OpBitwiseOr %uint %1579 %1615
+       %1617 = OpIAdd %uint %1608 %1502
+       %1618 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1617
+       %1619 = OpLoad %uint %1618
+       %1620 = OpBitwiseOr %uint %1583 %1619
+       %1621 = OpIAdd %uint %1617 %uint_1
+       %1622 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1621
+       %1623 = OpLoad %uint %1622
+       %1624 = OpBitwiseOr %uint %1587 %1623
+       %1625 = OpIAdd %uint %1608 %1504
+       %1626 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1625
+       %1627 = OpLoad %uint %1626
+       %1628 = OpBitwiseOr %uint %1591 %1627
+       %1629 = OpIAdd %uint %1625 %uint_1
+       %1630 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1629
+       %1631 = OpLoad %uint %1630
+       %1632 = OpBitwiseOr %uint %1595 %1631
+       %1633 = OpIAdd %uint %1608 %1506
+       %1634 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1633
+       %1635 = OpLoad %uint %1634
+       %1636 = OpBitwiseOr %uint %1599 %1635
+       %1637 = OpIAdd %uint %1633 %uint_1
+       %1638 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1637
+       %1639 = OpLoad %uint %1638
+       %1640 = OpBitwiseOr %uint %1603 %1639
+       %1642 = OpShiftRightLogical %uint %1566 %uint_14
+       %1643 = OpBitwiseAnd %uint %1642 %uint_127
+       %1644 = OpShiftLeftLogical %uint %1643 %uint_5
+       %1645 = OpIAdd %uint %1644 %1498
+       %1646 = OpIAdd %uint %1645 %1500
+       %1647 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1646
+       %1648 = OpLoad %uint %1647
+       %1649 = OpBitwiseOr %uint %1612 %1648
+       %1650 = OpIAdd %uint %1646 %uint_1
+       %1651 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1650
+       %1652 = OpLoad %uint %1651
+       %1653 = OpBitwiseOr %uint %1616 %1652
+       %1654 = OpIAdd %uint %1645 %1502
+       %1655 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1654
+       %1656 = OpLoad %uint %1655
+       %1657 = OpBitwiseOr %uint %1620 %1656
+       %1658 = OpIAdd %uint %1654 %uint_1
+       %1659 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1658
+       %1660 = OpLoad %uint %1659
+       %1661 = OpBitwiseOr %uint %1624 %1660
+       %1662 = OpIAdd %uint %1645 %1504
+       %1663 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1662
+       %1664 = OpLoad %uint %1663
+       %1665 = OpBitwiseOr %uint %1628 %1664
+       %1666 = OpIAdd %uint %1662 %uint_1
+       %1667 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1666
+       %1668 = OpLoad %uint %1667
+       %1669 = OpBitwiseOr %uint %1632 %1668
+       %1670 = OpIAdd %uint %1645 %1506
+       %1671 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1670
+       %1672 = OpLoad %uint %1671
+       %1673 = OpBitwiseOr %uint %1636 %1672
+       %1674 = OpIAdd %uint %1670 %uint_1
+       %1675 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1674
+       %1676 = OpLoad %uint %1675
+       %1677 = OpBitwiseOr %uint %1640 %1676
+       %1679 = OpShiftRightLogical %uint %1566 %uint_21
+       %1680 = OpBitwiseAnd %uint %1679 %uint_127
+       %1681 = OpShiftLeftLogical %uint %1680 %uint_5
+       %1682 = OpIAdd %uint %1681 %1498
+       %1683 = OpIAdd %uint %1682 %1500
+       %1684 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1683
+       %1685 = OpLoad %uint %1684
+       %1686 = OpBitwiseOr %uint %1649 %1685
+       %1687 = OpIAdd %uint %1683 %uint_1
+       %1688 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1687
+       %1689 = OpLoad %uint %1688
+       %1690 = OpBitwiseOr %uint %1653 %1689
+       %1691 = OpIAdd %uint %1682 %1502
+       %1692 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1691
+       %1693 = OpLoad %uint %1692
+       %1694 = OpBitwiseOr %uint %1657 %1693
+       %1695 = OpIAdd %uint %1691 %uint_1
+       %1696 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1695
+       %1697 = OpLoad %uint %1696
+       %1698 = OpBitwiseOr %uint %1661 %1697
+       %1699 = OpIAdd %uint %1682 %1504
+       %1700 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1699
+       %1701 = OpLoad %uint %1700
+       %1702 = OpBitwiseOr %uint %1665 %1701
+       %1703 = OpIAdd %uint %1699 %uint_1
+       %1704 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1703
+       %1705 = OpLoad %uint %1704
+       %1706 = OpBitwiseOr %uint %1669 %1705
+       %1707 = OpIAdd %uint %1682 %1506
+       %1708 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1707
+       %1709 = OpLoad %uint %1708
+       %1710 = OpBitwiseOr %uint %1673 %1709
+       %1711 = OpIAdd %uint %1707 %uint_1
+       %1712 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1711
+       %1713 = OpLoad %uint %1712
+       %1714 = OpBitwiseOr %uint %1677 %1713
+       %1715 = OpCompositeExtract %uint %1565 1
+       %1716 = OpShiftRightLogical %uint %1715 %uint_0
+       %1717 = OpBitwiseAnd %uint %1716 %uint_127
+       %1718 = OpShiftLeftLogical %uint %1717 %uint_5
+       %1719 = OpIAdd %uint %1718 %1498
+       %1720 = OpIAdd %uint %1719 %1500
+       %1721 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1720
+       %1722 = OpLoad %uint %1721
+       %1723 = OpBitwiseOr %uint %1686 %1722
+       %1724 = OpIAdd %uint %1720 %uint_1
+       %1725 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1724
+       %1726 = OpLoad %uint %1725
+       %1727 = OpBitwiseOr %uint %1690 %1726
+       %1728 = OpIAdd %uint %1719 %1502
+       %1729 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1728
+       %1730 = OpLoad %uint %1729
+       %1731 = OpBitwiseOr %uint %1694 %1730
+       %1732 = OpIAdd %uint %1728 %uint_1
+       %1733 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1732
+       %1734 = OpLoad %uint %1733
+       %1735 = OpBitwiseOr %uint %1698 %1734
+       %1736 = OpIAdd %uint %1719 %1504
+       %1737 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1736
+       %1738 = OpLoad %uint %1737
+       %1739 = OpBitwiseOr %uint %1702 %1738
+       %1740 = OpIAdd %uint %1736 %uint_1
+       %1741 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1740
+       %1742 = OpLoad %uint %1741
+       %1743 = OpBitwiseOr %uint %1706 %1742
+       %1744 = OpIAdd %uint %1719 %1506
+       %1745 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1744
+       %1746 = OpLoad %uint %1745
+       %1747 = OpBitwiseOr %uint %1710 %1746
+       %1748 = OpIAdd %uint %1744 %uint_1
+       %1749 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1748
+       %1750 = OpLoad %uint %1749
+       %1751 = OpBitwiseOr %uint %1714 %1750
+       %1752 = OpShiftRightLogical %uint %1715 %uint_7
+       %1753 = OpBitwiseAnd %uint %1752 %uint_127
+       %1754 = OpShiftLeftLogical %uint %1753 %uint_5
+       %1755 = OpIAdd %uint %1754 %1498
+       %1756 = OpIAdd %uint %1755 %1500
+       %1757 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1756
+       %1758 = OpLoad %uint %1757
+       %1759 = OpBitwiseOr %uint %1723 %1758
+       %1760 = OpIAdd %uint %1756 %uint_1
+       %1761 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1760
+       %1762 = OpLoad %uint %1761
+       %1763 = OpBitwiseOr %uint %1727 %1762
+       %1764 = OpIAdd %uint %1755 %1502
+       %1765 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1764
+       %1766 = OpLoad %uint %1765
+       %1767 = OpBitwiseOr %uint %1731 %1766
+       %1768 = OpIAdd %uint %1764 %uint_1
+       %1769 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1768
+       %1770 = OpLoad %uint %1769
+       %1771 = OpBitwiseOr %uint %1735 %1770
+       %1772 = OpIAdd %uint %1755 %1504
+       %1773 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1772
+       %1774 = OpLoad %uint %1773
+       %1775 = OpBitwiseOr %uint %1739 %1774
+       %1776 = OpIAdd %uint %1772 %uint_1
+       %1777 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1776
+       %1778 = OpLoad %uint %1777
+       %1779 = OpBitwiseOr %uint %1743 %1778
+       %1780 = OpIAdd %uint %1755 %1506
+       %1781 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1780
+       %1782 = OpLoad %uint %1781
+       %1783 = OpBitwiseOr %uint %1747 %1782
+       %1784 = OpIAdd %uint %1780 %uint_1
+       %1785 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1784
+       %1786 = OpLoad %uint %1785
+       %1787 = OpBitwiseOr %uint %1751 %1786
+       %1788 = OpShiftRightLogical %uint %1715 %uint_14
+       %1789 = OpBitwiseAnd %uint %1788 %uint_127
+       %1790 = OpShiftLeftLogical %uint %1789 %uint_5
+       %1791 = OpIAdd %uint %1790 %1498
+       %1792 = OpIAdd %uint %1791 %1500
+       %1793 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1792
+       %1794 = OpLoad %uint %1793
+       %1795 = OpBitwiseOr %uint %1759 %1794
+       %1796 = OpIAdd %uint %1792 %uint_1
+       %1797 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1796
+       %1798 = OpLoad %uint %1797
+       %1799 = OpBitwiseOr %uint %1763 %1798
+       %1800 = OpIAdd %uint %1791 %1502
+       %1801 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1800
+       %1802 = OpLoad %uint %1801
+       %1803 = OpBitwiseOr %uint %1767 %1802
+       %1804 = OpIAdd %uint %1800 %uint_1
+       %1805 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1804
+       %1806 = OpLoad %uint %1805
+       %1807 = OpBitwiseOr %uint %1771 %1806
+       %1808 = OpIAdd %uint %1791 %1504
+       %1809 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1808
+       %1810 = OpLoad %uint %1809
+       %1811 = OpBitwiseOr %uint %1775 %1810
+       %1812 = OpIAdd %uint %1808 %uint_1
+       %1813 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1812
+       %1814 = OpLoad %uint %1813
+       %1815 = OpBitwiseOr %uint %1779 %1814
+       %1816 = OpIAdd %uint %1791 %1506
+       %1817 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1816
+       %1818 = OpLoad %uint %1817
+       %1819 = OpBitwiseOr %uint %1783 %1818
+       %1820 = OpIAdd %uint %1816 %uint_1
+       %1821 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1820
+       %1822 = OpLoad %uint %1821
+       %1823 = OpBitwiseOr %uint %1787 %1822
+       %1824 = OpShiftRightLogical %uint %1715 %uint_21
+       %1825 = OpBitwiseAnd %uint %1824 %uint_127
+       %1826 = OpShiftLeftLogical %uint %1825 %uint_5
+       %1827 = OpIAdd %uint %1826 %1498
+       %1828 = OpIAdd %uint %1827 %1500
+       %1829 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1828
+       %1830 = OpLoad %uint %1829
+       %1831 = OpBitwiseOr %uint %1795 %1830
+       %1832 = OpIAdd %uint %1828 %uint_1
+       %1833 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1832
+       %1834 = OpLoad %uint %1833
+       %1835 = OpBitwiseOr %uint %1799 %1834
+       %1836 = OpIAdd %uint %1827 %1502
+       %1837 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1836
+       %1838 = OpLoad %uint %1837
+       %1839 = OpBitwiseOr %uint %1803 %1838
+       %1840 = OpIAdd %uint %1836 %uint_1
+       %1841 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1840
+       %1842 = OpLoad %uint %1841
+       %1843 = OpBitwiseOr %uint %1807 %1842
+       %1844 = OpIAdd %uint %1827 %1504
+       %1845 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1844
+       %1846 = OpLoad %uint %1845
+       %1847 = OpBitwiseOr %uint %1811 %1846
+       %1848 = OpIAdd %uint %1844 %uint_1
+       %1849 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1848
+       %1850 = OpLoad %uint %1849
+       %1851 = OpBitwiseOr %uint %1815 %1850
+       %1852 = OpIAdd %uint %1827 %1506
+       %1853 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1852
+       %1854 = OpLoad %uint %1853
+       %1855 = OpBitwiseOr %uint %1819 %1854
+       %1856 = OpIAdd %uint %1852 %uint_1
+       %1857 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1856
+       %1858 = OpLoad %uint %1857
+       %1859 = OpBitwiseOr %uint %1823 %1858
+       %1860 = OpCompositeExtract %uint %1565 2
+       %1861 = OpShiftRightLogical %uint %1860 %uint_0
+       %1862 = OpBitwiseAnd %uint %1861 %uint_127
+       %1863 = OpShiftLeftLogical %uint %1862 %uint_5
+       %1864 = OpIAdd %uint %1863 %1498
+       %1865 = OpIAdd %uint %1864 %1500
+       %1866 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1865
+       %1867 = OpLoad %uint %1866
+       %1868 = OpBitwiseOr %uint %1831 %1867
+       %1869 = OpIAdd %uint %1865 %uint_1
+       %1870 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1869
+       %1871 = OpLoad %uint %1870
+       %1872 = OpBitwiseOr %uint %1835 %1871
+       %1873 = OpIAdd %uint %1864 %1502
+       %1874 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1873
+       %1875 = OpLoad %uint %1874
+       %1876 = OpBitwiseOr %uint %1839 %1875
+       %1877 = OpIAdd %uint %1873 %uint_1
+       %1878 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1877
+       %1879 = OpLoad %uint %1878
+       %1880 = OpBitwiseOr %uint %1843 %1879
+       %1881 = OpIAdd %uint %1864 %1504
+       %1882 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1881
+       %1883 = OpLoad %uint %1882
+       %1884 = OpBitwiseOr %uint %1847 %1883
+       %1885 = OpIAdd %uint %1881 %uint_1
+       %1886 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1885
+       %1887 = OpLoad %uint %1886
+       %1888 = OpBitwiseOr %uint %1851 %1887
+       %1889 = OpIAdd %uint %1864 %1506
+       %1890 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1889
+       %1891 = OpLoad %uint %1890
+       %1892 = OpBitwiseOr %uint %1855 %1891
+       %1893 = OpIAdd %uint %1889 %uint_1
+       %1894 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1893
+       %1895 = OpLoad %uint %1894
+       %1896 = OpBitwiseOr %uint %1859 %1895
+       %1897 = OpShiftRightLogical %uint %1860 %uint_7
+       %1898 = OpBitwiseAnd %uint %1897 %uint_127
+       %1899 = OpShiftLeftLogical %uint %1898 %uint_5
+       %1900 = OpIAdd %uint %1899 %1498
+       %1901 = OpIAdd %uint %1900 %1500
+       %1902 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1901
+       %1903 = OpLoad %uint %1902
+       %1904 = OpBitwiseOr %uint %1868 %1903
+       %1905 = OpIAdd %uint %1901 %uint_1
+       %1906 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1905
+       %1907 = OpLoad %uint %1906
+       %1908 = OpBitwiseOr %uint %1872 %1907
+       %1909 = OpIAdd %uint %1900 %1502
+       %1910 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1909
+       %1911 = OpLoad %uint %1910
+       %1912 = OpBitwiseOr %uint %1876 %1911
+       %1913 = OpIAdd %uint %1909 %uint_1
+       %1914 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1913
+       %1915 = OpLoad %uint %1914
+       %1916 = OpBitwiseOr %uint %1880 %1915
+       %1917 = OpIAdd %uint %1900 %1504
+       %1918 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1917
+       %1919 = OpLoad %uint %1918
+       %1920 = OpBitwiseOr %uint %1884 %1919
+       %1921 = OpIAdd %uint %1917 %uint_1
+       %1922 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1921
+       %1923 = OpLoad %uint %1922
+       %1924 = OpBitwiseOr %uint %1888 %1923
+       %1925 = OpIAdd %uint %1900 %1506
+       %1926 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1925
+       %1927 = OpLoad %uint %1926
+       %1928 = OpBitwiseOr %uint %1892 %1927
+       %1929 = OpIAdd %uint %1925 %uint_1
+       %1930 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1929
+       %1931 = OpLoad %uint %1930
+       %1932 = OpBitwiseOr %uint %1896 %1931
+       %1933 = OpShiftRightLogical %uint %1860 %uint_14
+       %1934 = OpBitwiseAnd %uint %1933 %uint_127
+       %1935 = OpShiftLeftLogical %uint %1934 %uint_5
+       %1936 = OpIAdd %uint %1935 %1498
+       %1937 = OpIAdd %uint %1936 %1500
+       %1938 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1937
+       %1939 = OpLoad %uint %1938
+       %1940 = OpBitwiseOr %uint %1904 %1939
+       %1941 = OpIAdd %uint %1937 %uint_1
+       %1942 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1941
+       %1943 = OpLoad %uint %1942
+       %1944 = OpBitwiseOr %uint %1908 %1943
+       %1945 = OpIAdd %uint %1936 %1502
+       %1946 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1945
+       %1947 = OpLoad %uint %1946
+       %1948 = OpBitwiseOr %uint %1912 %1947
+       %1949 = OpIAdd %uint %1945 %uint_1
+       %1950 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1949
+       %1951 = OpLoad %uint %1950
+       %1952 = OpBitwiseOr %uint %1916 %1951
+       %1953 = OpIAdd %uint %1936 %1504
+       %1954 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1953
+       %1955 = OpLoad %uint %1954
+       %1956 = OpBitwiseOr %uint %1920 %1955
+       %1957 = OpIAdd %uint %1953 %uint_1
+       %1958 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1957
+       %1959 = OpLoad %uint %1958
+       %1960 = OpBitwiseOr %uint %1924 %1959
+       %1961 = OpIAdd %uint %1936 %1506
+       %1962 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1961
+       %1963 = OpLoad %uint %1962
+       %1964 = OpBitwiseOr %uint %1928 %1963
+       %1965 = OpIAdd %uint %1961 %uint_1
+       %1966 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1965
+       %1967 = OpLoad %uint %1966
+       %1968 = OpBitwiseOr %uint %1932 %1967
+       %1969 = OpShiftRightLogical %uint %1860 %uint_21
+       %1970 = OpBitwiseAnd %uint %1969 %uint_127
+       %1971 = OpShiftLeftLogical %uint %1970 %uint_5
+       %1972 = OpIAdd %uint %1971 %1498
+       %1973 = OpIAdd %uint %1972 %1500
+       %1974 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1973
+       %1975 = OpLoad %uint %1974
+       %1976 = OpBitwiseOr %uint %1940 %1975
+       %1977 = OpIAdd %uint %1973 %uint_1
+       %1978 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1977
+       %1979 = OpLoad %uint %1978
+       %1980 = OpBitwiseOr %uint %1944 %1979
+       %1981 = OpIAdd %uint %1972 %1502
+       %1982 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1981
+       %1983 = OpLoad %uint %1982
+       %1984 = OpBitwiseOr %uint %1948 %1983
+       %1985 = OpIAdd %uint %1981 %uint_1
+       %1986 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1985
+       %1987 = OpLoad %uint %1986
+       %1988 = OpBitwiseOr %uint %1952 %1987
+       %1989 = OpIAdd %uint %1972 %1504
+       %1990 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1989
+       %1991 = OpLoad %uint %1990
+       %1992 = OpBitwiseOr %uint %1956 %1991
+       %1993 = OpIAdd %uint %1989 %uint_1
+       %1994 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1993
+       %1995 = OpLoad %uint %1994
+       %1996 = OpBitwiseOr %uint %1960 %1995
+       %1997 = OpIAdd %uint %1972 %1506
+       %1998 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %1997
+       %1999 = OpLoad %uint %1998
+       %2000 = OpBitwiseOr %uint %1964 %1999
+       %2001 = OpIAdd %uint %1997 %uint_1
+       %2002 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2001
+       %2003 = OpLoad %uint %2002
+       %2004 = OpBitwiseOr %uint %1968 %2003
+       %2005 = OpCompositeExtract %uint %1565 3
+       %2006 = OpShiftRightLogical %uint %2005 %uint_0
+       %2007 = OpBitwiseAnd %uint %2006 %uint_127
+       %2008 = OpShiftLeftLogical %uint %2007 %uint_5
+       %2009 = OpIAdd %uint %2008 %1498
+       %2010 = OpIAdd %uint %2009 %1500
+       %2011 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2010
+       %2012 = OpLoad %uint %2011
+       %2013 = OpBitwiseOr %uint %1976 %2012
+       %2014 = OpIAdd %uint %2010 %uint_1
+       %2015 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2014
+       %2016 = OpLoad %uint %2015
+       %2017 = OpBitwiseOr %uint %1980 %2016
+       %2018 = OpIAdd %uint %2009 %1502
+       %2019 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2018
+       %2020 = OpLoad %uint %2019
+       %2021 = OpBitwiseOr %uint %1984 %2020
+       %2022 = OpIAdd %uint %2018 %uint_1
+       %2023 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2022
+       %2024 = OpLoad %uint %2023
+       %2025 = OpBitwiseOr %uint %1988 %2024
+       %2026 = OpIAdd %uint %2009 %1504
+       %2027 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2026
+       %2028 = OpLoad %uint %2027
+       %2029 = OpBitwiseOr %uint %1992 %2028
+       %2030 = OpIAdd %uint %2026 %uint_1
+       %2031 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2030
+       %2032 = OpLoad %uint %2031
+       %2033 = OpBitwiseOr %uint %1996 %2032
+       %2034 = OpIAdd %uint %2009 %1506
+       %2035 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2034
+       %2036 = OpLoad %uint %2035
+       %2037 = OpBitwiseOr %uint %2000 %2036
+       %2038 = OpIAdd %uint %2034 %uint_1
+       %2039 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2038
+       %2040 = OpLoad %uint %2039
+       %2041 = OpBitwiseOr %uint %2004 %2040
+       %2042 = OpShiftRightLogical %uint %2005 %uint_7
+       %2043 = OpBitwiseAnd %uint %2042 %uint_127
+       %2044 = OpShiftLeftLogical %uint %2043 %uint_5
+       %2045 = OpIAdd %uint %2044 %1498
+       %2046 = OpIAdd %uint %2045 %1500
+       %2047 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2046
+       %2048 = OpLoad %uint %2047
+       %2049 = OpBitwiseOr %uint %2013 %2048
+       %2050 = OpIAdd %uint %2046 %uint_1
+       %2051 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2050
+       %2052 = OpLoad %uint %2051
+       %2053 = OpBitwiseOr %uint %2017 %2052
+       %2054 = OpIAdd %uint %2045 %1502
+       %2055 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2054
+       %2056 = OpLoad %uint %2055
+       %2057 = OpBitwiseOr %uint %2021 %2056
+       %2058 = OpIAdd %uint %2054 %uint_1
+       %2059 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2058
+       %2060 = OpLoad %uint %2059
+       %2061 = OpBitwiseOr %uint %2025 %2060
+       %2062 = OpIAdd %uint %2045 %1504
+       %2063 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2062
+       %2064 = OpLoad %uint %2063
+       %2065 = OpBitwiseOr %uint %2029 %2064
+       %2066 = OpIAdd %uint %2062 %uint_1
+       %2067 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2066
+       %2068 = OpLoad %uint %2067
+       %2069 = OpBitwiseOr %uint %2033 %2068
+       %2070 = OpIAdd %uint %2045 %1506
+       %2071 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2070
+       %2072 = OpLoad %uint %2071
+       %2073 = OpBitwiseOr %uint %2037 %2072
+       %2074 = OpIAdd %uint %2070 %uint_1
+       %2075 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2074
+       %2076 = OpLoad %uint %2075
+       %2077 = OpBitwiseOr %uint %2041 %2076
+       %2078 = OpShiftRightLogical %uint %2005 %uint_14
+       %2079 = OpBitwiseAnd %uint %2078 %uint_127
+       %2080 = OpShiftLeftLogical %uint %2079 %uint_5
+       %2081 = OpIAdd %uint %2080 %1498
+       %2082 = OpIAdd %uint %2081 %1500
+       %2083 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2082
+       %2084 = OpLoad %uint %2083
+       %2085 = OpBitwiseOr %uint %2049 %2084
+       %2086 = OpIAdd %uint %2082 %uint_1
+       %2087 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2086
+       %2088 = OpLoad %uint %2087
+       %2089 = OpBitwiseOr %uint %2053 %2088
+       %2090 = OpIAdd %uint %2081 %1502
+       %2091 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2090
+       %2092 = OpLoad %uint %2091
+       %2093 = OpBitwiseOr %uint %2057 %2092
+       %2094 = OpIAdd %uint %2090 %uint_1
+       %2095 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2094
+       %2096 = OpLoad %uint %2095
+       %2097 = OpBitwiseOr %uint %2061 %2096
+       %2098 = OpIAdd %uint %2081 %1504
+       %2099 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2098
+       %2100 = OpLoad %uint %2099
+       %2101 = OpBitwiseOr %uint %2065 %2100
+       %2102 = OpIAdd %uint %2098 %uint_1
+       %2103 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2102
+       %2104 = OpLoad %uint %2103
+       %2105 = OpBitwiseOr %uint %2069 %2104
+       %2106 = OpIAdd %uint %2081 %1506
+       %2107 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2106
+       %2108 = OpLoad %uint %2107
+       %2109 = OpBitwiseOr %uint %2073 %2108
+       %2110 = OpIAdd %uint %2106 %uint_1
+       %2111 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2110
+       %2112 = OpLoad %uint %2111
+       %2113 = OpBitwiseOr %uint %2077 %2112
+       %2114 = OpShiftRightLogical %uint %2005 %uint_21
+       %2115 = OpBitwiseAnd %uint %2114 %uint_127
+       %2116 = OpShiftLeftLogical %uint %2115 %uint_5
+       %2117 = OpIAdd %uint %2116 %1498
+       %2118 = OpIAdd %uint %2117 %1500
+       %2119 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2118
+       %2120 = OpLoad %uint %2119
+       %2121 = OpBitwiseOr %uint %2085 %2120
+       %2122 = OpIAdd %uint %2118 %uint_1
+       %2123 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2122
+       %2124 = OpLoad %uint %2123
+       %2125 = OpBitwiseOr %uint %2089 %2124
+       %2126 = OpIAdd %uint %2117 %1502
+       %2127 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2126
+       %2128 = OpLoad %uint %2127
+       %2129 = OpBitwiseOr %uint %2093 %2128
+       %2130 = OpIAdd %uint %2126 %uint_1
+       %2131 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2130
+       %2132 = OpLoad %uint %2131
+       %2133 = OpBitwiseOr %uint %2097 %2132
+       %2134 = OpIAdd %uint %2117 %1504
+       %2135 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2134
+       %2136 = OpLoad %uint %2135
+       %2137 = OpBitwiseOr %uint %2101 %2136
+       %2138 = OpIAdd %uint %2134 %uint_1
+       %2139 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2138
+       %2140 = OpLoad %uint %2139
+       %2141 = OpBitwiseOr %uint %2105 %2140
+       %2142 = OpIAdd %uint %2117 %1506
+       %2143 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2142
+       %2144 = OpLoad %uint %2143
+       %2145 = OpBitwiseOr %uint %2109 %2144
+       %2146 = OpIAdd %uint %2142 %uint_1
+       %2147 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2146
+       %2148 = OpLoad %uint %2147
+       %2149 = OpBitwiseOr %uint %2113 %2148
+       %2150 = OpShiftRightLogical %uint %1566 %uint_28
+       %2151 = OpShiftRightLogical %uint %1715 %uint_24
+       %2153 = OpBitwiseAnd %uint %2151 %uint_112
+       %2154 = OpBitwiseOr %uint %2150 %2153
+       %2155 = OpShiftLeftLogical %uint %2154 %uint_5
+       %2156 = OpIAdd %uint %2155 %1498
+       %2157 = OpIAdd %uint %2156 %1500
+       %2158 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2157
+       %2159 = OpLoad %uint %2158
+       %2160 = OpBitwiseOr %uint %2121 %2159
+       %2161 = OpIAdd %uint %2157 %uint_1
+       %2162 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2161
+       %2163 = OpLoad %uint %2162
+       %2164 = OpBitwiseOr %uint %2125 %2163
+       %2165 = OpIAdd %uint %2156 %1502
+       %2166 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2165
+       %2167 = OpLoad %uint %2166
+       %2168 = OpBitwiseOr %uint %2129 %2167
+       %2169 = OpIAdd %uint %2165 %uint_1
+       %2170 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2169
+       %2171 = OpLoad %uint %2170
+       %2172 = OpBitwiseOr %uint %2133 %2171
+       %2173 = OpIAdd %uint %2156 %1504
+       %2174 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2173
+       %2175 = OpLoad %uint %2174
+       %2176 = OpBitwiseOr %uint %2137 %2175
+       %2177 = OpIAdd %uint %2173 %uint_1
+       %2178 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2177
+       %2179 = OpLoad %uint %2178
+       %2180 = OpBitwiseOr %uint %2141 %2179
+       %2181 = OpIAdd %uint %2156 %1506
+       %2182 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2181
+       %2183 = OpLoad %uint %2182
+       %2184 = OpBitwiseOr %uint %2145 %2183
+       %2185 = OpIAdd %uint %2181 %uint_1
+       %2186 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2185
+       %2187 = OpLoad %uint %2186
+       %2188 = OpBitwiseOr %uint %2149 %2187
+       %2189 = OpShiftRightLogical %uint %1860 %uint_28
+       %2190 = OpShiftRightLogical %uint %2005 %uint_24
+       %2191 = OpBitwiseAnd %uint %2190 %uint_112
+       %2192 = OpBitwiseOr %uint %2189 %2191
+       %2193 = OpShiftLeftLogical %uint %2192 %uint_5
+       %2194 = OpIAdd %uint %2193 %1498
+       %2195 = OpIAdd %uint %2194 %1500
+       %2196 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2195
+       %2197 = OpLoad %uint %2196
+       %2198 = OpBitwiseOr %uint %2160 %2197
+       %2199 = OpIAdd %uint %2195 %uint_1
+       %2200 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2199
+       %2201 = OpLoad %uint %2200
+       %2202 = OpBitwiseOr %uint %2164 %2201
+       %2203 = OpIAdd %uint %2194 %1502
+       %2204 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2203
+       %2205 = OpLoad %uint %2204
+       %2206 = OpBitwiseOr %uint %2168 %2205
+       %2207 = OpIAdd %uint %2203 %uint_1
+       %2208 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2207
+       %2209 = OpLoad %uint %2208
+       %2210 = OpBitwiseOr %uint %2172 %2209
+       %2211 = OpIAdd %uint %2194 %1504
+       %2212 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2211
+       %2213 = OpLoad %uint %2212
+       %2214 = OpBitwiseOr %uint %2176 %2213
+       %2215 = OpIAdd %uint %2211 %uint_1
+       %2216 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2215
+       %2217 = OpLoad %uint %2216
+       %2218 = OpBitwiseOr %uint %2180 %2217
+       %2219 = OpIAdd %uint %2194 %1506
+       %2220 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2219
+       %2221 = OpLoad %uint %2220
+       %2222 = OpBitwiseOr %uint %2184 %2221
+       %2223 = OpIAdd %uint %2219 %uint_1
+       %2224 = OpAccessChain %_ptr_Workgroup_uint %50 %uint_0 %2223
+       %2225 = OpLoad %uint %2224
+       %2226 = OpBitwiseOr %uint %2188 %2225
+       %2227 = OpIAdd %uint %uint_16 %1434
+       %2228 = OpShiftRightLogical %uint %1560 %2227
+       %2229 = OpBitwiseAnd %uint %2228 %uint_1
+       %2230 = OpISub %uint %uint_0 %2229
+       %2231 = OpNot %uint %2198
+       %2232 = OpBitwiseAnd %uint %2231 %1445
+       %2233 = OpBitwiseAnd %uint %2232 %2230
+       %2234 = OpNot %uint %2202
+       %2235 = OpBitwiseAnd %uint %2234 %1449
+       %2236 = OpBitwiseAnd %uint %2235 %2230
+       %2237 = OpBitwiseOr %uint %2233 %2236
+       %2238 = OpINotEqual %bool %2237 %uint_0
+       %2239 = OpGroupNonUniformBallot %v4uint %uint_3 %2238
+       %2240 = OpCompositeExtract %uint %2239 0
+       %2241 = OpBitwiseAnd %uint %2240 %85
+       %2242 = OpBitCount %uint %2241
+       %2243 = OpCompositeExtract %uint %2239 1
+       %2244 = OpBitwiseAnd %uint %2243 %89
+       %2245 = OpBitCount %uint %2244
+       %2246 = OpIAdd %uint %2242 %2245
+       %2247 = OpBitCount %uint %2240
+       %2248 = OpBitCount %uint %2243
+       %2249 = OpIAdd %uint %2247 %2248
+       %2250 = OpIAdd %uint %uint_16 %1450
+       %2251 = OpShiftRightLogical %uint %1560 %2250
+       %2252 = OpBitwiseAnd %uint %2251 %uint_1
+       %2253 = OpISub %uint %uint_0 %2252
+       %2254 = OpNot %uint %2206
+       %2255 = OpBitwiseAnd %uint %2254 %1461
+       %2256 = OpBitwiseAnd %uint %2255 %2253
+       %2257 = OpNot %uint %2210
+       %2258 = OpBitwiseAnd %uint %2257 %1465
+       %2259 = OpBitwiseAnd %uint %2258 %2253
+       %2260 = OpBitwiseOr %uint %2256 %2259
+       %2261 = OpINotEqual %bool %2260 %uint_0
+       %2262 = OpGroupNonUniformBallot %v4uint %uint_3 %2261
+       %2263 = OpCompositeExtract %uint %2262 0
+       %2264 = OpBitwiseAnd %uint %2263 %85
+       %2265 = OpBitCount %uint %2264
+       %2266 = OpCompositeExtract %uint %2262 1
+       %2267 = OpBitwiseAnd %uint %2266 %89
+       %2268 = OpBitCount %uint %2267
+       %2269 = OpIAdd %uint %2265 %2268
+       %2270 = OpBitCount %uint %2263
+       %2271 = OpBitCount %uint %2266
+       %2272 = OpIAdd %uint %2270 %2271
+       %2273 = OpIAdd %uint %2249 %2272
+       %2274 = OpIAdd %uint %uint_16 %1466
+       %2275 = OpShiftRightLogical %uint %1560 %2274
+       %2276 = OpBitwiseAnd %uint %2275 %uint_1
+       %2277 = OpISub %uint %uint_0 %2276
+       %2278 = OpNot %uint %2214
+       %2279 = OpBitwiseAnd %uint %2278 %1477
+       %2280 = OpBitwiseAnd %uint %2279 %2277
+       %2281 = OpNot %uint %2218
+       %2282 = OpBitwiseAnd %uint %2281 %1481
+       %2283 = OpBitwiseAnd %uint %2282 %2277
+       %2284 = OpBitwiseOr %uint %2280 %2283
+       %2285 = OpINotEqual %bool %2284 %uint_0
+       %2286 = OpGroupNonUniformBallot %v4uint %uint_3 %2285
+       %2287 = OpCompositeExtract %uint %2286 0
+       %2288 = OpBitwiseAnd %uint %2287 %85
+       %2289 = OpBitCount %uint %2288
+       %2290 = OpCompositeExtract %uint %2286 1
+       %2291 = OpBitwiseAnd %uint %2290 %89
+       %2292 = OpBitCount %uint %2291
+       %2293 = OpIAdd %uint %2289 %2292
+       %2294 = OpBitCount %uint %2287
+       %2295 = OpBitCount %uint %2290
+       %2296 = OpIAdd %uint %2294 %2295
+       %2297 = OpIAdd %uint %2273 %2296
+       %2298 = OpIAdd %uint %uint_16 %1482
+       %2299 = OpShiftRightLogical %uint %1560 %2298
+       %2300 = OpBitwiseAnd %uint %2299 %uint_1
+       %2301 = OpISub %uint %uint_0 %2300
+       %2302 = OpNot %uint %2222
+       %2303 = OpBitwiseAnd %uint %2302 %1493
+       %2304 = OpBitwiseAnd %uint %2303 %2301
+       %2305 = OpNot %uint %2226
+       %2306 = OpBitwiseAnd %uint %2305 %1497
+       %2307 = OpBitwiseAnd %uint %2306 %2301
+       %2308 = OpBitwiseOr %uint %2304 %2307
+       %2309 = OpINotEqual %bool %2308 %uint_0
+       %2310 = OpGroupNonUniformBallot %v4uint %uint_3 %2309
+       %2311 = OpCompositeExtract %uint %2310 0
+       %2312 = OpBitwiseAnd %uint %2311 %85
+       %2313 = OpBitCount %uint %2312
+       %2314 = OpCompositeExtract %uint %2310 1
+       %2315 = OpBitwiseAnd %uint %2314 %89
+       %2316 = OpBitCount %uint %2315
+       %2317 = OpIAdd %uint %2313 %2316
+       %2318 = OpBitCount %uint %2311
+       %2319 = OpBitCount %uint %2314
+       %2320 = OpIAdd %uint %2318 %2319
+       %2321 = OpIAdd %uint %2297 %2320
+               OpSelectionMerge %2324 None
+               OpBranchConditional %132 %2322 %2323
+       %2322 = OpLabel
+       %2325 = OpISub %uint %1430 %1511
+       %2326 = OpExtInst %uint %81 UMin %uint_64 %2325
+       %2327 = OpIMul %uint %2326 %365
+       %2328 = OpIAdd %uint %376 %2327
+               OpBranch %2324
+       %2324 = OpLabel
+       %2454 = OpPhi %uint %376 %2323 %2328 %2322
+       %2329 = OpUGreaterThan %bool %2321 %uint_0
+               OpSelectionMerge %2332 None
+               OpBranchConditional %2329 %2330 %2331
+       %2330 = OpLabel
+       %2333 = OpIAdd %uint %396 %2321
+       %2334 = OpUGreaterThan %bool %2333 %uint_256
+               OpSelectionMerge %2337 None
+               OpBranchConditional %2334 %2335 %2336
+       %2335 = OpLabel
+       %2338 = OpLogicalAnd %bool %67 %392
+               OpSelectionMerge %2340 None
+               OpBranchConditional %2338 %2339 %2340
+       %2339 = OpLabel
+       %2341 = OpAccessChain %_ptr_StorageBuffer_uint %34 %uint_0 %388
+               OpStore %2341 %396
+               OpBranch %2340
+       %2340 = OpLabel
+               OpSelectionMerge %2344 None
+               OpBranchConditional %67 %2342 %2343
+       %2342 = OpLabel
+       %2345 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %31 %uint_0 %uint_0
+       %2346 = OpAtomicIAdd %uint %2345 %uint_1 %uint_72 %uint_1
+               OpBranch %2344
+       %2344 = OpLabel
+       %2347 = OpPhi %uint %uint_0 %2343 %2346 %2342
+       %2348 = OpGroupNonUniformIAdd %uint %uint_3 Reduce %2347
+       %2349 = OpUGreaterThanEqual %bool %2348 %266
+       %2350 = OpLogicalAnd %bool %2349 %67
+               OpSelectionMerge %2352 None
+               OpBranchConditional %2350 %2351 %2352
+       %2351 = OpLabel
+       %2354 = OpInBoundsAccessChain %_ptr_StorageBuffer_uint %25 %uint_0 %uint_363
+       %2355 = OpAtomicIAdd %uint %2354 %uint_1 %uint_72 %uint_1
+               OpBranch %2352
+       %2352 = OpLabel
+               OpBranch %2337
+       %2337 = OpLabel
+       %2358 = OpPhi %uint %396 %2336 %uint_0 %2352
+       %2451 = OpPhi %bool %392 %2336 %true %2352
+       %2356 = OpPhi %uint %388 %2336 %2348 %2352
+       %2357 = OpShiftLeftLogical %uint %2356 %uint_8
+       %2359 = OpIAdd %uint %2357 %2358
+       %2361 = OpBitwiseAnd %uint %217 %uint_1048576
+       %2362 = OpINotEqual %bool %2361 %uint_0
+       %2363 = OpINotEqual %bool %65 %uint_0
+       %2364 = OpLogicalAnd %bool %2362 %2363
+       %2365 = OpULessThan %bool %2356 %266
+               OpSelectionMerge %2367 None
+               OpBranchConditional %2365 %2366 %2367
+       %2366 = OpLabel
+               OpSelectionMerge %2369 None
+               OpBranchConditional %2238 %2368 %2369
+       %2368 = OpLabel
+       %2373 = OpCopyObject %v4uint %2370
+               OpStore %2372 %2373
+       %2374 = OpIAdd %uint %1562 %103
+       %2375 = OpShiftLeftLogical %uint %101 %uint_16
+       %2376 = OpBitwiseOr %uint %2374 %2375
+       %2377 = OpShiftLeftLogical %uint %96 %uint_24
+       %2378 = OpBitwiseOr %uint %2376 %2377
+       %2379 = OpIAdd %uint %386 %1436
+       %2380 = OpSelect %uint %2364 %uint_0 %2233
+       %2381 = OpSelect %uint %2364 %uint_0 %2236
+       %2382 = OpCompositeConstruct %v4uint %2378 %2379 %2380 %2381
+       %2383 = OpIAdd %uint %2359 %2246
+       %2384 = OpAccessChain %_ptr_StorageBuffer_v4uint %28 %uint_0 %2383
+               OpStore %2384 %2382
+               OpBranch %2369
+       %2369 = OpLabel
+               OpSelectionMerge %2386 None
+               OpBranchConditional %2261 %2385 %2386
+       %2385 = OpLabel
+       %2387 = OpCopyObject %v4uint %2370
+               OpStore %2372 %2387
+       %2388 = OpIAdd %uint %1562 %103
+       %2389 = OpShiftLeftLogical %uint %101 %uint_16
+       %2390 = OpBitwiseOr %uint %2388 %2389
+       %2391 = OpShiftLeftLogical %uint %96 %uint_24
+       %2392 = OpBitwiseOr %uint %2390 %2391
+       %2393 = OpIAdd %uint %386 %1452
+       %2394 = OpSelect %uint %2364 %uint_0 %2256
+       %2395 = OpSelect %uint %2364 %uint_0 %2259
+       %2396 = OpCompositeConstruct %v4uint %2392 %2393 %2394 %2395
+       %2397 = OpIAdd %uint %2359 %2249
+       %2398 = OpIAdd %uint %2397 %2269
+       %2399 = OpAccessChain %_ptr_StorageBuffer_v4uint %28 %uint_0 %2398
+               OpStore %2399 %2396
+               OpBranch %2386
+       %2386 = OpLabel
+               OpSelectionMerge %2401 None
+               OpBranchConditional %2285 %2400 %2401
+       %2400 = OpLabel
+       %2402 = OpCopyObject %v4uint %2370
+               OpStore %2372 %2402
+       %2403 = OpIAdd %uint %1562 %103
+       %2404 = OpShiftLeftLogical %uint %101 %uint_16
+       %2405 = OpBitwiseOr %uint %2403 %2404
+       %2406 = OpShiftLeftLogical %uint %96 %uint_24
+       %2407 = OpBitwiseOr %uint %2405 %2406
+       %2408 = OpIAdd %uint %386 %1468
+       %2409 = OpSelect %uint %2364 %uint_0 %2280
+       %2410 = OpSelect %uint %2364 %uint_0 %2283
+       %2411 = OpCompositeConstruct %v4uint %2407 %2408 %2409 %2410
+       %2412 = OpIAdd %uint %2359 %2273
+       %2413 = OpIAdd %uint %2412 %2293
+       %2414 = OpAccessChain %_ptr_StorageBuffer_v4uint %28 %uint_0 %2413
+               OpStore %2414 %2411
+               OpBranch %2401
+       %2401 = OpLabel
+               OpSelectionMerge %2416 None
+               OpBranchConditional %2309 %2415 %2416
+       %2415 = OpLabel
+       %2417 = OpCopyObject %v4uint %2370
+               OpStore %2372 %2417
+       %2418 = OpIAdd %uint %1562 %103
+       %2419 = OpShiftLeftLogical %uint %101 %uint_16
+       %2420 = OpBitwiseOr %uint %2418 %2419
+       %2421 = OpShiftLeftLogical %uint %96 %uint_24
+       %2422 = OpBitwiseOr %uint %2420 %2421
+       %2423 = OpIAdd %uint %386 %1484
+       %2424 = OpSelect %uint %2364 %uint_0 %2304
+       %2425 = OpSelect %uint %2364 %uint_0 %2307
+       %2426 = OpCompositeConstruct %v4uint %2422 %2423 %2424 %2425
+       %2427 = OpIAdd %uint %2359 %2297
+       %2428 = OpIAdd %uint %2427 %2317
+       %2429 = OpAccessChain %_ptr_StorageBuffer_v4uint %28 %uint_0 %2428
+               OpStore %2429 %2426
+               OpBranch %2416
+       %2416 = OpLabel
+               OpBranch %2367
+       %2367 = OpLabel
+       %2430 = OpBitCount %uint %2233
+       %2431 = OpBitCount %uint %2236
+       %2432 = OpIAdd %uint %2430 %2431
+       %2433 = OpIAdd %uint %372 %2432
+       %2434 = OpBitCount %uint %2256
+       %2435 = OpBitCount %uint %2259
+       %2436 = OpIAdd %uint %2434 %2435
+       %2437 = OpIAdd %uint %2433 %2436
+       %2438 = OpBitCount %uint %2280
+       %2439 = OpBitCount %uint %2283
+       %2440 = OpIAdd %uint %2438 %2439
+       %2441 = OpIAdd %uint %2437 %2440
+       %2442 = OpBitCount %uint %2304
+       %2443 = OpBitCount %uint %2307
+       %2444 = OpIAdd %uint %2442 %2443
+       %2445 = OpIAdd %uint %2441 %2444
+       %2446 = OpIAdd %uint %2358 %2321
+               OpBranch %2332
+       %2332 = OpLabel
+       %2452 = OpPhi %uint %396 %2331 %2446 %2367
+       %2450 = OpPhi %bool %392 %2331 %2451 %2367
+       %2449 = OpPhi %uint %388 %2331 %2356 %2367
+       %2448 = OpPhi %uint %372 %2331 %2445 %2367
+       %2447 = OpIAdd %uint %1511 %uint_64
+               OpBranch %1509
+       %1509 = OpLabel
+               OpBranch %1507
+       %2343 = OpLabel
+               OpBranch %2344
+       %2336 = OpLabel
+               OpBranch %2337
+       %2331 = OpLabel
+               OpBranch %2332
+       %2323 = OpLabel
+               OpBranch %2324
+       %1428 = OpLabel
+       %2455 = OpAccessChain %_ptr_Workgroup_v4uint %57 %uint_0 %1425
+       %2456 = OpLoad %v4uint %2455
+       %2457 = OpCompositeExtract %uint %2456 0
+       %2458 = OpShiftRightLogical %uint %2457 %uint_0
+       %2459 = OpBitwiseAnd %uint %2458 %uint_127
+       %2460 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2459
+       %2461 = OpLoad %uint %2460
+       %2462 = OpBitwiseOr %uint %uint_0 %2461
+       %2463 = OpShiftRightLogical %uint %2457 %uint_7
+       %2464 = OpBitwiseAnd %uint %2463 %uint_127
+       %2465 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2464
+       %2466 = OpLoad %uint %2465
+       %2467 = OpBitwiseOr %uint %2462 %2466
+       %2468 = OpShiftRightLogical %uint %2457 %uint_14
+       %2469 = OpBitwiseAnd %uint %2468 %uint_127
+       %2470 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2469
+       %2471 = OpLoad %uint %2470
+       %2472 = OpBitwiseOr %uint %2467 %2471
+       %2473 = OpShiftRightLogical %uint %2457 %uint_21
+       %2474 = OpBitwiseAnd %uint %2473 %uint_127
+       %2475 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2474
+       %2476 = OpLoad %uint %2475
+       %2477 = OpBitwiseOr %uint %2472 %2476
+       %2478 = OpCompositeExtract %uint %2456 1
+       %2479 = OpShiftRightLogical %uint %2478 %uint_0
+       %2480 = OpBitwiseAnd %uint %2479 %uint_127
+       %2481 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2480
+       %2482 = OpLoad %uint %2481
+       %2483 = OpBitwiseOr %uint %2477 %2482
+       %2484 = OpShiftRightLogical %uint %2478 %uint_7
+       %2485 = OpBitwiseAnd %uint %2484 %uint_127
+       %2486 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2485
+       %2487 = OpLoad %uint %2486
+       %2488 = OpBitwiseOr %uint %2483 %2487
+       %2489 = OpShiftRightLogical %uint %2478 %uint_14
+       %2490 = OpBitwiseAnd %uint %2489 %uint_127
+       %2491 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2490
+       %2492 = OpLoad %uint %2491
+       %2493 = OpBitwiseOr %uint %2488 %2492
+       %2494 = OpShiftRightLogical %uint %2478 %uint_21
+       %2495 = OpBitwiseAnd %uint %2494 %uint_127
+       %2496 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2495
+       %2497 = OpLoad %uint %2496
+       %2498 = OpBitwiseOr %uint %2493 %2497
+       %2499 = OpCompositeExtract %uint %2456 2
+       %2500 = OpShiftRightLogical %uint %2499 %uint_0
+       %2501 = OpBitwiseAnd %uint %2500 %uint_127
+       %2502 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2501
+       %2503 = OpLoad %uint %2502
+       %2504 = OpBitwiseOr %uint %2498 %2503
+       %2505 = OpShiftRightLogical %uint %2499 %uint_7
+       %2506 = OpBitwiseAnd %uint %2505 %uint_127
+       %2507 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2506
+       %2508 = OpLoad %uint %2507
+       %2509 = OpBitwiseOr %uint %2504 %2508
+       %2510 = OpShiftRightLogical %uint %2499 %uint_14
+       %2511 = OpBitwiseAnd %uint %2510 %uint_127
+       %2512 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2511
+       %2513 = OpLoad %uint %2512
+       %2514 = OpBitwiseOr %uint %2509 %2513
+       %2515 = OpShiftRightLogical %uint %2499 %uint_21
+       %2516 = OpBitwiseAnd %uint %2515 %uint_127
+       %2517 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2516
+       %2518 = OpLoad %uint %2517
+       %2519 = OpBitwiseOr %uint %2514 %2518
+       %2520 = OpCompositeExtract %uint %2456 3
+       %2521 = OpShiftRightLogical %uint %2520 %uint_0
+       %2522 = OpBitwiseAnd %uint %2521 %uint_127
+       %2523 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2522
+       %2524 = OpLoad %uint %2523
+       %2525 = OpBitwiseOr %uint %2519 %2524
+       %2526 = OpShiftRightLogical %uint %2520 %uint_7
+       %2527 = OpBitwiseAnd %uint %2526 %uint_127
+       %2528 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2527
+       %2529 = OpLoad %uint %2528
+       %2530 = OpBitwiseOr %uint %2525 %2529
+       %2531 = OpShiftRightLogical %uint %2520 %uint_14
+       %2532 = OpBitwiseAnd %uint %2531 %uint_127
+       %2533 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2532
+       %2534 = OpLoad %uint %2533
+       %2535 = OpBitwiseOr %uint %2530 %2534
+       %2536 = OpShiftRightLogical %uint %2520 %uint_21
+       %2537 = OpBitwiseAnd %uint %2536 %uint_127
+       %2538 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2537
+       %2539 = OpLoad %uint %2538
+       %2540 = OpBitwiseOr %uint %2535 %2539
+       %2541 = OpShiftRightLogical %uint %2457 %uint_28
+       %2542 = OpShiftRightLogical %uint %2478 %uint_24
+       %2543 = OpBitwiseAnd %uint %2542 %uint_112
+       %2544 = OpBitwiseOr %uint %2541 %2543
+       %2545 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2544
+       %2546 = OpLoad %uint %2545
+       %2547 = OpBitwiseOr %uint %2540 %2546
+       %2548 = OpShiftRightLogical %uint %2499 %uint_28
+       %2549 = OpShiftRightLogical %uint %2520 %uint_24
+       %2550 = OpBitwiseAnd %uint %2549 %uint_112
+       %2551 = OpBitwiseOr %uint %2548 %2550
+       %2552 = OpAccessChain %_ptr_Workgroup_uint %56 %uint_0 %2551
+       %2553 = OpLoad %uint %2552
+       %2554 = OpBitwiseOr %uint %2547 %2553
+       %2555 = OpNot %uint %2554
+       %2556 = OpBitwiseAnd %uint %1420 %2555
+       %2557 = OpBitCount %uint %2556
+       %2558 = OpIAdd %uint %394 %2557
+       %2559 = OpINotEqual %bool %2556 %uint_0
+               OpSelectionMerge %2561 None
+               OpBranchConditional %2559 %2560 %2561
+       %2560 = OpLabel
+       %2562 = OpInBoundsAccessChain %_ptr_Workgroup_uint %58 %uint_0 %uint_0
+       %2563 = OpAtomicIAdd %uint %2562 %uint_2 %uint_264 %uint_1
+       %2564 = OpShiftLeftLogical %uint %1425 %uint_4
+       %2565 = OpShiftLeftLogical %uint %2556 %uint_16
+       %2566 = OpBitwiseOr %uint %2564 %2565
+       %2567 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %2563
+               OpStore %2567 %2566
+               OpBranch %2561
+       %2561 = OpLabel
+       %2568 = OpIAdd %uint %1425 %uint_256
+               OpBranch %1423
+       %1423 = OpLabel
+               OpBranch %1421
+       %1379 = OpLabel
+               OpBranch %1380
+       %1243 = OpLabel
+               OpBranch %1244
+       %1081 = OpLabel
+               OpBranch %1082
+       %1035 = OpLabel
+               OpBranch %1036
+        %873 = OpLabel
+               OpBranch %874
+        %827 = OpLabel
+               OpBranch %828
+        %665 = OpLabel
+               OpBranch %666
+        %618 = OpLabel
+               OpBranch %619
+        %405 = OpLabel
+               OpBranch %406
+        %350 = OpLabel
+               OpBranch %352
+        %348 = OpLabel
+       %2570 = OpIAdd %uint %344 %72
+       %2571 = OpULessThan %bool %2570 %131
+               OpSelectionMerge %2574 None
+               OpBranchConditional %2571 %2572 %2573
+       %2572 = OpLabel
+       %2575 = OpAccessChain %_ptr_StorageBuffer_v4uint %6 %uint_0 %2570
+       %2576 = OpLoad %v4uint %2575
+       %2577 = OpCompositeExtract %uint %2576 3
+       %2579 = OpBitwiseAnd %uint %2577 %uint_33554431
+       %2580 = OpCompositeExtract %uint %2576 0
+       %2581 = OpUConvert %ulong %2580
+       %2582 = OpCompositeExtract %uint %2576 1
+       %2583 = OpUConvert %ulong %2582
+       %2584 = OpShiftLeftLogical %ulong %2583 %ulong_32
+       %2585 = OpBitwiseOr %ulong %2581 %2584
+       %2586 = OpShiftRightLogical %uint %2577 %uint_25
+       %2587 = OpCompositeExtract %uint %2576 2
+       %2588 = OpBitwiseAnd %uint %2587 %uint_255
+       %2589 = OpShiftRightLogical %uint %2587 %uint_16
+       %2590 = OpBitwiseAnd %uint %2589 %uint_255
+       %2591 = OpIMul %uint %2590 %101
+       %2592 = OpIAdd %uint %2588 %2591
+       %2593 = OpUMod %uint %2592 %uint_65
+       %2594 = OpShiftRightLogical %uint %2587 %uint_8
+       %2595 = OpBitwiseAnd %uint %2594 %uint_255
+       %2596 = OpShiftRightLogical %uint %2587 %uint_24
+       %2597 = OpBitwiseAnd %uint %2596 %uint_255
+       %2598 = OpIMul %uint %2597 %101
+       %2599 = OpIAdd %uint %2595 %2598
+       %2600 = OpUMod %uint %2599 %uint_65
+       %2601 = OpULessThan %bool %2593 %uint_64
+       %2602 = OpBitwiseAnd %uint %2593 %uint_63
+       %2603 = OpUConvert %ulong %2602
+       %2604 = OpShiftLeftLogical %ulong %ulong_1 %2603
+       %2605 = OpSelect %ulong %2601 %2604 %ulong_0
+       %2606 = OpUGreaterThanEqual %bool %2593 %uint_64
+       %2607 = OpBitwiseAnd %uint %2593 %uint_31
+       %2608 = OpShiftLeftLogical %uint %uint_1 %2607
+       %2609 = OpSelect %uint %2606 %2608 %uint_0
+       %2610 = OpULessThan %bool %2600 %uint_64
+       %2611 = OpBitwiseAnd %uint %2600 %uint_63
+       %2612 = OpUConvert %ulong %2611
+       %2613 = OpShiftLeftLogical %ulong %ulong_1 %2612
+       %2614 = OpSelect %ulong %2610 %2613 %ulong_0
+       %2615 = OpUGreaterThanEqual %bool %2600 %uint_64
+       %2616 = OpBitwiseAnd %uint %2600 %uint_31
+       %2617 = OpShiftLeftLogical %uint %uint_1 %2616
+       %2618 = OpSelect %uint %2615 %2617 %uint_0
+       %2619 = OpBitwiseOr %ulong %2605 %2614
+       %2620 = OpBitwiseOr %uint %2609 %2618
+       %2621 = OpBitwiseOr %ulong %2585 %2619
+       %2622 = OpBitwiseOr %uint %2586 %2620
+       %2623 = OpIEqual %bool %2593 %2600
+       %2624 = OpBitwiseAnd %ulong %2585 %2619
+       %2625 = OpINotEqual %bool %2624 %ulong_0
+       %2626 = OpLogicalOr %bool %2623 %2625
+       %2627 = OpBitwiseAnd %uint %2586 %2620
+       %2628 = OpINotEqual %bool %2627 %uint_0
+       %2629 = OpLogicalOr %bool %2626 %2628
+       %2630 = OpSelect %ulong %2629 %ulong_0 %2621
+       %2631 = OpSelect %uint %2629 %uint_0 %2622
+       %2632 = OpINotEqual %bool %2630 %ulong_0
+       %2633 = OpINotEqual %bool %2631 %uint_0
+       %2634 = OpLogicalOr %bool %2632 %2633
+               OpBranch %2574
+       %2574 = OpLabel
+       %2686 = OpPhi %uint %uint_0 %2573 %2579 %2572
+       %2635 = OpPhi %bool %false %2573 %2634 %2572
+       %2636 = OpGroupNonUniformBallot %v4uint %uint_3 %2635
+       %2637 = OpCompositeExtract %uint %2636 0
+       %2638 = OpBitwiseAnd %uint %2637 %85
+       %2639 = OpBitCount %uint %2638
+       %2640 = OpCompositeExtract %uint %2636 1
+       %2641 = OpBitwiseAnd %uint %2640 %89
+       %2642 = OpBitCount %uint %2641
+       %2643 = OpIAdd %uint %2639 %2642
+       %2644 = OpBitCount %uint %2637
+       %2645 = OpBitCount %uint %2640
+       %2646 = OpIAdd %uint %2644 %2645
+               OpSelectionMerge %2648 None
+               OpBranchConditional %67 %2647 %2648
+       %2647 = OpLabel
+       %2650 = OpShiftLeftLogical %uint %2649 %uint_2
+       %2651 = OpIAdd %uint %2650 %76
+       %2652 = OpAccessChain %_ptr_Workgroup_uint %54 %uint_0 %2651
+               OpStore %2652 %2646
+               OpBranch %2648
+       %2648 = OpLabel
+               OpControlBarrier %uint_2 %uint_2 %uint_264
+               OpSelectionMerge %2655 None
+               OpBranchConditional %351 %2653 %2654
+       %2653 = OpLabel
+       %2656 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %353
+       %2657 = OpLoad %uint %2656
+       %2658 = OpShiftLeftLogical %uint %357 %uint_16
+       %2659 = OpBitwiseOr %uint %2657 %2658
+       %2660 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %353
+               OpStore %2660 %2659
+               OpBranch %2655
+       %2655 = OpLabel
+       %2700 = OpPhi %bool %351 %2654 %false %2653
+               OpBranch %2661
+       %2661 = OpLabel
+       %2672 = OpPhi %uint %2673 %2664 %uint_0 %2655
+       %2662 = OpPhi %uint %2676 %2664 %uint_0 %2655
+       %2674 = OpPhi %uint %2675 %2664 %uint_0 %2655
+       %2663 = OpULessThan %bool %2662 %uint_4
+               OpLoopMerge %2665 %2664 None
+               OpBranchConditional %2663 %2664 %2665
+       %2664 = OpLabel
+       %2666 = OpShiftLeftLogical %uint %2649 %uint_2
+       %2667 = OpIAdd %uint %2666 %2662
+       %2668 = OpAccessChain %_ptr_Workgroup_uint %54 %uint_0 %2667
+       %2669 = OpLoad %uint %2668
+       %2670 = OpULessThan %bool %2662 %76
+       %2671 = OpSelect %uint %2670 %2669 %uint_0
+       %2673 = OpIAdd %uint %2672 %2671
+       %2675 = OpIAdd %uint %2674 %2669
+       %2676 = OpIAdd %uint %2662 %uint_1
+               OpBranch %2661
+       %2665 = OpLabel
+               OpSelectionMerge %2679 None
+               OpBranchConditional %2635 %2677 %2678
+       %2677 = OpLabel
+       %2680 = OpIAdd %uint %342 %2672
+       %2681 = OpIAdd %uint %2680 %2643
+       %2682 = OpIAdd %uint %239 %386
+       %2683 = OpIAdd %uint %2682 %2681
+       %2684 = OpISub %uint %249 %uint_1
+       %2685 = OpExtInst %uint %81 UMin %2683 %2684
+       %2687 = OpAccessChain %_ptr_StorageBuffer_uint %37 %uint_0 %2685
+               OpStore %2687 %2686
+       %2688 = OpBitwiseAnd %uint %2681 %uint_1
+       %2689 = OpIEqual %bool %2688 %uint_0
+               OpSelectionMerge %2692 None
+               OpBranchConditional %2689 %2690 %2691
+       %2690 = OpLabel
+       %2693 = OpShiftRightLogical %uint %2681 %uint_1
+       %2694 = OpISub %uint %2570 %128
+       %2695 = OpAccessChain %_ptr_Workgroup_uint %55 %uint_0 %2693
+               OpStore %2695 %2694
+               OpBranch %2692
+       %2692 = OpLabel
+       %2705 = OpPhi %uint %2707 %2691 %353 %2690
+       %2703 = OpPhi %uint %2706 %2691 %357 %2690
+       %2701 = OpPhi %bool %true %2691 %2700 %2690
+               OpBranch %2679
+       %2679 = OpLabel
+       %2704 = OpPhi %uint %353 %2678 %2705 %2692
+       %2702 = OpPhi %uint %357 %2678 %2703 %2692
+       %2699 = OpPhi %bool %2700 %2678 %2701 %2692
+       %2696 = OpIAdd %uint %342 %2674
+       %2697 = OpBitwiseXor %uint %2649 %uint_1
+       %2698 = OpIAdd %uint %344 %uint_256
+               OpBranch %339
+        %339 = OpLabel
+               OpBranch %337
+       %2691 = OpLabel
+       %2707 = OpShiftRightLogical %uint %2681 %uint_1
+       %2706 = OpISub %uint %2570 %128
+               OpBranch %2692
+       %2678 = OpLabel
+               OpBranch %2679
+       %2654 = OpLabel
+               OpBranch %2655
+       %2573 = OpLabel
+               OpBranch %2574
+        %223 = OpLabel
+               OpBranch %224
+        %208 = OpLabel
+       %2714 = OpUGreaterThanEqual %bool %205 %103
+       %2715 = OpIAdd %uint %103 %uint_576
+       %2716 = OpULessThan %bool %205 %2715
+       %2717 = OpLogicalAnd %bool %2714 %2716
+               OpSelectionMerge %2719 None
+               OpBranchConditional %2717 %2718 %2719
+       %2718 = OpLabel
+       %2720 = OpCopyObject %v4uint %2370
+               OpStore %2372 %2720
+       %2721 = OpIAdd %uint %196 %205
+       %2722 = OpShiftLeftLogical %uint %2721 %uint_2
+       %2723 = OpIAdd %uint %2722 %2721
+       %2724 = OpAccessChain %_ptr_StorageBuffer_uint %13 %uint_0 %2723
+       %2725 = OpLoad %uint %2724
+       %2726 = OpIAdd %uint %2723 %uint_1
+       %2727 = OpAccessChain %_ptr_StorageBuffer_uint %13 %uint_0 %2726
+       %2728 = OpLoad %uint %2727
+       %2729 = OpIAdd %uint %2723 %uint_2
+       %2730 = OpAccessChain %_ptr_StorageBuffer_uint %13 %uint_0 %2729
+       %2731 = OpLoad %uint %2730
+       %2732 = OpIAdd %uint %2723 %uint_3
+       %2733 = OpAccessChain %_ptr_StorageBuffer_uint %13 %uint_0 %2732
+       %2734 = OpLoad %uint %2733
+       %2735 = OpCompositeConstruct %v4uint %2725 %2728 %2731 %2734
+               OpStore %2372 %2735
+       %2736 = OpIAdd %uint %2723 %uint_4
+       %2737 = OpAccessChain %_ptr_StorageBuffer_uint %13 %uint_0 %2736
+       %2738 = OpLoad %uint %2737
+       %2739 = OpBitwiseAnd %uint %2738 %uint_15
+       %2740 = OpShiftLeftLogical %uint %2739 %uint_28
+       %2742 = OpAccessChain %_ptr_Function_uint %2372 %uint_0
+       %2743 = OpLoad %uint %2742
+       %2744 = OpBitwiseOr %uint %2743 %2740
+       %2745 = OpAccessChain %_ptr_Function_uint %2372 %uint_0
+               OpStore %2745 %2744
+       %2746 = OpShiftRightLogical %uint %2738 %uint_4
+       %2747 = OpBitwiseAnd %uint %2746 %uint_7
+       %2748 = OpShiftLeftLogical %uint %2747 %uint_28
+       %2749 = OpAccessChain %_ptr_Function_uint %2372 %uint_1
+       %2750 = OpLoad %uint %2749
+       %2751 = OpBitwiseOr %uint %2750 %2748
+       %2752 = OpAccessChain %_ptr_Function_uint %2372 %uint_1
+               OpStore %2752 %2751
+       %2753 = OpShiftRightLogical %uint %2738 %uint_7
+       %2754 = OpBitwiseAnd %uint %2753 %uint_15
+       %2755 = OpShiftLeftLogical %uint %2754 %uint_28
+       %2756 = OpAccessChain %_ptr_Function_uint %2372 %uint_2
+       %2757 = OpLoad %uint %2756
+       %2758 = OpBitwiseOr %uint %2757 %2755
+       %2759 = OpAccessChain %_ptr_Function_uint %2372 %uint_2
+               OpStore %2759 %2758
+       %2760 = OpShiftRightLogical %uint %2738 %uint_11
+       %2761 = OpBitwiseAnd %uint %2760 %uint_7
+       %2762 = OpShiftLeftLogical %uint %2761 %uint_28
+       %2763 = OpAccessChain %_ptr_Function_uint %2372 %uint_3
+       %2764 = OpLoad %uint %2763
+       %2765 = OpBitwiseOr %uint %2764 %2762
+       %2766 = OpAccessChain %_ptr_Function_uint %2372 %uint_3
+               OpStore %2766 %2765
+       %2767 = OpISub %uint %205 %103
+       %2768 = OpLoad %v4uint %2372
+       %2769 = OpAccessChain %_ptr_Workgroup_v4uint %57 %uint_0 %2767
+               OpStore %2769 %2768
+               OpBranch %2719
+       %2719 = OpLabel
+       %2770 = OpIAdd %uint %205 %uint_256
+               OpBranch %202
+        %202 = OpLabel
+               OpBranch %200
+               OpFunctionEnd

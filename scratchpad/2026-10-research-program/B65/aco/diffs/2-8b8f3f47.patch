@@ -1,0 +1,167 @@
+commit 8b8f3f4768a5ede10a7974f08889d33a8a9a2fea
+Author: Claude <claude@example.com>
+Date:   Sat Nov 28 06:06:26 2026 +0000
+
+    midout wide: phase 3b reads each probe's digits once for four chunks
+    
+    Each lane covers chunks q, q + 4, q + 8 and q + 12 of one list entry
+    (64 probe streams, 64 entries x 16 chunks per cube step). The words,
+    masks and records per (entry, chunk) are computed by the same formula
+    as before; the records' order in a slab changes. A step places at most
+    256 records, one slab.
+    
+    Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+
+diff --git a/common/src/midout/gpu_wide.rs b/common/src/midout/gpu_wide.rs
+index e82e4aac..e2b9bd2a 100644
+--- a/common/src/midout/gpu_wide.rs
++++ b/common/src/midout/gpu_wide.rs
+@@ -749,16 +749,16 @@ mod wk {
+                 }
+                 sync_cube();
+                 let nlist = s_nl[0usize].load();
+-                // phase 3b: two chunks per lane (q = t % 8 and q + 8), 32 probe streams (st = t / 8), one list entry
+-                // per unit per step: a lane reads its probe's digits once for both chunks (the second chunk's rows
+-                // are a constant offset away), the same 32 entries x 16 chunks per cube step as before
+-                let q = t % 8u32;
+-                let st = t / 8u32;
+-                let mut vlo = Array::<u32>::new(2usize);
+-                let mut vhi = Array::<u32>::new(2usize);
++                // phase 3b: four chunks per lane (q = t % 4, chunks q, q + 4, q + 8, q + 12), 64 probe streams
++                // (st = t / 4), one list entry per unit per step: a lane reads its probe's digits once for its four
++                // chunks (their rows are constant offsets apart); 64 entries x 16 chunks per cube step
++                let q = t % 4u32;
++                let st = t / 4u32;
++                let mut vlo = Array::<u32>::new(4usize);
++                let mut vhi = Array::<u32>::new(4usize);
+                 #[unroll]
+-                for h in 0..2u32 {
+-                    let qh = q + comptime!(8 * h);
++                for h in 0..4u32 {
++                    let qh = q + comptime!(4 * h);
+                     let nq = select(qh < nch, min(64u32, ntake - min(ntake, qh * 64u32)), 0u32);
+                     vlo[h as usize] = select(nq >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nq % 32u32)) - 1u32);
+                     vhi[h as usize] = select(
+@@ -772,8 +772,9 @@ mod wk {
+                 let cpos0 = cdone + q * 64u32;
+                 let mut e0 = 0u32;
+                 while e0 < nlist {
+-                    let mut wlo = Array::<u32>::new(2usize);
+-                    let mut whi = Array::<u32>::new(2usize);
++                    let mut wlo = Array::<u32>::new(4usize);
++                    let mut whi = Array::<u32>::new(4usize);
++                    // e < nlist + 63 <= PMAX + 63 < pq's size (PMAX + 64)
+                     let e = e0 + st;
+                     let ent = select(e < nlist, pq[e as usize], 0u32);
+                     let p16 = ent & 0xFFFFu32;
+@@ -782,40 +783,39 @@ mod wk {
+                     if comptime!(maxpop > 18) {
+                         de = prob_e[(p16 >> 4u32) as usize];
+                     }
+-                    let mut alo0 = 0u32;
+-                    let mut ahi0 = 0u32;
+-                    let mut alo1 = 0u32;
+-                    let mut ahi1 = 0u32;
++                    let mut alo = Array::<u32>::new(4usize);
++                    let mut ahi = Array::<u32>::new(4usize);
++                    #[unroll]
++                    for h in 0..4u32 {
++                        alo[h as usize] = 0u32;
++                        ahi[h as usize] = 0u32;
++                    }
+                     #[unroll]
+                     for k in 0..maxpop {
+                         let dg = probe_digit(dws, de, k, maxpop);
+                         let row = (dg + qr) * 2u32;
+-                        alo0 |= sl[row as usize];
+-                        ahi0 |= sl[(row + 1u32) as usize];
+-                        alo1 |= sl[(row + comptime!(16 * srow)) as usize];
+-                        ahi1 |= sl[(row + comptime!(16 * srow + 1)) as usize];
++                        #[unroll]
++                        for h in 0..4u32 {
++                            alo[h as usize] = alo[h as usize] | sl[(row + comptime!(8 * srow * h)) as usize];
++                            ahi[h as usize] = ahi[h as usize] | sl[(row + comptime!(8 * srow * h + 1)) as usize];
++                        }
+                     }
++                    let mut nsl = Array::<u32>::new(4usize);
++                    let mut rk = Array::<u32>::new(4usize);
++                    let mut nn = 0u32;
+                     #[unroll]
+-                    for h in 0..2u32 {
+-                        let kmask = 0u32 - ((ent >> (qs + comptime!(8 * h))) & 1u32);
+-                        let mut al = alo0;
+-                        let mut ah = ahi0;
+-                        if comptime!(h == 1) {
+-                            al = alo1;
+-                            ah = ahi1;
+-                        }
+-                        wlo[h as usize] = !al & vlo[h as usize] & kmask;
+-                        whi[h as usize] = !ah & vhi[h as usize] & kmask;
++                    for h in 0..4u32 {
++                        let kmask = 0u32 - ((ent >> (qs + comptime!(4 * h))) & 1u32);
++                        wlo[h as usize] = !alo[h as usize] & vlo[h as usize] & kmask;
++                        whi[h as usize] = !ahi[h as usize] & vhi[h as usize] & kmask;
++                        let nz = (wlo[h as usize] | whi[h as usize]) != 0u32;
++                        nsl[h as usize] = nn;
++                        rk[h as usize] = plane_rank_m(nz, rlo, rhi, w);
++                        nn += plane_count(nz, w);
+                     }
+                     if t == 0u32 {
+-                        my_lslots += min(32u32, nlist - e0) * nch;
++                        my_lslots += min(64u32, nlist - e0) * nch;
+                     }
+-                    let nza = (wlo[0usize] | whi[0usize]) != 0u32;
+-                    let nzb = (wlo[1usize] | whi[1usize]) != 0u32;
+-                    let na = plane_count(nza, w);
+-                    let nn = na + plane_count(nzb, w);
+-                    let ra = plane_rank_m(nza, rlo, rhi, w);
+-                    let rb = plane_rank_m(nzb, rlo, rhi, w);
+                     if nn > 0u32 {
+                         if slab_used + nn > SLAB {
+                             if lane == 0u32 && have_slab {
+@@ -837,30 +837,25 @@ mod wk {
+                         // as when lanes split from lane 0's after a branch append apart from it
+                         let lost = (fault & 1048576u32) != 0u32 && lane != 0u32;
+                         if slab_id < nslab_cap {
+-                            if nza {
+-                                let mut rv = Vector::<u32, Const<4>>::empty();
+-                                rv[0usize] = ((p16 >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
+-                                rv[1usize] = cpos0;
+-                                rv[2usize] = select(lost, 0u32, wlo[0usize]);
+-                                rv[3usize] = select(lost, 0u32, whi[0usize]);
+-                                out[(sbase + ra) as usize] = rv;
+-                            }
+-                            if nzb {
+-                                let mut rv = Vector::<u32, Const<4>>::empty();
+-                                rv[0usize] = ((p16 >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
+-                                rv[1usize] = cpos0 + 512u32;
+-                                rv[2usize] = select(lost, 0u32, wlo[1usize]);
+-                                rv[3usize] = select(lost, 0u32, whi[1usize]);
+-                                out[(sbase + na + rb) as usize] = rv;
++                            #[unroll]
++                            for h in 0..4u32 {
++                                if (wlo[h as usize] | whi[h as usize]) != 0u32 {
++                                    let mut rv = Vector::<u32, Const<4>>::empty();
++                                    rv[0usize] = ((p16 >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
++                                    rv[1usize] = cpos0 + comptime!(256 * h);
++                                    rv[2usize] = select(lost, 0u32, wlo[h as usize]);
++                                    rv[3usize] = select(lost, 0u32, whi[h as usize]);
++                                    out[(sbase + nsl[h as usize] + rk[h as usize]) as usize] = rv;
++                                }
+                             }
+                         }
+-                        my_surv += wlo[0usize].count_ones()
+-                            + whi[0usize].count_ones()
+-                            + wlo[1usize].count_ones()
+-                            + whi[1usize].count_ones();
++                        #[unroll]
++                        for h in 0..4u32 {
++                            my_surv += wlo[h as usize].count_ones() + whi[h as usize].count_ones();
++                        }
+                         slab_used += nn;
+                     }
+-                    e0 += 32u32;
++                    e0 += 64u32;
+                 }
+                 if t == 0u32 {
+                     my_flat += nprobe * nch;

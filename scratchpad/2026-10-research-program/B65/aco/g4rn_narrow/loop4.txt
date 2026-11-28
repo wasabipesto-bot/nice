@@ -1,0 +1,571 @@
+== G2Kernel_WgpuRuntime_0x8ce3f91f5425c936.aco.txt: SGPRs=108 VGPRs=120 LDS size=21504 Subgroups per SIMD=12 Instructions=2484 Latency=66078 Inverse Throughput=15829
+   whole: alu=1816 valu=976 q=0 v64=21 salu=673 lds=146 vmem=28 smem=46 wait=594 vcyc=1018
+   loop 0: BB35..BB49 (5 blocks, innermost) alu=21 valu=11 q=0 v64=0 salu=9 lds=1 vmem=1 smem=1 wait=7 vcyc=11
+   loop 1: BB67..BB344 (115 blocks) alu=1424 valu=867 q=0 v64=21 salu=398 lds=138 vmem=13 smem=13 wait=423 vcyc=909
+   loop 2: BB71..BB104 (15 blocks, innermost) alu=127 valu=52 q=0 v64=5 salu=64 lds=6 vmem=2 smem=2 wait=42 vcyc=62
+   loop 3: BB254..BB268 (5 blocks, innermost) alu=79 valu=52 q=0 v64=0 salu=6 lds=21 vmem=0 smem=0 wait=18 vcyc=52
+   loop 4: BB270..BB324 (23 blocks, innermost) alu=414 valu=278 q=0 v64=0 salu=65 lds=71 vmem=7 smem=7 wait=113 vcyc=278
+     BB270 [uniform, loop-header,] alu=2 valu=0 q=0 v64=0 salu=2 lds=0 vmem=0 smem=0 wait=1 vcyc=0  s_cbranch_scc1->BB325
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %2755:scc = s_cmp_ge_u32 %1199:s[31], %1136:s[14]
+        salu  s_cbranch_scc1 block:BB325
+     BB273 [uniform,] alu=320 valu=226 q=0 v64=0 salu=23 lds=71 vmem=0 smem=0 wait=72 vcyc=226  s_cbranch_scc0->BB324
+        valu  v1: %1206:v[16] = v_add_u32 %1199:s[31], %1194:v[34]
+        wait  s_delay_alu valu_dep_1
+        valu  v1: %1207:v[21] = v_lshlrev_b32 2, %1206:v[16]
+        lds   v1: %1208:v[21] = ds_read_b32 %1207:v[21] offset0:384 storage:shared
+        valu  s2: %1209:s[36-37] = v_cmp_gt_u32 %2738:v[12], %1206:v[16]
+        wait  s_wait_dscnt imm:0
+        wait  s_waitcnt_depctr va_sdst(0)
+        valu  v1: %1210:v[21] = v_cndmask_b32 0, %1208:v[21], %1209:s[36-37]
+        wait  s_delay_alu valu_dep_1 next valu_dep_1
+        valu  v1: %1211:v[26] = v_bfe_u32 %1210:v[21], 4, 12
+        valu  v1: %1212:v[26] = v_lshlrev_b32 4, (is16bit)%1211:v[26]
+        lds   v2: %1213:v[40-41] = ds_read_b64 %1212:v[26] offset0:3328 storage:shared
+        lds   v2: %1214:v[42-43] = ds_read_b64 %1212:v[26] offset0:3336 storage:shared
+        wait  s_wait_dscnt imm:1
+        valu  v1: %1230:v[52] = v_bfe_u32 %2760:v[40], 6, 6
+        valu  v1: %1216:v[31] = v_and_b32 63, %2760:v[40]
+        wait  s_delay_alu valu_dep_2 skip_1 valu_dep_2
+        valu  v1: %1231:v[52] = v_lshlrev_b32 5, (is16bit)%1230:v[52]
+        valu  v1: %1217:v[31] = v_lshlrev_b32 5, (is16bit)%1216:v[31]
+        valu  v1: %1243:v[58] = v_add_lshl_u32 %1231:v[52], %1197:v[37], 2
+        valu  v1: %1233:v[53] = v_add_lshl_u32 %1231:v[52], %1195:v[35], 2
+        valu  v1: %1238:v[56] = v_add_lshl_u32 %1231:v[52], %1196:v[36], 2
+        valu  v1: %1248:v[52] = v_add_lshl_u32 %1231:v[52], %1198:v[38], 2
+        valu  v1: %1252:v[60] = v_bfe_u32 %2760:v[40], 12, 6
+        valu  v1: %1219:v[39] = v_add_lshl_u32 %1217:v[31], %1195:v[35], 2
+        valu  v1: %1222:v[46] = v_add_lshl_u32 %1217:v[31], %1196:v[36], 2
+        valu  v1: %1225:v[48] = v_add_lshl_u32 %1217:v[31], %1197:v[37], 2
+        valu  v1: %1228:v[31] = v_add_lshl_u32 %1217:v[31], %1198:v[38], 2
+        valu  v1: %1253:v[60] = v_lshlrev_b32 5, (is16bit)%1252:v[60]
+        wait  s_delay_alu valu_dep_1 skip_4 valu_dep_1
+        valu  v1: %1260:v[64] = v_add_lshl_u32 %1253:v[60], %1196:v[36], 2
+        valu  v1: %1255:v[61] = v_add_lshl_u32 %1253:v[60], %1195:v[35], 2
+        valu  v1: %1265:v[66] = v_add_lshl_u32 %1253:v[60], %1197:v[37], 2
+        valu  v1: %1270:v[60] = v_add_lshl_u32 %1253:v[60], %1198:v[38], 2
+        valu  v1: %1275:v[68] = v_bfe_u32 %2760:v[40], 18, 6
+        valu  v1: %1276:v[68] = v_lshlrev_b32 5, (is16bit)%1275:v[68]
+        wait  s_delay_alu valu_dep_1
+        valu  v1: %1283:v[72] = v_add_lshl_u32 %1276:v[68], %1196:v[36], 2
+        valu  v1: %1278:v[69] = v_add_lshl_u32 %1276:v[68], %1195:v[35], 2
+        lds   v2: %1220:v[44-45] = ds_read_b64 %1219:v[39] offset0:12544 storage:shared
+        lds   v2: %1223:v[46-47] = ds_read_b64 %1222:v[46] offset0:12544 storage:shared
+        lds   v2: %1226:v[48-49] = ds_read_b64 %1225:v[48] offset0:12544 storage:shared
+        lds   v2: %1229:v[50-51] = ds_read_b64 %1228:v[31] offset0:12544 storage:shared
+        lds   v2: %1234:v[54-55] = ds_read_b64 %1233:v[53] offset0:12544 storage:shared
+        lds   v2: %1239:v[56-57] = ds_read_b64 %1238:v[56] offset0:12544 storage:shared
+        lds   v2: %1244:v[58-59] = ds_read_b64 %1243:v[58] offset0:12544 storage:shared
+        lds   v2: %1249:v[52-53] = ds_read_b64 %1248:v[52] offset0:12544 storage:shared
+        lds   v2: %1256:v[62-63] = ds_read_b64 %1255:v[61] offset0:12544 storage:shared
+        lds   v2: %1261:v[64-65] = ds_read_b64 %1260:v[64] offset0:12544 storage:shared
+        lds   v2: %1266:v[66-67] = ds_read_b64 %1265:v[66] offset0:12544 storage:shared
+        lds   v2: %1271:v[60-61] = ds_read_b64 %1270:v[60] offset0:12544 storage:shared
+        lds   v2: %1279:v[70-71] = ds_read_b64 %1278:v[69] offset0:12544 storage:shared
+        lds   v2: %1284:v[72-73] = ds_read_b64 %1283:v[72] offset0:12544 storage:shared
+        valu  v1: %1288:v[74] = v_add_lshl_u32 %1276:v[68], %1197:v[37], 2
+        valu  v1: %1293:v[68] = v_add_lshl_u32 %1276:v[68], %1198:v[38], 2
+        valu  v1: %1297:v[40] = v_bfe_u32 %2760:v[40], 24, 6
+        wait  s_delay_alu valu_dep_1 next valu_dep_1
+        valu  v1: %1298:v[40] = v_lshlrev_b32 5, (is16bit)%1297:v[40]
+        valu  v1: %1300:v[75] = v_add_lshl_u32 %1298:v[40], %1195:v[35], 2
+        valu  v1: %1310:v[77] = v_add_lshl_u32 %1298:v[40], %1197:v[37], 2
+        valu  v1: %1305:v[76] = v_add_lshl_u32 %1298:v[40], %1196:v[36], 2
+        wait  s_wait_dscnt imm:5
+        valu  v1: %1257:v[62] = v_or3_b32 %2782:v[62], %2764:v[44], %2773:v[54]
+        valu  v1: %1315:v[40] = v_add_lshl_u32 %1298:v[40], %1198:v[38], 2
+        valu  v1: %1258:v[63] = v_or3_b32 %2783:v[63], %2765:v[45], %2774:v[55]
+        wait  s_wait_dscnt imm:4
+        valu  v1: %1262:v[64] = v_or3_b32 %2784:v[64], %2766:v[46], %2775:v[56]
+        valu  v1: %1263:v[65] = v_or3_b32 %2785:v[65], %2767:v[47], %2776:v[57]
+        wait  s_wait_dscnt imm:3
+        valu  v1: %1268:v[67] = v_or3_b32 %2787:v[67], %2769:v[49], %2778:v[59]
+        valu  v1: %1319:v[78] = v_and_b32 63, %2761:v[41]
+        valu  v1: %1267:v[66] = v_or3_b32 %2786:v[66], %2768:v[48], %2777:v[58]
+        wait  s_wait_dscnt imm:2
+        valu  v1: %1272:v[60] = v_or3_b32 %2788:v[60], %2770:v[50], %2779:v[52]
+        valu  v1: %1273:v[61] = v_or3_b32 %2789:v[61], %2771:v[51], %2780:v[53]
+        wait  s_delay_alu valu_dep_4 next valu_dep_1
+        valu  v1: %1320:v[78] = v_lshlrev_b32 5, (is16bit)%1319:v[78]
+        valu  v1: %1327:v[80] = v_add_lshl_u32 %1320:v[78], %1196:v[36], 2
+        valu  v1: %1322:v[79] = v_add_lshl_u32 %1320:v[78], %1195:v[35], 2
+        lds   v2: %1289:v[44-45] = ds_read_b64 %1288:v[74] offset0:12544 storage:shared
+        lds   v2: %1294:v[46-47] = ds_read_b64 %1293:v[68] offset0:12544 storage:shared
+        lds   v2: %1301:v[54-55] = ds_read_b64 %1300:v[75] offset0:12544 storage:shared
+        lds   v2: %1306:v[48-49] = ds_read_b64 %1305:v[76] offset0:12544 storage:shared
+        lds   v2: %1311:v[50-51] = ds_read_b64 %1310:v[77] offset0:12544 storage:shared
+        lds   v2: %1316:v[52-53] = ds_read_b64 %1315:v[40] offset0:12544 storage:shared
+        lds   v2: %1323:v[56-57] = ds_read_b64 %1322:v[79] offset0:12544 storage:shared
+        lds   v2: %1328:v[58-59] = ds_read_b64 %1327:v[80] offset0:12544 storage:shared
+        valu  v1: %1332:v[81] = v_add_lshl_u32 %1320:v[78], %1197:v[37], 2
+        valu  v1: %1337:v[78] = v_add_lshl_u32 %1320:v[78], %1198:v[38], 2
+        valu  v1: %1341:v[82] = v_bfe_u32 %2761:v[41], 6, 6
+        wait  s_delay_alu valu_dep_1 next valu_dep_1
+        valu  v1: %1342:v[82] = v_lshlrev_b32 5, (is16bit)%1341:v[82]
+        valu  v1: %1354:v[85] = v_add_lshl_u32 %1342:v[82], %1197:v[37], 2
+        valu  v1: %1344:v[83] = v_add_lshl_u32 %1342:v[82], %1195:v[35], 2
+        valu  v1: %1349:v[84] = v_add_lshl_u32 %1342:v[82], %1196:v[36], 2
+        valu  v1: %1359:v[82] = v_add_lshl_u32 %1342:v[82], %1198:v[38], 2
+        wait  s_wait_dscnt imm:5
+        valu  v1: %1302:v[54] = v_or3_b32 %2800:v[54], %1257:v[62], %2791:v[70]
+        valu  v1: %1303:v[55] = v_or3_b32 %2801:v[55], %1258:v[63], %2792:v[71]
+        wait  s_wait_dscnt imm:4
+        valu  v1: %1307:v[48] = v_or3_b32 %2802:v[48], %1262:v[64], %2793:v[72]
+        valu  v1: %1308:v[49] = v_or3_b32 %2803:v[49], %1263:v[65], %2794:v[73]
+        wait  s_wait_dscnt imm:3
+        valu  v1: %1313:v[51] = v_or3_b32 %2805:v[51], %1268:v[67], %2796:v[45]
+        valu  v1: %1312:v[50] = v_or3_b32 %2804:v[50], %1267:v[66], %2795:v[44]
+        valu  v1: %1363:v[86] = v_bfe_u32 %2761:v[41], 12, 6
+        wait  s_wait_dscnt imm:2
+        valu  v1: %1318:v[53] = v_or3_b32 %2807:v[53], %1273:v[61], %2798:v[47]
+        valu  v1: %1317:v[52] = v_or3_b32 %2806:v[52], %1272:v[60], %2797:v[46]
+        wait  s_delay_alu valu_dep_3 next valu_dep_1
+        valu  v1: %1364:v[86] = v_lshlrev_b32 5, (is16bit)%1363:v[86]
+        valu  v1: %1371:v[88] = v_add_lshl_u32 %1364:v[86], %1196:v[36], 2
+        valu  v1: %1366:v[87] = v_add_lshl_u32 %1364:v[86], %1195:v[35], 2
+        lds   v2: %1333:v[62-63] = ds_read_b64 %1332:v[81] offset0:12544 storage:shared
+        lds   v2: %1338:v[68-69] = ds_read_b64 %1337:v[78] offset0:12544 storage:shared
+        lds   v2: %1345:v[64-65] = ds_read_b64 %1344:v[83] offset0:12544 storage:shared
+        lds   v2: %1350:v[44-45] = ds_read_b64 %1349:v[84] offset0:12544 storage:shared
+        lds   v2: %1355:v[46-47] = ds_read_b64 %1354:v[85] offset0:12544 storage:shared
+        lds   v2: %1360:v[60-61] = ds_read_b64 %1359:v[82] offset0:12544 storage:shared
+        lds   v2: %1367:v[66-67] = ds_read_b64 %1366:v[87] offset0:12544 storage:shared
+        lds   v2: %1372:v[70-71] = ds_read_b64 %1371:v[88] offset0:12544 storage:shared
+        valu  v1: %1376:v[89] = v_add_lshl_u32 %1364:v[86], %1197:v[37], 2
+        valu  v1: %1381:v[86] = v_add_lshl_u32 %1364:v[86], %1198:v[38], 2
+        valu  v1: %1385:v[90] = v_bfe_u32 %2761:v[41], 18, 6
+        wait  s_delay_alu valu_dep_1 next valu_dep_1
+        valu  v1: %1386:v[90] = v_lshlrev_b32 5, (is16bit)%1385:v[90]
+        valu  v1: %1398:v[93] = v_add_lshl_u32 %1386:v[90], %1197:v[37], 2
+        valu  v1: %1388:v[91] = v_add_lshl_u32 %1386:v[90], %1195:v[35], 2
+        valu  v1: %1393:v[92] = v_add_lshl_u32 %1386:v[90], %1196:v[36], 2
+        valu  v1: %1403:v[90] = v_add_lshl_u32 %1386:v[90], %1198:v[38], 2
+        wait  s_wait_dscnt imm:5
+        valu  v1: %1346:v[64] = v_or3_b32 %2817:v[64], %1302:v[54], %2808:v[56]
+        valu  v1: %1347:v[65] = v_or3_b32 %2818:v[65], %1303:v[55], %2809:v[57]
+        wait  s_wait_dscnt imm:4
+        valu  v1: %1352:v[45] = v_or3_b32 %2820:v[45], %1308:v[49], %2811:v[59]
+        valu  v1: %1351:v[44] = v_or3_b32 %2819:v[44], %1307:v[48], %2810:v[58]
+        wait  s_wait_dscnt imm:3
+        valu  v1: %1356:v[46] = v_or3_b32 %2821:v[46], %1312:v[50], %2812:v[62]
+        valu  v1: %1357:v[47] = v_or3_b32 %2822:v[47], %1313:v[51], %2813:v[63]
+        valu  v1: %1407:v[41] = v_bfe_u32 %2761:v[41], 24, 6
+        wait  s_wait_dscnt imm:2
+        valu  v1: %1361:v[60] = v_or3_b32 %2823:v[60], %1317:v[52], %2814:v[68]
+        valu  v1: %1362:v[61] = v_or3_b32 %2824:v[61], %1318:v[53], %2815:v[69]
+        wait  s_delay_alu valu_dep_3 next valu_dep_1
+        valu  v1: %1408:v[41] = v_lshlrev_b32 5, (is16bit)%1407:v[41]
+        valu  v1: %1415:v[95] = v_add_lshl_u32 %1408:v[41], %1196:v[36], 2
+        valu  v1: %1420:v[96] = v_add_lshl_u32 %1408:v[41], %1197:v[37], 2
+        valu  v1: %1410:v[94] = v_add_lshl_u32 %1408:v[41], %1195:v[35], 2
+        valu  v1: %1425:v[41] = v_add_lshl_u32 %1408:v[41], %1198:v[38], 2
+        lds   v2: %1377:v[54-55] = ds_read_b64 %1376:v[89] offset0:12544 storage:shared
+        lds   v2: %1382:v[56-57] = ds_read_b64 %1381:v[86] offset0:12544 storage:shared
+        lds   v2: %1389:v[48-49] = ds_read_b64 %1388:v[91] offset0:12544 storage:shared
+        lds   v2: %1394:v[50-51] = ds_read_b64 %1393:v[92] offset0:12544 storage:shared
+        lds   v2: %1399:v[52-53] = ds_read_b64 %1398:v[93] offset0:12544 storage:shared
+        lds   v2: %1404:v[58-59] = ds_read_b64 %1403:v[90] offset0:12544 storage:shared
+        lds   v2: %1411:v[62-63] = ds_read_b64 %1410:v[94] offset0:12544 storage:shared
+        lds   v2: %1416:v[68-69] = ds_read_b64 %1415:v[95] offset0:12544 storage:shared
+        lds   v2: %1421:v[72-73] = ds_read_b64 %1420:v[96] offset0:12544 storage:shared
+        lds   v2: %1426:v[40-41] = ds_read_b64 %1425:v[41] offset0:12544 storage:shared
+        valu  v1: %1429:v[97] = v_and_b32 63, %2762:v[42]
+        wait  s_delay_alu valu_dep_1 next valu_dep_1
+        valu  v1: %1430:v[97] = v_lshlrev_b32 5, (is16bit)%1429:v[97]
+        valu  v1: %1432:v[98] = v_add_lshl_u32 %1430:v[97], %1195:v[35], 2
+        valu  v1: %1437:v[99] = v_add_lshl_u32 %1430:v[97], %1196:v[36], 2
+        valu  v1: %1442:v[100] = v_add_lshl_u32 %1430:v[97], %1197:v[37], 2
+        valu  v1: %1447:v[97] = v_add_lshl_u32 %1430:v[97], %1198:v[38], 2
+        valu  v1: %1451:v[101] = v_bfe_u32 %2762:v[42], 6, 6
+        wait  s_wait_dscnt imm:6
+        valu  v1: %1395:v[50] = v_or3_b32 %2837:v[50], %1351:v[44], %2828:v[70]
+        valu  v1: %1391:v[49] = v_or3_b32 %2836:v[49], %1347:v[65], %2827:v[67]
+        valu  v1: %1390:v[48] = v_or3_b32 %2835:v[48], %1346:v[64], %2826:v[66]
+        valu  v1: %1396:v[51] = v_or3_b32 %2838:v[51], %1352:v[45], %2829:v[71]
+        wait  s_wait_dscnt imm:5
+        valu  v1: %1400:v[52] = v_or3_b32 %2839:v[52], %1356:v[46], %2830:v[54]
+        valu  v1: %1401:v[53] = v_or3_b32 %2840:v[53], %1357:v[47], %2831:v[55]
+        wait  s_wait_dscnt imm:4
+        valu  v1: %1405:v[58] = v_or3_b32 %2841:v[58], %1361:v[60], %2832:v[56]
+        valu  v1: %1406:v[59] = v_or3_b32 %2842:v[59], %1362:v[61], %2833:v[57]
+        valu  v1: %1452:v[101] = v_lshlrev_b32 5, (is16bit)%1451:v[101]
+        wait  s_delay_alu valu_dep_1
+        valu  v1: %1459:v[103] = v_add_lshl_u32 %1452:v[101], %1196:v[36], 2
+        valu  v1: %1454:v[102] = v_add_lshl_u32 %1452:v[101], %1195:v[35], 2
+        lds   v2: %1433:v[44-45] = ds_read_b64 %1432:v[98] offset0:12544 storage:shared
+        lds   v2: %1438:v[46-47] = ds_read_b64 %1437:v[99] offset0:12544 storage:shared
+        lds   v2: %1443:v[54-55] = ds_read_b64 %1442:v[100] offset0:12544 storage:shared
+        lds   v2: %1448:v[56-57] = ds_read_b64 %1447:v[97] offset0:12544 storage:shared
+        lds   v2: %1455:v[60-61] = ds_read_b64 %1454:v[102] offset0:12544 storage:shared
+        lds   v2: %1460:v[64-65] = ds_read_b64 %1459:v[103] offset0:12544 storage:shared
+        valu  v1: %1473:v[105] = v_bfe_u32 %2762:v[42], 12, 6
+        valu  v1: %1464:v[104] = v_add_lshl_u32 %1452:v[101], %1197:v[37], 2
+        valu  v1: %1469:v[101] = v_add_lshl_u32 %1452:v[101], %1198:v[38], 2
+        wait  s_delay_alu valu_dep_3 next valu_dep_1
+        valu  v1: %1474:v[105] = v_lshlrev_b32 5, (is16bit)%1473:v[105]
+        valu  v1: %1476:v[106] = v_add_lshl_u32 %1474:v[105], %1195:v[35], 2
+        valu  v1: %1481:v[107] = v_add_lshl_u32 %1474:v[105], %1196:v[36], 2
+        valu  v1: %1486:v[108] = v_add_lshl_u32 %1474:v[105], %1197:v[37], 2
+        valu  v1: %1491:v[105] = v_add_lshl_u32 %1474:v[105], %1198:v[38], 2
+        wait  s_wait_dscnt imm:5
+        valu  v1: %1434:v[44] = v_or3_b32 %2852:v[44], %1390:v[48], %2844:v[62]
+        valu  v1: %1435:v[45] = v_or3_b32 %2853:v[45], %1391:v[49], %2845:v[63]
+        wait  s_wait_dscnt imm:4
+        valu  v1: %1440:v[47] = v_or3_b32 %2855:v[47], %1396:v[51], %2847:v[69]
+        valu  v1: %1439:v[46] = v_or3_b32 %2854:v[46], %1395:v[50], %2846:v[68]
+        valu  v1: %1495:v[109] = v_bfe_u32 %2762:v[42], 18, 6
+        wait  s_wait_dscnt imm:3
+        valu  v1: %1444:v[54] = v_or3_b32 %2856:v[54], %1400:v[52], %2848:v[72]
+        valu  v1: %1445:v[55] = v_or3_b32 %2857:v[55], %1401:v[53], %2849:v[73]
+        wait  s_wait_dscnt imm:2
+        valu  v1: %1449:v[56] = v_or3_b32 %2858:v[56], %1405:v[58], %2850:v[40]
+        valu  v1: %1450:v[57] = v_or3_b32 %2859:v[57], %1406:v[59], %2851:v[41]
+        valu  v1: %1496:v[109] = v_lshlrev_b32 5, (is16bit)%1495:v[109]
+        wait  s_delay_alu valu_dep_1
+        valu  v1: %1503:v[111] = v_add_lshl_u32 %1496:v[109], %1196:v[36], 2
+        valu  v1: %1498:v[110] = v_add_lshl_u32 %1496:v[109], %1195:v[35], 2
+        lds   v2: %1465:v[48-49] = ds_read_b64 %1464:v[104] offset0:12544 storage:shared
+        lds   v2: %1470:v[62-63] = ds_read_b64 %1469:v[101] offset0:12544 storage:shared
+        lds   v2: %1477:v[50-51] = ds_read_b64 %1476:v[106] offset0:12544 storage:shared
+        lds   v2: %1482:v[40-41] = ds_read_b64 %1481:v[107] offset0:12544 storage:shared
+        lds   v2: %1487:v[52-53] = ds_read_b64 %1486:v[108] offset0:12544 storage:shared
+        lds   v2: %1492:v[58-59] = ds_read_b64 %1491:v[105] offset0:12544 storage:shared
+        lds   v2: %1499:v[66-67] = ds_read_b64 %1498:v[110] offset0:12544 storage:shared
+        lds   v2: %1504:v[68-69] = ds_read_b64 %1503:v[111] offset0:12544 storage:shared
+        valu  v1: %1508:v[112] = v_add_lshl_u32 %1496:v[109], %1197:v[37], 2
+        valu  v1: %1513:v[109] = v_add_lshl_u32 %1496:v[109], %1198:v[38], 2
+        valu  v1: %1517:v[42] = v_bfe_u32 %2762:v[42], 24, 6
+        wait  s_delay_alu valu_dep_1 next valu_dep_1
+        valu  v1: %1518:v[42] = v_lshlrev_b32 5, (is16bit)%1517:v[42]
+        valu  v1: %1530:v[115] = v_add_lshl_u32 %1518:v[42], %1197:v[37], 2
+        valu  v1: %1520:v[113] = v_add_lshl_u32 %1518:v[42], %1195:v[35], 2
+        valu  v1: %1525:v[114] = v_add_lshl_u32 %1518:v[42], %1196:v[36], 2
+        valu  v1: %1535:v[42] = v_add_lshl_u32 %1518:v[42], %1198:v[38], 2
+        wait  s_wait_dscnt imm:5
+        valu  v1: %1479:v[51] = v_or3_b32 %2871:v[51], %1435:v[45], %2862:v[61]
+        valu  v1: %1478:v[50] = v_or3_b32 %2870:v[50], %1434:v[44], %2861:v[60]
+        wait  s_wait_dscnt imm:4
+        valu  v1: %1484:v[41] = v_or3_b32 %2873:v[41], %1440:v[47], %2864:v[65]
+        valu  v1: %1483:v[40] = v_or3_b32 %2872:v[40], %1439:v[46], %2863:v[64]
+        wait  s_wait_dscnt imm:3
+        valu  v1: %1489:v[53] = v_or3_b32 %2875:v[53], %1445:v[55], %2866:v[49]
+        valu  v1: %1488:v[52] = v_or3_b32 %2874:v[52], %1444:v[54], %2865:v[48]
+        valu  v1: %1539:v[116] = v_and_b32 63, %2763:v[43]
+        wait  s_wait_dscnt imm:2
+        valu  v1: %1494:v[59] = v_or3_b32 %2877:v[59], %1450:v[57], %2868:v[63]
+        valu  v1: %1493:v[58] = v_or3_b32 %2876:v[58], %1449:v[56], %2867:v[62]
+        wait  s_delay_alu valu_dep_3 next valu_dep_1
+        valu  v1: %1540:v[116] = v_lshlrev_b32 5, (is16bit)%1539:v[116]
+        valu  v1: %1542:v[117] = v_add_lshl_u32 %1540:v[116], %1195:v[35], 2
+        lds   v2: %1509:v[44-45] = ds_read_b64 %1508:v[112] offset0:12544 storage:shared
+        lds   v2: %1514:v[60-61] = ds_read_b64 %1513:v[109] offset0:12544 storage:shared
+        lds   v2: %1521:v[46-47] = ds_read_b64 %1520:v[113] offset0:12544 storage:shared
+        lds   v2: %1526:v[48-49] = ds_read_b64 %1525:v[114] offset0:12544 storage:shared
+        lds   v2: %1531:v[54-55] = ds_read_b64 %1530:v[115] offset0:12544 storage:shared
+        lds   v2: %1536:v[56-57] = ds_read_b64 %1535:v[42] offset0:12544 storage:shared
+        lds   v2: %1543:v[62-63] = ds_read_b64 %1542:v[117] offset0:12544 storage:shared
+        valu  v1: %1547:v[117] = v_add_lshl_u32 %1540:v[116], %1196:v[36], 2
+        lds   v2: %1548:v[64-65] = ds_read_b64 %1547:v[117] offset0:12544 storage:shared
+        valu  v1: %1552:v[117] = v_add_lshl_u32 %1540:v[116], %1197:v[37], 2
+        valu  v1: %1557:v[116] = v_add_lshl_u32 %1540:v[116], %1198:v[38], 2
+        wait  s_wait_dscnt imm:5
+        valu  v1: %1522:v[46] = v_or3_b32 %2888:v[46], %1478:v[50], %2879:v[66]
+        valu  v1: %1523:v[47] = v_or3_b32 %2889:v[47], %1479:v[51], %2880:v[67]
+        lds   v2: %1553:v[50-51] = ds_read_b64 %1552:v[117] offset0:12544 storage:shared
+        lds   v2: %1558:v[66-67] = ds_read_b64 %1557:v[116] offset0:12544 storage:shared
+        valu  v1: %1561:v[117] = v_bfe_u32 %2763:v[43], 6, 6
+        wait  s_wait_dscnt imm:6
+        valu  v1: %1528:v[49] = v_or3_b32 %2891:v[49], %1484:v[41], %2882:v[69]
+        valu  v1: %1527:v[48] = v_or3_b32 %2890:v[48], %1483:v[40], %2881:v[68]
+        wait  s_wait_dscnt imm:5
+        valu  v1: %1532:v[54] = v_or3_b32 %2892:v[54], %1488:v[52], %2883:v[44]
+        valu  v1: %1533:v[55] = v_or3_b32 %2893:v[55], %1489:v[53], %2884:v[45]
+        wait  s_wait_dscnt imm:4
+        valu  v1: %1537:v[56] = v_or3_b32 %2894:v[56], %1493:v[58], %2885:v[60]
+        valu  v1: %1538:v[57] = v_or3_b32 %2895:v[57], %1494:v[59], %2886:v[61]
+        valu  v1: %1562:v[117] = v_lshlrev_b32 5, (is16bit)%1561:v[117]
+        wait  s_delay_alu valu_dep_1
+        valu  v1: %1574:v[31] = v_add_lshl_u32 %1562:v[117], %1197:v[37], 2
+        valu  v1: %1564:v[16] = v_add_lshl_u32 %1562:v[117], %1195:v[35], 2
+        valu  v1: %1569:v[26] = v_add_lshl_u32 %1562:v[117], %1196:v[36], 2
+        valu  v1: %1579:v[117] = v_add_lshl_u32 %1562:v[117], %1198:v[38], 2
+        lds   v2: %1565:v[40-41] = ds_read_b64 %1564:v[16] offset0:12544 storage:shared
+        lds   v2: %1570:v[44-45] = ds_read_b64 %1569:v[26] offset0:12544 storage:shared
+        lds   v2: %1575:v[52-53] = ds_read_b64 %1574:v[31] offset0:12544 storage:shared
+        lds   v2: %1580:v[58-59] = ds_read_b64 %1579:v[117] offset0:12544 storage:shared
+        valu  v1: %1583:v[39] = v_add_u32 16, %1138:v[14]
+        valu  v1: %1604:v[42] = v_add_u32 16, %1152:v[19]
+        wait  s_delay_alu valu_dep_2 skip_1 valu_dep_2
+        valu  v1: %1584:v[39] = v_bfe_u32 %1210:v[21], %1583:v[39], 1
+        valu  v1: %1605:v[42] = v_bfe_u32 %1210:v[21], %1604:v[42], 1
+        valu  v1: %1587:v[39] = v_sub_u32 0, %1584:v[39]
+        valu  v1: %1608:v[42] = v_sub_u32 0, %1605:v[42]
+        wait  s_wait_dscnt imm:3
+        valu  v1: %1567:v[41] = v_or3_b32 %2906:v[41], %1523:v[47], %2897:v[63]
+        valu  v1: %1566:v[40] = v_or3_b32 %2905:v[40], %1522:v[46], %2896:v[62]
+        wait  s_wait_dscnt imm:2
+        valu  v1: %1571:v[44] = v_or3_b32 %2907:v[44], %1527:v[48], %2898:v[64]
+        valu  v1: %1572:v[45] = v_or3_b32 %2908:v[45], %1528:v[49], %2899:v[65]
+        wait  s_wait_dscnt imm:1
+        valu  v1: %1576:v[52] = v_or3_b32 %2909:v[52], %1532:v[54], %2900:v[50]
+        valu  v1: %1577:v[53] = v_or3_b32 %2910:v[53], %1533:v[55], %2901:v[51]
+        wait  s_wait_dscnt imm:0
+        valu  v1: %1581:v[58] = v_or3_b32 %2911:v[58], %1537:v[56], %2902:v[66]
+        valu  v1: %1582:v[59] = v_or3_b32 %2912:v[59], %1538:v[57], %2903:v[67]
+        valu  v1: %1590:v[41] = v_bfi_b32 %1567:v[41], 0, %1151:v[17]
+        valu  v1: %1586:v[40] = v_bfi_b32 %1566:v[40], 0, %1147:v[18]
+        valu  v1: %1607:v[44] = v_bfi_b32 %1571:v[44], 0, %1161:v[23]
+        valu  v1: %1611:v[45] = v_bfi_b32 %1572:v[45], 0, %1165:v[22]
+        wait  s_delay_alu valu_dep_4 skip_3 valu_dep_3
+        valu  v1: %1591:v[41] = v_and_b32 %1590:v[41], %1587:v[39]
+        valu  v1: %1588:v[40] = v_and_b32 %1586:v[40], %1587:v[39]
+        valu  v1: %1609:v[44] = v_and_b32 %1607:v[44], %1608:v[42]
+        valu  v1: %1612:v[45] = v_and_b32 %1611:v[45], %1608:v[42]
+        valu  v1: %1592:v[46] = v_or_b32 %1588:v[40], %1591:v[41]
+        wait  s_delay_alu valu_dep_2 next valu_dep_2
+        valu  v1: %1613:v[49] = v_or_b32 %1609:v[44], %1612:v[45]
+        valu  s2: %1593:s[36-37] = v_cmp_lg_i32 0, %1592:v[46]
+        wait  s_delay_alu valu_dep_2
+        valu  s2: %1614:s[40-41] = v_cmp_lg_i32 0, %1613:v[49]
+        salu  s2: %1594:s[38-39],  s1: %2913:scc = s_and_b64 %1593:s[36-37], %0:exec
+        wait  s_waitcnt_depctr sa_sdst(0)
+        valu  v1: %1596:v[47] = v_and_b32 %2914:s[38], %19:v[3]
+        valu  v1: %1597:v[48] = v_and_b32 %2915:s[39], %21:v[4]
+        salu  s1: %1601:s[39],  s1: %2916:scc = s_bcnt1_i32_b32 %2915:s[39]
+        salu  s1: %1602:s[38],  s1: %2917:scc = s_bcnt1_i32_b32 %2914:s[38]
+        valu  v1: %1626:v[54] = v_add_u32 16, %1166:v[24]
+        valu  v1: %1629:v[52] = v_bfi_b32 %1576:v[52], 0, %1175:v[28]
+        valu  v1: %1633:v[53] = v_bfi_b32 %1577:v[53], 0, %1179:v[27]
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %1603:s[38],  s1: %2918:scc = s_add_u32 %1602:s[38], %1601:s[39]
+        salu  s2: %1615:s[42-43],  s1: %2919:scc = s_and_b64 %1614:s[40-41], %0:exec
+        valu  v1: %1598:v[48] = v_bcnt_u32_b32 %1597:v[48], 0
+        valu  v1: %1627:v[54] = v_bfe_u32 %1210:v[21], %1626:v[54], 1
+        wait  s_waitcnt_depctr sa_sdst(0)
+        valu  v1: %1618:v[51] = v_and_b32 %2921:s[43], %21:v[4]
+        salu  s1: %1622:s[43],  s1: %2922:scc = s_bcnt1_i32_b32 %2921:s[43]
+        valu  v1: %1617:v[50] = v_and_b32 %2920:s[42], %19:v[3]
+        salu  s1: %1623:s[42],  s1: %2923:scc = s_bcnt1_i32_b32 %2920:s[42]
+        valu  v1: %1600:v[47] = v_bcnt_u32_b32 %1596:v[47], %1598:v[48]
+        valu  v1: %1630:v[54] = v_sub_u32 0, %1627:v[54]
+        valu  v1: %1619:v[51] = v_bcnt_u32_b32 %1618:v[51], 0
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %1624:s[42],  s1: %2924:scc = s_add_u32 %1623:s[42], %1622:s[43]
+        valu  v1: %1648:v[60] = v_add_u32 16, %1180:v[29]
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %1625:s[42],  s1: %2925:scc = s_add_u32 %1603:s[38], %1624:s[42]
+        valu  v1: %1631:v[52] = v_and_b32 %1629:v[52], %1630:v[54]
+        valu  v1: %1634:v[53] = v_and_b32 %1633:v[53], %1630:v[54]
+        valu  v1: %1651:v[58] = v_bfi_b32 %1581:v[58], 0, %1189:v[33]
+        valu  v1: %1621:v[50] = v_bcnt_u32_b32 %1617:v[50], %1619:v[51]
+        valu  v1: %1655:v[59] = v_bfi_b32 %1582:v[59], 0, %1193:v[32]
+        valu  v1: %1649:v[21] = v_bfe_u32 %1210:v[21], %1648:v[60], 1
+        valu  v1: %1635:v[55] = v_or_b32 %1631:v[52], %1634:v[53]
+        wait  s_delay_alu valu_dep_2 skip_1 valu_dep_2
+        valu  v1: %1652:v[21] = v_sub_u32 0, %1649:v[21]
+        valu  s2: %1636:s[44-45] = v_cmp_lg_i32 0, %1635:v[55]
+        valu  v1: %1656:v[59] = v_and_b32 %1655:v[59], %1652:v[21]
+        valu  v1: %1653:v[58] = v_and_b32 %1651:v[58], %1652:v[21]
+        salu  s2: %1637:s[46-47],  s1: %2926:scc = s_and_b64 %1636:s[44-45], %0:exec
+        wait  s_waitcnt_depctr sa_sdst(0)
+        valu  v1: %1640:v[57] = v_and_b32 %2928:s[47], %21:v[4]
+        valu  v1: %1639:v[56] = v_and_b32 %2927:s[46], %19:v[3]
+        salu  s1: %1644:s[47],  s1: %2929:scc = s_bcnt1_i32_b32 %2928:s[47]
+        salu  s1: %1645:s[46],  s1: %2930:scc = s_bcnt1_i32_b32 %2927:s[46]
+        valu  v1: %1657:v[61] = v_or_b32 %1653:v[58], %1656:v[59]
+        valu  v1: %1641:v[57] = v_bcnt_u32_b32 %1640:v[57], 0
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %1646:s[46],  s1: %2931:scc = s_add_u32 %1645:s[46], %1644:s[47]
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %1647:s[46],  s1: %2932:scc = s_add_u32 %1625:s[42], %1646:s[46]
+        valu  s2: %1658:s[48-49] = v_cmp_lg_i32 0, %1657:v[61]
+        valu  v1: %1643:v[56] = v_bcnt_u32_b32 %1639:v[56], %1641:v[57]
+        salu  s2: %1659:s[50-51],  s1: %2933:scc = s_and_b64 %1658:s[48-49], %0:exec
+        wait  s_waitcnt_depctr sa_sdst(0)
+        valu  v1: %1661:v[62] = v_and_b32 %2934:s[50], %19:v[3]
+        valu  v1: %1662:v[63] = v_and_b32 %2935:s[51], %21:v[4]
+        salu  s1: %1666:s[51],  s1: %2936:scc = s_bcnt1_i32_b32 %2935:s[51]
+        salu  s1: %1667:s[50],  s1: %2937:scc = s_bcnt1_i32_b32 %2934:s[50]
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %1668:s[50],  s1: %2938:scc = s_add_u32 %1667:s[50], %1666:s[51]
+        valu  v1: %1663:v[63] = v_bcnt_u32_b32 %1662:v[63], 0
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %1669:s[50],  s1: %2939:scc = s_add_u32 %1647:s[46], %1668:s[50]
+        salu  s1: %1670:s[39],  s1: %2940:scc = s_sub_i32 %1136:s[14], %1199:s[31]
+        wait  s_delay_alu valu_dep_1
+        valu  v1: %1665:v[62] = v_bcnt_u32_b32 %1661:v[62], %1663:v[63]
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %1671:s[39],  s1: %2941:scc = s_min_u32 64, %1670:s[39]
+        salu  s1: %2942:scc = s_cmp_lg_i32 %1669:s[50], 0
+        wait  s_waitcnt_depctr sa_sdst(0)
+        valu  v1: %1673:v[64] = v_mad_u32_u24 (is16bit)%1671:s[39], (is16bit)%396:s[15], %1203:v[2]
+        wait  s_delay_alu valu_dep_1
+        valu  v1: %1674:v[2] = v_cndmask_b32 %1203:v[2], %1673:v[64], %58:s[16-17]
+        salu  s_cbranch_scc0 block:BB324
+     BB274 [uniform,] alu=3 valu=0 q=0 v64=0 salu=3 lds=0 vmem=0 smem=0 wait=1 vcyc=0  s_cbranch_scc0->BB295
+        salu  s1: %1676:s[39],  s1: %2945:scc = s_add_u32 %1201:s[13], %1669:s[50]
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %2946:scc = s_cmp_lt_u32 0x100, %1676:s[39]
+        salu  s_cbranch_scc0 block:BB295
+     BB275 [branch,] alu=2 valu=0 q=0 v64=0 salu=2 lds=0 vmem=0 smem=0 wait=0 vcyc=0  s_cbranch_execz->BB281
+        salu  s2: %0:exec,  s1: %2949:scc = s_and_b64 %7:vcc, %1202:s[20-21]
+        salu  s_cbranch_execz block:BB281
+     BB276 [uniform,] alu=2 valu=1 q=0 v64=0 salu=1 lds=0 vmem=1 smem=1 wait=3 vcyc=1  
+        smem  s4: %1679:s[52-55] = s_load_dwordx4 %23:s[2-3], 0x90 storage:buffer semantics:private,reorder
+        salu  s1: %1680:s[0],  s1: %2954:scc = s_lshl_b32 %1204:s[0], 2
+        valu  v1: %0:v[16] = v_mov_b32 %1201:s[13]
+        wait  s_wait_loadcnt imm:0
+        wait  s_wait_storecnt imm:0
+        wait  s_wait_kmcnt imm:0
+        vmem  buffer_store_dword %1679:s[52-55],  v1: undef, %1680:s[0], %2955:v[16] storage:buffer
+     BB281 [branch, merge,] alu=2 valu=0 q=0 v64=0 salu=2 lds=0 vmem=0 smem=0 wait=0 vcyc=0  s_cbranch_execz->BB285
+        salu  s2: %0:exec = s_mov_b64 %7:vcc
+        salu  s_cbranch_execz block:BB285
+     BB282 [uniform,] alu=1 valu=1 q=0 v64=0 salu=0 lds=0 vmem=1 smem=1 wait=3 vcyc=1  
+        smem  s4: %1681:s[52-55] = s_load_dwordx4 %23:s[2-3], 0x80 storage:buffer semantics:private,reorder
+        valu  v1: %0:v[16] = v_mov_b32 1
+        wait  s_wait_loadcnt imm:0
+        wait  s_wait_storecnt imm:0
+        wait  s_wait_kmcnt imm:0
+        vmem  v1: %1682:v[16] = buffer_atomic_add %1681:s[52-55],  v1: undef, 0, %3131:v[16] atomic_return storage:buffer semantics:volatile,atomic,rmw
+     BB285 [uniform,] alu=2 valu=1 q=0 v64=0 salu=1 lds=0 vmem=0 smem=0 wait=1 vcyc=1  
+        salu  s2: %0:exec,  s1: %3196:scc = s_andn2_b64 -1, %0:exec
+        wait  s_wait_loadcnt imm:0
+        valu  v1: %0:v[16] = v_mov_b32 0
+     BB287 [branch, merge,] alu=16 valu=10 q=0 v64=0 salu=6 lds=0 vmem=0 smem=0 wait=8 vcyc=10  s_cbranch_execz->BB293
+        salu  s2: %0:exec = s_mov_b64 -1
+        wait  s_delay_alu salu_cycle_1 skip_2 valu_dep_1
+        salu  s2: %0:s[20-21],  s1: %0:scc,  s2: %0:exec = s_or_saveexec_b64 -1, %0:exec
+        wait  s_waitcnt_depctr sa_sdst(0)
+        valu  lv1: %0:v[118] = v_cndmask_b32 0, %0:v[16], %0:s[20-21]
+        valu  lv1: %0:v[118] = v_add_u32 %0:v[118], %0:v[118] quad_perm:[1,0,3,2] fi
+        wait  s_delay_alu valu_dep_1 next valu_dep_1
+        valu  lv1: %0:v[118] = v_add_u32 %0:v[118], %0:v[118] quad_perm:[2,3,0,1] fi
+        valu  lv1: %0:v[118] = v_add_u32 %0:v[118], %0:v[118] row_half_mirror fi
+        wait  s_delay_alu valu_dep_1 next valu_dep_1
+        valu  lv1: %0:v[118] = v_add_u32 %0:v[118], %0:v[118] row_mirror fi
+        valu  lv1: %0:v[119] = v_permlanex16_b32 %0:v[118], 0, 0
+        wait  s_delay_alu valu_dep_1 next valu_dep_1
+        valu  lv1: %0:v[118] = v_add_u32 %0:v[118], %0:v[119]
+        valu  s1: %0:s[0] = v_readlane_b32_e64 %0:v[118], 0
+        wait  s_waitcnt_depctr va_sdst(0)
+        valu  lv1: %0:v[118] = v_add_u32 %0:s[0], %0:v[118]
+        wait  s_delay_alu valu_dep_1 skip_1 salu_cycle_1
+        valu  s1: %0:s[0] = v_readlane_b32_e64 %0:v[118], 63
+        salu  s1: %2963:scc = s_cmp_ge_u32 %1684:s[0], %1917:s[8]
+        salu  s2: %1685:s[20-21] = s_cselect_b64 -1, 0, %2963:scc
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s2: %0:exec,  s1: %2964:scc = s_and_b64 %1685:s[20-21], %7:vcc
+        salu  s_cbranch_execz block:BB293
+     BB288 [uniform,] alu=1 valu=1 q=0 v64=0 salu=0 lds=0 vmem=1 smem=1 wait=3 vcyc=1  
+        smem  s4: %1687:s[52-55] = s_load_dwordx4 %23:s[2-3], 0x60 storage:buffer semantics:private,reorder
+        valu  v1: %0:v[16] = v_mov_b32 1
+        wait  s_wait_loadcnt imm:0
+        wait  s_wait_storecnt imm:0
+        wait  s_wait_kmcnt imm:0
+        vmem  buffer_atomic_add %1687:s[52-55],  v1: undef, 0, %3132:v[16] offset:1292 storage:buffer semantics:volatile,atomic,rmw
+     BB293 [uniform, merge,] alu=3 valu=0 q=0 v64=0 salu=3 lds=0 vmem=0 smem=0 wait=0 vcyc=0  
+        salu  s2: %0:exec = s_mov_b64 -1
+        salu  s1: %0:s[13] = s_mov_b32 0
+        salu  s2: %0:s[20-21] = s_mov_b64 -1
+     BB295 [uniform,] alu=6 valu=1 q=0 v64=0 salu=5 lds=0 vmem=0 smem=0 wait=2 vcyc=1  s_cbranch_scc0->BB322
+        salu  s1: %1693:s[39],  s1: %2970:scc = s_lshl_b32 %1692:s[0], 8
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s1: %1694:s[39],  s1: %2971:scc = s_add_u32 %1693:s[39], %1690:s[13]
+        salu  s1: %1696:s[43],  s1: %2972:scc = s_and_b32 %1919:s[10], 0x20000
+        salu  s1: %2973:scc = s_cmp_lt_u32 %1692:s[0], %1917:s[8]
+        wait  s_waitcnt_depctr sa_sdst(0)
+        valu  v1: %1697:v[16] = v_min_u32 %1696:s[43], %3:v[1]
+        salu  s_cbranch_scc0 block:BB322
+     BB296 [branch,] alu=4 valu=2 q=0 v64=0 salu=2 lds=0 vmem=0 smem=0 wait=0 vcyc=2  s_cbranch_execz->BB302
+        valu  v1: %1699:v[64] = v_lshrrev_b32 12, %2763:v[43]
+        valu  s2: %1700:s[52-53] = v_cmp_lg_i32 0, %1697:v[16]
+        salu  s2: %0:exec = s_mov_b64 %1593:s[36-37]
+        salu  s_cbranch_execz block:BB302
+     BB297 [uniform,] alu=6 valu=6 q=0 v64=0 salu=0 lds=0 vmem=1 smem=1 wait=3 vcyc=6  
+        smem  s4: %1706:s[56-59] = s_load_dwordx4 %23:s[2-3], 0x70 storage:buffer semantics:private,reorder
+        valu  v1: %1702:v[65] = v_add3_u32 %1139:v[15], %237:s[9], %257:s[25]
+        valu  v1: %1703:v[66] = v_cndmask_b32 %1588:v[40], 0, %1700:s[52-53]
+        valu  v1: %1704:v[67] = v_cndmask_b32 %1591:v[41], 0, %1700:s[52-53]
+        valu  v1: %0:v[16] = v_mov_b32 %1699:v[64]
+        valu  v1: %1708:v[47] = v_add_lshl_u32 %1694:s[39], %1600:v[47], 4
+        wait  s_wait_loadcnt imm:0
+        wait  s_wait_storecnt imm:0
+        wait  s_wait_kmcnt imm:0
+        vmem  buffer_store_dwordx4 %1706:s[56-59], %1708:v[47], 0, %1707:v[64-67] offen storage:buffer
+        valu  v1: %0:v[64] = v_mov_b32 %3250:v[16]
+     BB302 [branch, merge,] alu=7 valu=0 q=0 v64=0 salu=7 lds=0 vmem=0 smem=0 wait=3 vcyc=0  s_cbranch_execz->BB308
+        salu  s1: %2983:scc = s_bitcmp1_b32 %1919:s[10], 5
+        wait  s_delay_alu salu_cycle_1 skip_1 salu_cycle_1
+        salu  s2: %1709:s[36-37] = s_cselect_b64 -1, 0, %2983:scc
+        salu  s1: %2984:scc = s_cmp_eq_i32 %0:s[117], 0
+        salu  s2: %1710:s[54-55] = s_cselect_b64 -1, 0, %2984:scc
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s2: %1712:s[36-37],  s1: %2986:scc = s_nand_b64 %1709:s[36-37], %1710:s[54-55]
+        wait  s_waitcnt_depctr sa_sdst(0)
+        salu  s2: %0:exec,  s1: %2987:scc = s_and_b64 %1614:s[40-41], %1712:s[36-37]
+        salu  s_cbranch_execz block:BB308
+     BB303 [uniform,] alu=7 valu=7 q=0 v64=0 salu=0 lds=0 vmem=1 smem=1 wait=4 vcyc=7  
+        smem  s4: %1720:s[56-59] = s_load_dwordx4 %23:s[2-3], 0x70 storage:buffer semantics:private,reorder
+        valu  v1: %1715:v[65] = v_add3_u32 %1153:v[20], %237:s[9], %257:s[25]
+        valu  v1: %1716:v[66] = v_cndmask_b32 %1609:v[44], 0, %1700:s[52-53]
+        valu  v1: %1717:v[67] = v_cndmask_b32 %1612:v[45], 0, %1700:s[52-53]
+        valu  v1: %1719:v[50] = v_add3_u32 %1621:v[50], %1694:s[39], %1603:s[38]
+        valu  v1: %0:v[16] = v_mov_b32 %3251:v[64]
+        wait  s_delay_alu valu_dep_2
+        valu  v1: %1722:v[50] = v_lshlrev_b32 4, %1719:v[50]
+        wait  s_wait_loadcnt imm:0
+        wait  s_wait_storecnt imm:0
+        wait  s_wait_kmcnt imm:0
+        vmem  buffer_store_dwordx4 %1720:s[56-59], %1722:v[50], 0, %1721:v[64-67] offen storage:buffer
+        valu  v1: %0:v[64] = v_mov_b32 %3252:v[16]
+     BB308 [branch, merge,] alu=2 valu=0 q=0 v64=0 salu=2 lds=0 vmem=0 smem=0 wait=0 vcyc=0  s_cbranch_execz->BB314
+        salu  s2: %0:exec = s_mov_b64 %1636:s[44-45]
+        salu  s_cbranch_execz block:BB314
+     BB309 [uniform,] alu=7 valu=7 q=0 v64=0 salu=0 lds=0 vmem=1 smem=1 wait=4 vcyc=7  
+        smem  s4: %1729:s[56-59] = s_load_dwordx4 %23:s[2-3], 0x70 storage:buffer semantics:private,reorder
+        valu  v1: %1724:v[65] = v_add3_u32 %1167:v[25], %237:s[9], %257:s[25]
+        valu  v1: %1725:v[66] = v_cndmask_b32 %1631:v[52], 0, %1700:s[52-53]
+        valu  v1: %1726:v[67] = v_cndmask_b32 %1634:v[53], 0, %1700:s[52-53]
+        valu  v1: %1728:v[56] = v_add3_u32 %1643:v[56], %1694:s[39], %1625:s[42]
+        valu  v1: %0:v[16] = v_mov_b32 %3253:v[64]
+        wait  s_delay_alu valu_dep_2
+        valu  v1: %1731:v[56] = v_lshlrev_b32 4, %1728:v[56]
+        wait  s_wait_loadcnt imm:0
+        wait  s_wait_storecnt imm:0
+        wait  s_wait_kmcnt imm:0
+        vmem  buffer_store_dwordx4 %1729:s[56-59], %1731:v[56], 0, %1730:v[64-67] offen storage:buffer
+        valu  v1: %0:v[64] = v_mov_b32 %3254:v[16]
+     BB314 [branch, merge,] alu=2 valu=0 q=0 v64=0 salu=2 lds=0 vmem=0 smem=0 wait=0 vcyc=0  s_cbranch_execz->BB320
+        salu  s2: %0:exec = s_mov_b64 %1658:s[48-49]
+        salu  s_cbranch_execz block:BB320
+     BB315 [uniform,] alu=5 valu=5 q=0 v64=0 salu=0 lds=0 vmem=1 smem=1 wait=4 vcyc=5  
+        smem  s4: %1738:s[40-43] = s_load_dwordx4 %23:s[2-3], 0x70 storage:buffer semantics:private,reorder
+        valu  v1: %1733:v[65] = v_add3_u32 %1181:v[30], %237:s[9], %257:s[25]
+        valu  v1: %1734:v[66] = v_cndmask_b32 %1653:v[58], 0, %1700:s[52-53]
+        valu  v1: %1735:v[67] = v_cndmask_b32 %1656:v[59], 0, %1700:s[52-53]
+        valu  v1: %1737:v[62] = v_add3_u32 %1665:v[62], %1694:s[39], %1647:s[46]
+        wait  s_delay_alu valu_dep_1
+        valu  v1: %1740:v[62] = v_lshlrev_b32 4, %1737:v[62]
+        wait  s_wait_loadcnt imm:0
+        wait  s_wait_storecnt imm:0
+        wait  s_wait_kmcnt imm:0
+        vmem  buffer_store_dwordx4 %1738:s[40-43], %1740:v[62], 0, %1739:v[64-67] offen storage:buffer
+     BB320 [uniform, merge,] alu=1 valu=0 q=0 v64=0 salu=1 lds=0 vmem=0 smem=0 wait=0 vcyc=0  
+        salu  s2: %0:exec = s_mov_b64 -1
+     BB322 [uniform,] alu=11 valu=10 q=0 v64=0 salu=1 lds=0 vmem=0 smem=0 wait=1 vcyc=10  
+        valu  v1: %1741:v[41] = v_bcnt_u32_b32 %1591:v[41], 0
+        valu  v1: %1745:v[45] = v_bcnt_u32_b32 %1612:v[45], 0
+        valu  v1: %1749:v[53] = v_bcnt_u32_b32 %1634:v[53], 0
+        valu  v1: %1753:v[59] = v_bcnt_u32_b32 %1656:v[59], 0
+        salu  s1: %1757:s[13],  s1: %3012:scc = s_add_u32 %1690:s[13], %1669:s[50]
+        valu  v1: %1743:v[40] = v_bcnt_u32_b32 %1588:v[40], %1741:v[41]
+        valu  v1: %1747:v[44] = v_bcnt_u32_b32 %1609:v[44], %1745:v[45]
+        valu  v1: %1751:v[52] = v_bcnt_u32_b32 %1631:v[52], %1749:v[53]
+        valu  v1: %1755:v[58] = v_bcnt_u32_b32 %1653:v[58], %1753:v[59]
+        wait  s_delay_alu valu_dep_3 next valu_dep_1
+        valu  v1: %1748:v[44] = v_add3_u32 %1747:v[44], %1200:v[9], %1743:v[40]
+        valu  v1: %1756:v[9] = v_add3_u32 %1755:v[58], %1748:v[44], %1751:v[52]
+     BB324 [uniform, continue,] alu=2 valu=0 q=0 v64=0 salu=2 lds=0 vmem=0 smem=0 wait=0 vcyc=0  s_branch->BB270
+        salu  s1: %1762:s[31],  s1: %3013:scc = s_add_u32 %1199:s[31], 64
+        salu  s_branch block:BB270

@@ -18,16 +18,17 @@ def ldsbytes(ops):
         else:
             n += 4 * 64  # atomics, others
     return n
-slots = int(sys.argv[1]); p = sys.argv[2]
-blocks, st = L.parse(p)
-ls = L.loops(blocks)
-def body(i): a, b = ls[i]; return [o for blk in blocks[a:b + 1] for o in blk[2]]
-inner = [i for i, (a, b) in enumerate(ls) if not any(a < a2 and b2 <= b for (a2, b2) in ls if (a2, b2) != (a, b))]
-li = int(sys.argv[3]) if len(sys.argv) > 3 else max(inner, key=lambda i: sum(1 for o, _ in body(i) if o == 'ds_read_b64'))
-ops = body(li); c = L.count(ops); lb = ldsbytes(ops)
-r64 = sum(1 for o, _ in ops if o == 'ds_read_b64'); br = sum(1 for o, _ in ops if o.startswith('s_cbranch') or o == 's_branch')
-lw = sum(1 for o, _ in ops if o.startswith('ds_') and ('write' in o or 'store' in o or 'add' in o or 'and' in o or 'or' in o))
-v, s_, l = 2 * c['vcyc'], c['salu'], lb / 64
-print(f"{p.split('/')[-1][:40]} VGPRs={st.get('VGPRs')} LDS={st.get('LDS size')} waves={st.get('Subgroups per SIMD')} instr={st.get('Instructions')} loop {li}")
-print(f"  per wave-iteration: valu={c['valu']} q={c['q']} v64={c['v64']} vcyc={c['vcyc']} salu={c['salu']} (branches {br}) lds={c['lds']} (ds_read_b64 {r64}, stores/atomics {lw}) vmem={c['vmem']} wait={c['wait']} ldsB={lb}")
-print(f"  model SIMD-cycles per wave-iteration: VALU {v} SALU {s_} LDS {l:.0f} -> bound {max(v, s_, l):.0f}; per slot ({slots}): VALU {v/slots:.3f} LDS {l/slots:.3f} bound {max(v, s_, l)/slots:.3f}")
+if __name__ == '__main__':
+    slots = int(sys.argv[1]); p = sys.argv[2]
+    blocks, st = L.parse(p)
+    ls = L.loops(blocks)
+    def body(i): a, b = ls[i]; return [o for blk in blocks[a:b + 1] for o in blk[2]]
+    inner = [i for i, (a, b) in enumerate(ls) if not any(a < a2 and b2 <= b for (a2, b2) in ls if (a2, b2) != (a, b))]
+    li = int(sys.argv[3]) if len(sys.argv) > 3 else max(inner, key=lambda i: sum(1 for o, _ in body(i) if o == 'ds_read_b64'))
+    ops = body(li); c = L.count(ops); lb = ldsbytes(ops)
+    r64 = sum(1 for o, _ in ops if o == 'ds_read_b64'); br = sum(1 for o, _ in ops if o.startswith('s_cbranch') or o == 's_branch')
+    lw = sum(1 for o, _ in ops if o.startswith('ds_') and ('write' in o or 'store' in o or 'add' in o or 'and' in o or 'or' in o))
+    v, s_, l = 2 * c['vcyc'], c['salu'], lb / 64
+    print(f"{p.split('/')[-1][:40]} VGPRs={st.get('VGPRs')} LDS={st.get('LDS size')} waves={st.get('Subgroups per SIMD')} instr={st.get('Instructions')} loop {li}")
+    print(f"  per wave-iteration: valu={c['valu']} q={c['q']} v64={c['v64']} vcyc={c['vcyc']} salu={c['salu']} (branches {br}) lds={c['lds']} (ds_read_b64 {r64}, stores/atomics {lw}) vmem={c['vmem']} wait={c['wait']} ldsB={lb}")
+    print(f"  model SIMD-cycles per wave-iteration: VALU {v} SALU {s_} LDS {l:.0f} -> bound {max(v, s_, l):.0f}; per slot ({slots}): VALU {v/slots:.3f} LDS {l/slots:.3f} bound {max(v, s_, l)/slots:.3f}")

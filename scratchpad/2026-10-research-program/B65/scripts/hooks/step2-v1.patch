@@ -1,0 +1,369 @@
+diff --git a/common/src/midout/gpu_wide.rs b/common/src/midout/gpu_wide.rs
+index 68820047..fd109c78 100644
+--- a/common/src/midout/gpu_wide.rs
++++ b/common/src/midout/gpu_wide.rs
+@@ -2103,8 +2103,9 @@ mod wp {
+     }
+ 
+     /// The placed tops (`tps`, in slot order) into their arrays: masks (lo, hi), the prefix index, the
+-    /// prefilter's digits, and the digit table (7-bit fields, 4 per word, padded with the first digit); and the
+-    /// zeroing of the histogram and the list count for the slice's preparation.
++    /// prefilter's digits, the digit table (7-bit fields, 4 per word, padded with the first digit) and the
++    /// expansion's per-top context (`tctx`, see `wtop_ctx`); and the zeroing of the histogram and the list count
++    /// for the slice's preparation.
+     #[cube(launch_unchecked)]
+     pub fn wtdigz_kernel(
+         tps: &Array<Vector<u32, Const<4>>>,
+@@ -2112,15 +2113,23 @@ mod wp {
+         tmh: &mut Array<u32>,
+         thd: &mut Array<u32>,
+         ttq: &mut Array<u64>,
+-        ttqh: &mut Array<u32>,
+         tdig: &mut Array<u32>,
++        tctx: &mut Array<Vector<u32, Const<4>>>,
+         hist: &mut Array<u32>,
+         lcnt: &mut Array<u32>,
+         tstat: &Array<u32>,
+         acc: &mut Array<Atomic<u32>>,
+         nbk: u32,
+         cap: u32,
++        // the context's inputs, as the expansion had them: the slice's digits, the range's clip, the tops' leads
++        pipd: &Array<u32>,
++        clip: &Array<u32>,
++        nlead: u32,
++        hlo: u32,
++        hsmall: u32,
+         #[comptime] b: u32,
++        #[comptime] f0: u32,
++        #[comptime] k: u32,
+     ) {
+         // an empty top mask (no certified digit) pads with the pad digit, whose slice row is zero
+         let pad = comptime!(if b > 64 { b } else { 64 });
+@@ -2145,7 +2154,6 @@ mod wp {
+             tmh[i as usize] = y;
+             thd[i as usize] = v0[0usize];
+             ttq[i as usize] = u64::cast_from(v1[0usize]) | (u64::cast_from(v1[1usize]) << 32u64);
+-            ttqh[i as usize] = v1[2usize];
+             let first = select(
+                 x != 0u64,
+                 x.trailing_zeros(),
+@@ -2173,6 +2181,9 @@ mod wp {
+             for kk in 0..5u32 {
+                 tdig[(i * TDW + kk) as usize] = dw[kk as usize];
+             }
++            tctx[i as usize] = wtop_ctx(
++                v0[0usize], v1[2usize], pipd, nlead, hlo, hsmall, clip, b, f0, k,
++            );
+         }
+     }
+ 
+@@ -2219,23 +2230,38 @@ mod wp {
+         )
+     }
+ 
+-    /// A top's (h, unit), the bounds of r_f inside the range (`[lo, hi]`: all of it unless the range's first or
+-    /// last prefix, which `clip` names, cuts the top) and the small-n flag (1: n < b^ceil((k+2)/2) is possible).
++    /// A top's context for the expansion, from its prefix index `ix` (`thd`) and its prefilter word `mqh`
++    /// (the top's certified digits >= k + 2, hi word): [unit | h mod b << 8 | (h div b) mod b << 16 | small-n flag << 24, lo, hi, mqh], where (h, unit)
++    /// is the top's lead and unit, `[lo, hi]` the bounds of r_f inside the range (all of it unless the range's
++    /// first or last prefix, which `clip` names, cuts the top) and the small-n flag 1 when n < b^ceil((k+2)/2) is
++    /// possible. Written once per top by `wtdigz`, read with one load per record by the expansion.
+     #[cube]
+     fn wtop_ctx(
+-        ti: u32,
+-        thd: &Array<u32>,
++        ix: u32,
++        mqh: u32,
++        pipd: &Array<u32>,
+         nlead: u32,
+         hlo: u32,
+         hsmall: u32,
+         clip: &Array<u32>,
+-        pipv: u64,
+-        hzs: u32,
+         #[comptime] b: u32,
+         #[comptime] f0: u32,
+         #[comptime] k: u32,
+-    ) -> (u32, u32, u32, u32, u32) {
+-        let ix = thd[ti as usize];
++    ) -> Vector<u32, Const<4>> {
++        let bw = comptime!(b as u64);
++        let tsm = comptime!((k + 3) / 2);
++        // the slice's digits as a number, and whether those at positions >= ceil((k+2)/2) are zero
++        let mut pipz = true;
++        let mut pipv = 0u64;
++        #[unroll]
++        for j in 0..comptime!(k - 1 - f0) {
++            if comptime!(f0 + j >= tsm) {
++                if pipd[j as usize] != 0u32 {
++                    pipz = false;
++                }
++            }
++            pipv = pipv * bw + u64::cast_from(pipd[comptime!(k - 2 - f0 - j) as usize]);
++        }
+         let du = ix / nlead;
+         let h = hlo + ix % nlead;
+         let bp = comptime!((b as u64).pow(k - 1 - f0));
+@@ -2244,13 +2270,19 @@ mod wp {
+         let phi = u64::cast_from(clip[2usize]) | (u64::cast_from(clip[3usize]) << 32u64);
+         let lo = select(pp == plo, clip[4usize], 0u32);
+         let hi = select(pp == phi, clip[5usize], u32::MAX);
+-        let tsm = comptime!((k + 3) / 2);
+         let hz = select(
+-            h < hsmall && hzs != 0u32 && du * select(comptime!(k > tsm), 1u32, 0u32) == 0u32,
++            h < hsmall && pipz && du * select(comptime!(k > tsm), 1u32, 0u32) == 0u32,
+             1u32,
+             0u32,
+         );
+-        (h, du, lo, hi, hz)
++        let h0 = h % b;
++        let h1 = ((h - h0) / b) % b;
++        let mut cx = Vector::<u32, Const<4>>::empty();
++        cx[0usize] = du | (h0 << 8u32) | (h1 << 16u32) | (hz << 24u32);
++        cx[1usize] = lo;
++        cx[2usize] = hi;
++        cx[3usize] = mqh;
++        cx
+     }
+ 
+     /// Writes the kept bits' entries `(ti, r_f)` from `slot` on; returns the next slot.
+@@ -2304,20 +2336,15 @@ mod wp {
+         // range (not survivors; never listed), survivors appended counted by each lane apart from the plane scan
+         // that gives the list's own count `scount` (= it)
+         est: &mut Array<Atomic<u32>>,
+-        // the prefilter: the tops' thread indices and certified digits >= k + 2, the slice's digits, the range's
+-        // clip (as the check's), the small-n bound (n < b^ceil((k+2)/2) iff h < hsmall and the slice's digits
+-        // >= ceil((k+2)/2) are zero), the fault bits (F_NOPF 1: no prefilter; F_PF_DROP 1024: the prefilter
+-        // wrongly drops n whose r_f has bits 10-19 zero, as on the base-64 path; F_EXP_SPLIT 524288, only with
+-        // `emul`: lanes other than lane 0 with survivors in slabs s = 0 mod 7 leave the plane's scan, as lanes
+-        // split from lane 0's after a branch would: their entries are lost)
+-        thd: &Array<u32>,
++        // the prefilter: the tops' contexts (`wtop_ctx`: unit, lead digits, the range's clip, the small-n flag,
++        // certified digits >= k + 2 (hi word)) and certified digits >= k + 2 (lo, hi), the slice's digits, the
++        // fault bits (F_NOPF 1: no prefilter; F_PF_DROP 1024: the prefilter wrongly drops n whose r_f has bits
++        // 10-19 zero, as on the base-64 path; F_EXP_SPLIT 524288, only with `emul`: lanes other than lane 0 with
++        // survivors in slabs s = 0 mod 7 leave the plane's scan, as lanes split from lane 0's after a branch
++        // would: their entries are lost)
++        tctx: &Array<Vector<u32, Const<4>>>,
+         ttq: &Array<u64>,
+-        ttqh: &Array<u32>,
+         pipd: &Array<u32>,
+-        clip: &Array<u32>,
+-        nlead: u32,
+-        hlo: u32,
+-        hsmall: u32,
+         fault: u32,
+         nslab_cap: u32,
+         scap: u32,
+@@ -2339,33 +2366,32 @@ mod wp {
+         }
+         sync_cube();
+         let mut nput = 0u32;
+-        let bw = comptime!(b as u64);
+-        // n < b^ceil((k+2)/2) needs every slice digit at positions >= ceil((k+2)/2) zero
+         let tsm = comptime!((k + 3) / 2);
+-        let mut pipz = true;
+-        #[unroll]
+-        for j in 0..comptime!(k - 1 - f0) {
+-            if comptime!(f0 + j >= tsm) {
+-                if pipd[j as usize] != 0u32 {
+-                    pipz = false;
+-                }
+-            }
+-        }
+         let mut nread = 0u32;
+         let mut nclip = 0u32;
+         if ABSOLUTE_POS_X == 0u32 {
+             stat[0usize] = lcnt[0usize];
+             stat[1usize] = slabn[0usize];
+         }
+-        // the slice's digits f0..k-1, once per thread
+-        let mut pd = Array::<u32>::new(comptime!((k - 1 - f0) as usize));
+-        let mut pipv = 0u64;
++        // the digits [f0, k − 1) of every n: the slice's, once per thread; [k − 1, k + 2) are the record's top's
++        let mut rd = Array::<u32>::new(comptime!((k + 2) as usize));
+         #[unroll]
+         for j in 0..comptime!(k - 1 - f0) {
+-            pd[j as usize] = pipd[j as usize];
+-            pipv = pipv * bw + u64::cast_from(pipd[comptime!(k - 2 - f0 - j) as usize]);
++            rd[comptime!(f0 + j) as usize] = pipd[j as usize];
++        }
++        // `pf_w2`'s fixed super-digits: those below `it` depend on the slice's digits only (set here, once per
++        // thread); `it` and above on the record's top too (from `sfa` / `sfb`, made once per record)
++        let it = comptime!((k - 1) / 2);
++        let ns2 = comptime!((k + 3) / 2);
++        let mut sf = Array::<u32>::new(comptime!(((k + 3) / 2) as usize));
++        let mut sfa = Array::<u32>::new(comptime!(((k + 3) / 2) as usize));
++        let mut sfb = Array::<u32>::new(comptime!(((k + 3) / 2) as usize));
++        if comptime!(pf2) {
++            rd[comptime!(k - 1) as usize] = 0u32;
++            rd[comptime!(k) as usize] = 0u32;
++            rd[comptime!(k + 1) as usize] = 0u32;
++            pf_w2_fixed(&rd, &mut sf, b, f0, k);
+         }
+-        let hzs = select(pipz, 1u32, 0u32);
+         // one plane per slab at a time, its lanes over the slab's rows; two records per lane and take, their loads
+         // issued together, and one loop over both records' bits (a plane runs as many rounds as its lane with the
+         // most bits: max(a + b), not max(a lo) + max(a hi) + ...)
+@@ -2401,15 +2427,37 @@ mod wp {
+                 // each record's top (its probe slot among the job's compatible classes) and child-list position
+                 let (tia, posa) = wrec_top(reca, pseg, tseg, roots, c0, b, nroot);
+                 let (tib, posb) = wrec_top(recb, pseg, tseg, roots, c0, b, nroot);
+-                // each top's (h, unit), certified digits >= k + 2, range clip bounds and small-n flag
+-                let (ha, dua, lla, hla, hza) =
+-                    wtop_ctx(tia, thd, nlead, hlo, hsmall, clip, pipv, hzs, b, f0, k);
+-                let (hb, dub, llb, hlb, hzb) =
+-                    wtop_ctx(tib, thd, nlead, hlo, hsmall, clip, pipv, hzs, b, f0, k);
++                // each top's context (`wtop_ctx`, written by `wtdigz`): unit, lead digits, the range's clip
++                // bounds, small-n flag, certified digits >= k + 2
++                let cxa = tctx[tia as usize];
++                let cxb = tctx[tib as usize];
+                 let mqa = ttq[tia as usize];
+                 let mqb = ttq[tib as usize];
+-                let mha = ttqh[tia as usize];
+-                let mhb = ttqh[tib as usize];
++                let dua = cxa[0usize] & 255u32;
++                let dub = cxb[0usize] & 255u32;
++                let h0a = (cxa[0usize] >> 8u32) & 255u32;
++                let h0b = (cxb[0usize] >> 8u32) & 255u32;
++                let h1a = (cxa[0usize] >> 16u32) & 255u32;
++                let h1b = (cxb[0usize] >> 16u32) & 255u32;
++                let hza = cxa[0usize] >> 24u32;
++                let hzb = cxb[0usize] >> 24u32;
++                let lla = cxa[1usize];
++                let llb = cxb[1usize];
++                let hla = cxa[2usize];
++                let hlb = cxb[2usize];
++                let mha = cxa[3usize];
++                let mhb = cxb[3usize];
++                if comptime!(pf2) {
++                    // the records' top-dependent super-digits, once per record instead of once per bit
++                    rd[comptime!(k - 1) as usize] = dua;
++                    rd[comptime!(k) as usize] = h0a;
++                    rd[comptime!(k + 1) as usize] = h1a;
++                    pf_w2_fixed(&rd, &mut sfa, b, f0, k);
++                    rd[comptime!(k - 1) as usize] = dub;
++                    rd[comptime!(k) as usize] = h0b;
++                    rd[comptime!(k + 1) as usize] = h1b;
++                    pf_w2_fixed(&rd, &mut sfb, b, f0, k);
++                }
+                 let mut w0 = reca[2usize];
+                 let mut w1 = reca[3usize];
+                 let mut w2 = recb[2usize];
+@@ -2418,12 +2466,6 @@ mod wp {
+                 let mut k1 = 0u32;
+                 let mut k2 = 0u32;
+                 let mut k3 = 0u32;
+-                let mut rd = Array::<u32>::new(comptime!((k + 2) as usize));
+-                let mut sf = Array::<u32>::new(comptime!(((k + 3) / 2) as usize));
+-                #[unroll]
+-                for j in 0..comptime!(k - 1 - f0) {
+-                    rd[comptime!(f0 + j) as usize] = pd[j as usize];
+-                }
+                 while (w0 | w1 | w2 | w3) != 0u32 {
+                     // the lowest set bit of the first nonzero word, in the order a lo, a hi, b lo, b hi
+                     let ina = (w0 | w1) != 0u32;
+@@ -2443,20 +2485,22 @@ mod wp {
+                         // outside a clipped top's part of the range: not a survivor, never listed
+                         nclip += 1u32;
+                     } else {
+-                        let h = select(ina, ha, hb);
+-                        let du = select(ina, dua, dub);
+                         let mq = select(ina, mqa, mqb);
+                         let mqh = select(ina, mha, mhb);
+                         let hz = select(ina, hza, hzb) != 0u32;
+-                        rd[comptime!(k - 1) as usize] = du;
+-                        let h0 = h % b;
+-                        rd[comptime!(k) as usize] = h0;
+-                        rd[comptime!(k + 1) as usize] = ((h - h0) / b) % b;
+                         let mut pfok = false;
+                         if comptime!(pf2) {
+-                            pf_w2_fixed(&rd, &mut sf, b, f0, k);
++                            #[unroll]
++                            for i in 0..ns2 {
++                                if comptime!(i >= it) {
++                                    sf[i as usize] = select(ina, sfa[i as usize], sfb[i as usize]);
++                                }
++                            }
+                             pfok = pf_w2(&sf, rf, mq, mqh, hz, b, f0, k);
+                         } else {
++                            rd[comptime!(k - 1) as usize] = select(ina, dua, dub);
++                            rd[comptime!(k) as usize] = select(ina, h0a, h0b);
++                            rd[comptime!(k + 1) as usize] = select(ina, h1a, h1b);
+                             let mut yy = rf;
+                             let mut rz = true;
+                             #[unroll]
+@@ -2890,9 +2934,10 @@ struct WSlice {
+     tmhh: Handle,
+     tsegh: Handle,
+     thdh: Handle,
+-    /// Per top: the prefilter's `mhi` (lo, hi).
++    /// Per top: the expansion's context (`wtop_ctx`, 16 bytes).
++    tctx: Handle,
++    /// Per top: the prefilter's `mhi`, lo word (the hi word is in `tctx`).
+     ttq: Handle,
+-    ttqh: Handle,
+     tstat: Handle,
+     /// The slice's account (`A_*`).
+     acc: Handle,
+@@ -3425,8 +3470,8 @@ impl<R: Runtime> WideJoin<R> {
+         let tmh = self.client.empty(nt * 8);
+         let tmhh = self.client.empty(nt * 4);
+         let thdh = self.client.empty(nt * 4);
++        let tctx = self.client.empty(nt * 16);
+         let ttq = self.client.empty(nt * 8);
+-        let ttqh = self.client.empty(nt * 4);
+         let cur = self.client.empty(nseg * 4);
+         let dummy = self.client.empty(4);
+         let ntest = wb.ntest();
+@@ -3537,15 +3582,23 @@ impl<R: Runtime> WideJoin<R> {
+                     a(&tmhh, nt),
+                     a(&thdh, nt),
+                     a(&ttq, nt),
+-                    a(&ttqh, nt),
+                     a(&self.g_tdig, nt * TDW as usize),
++                    a(&tctx, nt),
+                     a(&self.histh, self.nbk as usize),
+                     a(&self.lcnt, 1),
+                     a(&tstat, 3),
+                     a(&acc, ACC_WORDS),
+                     self.nbk,
+                     nt as u32,
++                    a(&pipd, npd),
++                    a(&self.clip_h, 6),
++                    wb.nlead,
++                    wb.hlo,
++                    // the small-n bound (n < b^ceil((k+2)/2) needs h < 1)
++                    1u32,
+                     b,
++                    f0,
++                    k,
+                 );
+             }
+             if self.upto(2) {
+@@ -3619,8 +3672,8 @@ impl<R: Runtime> WideJoin<R> {
+             tmhh,
+             tsegh,
+             thdh,
++            tctx,
+             ttq,
+-            ttqh,
+             tstat,
+             acc,
+             l5n,
+@@ -3692,14 +3745,9 @@ impl<R: Runtime> WideJoin<R> {
+                     a(&scount, 1),
+                     a(&stat, 2),
+                     a(&est, EST_WORDS),
+-                    a(&ws.thdh, nt),
++                    a(&ws.tctx, nt),
+                     a(&ws.ttq, nt),
+-                    a(&ws.ttqh, nt),
+                     a(&ws.pipd, npd),
+-                    a(&self.clip_h, 6),
+-                    wb.nlead,
+-                    wb.hlo,
+-                    1u32,
+                     self.fault,
+                     self.nslab_cap,
+                     self.scap,

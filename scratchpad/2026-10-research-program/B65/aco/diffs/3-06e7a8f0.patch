@@ -1,0 +1,55 @@
+commit 06e7a8f056d10508c6f998d4aac35d1e0601fbf4
+Author: Claude <claude@example.com>
+Date:   Sat Nov 28 06:16:48 2026 +0000
+
+    midout wide: phase 3b skips the reads of chunks an entry does not keep
+    
+    With four chunks per lane, chunks 1-3 read their rows only when the
+    entry keeps the chunk and the chunk exists (vlo != 0); otherwise the
+    word is zero, as the kept mask made it before. Chunk 0 always reads,
+    so the row addresses are formed once outside the branches.
+    
+    Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+
+diff --git a/common/src/midout/gpu_wide.rs b/common/src/midout/gpu_wide.rs
+index e2b9bd2a..85a8a67d 100644
+--- a/common/src/midout/gpu_wide.rs
++++ b/common/src/midout/gpu_wide.rs
+@@ -785,20 +785,27 @@ mod wk {
+                     }
+                     let mut alo = Array::<u32>::new(4usize);
+                     let mut ahi = Array::<u32>::new(4usize);
++                    let mut rows = Array::<u32>::new(comptime!(maxpop as usize));
+                     #[unroll]
+-                    for h in 0..4u32 {
+-                        alo[h as usize] = 0u32;
+-                        ahi[h as usize] = 0u32;
++                    for k in 0..maxpop {
++                        rows[k as usize] = (probe_digit(dws, de, k, maxpop) + qr) * 2u32;
+                     }
++                    // a chunk the entry does not keep (or past nch) gives a zero word whatever its rows hold: the
++                    // reads of chunks 1-3 are skipped for it (lanes masked off; the whole branch when no lane of the
++                    // plane keeps it); chunk 0 reads always, so that the row addresses are formed once, outside
+                     #[unroll]
+-                    for k in 0..maxpop {
+-                        let dg = probe_digit(dws, de, k, maxpop);
+-                        let row = (dg + qr) * 2u32;
+-                        #[unroll]
+-                        for h in 0..4u32 {
+-                            alo[h as usize] = alo[h as usize] | sl[(row + comptime!(8 * srow * h)) as usize];
+-                            ahi[h as usize] = ahi[h as usize] | sl[(row + comptime!(8 * srow * h + 1)) as usize];
++                    for h in 0..4u32 {
++                        let mut xl = 0u32;
++                        let mut xh = 0u32;
++                        if comptime!(h == 0) || (((ent >> (qs + comptime!(4 * h))) & 1u32) != 0u32 && vlo[h as usize] != 0u32) {
++                            #[unroll]
++                            for k in 0..maxpop {
++                                xl |= sl[(rows[k as usize] + comptime!(8 * srow * h)) as usize];
++                                xh |= sl[(rows[k as usize] + comptime!(8 * srow * h + 1)) as usize];
++                            }
+                         }
++                        alo[h as usize] = xl;
++                        ahi[h as usize] = xh;
+                     }
+                     let mut nsl = Array::<u32>::new(4usize);
+                     let mut rk = Array::<u32>::new(4usize);

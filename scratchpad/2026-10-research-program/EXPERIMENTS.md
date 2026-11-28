@@ -5,6 +5,43 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## B65.7 The main kernels' word loop under the RX 9070 XT's compiler, offline: a layout that reads each probe's digits once for four chunks removes 21 % (base 65) and 17 % (base 64) of the loop's modelled cycles; not yet run on any card (2026-11-28 05:46–07:10 UTC, engineer, ivory offline; `B65/BRIEF-ACO.md`, `B65/ACO-RESULTS.md`, `B65/aco/`; fork scratch branch `exp/mo-wide-aco`, V5 for both kernels = `a4fb3543`)
+
+Mesa 26.0.8 RADV/ACO for GFX1201 on the drm-shim (container `g2mesa`); instruction counts are measured compiler
+output, cycles are the model of `G2/port/model_rdna4.py` plus a bank-conflict model of the engineer's own.
+
+| kernel, plane width 64 | word loop per wave-iteration: VALU / SALU / LDS ops | slots | model bound per slot | registers / shared memory / waves |
+|---|---|---|---|---|
+| `wide_kernel` b65, head `f503a13c` | 189 / 54 / 41 | 128 | 2.953 (VALU-bound; LDS at 87 %) | 120 / 21,504 B / 12 |
+| `wide_kernel` b65, V5 | 297 / 73 / 75 | 256 | **2.328 (−21 %; LDS-bound, 3.4 % above the reads' floor)** | unchanged |
+| `g2_kernel` b64, head | 169 / 51 / 39 | 128 | 2.641 | 120 / 21,504 B / 12 |
+| `g2_kernel` b64, V5 | 278 / 65 / 71 | 256 | **2.203 (−17 %)** | unchanged |
+
+- **V5:** one list entry per lane covering four chunks (lane t takes chunks (t % 16) ^ 4k), so a probe's digits
+  are read, extracted and turned into a row address once for four chunks; slices stored digit-major so a
+  16-lane group still reads 16 distinct bank pairs; the plane-width-64 transpose stores rotated over the four
+  tasks' chunks. Same words, masks and set of records; the records' order in a slab changes. With the work it
+  adds outside the loop, one round's transpose-and-pairing phases model at −10 % (base 65) and −6 % (base 64),
+  using base 64's list length for both (base 65's was not counted).
+- **Rejected on the way:** two or four chunks per lane in today's layout (VALU −24 to −41 % per slot) turn the
+  conflict-free reads into digit-dependent bank conflicts (×1.9–2.1 in the model) in a loop already at 87–92 %
+  of its shared-memory bound.
+- **Wide against narrow, the 20 VALU:** 10 digit extraction (digits 16–17 split over the words' top nibbles),
+  6 the 18th digit's address and ORs, 4 the record's first word. Two-word masks, digits 64..b and the pad row
+  cost nothing in this loop.
+- **Yesterday's count and fault hook cost nothing in this loop** (wide 187 → 189 VALU, narrow 171 → 169).
+- **Checked:** lavapipe parity (8-lane planes) for V2–V6 wide at b40 and b65, V1 and V5 narrow on two slices;
+  both fault tests on V5. **Not checked anywhere: the 64-lane transpose with its rotated stores** (only an AMD
+  card runs 64-lane planes), and no timing on any card.
+- **My reading of the base-64 diff** (`git diff f503a13c a4fb3543 -- common/src/midout/gpu.rs`): the lane map
+  covers each (entry, chunk) once, the record fields and slots are as before, the rotated stores write the
+  same rows under the same guard; I found no fault. The model has been wrong on this card's shared memory
+  before (CW, PS: predicted gains that measured slower), so I take the 21 % and 17 % as a reason to measure,
+  not as a result.
+- **Verdict:** kill line not met (three ideas without 8 % of the modelled loop). Next: B65.9, the variant on
+  eventeo's NVIDIA cards (exactness at 32 lanes through CUDA and Vulkan; whether it is neutral or better
+  there); then the RX 9070 XT when a window is granted.
+
 ## YIELD.2 Correction of YIELD.1: with the residue factor of the published odds model, base 64 holds 73 % of the reachable odds and base 65 27 %, not the reverse (2026-11-28, the director; `YIELD/yield2.py`, `yield2.txt`)
 
 **What was wrong.** YIELD.1 (2026-11-26) priced each base with E_b = N_b · b!/b^b, taken from my own

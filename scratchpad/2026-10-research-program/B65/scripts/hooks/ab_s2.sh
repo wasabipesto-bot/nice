@@ -1,7 +1,8 @@
 #!/bin/bash
 # ab_s2.sh NEW [RUN]: step 2's timing: hk1-bench-* (step 1's head) against NEW-bench-*, same session, alternating,
 # three rounds (the order reversed each round): base 65 wide (warm-up field 13731, field 77777) through CUDA and
-# through Vulkan/SPIR-V, then base 64 narrow once each (step 2 does not touch it: a control). No sampled check.
+# through Vulkan/SPIR-V, then base 64 narrow once each (step 2 does not touch it: a control); then the CUDA
+# timing stops 3 and 5 of each. No sampled check.
 . "$HOME/research/scripts/env.sh"
 S=$R/b65/scripts; NEW=$1; RUN=${2:-hooks-s2}; O=$R/runs/$RUN; mkdir -p $O
 W65="--base 65 --fields 13731,77777 --group 16"; N64="--fields 4095,77777 --group 16 --no-cpu-check"
@@ -16,4 +17,9 @@ for rt in cuda vk; do
   done
   for t in hk1 $NEW; do c ${rt}64n_${t}_1 $t-bench-$sfx $rt midout_bench $N64; done
 done
+# where it sits (CUDA, cumulative timing stops: 3 = up to the main kernel, 5 = + the expansion)
+for st in 3 5; do for t in hk1 $NEW; do
+  [ -e $R/b65h/stop ] && { echo stopped >> $O/rc.txt; exit 0; }
+  bash $S/run_b65.sh $RUN cuda65s${st}_$t $t-bench-cuda/midout_wide_bench cuda MIDOUT_STOP=$st -- $W65
+done; done
 echo done > $O/done

@@ -1,0 +1,157 @@
+commit 5e95b880068eeebcfad20ad949a029336c760d5d
+Author: Claude <claude@example.com>
+Date:   Sat Nov 28 06:29:08 2026 +0000
+
+    midout wide: digit-major slices, four chunks per lane without bank conflicts
+    
+    The slices are laid out [(v * 16 + q) * 2 + half], so a phase-3b read's
+    bank pair is its chunk whatever the digits. Lane t covers chunks
+    (t % 16) ^ 4k: a stream's four lanes cover all 16 chunks, and in each
+    read a group of 16 lanes reads 16 distinct chunks (with chunks q + 4k
+    per lane, four streams' digits decide the banks and the reads
+    conflict). The reads of chunks an entry does not keep are no longer
+    skipped. Words, masks and records are as before.
+    
+    Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+
+diff --git a/common/src/midout/gpu_wide.rs b/common/src/midout/gpu_wide.rs
+index 85a8a67d..e2a504d7 100644
+--- a/common/src/midout/gpu_wide.rs
++++ b/common/src/midout/gpu_wide.rs
+@@ -322,9 +322,9 @@ mod wk {
+         #[comptime] maxpop: u32,
+     ) {
+         let m = comptime!(b - 1);
+-        // rows per chunk: every digit 0..64 of the transpose has a row, and the pad digit (64 below base 65, b
+-        // above) a row of zeros, never common: an odd stride (65 below base 65, (b + 1) | 1 above)
+-        let srow = comptime!(if b > 64 { (b + 1) | 1 } else { 65 });
++        // slice rows, digit-major [(v * 16 + q) * 2 + half]: every digit 0..64 of the transpose has a row of 16
++        // chunks, and the pad digit (64 below base 65, b above) a row of zeros, never common; (b + 1) | 1 rows
++        // above base 64 (65 below), as before
+         let slw = comptime!((if b > 64 { (b + 1) | 1 } else { 65 }) * 32);
+         let pad = comptime!(if b > 64 { b } else { 64 });
+         let npl = comptime!(NT / w);
+@@ -406,7 +406,7 @@ mod wk {
+             comm[t as usize].store(u32::MAX);
+             commh[t as usize].store(u32::MAX);
+             // the pad digit's row of every chunk: zeros (no round writes it at W >= 32)
+-            sl[(((t / 2u32) * srow + pad) * 2u32 + t % 2u32) as usize] = 0u32;
++            sl[(pad * 32u32 + t) as usize] = 0u32;
+         }
+         if t == 32u32 {
+             cmv[pad as usize] = 0u32;
+@@ -647,7 +647,7 @@ mod wk {
+                         #[unroll]
+                         for sb in 0..segs {
+                             let v = comptime!(sb * w) + lane;
+-                            let row = (v + q * srow) * 2u32;
++                            let row = (v * 16u32 + q) * 2u32;
+                             let mut hv = xh;
+                             if comptime!(sb * w < 32) {
+                                 hv = xl;
+@@ -671,7 +671,7 @@ mod wk {
+                         for xv in 0..comptime!(b - 64) {
+                             let bal = plane_ballot(((mh >> comptime!(xv)) & 1u32) != 0u32);
+                             if q < nch && lane == 0u32 {
+-                                let row = (q * srow + comptime!(64 + xv)) * 2u32;
++                                let row = (comptime!((64 + xv) * 16) + q) * 2u32;
+                                 let mut eq = false;
+                                 if comptime!(w == 64) {
+                                     sl[row as usize] = bal[0usize];
+@@ -749,16 +749,19 @@ mod wk {
+                 }
+                 sync_cube();
+                 let nlist = s_nl[0usize].load();
+-                // phase 3b: four chunks per lane (q = t % 4, chunks q, q + 4, q + 8, q + 12), 64 probe streams
+-                // (st = t / 4), one list entry per unit per step: a lane reads its probe's digits once for its four
+-                // chunks (their rows are constant offsets apart); 64 entries x 16 chunks per cube step
+-                let q = t % 4u32;
++                // phase 3b: four chunks per lane, 64 probe streams (st = t / 4), one list entry per unit per step;
++                // 64 entries x 16 chunks per cube step. Lane t covers chunks c_k = (t % 16) ^ 4k (k < 4): a stream's
++                // four lanes cover all 16, and in each read the 16 lanes of a group read 16 distinct chunks. The
++                // slices are digit-major, [(v * 16 + c) * 2 + half], so a read's bank pair is its chunk whatever the
++                // digits: conflict-free. The probe's digits are read and the
++                // row address formed once for the four chunks.
++                let i16 = t % 16u32;
+                 let st = t / 4u32;
+                 let mut vlo = Array::<u32>::new(4usize);
+                 let mut vhi = Array::<u32>::new(4usize);
+                 #[unroll]
+                 for h in 0..4u32 {
+-                    let qh = q + comptime!(4 * h);
++                    let qh = i16 ^ comptime!(4 * h);
+                     let nq = select(qh < nch, min(64u32, ntake - min(ntake, qh * 64u32)), 0u32);
+                     vlo[h as usize] = select(nq >= 32u32, 0xFFFF_FFFFu32, (1u32 << (nq % 32u32)) - 1u32);
+                     vhi[h as usize] = select(
+@@ -767,9 +770,13 @@ mod wk {
+                         select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32),
+                     );
+                 }
+-                let qr = q * srow;
+-                let qs = 16u32 + q;
+-                let cpos0 = cdone + q * 64u32;
++                let q2 = i16 * 2u32;
++                // c_k's word offset from c_0's within a digit row (wrapping: c_k may be below c_0)
++                let mut dq = Array::<u32>::new(4usize);
++                #[unroll]
++                for h in 0..4u32 {
++                    dq[h as usize] = (i16 ^ comptime!(4 * h)) * 2u32 - q2;
++                }
+                 let mut e0 = 0u32;
+                 while e0 < nlist {
+                     let mut wlo = Array::<u32>::new(4usize);
+@@ -785,34 +792,27 @@ mod wk {
+                     }
+                     let mut alo = Array::<u32>::new(4usize);
+                     let mut ahi = Array::<u32>::new(4usize);
+-                    let mut rows = Array::<u32>::new(comptime!(maxpop as usize));
+                     #[unroll]
+-                    for k in 0..maxpop {
+-                        rows[k as usize] = (probe_digit(dws, de, k, maxpop) + qr) * 2u32;
++                    for h in 0..4u32 {
++                        alo[h as usize] = 0u32;
++                        ahi[h as usize] = 0u32;
+                     }
+-                    // a chunk the entry does not keep (or past nch) gives a zero word whatever its rows hold: the
+-                    // reads of chunks 1-3 are skipped for it (lanes masked off; the whole branch when no lane of the
+-                    // plane keeps it); chunk 0 reads always, so that the row addresses are formed once, outside
+                     #[unroll]
+-                    for h in 0..4u32 {
+-                        let mut xl = 0u32;
+-                        let mut xh = 0u32;
+-                        if comptime!(h == 0) || (((ent >> (qs + comptime!(4 * h))) & 1u32) != 0u32 && vlo[h as usize] != 0u32) {
+-                            #[unroll]
+-                            for k in 0..maxpop {
+-                                xl |= sl[(rows[k as usize] + comptime!(8 * srow * h)) as usize];
+-                                xh |= sl[(rows[k as usize] + comptime!(8 * srow * h + 1)) as usize];
+-                            }
++                    for k in 0..maxpop {
++                        let row = probe_digit(dws, de, k, maxpop) * 32u32 + q2;
++                        #[unroll]
++                        for h in 0..4u32 {
++                            let rh = row + dq[h as usize];
++                            alo[h as usize] = alo[h as usize] | sl[rh as usize];
++                            ahi[h as usize] = ahi[h as usize] | sl[(rh + 1u32) as usize];
+                         }
+-                        alo[h as usize] = xl;
+-                        ahi[h as usize] = xh;
+                     }
+                     let mut nsl = Array::<u32>::new(4usize);
+                     let mut rk = Array::<u32>::new(4usize);
+                     let mut nn = 0u32;
+                     #[unroll]
+                     for h in 0..4u32 {
+-                        let kmask = 0u32 - ((ent >> (qs + comptime!(4 * h))) & 1u32);
++                        let kmask = 0u32 - ((ent >> (16u32 + (i16 ^ comptime!(4 * h)))) & 1u32);
+                         wlo[h as usize] = !alo[h as usize] & vlo[h as usize] & kmask;
+                         whi[h as usize] = !ahi[h as usize] & vhi[h as usize] & kmask;
+                         let nz = (wlo[h as usize] | whi[h as usize]) != 0u32;
+@@ -849,7 +849,7 @@ mod wk {
+                                 if (wlo[h as usize] | whi[h as usize]) != 0u32 {
+                                     let mut rv = Vector::<u32, Const<4>>::empty();
+                                     rv[0usize] = ((p16 >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
+-                                    rv[1usize] = cpos0 + comptime!(256 * h);
++                                    rv[1usize] = cdone + (i16 ^ comptime!(4 * h)) * 64u32;
+                                     rv[2usize] = select(lost, 0u32, wlo[h as usize]);
+                                     rv[3usize] = select(lost, 0u32, whi[h as usize]);
+                                     out[(sbase + nsl[h as usize] + rk[h as usize]) as usize] = rv;
