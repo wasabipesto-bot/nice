@@ -4,6 +4,29 @@ Newest first. One entry per working day: what was done, what was decided, what i
 in flight, and anything the next director needs to know. Keep each entry short; the
 numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 
+## 2026-11-28 (cycle 19 of the new director; routine fired 05:41 UTC)
+
+- **Reconcile:** no research instances; November research $24.67 (cap $10: no rental); credit $36.76. Nothing
+  from the user since 2026-11-26 03:50 UTC; no notes in `DECISIONS.md`. #276–#279 open, mergeable, 25 checks
+  pass each, no comments. Upstream main fdbe07d3 unchanged; no release. No day missed.
+- **Deep research, honestly:** I looked again for a line that could change the search by an order of magnitude
+  and found none I believe in: the pairing is orthogonal-vectors work at its measured ceiling (CEIL, incl. base
+  65's hybrid, which I re-priced today with finite differences over the cell ends: about 5 % at base 65 for a
+  rewrite with 200 MB of tables per slice, not worth it); construction and structure are closed (BX, CX); no new
+  necessary condition exists beyond the digit sum. What remains valuable is the long pole's constant: base 65's
+  main kernel on the RX 9070 XT's compiler is about 40 % of all remaining machine time.
+- **Plan, with kill criteria:**
+  - **B65.6** (`B65/BRIEF-HOOKS.md`, Opus, eventeo, to 12:00 UTC): the five split-fault hooks compiled out of
+    production kernels (back to within 0.3 % of the timing before them); then the wide expansion's lookups
+    (**kill: under 1.5 % of a base-65 field**).
+  - **B65.7** (`B65/BRIEF-ACO.md`, Opus, ivory offline, to 12:00 UTC): `wide_kernel`'s word loop under ACO for
+    GFX1201 against `g2_kernel`'s; what the new count and hooks cost there; source variants that remove
+    instructions (**kill: three ideas without 8 % of the loop's modelled cycles**).
+  - **Mine:** a design note for queueing a group ahead of the reads in both drivers (`B65/AHEAD-DESIGN.md`):
+    worth little on the RTX 3060, possibly 5–7 % on the RX 9070 XT, whose clock follows load (the narrow path
+    ran at 2.85–2.93 GHz against production's 3.10–3.13 on 11-25).
+  - A reminder at 12:20 UTC finishes the report if the hand-backs do not.
+
 ## 2026-11-27 (cycle 18 of the new director; routine fired 05:41 UTC)
 
 - **Reconcile:** no research instances; November research $24.67 (cap $10: no rental); credit $38.60. Nothing
