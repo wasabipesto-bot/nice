@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-28 12:00 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-28 13:40 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
@@ -17,7 +17,7 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
 - **Your direction for it (2026-11-25):** a `midout` mode beside `detailed` and `niceonly`, visible in `--help`,
   with a new claim endpoint and its own table on the server; the field definition not locked in yet. **The
   client half exists since 2026-11-25** on the fork branch `dev/mo-mode` (`nice_client midout`, tested end to
-  end against a development server; notes in `G2/MODE-NOTES.md`; head `87620a18` on 2026-11-28, full CI matrix
+  end against a development server; notes in `G2/MODE-NOTES.md`; head `23823929` on 2026-11-28, full CI matrix
   green); the server half is the proposal of §1.
 - **Pull requests in general are allowed.** Open now, all green and mergeable: #276 (the crash at bases with
   no valid residue), #277 (a `--gpu` client that finds only a software renderer), #278 (the CI check for the

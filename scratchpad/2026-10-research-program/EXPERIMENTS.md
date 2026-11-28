@@ -31,8 +31,8 @@ with a group-16 pair in the same session. fs per admissible n; counts equal in e
   mask, a telemetry count) is within a factor 3.5 of wrapping at 256, a factor 7 at 128; I give up 0.2–0.6 %
   under heavy load on this card for the margin. Which of 128 and 256 is right for the RX 9070 XT, whose
   slices are 3.3 times shorter, is for a demoux window to say (an argument of the bench).
-- Fork CI on `23823929`: device parity 46141878365 and the full matrix 46141880493 started 11:52 UTC;
-  `dev/mo-mode` is fast-forwarded when both are green.
+- Fork CI on `23823929`: device parity 46141878365 and the full matrix 46141880493 green (13:38 UTC).
+  **Merged: `dev/mo-mode` fast-forwarded to `23823929`.**
 
 ## B65.9 The ACO study's layout (V5) on the RTX 3060: exact at 32 lanes, and 4–14 % slower there; parked (2026-11-28 10:05–11:24 UTC, the director; eventeo; `B65/scripts/v5/`, `B65/runs/v5-ab/`, `B65/runs/v5-tests/`; `exp/mo-wide-aco` `a4fb3543` against its base `f503a13c`)
 

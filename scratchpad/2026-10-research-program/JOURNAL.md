@@ -101,6 +101,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
 - **Tomorrow:** the design document and map to the new head; a written plan of how the middle-out work is
   cut into pull requests once the hold lifts (nothing opened); literature sweep (due about 11-30); with base
   64 first again, look once more for anything on its path that the kernel studies did not cover.
+- **13:38 UTC, the group-size change merged.** Fork CI on `23823929` green (device parity 46141878365; full
+  matrix 46141880493, the emulated arm-musl build last); **`dev/mo-mode` fast-forwarded 87620a18 → 23823929**.
+  The design document and map still describe `0b6e22e1`: tomorrow's re-base covers the hooks' comptime choice
+  and the group size.
 
 ## 2026-11-27 (cycle 18 of the new director; routine fired 05:41 UTC)
 
