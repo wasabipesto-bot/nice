@@ -16,8 +16,13 @@ use serde_json::{Value, json};
 /// The runtime types a route names (the client does not depend on `cubecl`).
 pub use cubecl::prelude::{ComputeClient as Client, Runtime as DeviceRuntime};
 
-/// Slices per synchronisation (the benches' default).
-const GROUP: usize = 16;
+/// Slices per synchronisation. The card idles once per group while the host reads the group's results. Under a
+/// busy host that pause cost 4.6-6.5 % of a base-64 field at 16 slices per group, 2.0 % at 64, 1.3 % at 128 and
+/// 0.4 % at 256 (RTX 3060 through Vulkan, six busy host threads; base 65: 3.1 %, 1.1 %, 0.4 % and 0.0 %), and
+/// nothing measurable on a quiet host. A group's per-unit counters are u32 and the drivers accept up to 256
+/// slices, where the largest count observed is within a factor 3.5 of wrapping; 128 keeps a factor 7. Card
+/// memory: 18 MiB more than at 16.
+const GROUP: usize = 128;
 /// Classes per batch on the base-64 path (the bench's default: all).
 const CLASSES_B64: u32 = 63;
 
