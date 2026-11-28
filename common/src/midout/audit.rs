@@ -401,6 +401,7 @@ fn audit_faults() {
     println!("fault 0: accounts pass: {base:?}");
     // the nice-number buffer: whatever the faults do, nothing is reported
     for f in faults {
+        gj.set_split_emulation(f & SPLIT_FAULTS != 0);
         gj.set_fault(f);
         let r = group(&gj, &pips);
         gj.set_fault(0);
@@ -484,6 +485,12 @@ fn cubecl_midout_timing_stop_is_refused() {
 /// from the expansion's plane scan or the main kernel's slab appends) through the accounts of the production group
 /// path; `F_PF_DROP` (the prefilter rejecting too much, which no account can see) through the sampled CPU check. A
 /// clean run passes before each fault (and after it, with `again`).
+///
+/// The split faults run on the kernels built with their emulation (`set_split_emulation`), the others on
+/// production's build. What the split faults prove is that the host's checks fire on the emulation build;
+/// production's kernels are the same source with the emulation blocks compiled out. The evidence that the two
+/// builds otherwise agree: without a fault the emulation build gives the production build's counts (asserted)
+/// and its sampled slice equals the CPU's n for n.
 fn faults_are_loud<R: Runtime>(client: ComputeClient<R>, pips: &[u64], classes: u32, again: bool) {
     let coord = Coord::for_base(64).unwrap();
     // the sampled slice's CPU reference, in parallel with the device runs
@@ -496,6 +503,29 @@ fn faults_are_loud<R: Runtime>(client: ComputeClient<R>, pips: &[u64], classes: 
     println!("W {} classes {classes} slices {pips:?}", gj.w);
     let base = group(&gj, pips).expect("the run without a fault passes its accounts");
     println!("fault 0: accounts pass: {base:?}");
+    // the split faults run on the kernels built with their emulation, the others on production's build; without a
+    // fault the two builds must agree (the audit's maxima depend on the order of atomics: not compared)
+    let k = |c: &DevCounts| {
+        (
+            c.children,
+            c.chunks,
+            c.flat,
+            c.kept,
+            c.survivors,
+            c.checked,
+            c.slices,
+            c.tops,
+            c.tested,
+        )
+    };
+    gj.set_split_emulation(true);
+    let eb = group(&gj, pips).expect("the emulation build without a fault passes its accounts");
+    assert_eq!(
+        k(&eb),
+        k(&base),
+        "the split emulation build without a fault vs production's build"
+    );
+    println!("split emulation build, no fault: accounts pass, counts equal to production's build");
     let mut silent = Vec::new();
     for (name, f) in [
         ("F_SKIP_MAIN", F_SKIP_MAIN),
@@ -506,6 +536,7 @@ fn faults_are_loud<R: Runtime>(client: ComputeClient<R>, pips: &[u64], classes: 
         ("F_SLAB_SPLIT", F_SLAB_SPLIT),
         ("F_PF_DROP", F_PF_DROP),
     ] {
+        gj.set_split_emulation(f & SPLIT_FAULTS != 0);
         gj.set_fault(f);
         let r = group(&gj, pips);
         gj.set_fault(0);
@@ -532,6 +563,11 @@ fn faults_are_loud<R: Runtime>(client: ComputeClient<R>, pips: &[u64], classes: 
     }
     let cpu = cpu.join().unwrap();
     let rank = slice_tops(pips[0], gj.roots()).rank;
+    gj.set_split_emulation(true);
+    sample_compare(&gj, sp, &rank, &cpu)
+        .expect("the sampled check of the split emulation build without a fault is equal");
+    println!("split emulation build, no fault: sampled slice {sp} equal");
+    gj.set_split_emulation(false);
     sample_compare(&gj, sp, &rank, &cpu).expect("the sampled check of a clean run is equal");
     println!(
         "sampled check, no fault: slice {sp} equal (survivors {} checked {})",

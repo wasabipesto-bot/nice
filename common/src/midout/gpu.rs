@@ -306,6 +306,9 @@ mod kernels {
         lcap: u32,
         #[comptime] w: u32,
         #[comptime] fill: u32,
+        // the split-plane fault emulation (`F_SLAB_SPLIT`) compiled in: false in every production path, true only
+        // where a test asks for it (`GpuJoin::set_split_emulation`)
+        #[comptime] emul: bool,
     ) {
         let npl = comptime!(NT / w);
         let segs = comptime!(64 / w); // ballot segments per chunk (W <= 64)
@@ -778,24 +781,37 @@ mod kernels {
                                     }
                                 }
                                 let sbase = slab_id * SLAB + slab_used;
-                                // F_SLAB_SPLIT (131072): the records of lanes other than lane 0 are lost (written
-                                // empty), as when lanes split from lane 0's after a branch append apart from it
-                                let lost = (fault & 131072u32) != 0u32 && lane != 0u32;
                                 if slab_id < nslab_cap {
                                     if nza {
                                         let mut rv = Vector::<u32, Const<4>>::empty();
                                         rv[0usize] = pk[0usize];
                                         rv[1usize] = lb + cpos;
-                                        rv[2usize] = select(lost, 0u32, wlo[0usize]);
-                                        rv[3usize] = select(lost, 0u32, whi[0usize]);
+                                        rv[2usize] = wlo[0usize];
+                                        rv[3usize] = whi[0usize];
+                                        if comptime!(emul) {
+                                            // F_SLAB_SPLIT (131072): the records of lanes other than lane 0 are
+                                            // lost (written empty), as when lanes split from lane 0's after a
+                                            // branch append apart from it
+                                            if (fault & 131072u32) != 0u32 && lane != 0u32 {
+                                                rv[2usize] = 0u32;
+                                                rv[3usize] = 0u32;
+                                            }
+                                        }
                                         out[(sbase + ra) as usize] = rv;
                                     }
                                     if nzb && !((fault & 32u32) != 0u32 && CUBE_POS_X == 0u32) {
                                         let mut rv = Vector::<u32, Const<4>>::empty();
                                         rv[0usize] = pk[1usize];
                                         rv[1usize] = lb + cpos;
-                                        rv[2usize] = select(lost, 0u32, wlo[1usize]);
-                                        rv[3usize] = select(lost, 0u32, whi[1usize]);
+                                        rv[2usize] = wlo[1usize];
+                                        rv[3usize] = whi[1usize];
+                                        if comptime!(emul) {
+                                            // F_SLAB_SPLIT, as above
+                                            if (fault & 131072u32) != 0u32 && lane != 0u32 {
+                                                rv[2usize] = 0u32;
+                                                rv[3usize] = 0u32;
+                                            }
+                                        }
                                         out[(sbase + na + rb) as usize] = rv;
                                     }
                                 }
@@ -960,11 +976,13 @@ mod prep {
         nroots: u32,
         pip8: u32,
         cap: u32,
-        // F_ANC_SPLIT (32768): certified roots outside lane 0 leave the plane's ballot (as lanes split from lane
-        // 0's after a branch would): their entries are lost
+        // F_ANC_SPLIT (32768, only with `emul`): certified roots outside lane 0 leave the plane's ballot (as lanes
+        // split from lane 0's after a branch would): their entries are lost
         fault: u32,
         acc8: &mut Array<Atomic<u32>>,
         #[comptime] w: u32,
+        // the split-plane fault emulation compiled in (tests only; see `g2_kernel`)
+        #[comptime] emul: bool,
     ) {
         let sh = SharedMemory::<Atomic<u32>>::new(2usize);
         if UNIT_POS_X < 2u32 {
@@ -996,8 +1014,12 @@ mod prep {
             }
             ok = m.count_ones() == 16u32;
         }
-        let split = (fault & 32768u32) != 0u32 && ok && UNIT_POS_PLANE != 0u32;
-        let b = plane_ballot(ok && !split);
+        // the lane's entry: its certified root, unless the split emulation takes it out of the ballot
+        let mut put = ok;
+        if comptime!(emul) {
+            put = ok && !((fault & 32768u32) != 0u32 && UNIT_POS_PLANE != 0u32);
+        }
+        let b = plane_ballot(put);
         let l = UNIT_POS_PLANE;
         let lo = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
         let mut r = (b[0usize] & lo).count_ones();
@@ -1012,7 +1034,7 @@ mod prep {
             base0 = cnt[0usize].fetch_add(n);
         }
         let base = plane_sum(base0); // only lane 0 holds it
-        if ok && !split {
+        if put {
             let slot = base + r;
             if slot < cap {
                 out[slot as usize] = r4;
@@ -1708,13 +1730,12 @@ mod post {
         fault: u32,
         // the prefilter in 24-bit limbs with 64-bit one-hot shifts (`pf24`: the SPIR-V path) or as measured on CUDA (`pf`)
         #[comptime] oh64: bool,
+        // the split-plane fault emulation (`F_EXP_SPLIT`) compiled in (tests only; see `g2_kernel`)
+        #[comptime] emul: bool,
     ) {
         let nopf = (fault & 1u32) != 0u32;
         // F_PF_DROP (1024): the prefilter wrongly drops survivors whose r0 has bits 10-19 zero
         let pfdrop = (fault & 1024u32) != 0u32;
-        // F_EXP_SPLIT (65536): lanes other than lane 0 with survivors in slabs s = 0 mod 7 leave the plane's scan
-        // (as lanes split from lane 0's after a branch would): their entries are lost
-        let fsplit = (fault & 65536u32) != 0u32;
         let shp = SharedMemory::<Atomic<u32>>::new(1usize);
         if UNIT_POS_X == 0u32 {
             shp[0usize].store(0u32);
@@ -1761,44 +1782,61 @@ mod post {
                     + reca[3usize].count_ones()
                     + recb[2usize].count_ones()
                     + recb[3usize].count_ones();
-                let (kla, kha, klb, khb) = keep_bits2(
+                let (kla0, kha0, klb0, khb0) = keep_bits2(
                     reca, recb, hda, hdb, topa, topb, lst, r0hi, pip_hi, nopf, pfdrop, oh64,
                 );
-                let nb = kla.count_ones() + kha.count_ones() + klb.count_ones() + khb.count_ones();
+                let mut kla = kla0;
+                let mut kha = kha0;
+                let mut klb = klb0;
+                let mut khb = khb0;
+                let mut nb =
+                    kla.count_ones() + kha.count_ones() + klb.count_ones() + khb.count_ones();
                 nput += nb;
-                let split = fsplit && nb > 0u32 && UNIT_POS_PLANE != 0u32 && s % 7u32 == 0u32;
-                let nbs = select(split, 0u32, nb);
-                let excl = plane_exclusive_sum(nbs);
-                let tot = plane_sum(nbs);
+                if comptime!(emul) {
+                    // F_EXP_SPLIT (65536): a lane other than lane 0 with survivors in a slab s = 0 mod 7 leaves the
+                    // plane's scan (its bits counted by `nput`, none appended), as lanes split from lane 0's after
+                    // a branch would
+                    if (fault & 65536u32) != 0u32
+                        && nb > 0u32
+                        && UNIT_POS_PLANE != 0u32
+                        && s % 7u32 == 0u32
+                    {
+                        kla = 0u32;
+                        kha = 0u32;
+                        klb = 0u32;
+                        khb = 0u32;
+                        nb = 0u32;
+                    }
+                }
+                let excl = plane_exclusive_sum(nb);
+                let tot = plane_sum(nb);
                 let mut b0 = 0u32;
                 if UNIT_POS_PLANE == 0u32 && tot > 0u32 {
                     b0 = scount[0usize].fetch_add(tot);
                 }
                 let slot = plane_sum(b0) + excl;
-                if !split {
-                    let sb = put_bits(
-                        reca[0usize],
-                        reca[1usize],
-                        kla,
-                        kha,
-                        lst,
-                        surv,
-                        slot,
-                        scap,
-                        r0hi,
-                    );
-                    put_bits(
-                        recb[0usize],
-                        recb[1usize],
-                        klb,
-                        khb,
-                        lst,
-                        surv,
-                        sb,
-                        scap,
-                        r0hi,
-                    );
-                }
+                let sb = put_bits(
+                    reca[0usize],
+                    reca[1usize],
+                    kla,
+                    kha,
+                    lst,
+                    surv,
+                    slot,
+                    scap,
+                    r0hi,
+                );
+                put_bits(
+                    recb[0usize],
+                    recb[1usize],
+                    klb,
+                    khb,
+                    lst,
+                    surv,
+                    sb,
+                    scap,
+                    r0hi,
+                );
                 r0 += 2u32 * PLANE_DIM;
             }
             s += pstride;
@@ -2693,6 +2731,12 @@ pub struct GpuJoin<R: Runtime> {
     stop: u32,
     /// fault-injection bits; 0 in production (only the audit tests set it).
     pub(crate) fault: u32,
+    /// The kernels compiled with the split-plane fault emulation (`SPLIT_FAULTS`; a comptime value of `g2_kernel`,
+    /// `anc8_kernel` and `expand_kernel`): false in every production path, set only by the tests
+    /// ([`GpuJoin::set_split_emulation`]). The faults it emulates therefore prove that the host's checks fire on
+    /// the kernels built with it; the production kernels are the same source with those blocks compiled out (the
+    /// fault tests assert that the two builds give equal counts and accounts without a fault).
+    emul: bool,
     /// Share the parents' root pass across digit 8 inside a field ([`GpuJoin::set_parent_sharing`], on).
     share8: bool,
     anc: Mutex<AncLists>,
@@ -2737,6 +2781,10 @@ pub(crate) const F_EXP_SPLIT: u32 = 65536;
 /// branch append apart from it (the slab's count consistent).
 #[allow(dead_code)] // set by the audit's tests only
 pub(crate) const F_SLAB_SPLIT: u32 = 131_072;
+/// The faults that model a split plane. Their emulation is compiled into the kernels only on a test's request
+/// ([`GpuJoin::set_split_emulation`]); production's kernels carry the per-lane counts these faults exercise and
+/// none of the emulation.
+pub(crate) const SPLIT_FAULTS: u32 = F_ANC_SPLIT | F_EXP_SPLIT | F_SLAB_SPLIT;
 
 impl<R: Runtime> GpuJoin<R> {
     /// The slab capacity the kernels are told (shrunk by `F_SLAB_CAP`).
@@ -2757,9 +2805,15 @@ impl<R: Runtime> GpuJoin<R> {
         }
     }
 
-    /// Set the fault bits; `F_PMAX300` also rebuilds the job table with the second instance at 300.
+    /// Set the fault bits; `F_PMAX300` also rebuilds the job table with the second instance at 300. A split fault
+    /// (`SPLIT_FAULTS`) needs the kernels built with its emulation ([`GpuJoin::set_split_emulation`]); without it
+    /// the fault would not be injected, so this panics.
     #[allow(dead_code)] // the audit's tests only
     pub(crate) fn set_fault(&mut self, f: u32) {
+        assert!(
+            f & SPLIT_FAULTS == 0 || self.emul,
+            "middle-out: split fault {f} set without the split emulation compiled in"
+        );
         self.fault = f;
         let pm = if f & F_PMAX300 != 0 { 300 } else { PMAX };
         let mut nb = Vec::new();
@@ -2777,6 +2831,14 @@ impl<R: Runtime> GpuJoin<R> {
         }
         self.batches = nb;
     }
+
+    /// (tests only) Build the kernels with (true) or without (false, production's build) the split-plane fault
+    /// emulation.
+    #[allow(dead_code)] // the audit's tests only
+    pub(crate) fn set_split_emulation(&mut self, on: bool) {
+        self.emul = on;
+    }
+
     /// # Errors
     /// A device whose plane width the kernel does not take.
     pub fn new(client: ComputeClient<R>, caps: Caps) -> Result<Self> {
@@ -2884,6 +2946,7 @@ impl<R: Runtime> GpuJoin<R> {
             anc: Mutex::new(AncLists::default()),
             stop: 6,
             fault: 0,
+            emul: false,
             client,
         })
     }
@@ -2939,6 +3002,7 @@ impl<R: Runtime> GpuJoin<R> {
                         self.fault,
                         ArrayArg::from_raw_parts(acc8.clone(), 4),
                         self.w,
+                        self.emul,
                     );
                 }
             }
@@ -3486,6 +3550,7 @@ impl<R: Runtime> GpuJoin<R> {
                         self.lcap,
                         self.w,
                         self.fill,
+                        self.emul,
                     );
                 }
                 if self.upto(5) {
@@ -3509,6 +3574,7 @@ impl<R: Runtime> GpuJoin<R> {
                         (pip >> 6) as u32,
                         self.fault,
                         self.oh64,
+                        self.emul,
                     );
                 }
                 if self.upto(6) && self.fault & F_SKIP_CHECK == 0 {
@@ -4508,6 +4574,19 @@ mod tests {
                 }
                 assert_eq!((o0.survivors, o0.checked, o0.slices), (o1.survivors, o1.checked, o1.slices));
                 println!("equal slice by slice with and without sharing: survivors {}, checked {}", o1.survivors, o1.checked);
+                // the split emulation build without a fault: production's build's counts, slice by slice
+                gj.set_split_emulation(true);
+                let (oe, re) = search_field_groups(&gj, &cn, vs, q, opt1, 0..nsl).unwrap();
+                assert_eq!(re.len(), r1.len());
+                for ((p0, c0), (p1, c1)) in re.iter().zip(&r1) {
+                    assert_eq!(p0, p1);
+                    let k = |c: &DevCounts| {
+                        (c.children, c.chunks, c.flat, c.kept, c.survivors, c.checked, c.slices, c.tops, c.tested)
+                    };
+                    assert_eq!(k(c0), k(c1), "slice {p0:?}: the split emulation build differs: {c0:?} vs {c1:?}");
+                }
+                assert_eq!((oe.survivors, oe.checked, oe.slices), (o1.survivors, o1.checked, o1.slices));
+                println!("split emulation build, no fault: equal slice by slice to production's build");
                 for (name, f) in [
                     ("F_SKIP_ANC", F_SKIP_ANC),
                     ("F_ANC_SPLIT", F_ANC_SPLIT),
@@ -4516,6 +4595,7 @@ mod tests {
                     ("F_DROP_PROBE", F_DROP_PROBE),
                     ("F_DROP_PARENT", F_DROP_PARENT),
                 ] {
+                    gj.set_split_emulation(f & SPLIT_FAULTS != 0);
                     gj.set_fault(f);
                     let r = search_field_groups(&gj, &cn, vs, q, opt16, 0..nsl);
                     gj.set_fault(0);
@@ -4938,8 +5018,10 @@ mod tests {
     /// `cubecl_backend::tests::wgsl_dump_for_lint`); does nothing unless `CUBECL_DEBUG_LOG` is set. One slice's
     /// first batch of 4 classes, compiled for the device's plane width and for widths 32 and 64 (the compile-only
     /// path where the device's differs): the parents with and without the shared depth-8 list, the tops on the
-    /// device and on the host, each prefilter form, production's check. Nothing is checked: only the batch runs,
-    /// so the slice's accounts fail (and under a forced width the plane checks too), which the output shows.
+    /// device and on the host, each prefilter form, production's check; production's kernels (no split emulation)
+    /// at every width, and the split emulation build (the tests' kernels) at the device's width. Nothing is
+    /// checked: only the batch runs, so the slice's accounts fail (and under a forced width the plane checks too),
+    /// which the output shows.
     #[test]
     #[ignore = "requires a wgpu device"]
     fn wgsl_dump_for_lint() {
@@ -4967,18 +5049,26 @@ mod tests {
                 let mut gj = GpuJoin::with_width(client.clone(), caps, force_w).unwrap();
                 gj.batches.truncate(1);
                 let st = slice_tops(pip, gj.roots());
-                let anc = gj.build_anc(&[(pip & 0xFF_FFFF) as u32]);
-                let dev = gj.run_slice_dev_with(pip, &st.rank, 1, false).map(|x| x.0);
-                let shared = gj.run_slice_dev_with(pip, &st.rank, 1, true).map(|x| x.0);
-                let host = gj.run_slice(&st).map(|x| x.0);
-                println!(
-                    "W {} prefilter {form:?}: anc8 {:?}, device tops {:?}, shared {:?}, host tops {:?}",
-                    gj.w,
-                    anc.err(),
-                    dev.err(),
-                    shared.err(),
-                    host.err()
-                );
+                let emuls: &[bool] = if force_w.is_none() {
+                    &[false, true]
+                } else {
+                    &[false]
+                };
+                for &emul in emuls {
+                    gj.set_split_emulation(emul);
+                    let anc = gj.build_anc(&[(pip & 0xFF_FFFF) as u32]);
+                    let dev = gj.run_slice_dev_with(pip, &st.rank, 1, false).map(|x| x.0);
+                    let shared = gj.run_slice_dev_with(pip, &st.rank, 1, true).map(|x| x.0);
+                    let host = gj.run_slice(&st).map(|x| x.0);
+                    println!(
+                        "W {} prefilter {form:?} split emulation {emul}: anc8 {:?}, device tops {:?}, shared {:?}, host tops {:?}",
+                        gj.w,
+                        anc.err(),
+                        dev.err(),
+                        shared.err(),
+                        host.err()
+                    );
+                }
             }
         }
     }

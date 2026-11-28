@@ -320,6 +320,9 @@ mod wk {
         #[comptime] b: u32,
         #[comptime] nroot: u32,
         #[comptime] maxpop: u32,
+        // the split-plane fault emulation (`F_SLAB_SPLIT`) compiled in: false in every production path, true only
+        // where a test asks for it (`WideJoin::set_split_emulation`)
+        #[comptime] emul: bool,
     ) {
         let m = comptime!(b - 1);
         // rows per chunk: every digit 0..64 of the transpose has a row, and the pad digit (64 below base 65, b
@@ -817,17 +820,23 @@ mod wk {
                             }
                         }
                         let sbase = slab_id * SLAB + slab_used;
-                        // F_SLAB_SPLIT (1048576): the records of lanes other than lane 0 are lost (written empty),
-                        // as when lanes split from lane 0's after a branch append apart from it
-                        let lost = (fault & 1048576u32) != 0u32 && lane != 0u32;
                         if slab_id < nslab_cap {
                             if nza {
                                 let mut rv = Vector::<u32, Const<4>>::empty();
                                 rv[0usize] =
                                     ((pk[0usize] >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
                                 rv[1usize] = cpos;
-                                rv[2usize] = select(lost, 0u32, wlo[0usize]);
-                                rv[3usize] = select(lost, 0u32, whi[0usize]);
+                                rv[2usize] = wlo[0usize];
+                                rv[3usize] = whi[0usize];
+                                if comptime!(emul) {
+                                    // F_SLAB_SPLIT (1048576): the records of lanes other than lane 0 are lost
+                                    // (written empty), as when lanes split from lane 0's after a branch append
+                                    // apart from it
+                                    if (fault & 1048576u32) != 0u32 && lane != 0u32 {
+                                        rv[2usize] = 0u32;
+                                        rv[3usize] = 0u32;
+                                    }
+                                }
                                 out[(sbase + ra) as usize] = rv;
                             }
                             if nzb {
@@ -835,8 +844,15 @@ mod wk {
                                 rv[0usize] =
                                     ((pk[1usize] >> 4u32) + poff) | (d << 16u32) | (c << 24u32);
                                 rv[1usize] = cpos;
-                                rv[2usize] = select(lost, 0u32, wlo[1usize]);
-                                rv[3usize] = select(lost, 0u32, whi[1usize]);
+                                rv[2usize] = wlo[1usize];
+                                rv[3usize] = whi[1usize];
+                                if comptime!(emul) {
+                                    // F_SLAB_SPLIT, as above
+                                    if (fault & 1048576u32) != 0u32 && lane != 0u32 {
+                                        rv[2usize] = 0u32;
+                                        rv[3usize] = 0u32;
+                                    }
+                                }
                                 out[(sbase + na + rb) as usize] = rv;
                             }
                         }
@@ -1430,14 +1446,16 @@ mod wp {
         nroots: u32,
         cap: u32,
         // F_ANC_DROP (65536): roots r_f = 0 mod 997 taken as uncertified (a wrong list, its counts consistent:
-        // only the sampled check sees it); F_ANC_SPLIT (131072): certified roots outside lane 0 leave the plane's
-        // ballot (as lanes split from lane 0's after a branch would): their entries are lost
+        // only the sampled check sees it); F_ANC_SPLIT (131072, only with `emul`): certified roots outside lane 0
+        // leave the plane's ballot (as lanes split from lane 0's after a branch would): their entries are lost
         fault: u32,
         acc8: &mut Array<Atomic<u32>>,
         #[comptime] w: u32,
         #[comptime] b: u32,
         #[comptime] f0: u32,
         #[comptime] k: u32,
+        // the split-plane fault emulation compiled in (tests only; see `wide_kernel`)
+        #[comptime] emul: bool,
     ) {
         let sh = SharedMemory::<Atomic<u32>>::new(2usize);
         if UNIT_POS_X < 2u32 {
@@ -1456,8 +1474,12 @@ mod wp {
             let (lo, hi, _cacc) = parent_w(rf, pipd8, b, f0, comptime!(k - 1));
             ok = (lo != 0u64 || hi != 0u32) && !((fault & 65536u32) != 0u32 && rf % 997u32 == 0u32);
         }
-        let split = (fault & 131072u32) != 0u32 && ok && UNIT_POS_PLANE != 0u32;
-        let bl = plane_ballot(ok && !split);
+        // the lane's entry: its certified root, unless the split emulation takes it out of the ballot
+        let mut put = ok;
+        if comptime!(emul) {
+            put = ok && !((fault & 131072u32) != 0u32 && UNIT_POS_PLANE != 0u32);
+        }
+        let bl = plane_ballot(put);
         let l = UNIT_POS_PLANE;
         let lm = select(l >= 32u32, 0xFFFF_FFFFu32, (1u32 << min(l, 31u32)) - 1u32);
         let mut r = (bl[0usize] & lm).count_ones();
@@ -1472,7 +1494,7 @@ mod wp {
             base0 = cnt[0usize].fetch_add(n);
         }
         let base = plane_sum(base0);
-        if ok && !split {
+        if put {
             let slot = base + r;
             if slot < cap {
                 out[slot as usize] = rf;
@@ -1765,8 +1787,8 @@ mod wp {
         plo_hi: u32,
         phi_lo: u32,
         phi_hi: u32,
-        // F_T5_SPLIT (262144): valid parents outside lane 0 leave the plane's ballot (as lanes split from lane 0's
-        // after a branch would): their entries are lost
+        // F_T5_SPLIT (262144, only with `emul`): valid parents outside lane 0 leave the plane's ballot (as lanes
+        // split from lane 0's after a branch would): their entries are lost
         fault: u32,
         #[comptime] w: u32,
         #[comptime] b: u32,
@@ -1775,6 +1797,8 @@ mod wp {
         #[comptime] l: u32,
         #[comptime] s2: u32,
         #[comptime] s3: u32,
+        // the split-plane fault emulation compiled in (tests only; see `wide_kernel`)
+        #[comptime] emul: bool,
     ) {
         let bb = comptime!(b * b);
         let na = comptime!((l + 1) / 2);
@@ -1840,8 +1864,12 @@ mod wp {
                 ok = !bad1 && !bad2;
             }
         }
-        let split = (fault & 262144u32) != 0u32 && ok && UNIT_POS_PLANE != 0u32;
-        let bl = plane_ballot(ok && !split);
+        // the lane's entry: its valid parent, unless the split emulation takes it out of the ballot
+        let mut put = ok;
+        if comptime!(emul) {
+            put = ok && !((fault & 262144u32) != 0u32 && UNIT_POS_PLANE != 0u32);
+        }
+        let bl = plane_ballot(put);
         let lane = UNIT_POS_PLANE;
         let lm = select(
             lane >= 32u32,
@@ -1860,7 +1888,7 @@ mod wp {
             base0 = l5n[0usize].fetch_add(n);
         }
         let base = plane_sum(base0);
-        if ok && !split {
+        if put {
             list[(base + r) as usize] = i;
         }
         if ok {
@@ -2279,9 +2307,9 @@ mod wp {
         // the prefilter: the tops' thread indices and certified digits >= k + 2, the slice's digits, the range's
         // clip (as the check's), the small-n bound (n < b^ceil((k+2)/2) iff h < hsmall and the slice's digits
         // >= ceil((k+2)/2) are zero), the fault bits (F_NOPF 1: no prefilter; F_PF_DROP 1024: the prefilter
-        // wrongly drops n whose r_f has bits 10-19 zero, as on the base-64 path; F_EXP_SPLIT 524288: lanes other
-        // than lane 0 with survivors in slabs s = 0 mod 7 leave the plane's scan, as lanes split from lane 0's
-        // after a branch would: their entries are lost)
+        // wrongly drops n whose r_f has bits 10-19 zero, as on the base-64 path; F_EXP_SPLIT 524288, only with
+        // `emul`: lanes other than lane 0 with survivors in slabs s = 0 mod 7 leave the plane's scan, as lanes
+        // split from lane 0's after a branch would: their entries are lost)
         thd: &Array<u32>,
         ttq: &Array<u64>,
         ttqh: &Array<u32>,
@@ -2300,10 +2328,11 @@ mod wp {
         #[comptime] k: u32,
         // the prefilter in base b² (`pf_w2`); false: digit by digit (`pf_w`)
         #[comptime] pf2: bool,
+        // the split-plane fault emulation (`F_EXP_SPLIT`) compiled in (tests only; see `wide_kernel`)
+        #[comptime] emul: bool,
     ) {
         let nopf = (fault & 1u32) != 0u32;
         let pfdrop = (fault & 1024u32) != 0u32;
-        let fsplit = (fault & 524288u32) != 0u32;
         let shp = SharedMemory::<Atomic<u32>>::new(1usize);
         if UNIT_POS_X == 0u32 {
             shp[0usize].store(0u32);
@@ -2452,21 +2481,32 @@ mod wp {
                         }
                     }
                 }
-                let nb = k0.count_ones() + k1.count_ones() + k2.count_ones() + k3.count_ones();
+                let mut nb = k0.count_ones() + k1.count_ones() + k2.count_ones() + k3.count_ones();
                 nput += nb;
-                let split = fsplit && nb > 0u32 && UNIT_POS_PLANE != 0u32 && s % 7u32 == 0u32;
-                let nbs = select(split, 0u32, nb);
-                let excl = plane_exclusive_sum(nbs);
-                let tot = plane_sum(nbs);
+                if comptime!(emul) {
+                    // F_EXP_SPLIT (524288): a lane other than lane 0 with survivors in a slab s = 0 mod 7 leaves
+                    // the plane's scan (its bits counted by `nput`, none appended)
+                    if (fault & 524288u32) != 0u32
+                        && nb > 0u32
+                        && UNIT_POS_PLANE != 0u32
+                        && s % 7u32 == 0u32
+                    {
+                        k0 = 0u32;
+                        k1 = 0u32;
+                        k2 = 0u32;
+                        k3 = 0u32;
+                        nb = 0u32;
+                    }
+                }
+                let excl = plane_exclusive_sum(nb);
+                let tot = plane_sum(nb);
                 let mut bs = 0u32;
                 if UNIT_POS_PLANE == 0u32 && tot > 0u32 {
                     bs = scount[0usize].fetch_add(tot);
                 }
                 let slot = plane_sum(bs) + excl;
-                if !split {
-                    let sb = put_bits_w(tia, posa, k0, k1, lst, surv, slot, scap);
-                    put_bits_w(tib, posb, k2, k3, lst, surv, sb, scap);
-                }
+                let sb = put_bits_w(tia, posa, k0, k1, lst, surv, slot, scap);
+                put_bits_w(tib, posb, k2, k3, lst, surv, sb, scap);
                 r0 += 2u32 * PLANE_DIM;
             }
             s += pstride;
@@ -2930,6 +2970,10 @@ pub(crate) const F_EXP_SPLIT: u32 = 524_288;
 /// 0's after a branch append apart from it (the slab's count consistent).
 #[allow(dead_code)] // the tests only
 pub(crate) const F_SLAB_SPLIT: u32 = 1_048_576;
+/// The faults that model a split plane. Their emulation is compiled into the kernels only on a test's request
+/// ([`WideJoin::set_split_emulation`]); production's kernels carry the per-lane counts these faults exercise and
+/// none of the emulation.
+pub(crate) const SPLIT_FAULTS: u32 = F_ANC_SPLIT | F_T5_SPLIT | F_EXP_SPLIT | F_SLAB_SPLIT;
 
 /// The parents' shared lists of a field: one per value of the slices' digits [f0, k − 2) (`keys`), the roots
 /// whose depth-(k − 2) ancestor is valid (`wanc_kernel`), with their lengths (read once per field).
@@ -3000,6 +3044,12 @@ pub struct WideJoin<R: Runtime> {
     pub(crate) stop: u32,
     /// fault-injection bits; 0 in production (only the tests set them).
     pub(crate) fault: u32,
+    /// The kernels compiled with the split-plane fault emulation (`SPLIT_FAULTS`; a comptime value of `wide_kernel`,
+    /// `wanc_kernel`, `wtops5_kernel` and `wexpand_kernel`): false in every production path, set only by the tests
+    /// ([`WideJoin::set_split_emulation`]). The faults it emulates therefore prove that the host's checks fire on
+    /// the kernels built with it; the production kernels are the same source with those blocks compiled out (the
+    /// fault tests assert that the two builds give equal counts and accounts without a fault).
+    emul: bool,
     /// The expansion's prefilter in base b² (`pf_w2`; on unless [`WideJoin::set_prefilter_b2`]).
     pf2: bool,
     /// Share the parents' root pass across the slice's top digit inside a field ([`WideJoin::set_parent_sharing`],
@@ -3139,6 +3189,7 @@ impl<R: Runtime> WideJoin<R> {
             t5state: std::sync::Mutex::new(None),
             stop: 6,
             fault: 0,
+            emul: false,
             pf2: true,
             share: true,
             anc: std::sync::Mutex::new(WAnc::default()),
@@ -3235,6 +3286,7 @@ impl<R: Runtime> WideJoin<R> {
                         wb.b,
                         wb.f0,
                         wb.k,
+                        self.emul,
                     );
                 }
             }
@@ -3316,10 +3368,24 @@ impl<R: Runtime> WideJoin<R> {
         self.stop != 6
     }
 
-    /// Set the fault bits (and forget the top hierarchy's list, so that the next slice makes it under them).
+    /// Set the fault bits (and forget the top hierarchy's list, so that the next slice makes it under them). A split
+    /// fault (`SPLIT_FAULTS`) needs the kernels built with its emulation ([`WideJoin::set_split_emulation`]);
+    /// without it the fault would not be injected, so this panics.
     #[allow(dead_code)] // the tests only
     pub(crate) fn set_fault(&mut self, f: u32) {
+        assert!(
+            f & SPLIT_FAULTS == 0 || self.emul,
+            "middle-out wide: split fault {f} set without the split emulation compiled in"
+        );
         self.fault = f;
+        *self.t5state.lock().expect("t5state") = None;
+    }
+
+    /// (tests only) Build the kernels with (true) or without (false, production's build) the split-plane fault
+    /// emulation, and forget the top hierarchy's list, so that the next slice makes it with that build.
+    #[allow(dead_code)] // the tests only
+    pub(crate) fn set_split_emulation(&mut self, on: bool) {
+        self.emul = on;
         *self.t5state.lock().expect("t5state") = None;
     }
 
@@ -3397,6 +3463,7 @@ impl<R: Runtime> WideJoin<R> {
                         l,
                         wb.s2,
                         wb.s3,
+                        self.emul,
                     );
                     *st = Some((grp, h));
                 }
@@ -3605,6 +3672,7 @@ impl<R: Runtime> WideJoin<R> {
                     wb.b,
                     wb.roots.len() as u32,
                     self.caps.maxpop,
+                    self.emul,
                 );
             }
             if self.upto(5) {
@@ -3641,6 +3709,7 @@ impl<R: Runtime> WideJoin<R> {
                     wb.f0,
                     wb.k,
                     self.pf2,
+                    self.emul,
                 );
             }
             if self.upto(6) {
@@ -5022,6 +5091,12 @@ mod tests {
     /// loud through the counts the lanes keep apart from it), a clean run passes before each (and after it, with `again`) with the unfaulted counts, and
     /// `F_BAD_PARENT` (a parent computed wrongly: every conservation law still holds) is loud through the sampled
     /// CPU check.
+    ///
+    /// The split faults run on the kernels built with their emulation (`set_split_emulation`), the others on
+    /// production's build. What the split faults prove is that the host's checks fire on the emulation build;
+    /// production's kernels are the same source with the emulation blocks compiled out. The evidence that the two
+    /// builds otherwise agree: without a fault the emulation build gives the production build's counts (asserted,
+    /// every clean rerun after a split fault included) and its sampled slice equals the CPU's n for n.
     #[allow(clippy::match_wildcard_for_single_variants)]
     fn wide_faults<R: Runtime>(
         client: ComputeClient<R>,
@@ -5049,6 +5124,16 @@ mod tests {
         );
         let base = wgroup(&gj, &rank, pips).expect("the run without a fault passes its accounts");
         println!("fault 0: accounts pass: {base:?}");
+        gj.set_split_emulation(true);
+        let eb = wgroup(&gj, &rank, pips)
+            .expect("the emulation build without a fault passes its accounts");
+        assert_eq!(
+            eb, base,
+            "the split emulation build without a fault vs production's build"
+        );
+        println!(
+            "split emulation build, no fault: accounts pass, counts equal to production's build"
+        );
         let mut silent = Vec::new();
         for (name, f) in [
             ("F_SKIP_MAIN", F_SKIP_MAIN),
@@ -5061,6 +5146,7 @@ mod tests {
             ("F_BAD_PARENT", F_BAD_PARENT),
             ("F_PF_DROP", F_PF_DROP),
         ] {
+            gj.set_split_emulation(f & SPLIT_FAULTS != 0);
             gj.set_fault(f);
             let r = wgroup(&gj, &rank, pips);
             gj.set_fault(0);
@@ -5088,6 +5174,11 @@ mod tests {
             cpu.0,
             t.elapsed().as_secs_f64()
         );
+        gj.set_split_emulation(true);
+        wide_sample_compare(&gj, sp, &rank, None, &cpu)
+            .expect("the sampled check of the split emulation build without a fault is equal");
+        println!("split emulation build, no fault: sampled slice {sp} equal");
+        gj.set_split_emulation(false);
         wide_sample_compare(&gj, sp, &rank, None, &cpu)
             .expect("the sampled check of a clean run is equal");
         println!(
@@ -5236,6 +5327,18 @@ mod tests {
                 "equal slice by slice with and without sharing: survivors {}, checked {}",
                 o1.survivors, o1.checked
             );
+            // the split emulation build without a fault: production's build's counts, slice by slice
+            gj.set_split_emulation(true);
+            let (oe, re) = search_field_wide_groups(&gj, &cn, vs, q, opt1, 0..nsl).unwrap();
+            assert_eq!(
+                re, r1,
+                "the split emulation build without a fault vs production's build"
+            );
+            assert_eq!(
+                (oe.survivors, oe.checked, oe.slices, &oe.nice),
+                (o1.survivors, o1.checked, o1.slices, &o1.nice)
+            );
+            println!("split emulation build, no fault: equal slice by slice to production's build");
             for (name, f) in [
                 ("F_SKIP_ANC", F_SKIP_ANC),
                 ("F_ANC_SPLIT", F_ANC_SPLIT),
@@ -5244,6 +5347,7 @@ mod tests {
                 ("F_DROP_PROBE", F_DROP_PROBE),
                 ("F_DROP_PARENT", F_DROP_PARENT),
             ] {
+                gj.set_split_emulation(f & SPLIT_FAULTS != 0);
                 gj.set_fault(f);
                 let r = search_field_wide_groups(&gj, &cn, vs, q, opt16, 0..nsl);
                 gj.set_fault(0);
@@ -5268,6 +5372,7 @@ mod tests {
                 cpu_check: true,
                 ..opt16
             };
+            gj.set_split_emulation(false);
             gj.set_fault(F_ANC_DROP);
             let r = search_field_wide_groups(&gj, &cn, vs, q, optc, 0..nsl);
             gj.set_fault(0);
@@ -5505,8 +5610,9 @@ mod tests {
     /// `cubecl_backend::tests::wgsl_dump_for_lint`); does nothing unless `CUBECL_DEBUG_LOG` is set. The client
     /// route's join (`WideCaps::for_base(65)`, the base's coordinate and shape), 4 classes per batch, one slice's
     /// first batch, compiled for the device's plane width and for widths 32 and 64 (the compile-only path where
-    /// the device's differs). Nothing is checked: only the batch runs, so the slice's accounts fail (and under a
-    /// forced width the plane checks too), which the output shows.
+    /// the device's differs): production's kernels (no split emulation) at every width, and the split emulation
+    /// build (the tests' kernels) at the device's width. Nothing is checked: only the batch runs, so the slice's
+    /// accounts fail (and under a forced width the plane checks too), which the output shows.
     #[test]
     #[ignore = "requires a wgpu device"]
     fn wgsl_dump_for_lint() {
@@ -5533,14 +5639,30 @@ mod tests {
             (caps.classes, caps.survivors, caps.parents) = (4, 20_000_000, 2_000_000);
             let mut gj = WideJoin::with_width(client.clone(), caps, &coord, sh, force_w).unwrap();
             gj.batches.truncate(1);
-            // the shared parent lists' kernel (`wanc`; one key)
-            let ra = gj.build_anc(&[gj.anc_key(pip)]);
-            println!("W {} base 65 slice {pip}: wanc {:?}", gj.w, ra.err());
-            let r = gj
-                .rank_of(pip)
-                .and_then(|rank| gj.run_slice(pip, &rank))
-                .map(|x| x.0);
-            println!("W {} base 65 slice {pip}: {:?}", gj.w, r.err());
+            let emuls: &[bool] = if force_w.is_none() {
+                &[false, true]
+            } else {
+                &[false]
+            };
+            for &emul in emuls {
+                gj.set_split_emulation(emul);
+                // the shared parent lists' kernel (`wanc`; one key)
+                let ra = gj.build_anc(&[gj.anc_key(pip)]);
+                println!(
+                    "W {} base 65 slice {pip} (split emulation {emul}): wanc {:?}",
+                    gj.w,
+                    ra.err()
+                );
+                let r = gj
+                    .rank_of(pip)
+                    .and_then(|rank| gj.run_slice(pip, &rank))
+                    .map(|x| x.0);
+                println!(
+                    "W {} base 65 slice {pip} (split emulation {emul}): {:?}",
+                    gj.w,
+                    r.err()
+                );
+            }
         }
     }
 }

@@ -69,7 +69,9 @@ jobs:
               # tests compile the browser kernel, the native detailed kernels
               # and the stride and join kernels at a few bases, and the
               # middle-out join's kernels at bases 64 and 65 (at the device's
-              # plane width and at widths 32 and 64); CubeCL logs their WGSL,
+              # plane width and at widths 32 and 64; the split-fault emulation
+              # build the tests use at the device's width, beside production's
+              # build at every width: `:emul=`); CubeCL logs their WGSL,
               # and the script fails on the pattern; its header says what it
               # cannot see. The --require-present kernels have no constant
               # division by a literal today, so only their presence is
@@ -90,26 +92,34 @@ jobs:
                       --require DetailedKernel@80 --require NiceonlyKernel@40 \
                       --require BucketKernel@57 --require JoinKernel@57 \
                       --require TopKernel@57 \
-                      --require G2Kernel:w=32 --require G2Kernel:w=64 \
+                      --require G2Kernel:w=32:emul=false --require G2Kernel:w=64:emul=false \
+                      --require G2Kernel:emul=true \
                       --require Hist2Kernel:w=32 --require Hist2Kernel:w=64 \
                       --require HsortKernel --require Scan16Kernel \
                       --require Tops1Kernel --require Tops2Kernel \
-                      --require-present Anc8Kernel:w=32 --require-present Anc8Kernel:w=64 \
-                      --require-present ExpandKernel:oh64=true \
-                      --require-present ExpandKernel:oh64=false \
+                      --require-present Anc8Kernel:w=32:emul=false \
+                      --require-present Anc8Kernel:w=64:emul=false \
+                      --require-present Anc8Kernel:emul=true \
+                      --require-present ExpandKernel:oh64=true:emul=false \
+                      --require-present ExpandKernel:oh64=false:emul=false \
+                      --require-present ExpandKernel:emul=true \
                       --require-present CheckKernel@64:ballot=true \
                       --require-present CheckKernel@64:ballot=false \
                       --require-present Scatter3Kernel --require-present DoneKernel \
                       --require-present TdigzKernel --require-present ToprecKernel \
                       --require-present Tops5Kernel --require-present TscanKernel \
                       --require-present Tdigz2Kernel --require-present Toprec2Kernel \
-                      --require WideKernel@65:w=32 --require WideKernel@65:w=64 \
+                      --require WideKernel@65:w=32:emul=false --require WideKernel@65:w=64:emul=false \
+                      --require WideKernel@65:emul=true \
                       --require WhistKernel@65:w=32 --require WhistKernel@65:w=64 \
-                      --require Wtops5Kernel@65:w=32 --require Wtops5Kernel@65:w=64 \
+                      --require Wtops5Kernel@65:w=32:emul=false --require Wtops5Kernel@65:w=64:emul=false \
+                      --require Wtops5Kernel@65:emul=true \
                       --require Wtops1Kernel@65:w=32 --require Wtops1Kernel@65:w=64 \
-                      --require WancKernel@65:w=32 --require WancKernel@65:w=64 \
+                      --require WancKernel@65:w=32:emul=false --require WancKernel@65:w=64:emul=false \
+                      --require WancKernel@65:emul=true \
                       --require-present Wtops2Kernel \
-                      --require WscatterKernel@65 --require WexpandKernel@65 \
+                      --require WscatterKernel@65 --require WexpandKernel@65:emul=false \
+                      --require WexpandKernel@65:emul=true \
                       --require WcheckKernel@65 --require WscanKernel:seg=false \
                       --require WsortKernel --require-present WscanKernel:seg=true \
                       --require-present WtdigzKernel@65 --require-present WdoneKernel
