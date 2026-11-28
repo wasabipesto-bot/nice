@@ -2,6 +2,11 @@
 
 Closed by argument the same morning. No agent, no prototype. `ecount.py` / `ecount.txt` hold the one computation.
 
+
+**Correction, 2026-11-28 (EXPERIMENTS.md YIELD.2):** `ecount.py` leaves out the residue factor R_b of the published
+odds model; with it the running total passes 1 between bases 110 and 120, not 125–128. The argument of this note
+(search cost grows far faster than the odds) does not depend on that.
+
 ## Where a second nice number is expected [computed, uniform heuristic]
 
 Expected nice numbers in base b = (count of n whose square and cube have b digits together) × b!/b^b, for the

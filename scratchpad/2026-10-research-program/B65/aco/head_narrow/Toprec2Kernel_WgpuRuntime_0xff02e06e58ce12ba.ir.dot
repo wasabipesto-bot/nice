@@ -1,0 +1,13 @@
+digraph {
+    0 [ label = "    binding(0) = input(2)[u32(0)] : (u32, u32, u32, u32) -> (u32);\l    binding(1) = binding(0).min(scalar<u32>(1)) : (u32, u32) -> (u32);\l    binding(2) = AbsolutePosX < binding(1) : (u32, u32) -> (bool);\l    binding(3) = binding(2) ? u32(1) : u32(0) : (bool, u32, u32) -> (u32);\l    binding(4) = plane_sum(binding(3)) : (u32) -> (u32);\l    binding(5) = UnitPosPlane == u32(0) : (u32, u32) -> (bool);\l    binding(6) = binding(4) > u32(0) : (u32, u32) -> (bool);\l    binding(7) = binding(5) && binding(6) : (bool, bool) -> (bool);\l    binding(7) ? bb2 : bb6; merge: bb6\l" ]
+    2 [ label = "    binding(8) = output(3)[u32(5)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);\l    binding(9) = atomic_add(binding(8), binding(4)) : (atomic<u32>, u32) -> (u32);\l    branch;\l" ]
+    4 [ label = "    binding(10) = input(0)[AbsolutePosX] : (u32, u32, u32, u32) -> (u32);\l    binding(11) = binding(10) & u32(65535) : (u32, u32) -> (u32);\l    binding(12) = input(0)[AbsolutePosX] : (u32, u32, u32, u32) -> (u32);\l    binding(13) = binding(12) >> u32(16) : (u32, u32) -> (u32);\l    binding(14) = binding(13) << u32(24) : (u32, u32) -> (u32);\l    binding(15) = binding(14) | scalar<u32>(0) : (u32, u32) -> (u32);\l    binding(16) = AbsolutePosX << u32(3) : (u32, u32) -> (u32);\l    binding(17) = binding(11) & u32(3) : (u32, u32) -> (u32);\l    binding(18) = binding(17) << u32(30) : (u32, u32) -> (u32);\l    binding(19) = binding(18) | binding(15) : (u32, u32) -> (u32);\l    output(1)[binding(16)] = binding(19)  : (u32, u32) -> (u32);\l    binding(20) = binding(16) + u32(1) : (u32, u32) -> (u32);\l    binding(21) = binding(11) >> u32(2) : (u32, u32) -> (u32);\l    output(1)[binding(20)] = binding(21)  : (u32, u32) -> (u32);\l    binding(22) = binding(16) + u32(2) : (u32, u32) -> (u32);\l    output(1)[binding(22)] = u32(0)  : (u32, u32) -> (u32);\l    binding(23) = binding(16) + u32(3) : (u32, u32) -> (u32);\l    output(1)[binding(23)] = u32(0)  : (u32, u32) -> (u32);\l    binding(24) = binding(16) + u32(4) : (u32, u32) -> (u32);\l    output(1)[binding(24)] = u32(0)  : (u32, u32) -> (u32);\l    binding(25) = binding(16) + u32(5) : (u32, u32) -> (u32);\l    output(1)[binding(25)] = u32(0)  : (u32, u32) -> (u32);\l    binding(26) = binding(16) + u32(6) : (u32, u32) -> (u32);\l    output(1)[binding(26)] = binding(15)  : (u32, u32) -> (u32);\l    binding(27) = binding(16) + u32(7) : (u32, u32) -> (u32);\l    output(1)[binding(27)] = u32(0)  : (u32, u32) -> (u32);\l    branch;\l" ]
+    6 [ label = "    binding(2) ? bb4 : bb7; merge: bb7\l" ]
+    7 [ label = "    return;\l" ]
+    0 -> 2 [ ]
+    0 -> 6 [ ]
+    4 -> 7 [ ]
+    2 -> 6 [ ]
+    6 -> 7 [ ]
+    6 -> 4 [ ]
+}

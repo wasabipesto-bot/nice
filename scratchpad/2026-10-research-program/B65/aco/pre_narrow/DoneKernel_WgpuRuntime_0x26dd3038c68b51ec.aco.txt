@@ -1,0 +1,163 @@
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+PIPEC device=AMD Radeon RX 9070 XT (RADV GFX1201) subgroupSize=64 minSubgroup=32 maxSubgroup=64
+shader: MESA_SHADER_COMPUTE
+source_blake3: {0xe8cf776a, 0x15db0e4f, 0x7b2df809, 0x2966405e, 0x82be858b, 0x54a083ff, 0x2efaa809, 0xa72cf3ed}
+workgroup_size: 32, 1, 1
+num_ubos: 1
+num_ssbos: 2
+system_values_read: 0x00000000'00000000'00002100'00000000
+api_subgroup_size: 32
+max_subgroup_size: 32
+min_subgroup_size: 32
+bit_sizes_int: 0x21
+separate_shader: true
+flrp_lowered: true
+writes_memory: true
+decl_var ubo INTERP_MODE_NONE readonly block #0 (~0, 0, 2)
+decl_var ssbo INTERP_MODE_NONE restrict block#2 #1 (~0, 0, 0)
+decl_var ssbo INTERP_MODE_NONE restrict block#2 #3 (~0, 0, 1)
+decl_function done_kernel () (entrypoint)
+
+impl done_kernel {
+    block b0:   // preds:
+    32x3   %0 = @load_workgroup_id
+    32     %1 = @load_vector_arg_amd (base=2, arg_upper_bound_u32_amd=31)
+    32     %2 = load_const (0x00000005)
+    32     %3 = ishl %0.x, %2 (0x5)
+    32     %4 = iadd %3, %1
+    32     %5 = load_const (0x00000000)
+    1      %6 = ieq %4, %5 (0x0)
+                // succs: b1 b2
+    if %6 {
+        block b1:   // preds: b0
+        32     %7 = @load_scalar_arg_amd (base=1, arg_upper_bound_u32_amd=0)
+                    @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=REL, mem_modes=ssbo|global)
+        32     %8 = load_const (0xffff8000 = -32768 = 4294934528)
+        64     %9 = pack_64_2x32_split %7, %8 (0xffff8000)
+        32x4  %10 = @load_global_amd (%9, %5 (0x0)) (base=0, access=readonly|reorderable|smem-amd, align_mul=4, align_offset=0)
+        32    %11 = load_const (0x00000001 = 0.000000)
+        32    %12 = load_const (0x0000003c = 60)
+        32    %13 = @ssbo_atomic (%10, %12 (0x3c), %11 (0x1)) (access=coherent, atomic_op=iadd, offset_shift=0)
+                    @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=ACQ, mem_modes=ssbo|global)
+                    @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=REL, mem_modes=ssbo|global)
+        32x4  %14 = @load_global_amd (%9, %5 (0x0)) (base=16, access=readonly|reorderable|smem-amd, align_mul=4, align_offset=0)
+        32    %15 = load_const (0x00000518 = 1304)
+        32    %16 = @ssbo_atomic (%14, %15 (0x518), %11 (0x1)) (access=coherent, atomic_op=iadd, offset_shift=0)
+                    @barrier (execution_scope=NONE, memory_scope=DEVICE, mem_semantics=ACQ, mem_modes=ssbo|global)
+                    // succs: b3
+    } else {
+        block b2:  // preds: b0, succs: b3
+    }
+    block b3:  // preds: b1 b2, succs: b4
+    block b4:
+}
+
+After RA:
+ACO shader stage: SW (CS), HW (COMPUTE_SHADER)
+BB0
+/* logical preds: / linear preds: / kind: top-level, branch, */
+	 s2: %18:s[0-1],  s1: %19:s[2],  v1: %20:v[0] = p_startpgm
+	p_logical_start
+	 v1: %5:v[0] = v_lshl_add_u32 %0:s[117], 5, %20:v[0]
+	 s1: %7:vcc_lo = v_cmp_eq_i32 0, %5:v[0]
+	p_logical_end
+	 s1: %0:exec_lo = p_parallelcopy %7:vcc_lo
+	p_cbranch_z %0:exec_lo BB2, BB1
+BB1
+/* logical preds: BB0, / linear preds: BB0, / kind: uniform, */
+	p_logical_start
+	 s2: %10:s[2-3] = p_create_vector %19:s[2], 0xffff8000
+	 s4: %11:s[4-7] = s_load_dwordx4 %10:s[2-3], 0 storage:buffer semantics:private,reorder
+	 s4: %15:s[0-3] = s_load_dwordx4 %10:s[2-3], 16 storage:buffer semantics:private,reorder
+	p_barrier storage:buffer semantics:release scope:device exec_scope:invocation
+	 v1: %31:v[0] = p_parallelcopy 1
+	buffer_atomic_add %11:s[4-7],  v1: undef, 0, %31:v[0] offset:60 storage:buffer semantics:volatile,atomic,rmw
+	p_barrier storage:buffer semantics:acquire scope:device exec_scope:invocation
+	p_barrier storage:buffer semantics:release scope:device exec_scope:invocation
+	buffer_atomic_add %15:s[0-3],  v1: undef, 0, %31:v[0] offset:1304 storage:buffer semantics:volatile,atomic,rmw
+	p_barrier storage:buffer semantics:acquire scope:device exec_scope:invocation
+	p_logical_end
+	p_branch BB3
+BB2
+/* logical preds: / linear preds: BB0, / kind: uniform, */
+	p_branch BB3
+BB3
+/* logical preds: / linear preds: BB1, BB2, / kind: invert, */
+	 s1: %0:exec_lo,  s1: %37:scc = s_andn2_b32 -1, %0:exec_lo
+	p_cbranch_z %0:exec_lo BB5, BB4
+BB4
+/* logical preds: BB0, / linear preds: BB3, / kind: uniform, */
+	p_logical_start
+	p_logical_end
+	p_branch BB6
+BB5
+/* logical preds: / linear preds: BB3, / kind: uniform, */
+	p_branch BB6
+BB6
+/* logical preds: BB1, BB4, / linear preds: BB4, BB5, / kind: uniform, top-level, merge, */
+	 s1: %0:exec_lo = p_parallelcopy -1
+	p_logical_start
+	p_logical_end
+	s_endpgm
+
+Compute Shader
+disasm:
+Shader disassembly is not supported in the current configuration (LLVM not available), falling back to print_program.
+
+After lowering to hw instructions:
+ACO shader stage: SW (CS), HW (COMPUTE_SHADER)
+BB0
+/* logical preds: / linear preds: / kind: top-level, branch, */
+	 v1: %5:v[0] = v_lshl_add_u32 %0:s[117], 5, %20:v[0]
+	s_delay_alu valu_dep_1
+	 s1: %0:exec_lo = v_cmpx_eq_i32 0, %5:v[0]
+	s_cbranch_execz block:BB6
+BB1
+/* logical preds: BB0, / linear preds: BB0, / kind: uniform, */
+	 s1: %0:s[3] = s_movk_i32 imm:-32768
+	s_clause imm:1
+	 s4: %11:s[4-7] = s_load_dwordx4 %10:s[2-3], 0 storage:buffer semantics:private,reorder
+	 s4: %15:s[0-3] = s_load_dwordx4 %10:s[2-3], 16 storage:buffer semantics:private,reorder
+	 v1: %0:v[0] = v_mov_b32 1
+	s_wait_kmcnt imm:0
+	buffer_atomic_add %11:s[4-7],  v1: undef, 0, %31:v[0] offset:60 storage:buffer semantics:volatile,atomic,rmw
+	s_wait_storecnt imm:0
+	buffer_atomic_add %15:s[0-3],  v1: undef, 0, %31:v[0] offset:1304 storage:buffer semantics:volatile,atomic,rmw
+BB6
+/* logical preds: BB1, BB0, / linear preds: BB1, BB0, / kind: uniform, top-level, merge, */
+	s_endpgm
+
+
+
+Compute Shader:
+*** SHADER STATS ***
+Driver pipeline hash: 1280863119090963274
+SGPRs: 108
+VGPRs: 24
+Spilled SGPRs: 0
+Spilled VGPRs: 0
+Code size: 84
+LDS size: 0
+Scratch size: 0
+Subgroups per SIMD: 16
+Combined inputs: 0
+Combined outputs: 0
+Hash: 123718369
+Instructions: 14
+Copies: 3
+Branches: 1
+Latency: 517
+Inverse Throughput: 65
+VMEM Clause: 2
+SMEM Clause: 1
+Pre-Sched SGPRs: 6
+Pre-Sched VGPRs: 1
+VALU: 3
+SALU: 1
+VMEM: 2
+SMEM: 2
+VOPD: 0
+********************
+
+
+PIPEC ok /home/claude/projects/nice/.worktrees/g2-cubecl/g2out/b65aco/pre_narrow/DoneKernel_WgpuRuntime_0x26dd3038c68b51ec.spv

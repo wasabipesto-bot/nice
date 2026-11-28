@@ -5,6 +5,47 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## YIELD.2 Correction of YIELD.1: with the residue factor of the published odds model, base 64 holds 73 % of the reachable odds and base 65 27 %, not the reverse (2026-11-28, the director; `YIELD/yield2.py`, `yield2.txt`)
+
+**What was wrong.** YIELD.1 (2026-11-26) priced each base with E_b = N_b · b!/b^b, taken from my own
+`CX/ecount.py`, whose comment says the residue filter "leaves the total expectation unchanged". That is false,
+and the project's published model has had it right since September
+(`../2026-08-cost-probability/METHODOLOGY.md` §2): λ_b = N_b · b!/b^b · R_b · α_{b,3}/P₆. A pandigital string
+has a fixed digit sum, so conditioning on the digit-sum congruence multiplies the odds of an admissible n by
+b − 1, and R_b/(b − 1) of the range is admissible: the net factor is R_b, the number of admissible residues
+(a base with R_b = 0 has no nice number at all, which the formula without R_b cannot say). R is 8 at base 64
+and 1 at base 65. Found by re-deriving the model while writing today's notes; my memory notes of October had
+the right total (0.19 % for the rest of b60 to b65) and I did not check YIELD.1 against them.
+
+**The corrected table** (λ from the published model's own code, `build.lam`):
+
+| base | R/(b−1) | admissible n | λ (published model) | YIELD.1's E (no R) | λ per admissible n (b64 = 1) | days of the RX 9070 XT |
+|---|---|---|---|---|---|---|
+| 62 | 2/61 | 3.13e20 | 4.25e-4 | 2.24e-4 | 7.7 | 4 (at 1.0 fs) |
+| **64** | **8/63** | 4.80e21 | **8.51e-4** | 1.22e-4 | **1** | 56 (at 1.0 fs) |
+| 65 | 1/64 | 4.34e21 | 3.17e-4 | 3.32e-4 | 0.41 | 152 (at 3.02 fs) |
+| 68 | 2/67 | 8.26e22 | 3.10e-4 | 1.68e-4 | 0.021 | 2,900 (at 3 fs) |
+| 69 | 2/68 | 2.01e23 | 2.94e-4 | 1.54e-4 | 0.008 | 7,000 |
+| 70 | 4/69 | 2.98e24 | 1.55e-3 | 4.29e-4 | 0.003 | 103,000 |
+
+- **Bases 64 and 65 together: λ = 1.17e-3; base 64 is 72.9 % of it in 27 % of the machine time, base 65 is
+  27.1 % in 73 %.** YIELD.1 had the two odds shares the wrong way round; its time shares stand.
+- **Per day of a card base 64 yields 7.3 times what base 65 does on the RX 9070 XT** (1.53e-5 against 2.09e-6
+  a day; 1.0 and 3.02 fs per admissible n) **and 4.5 times on the RTX 3060 through CUDA** (3.28 and 6.12 fs).
+  YIELD.1's "the two bases tie per day" and "on CUDA cards base 65 is the better buy, ×1.5" are both wrong.
+- **Base 64 goes first on every card; there is no question of order.** The question I added to the server
+  proposal (`G2/PROPOSAL-B.md` §9 item 8) is withdrawn.
+- **What stands:** bases 64 and 65 are the whole realistic horizon (base 68 costs 19 times more per unit of
+  odds than base 65 and 47 times more than base 64); base 65 is 73 % of the time to finish both, so a percent
+  gained on its path still shortens the whole run 2.7 times as much as a percent on base 64's.
+- **What changes in priorities:** a percent on base 64's path buys 2.7 times the odds per day that a percent on
+  base 65's does, and base 64 runs first. The open item on base 64's path is the 6–10 % it lost on the
+  RX 9070 XT while the desktop was in use (WIN3.1); the group-size sweep (B65.8) and any demoux window go to
+  base 64 first. The three days of work on base 65's path (B65.1–B65.7) keep their measured gains (about 11 %
+  of 152 days) but were ranked above base 64's by a wrong number.
+- The running total of λ from base 58 passes 1 between bases 110 and 120 under the published model
+  (`CX/NOTES.md` says 125–128 under the formula without R).
+
 ## B65.5 Every list appended by ballot or plane scan in the middle-out kernels now has a count its lanes keep apart from the ballot; the review's fixes; base-65 gains merged (2026-11-27 09:07–12:03 UTC, engineer, eventeo, the M4, the fork's CI; `B65/BRIEF-FIXES.md`, `B65/FIXES-NOTES.md`, `B65/runs/fixes/`; fork `dev/mo-wide-b65b` f503a13c = merge 73bc0065 of `dev/mo-wide-b65` into c16d48e9 plus 7 commits; fast-forwarded into `dev/mo-mode` by me at 12:10 UTC; 0.59 kWh)
 
 - **The audit** (table in the notes): appends whose only count came from the ballot or plane scan itself:
@@ -241,6 +282,10 @@ equal to the RX 9070 XT's of 2026-11-25.
 - All findings went to the engineer fixing the branch the same hour (`MODE2/FIX-NOTES.md` when done).
 
 ## YIELD.1 Expected nice numbers per unit of search work by base, under the middle-out join: base 65 is three times the buy base 64 is, and after it nothing is within reach (2026-11-26, the director; `YIELD/yield.py`, `yield.txt`)
+
+**CORRECTED 2026-11-28 by YIELD.2 (above): the model below leaves out the residue factor R_b. The E column, the
+"three times the buy", "73 % of the reachable probability", "tie per day" and "better buy on CUDA" statements are
+wrong; the ranges, admissible counts, days, and "nothing after base 65 is within reach" stand.**
 
 Uniform model (as `CX/ecount.py`: E_b = N_b · b!/b^b; the residue filter moves candidates between classes, not
 the total), exact ranges, R_b = residues mod b − 1 that a nice number can have, work = admissible n =

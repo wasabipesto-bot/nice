@@ -1,3 +1,6 @@
+# CORRECTED 2026-11-28 (EXPERIMENTS.md YIELD.2): the comment below is wrong. The published model multiplies by R_b
+# (conditioning on the digit sum gives an admissible n odds (b-1) times higher, and R_b/(b-1) of the range is
+# admissible), so these E are low by the factor R_b (times the low-digit factor 0.8-1.0).
 # Heuristic expected number of nice numbers per base: (#n in the base's range) * b!/b^b.
 # The residue filter redistributes candidates among classes but leaves the total expectation unchanged
 # (roots exist => density in root classes is (b-1)/R higher); a base with no roots or no range has none.

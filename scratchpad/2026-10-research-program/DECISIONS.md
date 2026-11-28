@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-26 09:25 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-28 07:00 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
@@ -18,8 +18,11 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
   with a new claim endpoint and its own table on the server; the field definition not locked in yet. **The
   client half exists since 2026-11-25** on the fork branch `dev/mo-mode` (`nice_client midout`, tested end to
   end against a development server; notes in `G2/MODE-NOTES.md`); the server half is the proposal of §1.
-- **Pull requests in general are allowed.** Open now: #276 (the crash at bases with no valid residue), #277
-  (a `--gpu` client that finds only a software renderer), #278 (the CI check for the SPIR-V atomic-store trap).
+- **Pull requests in general are allowed.** Open now, all green and mergeable: #276 (the crash at bases with
+  no valid residue), #277 (a `--gpu` client that finds only a software renderer), #278 (the CI check for the
+  SPIR-V atomic-store trap), #279 (`just lint` fails on machines that are not x86-64, your M4 among them).
+- **A correction (2026-11-28, §4):** on 2026-11-26 I told you base 65 held 73 % of the reachable odds. Wrong:
+  base 64 holds 73 %, base 65 27 %.
 - **demoux:** the window of 2026-11-25 ended at 05:53 UTC, well inside the lease; nothing of mine is on the
   machine (`G2/WINDOW3-RESULTS.md`, cleanup proof at the end).
 - **Machines (your message of 2026-11-26):** eventeo and mayalaran are set up and in use (`README.md`,
@@ -47,8 +50,8 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
 - **Your note:** formalising what we already believe is low-value; you would rather see a falsifiable statement
   of very high value posed and then proved or refuted.
 - **My honest reading: I do not have a statement of that kind that I think is reachable.** The candidates:
-  - **a. "A second nice number exists."** The prize, and almost surely true (the expected count passes 1 near
-    base 131). I know no route. Finding one needs a method that fixes about 90 % of the output digits before
+  - **a. "A second nice number exists."** The prize, and almost surely true (by your published model the
+    running total of expected nice numbers passes 1 between bases 110 and 120). I know no route. Finding one needs a method that fixes about 90 % of the output digits before
     gambling; every certificate there is fixes 40 %. Structured candidates (n with periodic or patterned
     digits, roots of patterned squares and cubes) were tested on 2026-11-25 across bases 17–329
     (`EXPERIMENTS.md` CX.2). One real effect: n with periodic digits have squares with no repeated digit at
@@ -77,40 +80,38 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
   change, about 150 lines, one pull request.
 - **If you do not answer:** nothing is built.
 
-## 4. Base 65 matters more than I said: an hour of demoux for it, and which base goes first
+## 4. An hour of demoux when convenient; and a correction: base 64, not base 65, holds most of the odds
 
-- **What changed (2026-11-26, `EXPERIMENTS.md` YIELD.1, table in `YIELD/yield.txt`):** I priced each base by
-  expected nice numbers per unit of search work under the new join. Base 65 has about the same amount of work
-  as base 64 (only one residue class in 64 can hold a nice number there) and 2.7 times its expected count.
-  The base after it, 68, costs 12 times more per unit of probability, so **bases 64 and 65 are the whole
-  realistic horizon, and base 65 is 73 % of it, in probability and in machine time** (about 150 days of your
-  RX 9070 XT at the speed measured on 2026-11-19, against 56 for base 64). I had been calling base 65 "months
-  away, not urgent". That was wrong: a gain on base 65's kernel path is worth 2.7 times the same gain at
-  base 64.
-- **What I am doing about it:** the path that base 65 uses (the "wide" kernels) is profiled on eventeo today,
-  and its known levers (a top hierarchy that tests about a fifth of today's 13.4 million top prefixes per
-  slice, the shared bottom lists that base 64 already has, the prefilter's arithmetic) become the main
-  optimisation work, developed on eventeo.
-- **Why your card ran base 65 slowly on 2026-11-25, as far as eventeo can tell** (`EXPERIMENTS.md` B65.1,
-  `B65/RESULTS.md`): not a regression (on the RTX 3060 the current branch is 10–13 % faster than the older
-  build, through CUDA and through Vulkan). What reproduces it is a busy host CPU: through Vulkan, six busy
-  threads make base 65 2.3 times slower with the card a quarter busy, while base 64 loses 5 %. Cause: the
-  base-65 path collects its results in about 29,600 small blocking reads per field, each of which stalls when
-  the CPU is contended; the base-64 path batches them. Your desktop was in use that day. **The fix (one batched read per
-  group; 45 lines of host code) is on the branch since 2026-11-26: on the RTX 3060 base 65 under six busy
-  threads went from 14.25 to 6.35 fs through Vulkan, and 3 % faster on a quiet host** (`B65/READS-RESULTS.md`).
-- **What I need from you, when convenient: one hour of demoux**, to confirm on the card itself that the fixed
-  build holds base 65 near 3 fs while the desktop is in use, and to measure the next levers there. Until then
-  the base-65 numbers I report are from the RTX 3060.
-- **A decision for later, not now: which base is handed out first.** At today's speeds the two bases tie in
-  expected yield per day; with any gain on base 65's path it goes ahead of base 64. The server proposal now
-  carries this as a small question (`G2/PROPOSAL-B.md` §9, item 8: a rank per base instead of the base number).
-- **If you do not answer:** I develop on eventeo, do not use demoux, and report base 65's numbers from the
-  RTX 3060 only (which says what CUDA does, not what your card does).
+- **The correction (2026-11-28; `EXPERIMENTS.md` YIELD.2, table in `YIELD/yield2.txt`).** On 2026-11-26 I wrote
+  here that base 65 was 73 % of the reachable probability and might be handed out before base 64. That was
+  wrong. My table left out the residue factor R_b that your published model has
+  (`../2026-08-cost-probability/METHODOLOGY.md` §2: eight admissible residue classes at base 64, one at base
+  65). With your model:
+
+  | | base 64 | base 65 |
+  |---|---|---|
+  | numbers to search (admissible n) | 4.80e21 | 4.34e21 |
+  | expected nice numbers (λ) | 8.5e-4 | 3.2e-4 |
+  | share of the odds within reach | **73 %** | 27 % |
+  | days of your RX 9070 XT at measured speeds | about 56 | about 150 |
+  | odds per day of that card | 1.5e-5 | 2.1e-6 |
+
+  Base 64 goes first on every card (7.3 times base 65's odds per day on your card, 4.5 times on an RTX 3060);
+  the question about base order that I had added to the server proposal is withdrawn. Bases 64 and 65 are
+  still the whole realistic horizon: base 68 costs 19 times more per unit of odds than base 65.
+- **What it changes in my work:** base 64's path comes first again. Its one known open loss is the 6–10 % it
+  ran slower on your card while the desktop was in use (2026-11-25). The base-65 work of the last three days
+  keeps its measured gains (about 11 % of base 65's 150 days, and base 65 is still 73 % of the time to finish
+  both bases), but I had ranked it above base 64 on a wrong number.
+- **What I ask, when convenient: one hour of demoux.** First for base 64: the same field at group sizes 16,
+  64 and 256 with the desktop in use and the card's clock logged; it tells whether that 6–10 % is the pause
+  between groups of slices, which can be closed (`B65/AHEAD-DESIGN.md`; the same sweep runs on eventeo today).
+  Then base 65 at the current head, to confirm on the card that the read fix of 2026-11-26 holds it near 3 fs.
+- **If you do not answer:** I develop on eventeo, do not use demoux, and report numbers from the RTX 3060 only.
 
 ## What happens next if you say nothing
 
-1. #276, #277 and #278 wait for your merge.
-2. The `midout` client mode on the fork branch `dev/mo-mode` is brought through the full CI matrix (three
-   tests of the branch fail on 32-bit and emulated targets) and reviewed; nothing is opened from it.
+1. #276, #277, #278 and #279 wait for your merge.
+2. Work on the middle-out join continues on the fork branch `dev/mo-mode` (base 64's path first, then base
+   65's); nothing is opened from it.
 3. No server code, no Lean work, no validation change, no use of demoux.

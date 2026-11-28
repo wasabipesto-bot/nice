@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Which base is the best buy? Expected nice numbers per admissible n searched, by base (2026-11-26).
+"""SUPERSEDED 2026-11-28 by yield2.py: E below leaves out the residue factor R_b (YIELD.2).
+Which base is the best buy? Expected nice numbers per admissible n searched, by base (2026-11-26).
 E_b = N_b * b!/b^b (the uniform model of CX/ecount.py; the residue filter moves candidates between classes, not
 the total), work = admissible n = N_b * R_b/(b-1) (R_b = residues mod b-1 a nice number can have).
 Exact ranges (integers), not the logarithmic approximation."""

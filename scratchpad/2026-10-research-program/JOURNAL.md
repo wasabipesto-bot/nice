@@ -26,6 +26,33 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     worth little on the RTX 3060, possibly 5–7 % on the RX 9070 XT, whose clock follows load (the narrow path
     ran at 2.85–2.93 GHz against production's 3.10–3.13 on 11-25).
   - A reminder at 12:20 UTC finishes the report if the hand-backs do not.
+- **06:00 UTC, the design note written, and my premise corrected on the way.** CubeCL 0.10's wgpu runtime
+  (source read today) submits every 32 launches, about every two slices, so a group does not wait for the
+  `sync`; the card is idle once per group for a read, two wake-ups and two slices of queueing: about 1 % on a
+  quiet host, not the 3–9 % I had put in the first draft. A read is issued when called (the look-ahead's
+  ordering works), and a throttle blocks the host every 512 launches (two groups fit). The clock effect on the
+  RX 9070 XT I no longer count as likely. What is left is the loss under a busy host (4.9 % narrow, ≤ 3 % wide
+  on the RTX 3060; 6–10 % on the RX 9070 XT with the desktop in use, cause not established).
+  - **B65.8, added:** a sweep of `--group` (16, 64, 256) prices the idea with no code, since gaps per field go
+    as 1/group. `B65/scripts/runs_group.sh`, handed to the hooks engineer for the end of their eventeo session.
+    **Rule written beforehand:** group 64 recovers at least half of the loss under six busy threads at base 64
+    → the gap is the cause: propose a larger default group for the narrow path if memory allows and build the
+    look-ahead for the wide path; under a quarter → the design is dropped and the loss is looked for elsewhere.
+- **07:00 UTC, an error of mine found and corrected: YIELD.1's odds were wrong (YIELD.2).** Re-deriving the
+  odds per base while the engineers worked, I found that YIELD.1 (11-26) used N·b!/b^b from my own
+  `CX/ecount.py` and so left out the residue factor R_b of the published model (R = 8 at base 64, 1 at base
+  65). With the published model's own code: base 64 λ 8.5e-4, base 65 3.2e-4; **base 64 is 73 % of the
+  reachable odds in 27 % of the time, base 65 the reverse**; per day base 64 yields 7.3× base 65 on the
+  RX 9070 XT. "Base 65 first?", "better buy on CUDA" and "73 % of the probability" were all wrong and had
+  gone to the user in two reports. Corrected today in: EXPERIMENTS (YIELD.2, note on YIELD.1), `YIELD/`,
+  LEDGER B65, DECISIONS §4 (rewritten as a correction), `G2/PROPOSAL-B.md` §9 item 8 (withdrawn), DESIGN.md §8,
+  `CX/`, notes on the reports of 11-26 and 11-27, the routine prompt (step 2), memory. **Lesson:** odds come
+  from `build.lam` only; a number that reorders the program's priorities gets checked against the published
+  model before it is reported.
+  - **What it changes:** base 64's path first. The sweep (B65.8) reads base 64 first; a demoux hour, if
+    granted, goes to base 64 with the desktop in use. Today's two engineers keep their tasks: the hooks are
+    on both paths (base 64's narrow path lost 1.3–2.0 % to them), and the ACO study of the wide kernel is
+    already running and still prices 73 % of the machine time.
 
 ## 2026-11-27 (cycle 18 of the new director; routine fired 05:41 UTC)
 

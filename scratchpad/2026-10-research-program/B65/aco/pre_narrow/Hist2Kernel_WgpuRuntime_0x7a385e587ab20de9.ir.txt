@@ -1,0 +1,449 @@
+Shared memories: [
+    shared_array(id: 0, offset: 0, length: 1, align: 4, ty: atomic<u32>)
+]
+
+uniform bb0 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(1) = UnitPosX == u32(0) : (u32, u32) -> (bool);
+    binding(1) ? bb2 : bb20; merge: bb20
+}
+
+bb2 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(2) = shared_array(0)[u32(0)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(2) = atomic_store(u32(0)) : (u32) -> (atomic<u32>);
+    branch bb20;
+}
+
+bb4 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(7) = output(6)[u32(16)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(8) = atomic_add(binding(7), u32(1)) : (atomic<u32>, u32) -> (u32);
+    branch bb21;
+}
+
+bb6 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(18) = input(0)[AbsolutePosX] : (u32, u32, u32, u32) -> (u32);
+    binding(19) = cast<u64>(binding(18)) : (u32) -> (u64);
+    binding(20) = binding(12) << u64(24) : (u64, u64) -> (u64);
+    binding(21) = binding(19) + binding(20) : (u64, u64) -> (u64);
+    binding(22) = binding(21) * binding(21) : (u64, u64) -> (u64);
+    binding(23) = binding(22) & u64(1152921504606846975) : (u64, u64) -> (u64);
+    binding(24) = binding(23) * binding(21) : (u64, u64) -> (u64);
+    binding(25) = binding(24) & u64(1152921504606846975) : (u64, u64) -> (u64);
+    binding(26) = binding(23) & u64(4294967295) : (u64, u64) -> (u64);
+    binding(27) = cast<u32>(binding(26)) : (u64) -> (u32);
+    binding(28) = binding(23) >> u64(32) : (u64, u64) -> (u64);
+    binding(29) = cast<u32>(binding(28)) : (u64) -> (u32);
+    binding(30) = binding(25) & u64(4294967295) : (u64, u64) -> (u64);
+    binding(31) = cast<u32>(binding(30)) : (u64) -> (u32);
+    binding(32) = binding(25) >> u64(32) : (u64, u64) -> (u64);
+    binding(33) = cast<u32>(binding(32)) : (u64) -> (u32);
+    binding(36) = binding(27) >> u32(0) : (u32, u32) -> (u32);
+    binding(37) = binding(36) & u32(63) : (u32, u32) -> (u32);
+    binding(38) = cast<u64>(binding(37)) : (u32) -> (u64);
+    binding(39) = u64(1) << binding(38) : (u64, u64) -> (u64);
+    binding(40) = binding(31) >> u32(0) : (u32, u32) -> (u32);
+    binding(41) = binding(40) & u32(63) : (u32, u32) -> (u32);
+    binding(42) = cast<u64>(binding(41)) : (u32) -> (u64);
+    binding(43) = u64(1) << binding(42) : (u64, u64) -> (u64);
+    binding(44) = binding(39) | binding(43) : (u64, u64) -> (u64);
+    local(34).v2 = u64(0) | binding(44) : (u64, u64) -> (u64);
+    binding(45) = binding(27) >> u32(6) : (u32, u32) -> (u32);
+    binding(46) = binding(45) & u32(63) : (u32, u32) -> (u32);
+    binding(47) = cast<u64>(binding(46)) : (u32) -> (u64);
+    binding(48) = u64(1) << binding(47) : (u64, u64) -> (u64);
+    binding(49) = binding(31) >> u32(6) : (u32, u32) -> (u32);
+    binding(50) = binding(49) & u32(63) : (u32, u32) -> (u32);
+    binding(51) = cast<u64>(binding(50)) : (u32) -> (u64);
+    binding(52) = u64(1) << binding(51) : (u64, u64) -> (u64);
+    binding(53) = binding(48) | binding(52) : (u64, u64) -> (u64);
+    local(34).v3 = local(34).v2 | binding(53) : (u64, u64) -> (u64);
+    binding(54) = binding(27) >> u32(12) : (u32, u32) -> (u32);
+    binding(55) = binding(54) & u32(63) : (u32, u32) -> (u32);
+    binding(56) = cast<u64>(binding(55)) : (u32) -> (u64);
+    binding(57) = u64(1) << binding(56) : (u64, u64) -> (u64);
+    binding(58) = binding(31) >> u32(12) : (u32, u32) -> (u32);
+    binding(59) = binding(58) & u32(63) : (u32, u32) -> (u32);
+    binding(60) = cast<u64>(binding(59)) : (u32) -> (u64);
+    binding(61) = u64(1) << binding(60) : (u64, u64) -> (u64);
+    binding(62) = binding(57) | binding(61) : (u64, u64) -> (u64);
+    local(34).v4 = local(34).v3 | binding(62) : (u64, u64) -> (u64);
+    binding(63) = binding(27) >> u32(18) : (u32, u32) -> (u32);
+    binding(64) = binding(63) & u32(63) : (u32, u32) -> (u32);
+    binding(65) = cast<u64>(binding(64)) : (u32) -> (u64);
+    binding(66) = u64(1) << binding(65) : (u64, u64) -> (u64);
+    binding(67) = binding(31) >> u32(18) : (u32, u32) -> (u32);
+    binding(68) = binding(67) & u32(63) : (u32, u32) -> (u32);
+    binding(69) = cast<u64>(binding(68)) : (u32) -> (u64);
+    binding(70) = u64(1) << binding(69) : (u64, u64) -> (u64);
+    binding(71) = binding(66) | binding(70) : (u64, u64) -> (u64);
+    local(34).v5 = local(34).v4 | binding(71) : (u64, u64) -> (u64);
+    binding(72) = binding(27) >> u32(24) : (u32, u32) -> (u32);
+    binding(73) = binding(72) & u32(63) : (u32, u32) -> (u32);
+    binding(74) = cast<u64>(binding(73)) : (u32) -> (u64);
+    binding(75) = u64(1) << binding(74) : (u64, u64) -> (u64);
+    binding(76) = binding(31) >> u32(24) : (u32, u32) -> (u32);
+    binding(77) = binding(76) & u32(63) : (u32, u32) -> (u32);
+    binding(78) = cast<u64>(binding(77)) : (u32) -> (u64);
+    binding(79) = u64(1) << binding(78) : (u64, u64) -> (u64);
+    binding(80) = binding(75) | binding(79) : (u64, u64) -> (u64);
+    local(34).v6 = local(34).v5 | binding(80) : (u64, u64) -> (u64);
+    binding(81) = binding(27) >> u32(30) : (u32, u32) -> (u32);
+    binding(82) = binding(29) << u32(2) : (u32, u32) -> (u32);
+    binding(83) = binding(81) | binding(82) : (u32, u32) -> (u32);
+    binding(84) = binding(83) & u32(63) : (u32, u32) -> (u32);
+    binding(85) = cast<u64>(binding(84)) : (u32) -> (u64);
+    binding(86) = u64(1) << binding(85) : (u64, u64) -> (u64);
+    binding(87) = binding(31) >> u32(30) : (u32, u32) -> (u32);
+    binding(88) = binding(33) << u32(2) : (u32, u32) -> (u32);
+    binding(89) = binding(87) | binding(88) : (u32, u32) -> (u32);
+    binding(90) = binding(89) & u32(63) : (u32, u32) -> (u32);
+    binding(91) = cast<u64>(binding(90)) : (u32) -> (u64);
+    binding(92) = u64(1) << binding(91) : (u64, u64) -> (u64);
+    binding(93) = binding(86) | binding(92) : (u64, u64) -> (u64);
+    local(34).v7 = local(34).v6 | binding(93) : (u64, u64) -> (u64);
+    binding(94) = binding(29) >> u32(4) : (u32, u32) -> (u32);
+    binding(95) = binding(94) & u32(63) : (u32, u32) -> (u32);
+    binding(96) = cast<u64>(binding(95)) : (u32) -> (u64);
+    binding(97) = u64(1) << binding(96) : (u64, u64) -> (u64);
+    binding(98) = binding(33) >> u32(4) : (u32, u32) -> (u32);
+    binding(99) = binding(98) & u32(63) : (u32, u32) -> (u32);
+    binding(100) = cast<u64>(binding(99)) : (u32) -> (u64);
+    binding(101) = u64(1) << binding(100) : (u64, u64) -> (u64);
+    binding(102) = binding(97) | binding(101) : (u64, u64) -> (u64);
+    local(34).v8 = local(34).v7 | binding(102) : (u64, u64) -> (u64);
+    binding(103) = binding(29) >> u32(10) : (u32, u32) -> (u32);
+    binding(104) = binding(103) & u32(63) : (u32, u32) -> (u32);
+    binding(105) = cast<u64>(binding(104)) : (u32) -> (u64);
+    binding(106) = u64(1) << binding(105) : (u64, u64) -> (u64);
+    binding(107) = binding(33) >> u32(10) : (u32, u32) -> (u32);
+    binding(108) = binding(107) & u32(63) : (u32, u32) -> (u32);
+    binding(109) = cast<u64>(binding(108)) : (u32) -> (u64);
+    binding(110) = u64(1) << binding(109) : (u64, u64) -> (u64);
+    binding(111) = binding(106) | binding(110) : (u64, u64) -> (u64);
+    local(34).v9 = local(34).v8 | binding(111) : (u64, u64) -> (u64);
+    binding(112) = binding(29) >> u32(16) : (u32, u32) -> (u32);
+    binding(113) = binding(112) & u32(63) : (u32, u32) -> (u32);
+    binding(114) = cast<u64>(binding(113)) : (u32) -> (u64);
+    binding(115) = u64(1) << binding(114) : (u64, u64) -> (u64);
+    binding(116) = binding(33) >> u32(16) : (u32, u32) -> (u32);
+    binding(117) = binding(116) & u32(63) : (u32, u32) -> (u32);
+    binding(118) = cast<u64>(binding(117)) : (u32) -> (u64);
+    binding(119) = u64(1) << binding(118) : (u64, u64) -> (u64);
+    binding(120) = binding(115) | binding(119) : (u64, u64) -> (u64);
+    local(34).v10 = local(34).v9 | binding(120) : (u64, u64) -> (u64);
+    binding(121) = local(34).v10.count_bits() : (u64) -> (u32);
+    binding(122) = binding(121) == u32(18) : (u32, u32) -> (bool);
+    binding(123) = binding(18) & u32(63) : (u32, u32) -> (u32);
+    binding(124) = binding(29) >> u32(22) : (u32, u32) -> (u32);
+    binding(125) = binding(124) & u32(63) : (u32, u32) -> (u32);
+    binding(127) = binding(33) >> u32(22) : (u32, u32) -> (u32);
+    binding(128) = binding(127) & u32(63) : (u32, u32) -> (u32);
+    binding(129) = binding(128) << u32(8) : (u32, u32) -> (u32);
+    binding(130) = binding(125) | binding(129) : (u32, u32) -> (u32);
+    binding(131) = binding(123) << u32(1) : (u32, u32) -> (u32);
+    binding(132) = binding(131) & u32(63) : (u32, u32) -> (u32);
+    binding(133) = binding(132) << u32(16) : (u32, u32) -> (u32);
+    binding(134) = binding(130) | binding(133) : (u32, u32) -> (u32);
+    binding(268) = binding(123) << u32(2) : (u32, u32) -> (u32);
+    binding(135) = binding(268) - binding(123) : (u32, u32) -> (u32);
+    binding(136) = binding(135) * binding(123) : (u32, u32) -> (u32);
+    binding(137) = binding(136) & u32(63) : (u32, u32) -> (u32);
+    binding(138) = binding(137) << u32(24) : (u32, u32) -> (u32);
+    binding(139) = binding(134) | binding(138) : (u32, u32) -> (u32);
+    binding(140) = binding(12) & u64(4294967295) : (u64, u64) -> (u64);
+    binding(141) = cast<u32>(binding(140)) : (u64) -> (u32);
+    binding(142) = binding(141) % u32(63) : (u32, u32) -> (u32);
+    binding(143) = binding(18) % u32(63) : (u32, u32) -> (u32);
+    binding(144) = binding(143) + binding(142) : (u32, u32) -> (u32);
+    binding(145) = binding(144) % u32(63) : (u32, u32) -> (u32);
+    binding(146) = input(1)[u32(0)] : (u32, u32, u32, u32) -> (u32);
+    binding(147) = cast<u64>(binding(146)) : (u32) -> (u64);
+    binding(148) = local(34).v10 >> binding(147) : (u64, u64) -> (u64);
+    binding(149) = binding(148) & u64(1) : (u64, u64) -> (u64);
+    binding(150) = cast<u32>(binding(149)) : (u64) -> (u32);
+    binding(151) = binding(150) << u32(7) : (u32, u32) -> (u32);
+    local(126).v6 = u32(0) | binding(151) : (u32, u32) -> (u32);
+    binding(152) = input(1)[u32(1)] : (u32, u32, u32, u32) -> (u32);
+    binding(153) = cast<u64>(binding(152)) : (u32) -> (u64);
+    binding(154) = local(34).v10 >> binding(153) : (u64, u64) -> (u64);
+    binding(155) = binding(154) & u64(1) : (u64, u64) -> (u64);
+    binding(156) = cast<u32>(binding(155)) : (u64) -> (u32);
+    binding(157) = binding(156) << u32(6) : (u32, u32) -> (u32);
+    local(126).v7 = local(126).v6 | binding(157) : (u32, u32) -> (u32);
+    binding(158) = input(1)[u32(2)] : (u32, u32, u32, u32) -> (u32);
+    binding(159) = cast<u64>(binding(158)) : (u32) -> (u64);
+    binding(160) = local(34).v10 >> binding(159) : (u64, u64) -> (u64);
+    binding(161) = binding(160) & u64(1) : (u64, u64) -> (u64);
+    binding(162) = cast<u32>(binding(161)) : (u64) -> (u32);
+    binding(163) = binding(162) << u32(5) : (u32, u32) -> (u32);
+    local(126).v8 = local(126).v7 | binding(163) : (u32, u32) -> (u32);
+    binding(164) = input(1)[u32(3)] : (u32, u32, u32, u32) -> (u32);
+    binding(165) = cast<u64>(binding(164)) : (u32) -> (u64);
+    binding(166) = local(34).v10 >> binding(165) : (u64, u64) -> (u64);
+    binding(167) = binding(166) & u64(1) : (u64, u64) -> (u64);
+    binding(168) = cast<u32>(binding(167)) : (u64) -> (u32);
+    binding(169) = binding(168) << u32(4) : (u32, u32) -> (u32);
+    local(126).v9 = local(126).v8 | binding(169) : (u32, u32) -> (u32);
+    binding(170) = input(1)[u32(4)] : (u32, u32, u32, u32) -> (u32);
+    binding(171) = cast<u64>(binding(170)) : (u32) -> (u64);
+    binding(172) = local(34).v10 >> binding(171) : (u64, u64) -> (u64);
+    binding(173) = binding(172) & u64(1) : (u64, u64) -> (u64);
+    binding(174) = cast<u32>(binding(173)) : (u64) -> (u32);
+    binding(175) = binding(174) << u32(3) : (u32, u32) -> (u32);
+    local(126).v10 = local(126).v9 | binding(175) : (u32, u32) -> (u32);
+    binding(176) = input(1)[u32(5)] : (u32, u32, u32, u32) -> (u32);
+    binding(177) = cast<u64>(binding(176)) : (u32) -> (u64);
+    binding(178) = local(34).v10 >> binding(177) : (u64, u64) -> (u64);
+    binding(179) = binding(178) & u64(1) : (u64, u64) -> (u64);
+    binding(180) = cast<u32>(binding(179)) : (u64) -> (u32);
+    binding(181) = binding(180) << u32(2) : (u32, u32) -> (u32);
+    local(126).v11 = local(126).v10 | binding(181) : (u32, u32) -> (u32);
+    binding(182) = input(1)[u32(6)] : (u32, u32, u32, u32) -> (u32);
+    binding(183) = cast<u64>(binding(182)) : (u32) -> (u64);
+    binding(184) = local(34).v10 >> binding(183) : (u64, u64) -> (u64);
+    binding(185) = binding(184) & u64(1) : (u64, u64) -> (u64);
+    binding(186) = cast<u32>(binding(185)) : (u64) -> (u32);
+    binding(187) = binding(186) << u32(1) : (u32, u32) -> (u32);
+    local(126).v12 = local(126).v11 | binding(187) : (u32, u32) -> (u32);
+    binding(188) = input(1)[u32(7)] : (u32, u32, u32, u32) -> (u32);
+    binding(189) = cast<u64>(binding(188)) : (u32) -> (u64);
+    binding(190) = local(34).v10 >> binding(189) : (u64, u64) -> (u64);
+    binding(191) = binding(190) & u64(1) : (u64, u64) -> (u64);
+    binding(192) = cast<u32>(binding(191)) : (u64) -> (u32);
+    binding(193) = binding(192) << u32(0) : (u32, u32) -> (u32);
+    local(126).v13 = local(126).v12 | binding(193) : (u32, u32) -> (u32);
+    binding(194) = binding(145) << u32(8) : (u32, u32) -> (u32);
+    binding(195) = u32(255) - local(126).v13 : (u32, u32) -> (u32);
+    binding(196) = binding(194) + binding(195) : (u32, u32) -> (u32);
+    binding(198) = !binding(122) : (bool) -> (bool);
+    local(197).v2 = binding(198) ? u64(0) : local(34).v10 : (bool, u64, u64) -> (u64);
+    branch bb7;
+}
+
+uniform bb7 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    local(15).v2 = phi [bb22: u32(0)][bb6: binding(196)];
+
+    local(13).v2 = phi [bb22: u64(0)][bb6: local(197).v2];
+
+    local(16).v2 = phi [bb22: u32(0)][bb6: binding(18)];
+
+    local(14).v2 = phi [bb22: u32(0)][bb6: binding(139)];
+
+
+    binding(199) = local(13).v2 != u64(0) : (u64, u64) -> (bool);
+    binding(200) = scalar<u32>(4) & u32(8192) : (u32, u32) -> (u32); @ uniform
+    binding(201) = binding(200) != u32(0) : (u32, u32) -> (bool); @ uniform
+    binding(202) = local(16).v2 % u32(997) : (u32, u32) -> (u32);
+    binding(203) = binding(202) == u32(0) : (u32, u32) -> (bool);
+    binding(204) = binding(201) && binding(203) : (bool, bool) -> (bool);
+    binding(205) = !binding(204) : (bool) -> (bool);
+    binding(206) = binding(199) && binding(205) : (bool, bool) -> (bool);
+    binding(208) = plane_ballot(binding(199)) : (bool) -> (vector<u32, 4>); @ uniform
+    binding(209) = binding(208)[u32(0)] : (vector<u32, 4>, u32, u32, u32) -> (u32); @ uniform
+    binding(210) = binding(209).count_bits() : (u32) -> (u32); @ uniform
+    binding(211) = binding(208)[u32(1)] : (vector<u32, 4>, u32, u32, u32) -> (u32); @ uniform
+    binding(212) = binding(211).count_bits() : (u32) -> (u32); @ uniform
+    local(126).v2 = binding(210) + binding(212) : (u32, u32) -> (u32); @ uniform
+    binding(213) = plane_ballot(binding(206)) : (bool) -> (vector<u32, 4>); @ uniform
+    binding(214) = UnitPosPlane >= u32(32) : (u32, u32) -> (bool);
+    binding(215) = UnitPosPlane.min(u32(31)) : (u32, u32) -> (u32);
+    binding(216) = u32(1) << binding(215) : (u32, u32) -> (u32);
+    binding(217) = binding(216) - u32(1) : (u32, u32) -> (u32);
+    binding(218) = binding(214) ? u32(4294967295) : binding(217) : (bool, u32, u32) -> (u32);
+    binding(219) = binding(213)[u32(0)] : (vector<u32, 4>, u32, u32, u32) -> (u32); @ uniform
+    binding(220) = binding(219) & binding(218) : (u32, u32) -> (u32);
+    binding(221) = binding(220).count_bits() : (u32) -> (u32);
+    binding(223) = binding(219).count_bits() : (u32) -> (u32); @ uniform
+    binding(226) = UnitPosPlane & u32(31) : (u32, u32) -> (u32);
+    binding(227) = u32(1) << binding(226) : (u32, u32) -> (u32);
+    binding(228) = binding(227) - u32(1) : (u32, u32) -> (u32);
+    binding(229) = binding(214) ? binding(228) : u32(0) : (bool, u32, u32) -> (u32);
+    binding(230) = binding(213)[u32(1)] : (vector<u32, 4>, u32, u32, u32) -> (u32); @ uniform
+    binding(231) = binding(230) & binding(229) : (u32, u32) -> (u32);
+    binding(232) = binding(231).count_bits() : (u32) -> (u32);
+    local(35).v2 = binding(221) + binding(232) : (u32, u32) -> (u32);
+    binding(234) = binding(230).count_bits() : (u32) -> (u32); @ uniform
+    local(224).v2 = binding(223) + binding(234) : (u32, u32) -> (u32); @ uniform
+    binding(236) = UnitPosPlane == u32(0) : (u32, u32) -> (bool);
+    binding(237) = local(224).v2 > u32(0) : (u32, u32) -> (bool); @ uniform
+    binding(238) = binding(236) && binding(237) : (bool, bool) -> (bool);
+    binding(238) ? bb10 : bb24; merge: bb11
+}
+
+bb10 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(239) = output(5)[u32(0)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(240) = atomic_add(binding(239), local(224).v2) : (atomic<u32>, u32) -> (u32);
+    branch bb11;
+}
+
+uniform bb11 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    local(235).v2 = phi [bb24: u32(0)][bb10: binding(240)];
+
+
+    binding(241) = plane_sum(local(235).v2) : (u32) -> (u32); @ uniform
+    binding(206) ? bb12 : bb25; merge: bb25
+}
+
+bb12 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(242) = binding(241) + local(35).v2 : (u32, u32) -> (u32);
+    binding(243) = binding(242) < scalar<u32>(3) : (u32, u32) -> (bool);
+    binding(243) ? bb14 : bb26; merge: bb26
+}
+
+bb14 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(247) = local(13).v2 & u64(4294967295) : (u64, u64) -> (u64);
+    binding(248) = cast<u32>(binding(247)) : (u64) -> (u32);
+    binding(249) = local(13).v2 >> u64(32) : (u64, u64) -> (u64);
+    binding(250) = cast<u32>(binding(249)) : (u64) -> (u32);
+    local(246).v2 = vec(binding(248), binding(250), local(14).v2, local(16).v2) : (u32, u32, u32, u32) -> (vector<u32, 4>);
+    output(3)[binding(242)] = local(246).v2  : (u32, vector<u32, 4>) -> (vector<u32, 4>); @ uniform
+    output(4)[binding(242)] = local(15).v2  : (u32, u32) -> (u32); @ uniform
+    branch bb26;
+}
+
+bb16 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(256) = shared_array(0)[u32(0)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(257) = atomic_add(binding(256), local(126).v2) : (atomic<u32>, u32) -> (u32);
+    branch bb27;
+}
+
+bb18 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(259) = shared_array(0)[u32(0)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(260) = atomic_load(binding(259)) : (atomic<u32>) -> (u32);
+    binding(261) = output(6)[u32(7)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(262) = atomic_add(binding(261), binding(260)) : (atomic<u32>, u32) -> (u32);
+    binding(263) = output(6)[u32(6)] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(264) = atomic_add(binding(263), u32(1)) : (atomic<u32>, u32) -> (u32);
+    branch bb28;
+}
+
+uniform bb20 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: []
+
+    binding(3) = PlaneDim != u32(64) : (u32, u32) -> (bool); @ uniform
+    binding(4) = UnitPosX & u32(63) : (u32, u32) -> (u32);
+    binding(5) = binding(4) != UnitPosPlane : (u32, u32) -> (bool);
+    binding(6) = binding(3) || binding(5) : (bool, bool) -> (bool);
+    binding(6) ? bb4 : bb21; merge: bb21
+}
+
+uniform bb21 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    sync_cube();
+    binding(9) = cast<u64>(scalar<u32>(1)) : (u32) -> (u64); @ uniform
+    binding(10) = cast<u64>(scalar<u32>(2)) : (u32) -> (u64); @ uniform
+    binding(11) = binding(10) << u64(32) : (u64, u64) -> (u64); @ uniform
+    binding(12) = binding(9) | binding(11) : (u64, u64) -> (u64); @ uniform
+    binding(17) = AbsolutePosX < scalar<u32>(0) : (u32, u32) -> (bool);
+    binding(17) ? bb6 : bb22; merge: bb7
+}
+
+bb22 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb7;
+}
+
+bb24 {
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    branch bb11;
+}
+
+uniform bb25 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(254) = local(126).v2 > u32(0) : (u32, u32) -> (bool); @ uniform
+    binding(255) = binding(236) && binding(254) : (bool, bool) -> (bool);
+    binding(255) ? bb16 : bb27; merge: bb27
+}
+
+bb26 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    binding(251) = output(2)[local(15).v2] : (atomic<u32>, u32, u32, u32) -> (atomic<u32>);
+    binding(252) = atomic_add(binding(251), u32(1)) : (atomic<u32>, u32) -> (u32);
+    branch bb25;
+}
+
+uniform bb27 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    sync_cube();
+    binding(1) ? bb18 : bb28; merge: bb28
+}
+
+uniform bb28 {
+    Uses: [Merge]
+    Live variables: []
+
+    Live shared memories: [shared(0)]
+
+    return;
+}
+

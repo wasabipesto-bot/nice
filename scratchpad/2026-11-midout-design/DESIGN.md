@@ -656,16 +656,18 @@ and it) in the same session.
 | RTX 3060, b65 | CUDA 6.30, 6.44 fs; Vulkan (SPIR-V) 6.32, 6.36 (trunk `66259bb0`: 6.98, 7.12 and 7.33, 7.25) | none | | 2026-11-26 05:49–08:00; head `f61cf79e`; field 77777 after a warm-up; sampled check off; quiet host | counts equal in every run and to the RX 9070 XT's of 2026-11-25 | `…/B65/runs/`, `B65/RESULTS.md` |
 | RTX 3060, b65, reads batched | Vulkan (SPIR-V) quiet 6.191, 6.172 fs (6.381 before); six busy host threads **6.35** (14.25 before) | none | | 2026-11-26 08:03–09:19; `0b6e22e1` against `4fff25e7` | counts equal; wide tests and fault messages identical through CUDA, WGSL, SPIR-V | `…/B65/runs/reads-*`, `B65/READS-RESULTS.md` |
 
-**What the numbers mean for the choice of base** [judged from measured rates and the uniform odds model; table
-in `~/projects/nice/scratchpad/2026-10-research-program/YIELD/yield.txt`, 2026-11-26]. Base 65 has about the same
-admissible work as base 64 (4.34e21 against 4.80e21 n: only one residue class in 64 can hold a nice number) and
-2.7 times its expected count of nice numbers (3.3e-4 against 1.2e-4), so three times the yield per admissible
-n. It runs on the wide path at about three times the time per admissible n on the RX 9070 XT (twice on an RTX
-3080), so today the two bases tie in yield per day there, and **base 65 is about 73 % of both the probability
-still within reach and the remaining machine time** (about 150 days of the RX 9070 XT against 56). Base 68 is
-12 times worse than base 64 and nothing after it is within reach. Consequences: the wide path is where a gain
-is worth most; on CUDA cards base 65 is already the better buy (×1.5 per card-day), so a fleet of NVIDIA cards
-would best take base 65 while the RX 9070 XT takes either.
+**What the numbers mean for the choice of base** [judged from measured rates and the project's published odds
+model; table in `~/projects/nice/scratchpad/2026-10-research-program/YIELD/yield2.txt`, corrected 2026-11-28: an
+earlier version of this paragraph left out the model's residue factor and had the two bases the wrong way
+round]. Base 65 has about the same admissible work as base 64 (4.34e21 against 4.80e21 n) but only one residue
+class where base 64 has eight, so 0.37 times its expected count of nice numbers (λ 3.2e-4 against 8.5e-4). It
+runs on the wide path at about three times the time per admissible n on the RX 9070 XT (twice on an RTX 3060
+or 3080). So **base 64 holds 73 % of the odds still within reach in 27 % of the machine time** (about 56 days
+of the RX 9070 XT), **and base 65 the other 27 % in 73 % of the time** (about 150 days); per card-day base 64
+yields 7.3 times what base 65 does on the RX 9070 XT and 4.5 times on an RTX 3060. Base 68 costs 19 times more
+per unit of odds than base 65 and nothing after it is within reach. Consequences: base 64 runs first on every
+card; a percent gained on base 64's path buys the most odds per day, and a percent gained on the wide path
+shortens the whole run the most.
 
 How the baselines were measured: on the 3080, production's client against a local stub, the same ten 1e17 fields
 three times in one day (6.615 fs each time, to 0.1 s). On the RX 9070 XT, production's join throughput harness:
