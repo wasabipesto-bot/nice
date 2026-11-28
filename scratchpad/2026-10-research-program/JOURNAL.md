@@ -83,6 +83,10 @@ numbers go in EXPERIMENTS.md and the status in LEDGER.md.
     still fit). Then the constant on the dev branch: **128 unless the 3 GB card or base 65 says otherwise**
     (the per-unit counters of a group are u32: the largest count observed wraps after about 900 slices, so 128
     leaves ×7 and 256 ×3.5; I take the margin over the last 0.3–0.5 % under load).
+- **11:24 UTC, B65.9 done: V5 is exact at 32 lanes and 4–14 % slower on the RTX 3060** (Vulkan base 64 +14.3 %,
+  base 65 +4.0 %; CUDA +11.0 %, +9.3 %; counts equal in 16 runs; all device tests pass on both runtimes).
+  By the rule: not a common path; as a 64-lane-only variant its own model (about 3 % of a base-64 field) is
+  under the ×1.05 bar. **Parked** on `exp/mo-wide-aco`; third and optional in the demoux ask.
 
 ## 2026-11-27 (cycle 18 of the new director; routine fired 05:41 UTC)
 

@@ -1,4 +1,4 @@
-# Open decisions for the maintainer (kept current; last updated 2026-11-28 10:15 UTC)
+# Open decisions for the maintainer (kept current; last updated 2026-11-28 11:30 UTC)
 
 Only what is still open is here. What you have already decided, with your words and what I did about each, is
 in `DECIDED.md` beside this file. To answer, write a note under an entry as you did on 2026-11-25 (a line
@@ -109,10 +109,11 @@ Paths are relative to `~/projects/nice/scratchpad/2026-10-research-program/`.
      benchmark, no new code). On eventeo today a busy host cost base 64 4.6 % at 16 slices per group and 0.4 %
      at 256 (`EXPERIMENTS.md` B65.8): the card idles once per group while the host reads results. Your card's
      slices are three times shorter, so the same pause is three times the share: very likely the 6–10 %.
-  2. **A new memory layout for the main kernel** (`B65/ACO-RESULTS.md`): offline it removes 17 % (base 64) and
-     21 % (base 65) of the inner loop's modelled cycles for your card's compiler. A model only; part of it
-     runs only on 64-lane hardware, which among the machines I can reach is your card alone.
-  3. Base 65 at the current head, to confirm on the card that the read fix of 2026-11-26 holds it near 3 fs.
+  2. Base 65 at the current head, to confirm on the card that the read fix of 2026-11-26 holds it near 3 fs.
+  3. If minutes remain: **a new memory layout for the main kernel** at 64 lanes (`B65/ACO-RESULTS.md`).
+     Offline it removes 17 % (base 64) and 21 % (base 65) of the inner loop's modelled cycles for your card's
+     compiler; on the RTX 3060 it is exact and 4–14 % slower (`EXPERIMENTS.md` B65.9), so it could only ever
+     be a variant for your card, and I expect at most 3–5 % of a field. Low priority.
 - **If you do not answer:** I develop on eventeo, do not use demoux, and report numbers from the RTX 3060 only.
 
 ## What happens next if you say nothing

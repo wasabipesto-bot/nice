@@ -5,6 +5,30 @@ and GPU, or host), commit(s) under test, exact commands, raw data path, the tabl
 and the one-line conclusion. Benchmark claims follow PROPOSAL.md §5: same box,
 interleaved A/B, ≥3 rounds, median and spread per scenario, no scenario −2 %.
 
+## B65.9 The ACO study's layout (V5) on the RTX 3060: exact at 32 lanes, and 4–14 % slower there; parked (2026-11-28 10:05–11:24 UTC, the director; eventeo; `B65/scripts/v5/`, `B65/runs/v5-ab/`, `B65/runs/v5-tests/`; `exp/mo-wide-aco` `a4fb3543` against its base `f503a13c`)
+
+Two alternating rounds, the timed field t 77777 after a warm-up field, fs per admissible n; counts equal in all
+16 runs (base 64: 48,216,914,309 survivors / 1,384,731,444 checked; base 65: 69,601,522,205 / 2,222,575,676).
+
+| RTX 3060 | base `f503a13c` | V5 `a4fb3543` | change |
+|---|---|---|---|
+| Vulkan/SPIR-V, base 64 narrow | 3.2224, 3.2803 | 3.7439, 3.6908 | **+14.3 %** |
+| Vulkan/SPIR-V, base 65 wide | 5.8243, 5.8231 | 6.0607, 6.0533 | +4.0 % |
+| CUDA, base 64 narrow | 3.3405, 3.3444 | 3.6834, 3.7339 | **+11.0 %** |
+| CUDA, base 65 wide | 6.1183, 6.1165 | 6.7109, 6.6575 | +9.3 % |
+
+- **Exact at 32 lanes:** every device test passes through CUDA and through Vulkan (card tier 8 of 8, wide and
+  narrow slices against the CPU with and without sharing, both fault tests, both sharing tests, the forced
+  64-lane compile). The 64-lane transpose with its rotated stores has still run nowhere.
+- **By the rule written beforehand:** slower by more than 2 % at base 64 on this card, so it cannot be the
+  common path. As a 64-lane-only variant its bar on the RX 9070 XT is ×1.05 of a base-64 field, and its own
+  model promises about 3 % of a base-64 field and 5 % of a base-65 field there (−6 % and −10 % of one phase).
+  **Parked** on the scratch branch. Not asked for demoux time on its own; if a window has minutes to spare,
+  one timed pair at 64 lanes settles it.
+- **What the card says about the model:** on NVIDIA the cost is not where ACO's count puts it for RDNA4 (the
+  card draws 10–18 W less under V5: the lanes wait more). The model was built for another card and I do not
+  read this as evidence about the RX 9070 XT either way.
+
 ## B65.8 The loss under a busy host is the pause between groups of slices: group 256 removes it at base 64 (4.6 % → 0.1–0.4 %), group 64 removes about two thirds at both bases; no code (2026-11-28 09:34–10:05 UTC, the director's script run by the hooks engineer; eventeo's RTX 3060 through Vulkan/SPIR-V; `B65/AHEAD-DESIGN.md`, `B65/scripts/runs_group.sh`, `B65/runs/group/`; build `hk1-bench-spv` = `6abf5743`)
 
 Each cell: a warm-up field then the timed field (base 64: t 77777 on the narrow path, `--threads 5 --no-cpu-check`;

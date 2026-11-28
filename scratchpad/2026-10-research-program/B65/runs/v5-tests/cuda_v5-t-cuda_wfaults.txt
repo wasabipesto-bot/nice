@@ -1,0 +1,21 @@
+
+running 1 test
+test midout::gpu_wide::tests::wide_faults_are_loud ... base 65 W 32 classes 64 slices [717171717, 0]
+fault 0: accounts pass: WCounts { children: 78410870, chunks: 1229231, flat: 490434952, kept: 246922718, survivors: 26951472, checked: 864008, slices: 2, tops: 3288048 }
+F_SKIP_MAIN (2): accounts LOUD: middle-out wide: 0 of 16640 job instances ran
+F_SKIP_TOPS (4096): accounts LOUD: middle-out wide: slice 717171717: wtops1 valid parents examined: 0, want 2838017 (account [0, 0, 1, 0, 0, 42549, 1268336, 1, 1268336, 42191028, 16384, 8320, 0, 42191028, 1, 0])
+F_DROP_PROBE (8): accounts LOUD: middle-out wide: slice 717171717: probes run = nroot x tops: 1697785, want 1701945 (account [2838017, 1701945, 1, 1701945, 1701945, 42549, 1268336, 1, 1268336, 42191028, 16384, 8320, 1697785, 42191028, 1, 0])
+F_DROP_PARENT (8192): accounts LOUD: middle-out wide: slice 717171717: parents certified (whist) = listed: 1268336, want 1267042 (account [2838017, 1701945, 1, 1701945, 1701945, 42549, 1268336, 1, 1267042, 42148280, 16384, 8320, 1701945, 42148280, 1, 0])
+F_T5_SPLIT (262144): accounts LOUD: middle-out wide: slice 717171717: wtops5 valid parents listed = counted by its lanes: 88391, want 2838017 (account [88391, 53079, 1, 53079, 53079, 42549, 1268336, 1, 1268336, 42191028, 16384, 8320, 53079, 42191028, 1, 0])
+F_EXP_SPLIT (524288): accounts LOUD: middle-out wide: expansion appended 454023 survivors, its lanes counted 527041
+F_SLAB_SPLIT (1048576): accounts LOUD: middle-out wide: 861969 survivor bits read by the expansion, the kernel counted 26951472
+F_BAD_PARENT (16384): accounts pass: survivors 26923820 vs 26951472
+F_PF_DROP (1024): accounts pass: survivors 26951472 vs 26951472
+CPU reference of slice 717171717: survivors 16482926 (waited 21.7 s)
+sampled check, no fault: slice 717171717 equal (survivors 16482926)
+F_BAD_PARENT: sampled check LOUD: middle-out wide: sampled CPU check of slice 717171717 differs: device survivors 16466135 checked 526511 list 526511, CPU survivors 16482926 checked 527041
+F_PF_DROP: sampled check LOUD: middle-out wide: sampled CPU check of slice 717171717 differs: device survivors 16482926 checked 526521 list 526521, CPU survivors 16482926 checked 527041
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 374 filtered out; finished in 32.65s
+
