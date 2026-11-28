@@ -816,20 +816,36 @@ mod wk {
                     }
                     let mut alo = Array::<u32>::new(4usize);
                     let mut ahi = Array::<u32>::new(4usize);
-                    #[unroll]
-                    for h in 0..4u32 {
-                        alo[h as usize] = 0u32;
-                        ahi[h as usize] = 0u32;
-                    }
+                    let mut rows = Array::<u32>::new(comptime!(maxpop as usize));
+                    // chunk 0 always reads, so that the rows are formed once outside the branches below
+                    let mut xl = 0u32;
+                    let mut xh = 0u32;
                     #[unroll]
                     for k in 0..maxpop {
                         let row = probe_digit(dws, de, k, maxpop) * 32u32;
-                        #[unroll]
-                        for h in 0..4u32 {
-                            let rh = row + dq[h as usize];
-                            alo[h as usize] = alo[h as usize] | sl[rh as usize];
-                            ahi[h as usize] = ahi[h as usize] | sl[(rh + 1u32) as usize];
+                        rows[k as usize] = row;
+                        let rh = row + dq[0usize];
+                        xl |= sl[rh as usize];
+                        xh |= sl[(rh + 1u32) as usize];
+                    }
+                    alo[0usize] = xl;
+                    ahi[0usize] = xh;
+                    // chunks 1-3: a chunk the entry does not keep (or past nch) gives a zero word whatever its rows
+                    // hold, so its reads are skipped (lanes masked off; the whole branch when no lane keeps it)
+                    #[unroll]
+                    for h in 1..4u32 {
+                        let mut yl = 0u32;
+                        let mut yh = 0u32;
+                        if ((ent >> (16u32 + (i16 ^ comptime!(4 * h)))) & 1u32) != 0u32 && vlo[h as usize] != 0u32 {
+                            #[unroll]
+                            for k in 0..maxpop {
+                                let rh = rows[k as usize] + dq[h as usize];
+                                yl |= sl[rh as usize];
+                                yh |= sl[(rh + 1u32) as usize];
+                            }
                         }
+                        alo[h as usize] = yl;
+                        ahi[h as usize] = yh;
                     }
                     let mut nsl = Array::<u32>::new(4usize);
                     let mut rk = Array::<u32>::new(4usize);
