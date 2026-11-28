@@ -556,7 +556,18 @@ mod wk {
                     }
                     sync_cube();
                 }
-                // phase 2: plane task i covers chunk q, segment s (members s*W .. s*W+W-1)
+                // phase 2: plane task i covers chunk q, segment s (members s*W .. s*W+W-1). At W 64 a task's
+                // slice words are kept and stored after the four tasks (chunks pl + 4i), each lane taking them in
+                // a rotated order, so that a store's lanes write four chunks, not one: in the digit-major layout a
+                // chunk is a bank pair
+                let mut kl = Array::<u32>::new(4usize);
+                let mut kh = Array::<u32>::new(4usize);
+                #[unroll]
+                for i in 0..4u32 {
+                    kl[i as usize] = 0u32;
+                    kh[i as usize] = 0u32;
+                }
+                #[unroll]
                 for i in 0..4u32 {
                     let task = pl + npl * i;
                     let q = task / segs;
@@ -653,8 +664,8 @@ mod wk {
                                 hv = xl;
                             }
                             if comptime!(w == 64) {
-                                sl[row as usize] = xl;
-                                sl[(row + 1u32) as usize] = xh;
+                                kl[i as usize] = xl;
+                                kh[i as usize] = xh;
                             } else if comptime!(w == 32) {
                                 sl[(row + sg) as usize] = hv;
                             } else {
@@ -691,6 +702,20 @@ mod wk {
                                     commh[q as usize].fetch_and(comptime!(!(1u32 << xv)));
                                 }
                             }
+                        }
+                    }
+                }
+                if comptime!(w == 64) {
+                    #[unroll]
+                    for j in 0..4u32 {
+                        let ii = (lane + j) & 3u32;
+                        let xl = select(ii == 0u32, kl[0usize], select(ii == 1u32, kl[1usize], select(ii == 2u32, kl[2usize], kl[3usize])));
+                        let xh = select(ii == 0u32, kh[0usize], select(ii == 1u32, kh[1usize], select(ii == 2u32, kh[2usize], kh[3usize])));
+                        let qq = pl + npl * ii;
+                        if qq < nch {
+                            let row = (lane * 16u32 + qq) * 2u32;
+                            sl[row as usize] = xl;
+                            sl[(row + 1u32) as usize] = xh;
                         }
                     }
                 }
@@ -770,12 +795,11 @@ mod wk {
                         select(nq > 32u32, (1u32 << (nq % 32u32)) - 1u32, 0u32),
                     );
                 }
-                let q2 = i16 * 2u32;
-                // c_k's word offset from c_0's within a digit row (wrapping: c_k may be below c_0)
+                // c_k's word offset within a digit row
                 let mut dq = Array::<u32>::new(4usize);
                 #[unroll]
                 for h in 0..4u32 {
-                    dq[h as usize] = (i16 ^ comptime!(4 * h)) * 2u32 - q2;
+                    dq[h as usize] = (i16 ^ comptime!(4 * h)) * 2u32;
                 }
                 let mut e0 = 0u32;
                 while e0 < nlist {
@@ -799,7 +823,7 @@ mod wk {
                     }
                     #[unroll]
                     for k in 0..maxpop {
-                        let row = probe_digit(dws, de, k, maxpop) * 32u32 + q2;
+                        let row = probe_digit(dws, de, k, maxpop) * 32u32;
                         #[unroll]
                         for h in 0..4u32 {
                             let rh = row + dq[h as usize];
